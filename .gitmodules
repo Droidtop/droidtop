@@ -1,0 +1,27 @@
+[submodule "vendor/gamenative"]
+	path = vendor/gamenative
+	url = https://github.com/utkarshdalal/GameNative.git
+[submodule "vendor/droidspaces"]
+	path = vendor/droidspaces
+	url = https://github.com/ravindu644/Droidspaces-OSS.git
+[submodule "vendor/wlroots"]
+	path = vendor/wlroots
+	url = https://gitlab.freedesktop.org/wlroots/wlroots.git
+[submodule "vendor/winlator-upstream"]
+	path = vendor/winlator-upstream
+	url = https://github.com/brunodev85/winlator.git
+[submodule "vendor/sway"]
+	path = vendor/sway
+	url = https://github.com/swaywm/sway.git
+[submodule "vendor/go-containerregistry"]
+	path = vendor/go-containerregistry
+	url = https://github.com/google/go-containerregistry.git
+[submodule "vendor/wayland-protocols"]
+	path = vendor/wayland-protocols
+	url = https://gitlab.freedesktop.org/wayland/wayland-protocols.git
+[submodule "vendor/wayland"]
+	path = vendor/wayland
+	url = https://gitlab.freedesktop.org/wayland/wayland.git
+[submodule "vendor/moonlight-common-c"]
+	path = vendor/moonlight-common-c
+	url = https://github.com/moonlight-stream/moonlight-common-c.git
