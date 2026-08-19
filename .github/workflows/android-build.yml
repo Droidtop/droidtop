@@ -1,0 +1,100 @@
+name: Android build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  NDK_VERSION: "27.0.12077973"
+  ANDROID_SDK_ROOT: ${{ github.workspace }}/.android-sdk
+  # Not /opt/android-deps (this repo's local-dev default, see
+  # build-scripts/build-vendor-deps.sh) — that needs root on a fresh
+  # runner. $HOME needs no sudo and is just as reproducible.
+  ANDROID_DEPS_PREFIX: ${{ github.workspace }}/.android-deps
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          # Vendored upstream sources (GameNative, DroidSpaces, sway,
+          # wlroots, moonlight-common-c, mbedtls, libffi, ...) are large;
+          # we only ever need their current tip, not history.
+          fetch-depth: 1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            build-essential cmake ninja-build meson pkg-config git python3 \
+            autoconf automake libtool texinfo \
+            libexpat1-dev libffi-dev libxml2-utils \
+            wayland-protocols libwayland-bin \
+            unzip curl
+
+      - name: Cache Android SDK/NDK
+        id: sdk-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.ANDROID_SDK_ROOT }}
+          key: android-sdk-ndk${{ env.NDK_VERSION }}-v1
+
+      - name: Install Android SDK + NDK
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
+          curl -sL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o /tmp/cmdline-tools.zip
+          unzip -q /tmp/cmdline-tools.zip -d "$ANDROID_SDK_ROOT/cmdline-tools"
+          mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+          rm /tmp/cmdline-tools.zip
+
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" --licenses > /dev/null
+          "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" \
+            "platform-tools" "platforms;android-34" "build-tools;34.0.0" "ndk;${NDK_VERSION}"
+
+      - name: Cache cross-compiled vendor deps (libffi, libwayland-client)
+        id: deps-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.ANDROID_DEPS_PREFIX }}
+          # Keyed on the two vendored submodules' pinned commits, not just a
+          # static string — a submodule bump should invalidate this.
+          key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD') }}-v1
+
+      - name: Build cross-compiled vendor deps (libffi, libwayland-client)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: build-scripts/build-vendor-deps.sh
+
+      - name: Re-copy jniLibs from cache
+        if: steps.deps-cache.outputs.cache-hit == 'true'
+        # jniLibs/*.so is gitignored (regenerable build output, see
+        # .gitignore) AND lives outside ANDROID_DEPS_PREFIX, so a cache hit
+        # on the deps still needs this one file copied back into place —
+        # cheap, no need to rerun the whole cross-compile for it.
+        run: |
+          mkdir -p host-bridge/src/main/jniLibs/arm64-v8a
+          cp "$ANDROID_DEPS_PREFIX/arm64-v8a/lib/libwayland-client.so" host-bridge/src/main/jniLibs/arm64-v8a/
+
+      - name: Build debug APK
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/${{ env.NDK_VERSION }}
+        run: ./gradlew :app:assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: droidtop-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
