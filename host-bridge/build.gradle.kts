@@ -21,6 +21,17 @@ android {
         externalNativeBuild {
             cmake {
                 cppFlags += "-std=c++20"
+                // CMake never reads shell env vars on its own — ANDROID_DEPS_PREFIX
+                // has to be handed across explicitly as a -D argument, or the
+                // CMakeLists.txt's own hardcoded default (/opt/android-deps) wins
+                // silently. That default happens to match this repo's local-dev
+                // convention, which is exactly why this gap wasn't caught until
+                // CI (which installs deps to $GITHUB_WORKSPACE/.android-deps
+                // instead) failed on "wayland-client.h file not found" despite
+                // the cross-compile step having already succeeded.
+                System.getenv("ANDROID_DEPS_PREFIX")?.let { prefix ->
+                    arguments += "-DANDROID_DEPS_PREFIX=$prefix"
+                }
             }
         }
     }
