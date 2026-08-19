@@ -58,7 +58,15 @@ echo "=== libffi ($ABI) ==="
         # own AC_CONFIG_MACRO_DIRS([m4]) under current autoconf/libtool —
         # strip it. Known upstream autotools-version friction, not a bug here.
         sed -i '/^ACLOCAL_AMFLAGS = -I m4$/d' Makefile.am
-        ./autogen.sh
+        # `-I m4` passed explicitly, not left to AC_CONFIG_MACRO_DIRS([m4])
+        # auto-detection: that worked in one environment (WSL2/Ubuntu 24.04)
+        # but not another (GitHub Actions' ubuntu-24.04 runner) -- aclocal
+        # didn't pick up the just-libtoolize'd m4/*.m4 files there, and
+        # autoconf failed on "possibly undefined macro: LT_SYS_SYMBOL_USCORE"
+        # (a real libtool macro, just not found). Being explicit sidesteps
+        # whatever aclocal-version behavior difference caused that, instead
+        # of chasing it further.
+        autoreconf -v -i -I m4
     fi
     BUILD_DIR="$WORK/libffi"
     mkdir -p "$BUILD_DIR"
