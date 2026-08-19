@@ -9,6 +9,16 @@ on:
 env:
   NDK_VERSION: "27.0.12077973"
   ANDROID_SDK_ROOT: ${{ github.workspace }}/.android-sdk
+  # GitHub's ubuntu-24.04 runner image preinstalls its own SDK and sets
+  # ANDROID_HOME to it (/usr/local/lib/android/sdk). AGP refuses to
+  # configure at all if ANDROID_HOME and ANDROID_SDK_ROOT disagree
+  # ("Several environment variables and/or system properties contain
+  # different paths to the SDK") — confirmed from the actual failing CI
+  # log, not a hypothetical. Pointing ANDROID_HOME at the same path we
+  # install our own pinned SDK/NDK to (rather than trying to reuse the
+  # runner's preinstalled one, which isn't guaranteed to have NDK
+  # 27.0.12077973) resolves the conflict by making both variables agree.
+  ANDROID_HOME: ${{ github.workspace }}/.android-sdk
   # Not /opt/android-deps (this repo's local-dev default, see
   # build-scripts/build-vendor-deps.sh) — that needs root on a fresh
   # runner. $HOME needs no sudo and is just as reproducible.
