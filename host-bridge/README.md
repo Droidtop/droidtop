@@ -11,11 +11,10 @@ module is a Wayland **client** of that compositor, plus a JNI bridge, doing
 exactly two things:
 
 1. **Frame passthrough** — capture buffers from the primary container's
-   headless output(s) via `wlr-screencopy-unstable-v1` and present them on
-   Android `Surface`s, one per `DisplayOutput` (built-in screen, second
-   screen, external lapdock monitor). Ideally via shared DMA-BUF/
-   `AHardwareBuffer` rather than a CPU copy — the container already has GPU
-   access through VirGL/Turnip.
+   headless output via `wlr-screencopy-unstable-v1` and present them on an
+   Android `Surface`. Currently single-output only (always the primary
+   screen) — matches the merged-desktop MVP; see "Not yet implemented" below
+   for what real multi-output support needs.
 2. **Input injection** — turn normalized events from `:input-seat` into
    `wlr-virtual-pointer-v1` / `virtual-keyboard-v1` protocol messages sent
    into the container.
@@ -27,70 +26,74 @@ Android `Surface` when it happens.
 
 ## Status
 
-**Builds and links successfully**, verified against a real Android NDK build
-(WSL2, NDK 27.0.12077973). `libhostbridge.so` compiles, links against a
-cross-compiled `libwayland-client.so` (`build-scripts/build-vendor-deps.sh`
-— builds `libffi` via autotools, then `libwayland-client` via Meson using a
-two-step native-scanner-then-cross-library approach, see that script's
-comments for why), and exports the correct JNI symbols
-(`Java_dev_droidtop_hostbridge_HostBridge_nativeConnect`/`nativeDisconnect`).
-Confirmed via `readelf -d`: `NEEDED libwayland-client.so` is present, so the
-dynamic link is real, not just a compile-time header match.
+**Builds and links successfully; frame capture and input injection are
+implemented, not just scaffolded.** Verified against a real Android NDK
+build (WSL2, NDK 27.0.12077973) — `libhostbridge.so` compiles, links against
+a cross-compiled `libwayland-client.so` (confirmed via `readelf -d`: `NEEDED
+libwayland-client.so`), and exports all nine JNI symbols matching
+`HostBridge.kt`'s `external fun` declarations exactly (checked with `nm -D`).
 
-Real bugs this surfaced, beyond the build-system ones already listed below:
-- A C++ namespace footgun in `wayland_client.h`: `struct wl_display*` used
-  directly inside `namespace hostbridge` without a prior global forward
-  declaration silently declares a *new*, distinct `hostbridge::wl_display`
-  type instead of referring to the real global one — every `wl_display_*`
-  call then fails to compile against "an incomplete type." Fixed by
-  forward-declaring `wl_display`/`wl_registry` in the global namespace
-  before entering `namespace hostbridge`.
-- The NDK's CMake toolchain file re-roots `find_library`/`find_path` PATHS
-  entries under its own sysroot by default (`CMAKE_FIND_ROOT_PATH`), which
-  silently broke finding `libwayland-client.so` even with an explicit,
-  correct path — needed `NO_CMAKE_FIND_ROOT_PATH` on both calls.
-- Windows git checkouts corrupt every shell/autotools script in the vendored
-  submodules with CRLF line endings, breaking shebangs; `build-vendor-deps.sh`
-  strips these itself now rather than requiring a manual fix each time.
+**What's genuinely NOT verified**: none of this has been run against a live
+compositor — there's no primary container + sway build to connect to yet
+(that's `runtime-linux-root`/`-noroot`'s job, still unimplemented). Compiling
+and linking correctly is real signal (protocol usage, struct layouts, and
+JNI signatures all have to be exactly right for that to happen at all), but
+it is not the same as confirmed-working. Treat the implementation below as
+"should work, written carefully against the protocol spec" rather than
+"proven."
 
-What's still not implemented (this is genuinely the next work, not a build
-problem): the frame-passthrough (`wlr-screencopy` capture loop →
-`HostBridge.presentOutput`) and input-injection paths described below.
-`nativeConnect` itself (registry binding) is real and does connect; nothing
-past that point exists yet.
+### What's implemented
 
-What's implemented:
-- `wayland_client.cpp`: opens a UNIX socket at an explicit filesystem path
-  (not `wl_display_connect(name)`, since the compositor's socket lives
-  inside the primary container's mount namespace — the caller must hand us
-  a path reachable from outside it), connects via
-  `wl_display_connect_to_fd`, and binds the four required globals
-  (`wl_compositor`, `wl_seat`, `zwlr_screencopy_manager_v1`,
-  `zwlr_virtual_pointer_manager_v1`, `zwp_virtual_keyboard_manager_v1`) off
-  the registry. Fails loudly (returns false, logs which globals were
-  missing) if sway isn't advertising all of them.
-- `CMakeLists.txt`: wires `wayland-scanner` codegen for the three non-core
-  protocols, all sourced from `vendor/wlroots/protocol` (confirmed against
-  the actual repo layout — an earlier draft incorrectly pointed
-  virtual-keyboard at `vendor/wayland-protocols`, which doesn't have it).
+- **Connection** (`WaylandClient::connect`) — opens a UNIX socket at an
+  explicit filesystem path (not `wl_display_connect(name)`, since the
+  compositor's socket lives inside the primary container's mount namespace),
+  connects via `wl_display_connect_to_fd`, binds `wl_compositor`, `wl_seat`,
+  `wl_shm`, `wl_output` (first one only — see multi-output note below),
+  `zwlr_screencopy_manager_v1`, `zwlr_virtual_pointer_manager_v1`, and
+  `zwp_virtual_keyboard_manager_v1`. Fails loudly if any of the five
+  required globals (compositor/seat/screencopy/vptr/vkbd) is missing.
+  Starts a background dispatch thread (`wl_display_dispatch` loop) so
+  screencopy's async frame-ready callbacks actually get delivered.
+- **Frame capture** (`presentPrimaryOutput` → `startNextCapture` and the
+  `frame_*` callbacks) — a continuous capture loop: request a frame via
+  `zwlr_screencopy_manager_v1_capture_output`, wait for the compositor's
+  `buffer`/`buffer_done` events, allocate a `wl_shm` buffer backed by
+  `ASharedMemory` (Android's `memfd_create` equivalent), call `frame.copy`,
+  and on `ready` blit the shm buffer onto the target `ANativeWindow` (naive
+  per-pixel BGRA→RGBA channel swap — correct, not optimized; a GPU
+  blit/DMA-BUF path is real future work, not an oversight) before
+  immediately requesting the next frame. `frame.failed` retries rather than
+  giving up.
+- **Virtual pointer** — relative motion, absolute motion, button, and axis
+  (scroll) requests, each followed by the required `frame()` call.
+- **Virtual keyboard** — key press/release requests. The protocol requires a
+  valid XKB keymap be set before *any* key event is accepted; rather than
+  cross-compiling `libxkbcommon` for Android just to generate one,
+  `default_keymap.h` embeds a standard "us"/pc105 keymap generated once,
+  on-host, via WSL's `libxkbcommon` (see that file's header comment) — no
+  xkbcommon dependency on-device at all.
 
-What's still TODO, in order:
-1. **Cross-compile `libwayland-client` for Android** (`vendor/wayland`,
-   Meson build, needs an Android cross-file + libexpat). This is the actual
-   blocker on everything else — `find_library(wayland-client)` in
-   `CMakeLists.txt` will fail until this exists. Not attempted here; no
-   `meson`/`ninja` available in this environment.
-2. Confirm `wayland-scanner` (a host build tool) is on the build machine's
-   `PATH` — required for the protocol codegen step to run at all.
-3. `zwlr_screencopy_manager_v1` capture loop → deliver frames to an Android
-   `Surface` (`HostBridge.presentOutput`) — not started.
-4. `zwlr_virtual_pointer_manager_v1` / `zwp_virtual_keyboard_manager_v1`
-   request wrappers for `:input-seat` to call into — not started.
-5. Once a real primary container + sway build exists to connect to, test
-   `nativeConnect` against it for real — this whole module has only been
-   written against protocol documentation, never exercised.
+### Known simplifications / not yet implemented
 
-See [docs/SPEC.md](../docs/SPEC.md) §11 for why this module is first in
-build order despite being unverified — everything else in the architecture
-assumes it works, so it's the thing worth de-risking before investing
-further.
+- **Single output only.** `WaylandGlobals::output` tracks the first
+  `wl_output` the compositor advertises; there's no list, and no way for
+  the Kotlin side to pick a different one. Real multi-output support (the
+  "pop this window to the second screen" feature from SPEC.md §4) needs
+  that list plus a per-`DisplayOutput` capture session, not just one.
+- **CPU blit, not zero-copy.** Frames are copied pixel-by-pixel from the shm
+  buffer to the `ANativeWindow`. Fine for a first correctness pass; will
+  matter for real framerate once there's something live to measure against.
+- **Coarse thread-safety.** Dispatch runs on one dedicated thread; input
+  injection and `presentPrimaryOutput`/`stopPresenting` are called from
+  whatever thread the JNI caller uses. This relies on libwayland-client's
+  documented guarantee that request marshaling is safe from other threads
+  as long as only one thread ever calls `wl_display_dispatch` — that's the
+  design here, but it hasn't been stress-tested.
+- **No output-removal handling.** If the primary container's compositor
+  restarts or the output disappears mid-session, nothing currently notices
+  or recovers.
+
+See [docs/SPEC.md](../docs/SPEC.md) §11 for the broader open risks (sway
+headless-backend performance, Wine's Wayland driver maturity, etc.) that
+this module's implementation being "complete" doesn't resolve on its own —
+those need a live compositor to actually test against.

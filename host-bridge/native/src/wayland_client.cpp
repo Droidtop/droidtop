@@ -1,9 +1,15 @@
 #include "wayland_client.h"
+#include "default_keymap.h"
 
 #include <android/log.h>
+#include <android/native_window.h>
+#include <android/sharedmem.h>
 #include <wayland-client.h>
 
+#include <cerrno>
 #include <cstring>
+#include <pthread.h>
+#include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -18,23 +24,70 @@
 #define LOG_TAG "hostbridge/wl"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 
 namespace hostbridge {
 
-// Globals bound off the primary container compositor's registry. Every one
-// of these is required — if sway (or whatever's running as the primary
-// container's compositor) doesn't advertise all four, connect() fails,
-// since hostbridge has no fallback path for a compositor missing any of
-// them.
+// Globals bound off the primary container compositor's registry. compositor/
+// seat/screencopy/virtual-pointer/virtual-keyboard are required — if the
+// compositor doesn't advertise all of them, connect() fails. output/shm are
+// tracked too (needed for screencopy) but their absence isn't fatal at
+// connect() time since a headless compositor might advertise its first
+// output slightly later; presentPrimaryOutput() checks for them itself.
 struct WaylandGlobals {
     wl_compositor* compositor = nullptr;
     wl_seat* seat = nullptr;
+    wl_shm* shm = nullptr;
     zwlr_screencopy_manager_v1* screencopy_manager = nullptr;
     zwlr_virtual_pointer_manager_v1* virtual_pointer_manager = nullptr;
     zwp_virtual_keyboard_manager_v1* virtual_keyboard_manager = nullptr;
+
+    // MVP: track only the first wl_output seen — matches the current
+    // single-merged-desktop default (DisplayOutput.kt / SPEC.md §4). A real
+    // multi-output implementation needs a list here plus a way for the
+    // Kotlin side to pick which one presentPrimaryOutput() targets; that's
+    // genuine future work, not an oversight.
+    wl_output* output = nullptr;
+
+    zwlr_virtual_pointer_v1* virtual_pointer = nullptr;
+    zwp_virtual_keyboard_v1* virtual_keyboard = nullptr;
+};
+
+// Live state for one in-progress (or steady-state looping) screencopy
+// capture session targeting a single ANativeWindow. Holds its own
+// manager/output/shm (copied from WaylandGlobals when the session starts)
+// so the frame-listener callbacks below — free functions, no access to
+// WaylandClient — can re-arm the next capture themselves without reaching
+// back through global state.
+struct OutputCapture {
+    ANativeWindow* window = nullptr;
+
+    zwlr_screencopy_manager_v1* manager = nullptr;
+    wl_output* output = nullptr;
+    wl_shm* shm = nullptr;
+
+    zwlr_screencopy_frame_v1* frame = nullptr;
+
+    // shm buffer, reused across frames unless the compositor reports a size
+    // change (only reallocated when width/height/stride actually differ).
+    wl_shm_pool* pool = nullptr;
+    wl_buffer* buffer = nullptr;
+    int shmFd = -1;
+    void* shmData = nullptr;
+    size_t shmSize = 0;
+
+    uint32_t width = 0;
+    uint32_t height = 0;
+    uint32_t stride = 0;
+    uint32_t format = 0; // enum wl_shm_format
+    bool haveBufferInfo = false;
+
+    bool running = false;
 };
 
 namespace {
+
+// ---- registry ----
 
 void registry_global(void* data, wl_registry* registry, uint32_t name,
                       const char* interface, uint32_t version) {
@@ -46,6 +99,14 @@ void registry_global(void* data, wl_registry* registry, uint32_t name,
     } else if (std::strcmp(interface, wl_seat_interface.name) == 0) {
         globals->seat = static_cast<wl_seat*>(
             wl_registry_bind(registry, name, &wl_seat_interface, 7));
+    } else if (std::strcmp(interface, wl_shm_interface.name) == 0) {
+        globals->shm = static_cast<wl_shm*>(
+            wl_registry_bind(registry, name, &wl_shm_interface, 1));
+    } else if (std::strcmp(interface, wl_output_interface.name) == 0) {
+        if (!globals->output) { // first one only — see OutputCapture's comment
+            globals->output = static_cast<wl_output*>(
+                wl_registry_bind(registry, name, &wl_output_interface, 2));
+        }
     } else if (std::strcmp(interface, zwlr_screencopy_manager_v1_interface.name) == 0) {
         globals->screencopy_manager = static_cast<zwlr_screencopy_manager_v1*>(
             wl_registry_bind(registry, name, &zwlr_screencopy_manager_v1_interface, version));
@@ -68,43 +129,249 @@ constexpr wl_registry_listener kRegistryListener = {
     .global_remove = registry_global_remove,
 };
 
-// Opens a UNIX domain socket at an explicit filesystem path and connects it.
-// We can't use wl_display_connect(name) here — that resolves a bare socket
-// name against THIS process's own $XDG_RUNTIME_DIR, but the compositor
-// we're reaching lives inside the primary container's mount namespace, so
-// the caller must hand us the socket's real path as seen from outside that
-// namespace (however the container runtime exposes it — a bind mount into
-// this app's accessible storage, most likely; that plumbing is
-// runtime-linux-root/-noroot's responsibility, not this file's).
-int connectUnixSocket(const char* path) {
-    int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+// ---- screencopy ----
+
+void startNextCapture(OutputCapture* cap); // fwd decl — frame_ready/frame_failed below re-arm via this
+
+void allocateShmBuffer(OutputCapture* cap) {
+    size_t size = static_cast<size_t>(cap->stride) * cap->height;
+    if (cap->buffer && size == cap->shmSize) {
+        return; // reuse — dimensions unchanged since last frame
+    }
+
+    if (cap->buffer) {
+        wl_buffer_destroy(cap->buffer);
+        cap->buffer = nullptr;
+    }
+    if (cap->pool) {
+        wl_shm_pool_destroy(cap->pool);
+        cap->pool = nullptr;
+    }
+    if (cap->shmData) {
+        munmap(cap->shmData, cap->shmSize);
+        cap->shmData = nullptr;
+    }
+    if (cap->shmFd >= 0) {
+        close(cap->shmFd);
+        cap->shmFd = -1;
+    }
+
+    // ASharedMemory (Android's memfd_create equivalent, NDK API 26+) rather
+    // than shm_open — gives us an fd wl_shm can mmap over the Wayland
+    // connection exactly like a normal Linux memfd would.
+    int fd = ASharedMemory_create("hostbridge-screencopy", size);
     if (fd < 0) {
-        LOGE("socket() failed for %s", path);
-        return -1;
+        LOGE("ASharedMemory_create(%zu) failed", size);
+        return;
     }
 
-    sockaddr_un addr{};
-    addr.sun_family = AF_UNIX;
-    std::strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
-
-    if (::connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
-        LOGE("connect() failed for %s", path);
+    void* data = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (data == MAP_FAILED) {
+        LOGE("mmap failed for screencopy shm buffer: %s", strerror(errno));
         close(fd);
-        return -1;
+        return;
     }
 
-    return fd;
+    cap->shmFd = fd;
+    cap->shmData = data;
+    cap->shmSize = size;
+    cap->pool = wl_shm_create_pool(cap->shm, fd, static_cast<int32_t>(size));
+    cap->buffer = wl_shm_pool_create_buffer(
+        cap->pool, 0, static_cast<int32_t>(cap->width), static_cast<int32_t>(cap->height),
+        static_cast<int32_t>(cap->stride), static_cast<wl_shm_format>(cap->format));
+}
+
+// Copies the just-captured shm frame onto the target ANativeWindow, with a
+// naive per-pixel BGRA<->RGBA channel swap: wl_shm's common format
+// (WL_SHM_FORMAT_ARGB8888/XRGB8888) is native-endian 0xAARRGGBB, i.e. bytes
+// B,G,R,A on a little-endian device — Android's WINDOW_FORMAT_RGBA_8888 is
+// bytes R,G,B,A. Correct, not optimized: fine for a first working version,
+// worth revisiting (GPU blit / shader) once this is actually running against
+// a live compositor and framerate is measurable.
+void blitFrameToWindow(OutputCapture* cap) {
+    if (!cap->window || !cap->shmData) return;
+
+    ANativeWindow_setBuffersGeometry(cap->window, static_cast<int32_t>(cap->width),
+                                      static_cast<int32_t>(cap->height), WINDOW_FORMAT_RGBA_8888);
+
+    ANativeWindow_Buffer buf;
+    if (ANativeWindow_lock(cap->window, &buf, nullptr) != 0) {
+        LOGE("ANativeWindow_lock failed");
+        return;
+    }
+
+    auto* src = static_cast<const uint8_t*>(cap->shmData);
+    auto* dst = static_cast<uint8_t*>(buf.bits);
+    uint32_t rows = cap->height < static_cast<uint32_t>(buf.height) ? cap->height : static_cast<uint32_t>(buf.height);
+    uint32_t cols = cap->width < static_cast<uint32_t>(buf.width) ? cap->width : static_cast<uint32_t>(buf.width);
+
+    for (uint32_t y = 0; y < rows; y++) {
+        const uint8_t* srcRow = src + static_cast<size_t>(y) * cap->stride;
+        uint8_t* dstRow = dst + static_cast<size_t>(y) * buf.stride * 4;
+        for (uint32_t x = 0; x < cols; x++) {
+            const uint8_t* p = srcRow + x * 4; // B, G, R, A
+            uint8_t* q = dstRow + x * 4;       // R, G, B, A
+            q[0] = p[2];
+            q[1] = p[1];
+            q[2] = p[0];
+            q[3] = p[3];
+        }
+    }
+
+    ANativeWindow_unlockAndPost(cap->window);
+}
+
+void frame_buffer(void* data, zwlr_screencopy_frame_v1* /*frame*/, uint32_t format,
+                   uint32_t width, uint32_t height, uint32_t stride) {
+    auto* cap = static_cast<OutputCapture*>(data);
+    // First shm buffer offer wins — we don't negotiate among several.
+    if (!cap->haveBufferInfo) {
+        cap->format = format;
+        cap->width = width;
+        cap->height = height;
+        cap->stride = stride;
+        cap->haveBufferInfo = true;
+    }
+}
+
+void frame_flags(void* /*data*/, zwlr_screencopy_frame_v1* /*frame*/, uint32_t /*flags*/) {}
+
+void frame_ready(void* data, zwlr_screencopy_frame_v1* frame, uint32_t /*tv_sec_hi*/,
+                  uint32_t /*tv_sec_lo*/, uint32_t /*tv_nsec*/) {
+    auto* cap = static_cast<OutputCapture*>(data);
+    blitFrameToWindow(cap);
+
+    zwlr_screencopy_frame_v1_destroy(frame);
+    cap->frame = nullptr;
+
+    if (cap->running) {
+        startNextCapture(cap); // continuous loop: immediately request the next frame
+    }
+}
+
+void frame_failed(void* data, zwlr_screencopy_frame_v1* frame) {
+    auto* cap = static_cast<OutputCapture*>(data);
+    LOGW("screencopy frame failed");
+    zwlr_screencopy_frame_v1_destroy(frame);
+    cap->frame = nullptr;
+
+    if (cap->running) {
+        startNextCapture(cap); // retry — a single failed frame shouldn't kill the session
+    }
+}
+
+void frame_damage(void* /*data*/, zwlr_screencopy_frame_v1* /*frame*/, uint32_t /*x*/,
+                   uint32_t /*y*/, uint32_t /*width*/, uint32_t /*height*/) {}
+
+void frame_linux_dmabuf(void* /*data*/, zwlr_screencopy_frame_v1* /*frame*/, uint32_t /*format*/,
+                         uint32_t /*width*/, uint32_t /*height*/) {
+    // Not implemented: this client only ever requests the shm path (see
+    // frame_buffer_done, which always allocates a wl_shm buffer) — GPU
+    // zero-copy via DMA-BUF is real future work (SPEC.md/README already
+    // call this out), not something silently dropped by accident.
+}
+
+void frame_buffer_done(void* data, zwlr_screencopy_frame_v1* frame) {
+    auto* cap = static_cast<OutputCapture*>(data);
+    if (!cap->haveBufferInfo) {
+        LOGE("buffer_done with no shm buffer offered — compositor didn't send a wl_shm option");
+        zwlr_screencopy_frame_v1_destroy(frame);
+        cap->frame = nullptr;
+        return;
+    }
+
+    allocateShmBuffer(cap);
+    if (!cap->buffer) {
+        LOGE("failed to allocate shm buffer for screencopy frame");
+        zwlr_screencopy_frame_v1_destroy(frame);
+        cap->frame = nullptr;
+        return;
+    }
+
+    zwlr_screencopy_frame_v1_copy(frame, cap->buffer);
+}
+
+// A real named object with static storage duration — deliberately NOT a
+// function returning a temporary. zwlr_screencopy_frame_v1_add_listener
+// stores this pointer for the lifetime of the frame object and Wayland
+// calls back into it asynchronously; taking the address of a temporary
+// here would leave that callback pointing at already-destroyed stack
+// memory the moment the enclosing expression finished.
+constexpr zwlr_screencopy_frame_v1_listener kFrameListener = {
+    .buffer = frame_buffer,
+    .flags = frame_flags,
+    .ready = frame_ready,
+    .failed = frame_failed,
+    .damage = frame_damage,
+    .linux_dmabuf = frame_linux_dmabuf,
+    .buffer_done = frame_buffer_done,
+};
+
+void startNextCapture(OutputCapture* cap) {
+    cap->haveBufferInfo = false;
+    cap->frame = zwlr_screencopy_manager_v1_capture_output(cap->manager, /*overlay_cursor=*/1, cap->output);
+    zwlr_screencopy_frame_v1_add_listener(cap->frame, &kFrameListener, cap);
 }
 
 } // namespace
+
+// ---- WaylandClient ----
 
 WaylandClient::~WaylandClient() {
     disconnect();
 }
 
+namespace {
+void* dispatchThreadTrampoline(void* arg) {
+    static_cast<WaylandClient*>(arg)->dispatchLoop();
+    return nullptr;
+}
+} // namespace
+
+void WaylandClient::startDispatchThread() {
+    dispatchThreadRunning_ = true;
+    auto* thread = new pthread_t();
+    pthread_create(thread, nullptr, dispatchThreadTrampoline, this);
+    dispatchThreadHandle_ = thread;
+}
+
+void WaylandClient::stopDispatchThread() {
+    if (!dispatchThreadHandle_) return;
+    dispatchThreadRunning_ = false;
+    // wl_display_dispatch() is blocking (waits on the socket) — in practice
+    // disconnect() closing the underlying fd out from under the thread is
+    // what actually unblocks it here. Good enough for a first version; a
+    // self-pipe/eventfd wakeup would be cleaner and should replace this if
+    // shutdown latency ever actually matters.
+    auto* thread = static_cast<pthread_t*>(dispatchThreadHandle_);
+    pthread_join(*thread, nullptr);
+    delete thread;
+    dispatchThreadHandle_ = nullptr;
+}
+
+void WaylandClient::dispatchLoop() {
+    while (dispatchThreadRunning_ && display_) {
+        if (wl_display_dispatch(display_) < 0) {
+            LOGW("wl_display_dispatch returned error, dispatch thread exiting");
+            break;
+        }
+    }
+}
+
 bool WaylandClient::connect(const char* socketPath) {
-    int fd = connectUnixSocket(socketPath);
+    int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (fd < 0) {
+        LOGE("socket() failed for %s", socketPath);
+        return false;
+    }
+
+    sockaddr_un addr{};
+    addr.sun_family = AF_UNIX;
+    std::strncpy(addr.sun_path, socketPath, sizeof(addr.sun_path) - 1);
+
+    if (::connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
+        LOGE("connect() failed for %s: %s", socketPath, strerror(errno));
+        close(fd);
         return false;
     }
 
@@ -136,17 +403,53 @@ bool WaylandClient::connect(const char* socketPath) {
         disconnect();
         return false;
     }
+    if (!globals_->shm || !globals_->output) {
+        LOGW("compositor advertised no wl_shm or no wl_output yet — screencopy will fail "
+             "until presentPrimaryOutput() is retried after one appears");
+    }
+
+    // Virtual input devices are created once, up front, and reused for the
+    // life of the connection.
+    globals_->virtual_pointer = zwlr_virtual_pointer_manager_v1_create_virtual_pointer(
+        globals_->virtual_pointer_manager, globals_->seat);
+    globals_->virtual_keyboard = zwp_virtual_keyboard_manager_v1_create_virtual_keyboard(
+        globals_->virtual_keyboard_manager, globals_->seat);
+
+    // zwp_virtual_keyboard_v1 requires a keymap before it will process any
+    // key event at all (protocol requirement, not a hostbridge choice) —
+    // see default_keymap.h for why this is a static embedded blob rather
+    // than something generated on-device.
+    size_t keymapSize = sizeof(kDefaultXkbKeymapUS); // includes the trailing NUL, which is fine/expected
+    int keymapFd = ASharedMemory_create("hostbridge-keymap", keymapSize);
+    if (keymapFd >= 0) {
+        void* dst = mmap(nullptr, keymapSize, PROT_READ | PROT_WRITE, MAP_SHARED, keymapFd, 0);
+        if (dst != MAP_FAILED) {
+            std::memcpy(dst, kDefaultXkbKeymapUS, keymapSize);
+            munmap(dst, keymapSize);
+            zwp_virtual_keyboard_v1_keymap(globals_->virtual_keyboard, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1,
+                                            keymapFd, static_cast<uint32_t>(keymapSize));
+        } else {
+            LOGE("mmap failed for keymap fd: %s", strerror(errno));
+        }
+        close(keymapFd); // wl_keyboard.keymap request duplicates the fd internally; safe to close ours
+    } else {
+        LOGE("ASharedMemory_create failed for keymap");
+    }
 
     LOGI("connected to primary container compositor at %s", socketPath);
 
-    // TODO (next, not yet implemented): request an output list, start a
-    // zwlr_screencopy_manager_v1 capture loop per DisplayOutput, and expose
-    // frame delivery back to HostBridge.kt's presentOutput(). See
-    // host-bridge/README.md status notes.
+    startDispatchThread();
     return true;
 }
 
 void WaylandClient::disconnect() {
+    stopPresenting();
+    stopDispatchThread();
+
+    if (globals_) {
+        if (globals_->virtual_pointer) zwlr_virtual_pointer_v1_destroy(globals_->virtual_pointer);
+        if (globals_->virtual_keyboard) zwp_virtual_keyboard_v1_destroy(globals_->virtual_keyboard);
+    }
     delete globals_;
     globals_ = nullptr;
 
@@ -158,6 +461,84 @@ void WaylandClient::disconnect() {
         wl_display_disconnect(display_);
         display_ = nullptr;
     }
+}
+
+bool WaylandClient::presentPrimaryOutput(ANativeWindow* window) {
+    if (!globals_ || !globals_->output || !globals_->shm || !globals_->screencopy_manager) {
+        LOGE("presentPrimaryOutput: missing output/shm/screencopy_manager global");
+        return false;
+    }
+
+    stopPresenting();
+
+    capture_ = new OutputCapture();
+    capture_->window = window;
+    capture_->manager = globals_->screencopy_manager;
+    capture_->output = globals_->output;
+    capture_->shm = globals_->shm;
+    capture_->running = true;
+
+    startNextCapture(capture_);
+    return true;
+}
+
+void WaylandClient::stopPresenting() {
+    if (!capture_) return;
+
+    capture_->running = false;
+    if (capture_->frame) {
+        zwlr_screencopy_frame_v1_destroy(capture_->frame);
+    }
+    if (capture_->buffer) wl_buffer_destroy(capture_->buffer);
+    if (capture_->pool) wl_shm_pool_destroy(capture_->pool);
+    if (capture_->shmData) munmap(capture_->shmData, capture_->shmSize);
+    if (capture_->shmFd >= 0) close(capture_->shmFd);
+
+    delete capture_;
+    capture_ = nullptr;
+}
+
+void WaylandClient::injectPointerMotion(double dx, double dy) {
+    if (!globals_ || !globals_->virtual_pointer) return;
+    uint32_t timeMs = 0; // 0 lets the compositor timestamp it — fine for injected input
+    zwlr_virtual_pointer_v1_motion(globals_->virtual_pointer, timeMs,
+                                    wl_fixed_from_double(dx), wl_fixed_from_double(dy));
+    zwlr_virtual_pointer_v1_frame(globals_->virtual_pointer);
+}
+
+void WaylandClient::injectPointerMotionAbsolute(double x, double y, uint32_t extentWidth, uint32_t extentHeight) {
+    if (!globals_ || !globals_->virtual_pointer) return;
+    zwlr_virtual_pointer_v1_motion_absolute(
+        globals_->virtual_pointer, 0,
+        static_cast<uint32_t>(x), static_cast<uint32_t>(y),
+        extentWidth, extentHeight);
+    zwlr_virtual_pointer_v1_frame(globals_->virtual_pointer);
+}
+
+void WaylandClient::injectPointerButton(uint32_t linuxButtonCode, bool pressed) {
+    if (!globals_ || !globals_->virtual_pointer) return;
+    zwlr_virtual_pointer_v1_button(globals_->virtual_pointer, 0, linuxButtonCode,
+                                    pressed ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED);
+    zwlr_virtual_pointer_v1_frame(globals_->virtual_pointer);
+}
+
+void WaylandClient::injectPointerAxis(double horizontal, double vertical) {
+    if (!globals_ || !globals_->virtual_pointer) return;
+    if (horizontal != 0.0) {
+        zwlr_virtual_pointer_v1_axis(globals_->virtual_pointer, 0, WL_POINTER_AXIS_HORIZONTAL_SCROLL,
+                                      wl_fixed_from_double(horizontal));
+    }
+    if (vertical != 0.0) {
+        zwlr_virtual_pointer_v1_axis(globals_->virtual_pointer, 0, WL_POINTER_AXIS_VERTICAL_SCROLL,
+                                      wl_fixed_from_double(vertical));
+    }
+    zwlr_virtual_pointer_v1_frame(globals_->virtual_pointer);
+}
+
+void WaylandClient::injectKey(uint32_t evdevKeyCode, bool pressed) {
+    if (!globals_ || !globals_->virtual_keyboard) return;
+    zwp_virtual_keyboard_v1_key(globals_->virtual_keyboard, 0, evdevKeyCode,
+                                 pressed ? WL_KEYBOARD_KEY_STATE_PRESSED : WL_KEYBOARD_KEY_STATE_RELEASED);
 }
 
 } // namespace hostbridge
