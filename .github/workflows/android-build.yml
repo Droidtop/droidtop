@@ -48,22 +48,23 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
           NEEDRESTART_MODE: a
         run: |
-          # Two prior runs hung 10-15+ minutes on this exact step, with
-          # ZERO output -- not even from `apt-get update` itself, confirmed
-          # from the actual cancelled runs' logs (##[error]The operation
-          # was canceled. right after the command banner, nothing before
-          # it). That rules out needrestart (which only prompts partway
-          # through an install, after real output) and points at the other
-          # well-documented GitHub Actions/Ubuntu gotcha instead: fresh
-          # runner images have apt-daily.timer / apt-daily-upgrade.timer
-          # background units that can be actively holding the dpkg/apt
-          # list lock right at job start. Stop them first (prevents NEW
-          # lock acquisition) and make apt itself wait out any lock still
-          # held rather than fail/hang unbounded (DPkg::Lock::Timeout).
+          # Three prior runs hung with ZERO visible output before being
+          # cancelled -- including one AFTER adding the apt-daily-timer
+          # stop + DPkg::Lock::Timeout fix, which didn't help either. The
+          # real problem so far has been that `-qq` suppresses literally
+          # all diagnostic output, so every "fix" up to now has been a
+          # guess with no evidence to confirm or rule it out. Fixing that
+          # first: `set -x` echoes each command as it starts (pinpoints
+          # exactly which one is stuck), dropped `-qq` so apt's own
+          # progress streams instead of being swallowed, and `timeout`
+          # wraps each command so a hang fails loudly with a clear signal
+          # after a bounded wait instead of running indefinitely and
+          # needing manual cancellation to even notice.
+          set -x
           sudo systemctl stop apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
           sudo systemctl stop apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
-          sudo apt-get update -qq -o DPkg::Lock::Timeout=300
-          sudo apt-get install -y -qq -o DPkg::Lock::Timeout=300 \
+          timeout 120 sudo apt-get update -o DPkg::Lock::Timeout=300
+          timeout 300 sudo apt-get install -y -o DPkg::Lock::Timeout=300 \
             build-essential cmake ninja-build meson pkg-config git python3 \
             autoconf automake libtool libltdl-dev texinfo \
             libexpat1-dev libffi-dev libxml2-utils \
