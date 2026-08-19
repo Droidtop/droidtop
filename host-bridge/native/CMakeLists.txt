@@ -109,3 +109,8 @@ endif()
 
 find_library(log-lib log)
 target_link_libraries(hostbridge ${log-lib})
+
+# ANativeWindow_* (frame passthrough onto a Surface) and ASharedMemory_create
+# (screencopy/keymap shm buffers) both live in libandroid.so.
+find_library(android-lib android)
+target_link_libraries(hostbridge ${android-lib})
