@@ -45,19 +45,25 @@ jobs:
 
       - name: Install build dependencies
         env:
-          # A prior run hung for 10+ minutes on this exact step with no
-          # error, no progress, nothing in the log — GitHub Actions' known
-          # `needrestart` gotcha: Ubuntu 24.04 images have it configured to
-          # prompt (via whiptail) about restarting services after a library
-          # upgrade, and that prompt doesn't get suppressed by `apt-get -y`
-          # (a different confirmation mechanism entirely). NEEDRESTART_MODE=a
-          # (automatic, no prompt) plus DEBIAN_FRONTEND=noninteractive
-          # (belt and suspenders for any other debconf prompt) fixes it.
           DEBIAN_FRONTEND: noninteractive
           NEEDRESTART_MODE: a
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq \
+          # Two prior runs hung 10-15+ minutes on this exact step, with
+          # ZERO output -- not even from `apt-get update` itself, confirmed
+          # from the actual cancelled runs' logs (##[error]The operation
+          # was canceled. right after the command banner, nothing before
+          # it). That rules out needrestart (which only prompts partway
+          # through an install, after real output) and points at the other
+          # well-documented GitHub Actions/Ubuntu gotcha instead: fresh
+          # runner images have apt-daily.timer / apt-daily-upgrade.timer
+          # background units that can be actively holding the dpkg/apt
+          # list lock right at job start. Stop them first (prevents NEW
+          # lock acquisition) and make apt itself wait out any lock still
+          # held rather than fail/hang unbounded (DPkg::Lock::Timeout).
+          sudo systemctl stop apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
+          sudo systemctl stop apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
+          sudo apt-get update -qq -o DPkg::Lock::Timeout=300
+          sudo apt-get install -y -qq -o DPkg::Lock::Timeout=300 \
             build-essential cmake ninja-build meson pkg-config git python3 \
             autoconf automake libtool libltdl-dev texinfo \
             libexpat1-dev libffi-dev libxml2-utils \
