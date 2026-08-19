@@ -58,14 +58,29 @@ echo "=== libffi ($ABI) ==="
         # own AC_CONFIG_MACRO_DIRS([m4]) under current autoconf/libtool —
         # strip it. Known upstream autotools-version friction, not a bug here.
         sed -i '/^ACLOCAL_AMFLAGS = -I m4$/d' Makefile.am
-        # `-I m4` passed explicitly, not left to AC_CONFIG_MACRO_DIRS([m4])
-        # auto-detection: that worked in one environment (WSL2/Ubuntu 24.04)
-        # but not another (GitHub Actions' ubuntu-24.04 runner) -- aclocal
-        # didn't pick up the just-libtoolize'd m4/*.m4 files there, and
-        # autoconf failed on "possibly undefined macro: LT_SYS_SYMBOL_USCORE"
-        # (a real libtool macro, just not found). Being explicit sidesteps
-        # whatever aclocal-version behavior difference caused that, instead
-        # of chasing it further.
+
+        # `-I m4` passed explicitly (not left to AC_CONFIG_MACRO_DIRS([m4])
+        # auto-detection) — needed on some but not all environments.
+        #
+        # libffi's configure.ac uses LT_SYS_SYMBOL_USCORE, which lives in
+        # libtool's ltdl.m4 — a file `libtoolize --copy` does NOT copy into
+        # m4/ by default (only libtool.m4/ltoptions.m4/ltsugar.m4/
+        # ltversion.m4/lt~obsolete.m4 are). aclocal still finds it via its
+        # own system search path in some environments (worked in WSL2/
+        # Ubuntu 24.04) but not others (GitHub Actions' ubuntu-24.04 runner
+        # failed with "possibly undefined macro: LT_SYS_SYMBOL_USCORE" even
+        # with -I m4 correctly applied — confirmed from the actual CI log,
+        # not guessed). Copying it into m4/ explicitly removes the
+        # dependency on that implicit, apparently-not-actually-portable
+        # system search path entirely.
+        mkdir -p m4
+        ltdl_m4="$(find /usr/share/aclocal* -name ltdl.m4 2>/dev/null | head -1)"
+        if [ -n "$ltdl_m4" ]; then
+            cp "$ltdl_m4" m4/
+        else
+            echo "WARNING: ltdl.m4 not found under /usr/share/aclocal* — libffi's autoreconf may fail on LT_SYS_SYMBOL_USCORE" >&2
+        fi
+
         autoreconf -v -i -I m4
     fi
     BUILD_DIR="$WORK/libffi"
