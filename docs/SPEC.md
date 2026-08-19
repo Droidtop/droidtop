@@ -274,6 +274,26 @@ pc-helper/               → separate Go program, runs on the remote gaming PC, 
 8. `shell-gamepad` — last, deliberately, and only once `library-core` has a
    working `LibraryProvider` to build a real UI against.
 
+## 10a. Build environment
+
+A local dev environment exists: a dedicated WSL2 distro (`droidtop-dev`),
+entirely on non-OS storage, with Android SDK/NDK 27.0.12077973, Gradle 8.9,
+Go, and the Meson/CMake/wayland-scanner toolchain installed. Primary CI is
+GitHub Actions (not yet set up); this local environment is for exactly the
+kind of hands-on de-risking §10/§11 call for.
+
+First real build pass against it already found and fixed three bugs no
+amount of reading would have caught: a duplicate version-catalog
+registration in `settings.gradle.kts`, Kotlin 2.0's Compose Compiler plugin
+being required-but-missing on every Compose module, and `default` being an
+invalid Java package segment (`shell-default`'s package is now
+`dev.droidtop.shell.standard`). All pure-Kotlin modules now build clean.
+`host-bridge` and `runtime-remote-stream` both build correctly up to their
+one real native dependency gap each (`libwayland-client`, OpenSSL — neither
+cross-compiled for Android yet) and fail at exactly that point, confirming
+those really are the next blockers, not a config mistake — see each
+module's README for specifics.
+
 ## 11. Open risks to verify hands-on, not assume
 
 - Whether sway's headless backend + `wlr-screencopy` performs well enough

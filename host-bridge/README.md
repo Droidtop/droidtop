@@ -27,11 +27,23 @@ Android `Surface` when it happens.
 
 ## Status
 
-**Nothing here has been compiled or run.** This environment has no Android
-NDK, no `meson`/`ninja`, and no `cmake` installed — everything below is
-written to be correct against the real Wayland/wlroots protocol APIs, but is
-unverified. Treat it as a strong starting point for the first real build
-attempt, not as proven-working code.
+**Partially verified against a real Android NDK build** (WSL2 + Android SDK/
+NDK 27.0.12077973 + CMake/Ninja). What that confirmed:
+- `wayland-scanner` codegen for all three protocols against
+  `vendor/wlroots/protocol` runs and produces correct C bindings.
+- The generated screencopy bindings compile cleanly against the NDK
+  toolchain.
+- The build fails exactly where expected and nowhere else: `wayland_client.cpp`
+  and the virtual-pointer/virtual-keyboard generated bindings fail on
+  `wayland-client.h`/`wayland-util.h` not found, because `libwayland-client`
+  itself isn't cross-compiled for Android yet. That's real signal, not a
+  mystery — see TODO #1 below, and it's now the only remaining blocker
+  between here and a linkable `.so`.
+
+(This correction cost one real bug: the CMakeLists.txt originally pointed
+virtual-keyboard's protocol XML at `vendor/wayland-protocols`, which doesn't
+have it — all three protocols actually live in `vendor/wlroots/protocol`.
+Fixed after the first real build attempt surfaced it.)
 
 What's implemented:
 - `wayland_client.cpp`: opens a UNIX socket at an explicit filesystem path
@@ -44,7 +56,9 @@ What's implemented:
   the registry. Fails loudly (returns false, logs which globals were
   missing) if sway isn't advertising all of them.
 - `CMakeLists.txt`: wires `wayland-scanner` codegen for the three non-core
-  protocols against `vendor/wlroots/protocol` and `vendor/wayland-protocols`.
+  protocols, all sourced from `vendor/wlroots/protocol` (confirmed against
+  the actual repo layout — an earlier draft incorrectly pointed
+  virtual-keyboard at `vendor/wayland-protocols`, which doesn't have it).
 
 What's still TODO, in order:
 1. **Cross-compile `libwayland-client` for Android** (`vendor/wayland`,

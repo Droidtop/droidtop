@@ -1,10 +1,11 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
 }
 
 android {
-    namespace = "dev.droidtop.shell.default"
+    namespace = "dev.droidtop.shell.standard"
     compileSdk = 34
 
     defaultConfig {
@@ -28,4 +29,8 @@ dependencies {
     implementation(project(":library-core"))
     implementation(project(":host-bridge"))
     implementation(libs.androidx.core.ktx)
+
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.material3)
 }

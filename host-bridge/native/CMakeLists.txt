@@ -9,7 +9,11 @@ project(hostbridge)
 #
 #   - wlr-screencopy-unstable-v1   (vendor/wlroots/protocol)   — frame capture
 #   - wlr-virtual-pointer-unstable-v1 (vendor/wlroots/protocol) — pointer injection
-#   - virtual-keyboard-unstable-v1  (vendor/wayland-protocols)  — keyboard injection
+#   - virtual-keyboard-unstable-v1  (vendor/wlroots/protocol)   — keyboard injection
+#
+# (all three live under vendor/wlroots/protocol, not vendor/wayland-protocols
+# — confirmed against the actual repo layout, corrected after the first real
+# build attempt referenced the wrong path)
 #
 # wayland-scanner is a HOST build tool (codegen only, runs at build time on
 # the machine building this, not on-device) — it does not need to be built
@@ -32,7 +36,7 @@ file(MAKE_DIRECTORY ${GEN_DIR})
 set(HOSTBRIDGE_PROTOCOLS
     "wlr-screencopy-unstable-v1;${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/wlroots/protocol/wlr-screencopy-unstable-v1.xml"
     "wlr-virtual-pointer-unstable-v1;${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/wlroots/protocol/wlr-virtual-pointer-unstable-v1.xml"
-    "virtual-keyboard-unstable-v1;${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/wayland-protocols/unstable/virtual-keyboard/virtual-keyboard-unstable-v1.xml"
+    "virtual-keyboard-unstable-v1;${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/wlroots/protocol/virtual-keyboard-unstable-v1.xml"
 )
 
 set(GENERATED_SOURCES "")

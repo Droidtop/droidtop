@@ -1,4 +1,4 @@
-package dev.droidtop.shell.default
+package dev.droidtop.shell.standard
 
 import dev.droidtop.library.Library
 
