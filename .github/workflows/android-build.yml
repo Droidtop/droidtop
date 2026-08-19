@@ -75,7 +75,11 @@ jobs:
 
       - name: Build cross-compiled vendor deps (libffi, libwayland-client)
         if: steps.deps-cache.outputs.cache-hit != 'true'
-        run: build-scripts/build-vendor-deps.sh
+        # Invoked via `bash` explicitly, not `./build-scripts/build-vendor-deps.sh`
+        # — this repo is developed partly on Windows, where the executable
+        # bit doesn't reliably survive a commit, and relying on it here
+        # failed CI outright ("Permission denied") the first time.
+        run: bash build-scripts/build-vendor-deps.sh
 
       - name: Re-copy jniLibs from cache
         if: steps.deps-cache.outputs.cache-hit == 'true'

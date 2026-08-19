@@ -15,7 +15,7 @@ import dev.droidtop.runtime.DisplayOutput
  *  3. Forwards normalized input from :input-seat in as virtual
  *     pointer/keyboard events.
  */
-class HostBridge {
+class HostBridge : HostBridgeInput {
     private var connected = false
 
     fun connect(waylandSocketPath: String): Boolean {
@@ -50,26 +50,26 @@ class HostBridge {
     // ---- Input injection, called from :input-seat's InputSeat ----
 
     /** Relative pointer motion (trackpad-style delta), in compositor-defined units. */
-    fun injectPointerMotion(dx: Double, dy: Double) {
+    override fun injectPointerMotion(dx: Double, dy: Double) {
         nativeInjectPointerMotion(dx, dy)
     }
 
     /** Absolute pointer position within a [extentWidth] x [extentHeight] logical area. */
-    fun injectPointerMotionAbsolute(x: Double, y: Double, extentWidth: Int, extentHeight: Int) {
+    override fun injectPointerMotionAbsolute(x: Double, y: Double, extentWidth: Int, extentHeight: Int) {
         nativeInjectPointerMotionAbsolute(x, y, extentWidth, extentHeight)
     }
 
     /** [linuxButtonCode]: BTN_LEFT/BTN_RIGHT/BTN_MIDDLE from linux/input-event-codes.h (0x110/0x111/0x112). */
-    fun injectPointerButton(linuxButtonCode: Int, pressed: Boolean) {
+    override fun injectPointerButton(linuxButtonCode: Int, pressed: Boolean) {
         nativeInjectPointerButton(linuxButtonCode, pressed)
     }
 
-    fun injectPointerAxis(horizontal: Double, vertical: Double) {
+    override fun injectPointerAxis(horizontal: Double, vertical: Double) {
         nativeInjectPointerAxis(horizontal, vertical)
     }
 
     /** [evdevKeyCode]: Linux evdev keycode (KEY_* from linux/input-event-codes.h), not an Android KeyEvent code. */
-    fun injectKey(evdevKeyCode: Int, pressed: Boolean) {
+    override fun injectKey(evdevKeyCode: Int, pressed: Boolean) {
         nativeInjectKey(evdevKeyCode, pressed)
     }
 
