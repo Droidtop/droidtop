@@ -42,9 +42,13 @@ build at a system libenet.
 ## Status
 
 Interfaces and native JNI signatures only — `remotestream_jni.cpp`'s three
-entry points are unimplemented, and none of this has been compiled (no NDK/
-OpenSSL cross-build available in this environment). moonlight-common-c is
+entry points are unimplemented. **Verified against a real Android NDK build**
+(WSL2 + NDK 27.0.12077973): the build reaches CMake configuration of
+`vendor/moonlight-common-c`'s own build rules (proving `add_subdirectory`
+against it works correctly) and fails at exactly its one stated
+dependency gap — `Could NOT find OpenSSL` — because OpenSSL isn't
+cross-compiled for Android in this environment yet. moonlight-common-c is
 mature and widely cross-compiled elsewhere (every Moonlight client ships it
-for multiple platforms including Android), so this is comparatively
-lower-risk than `host-bridge`'s from-scratch Wayland work — but it is
-unverified here specifically.
+for multiple platforms including Android), so getting an Android OpenSSL
+build in place is expected to be comparatively lower-risk than
+`host-bridge`'s from-scratch Wayland work.

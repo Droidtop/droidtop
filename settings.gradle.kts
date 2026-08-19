@@ -12,11 +12,10 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
     }
-    versionCatalogs {
-        create("libs") {
-            from(files("gradle/libs.versions.toml"))
-        }
-    }
+    // gradle/libs.versions.toml is picked up by convention — do not also
+    // declare it via versionCatalogs { create("libs") { from(...) } },
+    // that double-registers it and fails with "you can only call 'from' a
+    // single time" (caught building against a real Gradle 8.9 install).
 }
 
 rootProject.name = "droidtop"
