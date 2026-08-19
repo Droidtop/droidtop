@@ -10,6 +10,10 @@ android {
 
     defaultConfig {
         minSdk = 26
+        // Target hardware (Retroid Pocket 5 class devices) is arm64-v8a only.
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
     }
 
     externalNativeBuild {

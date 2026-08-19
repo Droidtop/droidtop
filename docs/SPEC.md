@@ -287,12 +287,29 @@ amount of reading would have caught: a duplicate version-catalog
 registration in `settings.gradle.kts`, Kotlin 2.0's Compose Compiler plugin
 being required-but-missing on every Compose module, and `default` being an
 invalid Java package segment (`shell-default`'s package is now
-`dev.droidtop.shell.standard`). All pure-Kotlin modules now build clean.
-`host-bridge` and `runtime-remote-stream` both build correctly up to their
-one real native dependency gap each (`libwayland-client`, OpenSSL — neither
-cross-compiled for Android yet) and fail at exactly that point, confirming
-those really are the next blockers, not a config mistake — see each
-module's README for specifics.
+`dev.droidtop.shell.standard`). All pure-Kotlin modules build clean.
+
+Both native modules now build and link successfully, not just "up to their
+one dependency gap" as an earlier pass of this doc said:
+- `:runtime-remote-stream` — switched to mbedTLS (`vendor/mbedtls`) instead
+  of OpenSSL, since it's CMake-native and cross-compiles through the same
+  NDK toolchain file Gradle already passes in. Builds clean end to end
+  (moonlight-common-c + its pinned ENet fork + mbedTLS).
+- `:host-bridge` — `build-scripts/build-vendor-deps.sh` cross-compiles
+  `libffi` (autotools) and `libwayland-client` (Meson, via a native-scanner-
+  then-cross-library two-step approach) and copies the result into
+  `jniLibs` for Gradle to package. `libhostbridge.so` links against it for
+  real (`readelf -d` confirms `NEEDED libwayland-client.so`) and exports
+  the correct JNI symbols. This was flagged in an earlier pass of this doc
+  as the single biggest unproven risk in the whole architecture — it's
+  proven now. Frame passthrough and input injection are still unimplemented
+  (see `:host-bridge`'s README), but that's ordinary remaining work, not an
+  open risk anymore.
+
+Both native modules are currently restricted to `arm64-v8a` only (matches
+the actual target hardware; other ABIs simply don't have cross-compiled
+deps yet, which isn't an interesting problem to solve until there's a
+reason to support other hardware).
 
 ## 11. Open risks to verify hands-on, not assume
 

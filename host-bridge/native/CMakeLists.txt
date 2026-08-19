@@ -74,16 +74,37 @@ target_include_directories(hostbridge PRIVATE
     ${GEN_DIR}
 )
 
-# NOT YET WIRED UP: needs a cross-compiled libwayland-client for the target
-# Android ABI. See host-bridge/README.md for what this requires (build
-# vendor/wayland's libwayland-client with a Meson Android cross file) —
-# unverified in this environment, no meson/ninja/NDK present.
-find_library(WAYLAND_CLIENT_LIB wayland-client)
-if(WAYLAND_CLIENT_LIB)
+# libwayland-client is cross-compiled separately (Meson + a cross file; see
+# host-bridge/README.md and build-scripts/build-vendor-deps.sh) — CMake
+# doesn't build it. ANDROID_DEPS_PREFIX points at where that build installed
+# its output, per-ABI (matches vendor/wayland's Meson --prefix convention:
+# <prefix>/<ANDROID_ABI>). Overridable via -DANDROID_DEPS_PREFIX=... for
+# devs who put their cross-compiled deps somewhere else.
+if(NOT ANDROID_DEPS_PREFIX)
+    set(ANDROID_DEPS_PREFIX "/opt/android-deps")
+endif()
+set(ANDROID_DEPS_DIR "${ANDROID_DEPS_PREFIX}/${ANDROID_ABI}")
+
+# NO_CMAKE_FIND_ROOT_PATH matters here: the NDK's CMake toolchain file sets
+# CMAKE_FIND_ROOT_PATH to its own sysroot and, by default, re-roots every
+# find_path/find_library PATHS entry underneath it — silently turning our
+# explicit ANDROID_DEPS_DIR into <ndk-sysroot>/opt/android-deps/..., which
+# doesn't exist. Caught when the .so was confirmed present on disk but
+# find_library still reported NOTFOUND.
+find_path(WAYLAND_CLIENT_INCLUDE_DIR wayland-client.h
+    PATHS "${ANDROID_DEPS_DIR}/include"
+    NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
+find_library(WAYLAND_CLIENT_LIB wayland-client
+    PATHS "${ANDROID_DEPS_DIR}/lib"
+    NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
+
+if(WAYLAND_CLIENT_LIB AND WAYLAND_CLIENT_INCLUDE_DIR)
+    target_include_directories(hostbridge PRIVATE ${WAYLAND_CLIENT_INCLUDE_DIR})
     target_link_libraries(hostbridge ${WAYLAND_CLIENT_LIB})
 else()
-    message(WARNING "libwayland-client not found — hostbridge will fail to link "
-                     "until a cross-compiled build is provided (see README.md).")
+    message(WARNING "libwayland-client not found under ${ANDROID_DEPS_DIR} — "
+                     "hostbridge will fail to link until a cross-compiled build "
+                     "is provided there (see README.md / build-scripts/build-vendor-deps.sh).")
 endif()
 
 find_library(log-lib log)

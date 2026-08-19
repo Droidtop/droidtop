@@ -10,6 +10,14 @@ android {
 
     defaultConfig {
         minSdk = 26
+        // Target hardware (Retroid Pocket 5 class devices) is arm64-v8a only.
+        // Also: only arm64-v8a's cross-compiled deps exist yet (see
+        // build-scripts/build-vendor-deps.sh) — the other ABIs fail for a
+        // trivial, uninteresting reason (deps not built for them), not a
+        // real bug, so keep them out of the default build entirely.
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
         externalNativeBuild {
             cmake {
                 cppFlags += "-std=c++20"
