@@ -9,9 +9,23 @@ project(remotestream)
 # that CMakeLists.txt as-is via add_subdirectory rather than reimplementing
 # its build rules.
 #
-# Requires OpenSSL >= 1.0.2 (or USE_MBEDTLS) available for the target ABI —
-# neither cross-compiled for Android in this environment. UNVERIFIED here;
-# see runtime-remote-stream/README.md.
+# TLS backend: OpenSSL is moonlight-common-c's default, but it needs a
+# separate Android cross-compile (Perl + its own Configure script) outside
+# this CMake build entirely. mbedTLS is CMake-native and cross-compiles
+# through the exact same NDK toolchain file Gradle already passes to this
+# build, so USE_MBEDTLS is set here instead — genuinely easier for this
+# specific pipeline, not a "second best" fallback.
+#
+# vendor/mbedtls currently tracks its `development` branch (default branch
+# at the time this was vendored) — pin to a numbered release tag (e.g.
+# v3.6.x) before shipping anything; tracking development for actual TLS
+# code is a real thing to fix, not just a formality.
+
+set(USE_MBEDTLS ON CACHE BOOL "" FORCE)
+add_subdirectory(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/mbedtls
+    ${CMAKE_CURRENT_BINARY_DIR}/mbedtls
+)
 
 set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(

@@ -17,6 +17,13 @@ captures/
 # NDK
 .externalNativeBuild/
 
+# Cross-compiled native deps (build-scripts/build-vendor-deps.sh output) —
+# regenerable, arch-specific, not source. jniLibs/*.so under host-bridge is
+# where that script copies its result for Gradle to package; regenerate
+# with the script rather than committing prebuilt binaries.
+.vendor-deps-build/
+host-bridge/src/main/jniLibs/
+
 # OS
 .DS_Store
 Thumbs.db

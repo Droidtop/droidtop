@@ -27,23 +27,37 @@ Android `Surface` when it happens.
 
 ## Status
 
-**Partially verified against a real Android NDK build** (WSL2 + Android SDK/
-NDK 27.0.12077973 + CMake/Ninja). What that confirmed:
-- `wayland-scanner` codegen for all three protocols against
-  `vendor/wlroots/protocol` runs and produces correct C bindings.
-- The generated screencopy bindings compile cleanly against the NDK
-  toolchain.
-- The build fails exactly where expected and nowhere else: `wayland_client.cpp`
-  and the virtual-pointer/virtual-keyboard generated bindings fail on
-  `wayland-client.h`/`wayland-util.h` not found, because `libwayland-client`
-  itself isn't cross-compiled for Android yet. That's real signal, not a
-  mystery — see TODO #1 below, and it's now the only remaining blocker
-  between here and a linkable `.so`.
+**Builds and links successfully**, verified against a real Android NDK build
+(WSL2, NDK 27.0.12077973). `libhostbridge.so` compiles, links against a
+cross-compiled `libwayland-client.so` (`build-scripts/build-vendor-deps.sh`
+— builds `libffi` via autotools, then `libwayland-client` via Meson using a
+two-step native-scanner-then-cross-library approach, see that script's
+comments for why), and exports the correct JNI symbols
+(`Java_dev_droidtop_hostbridge_HostBridge_nativeConnect`/`nativeDisconnect`).
+Confirmed via `readelf -d`: `NEEDED libwayland-client.so` is present, so the
+dynamic link is real, not just a compile-time header match.
 
-(This correction cost one real bug: the CMakeLists.txt originally pointed
-virtual-keyboard's protocol XML at `vendor/wayland-protocols`, which doesn't
-have it — all three protocols actually live in `vendor/wlroots/protocol`.
-Fixed after the first real build attempt surfaced it.)
+Real bugs this surfaced, beyond the build-system ones already listed below:
+- A C++ namespace footgun in `wayland_client.h`: `struct wl_display*` used
+  directly inside `namespace hostbridge` without a prior global forward
+  declaration silently declares a *new*, distinct `hostbridge::wl_display`
+  type instead of referring to the real global one — every `wl_display_*`
+  call then fails to compile against "an incomplete type." Fixed by
+  forward-declaring `wl_display`/`wl_registry` in the global namespace
+  before entering `namespace hostbridge`.
+- The NDK's CMake toolchain file re-roots `find_library`/`find_path` PATHS
+  entries under its own sysroot by default (`CMAKE_FIND_ROOT_PATH`), which
+  silently broke finding `libwayland-client.so` even with an explicit,
+  correct path — needed `NO_CMAKE_FIND_ROOT_PATH` on both calls.
+- Windows git checkouts corrupt every shell/autotools script in the vendored
+  submodules with CRLF line endings, breaking shebangs; `build-vendor-deps.sh`
+  strips these itself now rather than requiring a manual fix each time.
+
+What's still not implemented (this is genuinely the next work, not a build
+problem): the frame-passthrough (`wlr-screencopy` capture loop →
+`HostBridge.presentOutput`) and input-injection paths described below.
+`nativeConnect` itself (registry binding) is real and does connect; nothing
+past that point exists yet.
 
 What's implemented:
 - `wayland_client.cpp`: opens a UNIX socket at an explicit filesystem path

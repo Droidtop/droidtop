@@ -50,6 +50,23 @@ docs/                    SPEC.md and design decisions
 | `vendor/wayland`, `vendor/wayland-protocols` | [wayland](https://gitlab.freedesktop.org/wayland/wayland), [wayland-protocols](https://gitlab.freedesktop.org/wayland/wayland-protocols) | MIT | Core protocol/headers, codegen only |
 | `vendor/go-containerregistry` | [google/go-containerregistry](https://github.com/google/go-containerregistry) | Apache-2.0 | `crane` — OCI image pulling |
 | `vendor/moonlight-common-c` | [moonlight-stream/moonlight-common-c](https://github.com/moonlight-stream/moonlight-common-c) | GPL-3.0 | GameStream/Moonlight protocol client (pinned ENet fork included) |
+| `vendor/mbedtls` | [Mbed-TLS/mbedtls](https://github.com/Mbed-TLS/mbedtls) (v3.6.2) | Apache-2.0 | TLS backend for moonlight-common-c (chosen over OpenSSL — CMake-native) |
+| `vendor/libffi` | [libffi/libffi](https://github.com/libffi/libffi) | MIT | Runtime dependency of libwayland-client |
+
+## Building the native dependencies
+
+`:host-bridge` and `:runtime-remote-stream` need cross-compiled native deps
+that Gradle's own CMake build can't produce (they need Meson/autotools, not
+just CMake). Run this once before building either module:
+
+```bash
+build-scripts/build-vendor-deps.sh
+```
+
+Requires an Android SDK/NDK install and a Linux-like build environment
+(WSL2 works) with `meson`, `ninja`, `autoconf`/`automake`/`libtool`, and a
+few other standard packages — see the script's header comment for the exact
+list this was verified against.
 
 ## Licensing
 

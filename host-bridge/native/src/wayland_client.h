@@ -4,6 +4,16 @@
 // compositor, plus the registry globals hostbridge needs. See wayland_client.cpp
 // for what's implemented vs. TODO.
 
+// Forward-declared in the GLOBAL namespace deliberately: using `struct
+// wl_display*` etc. directly inside `namespace hostbridge` below, without
+// this, silently declares a NEW, distinct `hostbridge::wl_display` type
+// (elaborated-type-specifier lookup rules) instead of referring to the real
+// one from <wayland-client.h> — caught when wl_display_roundtrip() calls in
+// wayland_client.cpp failed to compile against "an incomplete type
+// hostbridge::wl_display", not the real wl_display.
+struct wl_display;
+struct wl_registry;
+
 namespace hostbridge {
 
 struct WaylandGlobals;

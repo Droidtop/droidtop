@@ -28,6 +28,12 @@ This project is distributed under the GNU General Public License v3.0 (see
   pinned ENet fork (`vendor/moonlight-common-c/enet`,
   https://github.com/cgutman/enet) as a nested submodule — required as-is,
   not substitutable with a generic ENet build.
+- **mbedTLS** — `vendor/mbedtls` (pinned to v3.6.2), https://github.com/Mbed-TLS/mbedtls — Apache-2.0.
+  TLS backend for moonlight-common-c, in place of OpenSSL — CMake-native,
+  cross-compiles through the same NDK toolchain file Gradle already uses.
+- **libffi** — `vendor/libffi`, https://github.com/libffi/libffi — MIT.
+  Runtime dependency of `libwayland-client`, cross-compiled by
+  `build-scripts/build-vendor-deps.sh`.
 
 ## Design references (not vendored, no code copied)
 
