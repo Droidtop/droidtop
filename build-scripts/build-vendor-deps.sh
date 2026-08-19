@@ -7,9 +7,16 @@
 #
 # Verified working in a WSL2 Ubuntu 24.04 environment with:
 #   apt: build-essential cmake ninja-build meson pkg-config git python3
-#        autoconf automake libtool texinfo libexpat1-dev libffi-dev
-#        libxml2-utils wayland-protocols libwayland-bin
+#        autoconf automake libtool libltdl-dev texinfo libexpat1-dev
+#        libffi-dev libxml2-utils wayland-protocols libwayland-bin
 #   Android SDK/NDK 27.0.12077973 installed via cmdline-tools' sdkmanager
+#
+# libltdl-dev matters specifically: it's the package that ships ltdl.m4
+# (needed below for libffi's LT_SYS_SYMBOL_USCORE). It was present on the
+# WSL2 box only because Debian/Ubuntu installs Recommends by default there
+# — GitHub Actions' runner apt config doesn't, so omitting it from an
+# explicit install list is a real, CI-only failure, not a hypothetical one
+# (this is exactly what happened the first two times this workflow ran).
 #
 # Usage: ./build-vendor-deps.sh [android-abi] [api-level] [ndk-path]
 # Defaults match this repo's build.gradle.kts files (arm64-v8a, API 26,
