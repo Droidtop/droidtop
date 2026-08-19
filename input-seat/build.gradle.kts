@@ -24,4 +24,6 @@ dependencies {
     implementation(project(":runtime-common"))
     implementation(project(":host-bridge"))
     implementation(libs.androidx.core.ktx)
+
+    testImplementation(libs.junit)
 }

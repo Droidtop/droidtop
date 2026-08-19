@@ -17,7 +17,7 @@ enum class InputSource { TOUCH, GAMEPAD, SECOND_SCREEN_TRACKPAD, SECOND_SCREEN_K
  * the second-screen trackpad maps to relative deltas like a real trackpad.
  */
 class InputSeat(
-    private val bridge: dev.droidtop.hostbridge.HostBridge,
+    private val bridge: dev.droidtop.hostbridge.HostBridgeInput,
 ) {
     /** [dx]/[dy]: trackpad-style relative deltas — the second-screen trackpad's primary use case. */
     fun onPointerMove(source: InputSource, dx: Float, dy: Float) {
