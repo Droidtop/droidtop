@@ -30,6 +30,39 @@ android {
         }
     }
 
+    // Only configured when the signing secrets are present (real CI runs,
+    // via SIGNING_KEYSTORE_PATH/SIGNING_STORE_PASSWORD/SIGNING_KEY_ALIAS/
+    // SIGNING_KEY_PASSWORD in the workflow) — local/contributor builds fall
+    // back to Android's default auto-generated debug keystore instead of
+    // failing when these aren't set.
+    //
+    // Without this, every CI run signs with a brand-new ephemeral debug
+    // keystore (GitHub Actions runners are fresh VMs with no persisted
+    // ~/.android/debug.keystore across runs), so every past "latest"
+    // release had a different signing identity and users had to fully
+    // uninstall before installing any newer build. One persistent keystore
+    // (generated once, stored only as a GitHub Actions secret — see
+    // .signing/ in .gitignore) fixes that.
+    val signingKeystorePath = System.getenv("SIGNING_KEYSTORE_PATH")
+    signingConfigs {
+        if (signingKeystorePath != null) {
+            create("droidtop") {
+                storeFile = file(signingKeystorePath)
+                storePassword = System.getenv("SIGNING_STORE_PASSWORD")
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            if (signingKeystorePath != null) {
+                signingConfig = signingConfigs.getByName("droidtop")
+            }
+        }
+    }
+
     buildFeatures {
         compose = true
     }

@@ -25,6 +25,10 @@ captures/
 host-bridge/src/main/jniLibs/
 runtime-linux-root/src/main/assets/bin/
 
+# Signing (real release key + passwords — never commit these; CI reads
+# them from repo secrets instead, see .github/workflows/android-build.yml)
+.signing/
+
 # OS
 .DS_Store
 Thumbs.db

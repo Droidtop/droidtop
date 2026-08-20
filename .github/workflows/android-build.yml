@@ -101,24 +101,31 @@ jobs:
         id: deps-cache
         uses: actions/cache@v4
         with:
-          # Caches the final packaged outputs *and* the ANDROID_DEPS_PREFIX
-          # build dir. jniLibs/assets/bin alone isn't enough: on a cache hit
-          # the "Build cross-compiled vendor deps" step is skipped entirely,
-          # but host-bridge's own CMake build (via ANDROID_DEPS_PREFIX) still
-          # needs wayland-client.h/wayland-util.h/libffi.a from that prefix
-          # at compile time, every run, cache hit or not. Run 32405390718
-          # hit exactly this: cache hit skipped the deps step, .android-deps
-          # was never populated, and host-bridge's ninja build failed with
-          # "'wayland-util.h' file not found". Covers both ABIs since they
-          # all live under these same parent directories.
+          # Caches the final packaged output (assets/bin) *and* the
+          # ANDROID_DEPS_PREFIX build dir. assets/bin alone isn't enough: on
+          # a cache hit the "Build cross-compiled vendor deps" step is
+          # skipped entirely, but host-bridge's own CMake build (via
+          # ANDROID_DEPS_PREFIX) still needs wayland-client.h/
+          # wayland-util.h/libffi.a from that prefix at compile time, every
+          # run, cache hit or not. Run 32405390718 hit exactly this: cache
+          # hit skipped the deps step, .android-deps was never populated,
+          # and host-bridge's ninja build failed with "'wayland-util.h' file
+          # not found". Covers both ABIs since they all live under these
+          # same parent directories.
+          #
+          # host-bridge/src/main/jniLibs is NOT cached (or populated by the
+          # build step) — libwayland-client.so is packaged via CMake's own
+          # prebuilt-shared-lib linking instead (see host-bridge/native/
+          # CMakeLists.txt and build-scripts/build-vendor-deps.sh); a
+          # separate copy into jniLibs duplicated that same APK path and
+          # broke :host-bridge:mergeDebugNativeLibs.
           path: |
-            host-bridge/src/main/jniLibs
             runtime-linux-root/src/main/assets/bin
             ${{ env.ANDROID_DEPS_PREFIX }}
           # Keyed on every vendored submodule this script actually builds
           # from, not just a static string — a submodule bump on any of
           # them should invalidate this.
-          key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD') }}-v4
+          key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD') }}-v5
 
       - name: Build cross-compiled vendor deps (libffi, libwayland-client, droidspaces)
         if: steps.deps-cache.outputs.cache-hit != 'true'
@@ -146,6 +153,23 @@ jobs:
             bash build-scripts/build-vendor-deps.sh "$abi"
           done
 
+      - name: Decode signing keystore
+        # Only runs when the secret actually exists — PR builds from forks
+        # don't get repo secrets, and this step falling back to "skipped"
+        # rather than failing lets those still build (just with Android's
+        # default ephemeral debug signing) instead of blocking on a secret
+        # they can't have. See app/build.gradle.kts for why a persistent
+        # keystore matters: without one, every CI run signs with a brand-new
+        # random debug key (fresh runner VM, no persisted debug.keystore),
+        # so every past "latest" release had a different signing identity
+        # and users had to fully uninstall before installing a newer build.
+        if: ${{ secrets.SIGNING_KEYSTORE_BASE64 != '' }}
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+        run: |
+          echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/droidtop-release.jks"
+          echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/droidtop-release.jks" >> "$GITHUB_ENV"
+
       - name: Build debug APK
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/${{ env.NDK_VERSION }}
@@ -153,6 +177,9 @@ jobs:
           # file, monotonic across runs) — exactly the "-(revision)" tag
           # requested, not a git SHA. Read by app/build.gradle.kts.
           VERSION_REVISION: ${{ github.run_number }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: ./gradlew :app:assembleDebug --stacktrace
 
       - name: Upload APK
