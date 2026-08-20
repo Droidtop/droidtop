@@ -154,21 +154,29 @@ jobs:
           done
 
       - name: Decode signing keystore
-        # Only runs when the secret actually exists — PR builds from forks
-        # don't get repo secrets, and this step falling back to "skipped"
-        # rather than failing lets those still build (just with Android's
-        # default ephemeral debug signing) instead of blocking on a secret
-        # they can't have. See app/build.gradle.kts for why a persistent
-        # keystore matters: without one, every CI run signs with a brand-new
-        # random debug key (fresh runner VM, no persisted debug.keystore),
-        # so every past "latest" release had a different signing identity
-        # and users had to fully uninstall before installing a newer build.
-        if: ${{ secrets.SIGNING_KEYSTORE_BASE64 != '' }}
+        # Only decodes when the secret actually exists — PR builds from
+        # forks don't get repo secrets, and this step no-op'ing rather than
+        # failing lets those still build (just with Android's default
+        # ephemeral debug signing) instead of blocking on a secret they
+        # can't have. The check has to live inside the script, not in a
+        # step-level `if:` — GitHub Actions rejects `secrets` references
+        # inside `if:` conditionals outright (a workflow-file parse error,
+        # confirmed from run 32409339266 failing instantly with "This run
+        # likely failed because of a workflow file issue" — zero jobs ever
+        # started). See app/build.gradle.kts for why a persistent keystore
+        # matters: without one, every CI run signs with a brand-new random
+        # debug key (fresh runner VM, no persisted debug.keystore), so
+        # every past "latest" release had a different signing identity and
+        # users had to fully uninstall before installing a newer build.
         env:
           SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
         run: |
-          echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/droidtop-release.jks"
-          echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/droidtop-release.jks" >> "$GITHUB_ENV"
+          if [ -n "$SIGNING_KEYSTORE_BASE64" ]; then
+            echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/droidtop-release.jks"
+            echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/droidtop-release.jks" >> "$GITHUB_ENV"
+          else
+            echo "No SIGNING_KEYSTORE_BASE64 secret available (e.g. a fork PR) — building with Android's default debug signing instead."
+          fi
 
       - name: Build debug APK
         env:
