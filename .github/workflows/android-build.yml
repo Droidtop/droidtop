@@ -24,6 +24,11 @@ env:
   # runner. $HOME needs no sudo and is just as reproducible.
   ANDROID_DEPS_PREFIX: ${{ github.workspace }}/.android-deps
 
+# gh release create/delete needs write access to repo contents — the
+# default GITHUB_TOKEN is read-only unless granted this explicitly.
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -129,6 +134,10 @@ jobs:
       - name: Build debug APK
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/${{ env.NDK_VERSION }}
+          # github.run_number: a plain incrementing integer (per workflow
+          # file, monotonic across runs) — exactly the "-(revision)" tag
+          # requested, not a git SHA. Read by app/build.gradle.kts.
+          VERSION_REVISION: ${{ github.run_number }}
         run: ./gradlew :app:assembleDebug --stacktrace
 
       - name: Upload APK
@@ -137,3 +146,28 @@ jobs:
           name: droidtop-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Publish rolling "latest" release
+        # Workflow artifacts (the step above) are ephemeral — ~90-day
+        # retention, buried under the Actions tab, awkward to hand someone
+        # a direct link to. A GitHub Release is the actual "give this to
+        # someone to install" mechanism: permanent, listed on the repo's
+        # main page, one clean download URL. Only publish from real pushes
+        # to main, not PRs — a PR's build isn't something to hand out yet.
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk droidtop-debug-latest.apk
+
+          # Rolling release, not one-per-commit: this project is under
+          # active development with no version numbers yet, so "latest"
+          # always pointing at the newest working build is more useful
+          # than accumulating dozens of stale per-commit releases. Delete
+          # + recreate rather than `gh release upload --clobber` onto an
+          # existing release, so the notes/timestamp stay accurate too.
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create latest droidtop-debug-latest.apk \
+            --title "DroidTop — latest debug build" \
+            --notes "Automatically built from commit ${{ github.sha }}. Debug build (unsigned, arm64-v8a + x86_64 fat APK) — not for production use, and functionality is still early: see docs/SPEC.md for current status." \
+            --prerelease
