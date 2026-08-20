@@ -9,6 +9,10 @@
 #   apt: build-essential cmake ninja-build meson pkg-config git python3
 #        autoconf automake libtool libltdl-dev texinfo libexpat1-dev
 #        libffi-dev libxml2-utils wayland-protocols libwayland-bin
+#   gh (GitHub CLI), authenticated (`gh auth login`) — used to pull the
+#        mirrored musl cross toolchains, see the droidspaces section below.
+#        Already preinstalled + authenticated via GH_TOKEN on GitHub-hosted
+#        Actions runners; needs manual install+login for local use.
 #   Android SDK/NDK 27.0.12077973 installed via cmdline-tools' sdkmanager
 #
 # libltdl-dev matters specifically: it's the package that ships ltdl.m4
@@ -190,18 +194,25 @@ MUSL_TOOLCHAIN_DIR="$REPO_ROOT/.vendor-deps-build/musl-cross-toolchain-$MUSL_TRI
 MUSL_CROSS_BIN="$MUSL_TOOLCHAIN_DIR/$MUSL_TRIPLE-cross/bin"
 if [ ! -x "$MUSL_CROSS_BIN/$MUSL_TRIPLE-gcc" ]; then
     mkdir -p "$MUSL_TOOLCHAIN_DIR"
-    # musl.cc isn't behind a CDN and CI's first real run against it (for
-    # arm64-v8a) failed with curl exit 28 (timeout) after ~2min with zero
-    # bytes transferred -- a real, observed failure, not a hypothetical.
-    # --retry/--retry-delay gives it a few chances to get past what's
-    # likely a transient stall rather than failing the whole build on one
-    # bad connection attempt; --max-time bounds each individual attempt so
-    # a hung connection can't silently eat the whole job the way the
-    # apt-lock issue once did.
-    curl --fail --retry 5 --retry-delay 5 --retry-connrefused --max-time 120 \
-        -L "https://musl.cc/$MUSL_TRIPLE-cross.tgz" -o "$MUSL_TOOLCHAIN_DIR/toolchain.tgz"
-    tar -xzf "$MUSL_TOOLCHAIN_DIR/toolchain.tgz" -C "$MUSL_TOOLCHAIN_DIR"
-    rm "$MUSL_TOOLCHAIN_DIR/toolchain.tgz"
+    # musl.cc isn't behind a CDN, and downloading directly from it proved
+    # genuinely unreliable from GitHub Actions runners -- not a transient
+    # blip: a real run retried 6 times over 12+ minutes (--retry 5,
+    # --max-time 120 each) and never got past a connection timeout even
+    # once. Mirrored both toolchains as assets on this repo's own
+    # "build-toolchains" release instead (re-hosted as-is, not modified —
+    # re-pull from https://musl.cc if they ever need updating) and pull
+    # from there via `gh release download`, which is authenticated and
+    # backed by GitHub's own reliable infrastructure rather than a single
+    # third-party host. Needs `gh auth login` locally, or GH_TOKEN set in
+    # CI (see .github/workflows/android-build.yml).
+    REPO_SLUG="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo bi0shacker001/droidtop)"
+    gh release download build-toolchains \
+        --repo "$REPO_SLUG" \
+        --pattern "$MUSL_TRIPLE-cross.tgz" \
+        --dir "$MUSL_TOOLCHAIN_DIR" \
+        --clobber
+    tar -xzf "$MUSL_TOOLCHAIN_DIR/$MUSL_TRIPLE-cross.tgz" -C "$MUSL_TOOLCHAIN_DIR"
+    rm "$MUSL_TOOLCHAIN_DIR/$MUSL_TRIPLE-cross.tgz"
 fi
 
 (
