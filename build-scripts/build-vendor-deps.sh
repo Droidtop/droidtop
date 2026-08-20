@@ -179,10 +179,16 @@ EOF
     ninja -C "$WORK/wayland-android-build" install
 )
 
-echo "=== Copying runtime .so deps into host-bridge's jniLibs (packaged into the APK) ==="
-JNILIBS="$REPO_ROOT/host-bridge/src/main/jniLibs/$ABI"
-mkdir -p "$JNILIBS"
-cp "$DEPS_DIR/lib/libwayland-client.so" "$JNILIBS/"
+# libwayland-client.so is NOT copied into host-bridge/src/main/jniLibs here.
+# host-bridge/native/CMakeLists.txt links hostbridge against it via an
+# absolute path (target_link_libraries(hostbridge ${WAYLAND_CLIENT_LIB})) —
+# AGP's external native build packaging already copies any prebuilt shared
+# library linked that way into the APK automatically (the documented
+# mechanism: https://developer.android.com/ndk/guides/prebuilts). Also
+# copying it into jniLibs here duplicated the same path
+# (lib/arm64-v8a/libwayland-client.so) from two different sources, which
+# :host-bridge:mergeDebugNativeLibs correctly refused to merge ("2 files
+# found with path ...").
 
 echo "=== droidspaces ($ABI) ==="
 # Genuinely simple compared to everything above: a single static musl
