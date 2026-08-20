@@ -23,6 +23,7 @@ captures/
 # with the script rather than committing prebuilt binaries.
 .vendor-deps-build/
 host-bridge/src/main/jniLibs/
+runtime-linux-root/src/main/assets/bin/
 
 # OS
 .DS_Store
