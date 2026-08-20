@@ -92,32 +92,30 @@ jobs:
           "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" \
             "platform-tools" "platforms;android-34" "build-tools;34.0.0" "ndk;${NDK_VERSION}"
 
-      - name: Cache cross-compiled vendor deps (libffi, libwayland-client)
+      - name: Cache cross-compiled vendor deps (libffi, libwayland-client, droidspaces)
         id: deps-cache
         uses: actions/cache@v4
         with:
-          path: ${{ env.ANDROID_DEPS_PREFIX }}
-          # Keyed on the two vendored submodules' pinned commits, not just a
-          # static string — a submodule bump should invalidate this.
-          key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD') }}-v1
+          # Caches the actual final packaged outputs directly (not the
+          # intermediate ANDROID_DEPS_PREFIX build dir) — a cache hit means
+          # there's nothing left to re-copy, the APK-ready files are already
+          # in place. Simpler than caching an intermediate location and
+          # needing a separate "restore the real files from it" step.
+          path: |
+            host-bridge/src/main/jniLibs
+            runtime-linux-root/src/main/assets/bin
+          # Keyed on every vendored submodule this script actually builds
+          # from, not just a static string — a submodule bump on any of
+          # them should invalidate this.
+          key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD') }}-v2
 
-      - name: Build cross-compiled vendor deps (libffi, libwayland-client)
+      - name: Build cross-compiled vendor deps (libffi, libwayland-client, droidspaces)
         if: steps.deps-cache.outputs.cache-hit != 'true'
         # Invoked via `bash` explicitly, not `./build-scripts/build-vendor-deps.sh`
         # — this repo is developed partly on Windows, where the executable
         # bit doesn't reliably survive a commit, and relying on it here
         # failed CI outright ("Permission denied") the first time.
         run: bash build-scripts/build-vendor-deps.sh
-
-      - name: Re-copy jniLibs from cache
-        if: steps.deps-cache.outputs.cache-hit == 'true'
-        # jniLibs/*.so is gitignored (regenerable build output, see
-        # .gitignore) AND lives outside ANDROID_DEPS_PREFIX, so a cache hit
-        # on the deps still needs this one file copied back into place —
-        # cheap, no need to rerun the whole cross-compile for it.
-        run: |
-          mkdir -p host-bridge/src/main/jniLibs/arm64-v8a
-          cp "$ANDROID_DEPS_PREFIX/arm64-v8a/lib/libwayland-client.so" host-bridge/src/main/jniLibs/arm64-v8a/
 
       - name: Build debug APK
         env:

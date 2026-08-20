@@ -156,5 +156,39 @@ JNILIBS="$REPO_ROOT/host-bridge/src/main/jniLibs/$ABI"
 mkdir -p "$JNILIBS"
 cp "$DEPS_DIR/lib/libwayland-client.so" "$JNILIBS/"
 
+echo "=== droidspaces ($ABI) ==="
+# Genuinely simple compared to everything above: a single static musl
+# binary, no shared-library deps at all (musl's static linking means it
+# only needs the Linux kernel syscall ABI, which Android provides — this
+# is exactly why it runs fine on Android despite being built against musl,
+# not bionic). Just needs a prebuilt aarch64-linux-musl-gcc cross toolchain.
+MUSL_TOOLCHAIN_DIR="$REPO_ROOT/.vendor-deps-build/musl-cross-toolchain"
+if [ ! -x "$MUSL_TOOLCHAIN_DIR/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc" ]; then
+    mkdir -p "$MUSL_TOOLCHAIN_DIR"
+    curl -sL https://musl.cc/aarch64-linux-musl-cross.tgz -o "$MUSL_TOOLCHAIN_DIR/toolchain.tgz"
+    tar -xzf "$MUSL_TOOLCHAIN_DIR/toolchain.tgz" -C "$MUSL_TOOLCHAIN_DIR"
+    rm "$MUSL_TOOLCHAIN_DIR/toolchain.tgz"
+fi
+
+(
+    export MUSL_CROSS="$MUSL_TOOLCHAIN_DIR/aarch64-linux-musl-cross/bin"
+    cd "$VENDOR/droidspaces"
+    make clean >/dev/null 2>&1 || true
+    # Upstream's own CFLAGS (copied from their Makefile) plus five
+    # -Wno-error= exceptions for warning classes that are false positives
+    # specifically under this musl-cross-make GCC version (confirmed by
+    # building it: every one of these fires on generic bounds-checked
+    # helpers like `safe_strncpy(dst, size, ...)` where `size` is a runtime
+    # parameter GCC's static analysis can't fully resolve, not on any
+    # actual bug) — everything else stays -Werror, matching upstream intent.
+    make aarch64 CFLAGS="-Wall -Wextra -Wpedantic -Werror -O2 -flto=auto -std=gnu99 -Isrc/include -no-pie -pthread -Wformat=2 -Wformat-security -Wnull-dereference -Wcast-qual -Wlogical-op -Wshadow -Wdouble-promotion -Wundef -Wduplicated-cond -Wduplicated-branches -Wimplicit-fallthrough=3 -fstack-protector-strong -Wno-error=format-truncation -Wno-error=format-overflow -Wno-error=array-bounds -Wno-error=stringop-truncation -Wno-error=stringop-overflow"
+)
+
+echo "=== Copying droidspaces binary into runtime-linux-root's assets (packaged into the APK) ==="
+DS_ASSETS="$REPO_ROOT/runtime-linux-root/src/main/assets/bin"
+mkdir -p "$DS_ASSETS"
+cp "$VENDOR/droidspaces/output/droidspaces" "$DS_ASSETS/droidspaces-arm64-v8a"
+
 echo "=== Done. Deps installed under $DEPS_DIR ==="
 find "$DEPS_DIR" -iname "*wayland-client*" -o -iname "libffi.a"
+file "$DS_ASSETS/droidspaces-arm64-v8a"

@@ -276,40 +276,48 @@ pc-helper/               → separate Go program, runs on the remote gaming PC, 
 
 ## 10a. Build environment
 
-A local dev environment exists: a dedicated WSL2 distro (`droidtop-dev`),
-entirely on non-OS storage, with Android SDK/NDK 27.0.12077973, Gradle 8.9,
-Go, and the Meson/CMake/wayland-scanner toolchain installed. Primary CI is
-GitHub Actions (not yet set up); this local environment is for exactly the
-kind of hands-on de-risking §10/§11 call for.
+Two build environments exist and are both real, not aspirational:
 
-First real build pass against it already found and fixed three bugs no
-amount of reading would have caught: a duplicate version-catalog
-registration in `settings.gradle.kts`, Kotlin 2.0's Compose Compiler plugin
-being required-but-missing on every Compose module, and `default` being an
-invalid Java package segment (`shell-default`'s package is now
-`dev.droidtop.shell.standard`). All pure-Kotlin modules build clean.
+- **Local**: a dedicated WSL2 distro (`droidtop-dev`), entirely on non-OS
+  storage, with Android SDK/NDK 27.0.12077973, Gradle 8.9, Go, and the
+  Meson/CMake/autotools/musl-cross toolchains needed by
+  `build-scripts/build-vendor-deps.sh`.
+- **CI**: GitHub Actions (`.github/workflows/android-build.yml`), mirroring
+  the local setup, uploading a debug APK artifact on every push to `main`.
+  Getting this green took six distinct, real CI-only bugs (missing
+  `libltdl-dev`, an `ANDROID_HOME`/`ANDROID_SDK_ROOT` conflict with the
+  runner's preinstalled SDK, `ANDROID_DEPS_PREFIX` never actually reaching
+  CMake, and a multi-attempt apt-lock hang that needed real diagnostics —
+  not more guessing — to actually fix) — see the workflow file's own
+  comments for the specifics of each.
 
-Both native modules now build and link successfully, not just "up to their
-one dependency gap" as an earlier pass of this doc said:
-- `:runtime-remote-stream` — switched to mbedTLS (`vendor/mbedtls`) instead
-  of OpenSSL, since it's CMake-native and cross-compiles through the same
-  NDK toolchain file Gradle already passes in. Builds clean end to end
-  (moonlight-common-c + its pinned ENet fork + mbedTLS).
-- `:host-bridge` — `build-scripts/build-vendor-deps.sh` cross-compiles
-  `libffi` (autotools) and `libwayland-client` (Meson, via a native-scanner-
-  then-cross-library two-step approach) and copies the result into
-  `jniLibs` for Gradle to package. `libhostbridge.so` links against it for
-  real (`readelf -d` confirms `NEEDED libwayland-client.so`) and exports
-  the correct JNI symbols. This was flagged in an earlier pass of this doc
-  as the single biggest unproven risk in the whole architecture — it's
-  proven now. Frame passthrough and input injection are still unimplemented
-  (see `:host-bridge`'s README), but that's ordinary remaining work, not an
-  open risk anymore.
+Every module now builds and links for real:
+- `:runtime-remote-stream` — mbedTLS (chosen over OpenSSL: CMake-native,
+  cross-compiles through the same NDK toolchain file Gradle already passes
+  in) + moonlight-common-c + its pinned ENet fork, all build end to end.
+  JNI entry points still unimplemented.
+- `:host-bridge` — cross-compiled `libffi` + `libwayland-client` (Meson, a
+  native-scanner-then-cross-library two-step approach), confirmed linked
+  for real (`readelf -d` shows `NEEDED libwayland-client.so`). Frame
+  passthrough (`wlr-screencopy` capture loop → `ANativeWindow`) and input
+  injection (virtual pointer/keyboard, with a statically embedded XKB
+  keymap — see that module's README for why) are both implemented, not
+  just scaffolded. Unverified against a live compositor (none exists yet
+  to connect to).
+- `:runtime-linux-root` — cross-compiles the `droidspaces` binary itself (a
+  single static musl executable, ~430KB, genuinely simple compared to the
+  above: no shared-library deps at all). `DroidSpacesRuntime` drives it as
+  a subprocess (`su -c`, matching how droidspaces is actually designed to
+  be used — a CLI tool, not a library), with the primary/sibling
+  Wayland-socket-sharing bind-mount design from §3 implemented against
+  droidspaces' real, documented `.config` format. Blocked on
+  `RootfsPuller` having no implementation yet (can't pull an OCI image) and
+  on no primary-container image (sway pre-installed) existing to pull.
+  Unverified against a real device — no rooted hardware in this
+  environment.
 
-Both native modules are currently restricted to `arm64-v8a` only (matches
-the actual target hardware; other ABIs simply don't have cross-compiled
-deps yet, which isn't an interesting problem to solve until there's a
-reason to support other hardware).
+All native modules are restricted to `arm64-v8a` only (matches the actual
+target hardware).
 
 ## 11. Open risks to verify hands-on, not assume
 
