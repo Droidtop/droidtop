@@ -165,7 +165,15 @@ echo "=== droidspaces ($ABI) ==="
 MUSL_TOOLCHAIN_DIR="$REPO_ROOT/.vendor-deps-build/musl-cross-toolchain"
 if [ ! -x "$MUSL_TOOLCHAIN_DIR/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc" ]; then
     mkdir -p "$MUSL_TOOLCHAIN_DIR"
-    curl -sL https://musl.cc/aarch64-linux-musl-cross.tgz -o "$MUSL_TOOLCHAIN_DIR/toolchain.tgz"
+    # musl.cc isn't behind a CDN and CI's first real run against it failed
+    # with curl exit 28 (timeout) after ~2min with zero bytes transferred --
+    # a real, observed failure, not a hypothetical. --retry/--retry-delay
+    # gives it a few chances to get past what's likely a transient stall
+    # rather than failing the whole build on one bad connection attempt;
+    # --max-time bounds each individual attempt so a hung connection can't
+    # silently eat the whole job the way the apt-lock issue once did.
+    curl --fail --retry 5 --retry-delay 5 --retry-connrefused --max-time 120 \
+        -L https://musl.cc/aarch64-linux-musl-cross.tgz -o "$MUSL_TOOLCHAIN_DIR/toolchain.tgz"
     tar -xzf "$MUSL_TOOLCHAIN_DIR/toolchain.tgz" -C "$MUSL_TOOLCHAIN_DIR"
     rm "$MUSL_TOOLCHAIN_DIR/toolchain.tgz"
 fi
