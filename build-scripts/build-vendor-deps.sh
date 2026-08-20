@@ -19,8 +19,12 @@
 # (this is exactly what happened the first two times this workflow ran).
 #
 # Usage: ./build-vendor-deps.sh [android-abi] [api-level] [ndk-path]
-# Defaults match this repo's build.gradle.kts files (arm64-v8a, API 26,
-# NDK 27.0.12077973 under $ANDROID_SDK_ROOT/ndk).
+# Builds ONE ABI per invocation — for a fat/universal APK covering both
+# targets (arm64-v8a for real hardware, x86_64 for emulators/x86 devices),
+# call this script once per ABI; see the "for ABI in ..." loop in
+# .github/workflows/android-build.yml. Defaults match this repo's
+# build.gradle.kts files (arm64-v8a, API 26, NDK 27.0.12077973 under
+# $ANDROID_SDK_ROOT/ndk).
 
 set -euo pipefail
 
@@ -30,12 +34,32 @@ NDK="${3:-${ANDROID_SDK_ROOT:-/opt/android-sdk}/ndk/27.0.12077973}"
 DEPS_PREFIX="${ANDROID_DEPS_PREFIX:-/opt/android-deps}"
 DEPS_DIR="$DEPS_PREFIX/$ABI"
 
-if [ "$ABI" != "arm64-v8a" ]; then
-    echo "Only arm64-v8a's target triple (aarch64-linux-android) is wired up below." >&2
-    echo "Add another case if/when a second ABI is actually needed." >&2
-    exit 1
-fi
-TARGET_TRIPLE="aarch64-linux-android"
+# Per-ABI target triples: one for the NDK's clang (Android/bionic target),
+# one for musl.cc's prebuilt cross toolchain (droidspaces' static-musl
+# build, unrelated to Android's own libc), and one for Meson's cpu naming
+# (which happens to match the musl triple's arch component for both ABIs
+# this project targets).
+case "$ABI" in
+    arm64-v8a)
+        TARGET_TRIPLE="aarch64-linux-android"
+        MUSL_TRIPLE="aarch64-linux-musl"
+        MESON_CPU_FAMILY="aarch64"
+        MESON_CPU="aarch64"
+        DROIDSPACES_MAKE_TARGET="aarch64"
+        ;;
+    x86_64)
+        TARGET_TRIPLE="x86_64-linux-android"
+        MUSL_TRIPLE="x86_64-linux-musl"
+        MESON_CPU_FAMILY="x86_64"
+        MESON_CPU="x86_64"
+        DROIDSPACES_MAKE_TARGET="x86_64"
+        ;;
+    *)
+        echo "No target-triple mapping for ABI '$ABI' — only arm64-v8a and x86_64 are wired up." >&2
+        echo "(Those are this project's actual targets: real ARM hardware + x86_64 emulators/devices.)" >&2
+        exit 1
+        ;;
+esac
 
 TOOLCHAIN_BIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
 CC="$TOOLCHAIN_BIN/$TARGET_TRIPLE$API-clang"
@@ -125,8 +149,8 @@ pkg-config = 'pkg-config'
 
 [host_machine]
 system = 'android'
-cpu_family = 'aarch64'
-cpu = 'aarch64'
+cpu_family = '$MESON_CPU_FAMILY'
+cpu = '$MESON_CPU'
 endian = 'little'
 
 [properties]
@@ -161,25 +185,27 @@ echo "=== droidspaces ($ABI) ==="
 # binary, no shared-library deps at all (musl's static linking means it
 # only needs the Linux kernel syscall ABI, which Android provides — this
 # is exactly why it runs fine on Android despite being built against musl,
-# not bionic). Just needs a prebuilt aarch64-linux-musl-gcc cross toolchain.
-MUSL_TOOLCHAIN_DIR="$REPO_ROOT/.vendor-deps-build/musl-cross-toolchain"
-if [ ! -x "$MUSL_TOOLCHAIN_DIR/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc" ]; then
+# not bionic). Just needs a prebuilt musl cross toolchain matching $ABI.
+MUSL_TOOLCHAIN_DIR="$REPO_ROOT/.vendor-deps-build/musl-cross-toolchain-$MUSL_TRIPLE"
+MUSL_CROSS_BIN="$MUSL_TOOLCHAIN_DIR/$MUSL_TRIPLE-cross/bin"
+if [ ! -x "$MUSL_CROSS_BIN/$MUSL_TRIPLE-gcc" ]; then
     mkdir -p "$MUSL_TOOLCHAIN_DIR"
-    # musl.cc isn't behind a CDN and CI's first real run against it failed
-    # with curl exit 28 (timeout) after ~2min with zero bytes transferred --
-    # a real, observed failure, not a hypothetical. --retry/--retry-delay
-    # gives it a few chances to get past what's likely a transient stall
-    # rather than failing the whole build on one bad connection attempt;
-    # --max-time bounds each individual attempt so a hung connection can't
-    # silently eat the whole job the way the apt-lock issue once did.
+    # musl.cc isn't behind a CDN and CI's first real run against it (for
+    # arm64-v8a) failed with curl exit 28 (timeout) after ~2min with zero
+    # bytes transferred -- a real, observed failure, not a hypothetical.
+    # --retry/--retry-delay gives it a few chances to get past what's
+    # likely a transient stall rather than failing the whole build on one
+    # bad connection attempt; --max-time bounds each individual attempt so
+    # a hung connection can't silently eat the whole job the way the
+    # apt-lock issue once did.
     curl --fail --retry 5 --retry-delay 5 --retry-connrefused --max-time 120 \
-        -L https://musl.cc/aarch64-linux-musl-cross.tgz -o "$MUSL_TOOLCHAIN_DIR/toolchain.tgz"
+        -L "https://musl.cc/$MUSL_TRIPLE-cross.tgz" -o "$MUSL_TOOLCHAIN_DIR/toolchain.tgz"
     tar -xzf "$MUSL_TOOLCHAIN_DIR/toolchain.tgz" -C "$MUSL_TOOLCHAIN_DIR"
     rm "$MUSL_TOOLCHAIN_DIR/toolchain.tgz"
 fi
 
 (
-    export MUSL_CROSS="$MUSL_TOOLCHAIN_DIR/aarch64-linux-musl-cross/bin"
+    export MUSL_CROSS="$MUSL_CROSS_BIN"
     cd "$VENDOR/droidspaces"
     make clean >/dev/null 2>&1 || true
     # Upstream's own CFLAGS (copied from their Makefile) plus five
@@ -189,14 +215,14 @@ fi
     # helpers like `safe_strncpy(dst, size, ...)` where `size` is a runtime
     # parameter GCC's static analysis can't fully resolve, not on any
     # actual bug) — everything else stays -Werror, matching upstream intent.
-    make aarch64 CFLAGS="-Wall -Wextra -Wpedantic -Werror -O2 -flto=auto -std=gnu99 -Isrc/include -no-pie -pthread -Wformat=2 -Wformat-security -Wnull-dereference -Wcast-qual -Wlogical-op -Wshadow -Wdouble-promotion -Wundef -Wduplicated-cond -Wduplicated-branches -Wimplicit-fallthrough=3 -fstack-protector-strong -Wno-error=format-truncation -Wno-error=format-overflow -Wno-error=array-bounds -Wno-error=stringop-truncation -Wno-error=stringop-overflow"
+    make "$DROIDSPACES_MAKE_TARGET" CFLAGS="-Wall -Wextra -Wpedantic -Werror -O2 -flto=auto -std=gnu99 -Isrc/include -no-pie -pthread -Wformat=2 -Wformat-security -Wnull-dereference -Wcast-qual -Wlogical-op -Wshadow -Wdouble-promotion -Wundef -Wduplicated-cond -Wduplicated-branches -Wimplicit-fallthrough=3 -fstack-protector-strong -Wno-error=format-truncation -Wno-error=format-overflow -Wno-error=array-bounds -Wno-error=stringop-truncation -Wno-error=stringop-overflow"
 )
 
 echo "=== Copying droidspaces binary into runtime-linux-root's assets (packaged into the APK) ==="
 DS_ASSETS="$REPO_ROOT/runtime-linux-root/src/main/assets/bin"
 mkdir -p "$DS_ASSETS"
-cp "$VENDOR/droidspaces/output/droidspaces" "$DS_ASSETS/droidspaces-arm64-v8a"
+cp "$VENDOR/droidspaces/output/droidspaces" "$DS_ASSETS/droidspaces-$ABI"
 
 echo "=== Done. Deps installed under $DEPS_DIR ==="
 find "$DEPS_DIR" -iname "*wayland-client*" -o -iname "libffi.a"
-file "$DS_ASSETS/droidspaces-arm64-v8a"
+file "$DS_ASSETS/droidspaces-$ABI"

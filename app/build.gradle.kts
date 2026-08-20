@@ -14,11 +14,13 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "0.1.0-dev"
-        // Target hardware (Retroid Pocket 5 class devices) is arm64-v8a
-        // only — matches host-bridge/runtime-remote-stream's own
-        // abiFilters, whose cross-compiled deps only exist for this ABI.
+        // arm64-v8a (real hardware, e.g. Retroid Pocket 5) + x86_64
+        // (emulators/x86 devices), matching host-bridge/runtime-remote-
+        // stream's own abiFilters — one fat APK covering both rather than
+        // separate per-ABI builds.
         ndk {
             abiFilters += "arm64-v8a"
+            abiFilters += "x86_64"
         }
     }
 

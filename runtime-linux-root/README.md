@@ -37,16 +37,19 @@ rationale. Instead:
 
 ## Status
 
-**Builds and packages for real.** `build-scripts/build-vendor-deps.sh`
-cross-compiles the `droidspaces` binary itself — a single static musl-libc
-executable (~430KB, verified), needing only a prebuilt
-`aarch64-linux-musl-gcc` toolchain and no other dependencies (static linking
-means it only needs the Linux kernel syscall ABI, which Android provides
-regardless of bionic vs musl userland — this is *much* simpler than
-`:host-bridge`'s wayland-client cross-compile). The binary is bundled as an
-APK asset (`assets/bin/droidspaces-arm64-v8a`, confirmed present in a real
-built APK) and extracted to a real executable file on first use
-(`DroidSpacesBinary`).
+**Builds and packages for real, for both target ABIs.** `build-scripts/
+build-vendor-deps.sh` cross-compiles the `droidspaces` binary itself — a
+single static musl-libc executable (~430KB on arm64-v8a, ~409KB on x86_64,
+both verified), needing only a prebuilt musl cross toolchain per ABI and no
+other dependencies (static linking means it only needs the Linux kernel
+syscall ABI, which Android provides regardless of bionic vs musl userland
+— this is *much* simpler than `:host-bridge`'s wayland-client
+cross-compile). The APK is a single fat build covering `arm64-v8a` (real
+hardware) and `x86_64` (emulators/x86 devices); both binaries are bundled
+as APK assets (`assets/bin/droidspaces-arm64-v8a` and
+`assets/bin/droidspaces-x86_64`, both confirmed present in a real built
+APK) and `DroidSpacesBinary` extracts the one matching the device's actual
+primary ABI (`Build.SUPPORTED_ABIS`) to a real executable file on first use.
 
 `DroidSpacesRuntime` implements the full container lifecycle for real,
 against droidspaces' actual documented CLI and `.config` file format:

@@ -10,9 +10,15 @@ android {
 
     defaultConfig {
         minSdk = 26
-        // Target hardware (Retroid Pocket 5 class devices) is arm64-v8a only.
+        // arm64-v8a (real hardware) + x86_64 (emulators/x86 devices) — a
+        // single fat APK covering both. No external cross-compiled deps
+        // needed here (mbedTLS/moonlight-common-c build self-contained via
+        // add_subdirectory), so both ABIs "just work" through Gradle's own
+        // per-ABI CMake invocation, unlike :host-bridge which needs
+        // build-scripts/build-vendor-deps.sh run per ABI first.
         ndk {
             abiFilters += "arm64-v8a"
+            abiFilters += "x86_64"
         }
     }
 
