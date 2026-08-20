@@ -316,8 +316,16 @@ Every module now builds and links for real:
   Unverified against a real device — no rooted hardware in this
   environment.
 
-All native modules are restricted to `arm64-v8a` only (matches the actual
-target hardware).
+The APK is a single fat build covering both `arm64-v8a` (real hardware —
+Retroid Pocket 5 and similar) and `x86_64` (emulators/x86 devices), rather
+than separate per-ABI builds — one file, works on either. Every
+cross-compiled artifact (libffi, libwayland-client, droidspaces) is built
+twice by `build-scripts/build-vendor-deps.sh` (once per ABI) and
+`DroidSpacesBinary` resolves which asset to extract at runtime against the
+device's actual primary ABI (`Build.SUPPORTED_ABIS`), not a hardcoded one.
+Verified: a real built APK contains distinct `lib/arm64-v8a/` and
+`lib/x86_64/` native libraries plus both `droidspaces-arm64-v8a` and
+`droidspaces-x86_64` assets (confirmed via `unzip -l`, not assumed).
 
 ## 11. Open risks to verify hands-on, not assume
 

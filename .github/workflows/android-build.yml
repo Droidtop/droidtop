@@ -101,13 +101,15 @@ jobs:
           # there's nothing left to re-copy, the APK-ready files are already
           # in place. Simpler than caching an intermediate location and
           # needing a separate "restore the real files from it" step.
+          # Covers both ABIs (jniLibs/arm64-v8a + jniLibs/x86_64, etc.) since
+          # both live under these same parent directories.
           path: |
             host-bridge/src/main/jniLibs
             runtime-linux-root/src/main/assets/bin
           # Keyed on every vendored submodule this script actually builds
           # from, not just a static string — a submodule bump on any of
           # them should invalidate this.
-          key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD') }}-v2
+          key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD') }}-v3
 
       - name: Build cross-compiled vendor deps (libffi, libwayland-client, droidspaces)
         if: steps.deps-cache.outputs.cache-hit != 'true'
@@ -115,7 +117,14 @@ jobs:
         # — this repo is developed partly on Windows, where the executable
         # bit doesn't reliably survive a commit, and relying on it here
         # failed CI outright ("Permission denied") the first time.
-        run: bash build-scripts/build-vendor-deps.sh
+        #
+        # One fat APK covers both arm64-v8a (real hardware) and x86_64
+        # (emulators/x86 devices) — the script builds one ABI per
+        # invocation, so run it once per target here.
+        run: |
+          for abi in arm64-v8a x86_64; do
+            bash build-scripts/build-vendor-deps.sh "$abi"
+          done
 
       - name: Build debug APK
         env:
