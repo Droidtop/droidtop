@@ -65,6 +65,10 @@ public class LauncherApplication extends Application {
 
         app.murinelauncher.theme.ThemeOverride.syncNightMode(this);
         MainProcessInitializer.initialize(this);
+
+        // First-run only (see OnboardingGate's own doc comment) -- no-ops
+        // on every launch after the user finishes or skips it once.
+        dev.droidtop.shell.standard.OnboardingGate.launchIfNeeded(this);
     }
 
     @Override

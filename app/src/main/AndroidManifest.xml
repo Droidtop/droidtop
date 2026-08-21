@@ -41,6 +41,15 @@
             android:launchMode="singleTask" />
 
         <!--
+          Started by dev.droidtop.shell.standard.OnboardingGate (:shell-default,
+          via explicit component name -- see that class's own doc comment for
+          why not a typed Intent) on first launch only.
+        -->
+        <activity
+            android:name="dev.droidtop.app.OnboardingActivity"
+            android:exported="true" />
+
+        <!--
           Runs the primary container's host-bridge session (connect + present
           outputs) as a foreground service so the desktop survives the
           launcher Activity being backgrounded — see docs/SPEC.md.
