@@ -642,6 +642,27 @@ app-drawer icon or a floating switcher button:
     new Kotlin code. Worth evolving `JoiPlayGameProvider` toward something
     like this once more than one external launcher needs supporting —
     not done in this pass.
+  - **Architecture facts, confirmed via decompiling both official release
+    APKs (structure/behavior only — nothing reproduced)**: Daijishō is a
+    traditional Activity/Fragment + XML-layout app, built more as a
+    home-screen replacement than a single-purpose grid — a "widget face"
+    system (shortcuts, continue-playing, RSS, checklists, a
+    RetroAchievements profile widget) plus embedded YouTube playback,
+    real feature depth beyond emulator launching. Its data model
+    (players/platforms/ROM libraries) is emulator/ROM-shaped throughout,
+    which is the actual structural reason the "doesn't handle non-
+    emulated content" gap exists — not a UI/paradigm limitation droidtop
+    could fix by reskinning it. iiSU, by contrast, is Compose-first
+    (almost no app-specific XML layouts, unlike Daijishō) with a
+    **dedicated `dualdisplay` package** — independent confirmation that
+    its dual-screen handling is real architectural investment, matching
+    the user's own read, not an incidental feature. droidtop's own
+    dual-screen model (§4 — physical upper/lower position, configurable
+    per-output role) is already more general than a single dedicated
+    package suggests iiSU's is, and droidtop's shells are already
+    Compose-based like iiSU rather than XML like Daijishō — meaning
+    droidtop is structurally better positioned to build a good
+    dual-screen experience than to copy either app's.
 
 ## 7a. Remote PC streaming (GameStream/Moonlight/Sunshine)
 
