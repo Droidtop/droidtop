@@ -116,6 +116,41 @@ for avoiding re-downloads when containers are recreated.
   that owns it — this is sway reassigning a surface to a different headless
   output, a compositor-side operation, not something `:host-bridge` or the
   owning app needs to know about.
+- **Configurable per-output role, KDE KScreen-modeled**: which screen shows
+  what isn't hardcoded — the user configures, per `DisplayOutput`, whether
+  it mirrors the primary, presents an independent `SecondaryDisplayLauncher`
+  instance (see below), or is a dedicated compositor output. Named/labeled
+  identity per output ("the Retroid's second screen," "the lapdock
+  monitor") is a first-class, persisted setting, not just an enumerated
+  `Display` id — matching how KDE's System Settings → Display & Monitor
+  lets a user name and assign roles to each physical output rather than
+  just listing them by number. This configuration lives in the Standard
+  shell's own settings menu (`com.android.launcher3.settings.
+  SettingsActivity`, forked in with `:shell-default` — see §9); droidtop
+  does not have or want a separate standalone settings app (§7).
+- **Real hook already exists, not hypothetical**: AOSP Launcher3 (and so
+  `:shell-default`, its fork) already ships
+  `com.android.launcher3.secondarydisplay.SecondaryDisplayLauncher` — a
+  `SECONDARY_HOME`-category `Activity`, Android's own standard mechanism
+  for a launcher to provide a home screen on a secondary `Display`. The
+  droidtop-specific multi-display patch work is wiring this existing
+  Activity to our `DisplayOutput`/mirror-vs-independent configuration
+  model, not building secondary-display launcher support from nothing.
+- **Dual-screen input/output split** (Retroid-style second-screen
+  accessory): the built-in screen is the primary visual output; the second
+  screen defaults to a trackpad/keyboard *input* surface for whatever's
+  showing on the primary, per §6's `AbsoluteTouchContext`/
+  `RelativeTouchContext` split — not automatically a second desktop. Making
+  it an independent output (its own `SecondaryDisplayLauncher` or mirrored
+  desktop) is one of the per-output roles above, opt-in like everything
+  else in this section.
+- **General framing**: droidtop's display/shell/settings model takes KDE
+  Plasma as its broader reference point, not just for KScreen specifically
+  — the goal (§1) is a real general-purpose compute device, and KDE is the
+  most complete existing example of "one coherent desktop shell with
+  modular, discoverable settings" to learn conventions from as more of
+  this gets built out (workspace switching, per-app window rules, etc.),
+  not a component to fork code from.
 
 ## 5. Windows compatibility — no real virtualization
 
@@ -157,13 +192,43 @@ profile, Linux-container app — as an equal `LibraryEntry` from a
 `LibraryProvider`, aggregated by a `Library`. Modeled on Playnite (no direct
 Android equivalent exists; this is a real gap being filled, not a fork).
 
-This layer must carry metadata (artwork, playtime, last-played) and a
-uniform launch interface *now*, even though the only shell being built
-initially (`:shell-default`) is a plain touch grid — because the point of
-building it this way is that a later gamepad-console shell
-(`:shell-gamepad`) is a new module reading the same data, not a
-rearchitecture. `:shell-gamepad` stays optional and toggleable; it is never
-the assumed default experience.
+This layer carries metadata (artwork, playtime, last-played) and a uniform
+launch interface, read by all three shells alike — `dev.droidtop.app.
+ShellPreference` (in `:app`) is the actual user-facing switch between them,
+not a build-time choice:
+
+- **`:shell-default` ("Standard")** — not a from-scratch touch grid; a real
+  fork of [Murine Launcher](https://github.com/alesimula/Murine-launcher)
+  (Apache-2.0, itself an already-de-privileged, standalone-Gradle-buildable
+  fork of AOSP Launcher3). This is also what renders when droidtop is
+  chosen as the device's actual Android home screen
+  (`com.android.launcher3.Launcher`, `SECONDARY_HOME`/`HOME` intent
+  filters). Brought in wholesale — ~20 of Murine's own sub-modules
+  (IconLoader, SettingsLib-\*, etc.) as real Gradle modules under
+  `shell-default/`, not kept as a passive `vendor/` reference the way
+  `runtime-windows`/`runtime-linux-root` relate to their `vendor/` sources:
+  a launcher's whole value is its UI code, which needs to be owned and
+  edited directly. The one deliberately-excluded piece is quickstep/
+  recents-animation support (`compatLib` + its per-Android-version
+  variants) — it needs system-signature permissions no non-privileged app
+  can hold, confirmed by real compile errors (local reimplementations of
+  AOSP's internal Transitions-framework classes needing package-private
+  `android.annotation` visibility only available inside a real platform
+  source tree compile), not assumed upfront. Source stays in the repo for
+  reference; just not part of the active build.
+  **droidtop has no separate settings app** — the Standard shell's own
+  forked-in settings menu (`com.android.launcher3.settings.
+  SettingsActivity`) is where display configuration (§4), shell
+  preferences, and everything else configurable lives, matching KDE's
+  "one coherent shell, modular settings" model rather than a
+  bolted-on companion app.
+- **`:shell-desktop` ("Desktop")** — taskbar + start menu wrapped around
+  the primary container's compositor output via `:host-bridge`'s
+  `HostBridge`. Real UI chrome; the live desktop connection itself is
+  blocked on `DesktopSessionService` (still a TODO — see `:app`).
+- **`:shell-gamepad` ("Handheld")** — full-screen, D-pad-navigable, reading
+  the same `Library`; optional and toggleable, never the assumed default
+  experience.
 
 ## 7a. Remote PC streaming (GameStream/Moonlight/Sunshine)
 
@@ -220,7 +285,8 @@ are GPL-3.0. `vendor/winlator-upstream` (kept only as a diff reference) is
 LGPL-2.1. `vendor/sway`, `vendor/wlroots` (protocol definitions only — not
 compiled for Android, see `:host-bridge`), and `vendor/wayland`/`vendor/
 wayland-protocols` (same — codegen/headers only) are MIT. `vendor/
-go-containerregistry` is Apache-2.0. `pc-helper` is a separate program, not
+go-containerregistry` is Apache-2.0. `shell-default`'s fork source (Murine
+Launcher, itself derived from AOSP Launcher3) is also Apache-2.0. `pc-helper` is a separate program, not
 statically linked into the Android app — its own license can be chosen
 independently (default assumption: also GPL-3.0 for consistency, revisit if
 that's not actually desired for a standalone PC service).
@@ -245,8 +311,14 @@ runtime-linux-noroot    → proot-based, new code, no root required
 input-seat              → unified seat; depends on host-bridge
 runtime-remote-stream    → Moonlight/GameStream client (fork: vendor/moonlight-common-c)
 library-core            → Playnite-style unified library/metadata; depends on runtime-common
-shell-default           → default touch UI; depends on library-core
-shell-gamepad           → optional gamepad console UI; depends on library-core; build last
+shell-default           → "Standard" shell: forked-in Murine Launcher (real AOSP
+                          Launcher3-derived UI, not from-scratch); depends on
+                          library-core, host-bridge
+shell-desktop           → "Desktop" shell: taskbar/start-menu chrome around the
+                          shared desktop; depends on library-core, host-bridge,
+                          runtime-common
+shell-gamepad           → "Handheld" shell: optional gamepad console UI; depends
+                          on library-core
 
 pc-helper/               → separate Go program, runs on the remote gaming PC, not an
                             Android module — Sunshine REST API client + (limited) Steam
