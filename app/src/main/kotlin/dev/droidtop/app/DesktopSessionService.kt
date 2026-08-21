@@ -1,20 +1,169 @@
 package dev.droidtop.app
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.os.Build
 import android.os.IBinder
+import dev.droidtop.hostbridge.HostBridge
+import dev.droidtop.runtime.ContainerRuntime
+import dev.droidtop.runtime.DisplayOutput
+import dev.droidtop.runtime.DisplayOutputKind
+import dev.droidtop.runtime.ImageCachePolicy
+import dev.droidtop.runtime.linux.noroot.ProotRuntime
+import dev.droidtop.runtime.linux.root.CraneRootfsPuller
+import dev.droidtop.runtime.linux.root.DroidSpacesRuntime
+import dev.droidtop.runtime.linux.root.FileImageCache
+import dev.droidtop.runtime.linux.root.RootProcess
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+
+sealed interface DesktopSessionState {
+    data object Idle : DesktopSessionState
+    data object Connecting : DesktopSessionState
+    data class Connected(val hostBridge: HostBridge, val primaryOutput: DisplayOutput) : DesktopSessionState
+    data class Failed(val message: String) : DesktopSessionState
+}
 
 /**
- * Foreground service owning the primary container's lifecycle and the
- * host-bridge connection to it — kept alive independent of whether
- * MainActivity (or any other Activity presenting a DisplayOutput) is in the
- * foreground, since the "desktop" should keep running when, e.g., the user
- * is only interacting via the second-screen trackpad.
+ * Owns the primary container's lifecycle and the host-bridge connection to
+ * it — kept alive independent of whether MainActivity (or any other
+ * Activity presenting a DisplayOutput) is in the foreground, since the
+ * "desktop" should keep running when, e.g., the user is only interacting
+ * via the second-screen trackpad.
+ *
+ * Real orchestration (root detection, picking a [ContainerRuntime] backend,
+ * creating/starting the primary container, connecting [HostBridge]) — not
+ * yet verified against a live compositor or a real device (no rooted
+ * device available in this environment). Two known, already-documented
+ * gaps this can't get past regardless of code correctness:
+ *  - [DroidSpacesRuntime.createPrimary] pulls `PRIMARY_IMAGE_REFERENCE`,
+ *    which is still a placeholder — no image exists to pull yet.
+ *  - [ProotRuntime] (the non-root path) is still `TODO()` throughout.
+ *
+ * [state] is how `:shell-desktop`'s `DesktopShell`/`:app`'s `MainActivity`
+ * are meant to observe the real session instead of the `null`/`null`
+ * placeholder they currently pass in — that wiring isn't done yet either.
  */
 class DesktopSessionService : Service() {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     override fun onBind(intent: Intent?): IBinder? = null
 
-    // TODO: create/start the primary Container (runtime-linux-root or
-    // -noroot, chosen by root availability), connect HostBridge to its
-    // Wayland socket, register DisplayOutputs as they appear/disappear.
+    override fun onCreate() {
+        super.onCreate()
+        startForeground(NOTIFICATION_ID, buildNotification())
+        _stateHolder.value = DesktopSessionState.Connecting
+        scope.launch { connect() }
+    }
+
+    override fun onDestroy() {
+        scope.cancel()
+        super.onDestroy()
+    }
+
+    private suspend fun connect() {
+        val runtime: ContainerRuntime = selectRuntime()
+
+        if (runtime is DroidSpacesRuntime) {
+            val check = runtime.checkSystemRequirements()
+            if (!check.succeeded) {
+                fail("droidspaces check failed: ${check.stderr.ifBlank { check.stdout }}")
+                return
+            }
+        }
+
+        val primary = try {
+            runtime.createPrimary()
+        } catch (t: Throwable) {
+            // Expected to fail until a real primary image exists (see this
+            // class's own doc comment) — a clear, attributable failure
+            // beats a silent no-op.
+            fail("Couldn't create the primary container: ${t.message}")
+            return
+        }
+
+        try {
+            runtime.start(primary)
+        } catch (t: Throwable) {
+            fail("Couldn't start the primary container: ${t.message}")
+            return
+        }
+
+        val hostBridge = HostBridge()
+        val socketPath = runtime.primaryWaylandSocketPath()
+        if (!hostBridge.connect(socketPath)) {
+            fail("HostBridge couldn't connect to $socketPath")
+            return
+        }
+
+        _stateHolder.value = DesktopSessionState.Connected(hostBridge, primaryDisplayOutput())
+    }
+
+    /**
+     * Root gives access to [DroidSpacesRuntime]'s real namespace/cgroup
+     * isolation; falls back to [ProotRuntime] (still entirely `TODO()`)
+     * otherwise. Checked by actually running a root shell command rather
+     * than inferring from e.g. build tags — the only real signal.
+     */
+    private suspend fun selectRuntime(): ContainerRuntime {
+        val rootAvailable = RootProcess.run("id").succeeded
+        return if (rootAvailable) {
+            DroidSpacesRuntime(
+                context = applicationContext,
+                rootfsPuller = CraneRootfsPuller(applicationContext),
+                imageCache = FileImageCache(applicationContext),
+                cachePolicy = ImageCachePolicy(enabled = true),
+            )
+        } else {
+            ProotRuntime()
+        }
+    }
+
+    private fun primaryDisplayOutput(): DisplayOutput {
+        @Suppress("DEPRECATION") // minSdk 26; WindowMetrics needs API 30+
+        val metrics = resources.displayMetrics
+        return DisplayOutput(
+            id = "primary",
+            androidDisplayId = android.view.Display.DEFAULT_DISPLAY,
+            kind = DisplayOutputKind.PRIMARY_SCREEN,
+            widthPx = metrics.widthPixels,
+            heightPx = metrics.heightPixels,
+        )
+    }
+
+    private fun fail(message: String) {
+        _stateHolder.value = DesktopSessionState.Failed(message)
+    }
+
+    private fun buildNotification(): Notification {
+        val channelId = "desktop_session"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(
+                NotificationChannel(channelId, "Desktop session", NotificationManager.IMPORTANCE_LOW),
+            )
+        }
+        return Notification.Builder(this, channelId)
+            .setContentTitle("droidtop desktop")
+            .setContentText("Running the shared desktop session")
+            .setSmallIcon(android.R.drawable.ic_menu_manage)
+            .build()
+    }
+
+    companion object {
+        private const val NOTIFICATION_ID = 1
+        private val _stateHolder = MutableStateFlow<DesktopSessionState>(DesktopSessionState.Idle)
+
+        /** Observed by DesktopShell/MainActivity instead of a null/null placeholder. */
+        val state: StateFlow<DesktopSessionState> = _stateHolder.asStateFlow()
+    }
 }

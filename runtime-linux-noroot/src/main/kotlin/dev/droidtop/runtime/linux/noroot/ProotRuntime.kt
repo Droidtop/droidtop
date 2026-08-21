@@ -30,4 +30,5 @@ class ProotRuntime : ContainerRuntime {
     override suspend fun start(container: Container): Unit = TODO()
     override suspend fun stop(container: Container): Unit = TODO()
     override suspend fun destroy(container: Container): Unit = TODO()
+    override fun primaryWaylandSocketPath(): String = TODO()
 }

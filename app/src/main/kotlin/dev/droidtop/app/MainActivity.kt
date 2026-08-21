@@ -1,9 +1,12 @@
 package dev.droidtop.app
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import dev.droidtop.library.Library
 import dev.droidtop.library.NativeAppProvider
 import dev.droidtop.shell.desktop.DesktopShell
@@ -20,10 +23,15 @@ import dev.droidtop.shell.standard.BackButtonMenu
  * that class's own doc comment), carrying [BackButtonMenu.EXTRA_MODE] to say
  * which of the two non-Standard shells to render.
  *
- * :shell-desktop needs a live HostBridge/DisplayOutput to show anything but
- * its own "no desktop session" placeholder — DesktopSessionService (which is
- * supposed to create the primary container and connect one) is still a TODO
- * stub, so `null`/`null` is passed here for now. See shell-desktop/README.md.
+ * Desktop mode starts [DesktopSessionService] and observes its
+ * [DesktopSessionService.state] instead of passing a hardcoded null
+ * HostBridge/DisplayOutput — real wiring, but the session itself is still
+ * expected to land in [DesktopSessionState.Failed] on any real device right
+ * now (see that service's own doc comment for the two concrete gaps: no
+ * primary container image exists yet, and the non-root runtime is
+ * unimplemented). `:shell-desktop`'s own "no desktop session" placeholder
+ * only ever covered the *idle* case; `DesktopShell` doesn't yet render
+ * Connecting/Failed distinctly — see shell-desktop/README.md.
  */
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,10 +40,22 @@ class MainActivity : AppCompatActivity() {
         val library = Library(listOf(NativeAppProvider(applicationContext)))
         val mode = intent.getStringExtra(BackButtonMenu.EXTRA_MODE)
 
+        if (mode != BackButtonMenu.MODE_HANDHELD) {
+            startForegroundService(Intent(this, DesktopSessionService::class.java))
+        }
+
         setContent {
             when (mode) {
                 BackButtonMenu.MODE_HANDHELD -> GamepadShell(library)
-                else -> DesktopShell(library, hostBridge = null, primaryOutput = null)
+                else -> {
+                    val sessionState by DesktopSessionService.state.collectAsState()
+                    val connected = sessionState as? DesktopSessionState.Connected
+                    DesktopShell(
+                        library = library,
+                        hostBridge = connected?.hostBridge,
+                        primaryOutput = connected?.primaryOutput,
+                    )
+                }
             }
         }
     }
