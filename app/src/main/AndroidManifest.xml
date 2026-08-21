@@ -42,7 +42,7 @@
 
         <!--
           Started by dev.droidtop.shell.standard.OnboardingGate (:shell-default,
-          via explicit component name -- see that class's own doc comment for
+          via explicit component name; see that class's own doc comment for
           why not a typed Intent) on first launch only.
         -->
         <activity
