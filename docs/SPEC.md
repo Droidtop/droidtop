@@ -390,6 +390,52 @@ something consequential, this needs the same kind of one-time pairing-code
 exchange as Sunshine itself before it can safely listen on anything but
 localhost. See `pc-helper/README.md`.
 
+## 7b. Onboarding, import, and configuration
+
+Not implemented yet — design only, but two real, concrete mechanisms
+already exist to build on rather than invent from scratch (confirmed by
+reading actual code/formats, not assumed):
+
+- **Importing from another Android home-screen launcher** has a real AOSP
+  mechanism already sitting in `:shell-default`'s forked source:
+  `LauncherProvider`, `provider/RestoreDbTask.java`, and `model/
+  DeviceGridState.java` are exactly what stock Android's own device-setup
+  "restore your home screen" flow uses to migrate a previous launcher's
+  workspace layout, and `RestoreDbTask.setPending(context, isManualRestore
+  = true)` confirms a manual-trigger path exists — not exclusively tied to
+  the OS's full Backup & Restore pipeline. Open question, not yet
+  investigated: exactly what has to exist on-device (a real backed-up
+  `launcher.db`, accessible from where) for a *manually*-triggered restore
+  to have anything to restore from — this needs real testing against an
+  actual previous launcher's data, not assumed to just work.
+  (Also relevant: `:app`'s own `android:allowBackup="false"` may need
+  reconsidering if any part of this ends up depending on the OS backup
+  pipeline specifically, as opposed to the manual path.)
+- **Importing from a gaming-focused launcher** (Daijishō, ES-DE, and by
+  extension anything using the same de-facto-standard `gamelist.xml` +
+  per-system JSON platform config convention those two popularize — one
+  importer plausibly covers more than just those two named tools) reads
+  from the user's ROMs/frontend-data folder via the Storage Access
+  Framework (`ACTION_OPEN_DOCUMENT_TREE`, user grants folder access
+  explicitly) — this data lives on shared storage, not another app's
+  private sandbox, so it's actually reachable under scoped storage rules,
+  confirmed via real research rather than assumed possible. Maps into
+  `:library-core`'s `LibraryEntry` model like anything else the library
+  aggregates.
+- **Onboarding flow** (not designed in detail yet) needs to cover, roughly
+  in order: root detection (determines `:runtime-linux-root` vs.
+  `:runtime-linux-noroot` availability, §3), display detection/
+  configuration (§4's per-output roles, physical upper/lower position —
+  the "which screen is which" question needs resolving here, not
+  post-hoc), the two import paths above (offered, not forced), and initial
+  shell-paradigm choice (Standard/Desktop/Handheld, and — once the
+  Handheld iiSU-vs-Daijishō paradigm split from §7 is real — which
+  paradigm). **Configuration itself has no separate settings app** (§7) —
+  onboarding is a first-run wizard around the exact same settings surface
+  (`com.android.launcher3.settings.SettingsActivity`) a user would reach
+  later through the normal back-button menu, not a parallel or
+  disposable-after-first-run UI.
+
 ## 8. Licensing
 
 `vendor/gamenative`, `vendor/droidspaces`, and `vendor/moonlight-common-c`
