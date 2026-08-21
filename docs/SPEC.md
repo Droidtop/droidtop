@@ -68,6 +68,46 @@ that container's socket — the same way Wine runs on any Linux desktop.
 Winlator/GameNative's own Android SurfaceView XServer is explicitly *not*
 ported; it's superseded entirely by this model.
 
+## 2a. Desktop shell architecture: launching, task management, native apps
+
+`:shell-desktop`'s taskbar/app-menu/task-manager chrome is real Android-side
+UI (Compose, presenting the passed-through compositor frame underneath) —
+**not** something baked into the primary container's OCI image. This
+mirrors Qubes' actual model: dom0 runs a real desktop environment, and
+AppVM windows are integrated into *that* desktop as ordinary windows, not
+the other way around. Three things follow from taking that model
+seriously (all still design/TODO — nothing below is implemented yet):
+
+- **OCI images stay stock, never customized.** No droidtop-specific panel,
+  launcher, or agent gets baked into a sibling's (or even the primary's)
+  rootfs image — a plain `docker.io/library/debian:bookworm` should work
+  unmodified. Whatever compositor/WM the *primary* container runs (sway is
+  the current default — see §2) is itself meant to be swappable by a user
+  who wants a different one; nothing in this design should assume sway
+  specifically beyond "some wlroots-based compositor with a headless
+  backend and wlr-screencopy/virtual-pointer/virtual-keyboard support."
+- **A helper process is the cross-container app-launch mechanism.** When
+  the taskbar's app menu (populated from `:library-core`'s `Library`, the
+  same data every shell reads) launches something that lives in a sibling
+  container, droidtop's own small helper binary — injected into that
+  container at launch time (bind-mount + exec via the container runtime's
+  existing primitives, e.g. droidspaces' own exec support), not baked into
+  the image — is what actually execs the target process inside that
+  container's namespace. Its window then appears on the shared desktop
+  through the same socket-sharing §2 already describes; the helper's job
+  is purely "start the right process in the right container," not
+  anything UI-layer.
+- **A task manager lives outside any single container**, in host-bridge's
+  own privileged position (able to see across the primary *and* every
+  sibling, which no single container's own namespace can) — lists and lets
+  the user manage every running process/window regardless of which
+  container owns it.
+- **Native Android apps join the same desktop via freeform windowing**
+  (`android:resizeableActivity` + `ActivityOptions.setLaunchWindowingMode(
+  WINDOWING_MODE_FREEFORM)`, the platform's real large-screen/desktop-mode
+  API) — resizable, movable windows sitting alongside Wine/Linux windows
+  in the same Desktop shell, not a separate "Android apps" mode.
+
 ## 3. Containers
 
 One `ContainerRuntime` interface (`runtime-common`), two interchangeable
@@ -144,6 +184,15 @@ for avoiding re-downloads when containers are recreated.
   it an independent output (its own `SecondaryDisplayLauncher` or mirrored
   desktop) is one of the per-output roles above, opt-in like everything
   else in this section.
+  - **Concrete for Desktop mode specifically**: the second screen's default
+    input role is a *persistent* on-screen keyboard (forked from Hacker's
+    Keyboard — see §6) plus a trackpad region beneath/alongside it, always
+    available rather than popping up only when a text field is focused
+    (the normal Android IME behavior would be wrong here — a desktop
+    keyboard is expected to just be there). **Toggleable**: a user who'd
+    rather use the second screen as an independent output (mirrored, or
+    its own `SecondaryDisplayLauncher`) turns this off, per the per-output
+    role model above.
 - **General framing**: droidtop's display/shell/settings model takes KDE
   Plasma as its broader reference point, not just for KScreen specifically
   — the goal (§1) is a real general-purpose compute device, and KDE is the
@@ -180,6 +229,16 @@ compositor only ever sees one logical pointer and keyboard.
   `AbsoluteTouchContext` (primary screen = absolute cursor position) /
   `RelativeTouchContext` (trackpad = relative deltas) split.
 - Keyboard forwarding: reference KDE Connect Android's Remote Input plugin.
+- **Second-screen persistent keyboard (Desktop mode's default second-screen
+  role, §4)**: a fork of [Hacker's Keyboard](
+  https://github.com/klausw/hackerskeyboard) (Apache-2.0, confirmed —
+  compatible with droidtop's GPL-3.0 combined position the same way
+  `:shell-default`'s Apache-2.0 fork already is, see §8), not a new
+  keyboard built from scratch — it already has the physical-keyboard-style
+  layout (dedicated Ctrl/Alt/Esc/arrow keys, unlike stock Android IMEs) a
+  desktop-input surface actually wants. Forked in and adapted the same way
+  as `:shell-default`, not kept as a passive `vendor/` reference. Not
+  implemented yet.
 - **Do not assume Winlator/GameNative's input code is a safe base** —
   Winlator has a known, open, acknowledged gap in native/Bluetooth mouse
   pointer capture (issue #1555). This needs real design and testing effort,
@@ -193,9 +252,12 @@ profile, Linux-container app — as an equal `LibraryEntry` from a
 Android equivalent exists; this is a real gap being filled, not a fork).
 
 This layer carries metadata (artwork, playtime, last-played) and a uniform
-launch interface, read by all three shells alike — `dev.droidtop.app.
-ShellPreference` (in `:app`) is the actual user-facing switch between them,
-not a build-time choice:
+launch interface, read by all three shells alike. Which shell is active is
+a user choice, not a build-time one — reached via a long-press of the back
+key (`dev.droidtop.shell.standard.BackButtonMenu`, wired into both
+`:shell-default`'s `Launcher` and `:app`'s `MainActivity`; a plain back
+press keeps doing its normal per-shell job in every state), not a separate
+app-drawer icon or a floating switcher button:
 
 - **`:shell-default` ("Standard")** — not a from-scratch touch grid; a real
   fork of [Murine Launcher](https://github.com/alesimula/Murine-launcher)
@@ -222,13 +284,30 @@ not a build-time choice:
   preferences, and everything else configurable lives, matching KDE's
   "one coherent shell, modular settings" model rather than a
   bolted-on companion app.
-- **`:shell-desktop` ("Desktop")** — taskbar + start menu wrapped around
-  the primary container's compositor output via `:host-bridge`'s
-  `HostBridge`. Real UI chrome; the live desktop connection itself is
-  blocked on `DesktopSessionService` (still a TODO — see `:app`).
+- **`:shell-desktop` ("Desktop")** — the real desktop-environment chrome
+  (taskbar, app menu populated from `Library`, task manager spanning every
+  container) around the primary container's compositor output via
+  `:host-bridge`'s `HostBridge` — see §2a for the full architecture
+  (helper-process cross-container launching, stock/unmodified OCI images,
+  freeform-windowed native Android apps joining the same desktop). Current
+  UI chrome (taskbar + start menu) is a first pass predating §2a's design
+  and needs reworking to match it — real app-menu injection instead of a
+  placeholder, no baked-in-image assumption. The live desktop connection
+  itself is blocked on `DesktopSessionService` (still a TODO — see `:app`).
 - **`:shell-gamepad` ("Handheld")** — full-screen, D-pad-navigable, reading
   the same `Library`; optional and toggleable, never the assumed default
-  experience.
+  experience. **Multiple selectable UI paradigms, not one merged design**:
+  iiSU (visuals-first, Wii U/3DS/XMB-inspired artwork carousels, its own
+  multi-display awareness) and Daijishō (its own distinct grid/list
+  paradigm, single-display) are different enough interaction models that
+  users should be able to pick between them, not get one design blending
+  cues from both. Both read the same `Library` — including native Android
+  apps, Wine profiles, and Linux-container apps as equally first-class
+  entries, which neither iiSU nor Daijishō do natively (both are
+  emulator-frontend-focused; droidtop's whole point is that Wine/desktop
+  apps aren't a separate, second-class mode). Current implementation
+  (`GamepadShell.kt`) is a single plain card carousel — real artwork
+  rendering and the paradigm-selection mechanism itself don't exist yet.
 
 ## 7a. Remote PC streaming (GameStream/Moonlight/Sunshine)
 
