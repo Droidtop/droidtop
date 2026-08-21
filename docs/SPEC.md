@@ -189,6 +189,95 @@ image works. Pulled layers are cached on-device by digest via `ImageCache`,
 action) rather than an invisible always-on cache, since it trades storage
 for avoiding re-downloads when containers are recreated.
 
+## 3a. Image index — recommended catalog, not a walled garden
+
+Picking an image (primary container's base+compositor, or a sibling's
+distro) shouldn't force a user to already know an OCI reference by heart.
+droidtop ships a **curated catalog** — OS × version × desktop-environment/
+compositor combos we've verified actually boot — as the default, one-tap
+path in the container-creation UI (§7c). This is a recommendation list,
+not a restriction: the "custom image reference" field from §3 ("any OCI
+image works") stays available right next to it for anyone who wants
+Debian/Ubuntu/Arch/whatever else the catalog doesn't cover.
+
+- **Default base: Alpine, across multiple desktop-environment/compositor
+  variants** — smallest realistic base to pull/cache/boot on a handheld
+  (musl+busybox, tiny image size vs. Debian/Ubuntu), catalog entries differ
+  by *desktop environment* (sway, labwc, and eventually heavier DEs like
+  Plasma Mobile/LXQt if they prove out on Alpine) rather than by base
+  distro. Non-Alpine bases stay reachable via the custom-reference path,
+  not removed — this is a default, not the only option (same "don't force
+  what's in the container" principle as compositor choice in §2).
+
+- **Catalog format**: a JSON manifest (`runtime-common` ships a bundled
+  copy for offline/first-run use), entries shaped roughly like `{os,
+  osVersion, desktopEnvironment, imageReference, role: PRIMARY|SIBLING|
+  BOTH, verified: bool}`. `verified` distinguishes "we booted this and it
+  worked" from "listed but unconfirmed" — don't blur those two, per this
+  session's general no-silent-assumptions discipline.
+- **Autodetection of new versions, not a hand-maintained list that rots**:
+  a catalog entry for e.g. "Debian stable" shouldn't need a droidtop code
+  change every time Debian cuts a point release. Since images are pulled
+  via [vendor/crane](../vendor/go-containerregistry) already (§3), the
+  same tooling can resolve a *floating* reference (`debian:stable`,
+  `debian:12`) down to the concrete digest currently behind it — a real
+  `crane` capability (list tags / resolve a tag to a digest), not new
+  infrastructure to build. This means the catalog can track "the tag
+  droidtop recommends for Debian stable" as a pointer that resolves fresh
+  at pull time, rather than a pinned version string that goes stale.
+  Exact refresh mechanism (bundled-manifest-plus-periodic-remote-refresh
+  vs. resolve-on-demand-only) is not decided yet — needs a decision before
+  implementation, not assumed here.
+- **Still not a backend droidtop calls into or is called by** — this is
+  droidtop, as a client, talking to standard OCI registries for its own
+  image selection, the same category of operation `CraneRootfsPuller`
+  already performs. Doesn't touch the §7b "we are not a backend" boundary
+  around other apps calling into droidtop.
+- **UI surface**: this is what §7c's container-creation flow picks from —
+  "Recommended" (catalog, grouped by OS/DE) vs. "Custom" (raw reference
+  field) as the two entry points into the same `RootfsPuller`. Not
+  designed in UI detail yet; §7c is still design-only overall.
+
+## 3b. Optional: other architectures/OSes via QEMU/libvirt — a value-add, not core
+
+`ContainerRuntime` (§3) covers droidtop's actual workflow — Linux
+containers and Wine/Box64 for Windows, both same-architecture (ARM64
+containers, x86 binaries translated, never a different-arch *guest
+kernel*). None of that requires this section. What this section adds is
+optional: let a user boot an **arbitrary-architecture VM** (x86_64,
+RISC-V, another ARM variant, etc.) via QEMU, with libvirt-style management
+around it if that proves worth building — genuinely useful (dev/testing
+an unrelated arch, running something Wine/Box64 can't cover), and another
+step toward the Qubes framing in §2/§2a (real VM-level isolation
+alongside the container-level split), but never a requirement for
+droidtop's normal desktop/gaming workflow to work.
+
+- **Acceleration is conditional, and droidtop must say so up front rather
+  than silently running slow** — per the hypervisor research this
+  session: Android's pKVM (AVF) isn't generally reachable by third-party
+  apps, and even where `/dev/kvm` is reachable, KVM only accelerates a
+  guest whose architecture matches the host's (ARM64 guest on this
+  device's ARM64 host) — an x86_64 or RISC-V guest is *always* software
+  emulation (QEMU TCG) on ARM64 hardware regardless of `/dev/kvm`
+  availability. Before starting a non-native-arch VM, check for `/dev/kvm`
+  access and whether the requested guest arch matches host arch, and show
+  a real performance warning (not a silent slow boot) whenever
+  acceleration won't apply — which is the common case for anything other
+  than an ARM64 guest on this hardware.
+- **Root, used when it helps, not required**: with root (KernelSU/Magisk),
+  `/dev/kvm` may be reachable on devices where the vendor kernel exposes
+  it for AVF's own use (device/kernel-specific, not guaranteed), and root
+  also gives real TUN/TAP networking and finer control over the QEMU
+  environment even without acceleration. No-root still works — same
+  root/no-root split as `ContainerRuntime` (§3), just software-emulation
+  only in that case.
+- **Not designed in detail** — whether this is a third `ContainerRuntime`-
+  adjacent backend, a fully separate `VmRuntime` construct, and how it
+  surfaces in the container-creation UI (§7c) alongside the image catalog
+  (§3a) are all open. Flagging the shape and the constraints (acceleration
+  conditionality, root-when-helpful) now so it isn't designed blind later,
+  not committing to an implementation yet.
+
 ## 4. Display
 
 - One `DisplayOutput` per Android `Display` the device currently has: the
