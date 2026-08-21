@@ -3,6 +3,7 @@ package dev.droidtop.runtime.linux.root
 import android.content.Context
 import dev.droidtop.runtime.Container
 import dev.droidtop.runtime.ContainerBackend
+import dev.droidtop.runtime.ContainerExecResult
 import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.ImageCache
@@ -121,6 +122,27 @@ class DroidSpacesRuntime(
         val result = RootProcess.run(binaryPath, "--name=${container.id}", "stop")
         check(result.succeeded) { "droidspaces stop failed for ${container.id}: ${result.stderr}" }
     }
+
+    /**
+     * `droidspaces --name=<id> run <cmd...>` — droidspaces' own documented
+     * exec-into-running-container primitive (Documentation/Linux-CLI.md's
+     * `run` subcommand). Per-invocation env vars aren't a `run` flag
+     * droidspaces exposes (only a per-container `env_file` at container-
+     * config time, already used in [createContainer] for
+     * XDG_RUNTIME_DIR/WAYLAND_DISPLAY) — [env] is instead prepended as
+     * inline POSIX shell assignments, the same pattern droidspaces' own
+     * CLI docs use (`run sh -c "id && env"`).
+     */
+    override suspend fun exec(container: Container, command: List<String>, env: Map<String, String>): ContainerExecResult {
+        val envPrefix = env.entries.joinToString(" ") { (k, v) -> "$k=${shellQuote(v)}" }
+        val commandLine = command.joinToString(" ") { shellQuote(it) }
+        val shellScript = if (envPrefix.isEmpty()) commandLine else "$envPrefix $commandLine"
+
+        val result = RootProcess.run(binaryPath, "--name=${container.id}", "run", "sh", "-c", shellScript)
+        return ContainerExecResult(exitCode = result.exitCode, stdout = result.stdout, stderr = result.stderr)
+    }
+
+    private fun shellQuote(value: String): String = "'" + value.replace("'", "'\\''") + "'"
 
     override suspend fun destroy(container: Container) {
         // Best-effort stop -- the container may already be stopped, that's

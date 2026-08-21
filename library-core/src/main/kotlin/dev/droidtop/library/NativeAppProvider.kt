@@ -12,7 +12,7 @@ import android.content.pm.PackageManager
  * around this being an equally first-class entry type, not a special case.
  */
 class NativeAppProvider(private val context: Context) : LibraryProvider {
-    override val kind = LibraryEntryKind.NATIVE_ANDROID_APP
+    override val kinds = setOf(LibraryEntryKind.NATIVE_ANDROID_APP)
 
     override suspend fun scan(): List<LibraryEntry> {
         val pm = context.packageManager
@@ -26,7 +26,7 @@ class NativeAppProvider(private val context: Context) : LibraryProvider {
             LibraryEntry(
                 id = packageName,
                 title = info.loadLabel(pm).toString(),
-                kind = kind,
+                kind = LibraryEntryKind.NATIVE_ANDROID_APP,
             )
         }.distinctBy { it.id }
     }
