@@ -488,6 +488,41 @@ source already in [vendor/gamenative](../vendor/gamenative):
     layer needed at all) is an open problem, not assumed solved just
     because `osList` says "linux."
 
+**Implementation status (first slice, real but partial):**
+
+- `ContainerRuntime.exec(container, command, env)` — the actual missing
+  primitive both launch paths below needed (there was no "run a process
+  inside an already-running container" operation at all before this;
+  `create*`/`start`/`stop`/`destroy` are lifecycle, not execution).
+  `DroidSpacesRuntime`'s implementation drives droidspaces' own documented
+  `--name=<id> run <cmd...>` subcommand (Documentation/Linux-CLI.md);
+  per-invocation env vars aren't a `run` flag droidspaces exposes, so
+  they're prepended as inline POSIX shell assignments instead (matches
+  droidspaces' own CLI-doc examples, e.g. `run sh -c "id && env"`).
+  `ProotRuntime.exec()` is still `TODO()`, same as the rest of that class.
+- `runtime-common`'s `GameDepotPlatform`/`GameDepotOption`/
+  `selectBestDepot()` implement this section's actual decision rule
+  (Linux > Windows, never macOS) as small, pure, unit-tested logic —
+  droidtop's own copy, not a dependency on gamenative's `DepotInfo`/`OS`
+  (`:runtime-windows` builds from ported gamenative code, not a Gradle
+  dependency on its module — see that module's build.gradle.kts).
+- `WineSession.launch()` now actually calls `ContainerRuntime.exec()` —
+  no longer `TODO()` — but only for a bare `wine <executable>` invocation.
+  **Still not ported**: Box64/FEXCore wrapper-flag selection, DXVK/VKD3D
+  environment setup, ImageFS-tracked component state — all real,
+  separate porting work from gamenative, not done in this pass.
+- `NativeLinuxGameSession` — the actual "no Wine at all" path this
+  section describes, also built on `ContainerRuntime.exec()`. Depends on
+  §3c's FEX `binfmt_misc` registration (not implemented yet) to actually
+  run an x86/x86-64 Linux binary transparently; a genuinely ARM64-native
+  binary would already work through this class today.
+- **Not done yet, the real remaining integration work**: wiring
+  `selectBestDepot()` into gamenative's actual depot-download/launch
+  pipeline — the `isWindowsCompatible`-filtering call sites in
+  `vendor/gamenative/.../service/SteamService.kt` (several, always assumes
+  Windows today) would need real changes, which is deep surgery into a
+  large vendored file not attempted here.
+
 ## 6. Input
 
 One Wayland seat (`:input-seat`), fed from every physical source: touch,
@@ -738,6 +773,56 @@ Two concrete references to build from rather than design blind:
   fork target (both are GTK/Linux-desktop apps, not Android) — interaction
   patterns and feature scope to learn from, the same way Daijishō/iiSU are
   UX references for `:shell-gamepad` rather than code to port.
+
+## 7d. JoiPlay: Ren'Py and RPG Maker games (`library-core`)
+
+JoiPlay is a Ren'Py/RPG Maker interpreter for Android — the same category
+of integration as RetroArch or DuckStation (§7): droidtop detects games
+and hands them off, it doesn't interpret any of these itself (§7b's "not
+a backend" boundary). Implemented in `library-core` (`GameEngineDetector`,
+`JoiPlay`, `JoiPlayGameProvider`), same `LibraryProvider`/`LibraryEntry`
+seam as `NativeAppProvider`.
+
+- **Engine detection signatures are ported from the user's own Pythia
+  project** (`G:\Support\GameManagement\RenPyPatch\pythia`), verified
+  there against real games in the user's library, not guessed:
+  - **Ren'Py**: `renpy/` and `game/` subdirectories both present directly
+    under the game root.
+  - **RPG Maker MV**: `js/rpg_core.js`, or `www/js/rpg_core.js` if
+    exported with the `www/` wrapper (MV/MZ are Electron/NW.js apps, not
+    the older engine's native format — a detector that only checks
+    `.rxdata`/`.rgss*a`-style signatures misses these, a real gap the
+    Pythia signatures avoid).
+  - **RPG Maker MZ**: same shape, `rmmz_core.js`.
+  - **RPG Maker VX Ace**: a filename containing `.rgss3a` *anywhere*
+    (substring, not exact suffix) — Pythia's own fix for a real install
+    where a patcher had renamed the archive to `Game.rgss3a.old`.
+  - **RPG Maker XP and VX are deliberately not detected** — Pythia never
+    implemented them either, for the same reason: no real sample to
+    verify a signature against. Same standard applied here rather than
+    fabricating a signature from a secondhand tool's docs.
+- **`LibraryEntryKind` is named per-engine, not per-launcher** (`RENPY`,
+  `RPG_MAKER_MV`, `RPG_MAKER_MZ`, `RPG_MAKER_VX_ACE`) — JoiPlay is what
+  droidtop uses today, but isn't assumed to be the only option forever
+  (e.g. RPG Maker MV/MZ being Electron/NW.js Windows apps under the hood
+  means a Wine prefix is a real alternate launch path too, same "prefer
+  the best available path" pattern as §5a's Steam-depot selection) — a
+  different provider could serve the same kind later without a rename.
+- **No documented add-game/launch API found for JoiPlay** — what IS real
+  and widely used: JoiPlay registers as an "Open With" handler for a
+  game's executable, so `JoiPlay.launchViaJoiPlay` fires a plain
+  `ACTION_VIEW` at the executable (via `FileProvider`, since scoped
+  storage needs a `content://` Uri across the app boundary) targeting
+  JoiPlay's package directly. **Not yet run against a real installed
+  JoiPlay to confirm it actually resolves** — needs a real device.
+- **Storage-access design tension, not resolved**: the current
+  implementation assumes direct filesystem `File` access to wherever game
+  folders live. If droidtop's actual game-storage approach ends up being
+  SAF-based (`ACTION_OPEN_DOCUMENT_TREE`, the mechanism §7b already uses
+  for ES-DE library sync) rather than a plain external-storage path, a
+  `DocumentFile`'s own `content://` Uri would be used directly and
+  `FileProvider` wouldn't be needed at all — open question, see
+  `library-core/src/main/res/xml/joiplay_file_paths.xml`'s own comment.
 
 ## 8. Licensing
 

@@ -2,6 +2,7 @@ package dev.droidtop.runtime.linux.noroot
 
 import dev.droidtop.runtime.Container
 import dev.droidtop.runtime.ContainerBackend
+import dev.droidtop.runtime.ContainerExecResult
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.RootfsImage
 
@@ -31,5 +32,9 @@ class ProotRuntime : ContainerRuntime {
     override suspend fun start(container: Container): Unit = TODO()
     override suspend fun stop(container: Container): Unit = TODO()
     override suspend fun destroy(container: Container): Unit = TODO()
+
+    override suspend fun exec(container: Container, command: List<String>, env: Map<String, String>): ContainerExecResult =
+        TODO("re-enter the proot rootfs and run $command (env=$env) inside it")
+
     override fun primaryWaylandSocketPath(): String = TODO()
 }

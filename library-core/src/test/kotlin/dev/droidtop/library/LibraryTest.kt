@@ -6,9 +6,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 private class FakeProvider(
-    override val kind: LibraryEntryKind,
+    kind: LibraryEntryKind,
     private val entries: List<LibraryEntry>,
 ) : LibraryProvider {
+    override val kinds = setOf(kind)
     val launched = mutableListOf<LibraryEntry>()
 
     override suspend fun scan(): List<LibraryEntry> = entries

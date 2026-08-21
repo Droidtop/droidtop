@@ -32,6 +32,12 @@ enum class LibraryEntryKind {
      * on a remote PC over Moonlight" isn't a special case in the UI.
      */
     REMOTE_STREAM,
+
+    /** A Ren'Py/RPG Maker game, launched via JoiPlay (see [JoiPlayGameProvider]) — same category as any other emulator entry, kind named after the engine rather than the launcher. */
+    RENPY,
+    RPG_MAKER_MV,
+    RPG_MAKER_MZ,
+    RPG_MAKER_VX_ACE,
 }
 
 /**
@@ -39,10 +45,12 @@ enum class LibraryEntryKind {
  * runtime-windows Wine profile store, a runtime-linux-* container's app
  * list, or (eventually) a Steam/Epic/GOG-style external source. Each is a
  * plugin in the Playnite sense: the library aggregates across all
- * registered providers into one list.
+ * registered providers into one list. [kinds] is a set, not a single
+ * value, because one physical provider can genuinely cover several kinds
+ * — [JoiPlayGameProvider] alone covers four different [GameEngine]s.
  */
 interface LibraryProvider {
-    val kind: LibraryEntryKind
+    val kinds: Set<LibraryEntryKind>
     suspend fun scan(): List<LibraryEntry>
     suspend fun launch(entry: LibraryEntry)
 }
@@ -51,6 +59,6 @@ class Library(private val providers: List<LibraryProvider>) {
     suspend fun scanAll(): List<LibraryEntry> = providers.flatMap { it.scan() }
 
     suspend fun launch(entry: LibraryEntry) {
-        providers.first { it.kind == entry.kind }.launch(entry)
+        providers.first { entry.kind in it.kinds }.launch(entry)
     }
 }

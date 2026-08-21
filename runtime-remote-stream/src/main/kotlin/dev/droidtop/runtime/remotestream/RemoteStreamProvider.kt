@@ -16,7 +16,7 @@ class RemoteStreamProvider(
     private val discovery: RemoteHostDiscovery,
     private val client: MoonlightClient,
 ) : LibraryProvider {
-    override val kind = LibraryEntryKind.REMOTE_STREAM
+    override val kinds = setOf(LibraryEntryKind.REMOTE_STREAM)
 
     override suspend fun scan(): List<LibraryEntry> {
         return discovery.discover()

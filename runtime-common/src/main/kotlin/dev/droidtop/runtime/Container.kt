@@ -36,17 +36,22 @@ enum class ContainerBackend {
     PROOT,
 }
 
+/** Result of [ContainerRuntime.exec] — deliberately not tied to any one backend's own process-result type. */
+data class ContainerExecResult(val exitCode: Int, val stdout: String, val stderr: String) {
+    val succeeded: Boolean get() = exitCode == 0
+}
+
 /** Common lifecycle surface both container backends implement. */
 interface ContainerRuntime {
     val backend: ContainerBackend
 
     /**
-     * [image] is caller-chosen — from the recommended catalog
-     * ([ImageCatalogEntry.toRootfsImage]) or a hand-typed custom OCI
-     * reference alike (see docs/SPEC.md §3a). For the PRIMARY role this
-     * must be an image with a compositor pre-installed (a stock distro
-     * image has none); this interface doesn't validate that — the caller
-     * is responsible for picking a PRIMARY-appropriate entry.
+     * [image] is caller-chosen — from the live-resolved catalog
+     * ([ResolvedImage.toRootfsImage], see docs/SPEC.md §3a) or a hand-typed
+     * custom OCI reference alike. For the PRIMARY role this must be an
+     * image with a compositor pre-installed (a stock distro image has
+     * none); this interface doesn't validate that — the caller is
+     * responsible for picking a PRIMARY-appropriate entry.
      */
     suspend fun createPrimary(image: RootfsImage): Container
 
@@ -56,6 +61,16 @@ interface ContainerRuntime {
     suspend fun start(container: Container)
     suspend fun stop(container: Container)
     suspend fun destroy(container: Container)
+
+    /**
+     * Runs [command] as a process inside an already-running [container] —
+     * the primitive both `:runtime-windows`'s `WineSession.launch()` and a
+     * native-Linux-depot launch (§5a) need: something that actually starts
+     * a process *inside* the container, as opposed to the container
+     * lifecycle operations above. [env] is merged into the process'
+     * environment (e.g. `WAYLAND_DISPLAY`, `WINEPREFIX`).
+     */
+    suspend fun exec(container: Container, command: List<String>, env: Map<String, String> = emptyMap()): ContainerExecResult
 
     /**
      * Host-visible filesystem path to the primary container's Wayland
