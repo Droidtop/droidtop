@@ -152,12 +152,23 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
             val currentEntries = entries
             val entry = detailEntry
             when {
-                currentEntries == null -> CircularProgressIndicator(color = Color.White)
+                // Real bug this fixes: the loading spinner used to gate this
+                // entire content area unconditionally, before `section` was
+                // ever checked -- Settings (which needs zero scan data) was
+                // stuck behind the same load state as Games/Apps, showing as
+                // "empty" even though it's a plain static list with nothing
+                // to wait for. detailEntry is also section-independent, so
+                // it stays checked before the loading gate too.
                 entry != null -> EntryDetailScreen(
                     entry = entry,
                     onLaunch = { onLaunch(entry); detailEntry = null },
                     onClose = { detailEntry = null },
                 )
+                section == HandheldSection.SETTINGS -> {
+                    canGoBack = false
+                    SettingsSection()
+                }
+                currentEntries == null -> CircularProgressIndicator(color = Color.White)
                 else -> when (section) {
                     HandheldSection.GAMES -> GamesSection(
                         entries = currentEntries.filter { it.kind in GAME_KINDS },
@@ -175,10 +186,9 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
                             onFocusedEntryChanged = onFocusedEntryChanged,
                         )
                     }
-                    HandheldSection.SETTINGS -> {
-                        canGoBack = false
-                        SettingsSection()
-                    }
+                    // SETTINGS is handled above, before the loading gate --
+                    // unreachable here, kept only so `when` stays exhaustive.
+                    HandheldSection.SETTINGS -> Unit
                 }
             }
         }
