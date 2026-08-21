@@ -27,26 +27,20 @@ folder of separate emulator-style apps:
   data model underneath must be launcher-ready from the start (see §7),
   because retrofitting that later would mean a rearchitecture, not a new
   module.
-- **droidtop doesn't have to be *the* launcher.** Being a real Android home
-  screen (§7) is one way to use it, not the only one — someone happy with
-  ES-DE, Daijishō, or iiSU as their actual daily frontend should still be
-  able to point that frontend's "launch this" action at droidtop and get
-  the real Wine/container compatibility engine underneath, without ever
-  touching droidtop's own UI. This is a real, deliberate product shape, not
-  an afterthought: the compatibility engine (Wine/Box64 translation,
-  container orchestration, the shared desktop) is arguably the biggest
-  single piece of value here, and tying it to one specific frontend would
-  undersell it. Concretely, this means an external-facing launch API
-  (Intent-based is the obvious first cut, since ES-DE/similar frontends
-  already support configuring an arbitrary custom command per emulated
-  system/platform — the same mechanism they use to shell out to RetroArch
-  or a standalone emulator today) is real, load-bearing surface area for
-  `:runtime-windows`/`:runtime-linux-root`/`:host-bridge` to expose, not
-  optional polish layered on afterward. Not designed in detail yet — which
-  Intent actions/extras, what a caller gets back, how a launched window's
-  display placement (§4) is decided when there's no droidtop shell driving
-  it — but the constraint is real starting now: nothing in the launch path
-  should assume droidtop's own UI is what initiated it.
+- **droidtop doesn't have to be *the* launcher, but it isn't a backend
+  service either.** Being a real Android home screen (§7) is one way to
+  use it, not the only one — someone who uses ES-DE (or Daijishō/iiSU) for
+  emulation should still be able to have droidtop's library stay in sync
+  with what ES-DE knows about, via the bidirectional data-level import/
+  export in §7b. **droidtop does not do emulation itself, and does not
+  expose a launch/execution API other apps call into** — the sync
+  relationship is data only (library entries, metadata, the platform
+  taxonomy §7b settles on), not droidtop running things on another app's
+  behalf or vice versa. The one real cross-launcher interop point: if the
+  user's actual home screen is a *different* launcher and they open
+  droidtop from there, it should default to the Desktop shell (not
+  Standard, which doesn't make sense when droidtop isn't the home
+  screen) — configurable in settings like everything else in §7b.
 
 ## 2. Core architectural decision: Qubes-style split, not a hand-rolled compositor
 
@@ -431,8 +425,17 @@ reading actual code/formats, not assumed):
   (Also relevant: `:app`'s own `android:allowBackup="false"` may need
   reconsidering if any part of this ends up depending on the OS backup
   pipeline specifically, as opposed to the manual path.)
-- **Importing from a gaming-focused launcher** (Daijishō, ES-DE, iiSU) reads
-  from the user's ROMs/frontend-data folder via the Storage Access
+- **Syncing with a gaming-focused launcher's library data** (Daijishō,
+  ES-DE, iiSU) — data-level only, both directions: reading their
+  catalog into droidtop's own `Library` so it stays aware of what's
+  there, and (later) writing back entries droidtop knows about that
+  they don't yet. **droidtop does not do emulation itself and does not
+  run or launch anything on another app's behalf** — this is purely
+  library/metadata sync, the same category as the AOSP launcher-import
+  mechanism above, not an execution or backend relationship. Launching
+  an ES-DE-sourced entry *from* droidtop means handing off to ES-DE (or
+  whatever emulator ES-DE itself would use), not droidtop emulating it.
+  Reads from the user's ROMs/frontend-data folder via the Storage Access
   Framework (`ACTION_OPEN_DOCUMENT_TREE`, user grants folder access
   explicitly) — this data lives on shared storage, not another app's
   private sandbox, so it's actually reachable under scoped storage rules,
@@ -479,6 +482,12 @@ reading actual code/formats, not assumed):
   (`com.android.launcher3.settings.SettingsActivity`) a user would reach
   later through the normal back-button menu, not a parallel or
   disposable-after-first-run UI.
+- **Opened from a different launcher** (droidtop isn't the user's actual
+  home screen — they use something else and just tap droidtop's own app
+  icon) **defaults to the Desktop shell**, not Standard — Standard doesn't
+  make sense as the thing that opens when droidtop isn't the home screen
+  in the first place. Configurable, like every other default in this
+  section, not hardcoded.
 
 ## 8. Licensing
 
