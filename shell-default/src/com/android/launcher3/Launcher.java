@@ -2179,6 +2179,22 @@ public class Launcher extends StatefulActivity<LauncherState>
         getOnBackAnimationCallback().onBackInvoked();
     }
 
+    // droidtop patch (not upstream Murine/Launcher3): there's no dedicated
+    // "menu" button on modern Android, so a long-press of the back key
+    // opens droidtop's shell switcher (Android/Desktop/Handheld/Settings)
+    // instead. A plain back press above still does its normal job
+    // (closing all-apps/a folder/etc.) regardless of state — this is a
+    // second, independent trigger, not a replacement for it. See
+    // dev.droidtop.shell.standard.BackButtonMenu.
+    @Override
+    public boolean onKeyLongPress(int keyCode, android.view.KeyEvent event) {
+        if (keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+            dev.droidtop.shell.standard.BackButtonMenu.show(this);
+            return true;
+        }
+        return super.onKeyLongPress(keyCode, event);
+    }
+
     protected void onBackStarted() {
         mStateManager.getState().onBackStarted(this);
     }

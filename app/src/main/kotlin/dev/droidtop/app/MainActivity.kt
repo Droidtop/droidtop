@@ -1,45 +1,24 @@
 package dev.droidtop.app
 
-import android.content.ComponentName
-import android.content.Intent
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import dev.droidtop.library.Library
 import dev.droidtop.library.NativeAppProvider
 import dev.droidtop.shell.desktop.DesktopShell
 import dev.droidtop.shell.gamepad.GamepadShell
+import dev.droidtop.shell.standard.BackButtonMenu
 
 /**
- * Secondary entry point (regular app-drawer icon) for switching to the
- * Desktop/Handheld shells or re-opening the Standard launcher.
- *
- * The real HOME/LAUNCHER entry point — [ShellKind.STANDARD] — is
- * `com.android.launcher3.Launcher`, a real standalone Activity forked in
- * from Murine Launcher (`:shell-default`, see its own README.md), not
- * something this Activity renders inline: unlike the other two shells, a
- * launcher's whole architecture assumes it owns the process as the HOME
- * activity, so "switching to Standard" here means launching it via
- * [Intent], the same way any launcher-picker would.
- *
- * [ShellKind.DESKTOP] (`:shell-desktop`, taskbar + start menu around the
- * shared desktop) and [ShellKind.HANDHELD] (`:shell-gamepad`, full-screen
- * controller-navigable) both remain Composables rendered directly here,
- * reading the same [Library] as Standard's NativeAppProvider.
+ * Not an app-drawer entry point — droidtop defaults to the normal Android
+ * home-screen experience (`com.android.launcher3.Launcher`, forked in as
+ * `:shell-default`'s "Standard" shell; see that module's README and its own
+ * AndroidManifest.xml for the real HOME/LAUNCHER intent-filter). This
+ * Activity only ever gets started by explicit Intent from a long-press of
+ * the back key (`BackButtonMenu`, wired into both `Launcher` and here — see
+ * that class's own doc comment), carrying [BackButtonMenu.EXTRA_MODE] to say
+ * which of the two non-Standard shells to render.
  *
  * :shell-desktop needs a live HostBridge/DisplayOutput to show anything but
  * its own "no desktop session" placeholder — DesktopSessionService (which is
@@ -51,61 +30,25 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         val library = Library(listOf(NativeAppProvider(applicationContext)))
+        val mode = intent.getStringExtra(BackButtonMenu.EXTRA_MODE)
 
         setContent {
-            var activeShell by remember { mutableStateOf(ShellPreference.get(applicationContext)) }
-            var pickerOpen by remember { mutableStateOf(false) }
-
-            Box(modifier = Modifier.fillMaxSize()) {
-                when (activeShell) {
-                    ShellKind.STANDARD -> StandardShellLaunchPrompt(onLaunch = { launchStandardShell() })
-                    ShellKind.DESKTOP -> DesktopShell(library, hostBridge = null, primaryOutput = null)
-                    ShellKind.HANDHELD -> GamepadShell(library)
-                }
-
-                // Small, unobtrusive entry point to switch shells — every
-                // shell gets this for free here rather than each one needing
-                // its own settings screen.
-                Button(
-                    onClick = { pickerOpen = true },
-                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
-                ) {
-                    Text("Shell")
-                }
-
-                if (pickerOpen) {
-                    ShellPickerDialog(
-                        current = activeShell,
-                        onSelect = { selected ->
-                            activeShell = selected
-                            ShellPreference.set(applicationContext, selected)
-                            pickerOpen = false
-                            if (selected == ShellKind.STANDARD) {
-                                launchStandardShell()
-                            }
-                        },
-                        onDismiss = { pickerOpen = false },
-                    )
-                }
+            when (mode) {
+                BackButtonMenu.MODE_HANDHELD -> GamepadShell(library)
+                else -> DesktopShell(library, hostBridge = null, primaryOutput = null)
             }
         }
     }
 
-    private fun launchStandardShell() {
-        val intent = Intent(Intent.ACTION_MAIN).apply {
-            component = ComponentName(this@MainActivity, "com.android.launcher3.Launcher")
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    // Same long-press-of-back shell switcher as Launcher — see
+    // BackButtonMenu's doc comment for why long-press rather than a plain
+    // back press (which keeps doing its normal job, here just finishing
+    // this Activity).
+    override fun onKeyLongPress(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            BackButtonMenu.show(this)
+            return true
         }
-        startActivity(intent)
-    }
-}
-
-@Composable
-private fun StandardShellLaunchPrompt(onLaunch: () -> Unit) {
-    Column(modifier = Modifier.fillMaxSize().padding(32.dp)) {
-        Text("Standard is a real, separate home-screen app (not rendered here).")
-        Button(onClick = onLaunch, modifier = Modifier.padding(top = 16.dp)) {
-            Text("Open Standard launcher")
-        }
+        return super.onKeyLongPress(keyCode, event)
     }
 }
