@@ -19,6 +19,27 @@
     <string name="pref_category_qsb_desc">Customize quick search box</string>
     <string name="pref_category_misc_title">Miscellaneous</string>
     <string name="pref_category_misc_desc">Other options</string>
+    <string name="pref_category_desktop_title">Desktop mode</string>
+    <string name="pref_category_desktop_desc">Settings for the Desktop shell</string>
+    <string name="pref_category_handheld_title">Handheld mode</string>
+    <string name="pref_category_handheld_desc">Settings for the Handheld shell</string>
+
+    <string name="pref_desktop_taskbar_top_title">Taskbar at top</string>
+    <string name="pref_desktop_taskbar_top_desc">Move the desktop taskbar to the top of the screen instead of the bottom</string>
+
+    <string name="pref_handheld_default_section_title">Default section</string>
+    <string name="pref_handheld_show_hints_title">Show button hints</string>
+    <string name="pref_handheld_show_hints_desc">Show the A/B/Y button legend at the bottom of the Handheld shell</string>
+    <string-array name="pref_handheld_default_section_entries">
+        <item>Games</item>
+        <item>Apps</item>
+    </string-array>
+    <string-array name="pref_handheld_default_section_values">
+        <item>games</item>
+        <item>apps</item>
+    </string-array>
+
+    <string name="pref_subcategory_other_shells">Other shells</string>
 
     <string name="pref_subcategory_day_night">UI theme</string>
     <string name="pref_subcategory_layout">Layout</string>

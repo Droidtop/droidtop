@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Desktop-mode preferences (dev.droidtop.shell.desktop.DesktopShell, :app).
+     Lives in :shell-default alongside every other mode's settings so the
+     settings surface stays one consistent place, not split per-shell -- see
+     shell-default/src/app/murinelauncher/settings/SettingsDesktopFragment.kt
+     and docs/SPEC.md's settings-architecture note.
+-->
+<androidx.preference.PreferenceScreen
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <SwitchPreferenceCompat
+        android:key="pref_desktop_taskbar_top"
+        android:title="@string/pref_desktop_taskbar_top_title"
+        android:summary="@string/pref_desktop_taskbar_top_desc"
+        android:defaultValue="false"
+        android:persistent="true" />
+
+</androidx.preference.PreferenceScreen>

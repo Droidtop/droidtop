@@ -37,7 +37,8 @@
         -->
         <activity
             android:name="dev.droidtop.app.MainActivity"
-            android:exported="true" />
+            android:exported="true"
+            android:launchMode="singleTask" />
 
         <!--
           Runs the primary container's host-bridge session (connect + present

@@ -1,5 +1,8 @@
 package dev.droidtop.shell.gamepad
 
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
@@ -40,6 +43,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
@@ -84,8 +88,9 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Unit = {}) {
+    val context = LocalContext.current
     var entries by remember { mutableStateOf<List<LibraryEntry>?>(null) }
-    var section by remember { mutableStateOf(HandheldSection.GAMES) }
+    var section by remember { mutableStateOf(HandheldPrefs.defaultSection(context)) }
     var canGoBack by remember { mutableStateOf(false) }
     var detailEntry by remember { mutableStateOf<LibraryEntry?>(null) }
     val scope = rememberCoroutineScope()
@@ -131,8 +136,36 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
                 }
             }
         }
-        ButtonHintFooter(canGoBack = canGoBack || detailEntry != null, showInfo = detailEntry == null)
+        if (HandheldPrefs.showHints(context)) {
+            ButtonHintFooter(canGoBack = canGoBack || detailEntry != null, showInfo = detailEntry == null)
+        }
     }
+}
+
+/**
+ * Reads the mode-specific preferences set from :shell-default's real
+ * settings screen (SettingsHandheldFragment / murine_prefs_handheld.xml).
+ * No compile-time dependency on :shell-default from here -- it and
+ * :shell-gamepad are separate library modules wired together only by :app
+ * -- so this reads the same SharedPreferences file
+ * ("com.android.launcher3.prefs", com.android.launcher3.LauncherFiles.
+ * SHARED_PREFERENCES_KEY) by its literal name instead.
+ */
+private object HandheldPrefs {
+    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val KEY_DEFAULT_SECTION = "pref_handheld_default_section"
+    private const val KEY_SHOW_HINTS = "pref_handheld_show_hints"
+
+    fun defaultSection(context: Context): HandheldSection {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return when (prefs.getString(KEY_DEFAULT_SECTION, "games")) {
+            "apps" -> HandheldSection.APPS
+            else -> HandheldSection.GAMES
+        }
+    }
+
+    fun showHints(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_SHOW_HINTS, true)
 }
 
 /**
@@ -500,9 +533,74 @@ private fun AppsSection(
     }
 }
 
+/**
+ * Opens droidtop's one real settings surface (:shell-default's
+ * SettingsActivity, a Fragment/Preference-based screen) instead of building
+ * a second, parallel settings UI here — see SettingsHandheldFragment for
+ * the actual Handheld-specific preferences this section jumps straight to.
+ * No compile-time dependency on :shell-default (see HandheldPrefs' own doc
+ * comment for why), so this launches by component/fragment name instead of
+ * a typed Intent.
+ */
 @Composable
 private fun SettingsSection() {
-    Text("Settings live in the Standard shell for now — see docs/SPEC.md §4.", color = Color.White)
+    val context = LocalContext.current
+    val firstFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { firstFocus.requestFocus() }
+
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        SettingsLink(
+            "Handheld settings",
+            "Default section, button hints",
+            modifier = Modifier.focusRequester(firstFocus),
+            onClick = { openSettings(context, "app.murinelauncher.settings.SettingsHandheldFragment") },
+        )
+        SettingsLink(
+            "All settings",
+            "General, icons, home screen, and everything else",
+            onClick = { openSettings(context, null) },
+        )
+    }
+}
+
+private fun openSettings(context: Context, fragment: String?) {
+    val intent = Intent(Intent.ACTION_MAIN).apply {
+        component = ComponentName(context.packageName, "com.android.launcher3.settings.SettingsActivity")
+        if (fragment != null) putExtra(":settings:fragment", fragment)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    context.startActivity(intent)
+}
+
+@Composable
+private fun SettingsLink(title: String, summary: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .onFocusChanged { focused = it.isFocused }
+            .focusable()
+            .onKeyEvent { event ->
+                if (event.type == KeyEventType.KeyUp &&
+                    (event.key == Key.ButtonA || event.key == Key.DirectionCenter || event.key == Key.Enter)
+                ) {
+                    onClick()
+                    true
+                } else {
+                    false
+                }
+            }
+            .border(
+                width = if (focused) 4.dp else 1.dp,
+                color = if (focused) Color.White else Color.DarkGray,
+                shape = RoundedCornerShape(12.dp),
+            )
+            .background(if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A), RoundedCornerShape(12.dp))
+            .padding(20.dp),
+    ) {
+        Text(title, color = Color.White, style = MaterialTheme.typography.titleMedium)
+        Text(summary, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+    }
 }
 
 internal data class HomeSection(val title: String, val entries: List<LibraryEntry>)
