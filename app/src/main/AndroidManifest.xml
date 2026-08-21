@@ -15,18 +15,18 @@
           The real HOME/LAUNCHER entry point is :shell-default's own
           com.android.launcher3.Launcher (forked-in Murine Launcher — see
           shell-default/README.md), declared in that library module's own
-          manifest and merged in here by AGP. MainActivity is a secondary
-          entry point (app drawer icon) for switching to the Desktop/
-          Handheld shells or opening the Standard launcher's settings.
+          manifest and merged in here by AGP. This is deliberately NOT a
+          second app-drawer icon: droidtop defaults to the normal Android
+          launcher experience, and reaches Desktop/Handheld/Settings via
+          the home screen's own back-button menu (see
+          dev.droidtop.shell.standard.BackButtonMenu, patched into
+          Launcher.onBackPressed()) launching this Activity by explicit
+          Intent with an EXTRA_MODE extra — not a separate entry point a
+          user would ever tap directly from the app drawer.
         -->
         <activity
             android:name="dev.droidtop.app.MainActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:exported="true" />
 
         <!--
           Runs the primary container's host-bridge session (connect + present
