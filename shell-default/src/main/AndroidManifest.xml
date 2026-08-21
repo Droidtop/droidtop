@@ -97,19 +97,19 @@
         <!--
           Sentry's own SDK ships a ContentProvider that auto-initializes
           itself from an "io.sentry.dsn" manifest meta-data entry, and it
-          runs during ActivityThread.handleBindApplication -- BEFORE
+          runs during ActivityThread.handleBindApplication, BEFORE
           Application.onCreate() ever executes. We never set that
           manifest meta-data (CrashReporting.init() sets the DSN
           programmatically instead, in LauncherApplication.onCreate(),
           see dev.droidtop.shell.standard.CrashReporting), so that
           auto-init provider ran with no DSN configured at all and threw
           IllegalArgumentException("DSN is required") on every single
-          process start -- crash-looping the home activity itself
+          process start, crash-looping the home activity itself
           (confirmed via a real on-device adb logcat capture, not
           guessed). A first attempt at this fix landed in
           shell-default/AndroidManifest.xml (the root-level one) instead
-          of this file -- that one is a reference copy AGP never actually
-          builds from; src/main/AndroidManifest.xml (this file) is the
+          of this file; that one is a reference copy AGP never actually
+          builds from. src/main/AndroidManifest.xml (this file) is the
           real one, confirmed by re-checking the crash on-device after
           the first fix's CI build installed cleanly and still crashed
           identically. Disabling auto-init here makes our own explicit
