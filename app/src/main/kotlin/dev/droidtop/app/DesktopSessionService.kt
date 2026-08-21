@@ -8,15 +8,16 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import dev.droidtop.hostbridge.HostBridge
-import dev.droidtop.runtime.BundledImageCatalog
+import dev.droidtop.runtime.BundledImageRepositories
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.DisplayOutput
 import dev.droidtop.runtime.DisplayOutputKind
+import dev.droidtop.runtime.ImageCatalogResolver
 import dev.droidtop.runtime.ImageCatalogRole
 import dev.droidtop.runtime.ImageCachePolicy
 import dev.droidtop.runtime.RootfsImage
-import dev.droidtop.runtime.toRootfsImage
 import dev.droidtop.runtime.linux.noroot.ProotRuntime
+import dev.droidtop.runtime.linux.root.CraneImageCatalogResolver
 import dev.droidtop.runtime.linux.root.CraneRootfsPuller
 import dev.droidtop.runtime.linux.root.DroidSpacesRuntime
 import dev.droidtop.runtime.linux.root.FileImageCache
@@ -49,9 +50,12 @@ sealed interface DesktopSessionState {
  * yet verified against a live compositor or a real device (no rooted
  * device available in this environment). Two known, already-documented
  * gaps this can't get past regardless of code correctness:
- *  - [selectPrimaryImage] picks the bundled catalog's PRIMARY entry, but
- *    that entry's own `imageReference` is still a placeholder (see
- *    runtime-common's `image-catalog.json`) — no image exists to pull yet.
+ *  - [selectPrimaryImage] resolves the bundled seed list's PRIMARY entry
+ *    against the real registry via [ImageCatalogResolver] (docs/SPEC.md
+ *    §3a's "populate at runtime, don't prepopulate" model), but that
+ *    entry's `repository` is still a placeholder (see runtime-common's
+ *    `known-image-repositories.json`) — nothing is actually published
+ *    there yet, so resolution itself fails, not just the later pull.
  *  - [ProotRuntime] (the non-root path) is still `TODO()` throughout.
  *
  * [state] is how `:shell-desktop`'s `DesktopShell`/`:app`'s `MainActivity`
@@ -87,9 +91,9 @@ class DesktopSessionService : Service() {
         }
 
         val primaryImage = try {
-            selectPrimaryImage()
+            selectPrimaryImage(CraneImageCatalogResolver(applicationContext))
         } catch (t: Throwable) {
-            fail("Couldn't pick a primary image from the catalog: ${t.message}")
+            fail("Couldn't resolve a primary image from the catalog: ${t.message}")
             return
         }
 
@@ -121,17 +125,21 @@ class DesktopSessionService : Service() {
     }
 
     /**
-     * Picks a PRIMARY-role entry from the bundled recommended-image catalog
-     * (docs/SPEC.md §3a) — first match, no real choice logic. There's no
-     * user-facing compositor-choice setting yet (§2/§3a both call this a
-     * user config decision, not something droidtop hardcodes), so this is
-     * a placeholder default, not the intended long-term selection path.
+     * Picks a PRIMARY-role repository from the bundled seed list (first
+     * match, no real choice logic — there's no user-facing compositor-
+     * choice setting yet; §2/§3a both call that a user config decision, not
+     * something droidtop hardcodes) and resolves it against the real
+     * registry via [resolver] — the catalog is populated live, not
+     * prepopulated with pinned versions (docs/SPEC.md §3a). Picks whatever
+     * tag the registry lists first; no "latest stable" ordering logic yet.
      */
-    private fun selectPrimaryImage(): RootfsImage {
-        val catalog = BundledImageCatalog.load(applicationContext)
-        val entry = catalog.entries.firstOrNull { it.role == ImageCatalogRole.PRIMARY || it.role == ImageCatalogRole.BOTH }
-            ?: error("No PRIMARY-role entry in the bundled image catalog")
-        return entry.toRootfsImage()
+    private suspend fun selectPrimaryImage(resolver: ImageCatalogResolver): RootfsImage {
+        val repositories = BundledImageRepositories.load(applicationContext).repositories
+        val repo = repositories.firstOrNull { it.role == ImageCatalogRole.PRIMARY || it.role == ImageCatalogRole.BOTH }
+            ?: error("No PRIMARY-role repository in the bundled seed list")
+        val tags = resolver.listTags(repo)
+        val tag = tags.firstOrNull() ?: error("No tags published under ${repo.registry}/${repo.repository}")
+        return resolver.resolve(repo, tag).toRootfsImage()
     }
 
     /**
