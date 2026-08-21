@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "alpine-3.20-sway",
+      "os": "alpine",
+      "osVersion": "3.20",
+      "desktopEnvironment": "sway",
+      "role": "PRIMARY",
+      "imageReference": "TODO/droidtop-primary-alpine-sway:not-published-yet",
+      "verified": false
+    },
+    {
+      "id": "alpine-3.20-labwc",
+      "os": "alpine",
+      "osVersion": "3.20",
+      "desktopEnvironment": "labwc",
+      "role": "PRIMARY",
+      "imageReference": "TODO/droidtop-primary-alpine-labwc:not-published-yet",
+      "verified": false
+    },
+    {
+      "id": "alpine-3.20-plain",
+      "os": "alpine",
+      "osVersion": "3.20",
+      "desktopEnvironment": null,
+      "role": "SIBLING",
+      "imageReference": "docker.io/library/alpine:3.20",
+      "verified": false
+    }
+  ]
+}
