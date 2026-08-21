@@ -68,6 +68,13 @@ Requires an Android SDK/NDK install and a Linux-like build environment
 few other standard packages — see the script's header comment for the exact
 list this was verified against.
 
+## UI Inspiration
+
+`shell-gamepad`'s controller-first library UI draws design inspiration
+from [Daijishō](https://github.com/TapiocaFox/Daijishou) and
+[iiSU](https://github.com/iisu-network/iiSU) — neither is a fork target
+or dependency; droidtop's implementation is original.
+
 ## Licensing
 
 GPL-3.0 sources are combined into this project, which means **the combined

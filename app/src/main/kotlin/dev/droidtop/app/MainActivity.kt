@@ -7,11 +7,13 @@ import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import dev.droidtop.library.JoiPlayGameProvider
 import dev.droidtop.library.Library
 import dev.droidtop.library.NativeAppProvider
 import dev.droidtop.shell.desktop.DesktopShell
 import dev.droidtop.shell.gamepad.GamepadShell
 import dev.droidtop.shell.standard.BackButtonMenu
+import java.io.File
 
 /**
  * Not an app-drawer entry point — droidtop defaults to the normal Android
@@ -37,7 +39,18 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val library = Library(listOf(NativeAppProvider(applicationContext)))
+        // Placeholder games root -- app-private external storage, chosen only
+        // because it needs no runtime permission. Not where a user would
+        // naturally put ROM/game folders; a real SAF-based folder picker
+        // (same mechanism as the ES-DE library sync in docs/SPEC.md §7b)
+        // is the real design, not built yet.
+        val gamesRoot = File(getExternalFilesDir(null), "games").apply { mkdirs() }
+        val library = Library(
+            listOf(
+                NativeAppProvider(applicationContext),
+                JoiPlayGameProvider(applicationContext, gamesRoot),
+            ),
+        )
         val mode = intent.getStringExtra(BackButtonMenu.EXTRA_MODE)
 
         if (mode != BackButtonMenu.MODE_HANDHELD) {
