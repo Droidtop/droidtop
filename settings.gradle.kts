@@ -77,3 +77,9 @@ include(":shell-default")
 // Optional gamepad-console-style launcher shell. Stub only for now — depends on
 // :library-core's plugin interface being stable before this gets built out.
 include(":shell-gamepad")
+
+// Optional desktop-style shell: taskbar + start-menu chrome around the
+// primary container's compositor output (presented via :host-bridge).
+// Depends on :host-bridge for HostBridge/HostBridgeInput and :runtime-common
+// for DisplayOutput.
+include(":shell-desktop")

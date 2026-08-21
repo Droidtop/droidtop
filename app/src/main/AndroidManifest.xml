@@ -15,6 +15,18 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!--
+              HOME + DEFAULT: lets the user pick DroidTop as their device's
+              home screen (Android's standard "make this app a launcher"
+              mechanism — a separate opt-in dialog, this doesn't force a
+              replacement). The "Standard" shell (:shell-default) is what
+              renders in that case; see MainActivity's own doc comment.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
         <!--
