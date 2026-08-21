@@ -5,6 +5,15 @@
     <!-- Secondary-display presentation (second screen / external lapdock monitor) -->
     <uses-feature android:name="android.software.presentation" android:required="false" />
 
+    <!-- DesktopSessionService (below) is a foreground service so the
+         primary container's session survives the launching Activity being
+         backgrounded. Both permissions are required for a "specialUse"
+         foreground service on API 34+; POST_NOTIFICATIONS is required on
+         API 33+ for the foreground-service notification itself to show. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:label="@string/droidtop_app_name"
         android:icon="@mipmap/ic_launcher"
@@ -38,7 +47,11 @@
         <service
             android:name="dev.droidtop.app.DesktopSessionService"
             android:exported="false"
-            android:foregroundServiceType="specialUse" />
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Runs the primary Linux container powering droidtop's shared desktop" />
+        </service>
 
     </application>
 </manifest>

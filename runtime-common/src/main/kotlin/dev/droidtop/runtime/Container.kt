@@ -45,4 +45,14 @@ interface ContainerRuntime {
     suspend fun start(container: Container)
     suspend fun stop(container: Container)
     suspend fun destroy(container: Container)
+
+    /**
+     * Host-visible filesystem path to the primary container's Wayland
+     * socket — what `:host-bridge`'s `HostBridge.connect()` needs. Only
+     * meaningful after `createPrimary()`/`start()` on the PRIMARY
+     * container; each backend owns the actual bind-mount/socket-sharing
+     * mechanics (see e.g. DroidSpacesRuntime's own doc comment) and just
+     * needs to expose where the result landed on the Android side.
+     */
+    fun primaryWaylandSocketPath(): String
 }
