@@ -59,27 +59,28 @@ Instead, mirror Qubes OS's dom0/AppVM split:
   container *is* the desktop. Ordinary window management, multi-output
   configuration, etc. are the compositor's problem, not ours — we're
   consuming a mature project instead of building one.
-  **Default compositor is [labwc](https://github.com/labwc/labwc)
-  (wlroots-based, GPL-2.0), not sway** — sway's tiling is a real design
-  choice for a lot of sway users, but it's tiling-first *policy* sitting on
-  top of wlroots, not something inherent to what droidtop actually needs
-  (that's wlroots' headless backend + the wlr-screencopy/virtual-pointer/
-  virtual-keyboard protocols, which any wlroots compositor exposes access
-  to). labwc is a window-*stacking* compositor explicitly modeled on
-  Openbox — ordinary floating windows, no tiling philosophy to configure
-  around — a closer match to the plain desktop feel §1 wants. [vendor/sway]
-  (../vendor/sway) is kept as a documented alternative for users who
-  specifically want tiling (§2a already establishes the compositor/WM is
-  meant to be swappable, not hardcoded); labwc itself isn't vendored as a
-  submodule the way sway/Android-side deps are, since it runs as an
-  ordinary package inside the primary container's own Linux userland (its
-  base distro's package manager, not something droidtop cross-compiles).
+  **Which compositor, and its floating-vs-tiling behavior, is a user
+  config choice, not something droidtop hardcodes** — consistent with
+  §2a's "we don't force what's in the container" principle. [vendor/sway]
+  (../vendor/sway) (wlroots-based, MIT) is one reasonable preset — its
+  default tiling behavior is real *policy* sitting on top of wlroots, not
+  something inherent to what droidtop actually needs (that's wlroots'
+  headless backend + the wlr-screencopy/virtual-pointer/virtual-keyboard
+  protocols, which any wlroots compositor exposes access to) — and sway
+  itself can be configured floating-only (`floating enable` catch-all
+  rules) for a user who wants sway specifically but not its tiling.
+  [labwc](https://github.com/labwc/labwc) (wlroots-based, GPL-2.0) is a
+  second preset worth offering: a window-*stacking* compositor explicitly
+  modeled on Openbox, ordinary floating windows with no tiling policy to
+  configure around at all. Neither is vendored as a submodule the way
+  sway's protocol headers/Android-side deps are — both run as ordinary
+  packages inside the primary container's own Linux userland (whatever
+  base distro's package manager), not something droidtop cross-compiles.
   **Not yet independently verified**: labwc's headless-backend support
   specifically — confirmed to be a real, actively-maintained wlroots
   stacking compositor, but headless-backend behavior wasn't confirmed by
   reading its actual backend-selection code, only inferred from being
-  wlroots-based generally. Verify before relying on it working out of the
-  box.
+  wlroots-based generally.
 - **Android's app code (`:host-bridge`) is a thin, privileged bridge only**
   — analogous to dom0's narrow GUI-daemon role in Qubes. It is a Wayland
   *client* of the primary container's compositor, doing exactly two things:
@@ -213,7 +214,7 @@ for avoiding re-downloads when containers are recreated.
   companion dual-screen home-launcher-routing tool) is another concrete
   reference for the same problem, worth looking at alongside iiSU.
 - Each `DisplayOutput` maps to one headless output inside the primary
-  container's compositor (labwc by default — see §2).
+  container's compositor (whichever the user's configured — see §2).
 - **Default**: every window is placed on the primary screen's output —
   `WindowPlacement.merged()` — one shared desktop, nothing hidden away.
 - **Opt-in**: any window can be reassigned to a different `DisplayOutput` at
@@ -509,6 +510,34 @@ reading actual code/formats, not assumed):
   in the first place. Configurable, like every other default in this
   section, not hardcoded.
 
+## 7c. Wine prefix / container configuration UI
+
+Not designed in detail or implemented — but real, needed UI surface, not
+an afterthought: managing Wine prefixes (Windows version, DXVK/VKD3D
+toggles, installed components, per-prefix vs. shared) and Linux sibling
+containers (create/clone/delete/stop, which distro, installed packages,
+folder/data mounts — §2a already establishes these are user-configurable,
+distrobox-style) both need real UI, not just the underlying runtime logic.
+
+Two concrete references to build from rather than design blind:
+
+- **Wine prefix management**: [vendor/gamenative](../vendor/gamenative)
+  (already `:runtime-windows`'s fork source) has its own real, working UI
+  for exactly this — Windows version selection, DXVK/VKD3D configuration,
+  installed-component tracking. Worth porting/adapting the same way
+  `:runtime-windows` itself is forked from gamenative's runtime, not
+  designed from nothing.
+- **Linux container management**: distrobox itself is CLI-only (no
+  official GUI), but [BoxBuddy](https://github.com/Dvlv/BoxBuddy) is a
+  real, actively-maintained GTK4 GUI for it — confirmed feature set:
+  per-container create/clone/delete/stop/upgrade, viewing installed apps,
+  opening a terminal into a container. [DistroShelf](
+  https://github.com/ranfdev/DistroShelf) is a second distrobox-GUI
+  reference worth comparing against, not just BoxBuddy alone. Neither is a
+  fork target (both are GTK/Linux-desktop apps, not Android) — interaction
+  patterns and feature scope to learn from, the same way Daijishō/iiSU are
+  UX references for `:shell-gamepad` rather than code to port.
+
 ## 8. Licensing
 
 `vendor/gamenative`, `vendor/droidspaces`, and `vendor/moonlight-common-c`
@@ -519,7 +548,7 @@ wayland-protocols` (same — codegen/headers only) are MIT. `vendor/
 go-containerregistry` is Apache-2.0. `shell-default`'s fork source (Murine
 Launcher, itself derived from AOSP Launcher3) is also Apache-2.0.
 `input-keyboard`'s fork source (Hacker's Keyboard) is also Apache-2.0.
-labwc (§2's default primary-container compositor — installed as a package
+labwc (§2's second compositor preset alongside sway — installed as a package
 inside the container image, not vendored/compiled by droidtop itself) is
 GPL-2.0; combining it doesn't change the project's overall GPL-3.0
 position, license-compatible the same way the other GPL sources already
