@@ -70,43 +70,59 @@ ported; it's superseded entirely by this model.
 
 ## 2a. Desktop shell architecture: launching, task management, native apps
 
-`:shell-desktop`'s taskbar/app-menu/task-manager chrome is real Android-side
-UI (Compose, presenting the passed-through compositor frame underneath) —
-**not** something baked into the primary container's OCI image. This
-mirrors Qubes' actual model: dom0 runs a real desktop environment, and
-AppVM windows are integrated into *that* desktop as ordinary windows, not
-the other way around. Three things follow from taking that model
-seriously (all still design/TODO — nothing below is implemented yet):
+Split placement, corrected after an initial pass that put everything on the
+Android side — that broke the actual intent:
 
+- **The taskbar + app launcher are container-side** — a real Wayland client
+  running *inside* the primary container alongside the compositor, a peer
+  to every Wine/Linux window on the exact same desktop (this is the actual
+  Qubes parallel: dom0 runs a real desktop environment that AppVM windows
+  integrate into as ordinary windows — droidtop's equivalent of "dom0's
+  desktop environment" is this in-container launcher, not host-bridge).
+  It shows an **injected list of applications** — `:library-core`'s
+  `Library` contents, pushed in from the Android side by some channel
+  (exact mechanism still open: a bind-mounted file the launcher
+  watches for changes is the simplest first cut, not yet designed in
+  detail) — and rendered inside the container, not composited by Android.
+- **The task manager is Android-side** — host-bridge's own privileged
+  position (able to see across the primary *and* every sibling, which no
+  single container's own namespace can) is what makes a real cross-
+  container task manager possible at all; this part stays as originally
+  reasoned.
+- **A helper process is what actually launches things**, bridging the two:
+  when the user picks something in the container-side launcher, it asks
+  the helper process to launch it; the helper is what execs the target
+  process inside whichever container (primary or sibling) actually owns
+  it — injected at launch time (bind-mount + exec via the container
+  runtime's existing primitives, e.g. droidspaces' own exec support), not
+  baked into any image. Its window then appears on the shared desktop
+  through the same socket-sharing §2 already describes.
 - **OCI images stay stock, never customized.** No droidtop-specific panel,
   launcher, or agent gets baked into a sibling's (or even the primary's)
   rootfs image — a plain `docker.io/library/debian:bookworm` should work
-  unmodified. Whatever compositor/WM the *primary* container runs (sway is
-  the current default — see §2) is itself meant to be swappable by a user
-  who wants a different one; nothing in this design should assume sway
-  specifically beyond "some wlroots-based compositor with a headless
-  backend and wlr-screencopy/virtual-pointer/virtual-keyboard support."
-- **A helper process is the cross-container app-launch mechanism.** When
-  the taskbar's app menu (populated from `:library-core`'s `Library`, the
-  same data every shell reads) launches something that lives in a sibling
-  container, droidtop's own small helper binary — injected into that
-  container at launch time (bind-mount + exec via the container runtime's
-  existing primitives, e.g. droidspaces' own exec support), not baked into
-  the image — is what actually execs the target process inside that
-  container's namespace. Its window then appears on the shared desktop
-  through the same socket-sharing §2 already describes; the helper's job
-  is purely "start the right process in the right container," not
-  anything UI-layer.
-- **A task manager lives outside any single container**, in host-bridge's
-  own privileged position (able to see across the primary *and* every
-  sibling, which no single container's own namespace can) — lists and lets
-  the user manage every running process/window regardless of which
-  container owns it.
+  unmodified; the in-container launcher and helper process are both
+  injected at runtime, not part of any image. Whatever compositor/WM the
+  *primary* container runs (sway is the current default — see §2) is
+  itself meant to be swappable by a user who wants a different one;
+  nothing in this design should assume sway specifically beyond "some
+  wlroots-based compositor with a headless backend and wlr-screencopy/
+  virtual-pointer/virtual-keyboard support."
+- **Siblings are user-configurable, distrobox-style** — the user picks
+  whichever distro they want per sibling (not a fixed droidtop-chosen
+  image), and each sibling's actual distrobox-equivalent configuration
+  (which host folders/data get mapped or mounted in, beyond the Wayland-
+  socket/PulseAudio sharing §2/§3 already describe) is itself
+  user-configurable per container, matching real distrobox's own
+  `--volume`-style semantics rather than a fixed set of mounts.
 - **Native Android apps join the same desktop via freeform windowing**
   (`android:resizeableActivity` + `ActivityOptions.setLaunchWindowingMode(
   WINDOWING_MODE_FREEFORM)`, the platform's real large-screen/desktop-mode
   API) — resizable, movable windows sitting alongside Wine/Linux windows
   in the same Desktop shell, not a separate "Android apps" mode.
+
+Nothing in this section is implemented yet — the in-container launcher
+doesn't exist as software, the injection channel isn't designed in detail,
+and the helper process is a concept, not code.
 
 ## 3. Containers
 
@@ -147,6 +163,21 @@ for avoiding re-downloads when containers are recreated.
   `Display` before building against it), or an external lapdock monitor over
   USB-C DisplayPort alt mode (also a standard secondary `Display` from
   Android's point of view).
+- **"Second screen" is a physical position (upper = output, lower = input
+  by default on a Retroid-style device), not whichever `Display` Android
+  happens to enumerate second** — `DisplayManager` assigns display IDs by
+  connection/registration order, which is not guaranteed to match physical
+  upper/lower position, so the two must never be conflated in code. iiSU
+  (a real prior-art reference here, not assumed) doesn't trust
+  auto-detection either: it lets the user manually swap which physical
+  screen is "top"/"bottom" (a dedicated button for this), and persists a
+  chosen screen per app/ROM so the assignment doesn't need to be redone
+  every launch. droidtop's own upper/lower role assignment needs the same
+  two things — manual override, not just auto-detected enumeration order,
+  and a persisted per-output (or per-app) choice — not a fresh design from
+  nothing. [Mjolnir](https://github.com/blacksheepmvp/mjolnir) (a
+  companion dual-screen home-launcher-routing tool) is another concrete
+  reference for the same problem, worth looking at alongside iiSU.
 - Each `DisplayOutput` maps to one headless output inside the primary
   container's sway instance.
 - **Default**: every window is placed on the primary screen's output —
@@ -177,20 +208,23 @@ for avoiding re-downloads when containers are recreated.
   Activity to our `DisplayOutput`/mirror-vs-independent configuration
   model, not building secondary-display launcher support from nothing.
 - **Dual-screen input/output split** (Retroid-style second-screen
-  accessory): the built-in screen is the primary visual output; the second
-  screen defaults to a trackpad/keyboard *input* surface for whatever's
-  showing on the primary, per §6's `AbsoluteTouchContext`/
-  `RelativeTouchContext` split — not automatically a second desktop. Making
-  it an independent output (its own `SecondaryDisplayLauncher` or mirrored
-  desktop) is one of the per-output roles above, opt-in like everything
-  else in this section.
-  - **Concrete for Desktop mode specifically**: the second screen's default
+  accessory): the **upper** physical screen is the default visual output;
+  the **lower** physical screen defaults to a trackpad/keyboard *input*
+  surface for whatever's showing on the upper one, per §6's
+  `AbsoluteTouchContext`/`RelativeTouchContext` split — not automatically a
+  second desktop, and not assumed to be "whichever `Display` enumerates
+  second" (see the physical-position note above — needs the same manual-
+  override-plus-persisted-choice treatment iiSU/Mjolnir use, not a fixed
+  mapping). Making the lower screen an independent output (its own
+  `SecondaryDisplayLauncher` or mirrored desktop) is one of the per-output
+  roles above, opt-in like everything else in this section.
+  - **Concrete for Desktop mode specifically**: the lower screen's default
     input role is a *persistent* on-screen keyboard (forked from Hacker's
     Keyboard — see §6) plus a trackpad region beneath/alongside it, always
     available rather than popping up only when a text field is focused
     (the normal Android IME behavior would be wrong here — a desktop
     keyboard is expected to just be there). **Toggleable**: a user who'd
-    rather use the second screen as an independent output (mirrored, or
+    rather use the lower screen as an independent output (mirrored, or
     its own `SecondaryDisplayLauncher`) turns this off, per the per-output
     role model above.
 - **General framing**: droidtop's display/shell/settings model takes KDE
@@ -284,16 +318,15 @@ app-drawer icon or a floating switcher button:
   preferences, and everything else configurable lives, matching KDE's
   "one coherent shell, modular settings" model rather than a
   bolted-on companion app.
-- **`:shell-desktop` ("Desktop")** — the real desktop-environment chrome
-  (taskbar, app menu populated from `Library`, task manager spanning every
-  container) around the primary container's compositor output via
-  `:host-bridge`'s `HostBridge` — see §2a for the full architecture
-  (helper-process cross-container launching, stock/unmodified OCI images,
-  freeform-windowed native Android apps joining the same desktop). Current
-  UI chrome (taskbar + start menu) is a first pass predating §2a's design
-  and needs reworking to match it — real app-menu injection instead of a
-  placeholder, no baked-in-image assumption. The live desktop connection
-  itself is blocked on `DesktopSessionService` (still a TODO — see `:app`).
+- **`:shell-desktop` ("Desktop")** — the Android-side half of §2a's split:
+  a cross-container task manager and the `SurfaceView` frame-passthrough
+  viewport (via `:host-bridge`'s `HostBridge`), *not* the taskbar/app
+  launcher — those are container-side (§2a). Current UI chrome (an
+  Android-side taskbar + start menu) is a first pass predating §2a's
+  design and needs reworking to match it: drop the in-app-launcher
+  UI in favor of a real task manager, since the app launcher belongs in
+  the primary container instead. The live desktop connection itself is
+  blocked on `DesktopSessionService` (still a TODO — see `:app`).
 - **`:shell-gamepad` ("Handheld")** — full-screen, D-pad-navigable, reading
   the same `Library`; optional and toggleable, never the assumed default
   experience. **Multiple selectable UI paradigms, not one merged design**:
@@ -393,11 +426,13 @@ library-core            → Playnite-style unified library/metadata; depends on 
 shell-default           → "Standard" shell: forked-in Murine Launcher (real AOSP
                           Launcher3-derived UI, not from-scratch); depends on
                           library-core, host-bridge
-shell-desktop           → "Desktop" shell: taskbar/start-menu chrome around the
-                          shared desktop; depends on library-core, host-bridge,
-                          runtime-common
-shell-gamepad           → "Handheld" shell: optional gamepad console UI; depends
-                          on library-core
+shell-desktop           → "Desktop" shell's Android-side half (§2a): cross-container
+                          task manager + frame passthrough, NOT the taskbar/app
+                          launcher (that's container-side); depends on library-core,
+                          host-bridge, runtime-common
+shell-gamepad           → "Handheld" shell: optional gamepad console UI, multiple
+                          selectable paradigms (iiSU-style, Daijishō-style — see
+                          §7); depends on library-core
 
 pc-helper/               → separate Go program, runs on the remote gaming PC, not an
                             Android module — Sunshine REST API client + (limited) Steam
