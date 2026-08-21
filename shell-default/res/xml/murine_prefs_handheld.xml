@@ -2,7 +2,7 @@
 <!--
      Handheld-mode preferences (dev.droidtop.shell.gamepad.GamepadShell,
      :app). Lives in :shell-default alongside every other mode's settings so
-     the settings surface stays one consistent place, not split per-shell --
+     the settings surface stays one consistent place, not split per-shell;
      see shell-default/src/app/murinelauncher/settings/SettingsHandheldFragment.kt
      and docs/SPEC.md's settings-architecture note.
 -->
