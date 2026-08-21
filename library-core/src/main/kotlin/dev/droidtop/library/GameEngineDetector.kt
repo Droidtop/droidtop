@@ -124,26 +124,37 @@ private fun GameEngine.toLibraryEntryKind(): LibraryEntryKind = when (this) {
  * the other two's status), regardless of what [GameLaunchStrategyResolver]
  * says is available for a given entry. Picking among multiple available
  * strategies (a real UI concern, not solved here) is the next real gap.
+ *
+ * [gamesRoots] is deliberately plural, not one folder -- games/ROMs aren't
+ * necessarily all in one place (a real SD card folder plus an internal
+ * one, say), and per direction, ROM/game support itself is opt-in for
+ * users who never touch it at all, so this needs to work with zero roots
+ * configured too (an empty list just means [scan] returns nothing, not an
+ * error).
  */
 class JoiPlayGameProvider(
     private val context: Context,
-    private val gamesRoot: File,
+    private val gamesRoots: List<File>,
     // ES-DE's own downloaded_media root convention (see EsDeArtwork's doc
-    // comment) -- defaults to a sibling of gamesRoot so an out-of-the-box
-    // install has somewhere sensible to look, but a user pointing droidtop
-    // at an existing ES-DE data directory can pass the real one in.
-    private val esDeMediaRoot: File = File(gamesRoot.parentFile, "ES-DE/downloaded_media"),
+    // comment) -- defaults to a sibling of each entry in [gamesRoots] so an
+    // out-of-the-box install has somewhere sensible to look per root, but a
+    // user pointing droidtop at an existing ES-DE data directory can pass
+    // explicit roots in instead. Keyed by the games root it applies to.
+    private val esDeMediaRoots: Map<File, File> = gamesRoots.associateWith { File(it.parentFile, "ES-DE/downloaded_media") },
 ) : LibraryProvider {
     override val kinds: Set<LibraryEntryKind> = GameEngine.entries.map { it.toLibraryEntryKind() }.toSet()
 
     override suspend fun scan(): List<LibraryEntry> =
-        GameEngineDetector.scan(gamesRoot).map { (folder, engine) ->
-            LibraryEntry(
-                id = folder.absolutePath,
-                title = folder.name,
-                kind = engine.toLibraryEntryKind(),
-                artworkUri = EsDeArtwork.resolve(esDeMediaRoot, engine.esDeSystemName(), folder.name),
-            )
+        gamesRoots.flatMap { root ->
+            val mediaRoot = esDeMediaRoots[root] ?: File(root.parentFile, "ES-DE/downloaded_media")
+            GameEngineDetector.scan(root).map { (folder, engine) ->
+                LibraryEntry(
+                    id = folder.absolutePath,
+                    title = folder.name,
+                    kind = engine.toLibraryEntryKind(),
+                    artworkUri = EsDeArtwork.resolve(mediaRoot, engine.esDeSystemName(), folder.name),
+                )
+            }
         }
 
     override suspend fun launch(entry: LibraryEntry) {
