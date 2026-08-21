@@ -1,0 +1,34 @@
+package dev.droidtop.shell.standard
+
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+
+/**
+ * First-run gate for droidtop's own onboarding flow (welcome + games-folder
+ * picker) -- real, concrete gap this closes: before this, there was no way
+ * for a user to point droidtop at their actual game files short of `adb
+ * push`ing into the app's private external-files dir (confirmed empty on a
+ * real test device this session). `:shell-default` can't depend on `:app`
+ * (see `:app`'s build.gradle.kts -- the dependency graph is one-way, `:app`
+ * depends on the shells, never the reverse), so -- same established
+ * pattern as [BackButtonMenu]'s Standard/Desktop/Handheld launches and
+ * `:shell-gamepad`'s Settings launch -- this starts `:app`'s
+ * OnboardingActivity by explicit component name rather than a typed Intent.
+ */
+object OnboardingGate {
+    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val KEY_COMPLETE = "droidtop_onboarding_complete"
+    private const val ONBOARDING_ACTIVITY = "dev.droidtop.app.OnboardingActivity"
+
+    fun launchIfNeeded(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(KEY_COMPLETE, false)) return
+
+        val intent = Intent(Intent.ACTION_MAIN).apply {
+            component = ComponentName(context.packageName, ONBOARDING_ACTIVITY)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    }
+}

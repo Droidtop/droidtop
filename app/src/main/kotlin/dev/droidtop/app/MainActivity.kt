@@ -70,12 +70,14 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Placeholder games root -- app-private external storage, chosen only
-        // because it needs no runtime permission. Not where a user would
-        // naturally put ROM/game folders; a real SAF-based folder picker
-        // (same mechanism as the ES-DE library sync in docs/SPEC.md §7b)
-        // is the real design, not built yet.
-        val gamesRoot = File(getExternalFilesDir(null), "games").apply { mkdirs() }
+        // Prefers the folder OnboardingActivity resolved from the user's own
+        // SAF pick (GamesRootPrefs.resolvePrimaryStoragePath -- primary
+        // shared storage only, see that function's own doc comment for why)
+        // -- falls back to the old app-private default for a fresh install
+        // that hasn't been through onboarding yet, or picked a folder that
+        // couldn't resolve to a real File path.
+        val gamesRoot = GamesRootPrefs.gamesRootPath(this)?.let(::File)
+            ?: File(getExternalFilesDir(null), "games").apply { mkdirs() }
         library = Library(
             listOf(
                 NativeAppProvider(applicationContext),
