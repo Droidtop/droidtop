@@ -99,10 +99,24 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
     var detailEntry by remember { mutableStateOf<LibraryEntry?>(null) }
     val scope = rememberCoroutineScope()
     val onLaunch: (LibraryEntry) -> Unit = { entry -> scope.launch { library.launch(entry) } }
+    val tabBarFocus = remember { FocusRequester() }
 
     LaunchedEffect(library) {
         entries = library.scanAll()
     }
+    // Real bug this fixes: onKeyEvent modifiers (L1/R1 section-switching
+    // below, GamesSection's Left/Right sibling-system switching) only ever
+    // see a key event by it bubbling up from whatever's currently focused
+    // -- if literally nothing has focus yet (the initial frame before
+    // `entries` loads, or an empty section with no focusable card at all),
+    // there is no focused node to bubble from, so those handlers silently
+    // never fire. Confirmed as the real cause of a reported "L1/R1 doesn't
+    // do anything" -- landing on the default Games tab with an empty
+    // library left nothing focused. Grabbing focus onto the tab bar itself
+    // on first composition guarantees a valid focus target always exists;
+    // GamesSection/AppsSection still steal focus onto real content once it
+    // loads, same as before.
+    LaunchedEffect(Unit) { tabBarFocus.requestFocus() }
 
     Column(
         modifier = Modifier
@@ -133,7 +147,7 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
                 }
             },
     ) {
-        SectionTabBar(current = section, onSelect = { section = it })
+        SectionTabBar(current = section, onSelect = { section = it }, currentTabFocus = tabBarFocus)
         Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
             val currentEntries = entries
             val entry = detailEntry
@@ -364,7 +378,7 @@ private val APP_KINDS = setOf(
 )
 
 @Composable
-private fun SectionTabBar(current: HandheldSection, onSelect: (HandheldSection) -> Unit) {
+private fun SectionTabBar(current: HandheldSection, onSelect: (HandheldSection) -> Unit, currentTabFocus: FocusRequester) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(32.dp),
@@ -375,7 +389,7 @@ private fun SectionTabBar(current: HandheldSection, onSelect: (HandheldSection) 
                 text = entrySection.displayName(),
                 color = if (focused) Color.White else Color.Gray,
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier
+                modifier = (if (entrySection == current) Modifier.focusRequester(currentTabFocus) else Modifier)
                     .focusable()
                     .onKeyEvent { event ->
                         if (event.type == KeyEventType.KeyUp &&
