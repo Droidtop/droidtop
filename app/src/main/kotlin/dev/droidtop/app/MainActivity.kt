@@ -70,18 +70,21 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Prefers the folder OnboardingActivity resolved from the user's own
-        // SAF pick (GamesRootPrefs.resolvePrimaryStoragePath -- primary
-        // shared storage only, see that function's own doc comment for why)
-        // -- falls back to the old app-private default for a fresh install
-        // that hasn't been through onboarding yet, or picked a folder that
-        // couldn't resolve to a real File path.
-        val gamesRoot = GamesRootPrefs.gamesRootPath(this)?.let(::File)
-            ?: File(getExternalFilesDir(null), "games").apply { mkdirs() }
+        // Every folder OnboardingActivity resolved from the user's own SAF
+        // picks (GamesRootPrefs.resolveStoragePath -- primary storage or a
+        // real SD card, see that function's own doc comment), zero or more
+        // of them -- ROM/game support is opt-in per direction, so an empty
+        // set here is a completely normal, expected state (JoiPlayGameProvider
+        // just finds nothing to scan), not a fallback-worthy problem. Falls
+        // back to the old app-private default only for a fresh install that
+        // hasn't been through onboarding at all yet.
+        val gamesRoots = GamesRootPrefs.gamesRootPaths(this).map(::File).ifEmpty {
+            listOf(File(getExternalFilesDir(null), "games").apply { mkdirs() })
+        }
         library = Library(
             listOf(
                 NativeAppProvider(applicationContext),
-                JoiPlayGameProvider(applicationContext, gamesRoot),
+                JoiPlayGameProvider(applicationContext, gamesRoots),
             ),
         )
         mode = intent.getStringExtra(BackButtonMenu.EXTRA_MODE)

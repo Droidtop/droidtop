@@ -14,6 +14,18 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!--
+      Requested during OnboardingActivity's flow, not implicitly. Real
+      games/ROM files (including on an SD card, per docs/SPEC.md's games
+      root note) need plain File-based reads that a SAF folder grant alone
+      doesn't provide; droidtop isn't Play-Store-distributed, so requesting
+      this directly is legitimate here the same way it's standard for
+      file-manager and ROM-manager apps generally.
+    -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+
     <application
         android:label="@string/droidtop_app_name"
         android:icon="@mipmap/ic_launcher"
