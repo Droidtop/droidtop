@@ -27,6 +27,26 @@ folder of separate emulator-style apps:
   data model underneath must be launcher-ready from the start (see §7),
   because retrofitting that later would mean a rearchitecture, not a new
   module.
+- **droidtop doesn't have to be *the* launcher.** Being a real Android home
+  screen (§7) is one way to use it, not the only one — someone happy with
+  ES-DE, Daijishō, or iiSU as their actual daily frontend should still be
+  able to point that frontend's "launch this" action at droidtop and get
+  the real Wine/container compatibility engine underneath, without ever
+  touching droidtop's own UI. This is a real, deliberate product shape, not
+  an afterthought: the compatibility engine (Wine/Box64 translation,
+  container orchestration, the shared desktop) is arguably the biggest
+  single piece of value here, and tying it to one specific frontend would
+  undersell it. Concretely, this means an external-facing launch API
+  (Intent-based is the obvious first cut, since ES-DE/similar frontends
+  already support configuring an arbitrary custom command per emulated
+  system/platform — the same mechanism they use to shell out to RetroArch
+  or a standalone emulator today) is real, load-bearing surface area for
+  `:runtime-windows`/`:runtime-linux-root`/`:host-bridge` to expose, not
+  optional polish layered on afterward. Not designed in detail yet — which
+  Intent actions/extras, what a caller gets back, how a launched window's
+  display placement (§4) is decided when there's no droidtop shell driving
+  it — but the constraint is real starting now: nothing in the launch path
+  should assume droidtop's own UI is what initiated it.
 
 ## 2. Core architectural decision: Qubes-style split, not a hand-rolled compositor
 
