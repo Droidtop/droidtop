@@ -369,6 +369,7 @@ private val GAME_KINDS = setOf(
     LibraryEntryKind.RPG_MAKER_MV,
     LibraryEntryKind.RPG_MAKER_MZ,
     LibraryEntryKind.RPG_MAKER_VX_ACE,
+    LibraryEntryKind.CONSOLE_ROM,
 )
 private val APP_KINDS = setOf(
     LibraryEntryKind.NATIVE_ANDROID_APP,
@@ -731,6 +732,7 @@ private fun LibraryEntryKind.displayName(): String = when (this) {
     LibraryEntryKind.REMOTE_STREAM -> "Remote PC"
     LibraryEntryKind.RENPY, LibraryEntryKind.KIRIKIRI -> "Visual Novels"
     LibraryEntryKind.RPG_MAKER_MV, LibraryEntryKind.RPG_MAKER_MZ, LibraryEntryKind.RPG_MAKER_VX_ACE -> "RPG Maker"
+    LibraryEntryKind.CONSOLE_ROM -> "Consoles"
 }
 
 @Composable
