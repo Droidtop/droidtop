@@ -41,20 +41,24 @@ public class LauncherApplication extends Application {
         app.murinelauncher.backup.BackupHelper.INSTANCE.applyStagedRestoreIfNeeded(this);
         mNightMode = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
 
+        // Reports every caught crash to droidtop's own self-hosted Bugsink
+        // instance (see dev.droidtop.shell.standard.CrashReporting) --
+        // safe to call even before a real DSN exists (no-ops until then).
+        dev.droidtop.shell.standard.CrashReporting.INSTANCE.init(this);
+
         com.zxy.recovery.core.Recovery.getInstance()
                 .debug(true)
-                // Upstream Murine Launcher's own maintainer email -- was
-                // still wired in from the fork, so a crash offered to email
-                // Murine's team instead of droidtop's. Placeholder until
-                // this whole Recovery hookup is replaced by Sentry/Bugsink
-                // SDK crash capture (see docs/SPEC.md), pointed at droidtop's
-                // own self-hosted instance instead of an email button.
-                .showDevEmail("bioshacker001@gmail.com", true)
                 .recoverInBackground(false)
                 .recoverStack(true)
                 .mainPage(Launcher.class)
                 .recoverEnabled(true)
-                //.callback(new MyCrashCallbacy())
+                // Was showDevEmail(...) pointed at Murine Launcher's own
+                // maintainer -- a droidtop crash offering to email someone
+                // else's team about a bug that isn't theirs. Real reporting
+                // now goes to Bugsink automatically (above); this callback
+                // is just the wire between Recovery's caught exception and
+                // that reporting path.
+                .callback(new dev.droidtop.shell.standard.DroidtopRecoveryCallback())
                 .silent(false, com.zxy.recovery.core.Recovery.SilentMode.RECOVER_ACTIVITY_STACK)
                 //.skip(TestActivity.class)
                 .init(this);

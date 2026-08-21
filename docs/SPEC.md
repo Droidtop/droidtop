@@ -585,6 +585,18 @@ app-drawer icon or a floating switcher button:
   preferences, and everything else configurable lives, matching KDE's
   "one coherent shell, modular settings" model rather than a
   bolted-on companion app.
+  - **Known real gap, confirmed on-device**: the Standard shell as it
+    ships from Murine Launcher upstream is functional but plain — first
+    real-device testing surfaced this directly, not a guess. Backlog item,
+    not started: **research third-party Android launchers** for concrete
+    UI/UX improvements to bring to `:shell-default` — real candidates
+    worth a structural (not pixel-copying — same discipline as §7's
+    gamepad-shell research) pass: Lawnchair (open-source, itself an
+    AOSP-Launcher3-family fork like this one — closest architectural
+    relative), Nova Launcher (long-established, feature-dense, closed-
+    source but well-documented UX conventions), Niagara Launcher
+    (minimalist/gesture-first, a genuinely different paradigm worth
+    comparing against). Not scoped or started yet.
 - **`:shell-desktop` ("Desktop")** — the Android-side half of §2a's split:
   a cross-container task manager and the `SurfaceView` frame-passthrough
   viewport (via `:host-bridge`'s `HostBridge`), *not* the taskbar/app

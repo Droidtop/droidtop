@@ -221,6 +221,15 @@ dependencies {
     implementation 'com.github.alesimula.Recovery:recovery:1.0.7'
     implementation 'com.github.alesimula:murine-aircompressor:2.0.9'
 
+    // Crash reporting to droidtop's own self-hosted Bugsink instance (a
+    // Sentry-API-compatible server, see docs/SPEC.md) -- Recovery (above)
+    // still owns the on-device "app crashed, restart?" UI; this is just
+    // the reporting transport, wired via Recovery's own RecoveryCallback
+    // (see LauncherApplication.java) instead of Recovery's built-in
+    // "email the developer" button, which pointed at Murine's own
+    // maintainer and had nothing to do with droidtop's own bugs.
+    implementation 'io.sentry:sentry-android:7.20.1'
+
     api libs.lottie
     implementation libs.dagger
     kapt libs.dagger.compiler
