@@ -63,6 +63,9 @@ object BundledImageCatalog {
 
     fun load(context: Context): ImageCatalog {
         val text = context.assets.open(ASSET_PATH).bufferedReader().use { it.readText() }
-        return json.decodeFromString(ImageCatalog.serializer(), text)
+        return parse(text)
     }
+
+    /** Split out from [load] so a plain JVM unit test can exercise real parsing without an Android [Context]. */
+    internal fun parse(text: String): ImageCatalog = json.decodeFromString(ImageCatalog.serializer(), text)
 }
