@@ -1,7 +1,12 @@
 package dev.droidtop.library
 
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * One "installed thing," modeled after Playnite's plugin architecture: a
@@ -84,17 +89,50 @@ interface LibraryProvider {
 }
 
 class Library(private val providers: List<LibraryProvider>) {
-    // Every provider's scan() does blocking File I/O with no dispatcher of
-    // its own -- called from a Composable's LaunchedEffect (shell-gamepad's
-    // GamepadShell), that would otherwise run on the Main dispatcher,
-    // freezing rendering and input alike. Confirmed as a real, not
-    // hypothetical, bug: a real ROMs folder's "j2me" system directory alone
-    // had 18,126 entries, and JoiPlayGameProvider's engine-detection scans
-    // every top-level games-root folder (including that one) looking for
-    // signature files -- a genuinely slow scan that was stalling the one
-    // thread Compose needs for everything else too.
+    // Two real, separate bugs this fixes, found by actually reading how
+    // Daijishō does the equivalent (its DaijishouSynchronizationModel):
+    //
+    // 1. Every provider's scan() does blocking File I/O with no dispatcher
+    //    of its own -- called from a Composable's LaunchedEffect
+    //    (shell-gamepad's GamepadShell), that would otherwise run on the
+    //    Main dispatcher, freezing rendering and input alike. A real
+    //    ROMs folder's "j2me" system directory alone had 18,126 entries.
+    //
+    // 2. providers.flatMap { it.scan() } runs every provider strictly
+    //    sequentially with zero isolation -- if any single provider hangs
+    //    or throws, the whole scan hangs or fails with no partial results
+    //    ever surfacing, and there's no way to tell which provider is the
+    //    problem. Daijishō's own real design (confirmed via its decompiled
+    //    sources) never does this: it syncs platforms concurrently
+    //    (maxConcurrentSynchronizationOfPlatforms, bounded 3-5 by CPU
+    //    count) with each one independently tracked and individually
+    //    error-handled, so one bad platform can't take the rest down.
+    //    Here: each provider runs as its own coroutine, failures are
+    //    caught and logged per-provider rather than propagating, and every
+    //    other provider's results still come back.
     suspend fun scanAll(): List<LibraryEntry> = withContext(Dispatchers.IO) {
-        providers.flatMap { it.scan() }
+        coroutineScope {
+            providers.map { provider ->
+                async {
+                    try {
+                        // A caught exception alone doesn't cover a provider
+                        // that genuinely never returns (a real possibility,
+                        // not just a defensive guess -- e.g. a storage
+                        // provider that blocks indefinitely on denied
+                        // access rather than throwing or returning null).
+                        // awaitAll() below would otherwise wait forever on
+                        // just that one coroutine.
+                        withTimeoutOrNull(15_000) { provider.scan() } ?: run {
+                            Log.e("droidtop.Library", "Provider ${provider::class.simpleName} timed out scanning")
+                            emptyList()
+                        }
+                    } catch (t: Throwable) {
+                        Log.e("droidtop.Library", "Provider ${provider::class.simpleName} failed to scan", t)
+                        emptyList()
+                    }
+                }
+            }.awaitAll().flatten()
+        }
     }
 
     suspend fun launch(entry: LibraryEntry) {
