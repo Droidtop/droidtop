@@ -1,6 +1,7 @@
 package dev.droidtop.library
 
 import android.content.Context
+import dev.droidtop.library.consoles.resolveSystem
 import java.io.File
 
 /** Which engine a game folder was built with — decoupled from how it gets launched (see [GameLaunchStrategy]/[GameLaunchStrategyResolver]): several launch paths can exist for the same engine. */
@@ -50,10 +51,22 @@ object GameEngineDetector {
     private fun isKirikiri(folder: File): Boolean =
         folder.listFiles()?.any { it.isFile && it.extension.lowercase() == "xp3" } == true
 
-    /** Every immediate subdirectory of [root] that [detect]s as some [GameEngine]. */
+    /**
+     * Every immediate subdirectory of [root] that [detect]s as some
+     * [GameEngine] -- skips any subdirectory whose name already resolves
+     * to a known console system (see [dev.droidtop.library.consoles.resolveSystem]),
+     * since those are provably ROM folders, not engine game folders. Real,
+     * not theoretical: a real ROMs folder's "j2me" system directory had
+     * 18,126 entries, and [isKirikiri]/[isRpgMakerVxAce] each do a full
+     * `listFiles()` scan looking for signature files -- wastefully slow on
+     * a folder this large, and on external/SD-card storage specifically,
+     * slow enough to be the real cause of a reported frozen-UI bug (see
+     * also [dev.droidtop.library.Library.scanAll]'s own fix for the other
+     * half of that: running this on the wrong dispatcher entirely).
+     */
     fun scan(root: File): List<Pair<File, GameEngine>> =
         (root.listFiles() ?: emptyArray())
-            .filter { it.isDirectory }
+            .filter { it.isDirectory && resolveSystem(it.name) == null }
             .mapNotNull { folder -> detect(folder)?.let { folder to it } }
 }
 
