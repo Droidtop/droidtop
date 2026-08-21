@@ -7,9 +7,11 @@
 
     <application
         android:label="@string/droidtop_app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:allowBackup="false"
         android:theme="@style/Theme.DroidTop"
-        tools:replace="android:label">
+        tools:replace="android:label,android:icon,android:roundIcon">
 
         <!--
           The real HOME/LAUNCHER entry point is :shell-default's own
