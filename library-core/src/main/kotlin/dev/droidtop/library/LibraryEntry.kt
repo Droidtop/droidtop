@@ -1,5 +1,8 @@
 package dev.droidtop.library
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
 /**
  * One "installed thing," modeled after Playnite's plugin architecture: a
  * native Android app, a Wine profile, and a Linux-container app are all
@@ -81,9 +84,22 @@ interface LibraryProvider {
 }
 
 class Library(private val providers: List<LibraryProvider>) {
-    suspend fun scanAll(): List<LibraryEntry> = providers.flatMap { it.scan() }
+    // Every provider's scan() does blocking File I/O with no dispatcher of
+    // its own -- called from a Composable's LaunchedEffect (shell-gamepad's
+    // GamepadShell), that would otherwise run on the Main dispatcher,
+    // freezing rendering and input alike. Confirmed as a real, not
+    // hypothetical, bug: a real ROMs folder's "j2me" system directory alone
+    // had 18,126 entries, and JoiPlayGameProvider's engine-detection scans
+    // every top-level games-root folder (including that one) looking for
+    // signature files -- a genuinely slow scan that was stalling the one
+    // thread Compose needs for everything else too.
+    suspend fun scanAll(): List<LibraryEntry> = withContext(Dispatchers.IO) {
+        providers.flatMap { it.scan() }
+    }
 
     suspend fun launch(entry: LibraryEntry) {
-        providers.first { entry.kind in it.kinds }.launch(entry)
+        withContext(Dispatchers.IO) {
+            providers.first { entry.kind in it.kinds }.launch(entry)
+        }
     }
 }
