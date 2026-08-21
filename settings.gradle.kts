@@ -146,6 +146,12 @@ project(":systemUIPluginCore").projectDir = file("shell-default/systemUIPluginCo
 // :library-core's plugin interface being stable before this gets built out.
 include(":shell-gamepad")
 
+// Second-screen persistent keyboard (docs/SPEC.md §4/§6) — forked from
+// Hacker's Keyboard (Apache-2.0), not built from scratch. Not wired up to
+// the second screen / :input-seat yet; just made to compile as its own
+// module so far.
+include(":input-keyboard")
+
 // Optional desktop-style shell: taskbar + start-menu chrome around the
 // primary container's compositor output (presented via :host-bridge).
 // Depends on :host-bridge for HostBridge/HostBridgeInput and :runtime-common
