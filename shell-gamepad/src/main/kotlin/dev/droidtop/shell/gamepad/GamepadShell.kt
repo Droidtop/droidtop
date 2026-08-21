@@ -87,6 +87,7 @@ import kotlinx.coroutines.launch
 fun GamepadShell(library: Library) {
     var entries by remember { mutableStateOf<List<LibraryEntry>?>(null) }
     var section by remember { mutableStateOf(HandheldSection.GAMES) }
+    var canGoBack by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(library) {
@@ -95,7 +96,7 @@ fun GamepadShell(library: Library) {
 
     Column(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         SectionTabBar(current = section, onSelect = { section = it })
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
             val currentEntries = entries
             when {
                 currentEntries == null -> CircularProgressIndicator(color = Color.White)
@@ -103,15 +104,58 @@ fun GamepadShell(library: Library) {
                     HandheldSection.GAMES -> GamesSection(
                         entries = currentEntries.filter { it.kind in GAME_KINDS },
                         onLaunch = { entry -> scope.launch { library.launch(entry) } },
+                        onDrillDownChanged = { canGoBack = it },
                     )
-                    HandheldSection.APPS -> AppsSection(
-                        entries = currentEntries.filter { it.kind in APP_KINDS },
-                        onLaunch = { entry -> scope.launch { library.launch(entry) } },
-                    )
-                    HandheldSection.SETTINGS -> SettingsSection()
+                    HandheldSection.APPS -> {
+                        canGoBack = false
+                        AppsSection(
+                            entries = currentEntries.filter { it.kind in APP_KINDS },
+                            onLaunch = { entry -> scope.launch { library.launch(entry) } },
+                        )
+                    }
+                    HandheldSection.SETTINGS -> {
+                        canGoBack = false
+                        SettingsSection()
+                    }
                 }
             }
         }
+        ButtonHintFooter(canGoBack = canGoBack)
+    }
+}
+
+/**
+ * A persistent, always-visible legend for what the controller's face
+ * buttons currently do — never leaves the user guessing. Real, valuable
+ * structural pattern found while studying Daijishō's shell (docs/SPEC.md
+ * §7), not present in this shell before.
+ */
+@Composable
+private fun ButtonHintFooter(canGoBack: Boolean) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF111111))
+            .padding(horizontal = 48.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(32.dp),
+    ) {
+        ButtonHint("A", "Select")
+        if (canGoBack) ButtonHint("B", "Back")
+    }
+}
+
+@Composable
+private fun ButtonHint(button: String, action: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            button,
+            color = Color.Black,
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier
+                .background(Color.White, RoundedCornerShape(50))
+                .padding(horizontal = 8.dp, vertical = 2.dp),
+        )
+        Text(action, color = Color.Gray, style = MaterialTheme.typography.labelMedium)
     }
 }
 
@@ -174,9 +218,11 @@ private fun HandheldSection.displayName(): String = when (this) {
  * returns to the engine list.
  */
 @Composable
-private fun GamesSection(entries: List<LibraryEntry>, onLaunch: (LibraryEntry) -> Unit) {
+private fun GamesSection(entries: List<LibraryEntry>, onLaunch: (LibraryEntry) -> Unit, onDrillDownChanged: (Boolean) -> Unit) {
     var selectedEngine by remember { mutableStateOf<LibraryEntryKind?>(null) }
     val firstFocus = remember { FocusRequester() }
+
+    LaunchedEffect(selectedEngine) { onDrillDownChanged(selectedEngine != null) }
 
     Box(
         modifier = Modifier
