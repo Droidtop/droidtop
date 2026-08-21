@@ -8,10 +8,14 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import dev.droidtop.hostbridge.HostBridge
+import dev.droidtop.runtime.BundledImageCatalog
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.DisplayOutput
 import dev.droidtop.runtime.DisplayOutputKind
+import dev.droidtop.runtime.ImageCatalogRole
 import dev.droidtop.runtime.ImageCachePolicy
+import dev.droidtop.runtime.RootfsImage
+import dev.droidtop.runtime.toRootfsImage
 import dev.droidtop.runtime.linux.noroot.ProotRuntime
 import dev.droidtop.runtime.linux.root.CraneRootfsPuller
 import dev.droidtop.runtime.linux.root.DroidSpacesRuntime
@@ -45,8 +49,9 @@ sealed interface DesktopSessionState {
  * yet verified against a live compositor or a real device (no rooted
  * device available in this environment). Two known, already-documented
  * gaps this can't get past regardless of code correctness:
- *  - [DroidSpacesRuntime.createPrimary] pulls `PRIMARY_IMAGE_REFERENCE`,
- *    which is still a placeholder — no image exists to pull yet.
+ *  - [selectPrimaryImage] picks the bundled catalog's PRIMARY entry, but
+ *    that entry's own `imageReference` is still a placeholder (see
+ *    runtime-common's `image-catalog.json`) — no image exists to pull yet.
  *  - [ProotRuntime] (the non-root path) is still `TODO()` throughout.
  *
  * [state] is how `:shell-desktop`'s `DesktopShell`/`:app`'s `MainActivity`
@@ -81,8 +86,15 @@ class DesktopSessionService : Service() {
             }
         }
 
+        val primaryImage = try {
+            selectPrimaryImage()
+        } catch (t: Throwable) {
+            fail("Couldn't pick a primary image from the catalog: ${t.message}")
+            return
+        }
+
         val primary = try {
-            runtime.createPrimary()
+            runtime.createPrimary(primaryImage)
         } catch (t: Throwable) {
             // Expected to fail until a real primary image exists (see this
             // class's own doc comment) — a clear, attributable failure
@@ -106,6 +118,20 @@ class DesktopSessionService : Service() {
         }
 
         _stateHolder.value = DesktopSessionState.Connected(hostBridge, primaryDisplayOutput())
+    }
+
+    /**
+     * Picks a PRIMARY-role entry from the bundled recommended-image catalog
+     * (docs/SPEC.md §3a) — first match, no real choice logic. There's no
+     * user-facing compositor-choice setting yet (§2/§3a both call this a
+     * user config decision, not something droidtop hardcodes), so this is
+     * a placeholder default, not the intended long-term selection path.
+     */
+    private fun selectPrimaryImage(): RootfsImage {
+        val catalog = BundledImageCatalog.load(applicationContext)
+        val entry = catalog.entries.firstOrNull { it.role == ImageCatalogRole.PRIMARY || it.role == ImageCatalogRole.BOTH }
+            ?: error("No PRIMARY-role entry in the bundled image catalog")
+        return entry.toRootfsImage()
     }
 
     /**

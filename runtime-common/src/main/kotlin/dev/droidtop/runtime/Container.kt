@@ -40,8 +40,19 @@ enum class ContainerBackend {
 interface ContainerRuntime {
     val backend: ContainerBackend
 
-    suspend fun createPrimary(): Container
-    suspend fun createSibling(): Container
+    /**
+     * [image] is caller-chosen — from the recommended catalog
+     * ([ImageCatalogEntry.toRootfsImage]) or a hand-typed custom OCI
+     * reference alike (see docs/SPEC.md §3a). For the PRIMARY role this
+     * must be an image with a compositor pre-installed (a stock distro
+     * image has none); this interface doesn't validate that — the caller
+     * is responsible for picking a PRIMARY-appropriate entry.
+     */
+    suspend fun createPrimary(image: RootfsImage): Container
+
+    /** [image] is any SIBLING/BOTH-appropriate reference — no compositor needed. */
+    suspend fun createSibling(image: RootfsImage): Container
+
     suspend fun start(container: Container)
     suspend fun stop(container: Container)
     suspend fun destroy(container: Container)

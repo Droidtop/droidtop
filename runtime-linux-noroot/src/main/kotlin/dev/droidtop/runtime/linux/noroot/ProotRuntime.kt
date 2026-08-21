@@ -3,6 +3,7 @@ package dev.droidtop.runtime.linux.noroot
 import dev.droidtop.runtime.Container
 import dev.droidtop.runtime.ContainerBackend
 import dev.droidtop.runtime.ContainerRuntime
+import dev.droidtop.runtime.RootfsImage
 
 /**
  * No-root Linux container backend. No existing project is a clean fork
@@ -19,12 +20,12 @@ import dev.droidtop.runtime.ContainerRuntime
 class ProotRuntime : ContainerRuntime {
     override val backend: ContainerBackend = ContainerBackend.PROOT
 
-    override suspend fun createPrimary(): Container {
-        TODO("proot rootfs bootstrap + vendor/sway (headless) as the primary display owner")
+    override suspend fun createPrimary(image: RootfsImage): Container {
+        TODO("proot rootfs bootstrap from $image + a compositor (see docs/SPEC.md §2/§3a) as the primary display owner")
     }
 
-    override suspend fun createSibling(): Container {
-        TODO("proot rootfs bootstrap; share primary's WAYLAND_DISPLAY + PulseAudio socket via bind mount")
+    override suspend fun createSibling(image: RootfsImage): Container {
+        TODO("proot rootfs bootstrap from $image; share primary's WAYLAND_DISPLAY + PulseAudio socket via bind mount")
     }
 
     override suspend fun start(container: Container): Unit = TODO()

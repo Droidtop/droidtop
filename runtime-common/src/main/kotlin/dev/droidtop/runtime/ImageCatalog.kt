@@ -15,11 +15,10 @@ import kotlinx.serialization.json.Json
  * PRIMARY entries point at droidtop's own published base+compositor images
  * (a stock upstream Alpine/Debian/etc. image has no compositor pre-
  * installed to boot a desktop with — see [ImageCatalogRole.PRIMARY]'s own
- * doc). None of those are published yet, matching
- * `DroidSpacesRuntime.PRIMARY_IMAGE_REFERENCE`'s own placeholder. SIBLING
- * entries are plain stock distro images — no compositor needed, since the
- * primary container's compositor serves every container — so those
- * reference real upstream registries today.
+ * doc). None of those are published yet — their `imageReference` fields are
+ * still placeholders. SIBLING entries are plain stock distro images — no
+ * compositor needed, since the primary container's compositor serves every
+ * container — so those reference real upstream registries today.
  */
 @Serializable
 data class ImageCatalogEntry(
