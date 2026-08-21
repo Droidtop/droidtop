@@ -1,5 +1,8 @@
 package dev.droidtop.shell.desktop
 
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.compose.foundation.background
@@ -31,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.droidtop.hostbridge.HostBridge
@@ -58,17 +62,29 @@ import java.util.Locale
  * for the live output, rather than faking a connection that doesn't exist.
  * Once DesktopSessionService is real, wiring a live HostBridge/DisplayOutput
  * through to this composable is the only change needed here.
+ *
+ * [sessionMessage] carries a human-readable description of the underlying
+ * [dev.droidtop.app.DesktopSessionState] (Connecting/Failed/Idle) — this
+ * composable previously showed the exact same "no desktop session" text for
+ * all three, which is genuinely misleading: root-checking/container-startup
+ * (Connecting) looks identical to a hard failure (Failed) looks identical to
+ * never having started at all (Idle). A real bug surfaced by this gap: the
+ * root-grant prompt DesktopSessionService triggers can land while the
+ * screen is dimmed and be effectively invisible (confirmed via on-device
+ * logcat), and with no in-app indication that a permission prompt is even
+ * expected, a user has no way to know something needs their attention.
  */
 @Composable
 fun DesktopShell(
     library: Library,
     hostBridge: HostBridge?,
     primaryOutput: DisplayOutput?,
+    sessionMessage: DesktopSessionMessage = DesktopSessionMessage.Idle,
 ) {
     var startMenuOpen by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0B1220))) {
-        DesktopViewport(hostBridge, primaryOutput)
+        DesktopViewport(hostBridge, primaryOutput, sessionMessage)
 
         Taskbar(
             startMenuOpen = startMenuOpen,
@@ -84,8 +100,19 @@ fun DesktopShell(
     }
 }
 
+/** Mirrors dev.droidtop.app.DesktopSessionState without :shell-desktop depending on :app. */
+sealed interface DesktopSessionMessage {
+    data object Idle : DesktopSessionMessage
+    data object Connecting : DesktopSessionMessage
+    data class Failed(val reason: String) : DesktopSessionMessage
+}
+
 @Composable
-private fun BoxScope.DesktopViewport(hostBridge: HostBridge?, primaryOutput: DisplayOutput?) {
+private fun BoxScope.DesktopViewport(
+    hostBridge: HostBridge?,
+    primaryOutput: DisplayOutput?,
+    sessionMessage: DesktopSessionMessage,
+) {
     if (hostBridge != null && primaryOutput != null) {
         var presentFailed by remember { mutableStateOf(false) }
 
@@ -128,21 +155,47 @@ private fun BoxScope.DesktopViewport(hostBridge: HostBridge?, primaryOutput: Dis
             modifier = Modifier.align(Alignment.Center).padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("Desktop session not started", color = Color.White, style = MaterialTheme.typography.titleLarge)
-            Text(
-                "The primary container (Wine/Linux desktop) isn't running yet — " +
-                    "start it to see your desktop here.",
-                color = Color.Gray,
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 8.dp),
-            )
+            when (sessionMessage) {
+                is DesktopSessionMessage.Connecting -> {
+                    Text("Starting the desktop session…", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "If a permission prompt appears (root access is required to run " +
+                            "the container), grant it to continue.",
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+                is DesktopSessionMessage.Failed -> {
+                    Text("Desktop session failed to start", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        sessionMessage.reason,
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+                is DesktopSessionMessage.Idle -> {
+                    Text("Desktop session not started", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "The primary container (Wine/Linux desktop) isn't running yet — " +
+                            "start it to see your desktop here.",
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun BoxScope.Taskbar(startMenuOpen: Boolean, onToggleStartMenu: () -> Unit) {
+    val context = LocalContext.current
     var clockText by remember { mutableStateOf(formatClock()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -153,7 +206,7 @@ private fun BoxScope.Taskbar(startMenuOpen: Boolean, onToggleStartMenu: () -> Un
 
     Row(
         modifier = Modifier
-            .align(Alignment.BottomStart)
+            .align(if (DesktopPrefs.taskbarAtTop(context)) Alignment.TopStart else Alignment.BottomStart)
             .fillMaxWidth()
             .height(48.dp)
             .background(Color(0xFF11182B)),
@@ -164,8 +217,36 @@ private fun BoxScope.Taskbar(startMenuOpen: Boolean, onToggleStartMenu: () -> Un
         }
         Spacer(modifier = Modifier.width(1.dp).height(32.dp).background(Color(0xFF2A3454)))
         Spacer(modifier = Modifier.weight(1f))
+        Button(onClick = { openSettings(context) }, modifier = Modifier.padding(horizontal = 8.dp)) {
+            Text("Settings")
+        }
         Text(clockText, color = Color.White, modifier = Modifier.padding(horizontal = 16.dp))
     }
+}
+
+/**
+ * Reads the mode-specific preference set from :shell-default's real
+ * settings screen (SettingsDesktopFragment / murine_prefs_desktop.xml). No
+ * compile-time dependency on :shell-default -- see :shell-gamepad's
+ * equivalent HandheldPrefs for the same reasoning -- so this reads the
+ * shared "com.android.launcher3.prefs" SharedPreferences file by its
+ * literal name instead.
+ */
+private object DesktopPrefs {
+    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val KEY_TASKBAR_TOP = "pref_desktop_taskbar_top"
+
+    fun taskbarAtTop(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_TASKBAR_TOP, false)
+}
+
+private fun openSettings(context: Context) {
+    val intent = Intent(Intent.ACTION_MAIN).apply {
+        component = ComponentName(context.packageName, "com.android.launcher3.settings.SettingsActivity")
+        putExtra(":settings:fragment", "app.murinelauncher.settings.SettingsDesktopFragment")
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    context.startActivity(intent)
 }
 
 private fun formatClock(): String =
@@ -173,8 +254,10 @@ private fun formatClock(): String =
 
 @Composable
 private fun BoxScope.StartMenu(library: Library, onDismiss: () -> Unit) {
+    val context = LocalContext.current
     var entries by remember { mutableStateOf<List<LibraryEntry>?>(null) }
     val scope = rememberCoroutineScope()
+    val taskbarAtTop = DesktopPrefs.taskbarAtTop(context)
 
     LaunchedEffect(library) {
         entries = library.scanAll()
@@ -182,8 +265,8 @@ private fun BoxScope.StartMenu(library: Library, onDismiss: () -> Unit) {
 
     Box(
         modifier = Modifier
-            .align(Alignment.BottomStart)
-            .padding(bottom = 48.dp)
+            .align(if (taskbarAtTop) Alignment.TopStart else Alignment.BottomStart)
+            .padding(top = if (taskbarAtTop) 48.dp else 0.dp, bottom = if (taskbarAtTop) 0.dp else 48.dp)
             .width(320.dp)
             .background(Color(0xFF161F38)),
     ) {

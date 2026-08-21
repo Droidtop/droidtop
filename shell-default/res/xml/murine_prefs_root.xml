@@ -50,4 +50,17 @@
         android:summary="@string/pref_category_misc_desc"
         android:fragment="app.murinelauncher.settings.SettingsMiscFragment"/>
 
+    <PreferenceCategory android:title="@string/pref_subcategory_other_shells">
+        <Preference
+            android:icon="@drawable/ic_settings_general"
+            android:title="@string/pref_category_desktop_title"
+            android:summary="@string/pref_category_desktop_desc"
+            android:fragment="app.murinelauncher.settings.SettingsDesktopFragment"/>
+        <Preference
+            android:icon="@drawable/ic_settings_general"
+            android:title="@string/pref_category_handheld_title"
+            android:summary="@string/pref_category_handheld_desc"
+            android:fragment="app.murinelauncher.settings.SettingsHandheldFragment"/>
+    </PreferenceCategory>
+
 </androidx.preference.PreferenceScreen>
