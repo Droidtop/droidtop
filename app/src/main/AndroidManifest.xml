@@ -62,6 +62,15 @@
             android:exported="true" />
 
         <!--
+          Explicit folder-to-console-system assignment. Started by
+          :shell-gamepad's SettingsSection via explicit component name, same
+          pattern as the SettingsActivity launches elsewhere.
+        -->
+        <activity
+            android:name="dev.droidtop.app.ConsoleSystemsActivity"
+            android:exported="true" />
+
+        <!--
           Runs the primary container's host-bridge session (connect + present
           outputs) as a foreground service so the desktop survives the
           launcher Activity being backgrounded — see docs/SPEC.md.
