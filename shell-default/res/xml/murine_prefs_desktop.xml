@@ -2,7 +2,7 @@
 <!--
      Desktop-mode preferences (dev.droidtop.shell.desktop.DesktopShell, :app).
      Lives in :shell-default alongside every other mode's settings so the
-     settings surface stays one consistent place, not split per-shell -- see
+     settings surface stays one consistent place, not split per-shell; see
      shell-default/src/app/murinelauncher/settings/SettingsDesktopFragment.kt
      and docs/SPEC.md's settings-architecture note.
 -->
