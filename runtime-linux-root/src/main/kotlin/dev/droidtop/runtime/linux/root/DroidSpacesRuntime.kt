@@ -149,6 +149,9 @@ class DroidSpacesRuntime(
     suspend fun checkSystemRequirements(): RootProcessResult =
         RootProcess.run(binaryPath, "check")
 
+    override fun primaryWaylandSocketPath(): String =
+        File(socketsDir, WAYLAND_SOCKET_NAME).absolutePath
+
     companion object {
         private const val PRIMARY_NAME = "droidtop-primary"
 
