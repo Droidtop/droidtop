@@ -33,11 +33,18 @@ enum class LibraryEntryKind {
      */
     REMOTE_STREAM,
 
-    /** A Ren'Py/RPG Maker game, launched via JoiPlay (see [JoiPlayGameProvider]) — same category as any other emulator entry, kind named after the engine rather than the launcher. */
+    /**
+     * A detected engine game — kind named after the engine, not any one
+     * launcher, since the same engine can be reachable through several
+     * real paths (see [GameLaunchStrategy]/[GameLaunchStrategyResolver]):
+     * JoiPlay today, a Wine prefix or a Linux container where the
+     * engine/export actually supports it.
+     */
     RENPY,
     RPG_MAKER_MV,
     RPG_MAKER_MZ,
     RPG_MAKER_VX_ACE,
+    KIRIKIRI,
 }
 
 /**
@@ -47,7 +54,7 @@ enum class LibraryEntryKind {
  * plugin in the Playnite sense: the library aggregates across all
  * registered providers into one list. [kinds] is a set, not a single
  * value, because one physical provider can genuinely cover several kinds
- * — [JoiPlayGameProvider] alone covers four different [GameEngine]s.
+ * — [JoiPlayGameProvider] alone covers five different [GameEngine]s.
  */
 interface LibraryProvider {
     val kinds: Set<LibraryEntryKind>

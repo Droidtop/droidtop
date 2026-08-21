@@ -58,6 +58,12 @@ class GameEngineDetectorTest {
     }
 
     @Test
+    fun `detects Kirikiri via any xp3 file`() {
+        touch("data.xp3")
+        assertEquals(GameEngine.KIRIKIRI, GameEngineDetector.detect(tmp.root))
+    }
+
+    @Test
     fun `unrecognized folder detects as null`() {
         touch("readme.txt")
         assertNull(GameEngineDetector.detect(tmp.root))
