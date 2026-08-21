@@ -86,6 +86,7 @@ dependencies {
     implementation(project(":runtime-remote-stream"))
     implementation(project(":library-core"))
     implementation(project(":shell-default"))
+    implementation(project(":shell-desktop"))
     implementation(project(":shell-gamepad"))
 
     implementation(libs.androidx.core.ktx)

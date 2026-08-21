@@ -17,6 +17,16 @@ to `shell-default`, never the required path. Reads from the exact same
 
 ## Status
 
-Empty — intentionally last in build order. Don't start this until
-`library-core`'s `LibraryProvider` model has at least one working
-implementation to build a real UI against.
+**Real, not a stub**: a full-screen, D-pad-navigable library shell
+(`GamepadShell.kt`) reading from the same `Library` as `:shell-default`.
+Card focus/navigation uses Compose's own default D-pad key handling (every
+`focusable()` node responds to DPAD key events without custom code); the
+controller's face button (A / cross) is handled explicitly since it's a
+distinct keycode from DPAD_CENTER on most Android gamepad mappings.
+
+**Known gap, not silent**: analog left-stick-as-navigation isn't
+implemented. A physical D-pad/hat press arrives as an ordinary `KeyEvent`
+(handled above), but a thumbstick reports raw `MotionEvent` axis data that
+Compose doesn't translate into focus movement on its own — doing that well
+needs deadzone/repeat-rate tuning against a real controller, which wasn't
+available while writing this.
