@@ -411,10 +411,7 @@ reading actual code/formats, not assumed):
   (Also relevant: `:app`'s own `android:allowBackup="false"` may need
   reconsidering if any part of this ends up depending on the OS backup
   pipeline specifically, as opposed to the manual path.)
-- **Importing from a gaming-focused launcher** (Daijishō, ES-DE, and by
-  extension anything using the same de-facto-standard `gamelist.xml` +
-  per-system JSON platform config convention those two popularize — one
-  importer plausibly covers more than just those two named tools) reads
+- **Importing from a gaming-focused launcher** (Daijishō, ES-DE, iiSU) reads
   from the user's ROMs/frontend-data folder via the Storage Access
   Framework (`ACTION_OPEN_DOCUMENT_TREE`, user grants folder access
   explicitly) — this data lives on shared storage, not another app's
@@ -422,6 +419,33 @@ reading actual code/formats, not assumed):
   confirmed via real research rather than assumed possible. Maps into
   `:library-core`'s `LibraryEntry` model like anything else the library
   aggregates.
+  - Daijishō/ES-DE both use `gamelist.xml` + per-system JSON platform
+    config — a genuine de-facto-standard in this space, not two
+    coincidentally-similar formats; one importer plausibly covers more
+    than just those two named tools.
+  - iiSU has its own platform-ID registry (`emuladores.json`/
+    `emuladores_default.json`) but *also* explicitly interops with ES-DE
+    metadata as a built-in feature ("Link ES-DE Metadata" during its own
+    setup) — confirms ES-DE's format really is the common denominator
+    other tools build interop around, not just droidtop's own assumption.
+    iiSU's exact schema needs real investigation before an importer can be
+    built (the only repository reachable here is an update-manifest
+    mirror, not iiSU's actual app source — this is a gap, not confirmed
+    detail, and shouldn't be treated as settled the way the AOSP/ES-DE
+    mechanisms above are).
+- **Platform/system taxonomy**: `LibraryEntry`'s retro/emulation entries
+  need a canonical platform identifier (`"snes"`, `"psx"`, `"gba"`, ...) to
+  group, filter, and theme by in the Handheld shell — and to have anywhere
+  to map *into* from each importer above. Rather than inventing droidtop's
+  own scheme, adopt **ES-DE's `es_systems.xml` platform-naming
+  convention as the canonical standard**: it's already the mechanism
+  Daijishō is compatible with, RetroArch/libretro core naming lines up
+  with closely, and iiSU explicitly interops against. Each importer
+  translates its own source format into this canonical set (Daijishō/
+  ES-DE need little to no translation since they already use it; iiSU's
+  own `emuladores.json` IDs need an explicit mapping table, not yet built
+  since the exact schema isn't confirmed — see above) rather than droidtop
+  carrying several incompatible per-source taxonomies side by side.
 - **Onboarding flow** (not designed in detail yet) needs to cover, roughly
   in order: root detection (determines `:runtime-linux-root` vs.
   `:runtime-linux-noroot` availability, §3), display detection/
