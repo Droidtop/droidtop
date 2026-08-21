@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Handheld-mode preferences (dev.droidtop.shell.gamepad.GamepadShell,
+     :app). Lives in :shell-default alongside every other mode's settings so
+     the settings surface stays one consistent place, not split per-shell --
+     see shell-default/src/app/murinelauncher/settings/SettingsHandheldFragment.kt
+     and docs/SPEC.md's settings-architecture note.
+-->
+<androidx.preference.PreferenceScreen
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <ListPreference
+        android:key="pref_handheld_default_section"
+        android:title="@string/pref_handheld_default_section_title"
+        android:summary="%s"
+        android:entries="@array/pref_handheld_default_section_entries"
+        android:entryValues="@array/pref_handheld_default_section_values"
+        android:defaultValue="games"
+        android:persistent="true" />
+
+    <SwitchPreferenceCompat
+        android:key="pref_handheld_show_hints"
+        android:title="@string/pref_handheld_show_hints_title"
+        android:summary="@string/pref_handheld_show_hints_desc"
+        android:defaultValue="true"
+        android:persistent="true" />
+
+</androidx.preference.PreferenceScreen>
