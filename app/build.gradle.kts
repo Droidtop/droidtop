@@ -6,7 +6,15 @@ plugins {
 
 android {
     namespace = "dev.droidtop.app"
-    compileSdk = 34
+    // shell-default (the forked-in Murine Launcher) and its sub-modules
+    // compile against 36 — several of their AndroidX dependencies
+    // (recyclerview 1.4.0, compose material3/animation 1.8.1+) require
+    // consumers to compile against 35+ too, confirmed via a real
+    // :app:assembleDebug AAR-metadata check failure. Every other droidtop
+    // module stays on its own existing compileSdk; only the final
+    // linking module (:app) has to be >= the highest compileSdk among
+    // everything it depends on.
+    compileSdk = 36
 
     // A plain incrementing integer, not a git SHA — CI passes its own
     // run number (github.run_number, monotonically increasing per

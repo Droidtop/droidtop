@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright (C) 2024 The Android Open Source Project
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+
+<resources>
+    <!-- Pixel-like Blue Palette - Dark Mode -->
+    <color name="settingslib_materialColorPrimary">#87B4FA</color>
+    <color name="settingslib_materialColorOnPrimary">#003258</color>
+    <color name="settingslib_materialColorPrimaryContainer">#00497E</color>
+    <color name="settingslib_materialColorOnPrimaryContainer">#D1E4FF</color>
+    <color name="settingslib_materialColorPrimaryInverse">#1871E6</color>
+    <color name="settingslib_materialColorPrimaryFixed">#D1E4FF</color>
+    <color name="settingslib_materialColorPrimaryFixedDim">#87B4FA</color>
+    <color name="settingslib_materialColorOnPrimaryFixed">#001D36</color>
+    <color name="settingslib_materialColorOnPrimaryFixedVariant">#00497E</color>
+    <color name="settingslib_materialColorSecondary">#B9C6EA</color>
+    <color name="settingslib_materialColorOnSecondary">#24304D</color>
+    <color name="settingslib_materialColorSecondaryContainer">#404A63</color>
+    <color name="settingslib_materialColorOnSecondaryContainer">#D7E2FF</color>
+    <color name="settingslib_materialColorSecondaryFixed">#D7E2FF</color>
+    <color name="settingslib_materialColorSecondaryFixedDim">#B9C6EA</color>
+    <color name="settingslib_materialColorOnSecondaryFixed">#0B1835</color>
+    <color name="settingslib_materialColorOnSecondaryFixedVariant">#3B4664</color>
+
+    <color name="settingslib_materialColorTertiary">#ADCAE5</color>
+    <color name="settingslib_materialColorOnTertiary">#123349</color>
+    <color name="settingslib_materialColorTertiaryContainer">#2D4960</color>
+    <color name="settingslib_materialColorOnTertiaryContainer">#CEE7FF</color>
+    <color name="settingslib_materialColorError">#F2B8B5</color>
+    <color name="settingslib_materialColorOnError">#601410</color>
+    <color name="settingslib_materialColorErrorContainer">#8C1D18</color>
+    <color name="settingslib_materialColorOnErrorContainer">#F9DEDC</color>
+    <color name="settingslib_materialColorOutline">#919191</color>
+    <color name="settingslib_materialColorOutlineVariant">#474747</color>
+    <color name="settingslib_materialColorBackground">#131313</color>
+    <color name="settingslib_materialColorOnBackground">#E5E2E1</color>
+    <color name="settingslib_materialColorSurface">#131313</color>
+    <color name="settingslib_materialColorOnSurface">#E5E2E1</color>
+    <color name="settingslib_materialColorSurfaceVariant">#474747</color>
+    <color name="settingslib_materialColorOnSurfaceVariant">#C7C7C7</color>
+    <color name="settingslib_materialColorSurfaceInverse">#E5E2E1</color>
+    <color name="settingslib_materialColorOnSurfaceInverse">#303030</color>
+    <color name="settingslib_materialColorSurfaceBright">@color/settingslib_neutral_variant_card</color>
+    <color name="settingslib_materialColorSurfaceDim">#131313</color>
+    <color name="settingslib_materialColorSurfaceContainer">#1F1F1F</color>
+    <color name="settingslib_materialColorSurfaceContainerLowest">#0C0E13</color>
+    <color name="settingslib_materialColorSurfaceContainerLow">#12171B</color>
+    <color name="settingslib_materialColorSurfaceContainerHigh">#1F2024</color>
+    <color name="settingslib_materialColorSurfaceContainerHighest">#33343A</color>
+
+    <color name="settingslib_colorBackgroundLevel_high">@color/m3_ref_palette_red60</color>
+    <color name="settingslib_colorContentLevel_high">@color/m3_ref_palette_red10</color>
+    <color name="settingslib_colorBackgroundLevel_medium">@color/m3_ref_palette_yellow60</color>
+    <color name="settingslib_colorContentLevel_medium">@color/m3_ref_palette_yellow10</color>
+    <color name="settingslib_colorBackgroundLevel_low">@color/m3_ref_palette_green70</color>
+    <color name="settingslib_colorContentLevel_low">@color/m3_ref_palette_green10</color>
+
+    <!-- Dialog colors -->
+    <color name="settingslib_dialog_colorError">@color/settingslib_error_300</color>
+
+    <color name="settingslib_ripple_color">#FFFFFFFF</color>
+    <color name="settingslib_list_divider_color">@color/settingslib_materialColorSurfaceContainerHighest</color>
+
+    <color name="settingslib_text_color_primary_device_default">@color/settingslib_materialColorOnSurface</color>
+    <color name="settingslib_text_color_secondary_device_default">@color/settingslib_materialColorOnSurfaceVariant</color>
+
+    <color name="settingslib_track_online_color">@color/settingslib_switch_track_outline_color</color>
+</resources>

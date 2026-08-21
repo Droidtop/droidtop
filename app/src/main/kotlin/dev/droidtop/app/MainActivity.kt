@@ -1,13 +1,17 @@
 package dev.droidtop.app
 
+import android.content.ComponentName
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -19,18 +23,23 @@ import dev.droidtop.library.Library
 import dev.droidtop.library.NativeAppProvider
 import dev.droidtop.shell.desktop.DesktopShell
 import dev.droidtop.shell.gamepad.GamepadShell
-import dev.droidtop.shell.standard.DefaultShell
 
 /**
- * Hosts whichever of the three shells the user has picked
- * (`dev.droidtop.app.ShellPreference`) — [ShellKind.STANDARD]
- * (`:shell-default`, a normal Android app-icon grid — this is also what
- * renders when DroidTop is chosen as the device's home screen, see the
- * HOME/DEFAULT intent-filter in AndroidManifest.xml), [ShellKind.DESKTOP]
- * (`:shell-desktop`, taskbar + start menu around the shared desktop), or
- * [ShellKind.HANDHELD] (`:shell-gamepad`, full-screen controller-navigable).
- * All three read the exact same [Library] — switching shells is just
- * rendering a different Composable, never a different app build.
+ * Secondary entry point (regular app-drawer icon) for switching to the
+ * Desktop/Handheld shells or re-opening the Standard launcher.
+ *
+ * The real HOME/LAUNCHER entry point — [ShellKind.STANDARD] — is
+ * `com.android.launcher3.Launcher`, a real standalone Activity forked in
+ * from Murine Launcher (`:shell-default`, see its own README.md), not
+ * something this Activity renders inline: unlike the other two shells, a
+ * launcher's whole architecture assumes it owns the process as the HOME
+ * activity, so "switching to Standard" here means launching it via
+ * [Intent], the same way any launcher-picker would.
+ *
+ * [ShellKind.DESKTOP] (`:shell-desktop`, taskbar + start menu around the
+ * shared desktop) and [ShellKind.HANDHELD] (`:shell-gamepad`, full-screen
+ * controller-navigable) both remain Composables rendered directly here,
+ * reading the same [Library] as Standard's NativeAppProvider.
  *
  * :shell-desktop needs a live HostBridge/DisplayOutput to show anything but
  * its own "no desktop session" placeholder — DesktopSessionService (which is
@@ -49,7 +58,7 @@ class MainActivity : AppCompatActivity() {
 
             Box(modifier = Modifier.fillMaxSize()) {
                 when (activeShell) {
-                    ShellKind.STANDARD -> DefaultShell(library)
+                    ShellKind.STANDARD -> StandardShellLaunchPrompt(onLaunch = { launchStandardShell() })
                     ShellKind.DESKTOP -> DesktopShell(library, hostBridge = null, primaryOutput = null)
                     ShellKind.HANDHELD -> GamepadShell(library)
                 }
@@ -71,11 +80,32 @@ class MainActivity : AppCompatActivity() {
                             activeShell = selected
                             ShellPreference.set(applicationContext, selected)
                             pickerOpen = false
+                            if (selected == ShellKind.STANDARD) {
+                                launchStandardShell()
+                            }
                         },
                         onDismiss = { pickerOpen = false },
                     )
                 }
             }
+        }
+    }
+
+    private fun launchStandardShell() {
+        val intent = Intent(Intent.ACTION_MAIN).apply {
+            component = ComponentName(this@MainActivity, "com.android.launcher3.Launcher")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        startActivity(intent)
+    }
+}
+
+@Composable
+private fun StandardShellLaunchPrompt(onLaunch: () -> Unit) {
+    Column(modifier = Modifier.fillMaxSize().padding(32.dp)) {
+        Text("Standard is a real, separate home-screen app (not rendered here).")
+        Button(onClick = onLaunch, modifier = Modifier.padding(top = 16.dp)) {
+            Text("Open Standard launcher")
         }
     }
 }

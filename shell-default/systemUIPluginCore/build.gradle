@@ -1,0 +1,40 @@
+plugins {
+    id 'com.android.library'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    compileSdk 36
+    namespace "com.android.systemui.plugin_core"
+
+    defaultConfig {
+        minSdkVersion 26
+        targetSdkVersion 36
+        versionCode 1
+        versionName "1.0"
+    }
+    buildFeatures {
+        aidl true
+    }
+    sourceSets {
+        main {
+            java.srcDirs = ['src']
+            aidl.srcDirs = ['src']
+            manifest.srcFile 'AndroidManifest.xml'
+        }
+    }
+}
+
+// Added by droidtop's fork (not upstream Murine) — see shell-default/
+// build.gradle's own header comment for why this can't be injected
+// centrally from there.
+def _frameworkStubs = project.configurations.detachedConfiguration(
+        project.dependencies.create("com.github.alesimula:android-framework-stubs:16-r2")
+)
+_frameworkStubs.transitive = false
+dependencies {
+    compileOnly project.files(_frameworkStubs.resolve())
+    implementation libs.androidx.core.ktx
+    implementation libs.annotation
+    implementation libs.kotlinx.coroutines
+}

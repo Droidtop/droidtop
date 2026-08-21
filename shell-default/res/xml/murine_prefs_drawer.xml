@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2015 Google Inc.
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+
+<androidx.preference.PreferenceScreen
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:launcher="http://schemas.android.com/apk/res-auto"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory android:title="@string/pref_drawer_type_title">
+        <com.android.settingslib.widget.SegmentedButtonPreference
+            android:key="pref_drawer_type"
+            android:title="Screen Mode" />
+        <com.android.settingslib.widget.SpacePreference
+            android:layout_height="6dp" />
+
+        <app.murinelauncher.widget.WarningCardPreference
+            android:key="pref_blur_warning"
+            android:visible="false"
+            app:formatHtml="true"
+            app:cardIcon="@android:drawable/ic_dialog_alert"
+            app:cardText="@string/pref_blur_unsupported_warning"
+            app:cardBackgroundColor="@color/settingslib_colorBackgroundLevel_medium"
+            app:cardContentColor="@color/settingslib_materialColorOnSurface" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/pref_subcategory_layout">
+        <SwitchPreferenceCompat
+            android:key="pref_grid_size_width_drawer_override_switch"
+            android:title="@string/pref_drawer_grid_width_override_title"
+            android:summary="@string/pref_drawer_grid_width_override_summary"
+            android:persistent="false" />
+
+        <!-- Min value set to 3 in code to prevent 0 (diabled) being recalcualted -->
+        <app.murinelauncher.widget.CustomSeekBarPreference
+            android:key="pref_grid_size_width_drawer_override"
+            android:title="@string/pref_label_grid_width"
+            android:min="0"
+            android:max="10"
+            app:showIncrementButtons="false"
+            app:showTicks="true" />
+    </PreferenceCategory>
+
+</androidx.preference.PreferenceScreen>

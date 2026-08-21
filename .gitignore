@@ -29,6 +29,12 @@ runtime-linux-root/src/main/assets/bin/
 # them from repo secrets instead, see .github/workflows/android-build.yml)
 .signing/
 
+# shell-default's framework-prebuilt jars (SystemUI-core, plugin core,
+# animation lib, msdl, aconfig flags, ~200MB+) — fetched from
+# github.com/alesimula/old-resources-m-launcher at build time, not
+# committed source; see build-scripts/fetch-shell-default-prebuilts.sh.
+shell-default/prebuilts/
+
 # OS
 .DS_Store
 Thumbs.db
