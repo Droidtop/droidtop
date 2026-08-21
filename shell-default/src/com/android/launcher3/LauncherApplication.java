@@ -43,7 +43,13 @@ public class LauncherApplication extends Application {
 
         com.zxy.recovery.core.Recovery.getInstance()
                 .debug(true)
-                .showDevEmail("alesimula@murinelauncher.app", true)
+                // Upstream Murine Launcher's own maintainer email -- was
+                // still wired in from the fork, so a crash offered to email
+                // Murine's team instead of droidtop's. Placeholder until
+                // this whole Recovery hookup is replaced by Sentry/Bugsink
+                // SDK crash capture (see docs/SPEC.md), pointed at droidtop's
+                // own self-hosted instance instead of an email button.
+                .showDevEmail("bioshacker001@gmail.com", true)
                 .recoverInBackground(false)
                 .recoverStack(true)
                 .mainPage(Launcher.class)
