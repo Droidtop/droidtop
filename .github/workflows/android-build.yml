@@ -219,5 +219,4 @@ jobs:
           gh release delete latest --yes --cleanup-tag 2>/dev/null || true
           gh release create latest droidtop-debug-latest.apk \
             --title "DroidTop — latest debug build" \
-            --notes "Automatically built from commit ${{ github.sha }}. Debug build (signed with a persistent DroidTop dev key — see .signing/ / SIGNING_KEYSTORE_BASE64, so it installs over a previous \"latest\" without uninstalling first; arm64-v8a + x86_64 fat APK) — not for production use, and functionality is still early: see docs/SPEC.md for current status." \
-            --prerelease
+            --notes "Automatically built from commit ${{ github.sha }}. Debug build (signed with a persistent DroidTop dev key — see .signing/ / SIGNING_KEYSTORE_BASE64, so it installs over a previous \"latest\" without uninstalling first; arm64-v8a + x86_64 fat APK) — not for production use, and functionality is still early: see docs/SPEC.md for current status."
