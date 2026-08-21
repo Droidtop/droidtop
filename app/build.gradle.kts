@@ -101,6 +101,14 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    // ViewTreeLifecycleOwner/ViewTreeSavedStateRegistryOwner (SecondScreenPresentation
+    // hosting Compose inside an android.app.Presentation, which isn't a LifecycleOwner/
+    // SavedStateRegistryOwner on its own the way an Activity is) -- not resolvable
+    // transitively via lifecycle-runtime-ktx alone, needs the base artifacts explicitly.
+    implementation("androidx.lifecycle:lifecycle-runtime:2.8.4")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.4")
+    implementation("androidx.savedstate:savedstate:1.2.1")
+    implementation("androidx.savedstate:savedstate-ktx:1.2.1")
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

@@ -83,7 +83,7 @@ import kotlinx.coroutines.launch
  * nothing here renders companion content on a second screen yet).
  */
 @Composable
-fun GamepadShell(library: Library) {
+fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Unit = {}) {
     var entries by remember { mutableStateOf<List<LibraryEntry>?>(null) }
     var section by remember { mutableStateOf(HandheldSection.GAMES) }
     var canGoBack by remember { mutableStateOf(false) }
@@ -113,6 +113,7 @@ fun GamepadShell(library: Library) {
                         onLaunch = onLaunch,
                         onShowDetail = { detailEntry = it },
                         onDrillDownChanged = { canGoBack = it },
+                        onFocusedEntryChanged = onFocusedEntryChanged,
                     )
                     HandheldSection.APPS -> {
                         canGoBack = false
@@ -120,6 +121,7 @@ fun GamepadShell(library: Library) {
                             entries = currentEntries.filter { it.kind in APP_KINDS },
                             onLaunch = onLaunch,
                             onShowDetail = { detailEntry = it },
+                            onFocusedEntryChanged = onFocusedEntryChanged,
                         )
                     }
                     HandheldSection.SETTINGS -> {
@@ -297,6 +299,7 @@ private fun GamesSection(
     onLaunch: (LibraryEntry) -> Unit,
     onShowDetail: (LibraryEntry) -> Unit,
     onDrillDownChanged: (Boolean) -> Unit,
+    onFocusedEntryChanged: (LibraryEntry?) -> Unit,
 ) {
     var selectedEngine by remember { mutableStateOf<LibraryEntryKind?>(null) }
     var recentOnly by remember { mutableStateOf(false) }
@@ -335,6 +338,7 @@ private fun GamesSection(
                             firstCardFocus = null,
                             onLaunch = onLaunch,
                             onShowDetail = onShowDetail,
+                            onFocusedEntryChanged = onFocusedEntryChanged,
                         )
                     }
                 }
@@ -381,6 +385,7 @@ private fun GamesSection(
                             modifier = if (index == 0) Modifier.focusRequester(firstFocus) else Modifier,
                             onLaunch = { onLaunch(entry) },
                             onShowDetail = { onShowDetail(entry) },
+                            onFocused = { onFocusedEntryChanged(entry) },
                         )
                     }
                 }
@@ -452,7 +457,12 @@ private fun EngineCard(kind: LibraryEntryKind, count: Int, modifier: Modifier = 
 
 /** Flat, kind-sectioned browser — no drill-down, unlike Games: apps aren't organized into "systems." */
 @Composable
-private fun AppsSection(entries: List<LibraryEntry>, onLaunch: (LibraryEntry) -> Unit, onShowDetail: (LibraryEntry) -> Unit) {
+private fun AppsSection(
+    entries: List<LibraryEntry>,
+    onLaunch: (LibraryEntry) -> Unit,
+    onShowDetail: (LibraryEntry) -> Unit,
+    onFocusedEntryChanged: (LibraryEntry?) -> Unit,
+) {
     val sections = buildAppSections(entries)
     val firstFocus = remember { FocusRequester() }
     LaunchedEffect(entries) { firstFocus.requestFocus() }
@@ -472,6 +482,7 @@ private fun AppsSection(entries: List<LibraryEntry>, onLaunch: (LibraryEntry) ->
                 firstCardFocus = if (!firstAssigned) firstFocus else null,
                 onLaunch = onLaunch,
                 onShowDetail = onShowDetail,
+                onFocusedEntryChanged = onFocusedEntryChanged,
             )
             firstAssigned = true
         }
@@ -497,7 +508,7 @@ private fun LibraryEntryKind.displayName(): String = when (this) {
     LibraryEntryKind.WINE_PROFILE -> "Windows"
     LibraryEntryKind.LINUX_CONTAINER_APP -> "Linux"
     LibraryEntryKind.REMOTE_STREAM -> "Remote PC"
-    LibraryEntryKind.RENPY -> "Visual Novels"
+    LibraryEntryKind.RENPY, LibraryEntryKind.KIRIKIRI -> "Visual Novels"
     LibraryEntryKind.RPG_MAKER_MV, LibraryEntryKind.RPG_MAKER_MZ, LibraryEntryKind.RPG_MAKER_VX_ACE -> "RPG Maker"
 }
 
@@ -507,6 +518,7 @@ private fun HomeSectionRow(
     firstCardFocus: FocusRequester?,
     onLaunch: (LibraryEntry) -> Unit,
     onShowDetail: (LibraryEntry) -> Unit,
+    onFocusedEntryChanged: (LibraryEntry?) -> Unit,
 ) {
     Column {
         Text(
@@ -525,6 +537,7 @@ private fun HomeSectionRow(
                     modifier = if (index == 0 && firstCardFocus != null) Modifier.focusRequester(firstCardFocus) else Modifier,
                     onLaunch = { onLaunch(entry) },
                     onShowDetail = { onShowDetail(entry) },
+                    onFocused = { onFocusedEntryChanged(entry) },
                 )
             }
         }
@@ -532,12 +545,15 @@ private fun HomeSectionRow(
 }
 
 @Composable
-private fun GameCard(entry: LibraryEntry, modifier: Modifier = Modifier, onLaunch: () -> Unit, onShowDetail: () -> Unit) {
+private fun GameCard(entry: LibraryEntry, modifier: Modifier = Modifier, onLaunch: () -> Unit, onShowDetail: () -> Unit, onFocused: () -> Unit = {}) {
     var focused by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
             .size(width = 220.dp, height = 260.dp)
-            .onFocusChanged { focused = it.isFocused }
+            .onFocusChanged {
+                focused = it.isFocused
+                if (it.isFocused) onFocused()
+            }
             .focusable()
             // DPAD_CENTER/Enter already trigger Modifier.clickable's default
             // key handling on a focused node, but a controller's face button
