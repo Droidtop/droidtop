@@ -57,6 +57,16 @@ jobs:
             17
             21
 
+      - name: Set up Go
+        # For cross-compiling crane (vendor/go-containerregistry), the OCI
+        # registry client CraneRootfsPuller shells out to — see
+        # build-scripts/build-vendor-deps.sh's crane section.
+        # go-containerregistry's go.mod requires >= 1.25; not assuming the
+        # runner's own preinstalled Go meets that.
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
       - name: Install build dependencies
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -139,8 +149,11 @@ jobs:
             ${{ env.ANDROID_DEPS_PREFIX }}
           # Keyed on every vendored submodule this script actually builds
           # from, not just a static string — a submodule bump on any of
-          # them should invalidate this.
-          key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD') }}-v5
+          # them should invalidate this. go-containerregistry added for
+          # crane (v6); bumping the version suffix too, since the v5 key
+          # (unaffected by this submodule addition) would otherwise cache-hit
+          # on an old assets/bin that never had crane-* built into it at all.
+          key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD') }}-v6
 
       - name: Build cross-compiled vendor deps (libffi, libwayland-client, droidspaces)
         if: steps.deps-cache.outputs.cache-hit != 'true'
