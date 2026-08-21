@@ -91,6 +91,7 @@ dependencies {
     implementation(project(":runtime-linux-root"))
     implementation(project(":runtime-linux-noroot"))
     implementation(project(":input-seat"))
+    implementation(project(":input-keyboard"))
     implementation(project(":runtime-remote-stream"))
     implementation(project(":library-core"))
     implementation(project(":shell-default"))
