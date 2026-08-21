@@ -18,6 +18,15 @@ data class LibraryEntry(
     val artworkUri: String? = null,
     val playtimeSeconds: Long = 0,
     val lastPlayedEpochMs: Long? = null,
+    // Only set for LibraryEntryKind.CONSOLE_ROM -- the real console system
+    // id (see dev.droidtop.library.consoles.ConsoleSystemDef), since
+    // CONSOLE_ROM alone doesn't distinguish NES from GBA from PS1 the way
+    // separate LibraryEntryKinds distinguish RENPY from RPG_MAKER_MV.
+    // shell-gamepad's Games section still buckets every CONSOLE_ROM entry
+    // under one "Consoles" system-list card for now, not per real console
+    // -- real per-system browsing (using this field) is the next UI step,
+    // not built in this pass.
+    val systemId: String? = null,
 )
 
 enum class LibraryEntryKind {
@@ -45,6 +54,15 @@ enum class LibraryEntryKind {
     RPG_MAKER_MZ,
     RPG_MAKER_VX_ACE,
     KIRIKIRI,
+
+    /**
+     * A real console ROM (NES, GBA, PS1, ...), launched via
+     * [dev.droidtop.library.consoles.ConsoleRomProvider] -- see that
+     * class's own doc comment for the real system list (generated from
+     * the open-source ES-DE project's own es_systems.xml) and launch
+     * mechanism (an am-start-style [dev.droidtop.library.consoles.Player]).
+     */
+    CONSOLE_ROM,
 }
 
 /**

@@ -23,6 +23,7 @@ import androidx.lifecycle.lifecycleScope
 import dev.droidtop.library.JoiPlayGameProvider
 import dev.droidtop.library.Library
 import dev.droidtop.library.NativeAppProvider
+import dev.droidtop.library.consoles.ConsoleRomProvider
 import dev.droidtop.runtime.DisplayOutputKind
 import dev.droidtop.runtime.DisplayOutputRepository
 import dev.droidtop.runtime.DualScreenCoordinator
@@ -85,6 +86,11 @@ class MainActivity : AppCompatActivity() {
             listOf(
                 NativeAppProvider(applicationContext),
                 JoiPlayGameProvider(applicationContext, gamesRoots),
+                // Same roots as JoiPlayGameProvider -- a folder can hold
+                // real console ROMs (<root>/<systemId>/<romFile>), engine
+                // games (<root>/<gameFolder>/...), or both; each provider
+                // only ever matches what's actually its own shape.
+                ConsoleRomProvider(applicationContext, gamesRoots),
             ),
         )
         mode = intent.getStringExtra(BackButtonMenu.EXTRA_MODE)
