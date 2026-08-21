@@ -1,0 +1,58 @@
+plugins {
+    id 'com.android.library'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace "com.android.launcher3.flags"
+
+    compileSdk 36
+
+    defaultConfig {
+        minSdkVersion 26
+        targetSdkVersion 36
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs = ['src']
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+}
+
+dependencies {
+    implementation(libs.core)
+    implementation(libs.annotation)
+}
+// Added by droidtop's fork (not upstream Murine) — see shell-default/
+// build.gradle's own header comment for why this can't be injected
+// centrally from there.
+def _frameworkStubs = project.configurations.detachedConfiguration(
+        project.dependencies.create("com.github.alesimula:android-framework-stubs:16-r2")
+)
+_frameworkStubs.transitive = false
+dependencies {
+    implementation libs.androidx.core.ktx
+    implementation libs.annotation
+    implementation libs.kotlinx.coroutines
+}
+// A plain compileOnly dependency does NOT win against the SDK's own
+// (redacted) android.jar for android.* symbols — that comes from AGP's
+// bootclasspath, a separate, higher-priority classpath segment. Prepending
+// the stub jar onto each compile task's own classpath/libraries is what
+// actually makes hidden android.* symbols resolve.
+tasks.withType(JavaCompile).configureEach { task ->
+    task.doFirst {
+        task.classpath = files(_frameworkStubs.resolve()) + task.classpath
+    }
+}
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach { task ->
+    task.doFirst {
+        task.libraries.from(files(_frameworkStubs.resolve()))
+    }
+}

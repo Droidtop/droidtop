@@ -1,0 +1,42 @@
+plugins {
+    id 'com.android.library'
+}
+
+android {
+    buildToolsVersion "36.1.0"
+    namespace "app.lawnchair.compatlib"
+    compileSdk 36
+
+    defaultConfig {
+        minSdkVersion 26
+    }
+
+    buildFeatures {
+        aidl true
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+
+    sourceSets {
+        main {
+            aidl.srcDirs = ['src/main/java']
+        }
+    }
+}
+
+// Added by droidtop's fork (not upstream Murine) — see shell-default/
+// build.gradle's own header comment for why this can't be injected
+// centrally from there.
+def _frameworkStubs = project.configurations.detachedConfiguration(
+        project.dependencies.create("com.github.alesimula:android-framework-stubs:16-r2")
+)
+_frameworkStubs.transitive = false
+dependencies {
+    compileOnly project.files(_frameworkStubs.resolve())
+    implementation libs.androidx.core.ktx
+    implementation libs.annotation
+    implementation libs.kotlinx.coroutines
+}

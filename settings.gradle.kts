@@ -11,6 +11,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Needed by :shell-default (the forked-in Murine Launcher source —
+        // see shell-default/README.md): chickenhook-restrictionbypass and
+        // a couple of its other deps are only published there.
+        maven { url = uri("https://jitpack.io") }
     }
     // gradle/libs.versions.toml is picked up by convention — do not also
     // declare it via versionCatalogs { create("libs") { from(...) } },
@@ -71,8 +75,72 @@ include(":runtime-remote-stream")
 // layer a future launcher shell (:shell-gamepad) will read from.
 include(":library-core")
 
-// Default shell: normal touch/mouse-first library grid. This is what ships first.
+// "Standard" shell: forked-in Murine Launcher (github.com/alesimula/Murine-launcher,
+// itself a de-privileged, standalone-Gradle-buildable fork of AOSP Launcher3),
+// stripped/patched for droidtop rather than kept as a passive vendor/ reference —
+// its whole value is UI code we need to own and edit directly, unlike
+// runtime-windows/runtime-linux-root's relationship to their vendor/ sources.
+// See shell-default/README.md. Its own module graph (originally a separate
+// root Gradle project) is included here rather than flattened, to keep future
+// upstream syncing tractable.
 include(":shell-default")
+
+include(":IconLoader")
+project(":IconLoader").projectDir = file("shell-default/iconloaderlib")
+
+include(":Animation")
+project(":Animation").projectDir = file("shell-default/animationlib")
+
+include(":Shared")
+project(":Shared").projectDir = file("shell-default/shared")
+
+include(":WMShared")
+project(":WMShared").projectDir = file("shell-default/wm_shared")
+
+include(":msdl")
+project(":msdl").projectDir = file("shell-default/msdllib")
+
+include(":flags")
+project(":flags").projectDir = file("shell-default/flagslib")
+
+include(":HiddenApi")
+project(":HiddenApi").projectDir = file("shell-default/hidden-api")
+
+include(":SettingsLib-SettingsTheme")
+project(":SettingsLib-SettingsTheme").projectDir = file("shell-default/SettingsLib/SettingsTheme")
+include(":SettingsLib-DataStore")
+project(":SettingsLib-DataStore").projectDir = file("shell-default/SettingsLib/DataStore")
+include(":SettingsLib-Metadata")
+project(":SettingsLib-Metadata").projectDir = file("shell-default/SettingsLib/Metadata")
+include(":SettingsLib-Preference")
+project(":SettingsLib-Preference").projectDir = file("shell-default/SettingsLib/Preference")
+include(":SettingsLib-SliderPreference")
+project(":SettingsLib-SliderPreference").projectDir = file("shell-default/SettingsLib/SliderPreference")
+include(":SettingsLib-SelectorWithWidgetPreference")
+project(":SettingsLib-SelectorWithWidgetPreference").projectDir = file("shell-default/SettingsLib/SelectorWithWidgetPreference")
+include(":SettingsLib-ExpandablePreference")
+project(":SettingsLib-ExpandablePreference").projectDir = file("shell-default/SettingsLib/ExpandablePreference")
+include(":SettingsLib-SegmentedButtonPreference")
+project(":SettingsLib-SegmentedButtonPreference").projectDir = file("shell-default/SettingsLib/SegmentedButtonPreference")
+include(":SettingsLib-MainSwitchPreference")
+project(":SettingsLib-MainSwitchPreference").projectDir = file("shell-default/SettingsLib/MainSwitchPreference")
+
+// compatLib (+ its 7 per-Android-version variants) and androidx-lib are
+// deliberately NOT included — see shell-default/build.gradle for why
+// (quickstep/recents-animation-only code that can't compile outside a real
+// AOSP platform source tree, confirmed by a real compile attempt, and
+// unreferenced by the actual launcher code). Source is still physically
+// present under shell-default/ for reference.
+//
+// systemUIPluginCore, unlike those, genuinely IS needed — it provides the
+// base Plugin/PluginListener/ProvidesInterface classes every interface in
+// shell-default/src_plugins/ extends, and Launcher.java/FloatingHeaderView.
+// java/etc. reference directly. Wrongly excluded alongside compatLib on a
+// first pass (grepped for the wrong package name); re-added once the real
+// compile errors ("cannot find symbol: class Plugin") showed it was
+// load-bearing after all.
+include(":systemUIPluginCore")
+project(":systemUIPluginCore").projectDir = file("shell-default/systemUIPluginCore")
 
 // Optional gamepad-console-style launcher shell. Stub only for now — depends on
 // :library-core's plugin interface being stable before this gets built out.

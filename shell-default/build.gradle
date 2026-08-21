@@ -1,0 +1,292 @@
+// shell-default: forked-in Murine Launcher (github.com/alesimula/Murine-launcher,
+// itself a de-privileged fork of AOSP Launcher3), stripped down to a single
+// variant for droidtop:
+//
+//  - Converted from com.android.application to com.android.library —
+//    :app is the one module that produces our final APK; every other
+//    module (including this one) contributes to it as a library.
+//  - Flavor dimensions removed entirely. Upstream had "app" (aosp/l3go) x
+//    "recents" (withQuickstep/withoutQuickstep) flavor dimensions; we only
+//    ever want the aosp+withoutQuickstep combination — l3go is the cut-down
+//    "Android Go" variant (irrelevant here), and quickstep/recents needs
+//    sysui_shared.jar (a real AOSP system-signature artifact we don't have
+//    and can't get as a normal app) to compile at all. Kept as a single
+//    hardcoded source set instead of a flavor matrix we'd never switch.
+//  - Package/namespace kept as com.android.launcher3 (not renamespaced to
+//    dev.droidtop.*) — every source file's `package` declaration and every
+//    cross-file reference uses this name throughout the fork; renaming it
+//    would touch thousands of lines for no functional benefit and would
+//    make pulling future upstream fixes much harder to diff against.
+//
+// See README.md for what's real vs. still-TODO (multi-display patch,
+// build verification status).
+plugins {
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.android)
+    id("org.jetbrains.kotlin.kapt")
+    alias(libs.plugins.rikka.refine)
+    alias(libs.plugins.google.ksp)
+    alias(libs.plugins.google.protobuf)
+}
+
+// Old prebuilt framework/SystemUI jars this fork needs at compile time
+// (SystemUI-core, plugin core, animation lib, msdl, aconfig flags, ...) —
+// not committed to this repo (~200MB+ of binary jars; see .gitignore and
+// build-scripts/fetch-shell-default-prebuilts.sh), fetched from
+// github.com/alesimula/old-resources-m-launcher before building.
+final String FRAMEWORK_PREBUILTS_DIR = "${projectDir}/prebuilts/libs/"
+
+// ------------------ Framework stub dependency pipeline ------------------
+// Per-Android-version hidden/internal API stub jars, published on Jitpack —
+// this is the actual mechanism that lets this fork call hidden framework
+// APIs without a full AOSP source tree (see compatLib's per-version
+// modules, which target these).
+ext.resolveJitpackStub = { String version ->
+    def config = project.configurations.detachedConfiguration(
+            project.dependencies.create("com.github.alesimula:android-framework-stubs:${version}")
+    )
+    config.transitive = false
+    return project.files(config.resolve())
+}
+
+def frameworkStubs10 = resolveJitpackStub('10-r1')
+def frameworkStubs11 = resolveJitpackStub('11-r1')
+def frameworkStubs12 = resolveJitpackStub('12-r1')
+def frameworkStubs13 = resolveJitpackStub('13-r1')
+def frameworkStubs14 = resolveJitpackStub('14-r1')
+def frameworkStubs15 = resolveJitpackStub('15-r1')
+def frameworkStubs16 = resolveJitpackStub('16-r2')
+
+android {
+    namespace 'com.android.launcher3'
+    // Matches every sub-module this depends on (androidx-lib, compatLib*,
+    // SettingsLib-*, systemUIPluginCore, ...) — they all hardcode
+    // compileSdk 36, so this module has to as well even though the rest
+    // of droidtop's own modules (:app, :host-bridge, ...) are still on 34.
+    // AGP allows a mixed compileSdk across modules in one build; it's the
+    // per-module SDK platform availability that matters, not uniformity.
+    compileSdk 36
+
+    defaultConfig {
+        minSdk 26
+        targetSdk 36
+        vectorDrawables.useSupportLibrary = true
+        // Library modules don't auto-generate BuildConfig.APPLICATION_ID
+        // the way an application module does (that's an app-only concept —
+        // AGP only auto-populates LIBRARY_PACKAGE_NAME for libraries).
+        // ApiWrapper.java/PrivateProfileManager.java reference
+        // BuildConfig.APPLICATION_ID directly; hardcoded here rather than
+        // threading a Context through those call sites, since shell-default
+        // is only ever consumed by :app (applicationId "dev.droidtop.app" —
+        // see app/build.gradle.kts) in this repo.
+        buildConfigField "String", "APPLICATION_ID", "\"dev.droidtop.app\""
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+
+    buildTypes {
+        debug {
+            buildConfigField "boolean", "IS_STUDIO_BUILD", "false"
+            buildConfigField "boolean", "QSB_ON_FIRST_SCREEN", "false"
+            buildConfigField "boolean", "IS_DEBUG_DEVICE", "false"
+            buildConfigField "boolean", "WIDGET_ON_FIRST_SCREEN", "true"
+            buildConfigField "boolean", "WIDGETS_ENABLED", "true"
+            buildConfigField "boolean", "NOTIFICATION_DOTS_ENABLED", "true"
+            buildConfigField "boolean", "ANIMATE_ALL_APPS_SEARCH", "false"
+        }
+    }
+
+    sourceSets {
+        main {
+            // AndroidManifest.xml at the conventional src/main path is a
+            // hand-merge of upstream's AndroidManifest-common.xml +
+            // AndroidManifest.xml (aospWithoutQuickstep flavor) — see that
+            // file's own header comment for why.
+            res.srcDirs = ['res']
+            java.srcDirs = ['src', 'src_plugins', 'src_no_quickstep', 'src_shortcuts_overrides']
+            proto {
+                srcDirs = ['protos/', 'protos_overrides/']
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+kapt {
+    useBuildCache = true
+    correctErrorTypes = true
+}
+
+// Prepend a framework stub jar to the compile classpath — a plain
+// compileOnly dependency does NOT win against the SDK's own (redacted)
+// android.jar for android.* symbols (that comes from AGP's bootclasspath,
+// a separate, higher-priority classpath segment); this actually reorders
+// each compile task's own classpath/libraries instead. Safe to call for
+// `project` (this module, self) at any point — it defers via
+// gradle.projectsEvaluated internally rather than calling afterEvaluate on
+// an already-evaluated project, which is the trap the removed cross-project
+// version of this hit (see the comment further down).
+ext.addFrameworkStubsInternal = { Project proj, String excludePrefix, def stubsConfig ->
+    proj.dependencies {
+        compileOnly proj.files(stubsConfig)
+    }
+    proj.gradle.projectsEvaluated {
+        proj.tasks.withType(JavaCompile).configureEach { task ->
+            if (!task.name.startsWith(excludePrefix)) {
+                // doFirst, not a direct assignment here: task.classpath is
+                // still null at configureEach time (before AGP finishes
+                // wiring it), which throws deep inside Groovy's `files(a,
+                // null)` coercion — confirmed by a real build failure
+                // (":Animation:compileDebugJavaWithJavac", "Could not find
+                // matching constructor for: FileCollection(File, null)").
+                // doFirst defers until task execution, when classpath is
+                // guaranteed fully resolved.
+                task.doFirst {
+                    task.classpath = proj.files(stubsConfig, task.classpath)
+                }
+            }
+        }
+        proj.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach { task ->
+            task.doFirst {
+                task.libraries.setFrom proj.files(stubsConfig, task.libraries)
+            }
+        }
+    }
+}
+
+// NOTE on two bugs in upstream Murine's own build.gradle this fork found
+// and worked around (not just corrected — the whole cross-project
+// injection *mechanism* had to go, see below):
+//
+// 1. The equivalent block there was `allprojects { ext { afterEvaluate {
+//    proj -> ... } } }` — nesting `afterEvaluate { ... }` *inside* an
+//    `ext {}` block doesn't register a real Project.afterEvaluate()
+//    lifecycle hook; in Groovy that just defines a dead extra-property
+//    literally named "afterEvaluate" holding an unused closure. The
+//    framework-stub and androidx.annotation/core-ktx/coroutines injection
+//    below silently never ran for any submodule as a result — confirmed
+//    while building this fork (compatLib failed with "cannot find symbol:
+//    RemoteAnimationTarget" / "cannot find symbol: androidx.annotation.
+//    NonNull", both of which this injection is supposed to provide).
+//
+// 2. `allprojects { ... }` in Gradle means every project in the *entire*
+//    build, not "this module and its children" — harmless in upstream
+//    Murine where it WAS the whole build, but inside droidtop's monorepo
+//    it would reach :app, :host-bridge, every other unrelated module too.
+//
+// Fixing just those two (calling a properly-scoped real afterEvaluate)
+// still failed differently: "Cannot run Project.afterEvaluate(Closure)
+// when the project is already evaluated" — Gradle evaluates a project's
+// *dependencies* before the project itself when they're referenced via
+// `implementation project(':X')` (which shell-default's own dependencies
+// block below does, for every one of these sub-modules), so by the time
+// this script tries to hook their afterEvaluate, they're already done.
+// There's no reliable ordering-independent way to inject dependencies
+// into sibling projects reactively like this; each module now declares
+// its own framework-stub/androidx.annotation/core-ktx/coroutines
+// dependencies directly in its own build.gradle instead (see e.g.
+// systemUIPluginCore/build.gradle, compatLib/*/build.gradle) — more
+// lines, but doesn't depend on cross-project evaluation order at all.
+
+dependencies {
+    implementation libs.androidx.appcompat
+    implementation libs.androidx.core.ktx
+    implementation libs.androidx.recyclerview
+    implementation libs.androidx.dynamicanimation
+    implementation libs.androidx.preference
+    implementation libs.androidx.slice.builders
+    implementation libs.androidx.graphics.shapes
+    implementation libs.androidx.window
+    implementation libs.androidx.core.animation
+    implementation libs.androidx.material3
+    implementation libs.androidx.tracing
+    implementation libs.androidx.palette.ktx
+    implementation libs.material
+    implementation libs.kotlinx.coroutines
+
+    implementation libs.protobuf.javalite
+    implementation libs.chickenhook.restrictionbypass
+    implementation libs.rikka.refine.runtime
+    implementation libs.intuit.sdp
+
+    implementation 'com.github.alesimula.Recovery:recovery:1.0.7'
+    implementation 'com.github.alesimula:murine-aircompressor:2.0.9'
+
+    api libs.lottie
+    implementation libs.dagger
+    kapt libs.dagger.compiler
+
+    testImplementation libs.junit
+    androidTestImplementation libs.mockito.core
+    androidTestImplementation libs.dexmaker
+    androidTestImplementation libs.dexmaker.mockito
+    androidTestImplementation libs.runner
+    androidTestImplementation libs.rules
+    androidTestImplementation libs.uiautomator.v18
+    androidTestImplementation libs.annotation
+
+    implementation project(':IconLoader')
+    implementation project(':Animation')
+    implementation project(':Shared')
+    implementation project(':msdl')
+    implementation project(':flags')
+    implementation project(':WMShared')
+    implementation project(':SettingsLib-SettingsTheme')
+    implementation project(':SettingsLib-SliderPreference')
+    implementation project(':SettingsLib-SelectorWithWidgetPreference')
+    implementation project(':SettingsLib-ExpandablePreference')
+    implementation project(':SettingsLib-SegmentedButtonPreference')
+    implementation project(':SettingsLib-MainSwitchPreference')
+
+    implementation project(':systemUIPluginCore')
+
+    // compatLib (+ its 7 per-Android-version variants) is NOT included —
+    // it's genuinely quickstep/recents-animation-only (unlike
+    // systemUIPluginCore, which is core plugin infrastructure needed
+    // regardless of quickstep — see above) and can't compile standalone
+    // regardless: compatLib/src/main/java/android/window/
+    // {RemoteTransition,TransitionInfo}.java are local reimplementations
+    // of AOSP's own internal Transitions-framework classes, declared
+    // directly inside the android.window package and using
+    // android.annotation.NonNull/Nullable — package-private annotations
+    // only resolvable from within a real platform source tree compile,
+    // not via any compileOnly stub jar. This is exactly the quickstep/
+    // recents-animation system-signature-permission wall dropping the
+    // quickstep flavor was already meant to avoid (see this file's own
+    // header comment) — confirmed by a real compile attempt, not assumed.
+    // The source is still physically present in this repo (compatLib/)
+    // for reference if a privileged/system-signed build ever revisits
+    // quickstep support; it just isn't included in settings.gradle.kts.
+}
+
+// This module's own compile against Launcher.java etc. needs the same
+// hidden-API stub prepending every sub-module gets — see this file's
+// header comment.
+addFrameworkStubsInternal(project, "compileFrameworkStubs", frameworkStubs16)
+
+def protocVersion = '4.33.1'
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:${protocVersion}"
+    }
+    generateProtoTasks {
+        all().each { task ->
+            task.builtins {
+                remove java
+                java {
+                    option "lite"
+                }
+            }
+        }
+    }
+}

@@ -1,4 +1,6 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Secondary-display presentation (second screen / external lapdock monitor) -->
     <uses-feature android:name="android.software.presentation" android:required="false" />
@@ -6,26 +8,23 @@
     <application
         android:label="@string/app_name"
         android:allowBackup="false"
-        android:theme="@style/Theme.DroidTop">
+        android:theme="@style/Theme.DroidTop"
+        tools:replace="android:label">
 
+        <!--
+          The real HOME/LAUNCHER entry point is :shell-default's own
+          com.android.launcher3.Launcher (forked-in Murine Launcher — see
+          shell-default/README.md), declared in that library module's own
+          manifest and merged in here by AGP. MainActivity is a secondary
+          entry point (app drawer icon) for switching to the Desktop/
+          Handheld shells or opening the Standard launcher's settings.
+        -->
         <activity
             android:name="dev.droidtop.app.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-            <!--
-              HOME + DEFAULT: lets the user pick DroidTop as their device's
-              home screen (Android's standard "make this app a launcher"
-              mechanism — a separate opt-in dialog, this doesn't force a
-              replacement). The "Standard" shell (:shell-default) is what
-              renders in that case; see MainActivity's own doc comment.
-            -->
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.HOME" />
-                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
 
