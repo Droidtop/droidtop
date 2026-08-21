@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "repositories": [
+    {
+      "id": "alpine-sway",
+      "os": "alpine",
+      "desktopEnvironment": "sway",
+      "compositorFamily": "WLROOTS",
+      "headlessSupport": "CONFIRMED",
+      "role": "PRIMARY",
+      "repository": "TODO/droidtop-primary-alpine-sway",
+      "officialSource": true,
+      "arm64Available": true,
+      "notes": "Not published anywhere yet -- nothing to resolve tags against until droidtop actually publishes a base+sway image. sway's headless backend (WLR_BACKENDS=headless) is well-documented (ArchWiki, Gentoo wiki) and is already droidtop's own reference compositor (vendor/sway)."
+    },
+    {
+      "id": "alpine-labwc",
+      "os": "alpine",
+      "desktopEnvironment": "labwc",
+      "compositorFamily": "WLROOTS",
+      "headlessSupport": "CONFIRMED",
+      "role": "PRIMARY",
+      "repository": "TODO/droidtop-primary-alpine-labwc",
+      "officialSource": true,
+      "arm64Available": true,
+      "notes": "Not published anywhere yet. labwc supports WLR_BACKENDS=headless + WLR_LIBINPUT_NO_DEVICES=1 (labwc's own actions docs, real wayvnc use). A 2022 headless assertion-failure report (labwc/labwc#605) may or may not still apply to current releases -- not independently re-verified by droidtop."
+    },
+    {
+      "id": "debian-sway",
+      "os": "debian",
+      "desktopEnvironment": "sway",
+      "compositorFamily": "WLROOTS",
+      "headlessSupport": "CONFIRMED",
+      "role": "PRIMARY",
+      "repository": "TODO/droidtop-primary-debian-sway",
+      "officialSource": true,
+      "arm64Available": true,
+      "notes": "Not published anywhere yet. Same sway headless-backend facts as the Alpine+sway entry; glibc base instead of musl for anyone who needs it."
+    },
+    {
+      "id": "alpine-hyprland",
+      "os": "alpine",
+      "desktopEnvironment": "hyprland",
+      "compositorFamily": "AQUAMARINE",
+      "headlessSupport": "REGRESSED",
+      "role": "PRIMARY",
+      "repository": "TODO/droidtop-primary-alpine-hyprland",
+      "officialSource": true,
+      "arm64Available": true,
+      "notes": "Not published anywhere yet, and not recommended if it were: multiple open upstream issues report headless/virtual outputs broken on current Hyprland (hyprwm/Hyprland#7917, #8806) since it forked off wlroots onto its own Aquamarine backend in 2024. Listed for visibility/filtering, not as a working recommendation."
+    },
+    {
+      "id": "alpine",
+      "os": "alpine",
+      "role": "SIBLING",
+      "repository": "library/alpine",
+      "officialSource": true,
+      "arm64Available": true
+    },
+    {
+      "id": "debian",
+      "os": "debian",
+      "role": "SIBLING",
+      "repository": "library/debian",
+      "officialSource": true,
+      "arm64Available": true
+    },
+    {
+      "id": "ubuntu",
+      "os": "ubuntu",
+      "role": "SIBLING",
+      "repository": "library/ubuntu",
+      "officialSource": true,
+      "arm64Available": true
+    },
+    {
+      "id": "fedora",
+      "os": "fedora",
+      "role": "SIBLING",
+      "repository": "library/fedora",
+      "officialSource": true,
+      "arm64Available": true
+    },
+    {
+      "id": "archlinux-official",
+      "os": "archlinux",
+      "role": "SIBLING",
+      "repository": "library/archlinux",
+      "officialSource": true,
+      "arm64Available": false,
+      "notes": "Official Arch Linux Docker image is amd64-only -- no arm64 build (confirmed via gitlab.archlinux.org/archlinux/archlinux-docker#29). Unusable on droidtop's ARM64 target as-is; a third-party rebuild (e.g. menci/docker-archlinuxarm) would need its own entry, not added here yet."
+    },
+    {
+      "id": "opensuse-tumbleweed",
+      "os": "opensuse",
+      "role": "SIBLING",
+      "repository": "opensuse/tumbleweed",
+      "officialSource": true,
+      "arm64Available": true,
+      "notes": "openSUSE's own Tumbleweed image lists linux/386, linux/amd64, linux/arm platforms; the ARM variant's exact architecture (armv7 vs. arm64) wasn't independently confirmed in this research pass."
+    },
+    {
+      "id": "voidlinux-glibc",
+      "os": "voidlinux",
+      "role": "SIBLING",
+      "repository": "void-linux/void-glibc",
+      "registry": "ghcr.io",
+      "officialSource": true,
+      "arm64Available": true,
+      "notes": "Void's own current containers are at ghcr.io/void-linux/void-*, confirmed to publish linux/arm64 -- not Docker Hub's voidlinux/voidlinux, which is stale (unmaintained for years)."
+    }
+  ]
+}
