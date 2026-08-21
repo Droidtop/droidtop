@@ -53,7 +53,10 @@ class ConsoleRomProvider(
         romsRoots.flatMap { root ->
             (root.listFiles() ?: emptyArray())
                 .filter { it.isDirectory }
-                .mapNotNull { systemFolder -> resolveSystem(systemFolder.name)?.let { systemFolder to it } }
+                .mapNotNull { systemFolder ->
+                    SystemOverridePrefs.resolveForFolder(context, systemFolder.absolutePath, systemFolder.name)
+                        ?.let { systemFolder to it }
+                }
                 .flatMap { (systemFolder, system) ->
                     if (DefaultPlayers.retroArch(system) == null) return@flatMap emptyList()
                     (systemFolder.listFiles() ?: emptyArray())
@@ -71,7 +74,8 @@ class ConsoleRomProvider(
 
     override suspend fun launch(entry: LibraryEntry) {
         val romFile = File(entry.id)
-        val system = resolveSystem(romFile.parentFile?.name ?: "")
+        val parentFolder = romFile.parentFile
+        val system = SystemOverridePrefs.resolveForFolder(context, parentFolder?.absolutePath ?: "", parentFolder?.name ?: "")
             ?: error("Couldn't resolve a console system for ${entry.id}")
         val player = DefaultPlayers.retroArch(system)
             ?: error("No Player configured for system ${system.id}")
