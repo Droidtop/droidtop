@@ -54,12 +54,32 @@ security-sensitive compositor code to write from scratch on a platform
 Instead, mirror Qubes OS's dom0/AppVM split:
 
 - **The primary container** is a real Linux container running a real
-  desktop compositor — [vendor/sway](../vendor/sway) (wlroots-based, MIT),
-  built with wlroots' headless backend so its outputs are virtual and
-  capturable rather than tied to real hardware. This container *is* the
-  desktop. Ordinary window management, multi-output configuration, etc. are
-  all sway's problem, not ours — we're consuming a mature project instead of
-  building a compositor.
+  desktop compositor, built with wlroots' headless backend so its outputs
+  are virtual and capturable rather than tied to real hardware. This
+  container *is* the desktop. Ordinary window management, multi-output
+  configuration, etc. are the compositor's problem, not ours — we're
+  consuming a mature project instead of building one.
+  **Default compositor is [labwc](https://github.com/labwc/labwc)
+  (wlroots-based, GPL-2.0), not sway** — sway's tiling is a real design
+  choice for a lot of sway users, but it's tiling-first *policy* sitting on
+  top of wlroots, not something inherent to what droidtop actually needs
+  (that's wlroots' headless backend + the wlr-screencopy/virtual-pointer/
+  virtual-keyboard protocols, which any wlroots compositor exposes access
+  to). labwc is a window-*stacking* compositor explicitly modeled on
+  Openbox — ordinary floating windows, no tiling philosophy to configure
+  around — a closer match to the plain desktop feel §1 wants. [vendor/sway]
+  (../vendor/sway) is kept as a documented alternative for users who
+  specifically want tiling (§2a already establishes the compositor/WM is
+  meant to be swappable, not hardcoded); labwc itself isn't vendored as a
+  submodule the way sway/Android-side deps are, since it runs as an
+  ordinary package inside the primary container's own Linux userland (its
+  base distro's package manager, not something droidtop cross-compiles).
+  **Not yet independently verified**: labwc's headless-backend support
+  specifically — confirmed to be a real, actively-maintained wlroots
+  stacking compositor, but headless-backend behavior wasn't confirmed by
+  reading its actual backend-selection code, only inferred from being
+  wlroots-based generally. Verify before relying on it working out of the
+  box.
 - **Android's app code (`:host-bridge`) is a thin, privileged bridge only**
   — analogous to dom0's narrow GUI-daemon role in Qubes. It is a Wayland
   *client* of the primary container's compositor, doing exactly two things:
@@ -193,7 +213,7 @@ for avoiding re-downloads when containers are recreated.
   companion dual-screen home-launcher-routing tool) is another concrete
   reference for the same problem, worth looking at alongside iiSU.
 - Each `DisplayOutput` maps to one headless output inside the primary
-  container's sway instance.
+  container's compositor (labwc by default — see §2).
 - **Default**: every window is placed on the primary screen's output —
   `WindowPlacement.merged()` — one shared desktop, nothing hidden away.
 - **Opt-in**: any window can be reassigned to a different `DisplayOutput` at
@@ -497,7 +517,13 @@ LGPL-2.1. `vendor/sway`, `vendor/wlroots` (protocol definitions only — not
 compiled for Android, see `:host-bridge`), and `vendor/wayland`/`vendor/
 wayland-protocols` (same — codegen/headers only) are MIT. `vendor/
 go-containerregistry` is Apache-2.0. `shell-default`'s fork source (Murine
-Launcher, itself derived from AOSP Launcher3) is also Apache-2.0. `pc-helper` is a separate program, not
+Launcher, itself derived from AOSP Launcher3) is also Apache-2.0.
+`input-keyboard`'s fork source (Hacker's Keyboard) is also Apache-2.0.
+labwc (§2's default primary-container compositor — installed as a package
+inside the container image, not vendored/compiled by droidtop itself) is
+GPL-2.0; combining it doesn't change the project's overall GPL-3.0
+position, license-compatible the same way the other GPL sources already
+are. `pc-helper` is a separate program, not
 statically linked into the Android app — its own license can be chosen
 independently (default assumption: also GPL-3.0 for consistency, revisit if
 that's not actually desired for a standalone PC service).
