@@ -612,6 +612,36 @@ app-drawer icon or a floating switcher button:
   apps aren't a separate, second-class mode). Current implementation
   (`GamepadShell.kt`) is a single plain card carousel — real artwork
   rendering and the paradigm-selection mechanism itself don't exist yet.
+  - **Both apps are closed-source** — confirmed this session (iiSU's
+    GitHub repo is a landing page/update-manifest only, no app source;
+    Daijishō's maintainer describes its own main repo the same way).
+    Learning from either means public docs/wiki/screenshots and, for
+    Daijishō specifically, inspecting its official release APK — never
+    copying UI or code, matching direction given this session.
+  - **UI takeaway** (the user's own judgment, from real use of both):
+    Daijishō's grid/list UI is the better starting point overall, but its
+    non-emulated-content gap (above) is real, not just a paradigm
+    preference — its extension architecture (a bundled V8 JS runtime,
+    `bootstrap.js`/`postscript.js`, zip-packaged extensions — confirmed by
+    inspecting its release APK's assets) is scraper/emulator-focused by
+    construction. iiSU's overall look isn't preferred, but its dual-screen
+    handling is genuinely good — exact visual split between the two
+    screens wasn't confirmed from available screenshots (both public
+    demo images show the same single-panel grid), so that specific
+    layout isn't something to copy blind either. `:shell-gamepad`'s
+    paradigms should synthesize the good pieces from both without
+    reproducing either — Daijishō's content breadth done properly
+    (native/Wine as first-class, not bolted on) plus iiSU's dual-screen
+    input/output split (§4), in droidtop's own visual language.
+  - **Real prior art for the launch mechanism, worth adopting later**:
+    Daijishō's "Player" config templates `am start`-style arguments
+    (`amStartArguments`, e.g. `-n <component> -a android.intent.action.
+    VIEW -d {file.uri}`) with variable substitution — a genuinely more
+    flexible model than §7d's current JoiPlay-hardcoded `ACTION_VIEW`
+    call, since new emulators/interpreters become data (a template) not
+    new Kotlin code. Worth evolving `JoiPlayGameProvider` toward something
+    like this once more than one external launcher needs supporting —
+    not done in this pass.
 
 ## 7a. Remote PC streaming (GameStream/Moonlight/Sunshine)
 
