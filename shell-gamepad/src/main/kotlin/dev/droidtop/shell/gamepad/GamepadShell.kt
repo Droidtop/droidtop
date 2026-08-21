@@ -669,11 +669,24 @@ private fun SettingsSection() {
             onClick = { openSettings(context, "app.murinelauncher.settings.SettingsHandheldFragment") },
         )
         SettingsLink(
+            "Console systems",
+            "Assign folders to a system by hand",
+            onClick = { openActivity(context, "dev.droidtop.app.ConsoleSystemsActivity") },
+        )
+        SettingsLink(
             "All settings",
             "General, icons, home screen, and everything else",
             onClick = { openSettings(context, null) },
         )
     }
+}
+
+private fun openActivity(context: Context, className: String) {
+    val intent = Intent(Intent.ACTION_MAIN).apply {
+        component = ComponentName(context.packageName, className)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    context.startActivity(intent)
 }
 
 private fun openSettings(context: Context, fragment: String?) {
