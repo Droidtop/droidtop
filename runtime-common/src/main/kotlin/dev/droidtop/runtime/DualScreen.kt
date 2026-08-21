@@ -6,7 +6,7 @@ import android.content.Context
  * Which physical role a [DisplayOutput] plays in droidtop's dual-screen
  * handling — the general model §4 establishes (physical position, not
  * enumeration order; manual override + a persisted choice, the same
- * pattern iiSU/Mjolnir use for exactly this problem), applied consistently
+ * pattern Mjolnir uses for exactly this problem), applied consistently
  * across Desktop and Handheld modes. droidtop treats a dual-screen
  * handheld as a real dual-monitor computer throughout (per direction:
  * "we're treating this handheld like a full computer throughout") — this
@@ -53,7 +53,7 @@ class PrefsDualScreenAssignmentStore(context: Context) : DualScreenAssignmentSto
  * [SECOND_SCREEN][DisplayOutputKind.SECOND_SCREEN] guessed as
  * [DualScreenRole.LOWER_INPUT] — immediately overridable via [swap] and
  * persisted from then on via [store], the same "manual swap + persisted
- * choice" behavior iiSU/Mjolnir use for this exact problem (§4).
+ * choice" behavior Mjolnir uses for this exact problem (§4).
  */
 class DualScreenCoordinator(private val store: DualScreenAssignmentStore) {
     suspend fun resolve(outputs: List<DisplayOutput>): Map<DisplayOutput, DualScreenRole> {

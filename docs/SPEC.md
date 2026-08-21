@@ -29,8 +29,8 @@ folder of separate emulator-style apps:
   module.
 - **droidtop doesn't have to be *the* launcher, but it isn't a backend
   service either.** Being a real Android home screen (§7) is one way to
-  use it, not the only one — someone who uses ES-DE (or Daijishō/iiSU) for
-  emulation should still be able to have droidtop's library stay in sync
+  use it, not the only one — someone who uses ES-DE or another dedicated
+  emulation frontend should still be able to have droidtop's library stay in sync
   with what ES-DE knows about, via the bidirectional data-level import/
   export in §7b. **droidtop does not do emulation itself, and does not
   expose a launch/execution API other apps call into** — the sync
@@ -365,17 +365,13 @@ instead of a full VM guest kernel:
   by default on a Retroid-style device), not whichever `Display` Android
   happens to enumerate second** — `DisplayManager` assigns display IDs by
   connection/registration order, which is not guaranteed to match physical
-  upper/lower position, so the two must never be conflated in code. iiSU
-  (a real prior-art reference here, not assumed) doesn't trust
-  auto-detection either: it lets the user manually swap which physical
-  screen is "top"/"bottom" (a dedicated button for this), and persists a
-  chosen screen per app/ROM so the assignment doesn't need to be redone
-  every launch. droidtop's own upper/lower role assignment needs the same
-  two things — manual override, not just auto-detected enumeration order,
-  and a persisted per-output (or per-app) choice — not a fresh design from
-  nothing. [Mjolnir](https://github.com/blacksheepmvp/mjolnir) (a
-  companion dual-screen home-launcher-routing tool) is another concrete
-  reference for the same problem, worth looking at alongside iiSU.
+  upper/lower position, so the two must never be conflated in code.
+  droidtop's own upper/lower role assignment needs manual override, not
+  just auto-detected enumeration order, plus a persisted per-output (or
+  per-app) choice — not trusting auto-detection alone. [Mjolnir](
+  https://github.com/blacksheepmvp/mjolnir) (a companion dual-screen
+  home-launcher-routing tool) is a concrete reference for the same
+  problem.
 - Each `DisplayOutput` maps to one headless output inside the primary
   container's compositor (whichever the user's configured — see §2).
 - **Default**: every window is placed on the primary screen's output —
@@ -412,7 +408,7 @@ instead of a full VM guest kernel:
   `AbsoluteTouchContext`/`RelativeTouchContext` split — not automatically a
   second desktop, and not assumed to be "whichever `Display` enumerates
   second" (see the physical-position note above — needs the same manual-
-  override-plus-persisted-choice treatment iiSU/Mjolnir use, not a fixed
+  override-plus-persisted-choice treatment Mjolnir uses, not a fixed
   mapping). Making the lower screen an independent output (its own
   `SecondaryDisplayLauncher` or mirrored desktop) is one of the per-output
   roles above, opt-in like everything else in this section.
@@ -601,68 +597,31 @@ app-drawer icon or a floating switcher button:
 - **`:shell-gamepad` ("Handheld")** — full-screen, D-pad-navigable, reading
   the same `Library`; optional and toggleable, never the assumed default
   experience. **Multiple selectable UI paradigms, not one merged design**:
-  iiSU (visuals-first, Wii U/3DS/XMB-inspired artwork carousels, its own
-  multi-display awareness) and Daijishō (its own distinct grid/list
-  paradigm, single-display) are different enough interaction models that
-  users should be able to pick between them, not get one design blending
-  cues from both. Both read the same `Library` — including native Android
-  apps, Wine profiles, and Linux-container apps as equally first-class
-  entries, which neither iiSU nor Daijishō do natively (both are
-  emulator-frontend-focused; droidtop's whole point is that Wine/desktop
-  apps aren't a separate, second-class mode). Current implementation
-  (`GamepadShell.kt`) is a single plain card carousel — real artwork
-  rendering and the paradigm-selection mechanism itself don't exist yet.
-  - **Both apps are closed-source** — confirmed this session (iiSU's
-    GitHub repo is a landing page/update-manifest only, no app source;
-    Daijishō's maintainer describes its own main repo the same way).
-    Learning from either means public docs/wiki/screenshots and, for
-    Daijishō specifically, inspecting its official release APK — never
-    copying UI or code, matching direction given this session.
-  - **UI takeaway** (the user's own judgment, from real use of both):
-    Daijishō's grid/list UI is the better starting point overall, but its
-    non-emulated-content gap (above) is real, not just a paradigm
-    preference — its extension architecture (a bundled V8 JS runtime,
-    `bootstrap.js`/`postscript.js`, zip-packaged extensions — confirmed by
-    inspecting its release APK's assets) is scraper/emulator-focused by
-    construction. iiSU's overall look isn't preferred, but its dual-screen
-    handling is genuinely good — exact visual split between the two
-    screens wasn't confirmed from available screenshots (both public
-    demo images show the same single-panel grid), so that specific
-    layout isn't something to copy blind either. `:shell-gamepad`'s
-    paradigms should synthesize the good pieces from both without
-    reproducing either — Daijishō's content breadth done properly
-    (native/Wine as first-class, not bolted on) plus iiSU's dual-screen
-    input/output split (§4), in droidtop's own visual language.
-  - **Real prior art for the launch mechanism, worth adopting later**:
-    Daijishō's "Player" config templates `am start`-style arguments
-    (`amStartArguments`, e.g. `-n <component> -a android.intent.action.
-    VIEW -d {file.uri}`) with variable substitution — a genuinely more
-    flexible model than §7d's current JoiPlay-hardcoded `ACTION_VIEW`
-    call, since new emulators/interpreters become data (a template) not
-    new Kotlin code. Worth evolving `JoiPlayGameProvider` toward something
-    like this once more than one external launcher needs supporting —
-    not done in this pass.
-  - **Architecture facts, confirmed via decompiling both official release
-    APKs (structure/behavior only — nothing reproduced)**: Daijishō is a
-    traditional Activity/Fragment + XML-layout app, built more as a
-    home-screen replacement than a single-purpose grid — a "widget face"
-    system (shortcuts, continue-playing, RSS, checklists, a
-    RetroAchievements profile widget) plus embedded YouTube playback,
-    real feature depth beyond emulator launching. Its data model
-    (players/platforms/ROM libraries) is emulator/ROM-shaped throughout,
-    which is the actual structural reason the "doesn't handle non-
-    emulated content" gap exists — not a UI/paradigm limitation droidtop
-    could fix by reskinning it. iiSU, by contrast, is Compose-first
-    (almost no app-specific XML layouts, unlike Daijishō) with a
-    **dedicated `dualdisplay` package** — independent confirmation that
-    its dual-screen handling is real architectural investment, matching
-    the user's own read, not an incidental feature. droidtop's own
-    dual-screen model (§4 — physical upper/lower position, configurable
-    per-output role) is already more general than a single dedicated
-    package suggests iiSU's is, and droidtop's shells are already
-    Compose-based like iiSU rather than XML like Daijishō — meaning
-    droidtop is structurally better positioned to build a good
-    dual-screen experience than to copy either app's.
+  a visuals-first, artwork-carousel paradigm with its own multi-display
+  awareness and a grid/list paradigm are different enough interaction
+  models that users should be able to pick between them, not get one
+  design blending cues from both. Both read the same `Library` —
+  including native Android apps, Wine profiles, and Linux-container apps
+  as equally first-class entries, not a bolted-on afterthought behind an
+  emulator-frontend-shaped data model — droidtop's whole point is that
+  Wine/desktop apps aren't a separate, second-class mode. Current
+  implementation (`GamepadShell.kt`) has three top-level sections:
+  **Games** (browses engine-first, then per-engine game-second — the same
+  System → Game hierarchy ES-DE uses, since droidtop's emulated/
+  interpreted `LibraryEntryKind`s are its equivalent of ES-DE's
+  "systems"), **Apps** (a flat, kind-sectioned browser for everything
+  non-emulated — native/Wine/Linux/remote — kept as its own top-level
+  section rather than folded into Games, since treating that content as
+  equally first-class is the actual differentiator), and **Settings**
+  (placeholder for now). A persistent, always-visible controller-button
+  hint bar (what A/B currently do) avoids ever leaving the user guessing.
+  Real artwork rendering and full paradigm-selection UI don't exist yet.
+  - **Design direction, not yet built**: a more flexible, data-driven
+    launch-mechanism model — new emulators/interpreters becoming
+    configuration (a template describing how to invoke them) rather than
+    new Kotlin code per integration — is worth adopting once more than
+    one external launcher needs supporting via `JoiPlayGameProvider`; not
+    done in this pass.
 
 ## 7a. Remote PC streaming (GameStream/Moonlight/Sunshine)
 
@@ -733,9 +692,9 @@ reading actual code/formats, not assumed):
   (Also relevant: `:app`'s own `android:allowBackup="false"` may need
   reconsidering if any part of this ends up depending on the OS backup
   pipeline specifically, as opposed to the manual path.)
-- **Syncing with a gaming-focused launcher's library data** (Daijishō,
-  ES-DE, iiSU) — data-level only, both directions: reading their
-  catalog into droidtop's own `Library` so it stays aware of what's
+- **Syncing with a gaming-focused launcher's library data** (ES-DE and
+  other emulation frontends) — data-level only, both directions: reading
+  their catalog into droidtop's own `Library` so it stays aware of what's
   there, and (later) writing back entries droidtop knows about that
   they don't yet. **droidtop does not do emulation itself and does not
   run or launch anything on another app's behalf** — this is purely
@@ -750,33 +709,31 @@ reading actual code/formats, not assumed):
   confirmed via real research rather than assumed possible. Maps into
   `:library-core`'s `LibraryEntry` model like anything else the library
   aggregates.
-  - Daijishō/ES-DE both use `gamelist.xml` + per-system JSON platform
-    config — a genuine de-facto-standard in this space, not two
-    coincidentally-similar formats; one importer plausibly covers more
-    than just those two named tools.
-  - iiSU has its own platform-ID registry (`emuladores.json`/
-    `emuladores_default.json`) but *also* explicitly interops with ES-DE
-    metadata as a built-in feature ("Link ES-DE Metadata" during its own
-    setup) — confirms ES-DE's format really is the common denominator
-    other tools build interop around, not just droidtop's own assumption.
-    iiSU's exact schema needs real investigation before an importer can be
-    built (the only repository reachable here is an update-manifest
-    mirror, not iiSU's actual app source — this is a gap, not confirmed
-    detail, and shouldn't be treated as settled the way the AOSP/ES-DE
-    mechanisms above are).
+  - ES-DE and several compatible tools use `gamelist.xml` + per-system
+    JSON platform config — a genuine de-facto-standard in this space, not
+    a one-off format; one importer plausibly covers more than just ES-DE
+    itself.
+  - Other gaming-focused launchers exist with their own platform-ID
+    registries that in some cases explicitly interop with ES-DE metadata
+    as a built-in feature — further confirmation that ES-DE's format
+    really is the common denominator other tools build interop around,
+    not just droidtop's own assumption. Any such registry's exact schema
+    needs real investigation before an importer for it can be built —
+    flagged as an open gap, not assumed settled the way the AOSP/ES-DE
+    mechanisms above are.
 - **Platform/system taxonomy**: `LibraryEntry`'s retro/emulation entries
   need a canonical platform identifier (`"snes"`, `"psx"`, `"gba"`, ...) to
   group, filter, and theme by in the Handheld shell — and to have anywhere
   to map *into* from each importer above. Rather than inventing droidtop's
   own scheme, adopt **ES-DE's `es_systems.xml` platform-naming
   convention as the canonical standard**: it's already the mechanism
-  Daijishō is compatible with, RetroArch/libretro core naming lines up
-  with closely, and iiSU explicitly interops against. Each importer
-  translates its own source format into this canonical set (Daijishō/
-  ES-DE need little to no translation since they already use it; iiSU's
-  own `emuladores.json` IDs need an explicit mapping table, not yet built
-  since the exact schema isn't confirmed — see above) rather than droidtop
-  carrying several incompatible per-source taxonomies side by side.
+  several compatible launchers are built around, and RetroArch/libretro
+  core naming lines up with it closely. Each importer translates its own
+  source format into this canonical set (tools already using ES-DE's own
+  format need little to no translation; anything with its own registry
+  needs an explicit mapping table, not yet built since no such schema is
+  confirmed yet — see above) rather than droidtop carrying several
+  incompatible per-source taxonomies side by side.
 - **Onboarding flow** (not designed in detail yet) needs to cover, roughly
   in order: root detection (determines `:runtime-linux-root` vs.
   `:runtime-linux-noroot` availability, §3), display detection/
@@ -784,7 +741,7 @@ reading actual code/formats, not assumed):
   the "which screen is which" question needs resolving here, not
   post-hoc), the two import paths above (offered, not forced), and initial
   shell-paradigm choice (Standard/Desktop/Handheld, and — once the
-  Handheld iiSU-vs-Daijishō paradigm split from §7 is real — which
+  Handheld multi-paradigm split from §7 is real — which
   paradigm). **Configuration itself has no separate settings app** (§7) —
   onboarding is a first-run wizard around the exact same settings surface
   (`com.android.launcher3.settings.SettingsActivity`) a user would reach
@@ -822,8 +779,9 @@ Two concrete references to build from rather than design blind:
   https://github.com/ranfdev/DistroShelf) is a second distrobox-GUI
   reference worth comparing against, not just BoxBuddy alone. Neither is a
   fork target (both are GTK/Linux-desktop apps, not Android) — interaction
-  patterns and feature scope to learn from, the same way Daijishō/iiSU are
-  UX references for `:shell-gamepad` rather than code to port.
+  patterns and feature scope to learn from, the same way other gaming-
+  focused launchers are UX references for `:shell-gamepad` rather than
+  code to port.
 
 ## 7d. JoiPlay: Ren'Py and RPG Maker games (`library-core`)
 
@@ -922,8 +880,7 @@ shell-desktop           → "Desktop" shell's Android-side half (§2a): cross-co
                           launcher (that's container-side); depends on library-core,
                           host-bridge, runtime-common
 shell-gamepad           → "Handheld" shell: optional gamepad console UI, multiple
-                          selectable paradigms (iiSU-style, Daijishō-style — see
-                          §7); depends on library-core
+                          selectable paradigms — see §7; depends on library-core
 
 pc-helper/               → separate Go program, runs on the remote gaming PC, not an
                             Android module — Sunshine REST API client + (limited) Steam
