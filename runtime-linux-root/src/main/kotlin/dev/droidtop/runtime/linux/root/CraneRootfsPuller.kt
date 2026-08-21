@@ -30,9 +30,10 @@ import java.io.File
  * cross-compiles and runs standalone (confirmed locally — `crane version`
  * and a real `crane digest`/`crane export` pull against a public image both
  * worked against real network access), but nothing has pulled an image
- * *for* a real droidspaces container yet, since PRIMARY_IMAGE_REFERENCE in
- * [DroidSpacesRuntime] is still a placeholder — no primary image with sway
- * pre-installed has been published. See that class's own TODO.
+ * *for* a real droidspaces container yet — the recommended-image catalog's
+ * (runtime-common's `image-catalog.json`, see docs/SPEC.md §3a) PRIMARY
+ * entries are still placeholder references, since no primary image with a
+ * compositor pre-installed has been published anywhere yet.
  */
 class CraneRootfsPuller(private val context: Context) : RootfsPuller {
     private val binaryPath: String by lazy { CraneBinary.ensureExtracted(context) }
