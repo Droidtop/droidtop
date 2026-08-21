@@ -23,11 +23,14 @@ import java.util.UUID
  * Two changes from upstream DroidSpaces' own usage patterns, both required
  * by the shared-desktop design in docs/SPEC.md:
  *
- *  1. [createPrimary]'s container is where vendor/sway (headless-output
- *     build) is meant to run as the shared desktop compositor — this class
- *     only handles the container lifecycle; actually installing/starting
- *     sway inside the rootfs is the pulled image's job (see the `TODO` on
- *     [PRIMARY_IMAGE_REFERENCE]), not something orchestrated from here.
+ *  1. [createPrimary]'s container is where a compositor (sway or labwc —
+ *     user-configurable, see docs/SPEC.md §2/§3a) is meant to run as the
+ *     shared desktop compositor — this class only handles the container
+ *     lifecycle; actually installing/starting the compositor inside the
+ *     rootfs is the caller-supplied image's job, not something orchestrated
+ *     from here. Nothing enforces that the caller actually passed a
+ *     PRIMARY-appropriate image — see [ContainerRuntime.createPrimary]'s
+ *     own doc comment.
  *
  *  2. Sibling containers do NOT use upstream DroidSpaces' own
  *     `--termux-x11`/Termux:X11 auto-launch feature at all — instead, every
@@ -70,30 +73,19 @@ class DroidSpacesRuntime(
      */
     private val socketsDir = File(rootDir, "sockets/primary")
 
-    override suspend fun createPrimary(): Container =
-        createContainer(
-            name = PRIMARY_NAME,
-            role = ContainerRole.PRIMARY,
-            // TODO: this needs to actually exist — a published OCI image
-            // with vendor/sway (headless build) pre-installed and
-            // configured to start on boot with XDG_RUNTIME_DIR/
-            // WAYLAND_DISPLAY already pointed at CONTAINER_SOCKET_DIR.
-            // Nothing publishes that image yet; RootfsPuller itself also
-            // has no implementation yet (see runtime-common/RootfsImage.kt)
-            // — both are the actual remaining gap here, not this class's
-            // container-orchestration logic, which is real.
-            image = RootfsImage(reference = PRIMARY_IMAGE_REFERENCE),
-        )
+    // [image] must actually have a compositor pre-installed and configured
+    // to start on boot with XDG_RUNTIME_DIR/WAYLAND_DISPLAY already pointed
+    // at CONTAINER_SOCKET_DIR (see docs/SPEC.md §3a's PRIMARY-role entries)
+    // — this class doesn't validate that, it just pulls whatever reference
+    // the caller hands it and boots the container.
+    override suspend fun createPrimary(image: RootfsImage): Container =
+        createContainer(name = PRIMARY_NAME, role = ContainerRole.PRIMARY, image = image)
 
-    override suspend fun createSibling(): Container =
+    override suspend fun createSibling(image: RootfsImage): Container =
         createContainer(
             name = "droidtop-sibling-${UUID.randomUUID().toString().take(8)}",
             role = ContainerRole.SIBLING,
-            // TODO: the ContainerRuntime interface doesn't yet let a caller
-            // pick which distro a sibling should run (it takes no
-            // parameters at all) — real gap, not an oversight here. Falls
-            // back to a generic default until that's designed.
-            image = RootfsImage(reference = DEFAULT_SIBLING_IMAGE_REFERENCE),
+            image = image,
         )
 
     private suspend fun createContainer(name: String, role: ContainerRole, image: RootfsImage): Container {
@@ -157,8 +149,5 @@ class DroidSpacesRuntime(
 
         private const val CONTAINER_SOCKET_DIR = "/run/droidtop-sockets"
         private const val WAYLAND_SOCKET_NAME = "wayland-0"
-
-        private const val PRIMARY_IMAGE_REFERENCE = "TODO/droidtop-primary:not-published-yet"
-        private const val DEFAULT_SIBLING_IMAGE_REFERENCE = "docker.io/library/debian:bookworm"
     }
 }
