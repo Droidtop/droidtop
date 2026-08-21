@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -37,14 +38,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
@@ -100,7 +104,35 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
         entries = library.scanAll()
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            // Shoulder-button section switching -- a standard console-UI
+            // pattern (Daijishō and most console launchers use L1/R1 to
+            // cycle top-level tabs) that works regardless of what currently
+            // has focus, unlike D-pad navigation up into the tab bar. Only
+            // active when nothing has already consumed the event (detail
+            // screen's own Back handling, individual card key handlers,
+            // etc. all take priority since they're closer to the focused
+            // node in the bubbling chain).
+            .onKeyEvent { event ->
+                if (event.type != KeyEventType.KeyUp || detailEntry != null) return@onKeyEvent false
+                val sections = HandheldSection.entries
+                val currentIndex = sections.indexOf(section)
+                when (event.key) {
+                    Key.ButtonL1 -> {
+                        section = sections[(currentIndex - 1 + sections.size) % sections.size]
+                        true
+                    }
+                    Key.ButtonR1 -> {
+                        section = sections[(currentIndex + 1) % sections.size]
+                        true
+                    }
+                    else -> false
+                }
+            },
+    ) {
         SectionTabBar(current = section, onSelect = { section = it })
         Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
             val currentEntries = entries
@@ -137,7 +169,12 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
             }
         }
         if (HandheldPrefs.showHints(context)) {
-            ButtonHintFooter(canGoBack = canGoBack || detailEntry != null, showInfo = detailEntry == null)
+            ButtonHintFooter(
+                canGoBack = canGoBack || detailEntry != null,
+                showInfo = detailEntry == null,
+                showSectionSwitch = detailEntry == null,
+                showSystemSwitch = detailEntry == null && section == HandheldSection.GAMES && canGoBack,
+            )
         }
     }
 }
@@ -192,8 +229,37 @@ private fun EntryDetailScreen(entry: LibraryEntry, onLaunch: () -> Unit, onClose
             },
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        if (entry.artworkUri != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .background(Color(0xFF1A1A1A), RoundedCornerShape(16.dp)),
+            ) {
+                AsyncImage(
+                    model = entry.artworkUri,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().background(Color(0xFF1A1A1A), RoundedCornerShape(16.dp)),
+                )
+                // Platform/kind label overlaid on the art, matching Daijishō's
+                // own detail-screen layout (boxart with the platform name
+                // overlaid at the bottom of the art) -- structure, not pixels.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomStart)
+                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000))))
+                        .padding(12.dp),
+                ) {
+                    Text(entry.kind.displayName(), color = Color.White, style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
         Text(entry.title, color = Color.White, style = MaterialTheme.typography.headlineMedium)
-        Text(entry.kind.displayName(), color = Color.Gray, style = MaterialTheme.typography.titleMedium)
+        if (entry.artworkUri == null) {
+            Text(entry.kind.displayName(), color = Color.Gray, style = MaterialTheme.typography.titleMedium)
+        }
         if (entry.playtimeSeconds > 0) {
             Text("Played ${entry.playtimeSeconds / 60} min", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
         }
@@ -239,7 +305,12 @@ private fun ActionChip(label: String, highlighted: Boolean, modifier: Modifier =
  * valuable pattern not present in this shell before (docs/SPEC.md §7).
  */
 @Composable
-private fun ButtonHintFooter(canGoBack: Boolean, showInfo: Boolean) {
+private fun ButtonHintFooter(
+    canGoBack: Boolean,
+    showInfo: Boolean,
+    showSectionSwitch: Boolean = false,
+    showSystemSwitch: Boolean = false,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -250,6 +321,14 @@ private fun ButtonHintFooter(canGoBack: Boolean, showInfo: Boolean) {
         ButtonHint("A", "Select")
         if (showInfo) ButtonHint("Y", "Info")
         if (canGoBack) ButtonHint("B", "Back")
+        // L1/R1 switch top-level sections (Games/Apps/Settings) from
+        // anywhere; Left/Right additionally jump between sibling systems
+        // while browsing a per-engine game grid -- ES-DE's own documented
+        // "General navigation" convention (left/right "navigate ... between
+        // gamelists"), adopted here for the same reason it works well
+        // there: skips a Back-then-reselect round trip.
+        if (showSystemSwitch) ButtonHint("◄/►", "Switch system")
+        if (showSectionSwitch) ButtonHint("L/R", "Switch section")
     }
 }
 
@@ -337,6 +416,12 @@ private fun GamesSection(
     var selectedEngine by remember { mutableStateOf<LibraryEntryKind?>(null) }
     var recentOnly by remember { mutableStateOf(false) }
     val firstFocus = remember { FocusRequester() }
+    // Present-and-non-empty engines, in GAME_KINDS' declaration order --
+    // hoisted so both the engine-list view and the per-engine grid view can
+    // use the same ordering (needed for ES-DE-style Left/Right sibling-
+    // system switching below).
+    val byEngine = entries.groupBy { it.kind }
+    val orderedEngines = GAME_KINDS.filter { byEngine.containsKey(it) }
 
     LaunchedEffect(selectedEngine) { onDrillDownChanged(selectedEngine != null) }
 
@@ -344,22 +429,35 @@ private fun GamesSection(
         modifier = Modifier
             .fillMaxSize()
             .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp &&
-                    (event.key == Key.Back || event.key == Key.ButtonB) &&
-                    selectedEngine != null
-                ) {
-                    selectedEngine = null
-                    true
-                } else {
-                    false
+                if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
+                val engine = selectedEngine
+                when {
+                    (event.key == Key.Back || event.key == Key.ButtonB) && engine != null -> {
+                        selectedEngine = null
+                        true
+                    }
+                    // ES-DE's real, documented "General navigation" convention:
+                    // Left/Right inside a gamelist jumps directly to the
+                    // adjacent system's gamelist rather than requiring a
+                    // Back-then-reselect round trip through the system list.
+                    event.key == Key.DirectionLeft && engine != null && orderedEngines.size > 1 -> {
+                        val index = orderedEngines.indexOf(engine)
+                        selectedEngine = orderedEngines[(index - 1 + orderedEngines.size) % orderedEngines.size]
+                        true
+                    }
+                    event.key == Key.DirectionRight && engine != null && orderedEngines.size > 1 -> {
+                        val index = orderedEngines.indexOf(engine)
+                        selectedEngine = orderedEngines[(index + 1) % orderedEngines.size]
+                        true
+                    }
+                    else -> false
                 }
             },
     ) {
         val engine = selectedEngine
         if (engine == null) {
             val continuePlaying = entries.filter { it.lastPlayedEpochMs != null }.sortedByDescending { it.lastPlayedEpochMs }
-            val byEngine = entries.groupBy { it.kind }
-            val hasAnyEngineCard = GAME_KINDS.any { byEngine.containsKey(it) }
+            val hasAnyEngineCard = orderedEngines.isNotEmpty()
             // firstFocus is only ever attached to a Modifier below when there's
             // at least one EngineCard to attach it to -- requesting focus
             // otherwise throws (FocusRequester not initialized), which is
@@ -380,11 +478,11 @@ private fun GamesSection(
                         )
                     }
                 }
-                items(GAME_KINDS.filter { byEngine.containsKey(it) }, key = { it.name }) { kind ->
+                items(orderedEngines, key = { it.name }) { kind ->
                     EngineCard(
                         kind = kind,
                         count = byEngine.getValue(kind).size,
-                        modifier = if (kind == GAME_KINDS.filter { byEngine.containsKey(it) }.firstOrNull()) {
+                        modifier = if (kind == orderedEngines.firstOrNull()) {
                             Modifier.focusRequester(firstFocus)
                         } else {
                             Modifier
@@ -656,7 +754,7 @@ private fun HomeSectionRow(
 @Composable
 private fun GameCard(entry: LibraryEntry, modifier: Modifier = Modifier, onLaunch: () -> Unit, onShowDetail: () -> Unit, onFocused: () -> Unit = {}) {
     var focused by remember { mutableStateOf(false) }
-    Column(
+    Box(
         modifier = modifier
             .size(width = 220.dp, height = 260.dp)
             .onFocusChanged {
@@ -691,11 +789,35 @@ private fun GameCard(entry: LibraryEntry, modifier: Modifier = Modifier, onLaunc
             .background(
                 if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A),
                 RoundedCornerShape(12.dp),
-            )
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Bottom,
+            ),
     ) {
-        Text(entry.title, color = Color.White, style = MaterialTheme.typography.titleMedium)
-        Text(entry.kind.name, color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+        if (entry.artworkUri != null) {
+            AsyncImage(
+                model = entry.artworkUri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            // Bottom scrim so the title stays legible over arbitrary artwork.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomStart)
+                    .background(
+                        Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000))),
+                    )
+                    .padding(12.dp),
+            ) {
+                Column {
+                    Text(entry.title, color = Color.White, style = MaterialTheme.typography.titleMedium)
+                    Text(entry.kind.name, color = Color.LightGray, style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        } else {
+            Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.Bottom) {
+                Text(entry.title, color = Color.White, style = MaterialTheme.typography.titleMedium)
+                Text(entry.kind.name, color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+            }
+        }
     }
 }

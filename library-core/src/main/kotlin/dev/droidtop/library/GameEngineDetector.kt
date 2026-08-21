@@ -128,12 +128,22 @@ private fun GameEngine.toLibraryEntryKind(): LibraryEntryKind = when (this) {
 class JoiPlayGameProvider(
     private val context: Context,
     private val gamesRoot: File,
+    // ES-DE's own downloaded_media root convention (see EsDeArtwork's doc
+    // comment) -- defaults to a sibling of gamesRoot so an out-of-the-box
+    // install has somewhere sensible to look, but a user pointing droidtop
+    // at an existing ES-DE data directory can pass the real one in.
+    private val esDeMediaRoot: File = File(gamesRoot.parentFile, "ES-DE/downloaded_media"),
 ) : LibraryProvider {
     override val kinds: Set<LibraryEntryKind> = GameEngine.entries.map { it.toLibraryEntryKind() }.toSet()
 
     override suspend fun scan(): List<LibraryEntry> =
         GameEngineDetector.scan(gamesRoot).map { (folder, engine) ->
-            LibraryEntry(id = folder.absolutePath, title = folder.name, kind = engine.toLibraryEntryKind())
+            LibraryEntry(
+                id = folder.absolutePath,
+                title = folder.name,
+                kind = engine.toLibraryEntryKind(),
+                artworkUri = EsDeArtwork.resolve(esDeMediaRoot, engine.esDeSystemName(), folder.name),
+            )
         }
 
     override suspend fun launch(entry: LibraryEntry) {

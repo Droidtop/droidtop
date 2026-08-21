@@ -68,12 +68,27 @@ Requires an Android SDK/NDK install and a Linux-like build environment
 few other standard packages — see the script's header comment for the exact
 list this was verified against.
 
-## UI Inspiration
+## UI inspiration and non-affiliation
 
-`shell-gamepad`'s controller-first library UI draws design inspiration
-from [Daijishō](https://github.com/TapiocaFox/Daijishou) and
-[iiSU](https://github.com/iisu-network/iiSU) — neither is a fork target
-or dependency; droidtop's implementation is original.
+droidtop's actual goal is turning an Android device into a general-purpose
+compute system — a real desktop, not a game console. Gaming is one
+important facet of that (a controller-first library UI, emulated/interpreted
+engine support), so `shell-gamepad`'s design draws inspiration from other
+projects that have already solved parts of that same UX problem well:
+[Daijishō](https://github.com/TapiocaFox/Daijishou), the
+[EmulationStation Desktop Edition (ES-DE)](https://gitlab.com/es-de/emulationstation-de)
+project's own on-disk conventions and navigation model, and others as they
+come up.
+
+**droidtop is not affiliated with, endorsed by, or representative of any of
+these projects.** None of them are a fork target or dependency of droidtop
+(vendored/forked sources are listed separately above with their own
+licenses). Where droidtop's implementation is inspired by or interoperable
+with one of these projects' own published, open-source conventions (e.g.
+ES-DE's media-matching layout), that's called out at the point of use in
+source comments. Any bugs, omissions, or design choices in droidtop are
+droidtop's own and should never be read as a reflection of the projects it
+learned from.
 
 ## Licensing
 
