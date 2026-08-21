@@ -21,6 +21,10 @@ object OnboardingGate {
     private const val KEY_COMPLETE = "droidtop_onboarding_complete"
     private const val ONBOARDING_ACTIVITY = "dev.droidtop.app.OnboardingActivity"
 
+    // Called from LauncherApplication.java (Java can't call a Kotlin
+    // object's member function as a static method without this -- same
+    // reason BackButtonMenu.show is @JvmStatic).
+    @JvmStatic
     fun launchIfNeeded(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         if (prefs.getBoolean(KEY_COMPLETE, false)) return
