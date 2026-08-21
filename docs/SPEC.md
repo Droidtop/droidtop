@@ -189,54 +189,73 @@ image works. Pulled layers are cached on-device by digest via `ImageCache`,
 action) rather than an invisible always-on cache, since it trades storage
 for avoiding re-downloads when containers are recreated.
 
-## 3a. Image index — recommended catalog, not a walled garden
+## 3a. Image index — populated live, not a pinned/prepopulated catalog
 
 Picking an image (primary container's base+compositor, or a sibling's
-distro) shouldn't force a user to already know an OCI reference by heart.
-droidtop ships a **curated catalog** — OS × version × desktop-environment/
-compositor combos we've verified actually boot — as the default, one-tap
-path in the container-creation UI (§7c). This is a recommendation list,
-not a restriction: the "custom image reference" field from §3 ("any OCI
-image works") stays available right next to it for anyone who wants
-Debian/Ubuntu/Arch/whatever else the catalog doesn't cover.
+distro) shouldn't force a user to already know an OCI reference by heart,
+and it shouldn't be a hand-maintained list that goes stale the moment a
+distro cuts a new release. **droidtop does not bake specific versions or
+"verified" claims into a bundled manifest.** What it bundles is the
+minimum unavoidable seed: a short list of *known OCI repositories* worth
+showing (`KnownImageRepository` in `runtime-common`, backed by
+`known-image-repositories.json`) — repository name + real metadata
+(desktop environment, compositor family, headless-support verdict,
+official-vs-third-party source, arm64 availability), deliberately with
+**no version/tag baked in**. There is no OCI Distribution API for
+"discover every distro image that exists" — `crane ls <repo>` needs an
+already-known repository name — so some seed list is unavoidable, but it
+stops at "which repositories," never "which versions."
 
-- **Default base: Alpine, across multiple desktop-environment/compositor
-  variants** — smallest realistic base to pull/cache/boot on a handheld
-  (musl+busybox, tiny image size vs. Debian/Ubuntu), catalog entries differ
-  by *desktop environment* (sway, labwc, and eventually heavier DEs like
-  Plasma Mobile/LXQt if they prove out on Alpine) rather than by base
-  distro. Non-Alpine bases stay reachable via the custom-reference path,
-  not removed — this is a default, not the only option (same "don't force
-  what's in the container" principle as compositor choice in §2).
-
-- **Catalog format**: a JSON manifest (`runtime-common` ships a bundled
-  copy for offline/first-run use), entries shaped roughly like `{os,
-  osVersion, desktopEnvironment, imageReference, role: PRIMARY|SIBLING|
-  BOTH, verified: bool}`. `verified` distinguishes "we booted this and it
-  worked" from "listed but unconfirmed" — don't blur those two, per this
-  session's general no-silent-assumptions discipline.
-- **Autodetection of new versions, not a hand-maintained list that rots**:
-  a catalog entry for e.g. "Debian stable" shouldn't need a droidtop code
-  change every time Debian cuts a point release. Since images are pulled
-  via [vendor/crane](../vendor/go-containerregistry) already (§3), the
-  same tooling can resolve a *floating* reference (`debian:stable`,
-  `debian:12`) down to the concrete digest currently behind it — a real
-  `crane` capability (list tags / resolve a tag to a digest), not new
-  infrastructure to build. This means the catalog can track "the tag
-  droidtop recommends for Debian stable" as a pointer that resolves fresh
-  at pull time, rather than a pinned version string that goes stale.
-  Exact refresh mechanism (bundled-manifest-plus-periodic-remote-refresh
-  vs. resolve-on-demand-only) is not decided yet — needs a decision before
-  implementation, not assumed here.
+- **Populated at runtime via `ImageCatalogResolver`**: for each known
+  repository, `CraneImageCatalogResolver` (`runtime-linux-root`, built on
+  the same [vendor/crane](../vendor/go-containerregistry) binary
+  `CraneRootfsPuller` already uses) calls `crane ls` to list every tag
+  currently published, then `crane digest` to resolve whichever tag gets
+  picked to its immutable digest — real registry calls, not a cached
+  snapshot. This is what makes the image-selection UI (§7c) sortable and
+  filterable by live data (which versions exist right now, for real)
+  instead of by whatever was true when droidtop last shipped.
+- **Docker Hub (`docker.io`) is the default registry** a `KnownImageRepository`
+  resolves against when it doesn't specify one — matches how `docker
+  pull`/most tooling already behaves. A few entries need a different
+  registry explicitly (e.g. Void Linux's current containers are at
+  `ghcr.io/void-linux/void-*` — Docker Hub's own `voidlinux/voidlinux` is
+  stale, unmaintained for years) — those set `registry` explicitly and
+  must explain why via `notes`.
+- **Real research findings baked into the seed metadata, not assumed**:
+  wlroots-based compositors (sway, labwc) ship a headless backend as core
+  infrastructure (`WLR_BACKENDS=headless`) — well-documented, and already
+  droidtop's own compositor choice (§2). Hyprland forked off wlroots onto
+  its own Aquamarine backend in 2024 and currently has multiple *open*
+  upstream issues reporting headless/virtual outputs broken
+  (hyprwm/Hyprland#7917, #8806) — included in the seed list anyway
+  (`headlessSupport: REGRESSED`), specifically so it's visible and
+  filterable rather than silently omitted. Separately: the *official*
+  `archlinux/archlinux` Docker image is amd64-only — no arm64 build at all
+  (Arch Linux's own tracking issue,
+  gitlab.archlinux.org/archlinux/archlinux-docker#29) — which matters
+  enormously since droidtop only targets ARM64 hardware; that entry is
+  still listed (so it's visible/filterable) but marked
+  `arm64Available: false` with a note, not silently included as if it
+  would work.
 - **Still not a backend droidtop calls into or is called by** — this is
   droidtop, as a client, talking to standard OCI registries for its own
   image selection, the same category of operation `CraneRootfsPuller`
   already performs. Doesn't touch the §7b "we are not a backend" boundary
   around other apps calling into droidtop.
 - **UI surface**: this is what §7c's container-creation flow picks from —
-  "Recommended" (catalog, grouped by OS/DE) vs. "Custom" (raw reference
-  field) as the two entry points into the same `RootfsPuller`. Not
-  designed in UI detail yet; §7c is still design-only overall.
+  "Recommended" (the resolved, sortable/filterable list) vs. "Custom" (raw
+  reference field) as the two entry points into the same `RootfsPuller`.
+  Not designed in UI detail yet; §7c is still design-only overall. Sort/
+  filter dimensions the model already supports: OS, desktop environment,
+  role, `headlessSupport`, `arm64Available`, `officialSource` — picking
+  which of those the UI actually exposes is still open.
+- **PRIMARY entries are the one real exception**: droidtop hasn't
+  published any base+compositor image anywhere yet, so those repositories
+  are still placeholders with nothing real to resolve tags against — see
+  §11's open risks. Everything above about live resolution is fully real
+  for the SIBLING entries (plain stock distro images already exist on
+  real registries today).
 
 ## 3b. Optional: other architectures/OSes via QEMU/libvirt — a value-add, not core
 
@@ -277,6 +296,61 @@ droidtop's normal desktop/gaming workflow to work.
   (§3a) are all open. Flagging the shape and the constraints (acceleration
   conditionality, root-when-helpful) now so it isn't designed blind later,
   not committing to an implementation yet.
+
+## 3c. FEX-Emu — x86/x86-64 emulation for Linux software in general, not just Wine
+
+[vendor/gamenative](../vendor/gamenative) (`:runtime-windows`'s fork
+source, §5) already has real, working FEX-Emu integration alongside
+Box64 — `FEXCorePresetsDialog.kt`/`Box64PresetsDialog.kt` in its settings
+UI, both selectable CPU-translation backends for the same Wine prefix.
+Once `:runtime-windows`'s `WineSession.launch()` is actually ported from
+gamenative (§10, still a `TODO()` stub), droidtop inherits FEX-as-a-Wine-
+backend option for free — no new work needed there.
+
+**What's genuinely new here**: FEX is useful independent of Wine
+entirely, for running **x86/x86-64 Linux software** — Flatpaks, native
+Linux apps, anything shipped only as an x86_64 ELF binary — inside
+droidtop's own Alpine/Debian/etc. containers (§3), the same category of
+value as §3b's QEMU/libvirt but scoped to userspace binary translation
+instead of a full VM guest kernel:
+
+- **Mechanism**: FEX ships real `binfmt_misc` registration files
+  (`FEX-x86_64.conf.in`) so the kernel auto-invokes `FEXLoader` whenever an
+  x86/x86-64 ELF is executed — genuinely transparent ("run it like a
+  native binary") once registered, not a manual wrapper-script
+  invocation. FEX also supports 32-bit x86, not just x86-64 — a real gap
+  Box64 alone has (Box64 is x86-64-only; Steam's own tooling, for one
+  concrete example, needs both).
+- **binfmt_misc registration needs root** — writing to
+  `/proc/sys/fs/binfmt_misc/register` is a host-kernel-level operation.
+  This works cleanly for `DroidSpacesRuntime`'s root path (already
+  requires root for namespaces/cgroups — no new privilege requirement),
+  but the no-root `ProotRuntime` path can't register a kernel-level
+  interpreter at all; FEX would still work there, just via explicit
+  `FEXInterpreter <binary>` invocation instead of transparent execution —
+  a real capability difference between the two backends, not just a
+  performance one, that needs to be visible wherever this gets surfaced in
+  the UI.
+- **Official position, and why it doesn't block droidtop anyway**:
+  FEX-Emu's own docs are explicit that Android is not a target and never
+  will be, because Termux-style proot-over-Android environments have
+  fundamental Linux-compatibility gaps FEX can't paper over. That caveat is
+  about running FEX directly against Android's own userspace — it doesn't
+  apply to droidtop's actual model, where FEX would run *inside* a real
+  Linux container (namespaced under `DroidSpacesRuntime`, or prooted under
+  `ProotRuntime` — either way a real Linux rootfs, not Android's own
+  userspace), which is exactly the environment FEX is built for.
+- **RootFS management**: FEX's own `FEXRootFSFetcher` needs host utilities
+  (curl, squashfuse/unsquashfs or erofsfuse) to pull its translation
+  rootfs — worth checking those are available/buildable in droidtop's
+  container images before assuming this "just works," not verified yet.
+- **Not designed in detail or implemented** — this is a real, grounded
+  value-add candidate (unlike §3b's QEMU/libvirt VMs, which are genuinely
+  optional, FEX for x86 Linux software is closer to a natural extension of
+  §3's existing container model), but nothing here is built: no
+  `binfmt_misc` registration code, no FEX binary bundling/cross-compile
+  step (would follow the same pattern as `CraneBinary`/`DroidSpacesBinary`
+  — bundled as an APK asset, extracted at first use), no UI surface.
 
 ## 4. Display
 
@@ -370,11 +444,49 @@ software CPU emulation, which is worse than Box64/Wine translation. Google's
 AVF/pKVM is Pixel-only in practice and built for paravirtualized Linux
 guests, not general-purpose Windows VMs.
 
-**Conclusion: Wine + Box64 binary translation (`:runtime-windows`, forked
-from [vendor/gamenative](../vendor/gamenative)) is the only Windows path.**
-Revisit hardware virtualization only if targeting Snapdragon 8 Gen 2+/
-Dimensity 9000+ devices specifically, and even then only as a path to
-running a *Linux* guest, not Windows.
+**Conclusion: Wine + userspace x86 binary translation (`:runtime-windows`,
+forked from [vendor/gamenative](../vendor/gamenative)) is the only Windows
+path.** Revisit hardware virtualization only if targeting Snapdragon 8
+Gen 2+/Dimensity 9000+ devices specifically, and even then only as a path
+to running a *Linux* guest, not Windows. See §5a for which translation
+backend and for the native-Linux-build alternative to Wine entirely.
+
+## 5a. CPU-translation backend choice, and preferring a native Linux build over Wine
+
+Two corrections to §5's "Wine + Box64" framing, both from real gamenative
+source already in [vendor/gamenative](../vendor/gamenative):
+
+- **Backend choice is the user's, not fixed to Box64** — gamenative
+  already ships both `Box64PresetsDialog.kt` and `FEXCorePresetsDialog.kt`
+  as selectable CPU-translation backends for the same Wine prefix (see
+  `SettingsGroupEmulation.kt`). Once `WineSession.launch()` is actually
+  ported from gamenative (§10, still `TODO()`), droidtop inherits this
+  choice for free — no new work needed to offer it. FEX also brings real,
+  distinct value beyond Wine itself — see §3c.
+- **Prefer a native Linux build over Wine+translation when one exists**:
+  some Steam titles ship a genuine Linux depot alongside (or instead of)
+  Windows, and gamenative's own `DepotInfo` (`vendor/gamenative/app/src/
+  main/java/app/gamenative/data/DepotInfo.kt`) already models this —
+  `osList: EnumSet<OS>` (`OS.windows`/`OS.linux`/`OS.macos`) and
+  `isWindowsCompatible` per depot. droidtop should prefer a Linux depot
+  when `osList` contains it, running it as a normal process inside a
+  Linux sibling/primary container (§3) with no Wine/translation involved
+  at all — strictly better than translation when it's available, not a
+  new capability to build so much as a selection-order change: check for
+  a Linux depot first, fall back to Wine+Box64/FEX only when there isn't
+  one.
+  - **Real, undocumented gap, not solved by the above**: gamenative's
+    `OSArch` enum only distinguishes 32-bit vs. 64-bit
+    (`vendor/gamenative/app/src/main/java/app/gamenative/enums/OSArch.kt`)
+    — it has no CPU-family signal (x86 vs. ARM). A Linux depot's *binary*
+    could still be x86/x86-64 needing FEX/Box64 translation (the common
+    case) or, rarely, genuinely ARM64-native (which some titles do ship,
+    per this session's research prompt, though standard Steam depot
+    metadata doesn't cleanly flag it) — telling those apart isn't
+    something the existing fork provides, and isn't designed here either.
+    Detecting a truly native-ARM64 Linux depot (best case: no translation
+    layer needed at all) is an open problem, not assumed solved just
+    because `osList` says "linux."
 
 ## 6. Input
 
