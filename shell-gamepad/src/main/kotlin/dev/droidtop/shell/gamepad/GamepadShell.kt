@@ -326,7 +326,12 @@ private fun GamesSection(
         if (engine == null) {
             val continuePlaying = entries.filter { it.lastPlayedEpochMs != null }.sortedByDescending { it.lastPlayedEpochMs }
             val byEngine = entries.groupBy { it.kind }
-            LaunchedEffect(entries) { firstFocus.requestFocus() }
+            val hasAnyEngineCard = GAME_KINDS.any { byEngine.containsKey(it) }
+            // firstFocus is only ever attached to a Modifier below when there's
+            // at least one EngineCard to attach it to -- requesting focus
+            // otherwise throws (FocusRequester not initialized), which is
+            // exactly what happened with an empty/fresh games folder.
+            LaunchedEffect(entries) { if (hasAnyEngineCard) firstFocus.requestFocus() }
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(32.dp),
@@ -362,7 +367,10 @@ private fun GamesSection(
             val allGames = entries.filter { it.kind == engine }
             val recentCount = allGames.count { it.lastPlayedEpochMs != null }
             val games = if (recentOnly) allGames.filter { it.lastPlayedEpochMs != null } else allGames
-            LaunchedEffect(engine, recentOnly) { firstFocus.requestFocus() }
+            // Same "don't request focus on an unattached FocusRequester" fix
+            // as the engine-list view above -- games can be empty here too
+            // (the "recent" filter selected with zero recently-played entries).
+            LaunchedEffect(engine, recentOnly) { if (games.isNotEmpty()) firstFocus.requestFocus() }
             Column(modifier = Modifier.fillMaxSize()) {
                 Row(
                     modifier = Modifier.padding(horizontal = 48.dp, vertical = 8.dp),
@@ -465,7 +473,10 @@ private fun AppsSection(
 ) {
     val sections = buildAppSections(entries)
     val firstFocus = remember { FocusRequester() }
-    LaunchedEffect(entries) { firstFocus.requestFocus() }
+    // Same "don't request focus on an unattached FocusRequester" fix as
+    // GamesSection -- firstFocus is only attached to a card once sections
+    // is confirmed non-empty (see the early return right below).
+    LaunchedEffect(entries) { if (sections.isNotEmpty()) firstFocus.requestFocus() }
 
     if (sections.isEmpty()) {
         Text("No apps detected yet.", color = Color.White)
