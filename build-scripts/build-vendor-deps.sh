@@ -14,6 +14,8 @@
 #        Already preinstalled + authenticated via GH_TOKEN on GitHub-hosted
 #        Actions runners; needs manual install+login for local use.
 #   Android SDK/NDK 27.0.12077973 installed via cmdline-tools' sdkmanager
+#   Go >= 1.25 (see vendor/go-containerregistry/go.mod) — for cross-
+#        compiling crane, see that section below
 #
 # libltdl-dev matters specifically: it's the package that ships ltdl.m4
 # (needed below for libffi's LT_SYS_SYMBOL_USCORE). It was present on the
@@ -50,6 +52,7 @@ case "$ABI" in
         MESON_CPU_FAMILY="aarch64"
         MESON_CPU="aarch64"
         DROIDSPACES_MAKE_TARGET="aarch64"
+        GOARCH="arm64"
         ;;
     x86_64)
         TARGET_TRIPLE="x86_64-linux-android"
@@ -57,6 +60,7 @@ case "$ABI" in
         MESON_CPU_FAMILY="x86_64"
         MESON_CPU="x86_64"
         DROIDSPACES_MAKE_TARGET="x86_64"
+        GOARCH="amd64"
         ;;
     *)
         echo "No target-triple mapping for ABI '$ABI' — only arm64-v8a and x86_64 are wired up." >&2
@@ -240,6 +244,34 @@ DS_ASSETS="$REPO_ROOT/runtime-linux-root/src/main/assets/bin"
 mkdir -p "$DS_ASSETS"
 cp "$VENDOR/droidspaces/output/droidspaces" "$DS_ASSETS/droidspaces-$ABI"
 
+echo "=== crane ($ABI) ==="
+# vendor/go-containerregistry's CLI — the OCI registry client
+# CraneRootfsPuller shells out to (runtime-linux-root). Go cross-compiles
+# to Android natively (no separate cross-toolchain download needed, unlike
+# droidspaces' musl-cross toolchains above): GOOS=android + GOARCH is
+# enough. The one wrinkle is that android/amd64 specifically requires
+# external (cgo) linking — confirmed by a real build failure ("android/amd64
+# requires external (cgo) linking, but cgo is not enabled") — while
+# android/arm64 links statically fine with CGO_ENABLED=0. Reuses the same
+# NDK clang already resolved above for $CC when cgo is needed.
+if ! command -v go >/dev/null 2>&1; then
+    echo "go not found on PATH — crane needs Go >= 1.25 (see vendor/go-containerregistry/go.mod)." >&2
+    exit 1
+fi
+(
+    cd "$VENDOR/go-containerregistry"
+    if [ "$ABI" = "x86_64" ]; then
+        export CGO_ENABLED=1
+        export CC="$CC"
+    else
+        export CGO_ENABLED=0
+    fi
+    GOOS=android GOARCH="$GOARCH" go build -trimpath -ldflags="-s -w" \
+        -o "$REPO_ROOT/runtime-linux-root/src/main/assets/bin/crane-$ABI" \
+        ./cmd/crane
+)
+
 echo "=== Done. Deps installed under $DEPS_DIR ==="
 find "$DEPS_DIR" -iname "*wayland-client*" -o -iname "libffi.a"
 file "$DS_ASSETS/droidspaces-$ABI"
+file "$REPO_ROOT/runtime-linux-root/src/main/assets/bin/crane-$ABI"
