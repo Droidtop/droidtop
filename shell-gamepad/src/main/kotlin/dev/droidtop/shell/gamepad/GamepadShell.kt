@@ -489,8 +489,14 @@ private sealed interface GameGroup {
 // id) specifically so they render through this same System -> Game
 // carousel/theming, not a generic "Windows" engine bucket -- any future
 // kind that sets systemId gets the same real theming for free.
-private fun LibraryEntry.gameGroup(): GameGroup =
-    if (systemId != null) GameGroup.System(systemId) else GameGroup.Engine(kind)
+private fun LibraryEntry.gameGroup(): GameGroup {
+    // Local val, not a direct smart-cast on systemId: it's a public property
+    // declared in a different module (library-core), which Kotlin won't
+    // smart-cast across module boundaries -- a real compile error caught by
+    // CI, not a style choice.
+    val id = systemId
+    return if (id != null) GameGroup.System(id) else GameGroup.Engine(kind)
+}
 
 /**
  * System-first, then per-system game grid — ES-DE's System → Game
