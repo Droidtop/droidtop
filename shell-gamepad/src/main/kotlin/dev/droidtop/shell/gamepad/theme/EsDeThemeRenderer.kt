@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.unit.Dp
@@ -25,21 +26,26 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Renders the subset of a parsed [EsDeThemeView] this module actually
- * covers -- `image` and `text` elements, positioned via their real
- * NORMALIZED_PAIR `pos`/`size` (0-1 fractions of the view's own bounds,
- * same convention ES-DE itself uses). `carousel` elements are parsed into
- * the data model (see [EsDeTheme]) but not rendered here -- a carousel is
- * a real scrolling/focus component, not a statically positioned element,
- * and belongs wired into whatever's actually driving Games' own system
- * list (shell-gamepad's GamepadShell) rather than a generic renderer here.
- *
- * Not wired into any real shell UI yet -- this is the rendering primitive;
- * loading an actual theme pack and using it in shell-gamepad's Games tab
- * is the next real step, not attempted in this pass.
+ * Renders a parsed [EsDeThemeView] as ONE coherent screen -- every
+ * positioned element (background/video/info text/carousel/help/...)
+ * composited together by real z-index, the theme itself driving the
+ * layout. This replaces an earlier, real bug: [EsDeSystemListView] used
+ * to be rendered separately, in droidtop's own hardcoded Column, ignoring
+ * the theme's actual `pos`/`size`/`origin` for the carousel/grid/textlist
+ * element entirely (DEcaffe positions it centered near the BOTTOM of the
+ * screen; droidtop's own layout put system cards crowding the TOP,
+ * nothing like the real theme). The primary list element is now just
+ * another themed element type in this same dispatcher, positioned exactly
+ * like every other one -- [items]/[firstItemFocus] are threaded through
+ * only for that one case.
  */
 @Composable
-fun EsDeThemedView(view: EsDeThemeView, modifier: Modifier = Modifier) {
+fun EsDeThemedView(
+    view: EsDeThemeView,
+    items: List<EsDeListItem>,
+    firstItemFocus: FocusRequester?,
+    modifier: Modifier = Modifier,
+) {
     BoxWithConstraints(modifier = modifier) {
         val viewWidth = maxWidth
         val viewHeight = maxHeight
@@ -64,9 +70,35 @@ fun EsDeThemedView(view: EsDeThemeView, modifier: Modifier = Modifier) {
                 // below instead: parsed, not rendered, until real
                 // per-game metadata exists to bind it to.
                 "clock" -> EsDeThemedClock(element, viewWidth, viewHeight)
+                // The real fix described above: positioned/sized exactly
+                // like any other themed element, using the SAME EsDeCarousel/
+                // EsDeGrid/EsDeTextList composables that already read the
+                // theme's own itemSize/colors -- only the outer placement
+                // was ever wrong.
+                "carousel", "grid", "textlist" -> EsDeThemedListElement(
+                    element, items, firstItemFocus, viewWidth, viewHeight,
+                )
             }
         }
     }
+}
+
+@Composable
+private fun EsDeThemedListElement(
+    element: EsDeThemeElement,
+    items: List<EsDeListItem>,
+    firstItemFocus: FocusRequester?,
+    viewWidth: Dp,
+    viewHeight: Dp,
+) {
+    val (width, height) = sizeOf(element, viewWidth, viewHeight)
+    val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
+    EsDeSystemListView(
+        element = element,
+        items = items,
+        firstItemFocus = firstItemFocus,
+        modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY).size(width = width, height = height),
+    )
 }
 
 @Composable
