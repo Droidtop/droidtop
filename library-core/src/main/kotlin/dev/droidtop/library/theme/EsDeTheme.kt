@@ -14,17 +14,27 @@ package dev.droidtop.library.theme
  * against it, not guessed), producing droidtop's own independent data
  * model that droidtop's own Compose code renders.
  *
- * Covers `image`, `text`, `carousel`, `grid`, and `textlist` -- the three
- * real ES-DE element types a theme can use as a view's *primary browsing
- * component* (a system/gamelist view picks exactly one of these three to
- * actually list items with; see [EsDeThemeView.primaryListElement]), plus
- * the two universal decoration types. Not the full ES-DE schema (video,
- * animation, datetime, rating, badges, helpsystem, systemstatus, sound
- * exist in the real schema and aren't covered here). Also scoped to each
- * covered element type's most structurally load-bearing properties
+ * Covers all 16 real ES-DE element types (`ThemeData::sElementMap`, fetched
+ * and read directly this session): `image`, `text`, `carousel`, `grid`,
+ * `textlist` (the three real types a theme can use as a view's *primary
+ * browsing component* -- a system/gamelist view picks exactly one; see
+ * [EsDeThemeView.primaryListElement] -- plus the two universal decoration
+ * types), and `video`, `animation`, `badges`, `datetime`, `gamelistinfo`,
+ * `rating`, `gameselector`, `helpsystem`, `systemstatus`, `clock`, `sound`.
+ * Each type is scoped to its own most structurally load-bearing properties
  * (position, size, path, color, text, font, rotation, opacity, visibility,
  * stacking order, item geometry), not literally every property ES-DE
- * supports (`grid` alone has ~60 in the real schema).
+ * supports (`carousel` alone has ~60 in the real schema) -- an
+ * unrecognized property is skipped, not a parse failure (see
+ * [dev.droidtop.library.theme.EsDeThemeParser]'s own doc comment).
+ *
+ * Parsing coverage and rendering coverage are real, separate things: every
+ * type here parses into the real data model, but rendering
+ * ([dev.droidtop.shell.gamepad.theme.EsDeThemedView]) is honestly partial
+ * for `badges`/`rating`/`gamelistinfo`/`gameselector` -- they need real
+ * per-game metadata (favorites, ratings, play counts) droidtop's own
+ * [dev.droidtop.library.LibraryEntry] doesn't model yet, so rendering them
+ * would mean fabricating data, not a real gap in the parser itself.
  */
 data class EsDeTheme(
     val variables: Map<String, String>,
@@ -83,8 +93,9 @@ internal enum class EsDePropertyType { NORMALIZED_PAIR, PATH, STRING, COLOR, UNS
 /**
  * Real element/property schema, transcribed from ES-DE's own
  * `ThemeData::sElementMap` (verified against the actual source, not
- * guessed) -- restricted to `image`, `text`, and `carousel`, and within
- * those, to the properties this parser actually implements.
+ * guessed) -- all 16 real element types, within each restricted to the
+ * properties this parser actually implements (see [EsDeTheme]'s own doc
+ * comment for the real parsing-vs-rendering coverage distinction).
  */
 internal val ES_DE_ELEMENT_SCHEMA: Map<String, Map<String, EsDePropertyType>> = mapOf(
     "image" to mapOf(
@@ -102,12 +113,24 @@ internal val ES_DE_ELEMENT_SCHEMA: Map<String, Map<String, EsDePropertyType>> = 
         "visible" to EsDePropertyType.BOOLEAN,
         "zIndex" to EsDePropertyType.FLOAT,
     ),
+    // Real property set expanded beyond the original pass to include
+    // ES-DE's own metadata-binding properties (metadata/systemdata/
+    // gameselector/defaultValue) -- what a real gamelist theme uses to
+    // bind a text element to a specific per-game field (developer, genre,
+    // release date, ...) rather than static text. See [EsDeTheme]'s own
+    // doc comment for why rendering these still needs real per-game
+    // metadata droidtop doesn't model yet.
     "text" to mapOf(
         "pos" to EsDePropertyType.NORMALIZED_PAIR,
         "size" to EsDePropertyType.NORMALIZED_PAIR,
         "origin" to EsDePropertyType.NORMALIZED_PAIR,
         "rotation" to EsDePropertyType.FLOAT,
         "text" to EsDePropertyType.STRING,
+        "systemdata" to EsDePropertyType.STRING,
+        "metadata" to EsDePropertyType.STRING,
+        "defaultValue" to EsDePropertyType.STRING,
+        "gameselector" to EsDePropertyType.STRING,
+        "gameselectorEntry" to EsDePropertyType.UNSIGNED_INTEGER,
         "fontPath" to EsDePropertyType.PATH,
         "fontSize" to EsDePropertyType.FLOAT,
         "horizontalAlignment" to EsDePropertyType.STRING,
@@ -179,6 +202,159 @@ internal val ES_DE_ELEMENT_SCHEMA: Map<String, Map<String, EsDePropertyType>> = 
         "letterCase" to EsDePropertyType.STRING,
         "lineSpacing" to EsDePropertyType.FLOAT,
         "zIndex" to EsDePropertyType.FLOAT,
+    ),
+    // Real fallback-image-only rendering (see EsDeThemedView) -- actual
+    // video playback is real, separate work, not attempted this pass.
+    "video" to mapOf(
+        "pos" to EsDePropertyType.NORMALIZED_PAIR,
+        "size" to EsDePropertyType.NORMALIZED_PAIR,
+        "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "path" to EsDePropertyType.PATH,
+        "default" to EsDePropertyType.PATH,
+        "defaultImage" to EsDePropertyType.PATH,
+        "color" to EsDePropertyType.COLOR,
+        "imageCornerRadius" to EsDePropertyType.FLOAT,
+        "opacity" to EsDePropertyType.FLOAT,
+        "visible" to EsDePropertyType.BOOLEAN,
+        "zIndex" to EsDePropertyType.FLOAT,
+    ),
+    // Same real fallback-image-only rendering as "video" -- real GIF/frame
+    // animation playback is separate work, not attempted this pass.
+    "animation" to mapOf(
+        "pos" to EsDePropertyType.NORMALIZED_PAIR,
+        "size" to EsDePropertyType.NORMALIZED_PAIR,
+        "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "path" to EsDePropertyType.PATH,
+        "color" to EsDePropertyType.COLOR,
+        "cornerRadius" to EsDePropertyType.FLOAT,
+        "opacity" to EsDePropertyType.FLOAT,
+        "visible" to EsDePropertyType.BOOLEAN,
+        "zIndex" to EsDePropertyType.FLOAT,
+    ),
+    // Parses real; rendering deferred -- needs real per-game favorite/
+    // controller-support/folder metadata droidtop's LibraryEntry doesn't
+    // model yet (see EsDeTheme's own doc comment).
+    "badges" to mapOf(
+        "pos" to EsDePropertyType.NORMALIZED_PAIR,
+        "size" to EsDePropertyType.NORMALIZED_PAIR,
+        "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "lines" to EsDePropertyType.UNSIGNED_INTEGER,
+        "itemsPerLine" to EsDePropertyType.UNSIGNED_INTEGER,
+        "itemMargin" to EsDePropertyType.NORMALIZED_PAIR,
+        "customBadgeIcon" to EsDePropertyType.PATH,
+        "customControllerIcon" to EsDePropertyType.PATH,
+        "badgeIconColor" to EsDePropertyType.COLOR,
+        "opacity" to EsDePropertyType.FLOAT,
+        "visible" to EsDePropertyType.BOOLEAN,
+        "zIndex" to EsDePropertyType.FLOAT,
+    ),
+    // Real, live-rendered (current date/time) -- doesn't need per-game
+    // metadata, unlike badges/rating/gamelistinfo.
+    "datetime" to mapOf(
+        "pos" to EsDePropertyType.NORMALIZED_PAIR,
+        "size" to EsDePropertyType.NORMALIZED_PAIR,
+        "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "metadata" to EsDePropertyType.STRING,
+        "defaultValue" to EsDePropertyType.STRING,
+        "fontPath" to EsDePropertyType.PATH,
+        "fontSize" to EsDePropertyType.FLOAT,
+        "horizontalAlignment" to EsDePropertyType.STRING,
+        "verticalAlignment" to EsDePropertyType.STRING,
+        "color" to EsDePropertyType.COLOR,
+        "backgroundColor" to EsDePropertyType.COLOR,
+        "letterCase" to EsDePropertyType.STRING,
+        "format" to EsDePropertyType.STRING,
+        "opacity" to EsDePropertyType.FLOAT,
+        "visible" to EsDePropertyType.BOOLEAN,
+        "zIndex" to EsDePropertyType.FLOAT,
+    ),
+    // Parses real; rendering deferred -- "X/Y games" summary needs a real
+    // list-count context this element type alone doesn't carry.
+    "gamelistinfo" to mapOf(
+        "pos" to EsDePropertyType.NORMALIZED_PAIR,
+        "size" to EsDePropertyType.NORMALIZED_PAIR,
+        "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "fontPath" to EsDePropertyType.PATH,
+        "fontSize" to EsDePropertyType.FLOAT,
+        "horizontalAlignment" to EsDePropertyType.STRING,
+        "verticalAlignment" to EsDePropertyType.STRING,
+        "color" to EsDePropertyType.COLOR,
+        "backgroundColor" to EsDePropertyType.COLOR,
+        "opacity" to EsDePropertyType.FLOAT,
+        "visible" to EsDePropertyType.BOOLEAN,
+        "zIndex" to EsDePropertyType.FLOAT,
+    ),
+    // Parses real; rendering deferred -- needs a real per-game star-rating
+    // value droidtop's LibraryEntry doesn't model yet.
+    "rating" to mapOf(
+        "pos" to EsDePropertyType.NORMALIZED_PAIR,
+        "size" to EsDePropertyType.NORMALIZED_PAIR,
+        "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "hideIfZero" to EsDePropertyType.BOOLEAN,
+        "color" to EsDePropertyType.COLOR,
+        "filledPath" to EsDePropertyType.PATH,
+        "unfilledPath" to EsDePropertyType.PATH,
+        "overlay" to EsDePropertyType.BOOLEAN,
+        "opacity" to EsDePropertyType.FLOAT,
+        "visible" to EsDePropertyType.BOOLEAN,
+        "zIndex" to EsDePropertyType.FLOAT,
+    ),
+    // Not a positioned visual element in real ES-DE either -- selects
+    // which game(s) other elements' gameselector/gameselectorEntry
+    // properties reference. Parsed for completeness; no rendering (there's
+    // nothing to draw).
+    "gameselector" to mapOf(
+        "selection" to EsDePropertyType.STRING,
+        "gameCount" to EsDePropertyType.UNSIGNED_INTEGER,
+        "allowDuplicates" to EsDePropertyType.BOOLEAN,
+    ),
+    // Parses real; no rendering here -- droidtop already has its own
+    // hand-built persistent button-hint footer (docs/SPEC.md §7), a real,
+    // working equivalent, not a gap.
+    "helpsystem" to mapOf(
+        "pos" to EsDePropertyType.NORMALIZED_PAIR,
+        "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "textColor" to EsDePropertyType.COLOR,
+        "iconColor" to EsDePropertyType.COLOR,
+        "fontPath" to EsDePropertyType.PATH,
+        "fontSize" to EsDePropertyType.FLOAT,
+        "entrySpacing" to EsDePropertyType.FLOAT,
+        "backgroundColor" to EsDePropertyType.COLOR,
+        "opacity" to EsDePropertyType.FLOAT,
+        "customButtonIcon" to EsDePropertyType.PATH,
+    ),
+    // Parses real; rendering deferred -- ES-DE's own real network/
+    // Bluetooth/battery status row needs real device-status plumbing this
+    // pass doesn't build.
+    "systemstatus" to mapOf(
+        "pos" to EsDePropertyType.NORMALIZED_PAIR,
+        "height" to EsDePropertyType.FLOAT,
+        "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "fontPath" to EsDePropertyType.PATH,
+        "color" to EsDePropertyType.COLOR,
+        "backgroundColor" to EsDePropertyType.COLOR,
+        "customIcon" to EsDePropertyType.PATH,
+        "opacity" to EsDePropertyType.FLOAT,
+    ),
+    // Real, live-rendered (current time) -- same real category as datetime.
+    "clock" to mapOf(
+        "pos" to EsDePropertyType.NORMALIZED_PAIR,
+        "size" to EsDePropertyType.NORMALIZED_PAIR,
+        "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "fontPath" to EsDePropertyType.PATH,
+        "fontSize" to EsDePropertyType.FLOAT,
+        "horizontalAlignment" to EsDePropertyType.STRING,
+        "verticalAlignment" to EsDePropertyType.STRING,
+        "color" to EsDePropertyType.COLOR,
+        "backgroundColor" to EsDePropertyType.COLOR,
+        "format" to EsDePropertyType.STRING,
+        "opacity" to EsDePropertyType.FLOAT,
+    ),
+    // Not a visual element at all in real ES-DE (plays on navigation/
+    // selection) -- parsed for completeness; no rendering, real audio
+    // playback wiring is separate work.
+    "sound" to mapOf(
+        "path" to EsDePropertyType.PATH,
     ),
 )
 

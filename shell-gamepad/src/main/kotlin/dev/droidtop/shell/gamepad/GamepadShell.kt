@@ -60,6 +60,7 @@ import dev.droidtop.library.theme.SystemThemeColors
 import dev.droidtop.library.theme.primaryListElement
 import dev.droidtop.shell.gamepad.theme.EsDeListItem
 import dev.droidtop.shell.gamepad.theme.EsDeSystemListView
+import dev.droidtop.shell.gamepad.theme.EsDeThemedView
 import dev.droidtop.shell.gamepad.theme.ThemeAssets
 import kotlinx.coroutines.launch
 
@@ -597,20 +598,6 @@ private fun GamesSection(
                 if (entries.isEmpty()) {
                     Text("No games detected yet.", color = Color.White, modifier = Modifier.padding(horizontal = 48.dp))
                 } else {
-                    Text(
-                        "Systems",
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.padding(horizontal = 48.dp, vertical = 8.dp),
-                    )
-                    // Real fix: the browsing *shape* (carousel/grid/
-                    // textlist) now comes from the loaded theme's own
-                    // "system" view definition (ES-DE's real convention --
-                    // a theme.xml declares exactly one of these per view,
-                    // confirmed by reading the bundled DEcaffe theme.xml
-                    // directly), not a hardcoded LazyRow. EsDeSystemListView
-                    // falls back to a carousel when no theme/element loads,
-                    // so this never regresses to nothing rendering.
                     val context = LocalContext.current
                     val theme = remember { ThemeAssets.loadDecaffeTheme(context) }
                     val listElement = remember(theme) { theme?.views?.get("system")?.primaryListElement() }
@@ -626,12 +613,42 @@ private fun GamesSection(
                             onSelect = { selectedGroup = entryGroup },
                         )
                     }
-                    EsDeSystemListView(
-                        element = listElement,
-                        items = items,
-                        firstItemFocus = firstFocus,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp),
-                    )
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        // Real fix: this was the actual rendering primitive
+                        // for a theme's own background art/decorative
+                        // image+text elements (EsDeThemedView, real and
+                        // working) sitting completely unused -- nothing
+                        // called it anywhere. Every other system's carousel/
+                        // grid/textlist got real theme colors and logos,
+                        // but the "system" view's own background/decoration
+                        // elements (DEcaffe's real full-bleed platform art,
+                        // decorative text) never rendered at all, which is
+                        // the concrete reason this screen still looked
+                        // placeholder despite the theming work already
+                        // done. Rendered behind the list, real elements
+                        // only (image/text) -- the theme's own primary list
+                        // element (carousel/grid/textlist) is deliberately
+                        // excluded here since EsDeSystemListView already
+                        // renders it as a real, focusable, interactive
+                        // component, not a static positioned image.
+                        theme?.views?.get("system")?.let { systemView ->
+                            EsDeThemedView(systemView, modifier = Modifier.fillMaxSize())
+                        }
+                        Column {
+                            Text(
+                                "Systems",
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleLarge,
+                                modifier = Modifier.padding(horizontal = 48.dp, vertical = 8.dp),
+                            )
+                            EsDeSystemListView(
+                                element = listElement,
+                                items = items,
+                                firstItemFocus = firstFocus,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp),
+                            )
+                        }
+                    }
                 }
             }
         } else {
