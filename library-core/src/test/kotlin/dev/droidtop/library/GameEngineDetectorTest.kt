@@ -81,7 +81,31 @@ class GameEngineDetectorTest {
         val results = GameEngineDetector.scan(tmp.root)
 
         assertEquals(2, results.size)
-        assertEquals(GameEngine.RENPY, results.first { it.first.name == "VN1" }.second)
-        assertEquals(GameEngine.RPG_MAKER_MV, results.first { it.first.name == "RPG1" }.second)
+        val vn1 = results.first { it.displayFolder.name == "VN1" }
+        assertEquals(GameEngine.RENPY, vn1.engine)
+        assertEquals(vn1.displayFolder, vn1.gameRoot)
+        val rpg1 = results.first { it.displayFolder.name == "RPG1" }
+        assertEquals(GameEngine.RPG_MAKER_MV, rpg1.engine)
+        assertEquals(rpg1.displayFolder, rpg1.gameRoot)
+    }
+
+    @Test
+    fun `scan finds a game nested one folder deeper than the outer display folder`() {
+        // Real, confirmed shape: some Ren'Py distribution zips wrap the
+        // actual game in an extra version-named folder
+        // ("BeingADik/BeingADIK-0.8.3-scrappy/{renpy,game}") -- the outer
+        // folder should stay the display name, the inner one is where the
+        // real launch file actually lives.
+        File(tmp.root, "BeingADik/BeingADIK-0.8.3-scrappy/renpy").mkdirs()
+        File(tmp.root, "BeingADik/BeingADIK-0.8.3-scrappy/game").mkdirs()
+        File(tmp.root, "BeingADik/BeingADIK-0.8.3-scrappy/game/.keep").createNewFile()
+
+        val results = GameEngineDetector.scan(tmp.root)
+
+        assertEquals(1, results.size)
+        val game = results.first()
+        assertEquals("BeingADik", game.displayFolder.name)
+        assertEquals("BeingADIK-0.8.3-scrappy", game.gameRoot.name)
+        assertEquals(GameEngine.RENPY, game.engine)
     }
 }
