@@ -674,14 +674,9 @@ private fun SettingsSection() {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SettingsLink(
             "Handheld settings",
-            "Default section, button hints",
+            "Default section, button hints, console systems",
             modifier = Modifier.focusRequester(firstFocus),
             onClick = { openSettings(context, "app.murinelauncher.settings.SettingsHandheldFragment") },
-        )
-        SettingsLink(
-            "Console systems",
-            "Assign folders to a system by hand",
-            onClick = { openActivity(context, "dev.droidtop.app.ConsoleSystemsActivity") },
         )
         SettingsLink(
             "All settings",
@@ -689,14 +684,6 @@ private fun SettingsSection() {
             onClick = { openSettings(context, null) },
         )
     }
-}
-
-private fun openActivity(context: Context, className: String) {
-    val intent = Intent(Intent.ACTION_MAIN).apply {
-        component = ComponentName(context.packageName, className)
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-    context.startActivity(intent)
 }
 
 private fun openSettings(context: Context, fragment: String?) {
