@@ -3,6 +3,7 @@ package dev.droidtop.shell.standard
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 
 /**
@@ -29,6 +30,7 @@ object BackButtonMenu {
     const val EXTRA_MODE = "dev.droidtop.app.EXTRA_MODE"
     const val MODE_DESKTOP = "desktop"
     const val MODE_HANDHELD = "handheld"
+    const val MODE_STANDARD = "standard"
 
     @JvmStatic
     fun show(activity: Activity) {
@@ -45,6 +47,7 @@ object BackButtonMenu {
     }
 
     private fun launchStandard(activity: Activity) {
+        ModePrefs.setLastMode(activity, MODE_STANDARD)
         val intent = Intent(Intent.ACTION_MAIN).apply {
             component = ComponentName(activity.packageName, STANDARD_LAUNCHER_ACTIVITY)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -53,6 +56,7 @@ object BackButtonMenu {
     }
 
     private fun launchAppMode(activity: Activity, mode: String) {
+        ModePrefs.setLastMode(activity, mode)
         val intent = Intent(Intent.ACTION_MAIN).apply {
             setClassName(activity.packageName, APP_MAIN_ACTIVITY)
             putExtra(EXTRA_MODE, mode)

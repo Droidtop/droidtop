@@ -31,6 +31,7 @@ import dev.droidtop.runtime.DualScreenRole
 import dev.droidtop.runtime.PrefsDualScreenAssignmentStore
 import dev.droidtop.shell.gamepad.GamepadShell
 import dev.droidtop.shell.standard.BackButtonMenu
+import dev.droidtop.shell.standard.ModePrefs
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.io.File
@@ -93,7 +94,7 @@ class MainActivity : AppCompatActivity() {
                 ConsoleRomProvider(applicationContext, gamesRoots),
             ),
         )
-        mode = intent.getStringExtra(BackButtonMenu.EXTRA_MODE)
+        mode = resolveMode(intent)
 
         observeSecondScreen()
 
@@ -111,7 +112,26 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        mode = intent.getStringExtra(BackButtonMenu.EXTRA_MODE)
+        mode = resolveMode(intent)
+    }
+
+    /**
+     * Prefers an explicit [BackButtonMenu.EXTRA_MODE] (a real user choice,
+     * from [BackButtonMenu] or Launcher's own cold-boot redirect — see the
+     * "droidtop patch" in `Launcher.onCreate`); falls back to
+     * [ModePrefs]'s last app-hosted mode when absent, so this Activity
+     * resumes correctly even if launched by something that didn't set the
+     * extra. Persists whatever mode is resolved as a safety net — every
+     * known real caller already does this before launching, but a null
+     * write here would be wrong (it would forget the real last mode).
+     */
+    private fun resolveMode(intent: Intent): String? {
+        val explicit = intent.getStringExtra(BackButtonMenu.EXTRA_MODE)
+        val resolved = explicit ?: ModePrefs.lastMode(this).takeIf {
+            it == BackButtonMenu.MODE_HANDHELD || it == BackButtonMenu.MODE_DESKTOP
+        }
+        if (resolved != null) ModePrefs.setLastMode(this, resolved)
+        return resolved
     }
 
     /**
