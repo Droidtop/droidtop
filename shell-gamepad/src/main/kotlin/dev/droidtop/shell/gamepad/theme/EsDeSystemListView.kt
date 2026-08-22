@@ -1,5 +1,8 @@
 package dev.droidtop.shell.gamepad.theme
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -104,13 +108,20 @@ fun EsDeSystemListView(
  * formula above naturally handles that same case without a special case,
  * since `itemSpacing` there equals the carousel's own full width.
  *
- * Real, honestly-deferred gaps: [focusedIndex] jumps directly to whatever
- * item currently has Compose focus rather than ES-DE's own continuously-
- * animated `camOffset` (a float that eases from the old selected index to
- * the new one, producing a real glide/settle animation) -- items snap
- * instead of gliding. `itemStacking`/wheel carousel types/reflections are
- * real ES-DE features not ported here at all. All genuinely separate,
- * scoped follow-up work, not attempted in this pass.
+ * `camOffset` is now real, continuous, eased animation too -- ported
+ * directly from `CarouselComponent::onCursorChanged`'s own real
+ * `LambdaAnimation`: ease-out-quad (`t = 1 - (1-t)^2`), duration 400ms by
+ * default, scaled down (`clamp(distance * 1.5 * 400, 200, 400)`) when the
+ * animation restarts mid-flight at a fractional distance (e.g. a rapid
+ * double-press) rather than a full one-item step. Not ported: ES-DE's
+ * real wraparound "shortest path" logic for a circular/looping carousel
+ * (`onCursorChanged`'s `posMax` handling) -- droidtop's system list isn't
+ * circular, so a direct `animateTo` is the correct real behavior here,
+ * not a missing feature.
+ *
+ * Real, honestly-deferred gaps: `itemStacking`/wheel carousel types
+ * (`verticalWheel`/`horizontalWheel`)/reflections are real ES-DE features
+ * not ported here at all. Genuinely separate, scoped follow-up work.
  */
 @Composable
 private fun EsDeCarousel(
@@ -136,17 +147,38 @@ private fun EsDeCarousel(
     val itemScale = (element?.valueOrNull<EsDeThemeValue.FloatValue>("itemScale")?.value ?: 1.2f).coerceIn(0.2f, 3f)
 
     var focusedIndex by remember { mutableStateOf(0) }
+    val camOffset = remember { Animatable(0f) }
     val density = LocalDensity.current
+
+    LaunchedEffect(focusedIndex) {
+        val startPos = camOffset.value
+        val target = focusedIndex.toFloat()
+        val distance = kotlin.math.abs(target - startPos)
+        // Real formula (CarouselComponent::onCursorChanged): full 400ms
+        // for a whole-item step; scaled down when restarting mid-flight.
+        val animTimeMs = if (distance != 1f) {
+            (distance * 1.5f * 400f).coerceIn(200f, 400f)
+        } else {
+            400f
+        }
+        camOffset.animateTo(
+            targetValue = target,
+            animationSpec = tween(
+                durationMillis = animTimeMs.toInt(),
+                easing = Easing { t -> 1f - (1f - t) * (1f - t) },
+            ),
+        )
+    }
 
     BoxWithConstraints(modifier = modifier) {
         val carouselWidthPx = with(density) { maxWidth.toPx() }
         val itemWidthPx = with(density) { itemWidth.toPx() }
         val itemSpacingPx = ((carouselWidthPx - itemWidthPx * maxItemCount) / maxItemCount) + itemWidthPx
-        val xOffBasePx = (carouselWidthPx - itemWidthPx) / 2f - focusedIndex * itemSpacingPx
+        val xOffBasePx = (carouselWidthPx - itemWidthPx) / 2f - camOffset.value * itemSpacingPx
         val yOffPx = with(density) { (maxHeight - itemHeight).toPx() / 2f }
 
         items.forEachIndexed { index, item ->
-            val distance = (index - focusedIndex).toFloat()
+            val distance = index - camOffset.value
             val absDistance = kotlin.math.abs(distance)
             // Real formula, ported as-is: itemScale >= 1 scales UP toward
             // the focused item; itemScale < 1 scales DOWN away from it.
