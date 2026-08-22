@@ -585,19 +585,22 @@ private fun GamesSection(
             // otherwise throws (FocusRequester not initialized), which is
             // exactly what happened with an empty/fresh games folder.
             LaunchedEffect(entries) { if (hasAnyGroupCard) firstFocus.requestFocus() }
-            Column(modifier = Modifier.fillMaxSize().padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(32.dp)) {
-                if (continuePlaying.isNotEmpty()) {
-                    HomeSectionRow(
-                        HomeSection("Continue Playing", continuePlaying),
-                        firstCardFocus = null,
-                        onLaunch = onLaunch,
-                        onShowDetail = onShowDetail,
-                        onFocusedEntryChanged = onFocusedEntryChanged,
-                    )
-                }
-                if (entries.isEmpty()) {
+            if (entries.isEmpty()) {
+                Column(modifier = Modifier.fillMaxSize().padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(32.dp)) {
                     Text("No games detected yet.", color = Color.White, modifier = Modifier.padding(horizontal = 48.dp))
-                } else {
+                }
+            } else {
+                // Box, not Column: EsDeThemedView needs to genuinely fill
+                // the whole screen (a real full-bleed background image is
+                // one of its own themed elements) -- a Column sibling would
+                // have measured it against the Column's remaining-height
+                // constraint and clipped/overlapped continuePlaying instead,
+                // the same class of sizing bug fillMaxSize itself just
+                // fixed at the EsDeThemedView call site below. continuePlaying
+                // renders on top, anchored to the top -- the reference
+                // theme has no equivalent concept, so this is droidtop's
+                // own addition layered over the theme rather than part of it.
+                Box(modifier = Modifier.fillMaxSize()) {
                     val context = LocalContext.current
                     val theme = remember { ThemeAssets.loadDecaffeTheme(context) }
                     val listElement = remember(theme) { theme?.views?.get("system")?.primaryListElement() }
@@ -613,41 +616,43 @@ private fun GamesSection(
                             onSelect = { selectedGroup = entryGroup },
                         )
                     }
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        // Real fix: this was the actual rendering primitive
-                        // for a theme's own background art/decorative
-                        // image+text elements (EsDeThemedView, real and
-                        // working) sitting completely unused -- nothing
-                        // called it anywhere. Every other system's carousel/
-                        // grid/textlist got real theme colors and logos,
-                        // but the "system" view's own background/decoration
-                        // elements (DEcaffe's real full-bleed platform art,
-                        // decorative text) never rendered at all, which is
-                        // the concrete reason this screen still looked
-                        // placeholder despite the theming work already
-                        // done. Rendered behind the list, real elements
-                        // only (image/text) -- the theme's own primary list
-                        // element (carousel/grid/textlist) is deliberately
-                        // excluded here since EsDeSystemListView already
-                        // renders it as a real, focusable, interactive
-                        // component, not a static positioned image.
-                        theme?.views?.get("system")?.let { systemView ->
-                            EsDeThemedView(systemView, modifier = Modifier.fillMaxSize())
-                        }
-                        Column {
-                            Text(
-                                "Systems",
-                                color = Color.White,
-                                style = MaterialTheme.typography.titleLarge,
-                                modifier = Modifier.padding(horizontal = 48.dp, vertical = 8.dp),
-                            )
-                            EsDeSystemListView(
-                                element = listElement,
-                                items = items,
-                                firstItemFocus = firstFocus,
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp),
-                            )
-                        }
+                    // Real fix: the theme now drives this whole screen's
+                    // layout, not just a decorative background behind
+                    // droidtop's own hardcoded system-list Column. The
+                    // carousel/grid/textlist is positioned at the theme's
+                    // own real pos/size (see EsDeThemedView's own doc
+                    // comment) alongside every other themed element
+                    // (background art, info text, help icons), composited
+                    // together by real z-index -- fillMaxSize (not the
+                    // fillMaxWidth this used to be) is what actually lets a
+                    // full-bleed background image cover the real screen
+                    // instead of just whatever height droidtop's own
+                    // content happened to wrap to. No separate "Systems"
+                    // label anymore -- the theme's own carousel title
+                    // treatment is the real visual identity for "what's
+                    // selected," matching the reference theme.
+                    theme?.views?.get("system")?.let { systemView ->
+                        EsDeThemedView(
+                            view = systemView,
+                            items = items,
+                            firstItemFocus = firstFocus,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } ?: EsDeSystemListView(
+                        element = listElement,
+                        items = items,
+                        firstItemFocus = firstFocus,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp),
+                    )
+                    if (continuePlaying.isNotEmpty()) {
+                        HomeSectionRow(
+                            HomeSection("Continue Playing", continuePlaying),
+                            firstCardFocus = null,
+                            onLaunch = onLaunch,
+                            onShowDetail = onShowDetail,
+                            onFocusedEntryChanged = onFocusedEntryChanged,
+                            modifier = Modifier.align(Alignment.TopStart).padding(top = 16.dp),
+                        )
                     }
                 }
             }
@@ -1026,8 +1031,9 @@ private fun HomeSectionRow(
     onLaunch: (LibraryEntry) -> Unit,
     onShowDetail: (LibraryEntry) -> Unit,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Column {
+    Column(modifier = modifier) {
         Text(
             section.title,
             color = Color.White,
