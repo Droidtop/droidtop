@@ -1,6 +1,7 @@
 package dev.droidtop.library.consoles
 
 import android.content.Context
+import dev.droidtop.library.EsDeArtwork
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
@@ -128,8 +129,8 @@ class ConsoleRomProvider(
         // same directory ES-DE's own `downloaded_media` sits alongside --
         // real per-game artwork when a user's existing ES-DE (or any other
         // scraper writing that same real layout) has already scraped it.
-        // See GameMediaResolver's own doc comment for why droidtop reads
-        // this rather than scraping itself.
+        // See EsDeArtwork's own doc comment for why droidtop reads this
+        // rather than scraping itself.
         val gamesRoot = systemFolder.parentFile ?: systemFolder
         return systemFolder.walkTopDown()
             .filter { it.isFile && it.extension.lowercase() in system.extensions }
@@ -139,7 +140,7 @@ class ConsoleRomProvider(
                     title = romFile.nameWithoutExtension,
                     kind = LibraryEntryKind.CONSOLE_ROM,
                     systemId = system.id,
-                    artworkUri = GameMediaResolver.findArtwork(gamesRoot, system.id, romFile.nameWithoutExtension),
+                    artworkUri = EsDeArtwork.resolve(gamesRoot, system.id, romFile.nameWithoutExtension),
                 )
             }
             .toList()

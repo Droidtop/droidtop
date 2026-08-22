@@ -35,9 +35,9 @@ import java.net.URLEncoder
  *    image-sizing convention).
  *
  * Writes straight into ES-DE's own real `downloaded_media` layout
- * ([dev.droidtop.library.consoles.GameMediaResolver] already reads that
- * exact layout) -- scraping and display are already fully wired together
- * with no further glue needed once an image lands on disk.
+ * ([dev.droidtop.library.EsDeArtwork] already reads that exact layout) --
+ * scraping and display are already fully wired together with no further
+ * glue needed once an image lands on disk.
  */
 object IgdbScraperClient {
     class ScraperException(message: String, cause: Throwable? = null) : Exception(message, cause)
