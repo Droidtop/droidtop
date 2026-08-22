@@ -526,35 +526,44 @@ private fun GamesSection(
             // otherwise throws (FocusRequester not initialized), which is
             // exactly what happened with an empty/fresh games folder.
             LaunchedEffect(entries) { if (hasAnyGroupCard) firstFocus.requestFocus() }
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(32.dp),
-            ) {
+            Column(modifier = Modifier.fillMaxSize().padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(32.dp)) {
                 if (continuePlaying.isNotEmpty()) {
-                    item(key = "continue-playing") {
-                        HomeSectionRow(
-                            HomeSection("Continue Playing", continuePlaying),
-                            firstCardFocus = null,
-                            onLaunch = onLaunch,
-                            onShowDetail = onShowDetail,
-                            onFocusedEntryChanged = onFocusedEntryChanged,
-                        )
-                    }
-                }
-                items(orderedGroups, key = { it.key }) { entryGroup ->
-                    GroupCard(
-                        label = entryGroup.label,
-                        count = byGroup.getValue(entryGroup).size,
-                        modifier = if (entryGroup == orderedGroups.firstOrNull()) {
-                            Modifier.focusRequester(firstFocus)
-                        } else {
-                            Modifier
-                        },
-                        onSelect = { selectedGroup = entryGroup },
+                    HomeSectionRow(
+                        HomeSection("Continue Playing", continuePlaying),
+                        firstCardFocus = null,
+                        onLaunch = onLaunch,
+                        onShowDetail = onShowDetail,
+                        onFocusedEntryChanged = onFocusedEntryChanged,
                     )
                 }
                 if (entries.isEmpty()) {
-                    item(key = "empty") { Text("No games detected yet.", color = Color.White, modifier = Modifier.padding(horizontal = 48.dp)) }
+                    Text("No games detected yet.", color = Color.White, modifier = Modifier.padding(horizontal = 48.dp))
+                } else {
+                    Text(
+                        "Systems",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.padding(horizontal = 48.dp, vertical = 8.dp),
+                    )
+                    // A horizontal carousel, not a vertical list -- ES-DE's
+                    // own real System view convention (confirmed via its
+                    // published docs: systems are browsed as a carousel),
+                    // distinct from Daijishō's vertical-list settings-style
+                    // browsing. "Wiring in ES-DE" is about this structural
+                    // shape, not just the underlying system/ROM data.
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp),
+                        horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    ) {
+                        itemsIndexed(orderedGroups, key = { _, entryGroup -> entryGroup.key }) { index, entryGroup ->
+                            GroupCard(
+                                label = entryGroup.label,
+                                count = byGroup.getValue(entryGroup).size,
+                                modifier = if (index == 0) Modifier.focusRequester(firstFocus) else Modifier,
+                                onSelect = { selectedGroup = entryGroup },
+                            )
+                        }
+                    }
                 }
             }
         } else {
@@ -628,10 +637,9 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun GroupCard(label: String, count: Int, modifier: Modifier = Modifier, onSelect: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    Row(
+    Column(
         modifier = modifier
-            .padding(horizontal = 48.dp)
-            .fillMaxWidth()
+            .size(width = 200.dp, height = 140.dp)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             .onKeyEvent { event ->
@@ -650,10 +658,11 @@ private fun GroupCard(label: String, count: Int, modifier: Modifier = Modifier, 
                 shape = RoundedCornerShape(12.dp),
             )
             .background(if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A), RoundedCornerShape(12.dp))
-            .padding(24.dp),
+            .padding(20.dp),
+        verticalArrangement = Arrangement.Bottom,
     ) {
-        Text(label, color = Color.White, style = MaterialTheme.typography.titleLarge)
-        Text("  ($count)", color = Color.Gray, style = MaterialTheme.typography.titleMedium)
+        Text(label, color = Color.White, style = MaterialTheme.typography.titleMedium)
+        Text("$count items", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
     }
 }
 
