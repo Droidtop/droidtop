@@ -1,0 +1,85 @@
+<theme>
+
+    <variables>
+		<mainFont>./assets/fonts/deal.otf</mainFont>
+        <secondFont>./assets/fonts/bold.ttf</secondFont>
+        <helpFont>./assets/fonts/elli.otf</helpFont>
+		
+	</variables>
+
+
+        <fontSize name="medium">
+            <variables>
+                <helpFontSize>0.0275</helpFontSize>
+                <helppos>.01 0.935</helppos>
+                <mainFontSize>0.03</mainFontSize>
+                <descsize>0.04</descsize>
+                <carbacksize>1 1</carbacksize>
+                <carbacktoppos>0.5 0.95</carbacktoppos>
+                <carbackbotpos>0.5 .75</carbackbotpos>
+                <carinnertoppos>0.5 0.85</carinnertoppos>
+                <carinnerbotpos>0.5 0.85</carinnerbotpos>
+                <infosize>0.03</infosize>
+                <sysgamename>0.5 0.735</sysgamename>
+                <sysgamenamesize>0.35 0.06</sysgamenamesize>
+                <sysgamelistdate>0.26 0.735</sysgamelistdate>
+                <sysgamedate>0.26 0.735</sysgamedate>
+                <sysgamecount>0.875 0.735</sysgamecount>
+                <sysgamerate>0.675 0.75</sysgamerate>
+                <sysgamelistrate>0.81 0.7525</sysgamelistrate>
+                <ratesize>0.08 0.025</ratesize>
+                <gamedescpos>0.81 0.04</gamedescpos>
+            </variables>
+        </fontSize>
+        <fontSize name="large">
+            <variables>
+                <helpFontSize>0.0375</helpFontSize>
+                <helppos>.01 0.944</helppos>
+                <mainFontSize>0.0325</mainFontSize>
+                <descsize>0.035</descsize>
+                <carbacksize>1 1.5</carbacksize>
+                <carbacktoppos>0.5 1.03</carbacktoppos>
+                <carbackbotpos>0.5 .67</carbackbotpos>
+                <carinnertoppos>0.5 0.88</carinnertoppos>
+                <carinnerbotpos>0.5 0.82</carinnerbotpos>
+                <infosize>0.04</infosize>
+                <sysgamename>0.515 0.725</sysgamename>
+                <sysgamenamesize>0.6 0.06</sysgamenamesize>
+                <sysgamelistdate>0.26 0.725</sysgamelistdate>
+                <sysgamedate>0.125 0.725</sysgamedate>
+                <sysgamecount>0.875 0.725</sysgamecount>
+                <sysgamerate>1.825 0.735</sysgamerate>
+                <sysgamelistrate>0.81 0.735</sysgamelistrate>
+                <ratesize>0.08 0.035</ratesize>
+                <gamedescpos>0.81 0.04</gamedescpos>
+                <fontvis>false</fontvis>
+            </variables>
+        </fontSize>
+
+        <fontSize name="x-large">
+            <variables>
+                <helpFontSize>0.0415</helpFontSize>
+                <helppos>.005 0.9475</helppos>
+                <mainFontSize>0.04</mainFontSize>
+                <descsize>0.04</descsize>
+                <carbacksize>1.1 2</carbacksize>
+                <carbacktoppos>0.5 1.1275</carbacktoppos>
+                <carbackbotpos>0.5 .5725</carbackbotpos>
+                <carinnertoppos>0.5 0.925</carinnertoppos>
+                <carinnerbotpos>0.5 0.775</carinnerbotpos>
+                <infosize>0.05</infosize>
+                <sysgamename>0.515 0.72</sysgamename>
+                <sysgamenamesize>0.6 0.06</sysgamenamesize>
+                <sysgamelistdate>0.125 0.72</sysgamelistdate>
+                <sysgamedate>0.1 0.72</sysgamedate>
+                <sysgamecount>0.875 0.72</sysgamecount>
+                <sysgamerate>1.825 0.73</sysgamerate>
+                <sysgamelistrate>0.81 0.73</sysgamelistrate>
+                <ratesize>0.08 0.04</ratesize>
+                <gamedescpos>0.81 0.04</gamedescpos>
+                <fontvis>false</fontvis>
+            </variables>
+        </fontSize>
+   
+
+</theme>

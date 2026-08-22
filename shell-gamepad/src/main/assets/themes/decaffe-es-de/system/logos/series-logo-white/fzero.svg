@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="540" height="196" viewBox="0 0 540 196">
+  <defs>
+    <style>
+      .cls-1, .cls-2 {
+        fill: #fff;
+      }
+
+      .cls-1, .cls-3 {
+        fill-rule: evenodd;
+      }
+
+      .cls-3 {
+        fill: none;
+        stroke: #fff;
+        stroke-width: 2px;
+      }
+    </style>
+  </defs>
+  <path class="cls-1" d="M16,14H95V70H67V49H53V79H84v34H53v32h9v33H16V146H26V48.975H16V14Z"/>
+  <path class="cls-1" d="M150,14V70h26V48.975h23L151,143v35h81V126H206v18H183l48-95.025V14H150Z"/>
+  <rect class="cls-2" x="103" y="88" width="33" height="25"/>
+  <path class="cls-1" d="M252,145h-8v33h84V125H301v20H280V113h32V78H280V48.975h21V66h26V14H244V48.975h8V145Z"/>
+  <path class="cls-1" d="M339,178h38V114h14c3.555,0,6,1.6,6,6v58h37V145h-9V107c0-2.2-4.9-10-10-10,4.463,0,8-8.657,8-16V39c0-4.767-9.165-25-29-25H339V48.975h9v96.044h-9V178ZM377,48.975V80h13c2.158,0,4-2,4-6V53c0-1.973-2.578-4-4-4S377,48.975,377,48.975Z"/>
+  <path class="cls-3" d="M478,139h8V55h-8v84Z"/>
+  <path class="cls-1" d="M441,93v54c0,9.216,9.377,31,25,31h34s23-4.96,23-31V44c0-6.774-5.3-30-22-30H464c-7.08,0-23,9.237-23,30V93Zm30-46h22v98H471V47Z"/>
+  <path class="cls-3" d="M385,57V73s3,0.3,3-2V58S387.809,57,385,57Z"/>
+  <path class="cls-3" d="M320,119H294v20h-6V122h6"/>
+  <path class="cls-3" d="M238,8V57h7v82h-7v46"/>
+  <path class="cls-3" d="M239,139V119H201v20h-6s2.06-4.121,6-12v-8c1.6,0,1.835-.078,4.039-0.078L237,55"/>
+  <path class="cls-3" d="M60,55V74H91v47H60v18H70v46H8V139H19V57H8V8h94V77H91"/>
+  <path class="cls-3" d="M96,81v40h48V81H96Z"/>
+  <path class="cls-3" d="M184,65V57h4l-45,86v42H385V121h5v64h50V167s8.157,18,24,18h37c9.416,0,29-18.3,29-33V38c0-7.447-11.557-30-29-30H460c-5.24,0-25,12.117-25,32v98h-2V111c0-3.127-.176-15-6-15,3.721-10.146,3-2.189,3-14V39c0-6.858-5.225-31-36-31H143V77h35Z"/>
+  <path class="cls-3" d="M440.006,168V139H432"/>
+  <path class="cls-3" d="M333,185V139h8V57h-8V8"/>
+  <path class="cls-3" d="M334.882,57V74H320v45h14.882v20"/>
+  <path class="cls-3" d="M320,74H294V56h-6V71h6"/>
+  <path class="cls-3" d="M158,84"/>
+</svg>

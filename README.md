@@ -90,6 +90,20 @@ source comments. Any bugs, omissions, or design choices in droidtop are
 droidtop's own and should never be read as a reflection of the projects it
 learned from.
 
+## Bundled theme
+
+`shell-gamepad/src/main/assets/themes/decaffe-es-de` is a complete,
+unmodified copy of the **DEcaffe** ES-DE theme, created by
+[Weestuarty](https://github.com/Weestuarty-es-de/decaffe-es-de), used here
+as droidtop's default theme for its ES-DE-format theme renderer (see
+`library-core/theme`). Licensed **CC BY-NC-SA** (Attribution-
+NonCommercial-ShareAlike) — the real license text ships alongside it. Two
+real, binding terms worth knowing: it must stay attributed to Weestuarty
+with a link back to the original repo, and it can only be distributed
+non-commercially (droidtop bundling it for free, non-commercial
+distribution is fine; a commercial droidtop distribution would need this
+theme removed or re-licensed first).
+
 ## Licensing
 
 GPL-3.0 sources are combined into this project, which means **the combined
