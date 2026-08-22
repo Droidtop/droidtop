@@ -21,10 +21,15 @@ object ModePrefs {
     private const val PREFS_NAME = "com.android.launcher3.prefs"
     private const val KEY_LAST_MODE = "droidtop_last_mode"
 
+    // @JvmStatic: Launcher.java (Java, not Kotlin) calls these directly as
+    // ModePrefs.lastMode(...)/setLastMode(...) -- without this a Kotlin
+    // object's members are only reachable from Java via ModePrefs.INSTANCE.
+    @JvmStatic
     fun lastMode(context: Context): String =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(KEY_LAST_MODE, BackButtonMenu.MODE_STANDARD) ?: BackButtonMenu.MODE_STANDARD
 
+    @JvmStatic
     fun setLastMode(context: Context, mode: String) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
