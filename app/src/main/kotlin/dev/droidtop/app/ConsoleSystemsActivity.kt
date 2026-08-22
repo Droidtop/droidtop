@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.dp
 import dev.droidtop.library.consoles.ConsoleSystemDef
 import dev.droidtop.library.consoles.CustomPlayerPrefs
 import dev.droidtop.library.consoles.ES_DE_CONSOLE_SYSTEMS
-import dev.droidtop.library.consoles.GameMediaResolver
+import dev.droidtop.library.EsDeArtwork
 import dev.droidtop.library.consoles.Player
 import dev.droidtop.library.consoles.PlayerOverridePrefs
 import dev.droidtop.library.consoles.SystemOverridePrefs
@@ -193,7 +193,7 @@ private fun ConsoleSystemsScreen() {
 
 /**
  * Scrapes cover art for every ROM in [folder] that doesn't already have
- * real artwork on disk (see [GameMediaResolver]) -- skips ones that do,
+ * real artwork on disk (see [EsDeArtwork]) -- skips ones that do,
  * since re-scraping unchanged games on every run would waste IGDB's real
  * rate limit for no benefit. Runs on [Dispatchers.IO] (real network I/O,
  * one request per missing game, deliberately sequential rather than
@@ -208,7 +208,7 @@ private suspend fun scrapeSystemArtwork(
 ): String = withContext(Dispatchers.IO) {
     val gamesRoot = folder.parentFile ?: folder
     val romFiles = folder.walkTopDown().filter { it.isFile && it.extension.lowercase() in system.extensions }.toList()
-    val missing = romFiles.filter { GameMediaResolver.findArtwork(gamesRoot, system.id, it.nameWithoutExtension) == null }
+    val missing = romFiles.filter { EsDeArtwork.resolve(gamesRoot, system.id, it.nameWithoutExtension) == null }
     if (missing.isEmpty()) return@withContext "${system.displayName}: every ROM already has real artwork."
 
     val igdbConfigured = ScraperPrefs.isConfigured(context)
