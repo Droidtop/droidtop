@@ -54,6 +54,9 @@ import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.consoles.ES_DE_CONSOLE_SYSTEMS
 import dev.droidtop.library.theme.SystemThemeColors
+import dev.droidtop.library.theme.primaryListElement
+import dev.droidtop.shell.gamepad.theme.EsDeListItem
+import dev.droidtop.shell.gamepad.theme.EsDeSystemListView
 import dev.droidtop.shell.gamepad.theme.ThemeAssets
 import kotlinx.coroutines.launch
 
@@ -577,43 +580,35 @@ private fun GamesSection(
                         style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.padding(horizontal = 48.dp, vertical = 8.dp),
                     )
-                    // A horizontal carousel, not a vertical list -- ES-DE's
-                    // own real System view convention (confirmed via its
-                    // published docs: systems are browsed as a carousel),
-                    // distinct from Daijishō's vertical-list settings-style
-                    // browsing. "Wiring in ES-DE" is about this structural
-                    // shape, not just the underlying system/ROM data.
+                    // Real fix: the browsing *shape* (carousel/grid/
+                    // textlist) now comes from the loaded theme's own
+                    // "system" view definition (ES-DE's real convention --
+                    // a theme.xml declares exactly one of these per view,
+                    // confirmed by reading the bundled DEcaffe theme.xml
+                    // directly), not a hardcoded LazyRow. EsDeSystemListView
+                    // falls back to a carousel when no theme/element loads,
+                    // so this never regresses to nothing rendering.
                     val context = LocalContext.current
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp),
-                        horizontalArrangement = Arrangement.spacedBy(24.dp),
-                    ) {
-                        itemsIndexed(orderedGroups, key = { _, entryGroup -> entryGroup.key }) { index, entryGroup ->
-                            GroupCard(
-                                label = entryGroup.label,
-                                count = byGroup.getValue(entryGroup).size,
-                                // Real DEcaffe theme artwork (see ThemeAssets'
-                                // own doc comment) -- only real console
-                                // systems have a matching asset, so this is
-                                // null (plain text card, same as before) for
-                                // droidtop's own engine groups.
-                                logoPath = (entryGroup as? GameGroup.System)?.let { ThemeAssets.systemLogoPath(context, it.systemId) },
-                                // Real per-system accent (see
-                                // SystemThemeColors) instead of a uniform
-                                // white focus border for every system --
-                                // matches Daijishō's own real per-platform
-                                // colored tiles (confirmed via a live iiSU
-                                // screenshot this session) and the bundled
-                                // ES-DE theme's own per-system color data,
-                                // rather than one flat look for everything.
-                                accentColor = (entryGroup as? GameGroup.System)
-                                    ?.let { SystemThemeColors.forSystem(context, it.systemId) }
-                                    ?.let { Color(it) },
-                                modifier = if (index == 0) Modifier.focusRequester(firstFocus) else Modifier,
-                                onSelect = { selectedGroup = entryGroup },
-                            )
-                        }
+                    val theme = remember { ThemeAssets.loadDecaffeTheme(context) }
+                    val listElement = remember(theme) { theme?.views?.get("system")?.primaryListElement() }
+                    val items = orderedGroups.map { entryGroup ->
+                        EsDeListItem(
+                            key = entryGroup.key,
+                            label = entryGroup.label,
+                            count = byGroup.getValue(entryGroup).size,
+                            logoPath = (entryGroup as? GameGroup.System)?.let { ThemeAssets.systemLogoPath(context, it.systemId) },
+                            accentColor = (entryGroup as? GameGroup.System)
+                                ?.let { SystemThemeColors.forSystem(context, it.systemId) }
+                                ?.let { Color(it) },
+                            onSelect = { selectedGroup = entryGroup },
+                        )
                     }
+                    EsDeSystemListView(
+                        element = listElement,
+                        items = items,
+                        firstItemFocus = firstFocus,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp),
+                    )
                 }
             }
         } else {
@@ -700,48 +695,6 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
     )
 }
 
-@Composable
-private fun GroupCard(label: String, count: Int, logoPath: String? = null, accentColor: Color? = null, modifier: Modifier = Modifier, onSelect: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    Column(
-        modifier = modifier
-            .size(width = 200.dp, height = 140.dp)
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp &&
-                    (event.key == Key.ButtonA || event.key == Key.DirectionCenter || event.key == Key.Enter)
-                ) {
-                    onSelect()
-                    true
-                } else {
-                    false
-                }
-            }
-            .border(
-                width = if (focused) 4.dp else 1.dp,
-                color = if (focused) (accentColor ?: Color.White) else Color.DarkGray,
-                shape = RoundedCornerShape(12.dp),
-            )
-            .background(if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A), RoundedCornerShape(12.dp))
-            .padding(20.dp),
-        verticalArrangement = Arrangement.Bottom,
-    ) {
-        // Real DEcaffe theme logo when this system has one (see
-        // ThemeAssets); falls back to text-only (the original layout) when
-        // it doesn't, rather than leaving empty space for a missing asset.
-        if (logoPath != null) {
-            AsyncImage(
-                model = logoPath,
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxWidth().weight(1f).padding(bottom = 8.dp),
-            )
-        }
-        Text(label, color = Color.White, style = MaterialTheme.typography.titleMedium, maxLines = 1)
-        Text("$count items", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
-    }
-}
 
 /** Flat, kind-sectioned browser — no drill-down, unlike Games: apps aren't organized into "systems." */
 @Composable

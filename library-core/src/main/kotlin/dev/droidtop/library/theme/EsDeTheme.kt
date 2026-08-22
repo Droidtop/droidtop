@@ -14,15 +14,17 @@ package dev.droidtop.library.theme
  * against it, not guessed), producing droidtop's own independent data
  * model that droidtop's own Compose code renders.
  *
- * Deliberately scoped to the two universal element types every real theme
- * uses (`image`, `text`) plus `carousel` (droidtop's own Games system list
- * already uses this shape) -- not the full ES-DE schema (grid, textlist,
- * video, animation, datetime, rating, badges, helpsystem, systemstatus,
- * sound all exist in the real schema and aren't covered here yet). Also
- * scoped to each covered element type's most structurally load-bearing
- * properties (position, size, path, color, text, font, rotation, opacity,
- * visibility, stacking order), not literally every property ES-DE
- * supports (`carousel` alone has ~60 in the real schema).
+ * Covers `image`, `text`, `carousel`, `grid`, and `textlist` -- the three
+ * real ES-DE element types a theme can use as a view's *primary browsing
+ * component* (a system/gamelist view picks exactly one of these three to
+ * actually list items with; see [EsDeThemeView.primaryListElement]), plus
+ * the two universal decoration types. Not the full ES-DE schema (video,
+ * animation, datetime, rating, badges, helpsystem, systemstatus, sound
+ * exist in the real schema and aren't covered here). Also scoped to each
+ * covered element type's most structurally load-bearing properties
+ * (position, size, path, color, text, font, rotation, opacity, visibility,
+ * stacking order, item geometry), not literally every property ES-DE
+ * supports (`grid` alone has ~60 in the real schema).
  */
 data class EsDeTheme(
     val variables: Map<String, String>,
@@ -33,6 +35,9 @@ data class EsDeTheme(
 data class EsDeThemeView(
     val elements: Map<String, EsDeThemeElement>,
 )
+
+/** Real ES-DE element types a view can use to actually list/browse items with -- exactly one per view in practice. */
+val ES_DE_PRIMARY_LIST_TYPES = setOf("carousel", "grid", "textlist")
 
 /**
  * One themed element -- [key] matches ES-DE's own real convention of
@@ -47,6 +52,18 @@ data class EsDeThemeElement(
 ) {
     inline fun <reified T : EsDeThemeValue> valueOrNull(name: String): T? = properties[name] as? T
 }
+
+/**
+ * Which real browsing shape (carousel/grid/textlist) this view actually
+ * uses, per ES-DE's own convention: a real theme.xml declares exactly one
+ * of these per system/gamelist view (confirmed against the bundled DEcaffe
+ * theme's own real system view, which declares one `<carousel>` and
+ * nothing else in [ES_DE_PRIMARY_LIST_TYPES]) -- droidtop's own Games
+ * system list should render whichever shape the loaded theme actually
+ * specifies, not a hardcoded app-level choice.
+ */
+fun EsDeThemeView.primaryListElement(): EsDeThemeElement? =
+    elements.values.firstOrNull { it.type in ES_DE_PRIMARY_LIST_TYPES }
 
 sealed interface EsDeThemeValue {
     data class Pair(val x: Float, val y: Float) : EsDeThemeValue
@@ -115,6 +132,52 @@ internal val ES_DE_ELEMENT_SCHEMA: Map<String, Map<String, EsDePropertyType>> = 
         "textColor" to EsDePropertyType.COLOR,
         "fontPath" to EsDePropertyType.PATH,
         "fontSize" to EsDePropertyType.FLOAT,
+        "letterCase" to EsDePropertyType.STRING,
+        "unfocusedItemOpacity" to EsDePropertyType.FLOAT,
+        "unfocusedItemSaturation" to EsDePropertyType.FLOAT,
+        "zIndex" to EsDePropertyType.FLOAT,
+    ),
+    // Real property set transcribed from ES-DE's own ThemeData.cpp
+    // sElementMap (fetched and read directly this session, not guessed --
+    // ~60 real properties exist; scoped here to the ones that materially
+    // change layout/appearance for a real Compose grid renderer).
+    "grid" to mapOf(
+        "pos" to EsDePropertyType.NORMALIZED_PAIR,
+        "size" to EsDePropertyType.NORMALIZED_PAIR,
+        "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "itemSize" to EsDePropertyType.NORMALIZED_PAIR,
+        "itemScale" to EsDePropertyType.FLOAT,
+        "itemSpacing" to EsDePropertyType.NORMALIZED_PAIR,
+        "unfocusedItemOpacity" to EsDePropertyType.FLOAT,
+        "unfocusedItemSaturation" to EsDePropertyType.FLOAT,
+        "imageColor" to EsDePropertyType.COLOR,
+        "imageSelectedColor" to EsDePropertyType.COLOR,
+        "backgroundColor" to EsDePropertyType.COLOR,
+        "selectorColor" to EsDePropertyType.COLOR,
+        "text" to EsDePropertyType.STRING,
+        "textColor" to EsDePropertyType.COLOR,
+        "textSelectedColor" to EsDePropertyType.COLOR,
+        "fontPath" to EsDePropertyType.PATH,
+        "fontSize" to EsDePropertyType.FLOAT,
+        "letterCase" to EsDePropertyType.STRING,
+        "zIndex" to EsDePropertyType.FLOAT,
+    ),
+    // Same real source as "grid" above.
+    "textlist" to mapOf(
+        "pos" to EsDePropertyType.NORMALIZED_PAIR,
+        "size" to EsDePropertyType.NORMALIZED_PAIR,
+        "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "selectorColor" to EsDePropertyType.COLOR,
+        "primaryColor" to EsDePropertyType.COLOR,
+        "secondaryColor" to EsDePropertyType.COLOR,
+        "selectedColor" to EsDePropertyType.COLOR,
+        "selectedBackgroundColor" to EsDePropertyType.COLOR,
+        "fontPath" to EsDePropertyType.PATH,
+        "fontSize" to EsDePropertyType.FLOAT,
+        "horizontalAlignment" to EsDePropertyType.STRING,
+        "horizontalMargin" to EsDePropertyType.FLOAT,
+        "letterCase" to EsDePropertyType.STRING,
+        "lineSpacing" to EsDePropertyType.FLOAT,
         "zIndex" to EsDePropertyType.FLOAT,
     ),
 )
