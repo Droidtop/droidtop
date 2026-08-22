@@ -443,13 +443,13 @@ public class Launcher extends StatefulActivity<LauncherState>
         return fromContext(context);
     }
 
-    @Override
-    @TargetApi(Build.VERSION_CODES.S)
     // droidtop patch (not upstream Murine/Launcher3): set in onCreate,
     // consumed in onStart -- see onStart's own comment for why the actual
     // redirect can't happen from inside onCreate itself.
     private String mDroidtopPendingModeRedirect;
 
+    @Override
+    @TargetApi(Build.VERSION_CODES.S)
     protected void onCreate(Bundle savedInstanceState) {
         // droidtop patch (not upstream Murine/Launcher3): resume the user's
         // last-used shell mode (Desktop/Handheld) instead of always landing
