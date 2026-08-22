@@ -31,4 +31,19 @@
         android:title="@string/pref_handheld_console_systems_title"
         android:summary="@string/pref_handheld_console_systems_desc" />
 
+    <!-- Separate from pref_grid_size_width_drawer_override (murine_prefs_drawer.xml):
+         that one sizes the Standard launcher's own app drawer grid; this
+         sizes GamepadShell's Apps tab grid, a different view entirely with
+         its own icon size/density needs (see GamepadShell's AppIconGrid). -->
+    <app.murinelauncher.widget.CustomSeekBarPreference
+        android:key="pref_handheld_apps_grid_columns"
+        android:title="@string/pref_handheld_apps_grid_columns_title"
+        android:summary="@string/pref_handheld_apps_grid_columns_desc"
+        android:min="2"
+        android:max="10"
+        android:defaultValue="5"
+        android:persistent="true"
+        app:showIncrementButtons="false"
+        app:showTicks="true" />
+
 </androidx.preference.PreferenceScreen>

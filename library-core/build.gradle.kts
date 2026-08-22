@@ -5,7 +5,10 @@ plugins {
 
 android {
     namespace = "dev.droidtop.library"
-    compileSdk = 34
+    // shell-default (below) compiles against 36 -- same real AAR-metadata
+    // mismatch :app already hit and fixed once this session; any module
+    // that depends on shell-default needs to match or exceed it.
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 26
@@ -22,6 +25,13 @@ android {
 
 dependencies {
     implementation(project(":runtime-common"))
+    // Real integration, not a duplicate: NativeAppProvider sources its app
+    // list and icons from shell-default's own real IconCache/LauncherApps
+    // machinery (the same one Standard's app drawer uses) instead of a
+    // second, separate PackageManager-based implementation. Safe
+    // direction -- shell-default has no dependency back on library-core,
+    // confirmed before adding this.
+    implementation(project(":shell-default"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
 

@@ -21,6 +21,7 @@ public final class SettingsHandheldFragment : AbstractSettingsFragment() {
     companion object {
         const val PREF_DEFAULT_SECTION: String = "pref_handheld_default_section"
         const val PREF_CONSOLE_SYSTEMS: String = "pref_handheld_console_systems"
+        const val PREF_APPS_GRID_COLUMNS: String = "pref_handheld_apps_grid_columns"
     }
 
     override fun getPreferenceScreenResId() = R.xml.droidtop_handheld_prefs
