@@ -445,34 +445,31 @@ public class Launcher extends StatefulActivity<LauncherState>
 
     @Override
     @TargetApi(Build.VERSION_CODES.S)
+    // droidtop patch (not upstream Murine/Launcher3): set in onCreate,
+    // consumed in onStart -- see onStart's own comment for why the actual
+    // redirect can't happen from inside onCreate itself.
+    private String mDroidtopPendingModeRedirect;
+
     protected void onCreate(Bundle savedInstanceState) {
         // droidtop patch (not upstream Murine/Launcher3): resume the user's
         // last-used shell mode (Desktop/Handheld) instead of always landing
         // on Standard's own home grid, so a device reboot or a launcher
         // process restart returns to where the user actually left off.
-        // Only redirects on a genuine fresh task start (isTaskRoot() +
-        // no saved state) -- not on every warm onCreate/config change/
-        // multi-window reattach -- and only away from Standard: picking
-        // "Android" from BackButtonMenu records "standard" as the last
-        // mode first, which is what stops this from immediately bouncing
-        // back. isTaskRoot() is safe to call before super.onCreate() (the
-        // task token is attached before onCreate runs); super.onCreate()
-        // itself is still called exactly once either way -- here when
-        // redirecting, or further down in this method's own original body
-        // when not. See dev.droidtop.shell.standard.ModePrefs's own doc
-        // comment for the follow-up this closes out (auto-redirect was
-        // deliberately deferred, then asked for explicitly).
+        // Only redirects on a genuine fresh task start (isTaskRoot() + no
+        // saved state) -- not on every warm onCreate/config change/multi-
+        // window reattach -- and only away from Standard: picking "Android"
+        // from BackButtonMenu records "standard" as the last mode first,
+        // which is what stops this from immediately bouncing back.
+        // isTaskRoot() is safe to call this early (the task token is
+        // attached before onCreate runs). Only *recorded* here, not acted
+        // on -- see onStart for why. See dev.droidtop.shell.standard.
+        // ModePrefs's own doc comment for the follow-up this closes out
+        // (auto-redirect was deliberately deferred, then asked for
+        // explicitly).
         if (savedInstanceState == null && isTaskRoot()) {
             String lastMode = dev.droidtop.shell.standard.ModePrefs.lastMode(this);
             if (!dev.droidtop.shell.standard.BackButtonMenu.MODE_STANDARD.equals(lastMode)) {
-                super.onCreate(savedInstanceState);
-                Intent redirect = new Intent(Intent.ACTION_MAIN);
-                redirect.setClassName(getPackageName(), "dev.droidtop.app.MainActivity");
-                redirect.putExtra(dev.droidtop.shell.standard.BackButtonMenu.EXTRA_MODE, lastMode);
-                redirect.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(redirect);
-                finish();
-                return;
+                mDroidtopPendingModeRedirect = lastMode;
             }
         }
         mIsReCreated = true;
@@ -1187,6 +1184,31 @@ public class Launcher extends StatefulActivity<LauncherState>
 
     @Override
     protected void onStart() {
+        // droidtop patch (not upstream Murine/Launcher3): the actual mode
+        // redirect (see onCreate's own comment) has to happen here, not
+        // from inside onCreate -- a real crash found by testing this on
+        // the actual device: finishing early from onCreate skips the rest
+        // of Launcher's own real initialization (mModel and friends never
+        // get assigned), and Launcher.onDestroy() unconditionally uses
+        // them, causing a real NullPointerException
+        // ("LauncherModel.removeCallbacks on a null object reference") the
+        // moment Android destroys this half-initialized Activity. onStart
+        // is guaranteed to run only after onCreate's *entire* body has
+        // completed, so by here Launcher is genuinely, fully initialized,
+        // and finishing is safe. Guarded to fire at most once (onStart can
+        // run again later in this Activity's life, e.g. after a stop/
+        // restart cycle -- this must not redirect on every one of those).
+        if (mDroidtopPendingModeRedirect != null) {
+            String mode = mDroidtopPendingModeRedirect;
+            mDroidtopPendingModeRedirect = null;
+            Intent redirect = new Intent(Intent.ACTION_MAIN);
+            redirect.setClassName(getPackageName(), "dev.droidtop.app.MainActivity");
+            redirect.putExtra(dev.droidtop.shell.standard.BackButtonMenu.EXTRA_MODE, mode);
+            redirect.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(redirect);
+            finish();
+        }
+
         TraceHelper.INSTANCE.beginSection(ON_START_EVT);
         super.onStart();
         if (!mDeferOverlayCallbacks) {
