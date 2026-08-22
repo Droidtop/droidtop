@@ -26,21 +26,29 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.IntrinsicSize
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.ui.unit.dp
 import dev.droidtop.library.consoles.ConsoleSystemDef
 import dev.droidtop.library.consoles.CustomPlayerPrefs
 import dev.droidtop.library.consoles.ES_DE_CONSOLE_SYSTEMS
+import dev.droidtop.library.consoles.GameMediaResolver
 import dev.droidtop.library.consoles.Player
 import dev.droidtop.library.consoles.PlayerOverridePrefs
 import dev.droidtop.library.consoles.SystemOverridePrefs
 import dev.droidtop.library.consoles.availablePlayers
 import dev.droidtop.library.consoles.resolvePlayer
+import dev.droidtop.library.scraper.IgdbScraperClient
+import dev.droidtop.library.scraper.LutrisScraperClient
+import dev.droidtop.library.scraper.ScraperPrefs
 import dev.droidtop.library.theme.SystemThemeColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -78,7 +86,11 @@ private fun ConsoleSystemsScreen() {
     var pickerForFolder by remember { mutableStateOf<File?>(null) }
     var playerPickerForSystem by remember { mutableStateOf<ConsoleSystemDef?>(null) }
     var addCustomPlayerForSystem by remember { mutableStateOf<ConsoleSystemDef?>(null) }
+    var scraperSettingsOpen by remember { mutableStateOf(false) }
+    var scrapingFolder by remember { mutableStateOf<File?>(null) }
+    var scrapeStatus by remember { mutableStateOf<String?>(null) }
     var version by remember { mutableStateOf(0) }
+    val scope = rememberCoroutineScope()
 
     val folders = remember(version) {
         GamesRootPrefs.gamesRootPaths(context)
@@ -123,6 +135,7 @@ private fun ConsoleSystemsScreen() {
                 },
                 onDismiss = { pickerForFolder = null },
             )
+            scraperSettingsOpen -> ScraperSettingsScreen(onDismiss = { scraperSettingsOpen = false })
             else -> Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
                 Text("Console systems", color = Color.White, style = MaterialTheme.typography.headlineSmall)
                 Text(
@@ -133,6 +146,12 @@ private fun ConsoleSystemsScreen() {
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
                 )
+                TextButton(onClick = { scraperSettingsOpen = true }) {
+                    Text(if (ScraperPrefs.isConfigured(context)) "IGDB scraper configured -- edit" else "Set up artwork scraper (IGDB)")
+                }
+                scrapeStatus?.let {
+                    Text(it, color = Color(0xFF8AB4FF), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
+                }
                 if (folders.isEmpty()) {
                     Text("No game folders configured yet.", color = Color.Gray)
                 }
@@ -143,8 +162,27 @@ private fun ConsoleSystemsScreen() {
                             folderName = folder.name,
                             resolvedSystem = resolved,
                             resolvedPlayer = resolved?.let { resolvePlayer(context, it) },
+                            isScraping = scrapingFolder == folder,
                             onClickSystem = { pickerForFolder = folder },
                             onClickPlayer = { if (resolved != null) playerPickerForSystem = resolved },
+                            onScrape = if (resolved != null) {
+                                // Always offered, not gated on IGDB being
+                                // configured -- Lutris (see
+                                // scrapeSystemArtwork) needs no setup at
+                                // all and is tried first regardless.
+                                {
+                                    scrapingFolder = folder
+                                    scope.launch {
+                                        scrapeStatus = scrapeSystemArtwork(context, folder, resolved) { done, total ->
+                                            scrapeStatus = "Scraping ${resolved.displayName}: $done/$total"
+                                        }
+                                        scrapingFolder = null
+                                        version++
+                                    }
+                                }
+                            } else {
+                                null
+                            },
                         )
                     }
                 }
@@ -153,13 +191,62 @@ private fun ConsoleSystemsScreen() {
     }
 }
 
+/**
+ * Scrapes cover art for every ROM in [folder] that doesn't already have
+ * real artwork on disk (see [GameMediaResolver]) -- skips ones that do,
+ * since re-scraping unchanged games on every run would waste IGDB's real
+ * rate limit for no benefit. Runs on [Dispatchers.IO] (real network I/O,
+ * one request per missing game, deliberately sequential rather than
+ * parallel -- IGDB's own rate limiting is per-second, not something to
+ * hammer from N concurrent coroutines).
+ */
+private suspend fun scrapeSystemArtwork(
+    context: android.content.Context,
+    folder: File,
+    system: ConsoleSystemDef,
+    onProgress: (done: Int, total: Int) -> Unit,
+): String = withContext(Dispatchers.IO) {
+    val gamesRoot = folder.parentFile ?: folder
+    val romFiles = folder.walkTopDown().filter { it.isFile && it.extension.lowercase() in system.extensions }.toList()
+    val missing = romFiles.filter { GameMediaResolver.findArtwork(gamesRoot, system.id, it.nameWithoutExtension) == null }
+    if (missing.isEmpty()) return@withContext "${system.displayName}: every ROM already has real artwork."
+
+    val igdbConfigured = ScraperPrefs.isConfigured(context)
+    val clientId = ScraperPrefs.clientId(context)
+    val clientSecret = ScraperPrefs.clientSecret(context)
+    var found = 0
+    var failed = 0
+    missing.forEachIndexed { index, romFile ->
+        onProgress(index, missing.size)
+        try {
+            // Lutris first -- real, genuinely keyless (see LutrisScraperClient),
+            // no setup friction at all. IGDB only as a fallback when Lutris
+            // has nothing and the user has actually configured it -- IGDB
+            // needs a real, self-service-but-still-manual Twitch dev app.
+            val coverUrl = LutrisScraperClient.findCoverUrl(romFile.nameWithoutExtension)
+                ?: if (igdbConfigured) IgdbScraperClient.findCoverUrl(clientId, clientSecret, romFile.nameWithoutExtension) else null
+            if (coverUrl != null) {
+                val destination = File(File(File(gamesRoot, "downloaded_media"), system.id), "covers/${romFile.nameWithoutExtension}.png")
+                IgdbScraperClient.downloadImage(coverUrl, destination)
+                found++
+            }
+        } catch (t: Exception) {
+            failed++
+            android.util.Log.e("droidtop.Scraper", "Failed to scrape ${romFile.name}", t)
+        }
+    }
+    "${system.displayName}: found $found, no match for ${missing.size - found - failed}, $failed failed (of ${missing.size} missing artwork)."
+}
+
 @Composable
 private fun FolderRow(
     folderName: String,
     resolvedSystem: ConsoleSystemDef?,
     resolvedPlayer: Player.AmStart?,
+    isScraping: Boolean,
     onClickSystem: () -> Unit,
     onClickPlayer: () -> Unit,
+    onScrape: (() -> Unit)?,
 ) {
     val context = LocalContext.current
     // Real per-system accent (see SystemThemeColors) instead of a flat
@@ -198,6 +285,68 @@ private fun FolderRow(
                     modifier = Modifier.fillMaxWidth().clickable(onClick = onClickPlayer).padding(top = 6.dp),
                 )
             }
+            if (onScrape != null) {
+                Text(
+                    if (isScraping) "Scraping artwork..." else "Scrape missing artwork (Lutris + IGDB)",
+                    color = if (isScraping) Color.Gray else (accent ?: Color(0xFF8AB4FF)),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .let { if (!isScraping) it.clickable(onClick = onScrape) else it }
+                        .padding(top = 6.dp),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * IGDB Client ID/Secret entry -- see [IgdbScraperClient]'s own doc comment
+ * for why this is the one scraper source that actually needs a settings
+ * screen tonight (self-service but still a real, one-time Twitch developer
+ * app a user has to create; Lutris needs nothing at all, so it has no
+ * settings surface here).
+ */
+@Composable
+private fun ScraperSettingsScreen(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    var clientId by remember { mutableStateOf(ScraperPrefs.clientId(context)) }
+    var clientSecret by remember { mutableStateOf(ScraperPrefs.clientSecret(context)) }
+
+    Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+        Text("Artwork scraper", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+        Text(
+            "Cover art is scraped from Lutris (lutris.net) automatically, no setup needed. " +
+                "IGDB adds a second source for anything Lutris doesn't have -- it needs your own " +
+                "free Twitch developer app (dev.twitch.tv/console -> Register Your Application, " +
+                "Client Type: Confidential) for a Client ID and Client Secret. This is a one-time, " +
+                "self-service step on Twitch's own site -- droidtop can't create this for you.",
+            color = Color.Gray,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
+        )
+        Text("IGDB Client ID", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+        BasicTextField(
+            value = clientId,
+            onValueChange = { clientId = it },
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 16.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
+        )
+        Text("IGDB Client Secret", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+        BasicTextField(
+            value = clientSecret,
+            onValueChange = { clientSecret = it },
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
+        )
+        Row(modifier = Modifier.fillMaxWidth().padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(
+                onClick = {
+                    ScraperPrefs.set(context, clientId.trim(), clientSecret.trim())
+                    onDismiss()
+                },
+            ) { Text("Save") }
         }
     }
 }
