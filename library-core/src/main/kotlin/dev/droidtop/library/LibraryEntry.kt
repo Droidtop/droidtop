@@ -110,29 +110,47 @@ class Library(private val providers: List<LibraryProvider>) {
     //    Here: each provider runs as its own coroutine, failures are
     //    caught and logged per-provider rather than propagating, and every
     //    other provider's results still come back.
-    suspend fun scanAll(): List<LibraryEntry> = withContext(Dispatchers.IO) {
+    suspend fun scanAll(): List<LibraryEntry> = scanKinds(LibraryEntryKind.entries.toSet())
+
+    /**
+     * Real bug this fixes, reported directly: Apps was showing empty even
+     * though NativeAppProvider itself completes almost instantly, because
+     * [scanAll] combined every provider into one list and only ever
+     * returned once *all* of them finished -- a slow ConsoleRomProvider
+     * scan (a real SD card, real folder sizes) silently gated Apps' own,
+     * already-ready results. shell-gamepad now calls this once per section
+     * (Games' kinds, Apps' kinds) as two fully independent scans, so one
+     * section's slow provider can never block another section's fast one
+     * from ever rendering.
+     */
+    suspend fun scanKinds(kinds: Set<LibraryEntryKind>): List<LibraryEntry> = withContext(Dispatchers.IO) {
         coroutineScope {
-            providers.map { provider ->
-                async {
-                    try {
-                        // A caught exception alone doesn't cover a provider
-                        // that genuinely never returns (a real possibility,
-                        // not just a defensive guess -- e.g. a storage
-                        // provider that blocks indefinitely on denied
-                        // access rather than throwing or returning null).
-                        // awaitAll() below would otherwise wait forever on
-                        // just that one coroutine.
-                        withTimeoutOrNull(15_000) { provider.scan() } ?: run {
-                            Log.e("droidtop.Library", "Provider ${provider::class.simpleName} timed out scanning")
-                            emptyList()
-                        }
-                    } catch (t: Throwable) {
-                        Log.e("droidtop.Library", "Provider ${provider::class.simpleName} failed to scan", t)
-                        emptyList()
-                    }
-                }
-            }.awaitAll().flatten()
+            providers
+                .filter { provider -> provider.kinds.any { it in kinds } }
+                .map { provider -> async { scanProviderSafely(provider) } }
+                .awaitAll()
+                .flatten()
         }
+    }
+
+    private suspend fun scanProviderSafely(provider: LibraryProvider): List<LibraryEntry> = try {
+        // A caught exception alone doesn't cover a provider that genuinely
+        // never returns (a real possibility, not just a defensive guess --
+        // e.g. a storage provider that blocks indefinitely on denied
+        // access rather than throwing or returning null). Note this only
+        // actually helps if the provider's own work has real suspension
+        // points -- a coroutine timeout can't preempt a single long
+        // blocking File I/O call already in progress, only stop waiting
+        // for it further once it does return control. Making the scan
+        // itself fast (see ConsoleRomProvider's own per-system
+        // parallelism) matters more than this timeout for that reason.
+        withTimeoutOrNull(15_000) { provider.scan() } ?: run {
+            Log.e("droidtop.Library", "Provider ${provider::class.simpleName} timed out scanning")
+            emptyList()
+        }
+    } catch (t: Throwable) {
+        Log.e("droidtop.Library", "Provider ${provider::class.simpleName} failed to scan", t)
+        emptyList()
     }
 
     suspend fun launch(entry: LibraryEntry) {
