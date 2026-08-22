@@ -10,6 +10,9 @@ import android.util.Log
 import com.android.launcher3.LauncherAppState
 import com.android.launcher3.icons.cache.CacheLookupFlag
 import com.android.launcher3.model.data.AppInfo
+import com.android.launcher3.util.Executors
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
@@ -31,40 +34,57 @@ class NativeAppProvider(private val context: Context) : LibraryProvider {
         val iconCache = LauncherAppState.getInstance(context).iconCache
         val iconDir = File(context.cacheDir, "app_icons").apply { mkdirs() }
 
-        return launcherApps.getActivityList(null, Process.myUserHandle())
-            .map { activityInfo ->
+        val activities = launcherApps.getActivityList(null, Process.myUserHandle())
+
+        // IconCache asserts it's only ever touched from Launcher3's own
+        // worker thread -- a real, confirmed crash caught via logcat
+        // ("Cache accessed on wrong thread"), not a guess: Dispatchers.IO
+        // runs on kotlinx.coroutines' own thread pool, a different thread
+        // than Launcher3's MODEL_EXECUTOR. SettingsHiddenAppsFragment (the
+        // real, working precedent this class mirrors) avoids this the same
+        // way, via Executors.MODEL_EXECUTOR.execute { ... }.
+        // Every appInfo.bitmap/iconCache touch (including .newIcon(), which
+        // reads the cache-owned BitmapInfo) stays inside this block, same
+        // as SettingsHiddenAppsFragment's real working precedent -- only
+        // the resulting title string and a plain Bitmap (safe to touch from
+        // any thread) leave this dispatcher.
+        val entries = withContext(Executors.MODEL_EXECUTOR.asCoroutineDispatcher()) {
+            activities.map { activityInfo ->
                 val appInfo = AppInfo(context, activityInfo, activityInfo.user)
                 iconCache.getTitleAndIcon(appInfo, activityInfo, CacheLookupFlag.DEFAULT_LOOKUP_FLAG)
+                val bitmap = drawableToBitmap(appInfo.bitmap.newIcon(context))
+                Triple(activityInfo.componentName.packageName, (appInfo.title ?: activityInfo.label).toString(), bitmap)
+            }
+        }
 
-                val packageName = activityInfo.componentName.packageName
-                val artworkUri = writeIconFile(iconDir, packageName) {
-                    appInfo.bitmap.newIcon(context)
-                }
-
+        return entries
+            .map { (packageName, title, bitmap) ->
                 LibraryEntry(
                     id = packageName,
-                    title = (appInfo.title ?: activityInfo.label).toString(),
+                    title = title,
                     kind = LibraryEntryKind.NATIVE_ANDROID_APP,
-                    artworkUri = artworkUri,
+                    artworkUri = writeIconFile(iconDir, packageName, bitmap),
                 )
             }
             .distinctBy { it.id }
+    }
+
+    private fun drawableToBitmap(drawable: android.graphics.drawable.Drawable): Bitmap {
+        val width = drawable.intrinsicWidth.coerceAtLeast(1)
+        val height = drawable.intrinsicHeight.coerceAtLeast(1)
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        drawable.setBounds(0, 0, width, height)
+        drawable.draw(Canvas(bitmap))
+        return bitmap
     }
 
     // Real icons only, never a placeholder file: on any failure this
     // returns null and the entry just renders with no artwork (Coil's
     // existing AsyncImage null-model handling), rather than caching a
     // broken/empty file that would then stick around across scans.
-    private fun writeIconFile(iconDir: File, packageName: String, loadDrawable: () -> android.graphics.drawable.Drawable): String? {
+    private fun writeIconFile(iconDir: File, packageName: String, bitmap: Bitmap): String? {
         val file = File(iconDir, "$packageName.png")
         return try {
-            val drawable = loadDrawable()
-            val width = drawable.intrinsicWidth.coerceAtLeast(1)
-            val height = drawable.intrinsicHeight.coerceAtLeast(1)
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(bitmap)
-            drawable.setBounds(0, 0, width, height)
-            drawable.draw(canvas)
             FileOutputStream(file).use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
             file.absolutePath
         } catch (t: Throwable) {
