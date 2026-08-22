@@ -225,6 +225,13 @@ private fun EsDeTextList(element: EsDeThemeElement, items: List<EsDeListItem>, f
     val primaryColor = element.valueOrNull<EsDeThemeValue.Color>("primaryColor")?.let { colorOf(it) } ?: Color.White
     val selectedColor = element.valueOrNull<EsDeThemeValue.Color>("selectedColor")?.let { colorOf(it) } ?: primaryColor
     val uppercase = element.valueOrNull<EsDeThemeValue.Str>("letterCase")?.value == "uppercase"
+    // Real ES-DE default (TextListComponent's own constructor): 0x333333FF.
+    // A real, distinct property from selectedColor (the text's own color)
+    // -- this is the highlight bar drawn BEHIND the selected row, not
+    // read at all before this pass (a plain alpha-primaryColor guess
+    // stood in for it).
+    val selectorColor = element.valueOrNull<EsDeThemeValue.Color>("selectorColor")?.let { colorOf(it) }
+        ?: Color(0x33, 0x33, 0x33, 0xFF)
 
     LazyColumn(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         itemsIndexed(items, key = { _, item -> item.key }) { index, item ->
@@ -232,6 +239,7 @@ private fun EsDeTextList(element: EsDeThemeElement, items: List<EsDeListItem>, f
                 item = item,
                 primaryColor = primaryColor,
                 selectedColor = selectedColor,
+                selectorColor = selectorColor,
                 uppercase = uppercase,
                 modifier = if (index == 0 && firstItemFocus != null) Modifier.focusRequester(firstItemFocus) else Modifier,
             )
@@ -240,7 +248,14 @@ private fun EsDeTextList(element: EsDeThemeElement, items: List<EsDeListItem>, f
 }
 
 @Composable
-private fun EsDeTextListRow(item: EsDeListItem, primaryColor: Color, selectedColor: Color, uppercase: Boolean, modifier: Modifier) {
+private fun EsDeTextListRow(
+    item: EsDeListItem,
+    primaryColor: Color,
+    selectedColor: Color,
+    selectorColor: Color,
+    uppercase: Boolean,
+    modifier: Modifier,
+) {
     var focused by remember { mutableStateOf(false) }
     Text(
         if (uppercase) item.label.uppercase() else item.label,
@@ -264,7 +279,7 @@ private fun EsDeTextListRow(item: EsDeListItem, primaryColor: Color, selectedCol
                     false
                 }
             }
-            .background(if (focused) primaryColor.copy(alpha = 0.12f) else Color.Transparent)
+            .background(if (focused) selectorColor else Color.Transparent)
             .padding(horizontal = 48.dp, vertical = 10.dp),
     )
 }
