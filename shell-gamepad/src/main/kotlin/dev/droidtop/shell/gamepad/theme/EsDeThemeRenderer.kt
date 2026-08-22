@@ -247,8 +247,23 @@ private fun positionOf(
     return x to y
 }
 
+/**
+ * Real, distinct ES-DE properties (confirmed against ImageComponent.cpp's
+ * own setResize/setMaxSize): "size" stretches to an exact size, "maxSize"
+ * scales down to fit WITHIN bounds preserving aspect ratio -- a real
+ * theme can use only one (Art Book Next's own system-logo element has no
+ * "size" at all, only "maxSize"). "size" wins if both are present,
+ * matching ES-DE's own real precedence (its applyTheme sets one or the
+ * other, "size" checked first). The maxSize case doesn't yet apply real
+ * aspect-preserving containment at this layer -- AsyncImage's own
+ * ContentScale.Fit (already applied at the call site) does that visually
+ * within whatever box these bounds define, an honest approximation since
+ * this parser doesn't decode the target image's real intrinsic size.
+ */
 private fun sizeOf(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp): kotlin.Pair<Dp, Dp> {
-    val size = element.valueOrNull<EsDeThemeValue.Pair>("size") ?: EsDeThemeValue.Pair(0.2f, 0.2f)
+    val size = element.valueOrNull<EsDeThemeValue.Pair>("size")
+        ?: element.valueOrNull<EsDeThemeValue.Pair>("maxSize")
+        ?: EsDeThemeValue.Pair(0.2f, 0.2f)
     return viewWidth * size.x to viewHeight * size.y
 }
 

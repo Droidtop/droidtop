@@ -101,6 +101,15 @@ internal val ES_DE_ELEMENT_SCHEMA: Map<String, Map<String, EsDePropertyType>> = 
     "image" to mapOf(
         "pos" to EsDePropertyType.NORMALIZED_PAIR,
         "size" to EsDePropertyType.NORMALIZED_PAIR,
+        // Real, distinct ES-DE property from "size" (confirmed against
+        // ImageComponent.cpp's own setResize/setMaxSize): "size" stretches
+        // to an exact size, "maxSize" scales down to fit WITHIN bounds
+        // while preserving aspect ratio -- a real theme can use either
+        // (Art Book Next's own system-logo element uses ONLY maxSize, no
+        // size at all), and this was missing from the schema entirely,
+        // meaning such an element fell through to the renderer's generic
+        // default-size fallback instead of its own real bounds.
+        "maxSize" to EsDePropertyType.NORMALIZED_PAIR,
         "origin" to EsDePropertyType.NORMALIZED_PAIR,
         "rotation" to EsDePropertyType.FLOAT,
         "path" to EsDePropertyType.PATH,
