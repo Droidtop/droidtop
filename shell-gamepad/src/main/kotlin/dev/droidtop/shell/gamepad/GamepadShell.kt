@@ -52,6 +52,7 @@ import coil3.compose.AsyncImage
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
+import dev.droidtop.library.consoles.ES_DE_CONSOLE_SYSTEMS
 import kotlinx.coroutines.launch
 
 /**
@@ -424,11 +425,40 @@ private fun HandheldSection.displayName(): String = when (this) {
 }
 
 /**
- * Engine-first, then per-engine game grid — ES-DE's System → Game
- * hierarchy, applied to droidtop's own [LibraryEntryKind]s. `selectedEngine
- * == null` shows the engine list; picking one drills into that engine's
- * games. Back (D-pad-focused "Back" card, or the controller's B/Back key)
- * returns to the engine list.
+ * One browsable group in Games' system list -- either a non-ROM engine
+ * ([LibraryEntryKind] like RENPY) or a real console system (an NES/GBA/PSX
+ * ROM folder, keyed by [LibraryEntry.systemId]). Splitting these out is
+ * the real fix for CONSOLE_ROM entries previously all bucketing under one
+ * flat "Consoles" card regardless of which actual system they were --
+ * losing exactly the System → Game structure ES-DE (and every other real
+ * emulation frontend) uses, which was the whole point of adopting that
+ * model in the first place.
+ */
+private sealed interface GameGroup {
+    val key: String
+    val label: String
+
+    data class Engine(val kind: LibraryEntryKind) : GameGroup {
+        override val key get() = "engine:${kind.name}"
+        override val label get() = kind.displayName()
+    }
+
+    data class System(val systemId: String) : GameGroup {
+        override val key get() = "system:$systemId"
+        override val label get() = ES_DE_CONSOLE_SYSTEMS.firstOrNull { it.id == systemId }?.displayName ?: systemId
+    }
+}
+
+private fun LibraryEntry.gameGroup(): GameGroup =
+    if (kind == LibraryEntryKind.CONSOLE_ROM) GameGroup.System(systemId ?: "unknown") else GameGroup.Engine(kind)
+
+/**
+ * System-first, then per-system game grid — ES-DE's System → Game
+ * hierarchy, applied both to droidtop's own engine [LibraryEntryKind]s and
+ * to real console systems (see [GameGroup]). `selectedGroup == null` shows
+ * the system list; picking one drills into that system's games. Back
+ * (D-pad-focused "Back" card, or the controller's B/Back key) returns to
+ * the system list.
  */
 @Composable
 private fun GamesSection(
@@ -438,56 +468,64 @@ private fun GamesSection(
     onDrillDownChanged: (Boolean) -> Unit,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
 ) {
-    var selectedEngine by remember { mutableStateOf<LibraryEntryKind?>(null) }
+    var selectedGroup by remember { mutableStateOf<GameGroup?>(null) }
     var recentOnly by remember { mutableStateOf(false) }
     val firstFocus = remember { FocusRequester() }
-    // Present-and-non-empty engines, in GAME_KINDS' declaration order --
-    // hoisted so both the engine-list view and the per-engine grid view can
-    // use the same ordering (needed for ES-DE-style Left/Right sibling-
-    // system switching below).
-    val byEngine = entries.groupBy { it.kind }
-    val orderedEngines = GAME_KINDS.filter { byEngine.containsKey(it) }
+    // Present-and-non-empty groups -- engines first (in GAME_KINDS'
+    // declaration order), then real console systems (alphabetical by
+    // display name) -- hoisted so both the system-list view and the
+    // per-system grid view share one ordering (needed for ES-DE-style
+    // Left/Right sibling-system switching below).
+    val byGroup = entries.groupBy { it.gameGroup() }
+    val orderedEngineGroups = GAME_KINDS
+        .filter { it != LibraryEntryKind.CONSOLE_ROM }
+        .map { GameGroup.Engine(it) }
+        .filter { byGroup.containsKey(it) }
+    val orderedSystemGroups = byGroup.keys
+        .filterIsInstance<GameGroup.System>()
+        .sortedBy { it.label.lowercase() }
+    val orderedGroups: List<GameGroup> = orderedEngineGroups + orderedSystemGroups
 
-    LaunchedEffect(selectedEngine) { onDrillDownChanged(selectedEngine != null) }
+    LaunchedEffect(selectedGroup) { onDrillDownChanged(selectedGroup != null) }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
-                val engine = selectedEngine
+                val group = selectedGroup
                 when {
-                    (event.key == Key.Back || event.key == Key.ButtonB) && engine != null -> {
-                        selectedEngine = null
+                    (event.key == Key.Back || event.key == Key.ButtonB) && group != null -> {
+                        selectedGroup = null
                         true
                     }
                     // ES-DE's real, documented "General navigation" convention:
                     // Left/Right inside a gamelist jumps directly to the
                     // adjacent system's gamelist rather than requiring a
                     // Back-then-reselect round trip through the system list.
-                    event.key == Key.DirectionLeft && engine != null && orderedEngines.size > 1 -> {
-                        val index = orderedEngines.indexOf(engine)
-                        selectedEngine = orderedEngines[(index - 1 + orderedEngines.size) % orderedEngines.size]
+                    event.key == Key.DirectionLeft && group != null && orderedGroups.size > 1 -> {
+                        val index = orderedGroups.indexOf(group)
+                        selectedGroup = orderedGroups[(index - 1 + orderedGroups.size) % orderedGroups.size]
                         true
                     }
-                    event.key == Key.DirectionRight && engine != null && orderedEngines.size > 1 -> {
-                        val index = orderedEngines.indexOf(engine)
-                        selectedEngine = orderedEngines[(index + 1) % orderedEngines.size]
+                    event.key == Key.DirectionRight && group != null && orderedGroups.size > 1 -> {
+                        val index = orderedGroups.indexOf(group)
+                        selectedGroup = orderedGroups[(index + 1) % orderedGroups.size]
                         true
                     }
                     else -> false
                 }
             },
     ) {
-        val engine = selectedEngine
-        if (engine == null) {
+        val group = selectedGroup
+        if (group == null) {
             val continuePlaying = entries.filter { it.lastPlayedEpochMs != null }.sortedByDescending { it.lastPlayedEpochMs }
-            val hasAnyEngineCard = orderedEngines.isNotEmpty()
+            val hasAnyGroupCard = orderedGroups.isNotEmpty()
             // firstFocus is only ever attached to a Modifier below when there's
-            // at least one EngineCard to attach it to -- requesting focus
+            // at least one GroupCard to attach it to -- requesting focus
             // otherwise throws (FocusRequester not initialized), which is
             // exactly what happened with an empty/fresh games folder.
-            LaunchedEffect(entries) { if (hasAnyEngineCard) firstFocus.requestFocus() }
+            LaunchedEffect(entries) { if (hasAnyGroupCard) firstFocus.requestFocus() }
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(32.dp),
@@ -503,16 +541,16 @@ private fun GamesSection(
                         )
                     }
                 }
-                items(orderedEngines, key = { it.name }) { kind ->
-                    EngineCard(
-                        kind = kind,
-                        count = byEngine.getValue(kind).size,
-                        modifier = if (kind == orderedEngines.firstOrNull()) {
+                items(orderedGroups, key = { it.key }) { entryGroup ->
+                    GroupCard(
+                        label = entryGroup.label,
+                        count = byGroup.getValue(entryGroup).size,
+                        modifier = if (entryGroup == orderedGroups.firstOrNull()) {
                             Modifier.focusRequester(firstFocus)
                         } else {
                             Modifier
                         },
-                        onSelect = { selectedEngine = kind },
+                        onSelect = { selectedGroup = entryGroup },
                     )
                 }
                 if (entries.isEmpty()) {
@@ -520,13 +558,13 @@ private fun GamesSection(
                 }
             }
         } else {
-            val allGames = entries.filter { it.kind == engine }
+            val allGames = entries.filter { it.gameGroup() == group }
             val recentCount = allGames.count { it.lastPlayedEpochMs != null }
             val games = if (recentOnly) allGames.filter { it.lastPlayedEpochMs != null } else allGames
             // Same "don't request focus on an unattached FocusRequester" fix
-            // as the engine-list view above -- games can be empty here too
+            // as the system-list view above -- games can be empty here too
             // (the "recent" filter selected with zero recently-played entries).
-            LaunchedEffect(engine, recentOnly) { if (games.isNotEmpty()) firstFocus.requestFocus() }
+            LaunchedEffect(group, recentOnly) { if (games.isNotEmpty()) firstFocus.requestFocus() }
             Column(modifier = Modifier.fillMaxSize()) {
                 Row(
                     modifier = Modifier.padding(horizontal = 48.dp, vertical = 8.dp),
@@ -588,7 +626,7 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun EngineCard(kind: LibraryEntryKind, count: Int, modifier: Modifier = Modifier, onSelect: () -> Unit) {
+private fun GroupCard(label: String, count: Int, modifier: Modifier = Modifier, onSelect: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     Row(
         modifier = modifier
@@ -614,7 +652,7 @@ private fun EngineCard(kind: LibraryEntryKind, count: Int, modifier: Modifier = 
             .background(if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A), RoundedCornerShape(12.dp))
             .padding(24.dp),
     ) {
-        Text(kind.displayName(), color = Color.White, style = MaterialTheme.typography.titleLarge)
+        Text(label, color = Color.White, style = MaterialTheme.typography.titleLarge)
         Text("  ($count)", color = Color.Gray, style = MaterialTheme.typography.titleMedium)
     }
 }
