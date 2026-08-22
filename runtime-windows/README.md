@@ -34,24 +34,42 @@ byte-for-byte from `vendor/gamenative`) plus its own real resource tree
 `com.winlator` itself (`src/main/java/app/gamenative/powercontrol/`, a
 real, self-contained CPU/GPU performance-management layer — confirmed
 zero Hilt/Room/Steam coupling before copying, unlike the rest of
-`app.gamenative`). Two small, real, hand-written compatibility shims
-(`app/gamenative/BuildConfig.kt`, `app/gamenative/PluviaApp.kt`) satisfy
-the only two things forked-in code actually reads from `app.gamenative`
-beyond `powercontrol` and its own generated `R` class — see each shim's
-own doc comment.
+`app.gamenative`). A handful of small, real, hand-written compatibility shims under
+`src/main/java/app/gamenative/` (`BuildConfig.kt`, `PluviaApp.kt`,
+`MainActivity.kt`, `PrefManager.kt`, `service/SteamService.kt`,
+`utils/ContainerUtils.kt`, `utils/LsfgVkManager.kt`,
+`utils/downloader/ContainerFilesDownloader.kt`,
+`ui/screen/auth/EpicOAuthActivity.kt`, `events/AndroidEvent.kt`) satisfy
+the real `app.gamenative.*` symbols forked-in `com.winlator` code actually
+reads — each covers only the specific fields/methods a real call site
+uses (confirmed by reading the call sites, not guessed), documented
+per-file with what upstream's real version does and why it's stubbed
+rather than forked. Four more (`data/ShooterModeConfig.kt`,
+`data/TouchGestureConfig.kt`, `enums/Marker.kt`, `utils/MarkerUtils.kt`,
+`SteamBootstrap.kt`) turned out to be genuinely self-contained — no
+Hilt/Room/JavaSteam coupling — so those are forked in wholesale,
+unmodified, same as `com.winlator` itself.
 
-**Deliberately not forked in**: gamenative's own Application/DI/database/
-Steam-networking/VR layer (Hilt, Room, JavaSteam, dynamic feature
-modules) — confirmed via reading `com.winlator`'s actual imports that
-none of it is needed for the runtime half this module wants. A much
-larger, separate fork pass if droidtop ever wants gamenative's own
-Steam-library UI specifically, not attempted here.
+These shims are a stopgap to get this module compiling, not a
+destination — droidtop will eventually want the real Steam/service layer
+they stand in for (account login, library sync, the actual Gateway/CDN
+calls). Revisit once droidtop has its own equivalent of that layer; until
+then, treat every shim's "not wired up yet" as literal, not a finished
+feature.
 
-**Not wired up yet, by design** — the fork exists as real, compiling
-(or converging toward compiling — this was a large first pass, iterated
-against real CI failures) source, not yet called from `WineSession` or
-any droidtop shell. Bringing the code in and actually using it are
-deliberately separate steps.
+**Deliberately not forked in yet**: gamenative's own Application/DI/
+database/Steam-networking/VR layer (Hilt, Room, JavaSteam, dynamic
+feature modules) — confirmed via reading `com.winlator`'s actual imports
+that none of it is needed for the runtime half this module wants today.
+A much larger, separate fork pass once droidtop wants gamenative's own
+Steam-library UI specifically.
+
+**`runtime-windows` compiles cleanly as of this session** (confirmed via
+CI, not just locally) — the full wholesale `com.winlator` fork plus the
+shims above. **Not wired up yet, by design**: the fork exists as real,
+compiling source, not yet called from `WineSession` or any droidtop
+shell. Bringing the code in and actually using it are deliberately
+separate steps.
 
 This module's Android `namespace` is `app.gamenative` (not droidtop's
 usual `dev.droidtop.*`) specifically so the forked tree's own real
