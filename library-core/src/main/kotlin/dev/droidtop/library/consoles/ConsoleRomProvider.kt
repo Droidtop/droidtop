@@ -4,6 +4,9 @@ import android.content.Context
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import java.io.File
 
 /**
@@ -49,28 +52,45 @@ class ConsoleRomProvider(
 ) : LibraryProvider {
     override val kinds: Set<LibraryEntryKind> = setOf(LibraryEntryKind.CONSOLE_ROM)
 
-    override suspend fun scan(): List<LibraryEntry> =
-        romsRoots.flatMap { root ->
-            (root.listFiles() ?: emptyArray())
-                .filter { it.isDirectory }
-                .mapNotNull { systemFolder ->
-                    SystemOverridePrefs.resolveForFolder(context, systemFolder.absolutePath, systemFolder.name)
-                        ?.let { systemFolder to it }
-                }
-                .flatMap { (systemFolder, system) ->
-                    if (DefaultPlayers.retroArch(system) == null) return@flatMap emptyList()
-                    (systemFolder.listFiles() ?: emptyArray())
-                        .filter { it.isFile && it.extension.lowercase() in system.extensions }
-                        .map { romFile ->
-                            LibraryEntry(
-                                id = romFile.absolutePath,
-                                title = romFile.nameWithoutExtension,
-                                kind = LibraryEntryKind.CONSOLE_ROM,
-                                systemId = system.id,
-                            )
-                        }
-                }
-        }
+    // Real bug this fixes, reported directly: a huge single system folder
+    // (a real device's "j2me" folder had 18,126 files) made the *entire*
+    // scan slow, since every system was scanned sequentially in one
+    // coroutine -- one huge folder blocked every other system, fast or
+    // slow, from ever returning. Each system folder now scans as its own
+    // coroutine, so j2me being slow no longer holds up nes/gba/psx/etc,
+    // which return as soon as their own (much smaller) folders are read.
+    override suspend fun scan(): List<LibraryEntry> = coroutineScope {
+        romsRoots
+            .flatMap { root -> (root.listFiles() ?: emptyArray()).filter { it.isDirectory } }
+            .mapNotNull { systemFolder ->
+                SystemOverridePrefs.resolveForFolder(context, systemFolder.absolutePath, systemFolder.name)
+                    ?.let { systemFolder to it }
+            }
+            .map { (systemFolder, system) -> async { scanSystemFolder(systemFolder, system) } }
+            .awaitAll()
+            .flatten()
+    }
+
+    // Recursive, not just the system folder's immediate children -- lets a
+    // large system be reorganized into subfolders (by first letter, by
+    // collection, whatever) for real, purely as a filesystem organization
+    // choice, without that reorganizing ever hiding files from droidtop:
+    // every file under the system folder at any depth is still found and
+    // still counted as belonging to that one system.
+    private fun scanSystemFolder(systemFolder: File, system: ConsoleSystemDef): List<LibraryEntry> {
+        if (DefaultPlayers.retroArch(system) == null) return emptyList()
+        return systemFolder.walkTopDown()
+            .filter { it.isFile && it.extension.lowercase() in system.extensions }
+            .map { romFile ->
+                LibraryEntry(
+                    id = romFile.absolutePath,
+                    title = romFile.nameWithoutExtension,
+                    kind = LibraryEntryKind.CONSOLE_ROM,
+                    systemId = system.id,
+                )
+            }
+            .toList()
+    }
 
     override suspend fun launch(entry: LibraryEntry) {
         val romFile = File(entry.id)

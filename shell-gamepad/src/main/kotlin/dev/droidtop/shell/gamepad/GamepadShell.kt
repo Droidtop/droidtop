@@ -94,7 +94,15 @@ import kotlinx.coroutines.launch
 @Composable
 fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Unit = {}) {
     val context = LocalContext.current
-    var entries by remember { mutableStateOf<List<LibraryEntry>?>(null) }
+    // Two independent states, not one -- see Library.scanKinds' own doc
+    // comment: a single combined scan meant Apps stayed empty until the
+    // (real, SD-card-scale) Games/ROM scan also finished, even though
+    // NativeAppProvider itself completes almost instantly on its own.
+    // Each LaunchedEffect below runs as its own coroutine, so one
+    // section's slow provider can never gate the other section's ready
+    // results from ever rendering.
+    var gameEntries by remember { mutableStateOf<List<LibraryEntry>?>(null) }
+    var appEntries by remember { mutableStateOf<List<LibraryEntry>?>(null) }
     var section by remember { mutableStateOf(HandheldPrefs.defaultSection(context)) }
     var canGoBack by remember { mutableStateOf(false) }
     var detailEntry by remember { mutableStateOf<LibraryEntry?>(null) }
@@ -102,9 +110,14 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
     val onLaunch: (LibraryEntry) -> Unit = { entry -> scope.launch { library.launch(entry) } }
     val tabBarFocus = remember { FocusRequester() }
 
-    LaunchedEffect(library) {
-        entries = library.scanAll()
-    }
+    // The extra .filter is real, not redundant: Library.scanKinds matches
+    // at the provider level (does this provider produce any requested
+    // kind), not per-entry -- a provider spanning kinds on both sides of
+    // the Games/Apps split (JoiPlayGameProvider currently covers RENPY/
+    // RPG_MAKER_*/KIRIKIRI, and GAME_KINDS is a subset missing KIRIKIRI)
+    // could otherwise leak an entry into the wrong section.
+    LaunchedEffect(library) { gameEntries = library.scanKinds(GAME_KINDS).filter { it.kind in GAME_KINDS } }
+    LaunchedEffect(library) { appEntries = library.scanKinds(APP_KINDS).filter { it.kind in APP_KINDS } }
     // Real bug this fixes: onKeyEvent modifiers (L1/R1 section-switching
     // below, GamesSection's Left/Right sibling-system switching) only ever
     // see a key event by it bubbling up from whatever's currently focused
@@ -150,7 +163,6 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
     ) {
         SectionTabBar(current = section, onSelect = { section = it }, currentTabFocus = tabBarFocus)
         Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
-            val currentEntries = entries
             val entry = detailEntry
             when {
                 // Real bug this fixes: the loading spinner used to gate this
@@ -169,10 +181,15 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
                     canGoBack = false
                     SettingsSection()
                 }
-                currentEntries == null -> CircularProgressIndicator(color = Color.White)
+                // Each section now gates on its own scan only (see
+                // gameEntries/appEntries' own comment) -- Games' spinner no
+                // longer has anything to do with whether Apps is ready, and
+                // vice versa.
+                section == HandheldSection.GAMES && gameEntries == null -> CircularProgressIndicator(color = Color.White)
+                section == HandheldSection.APPS && appEntries == null -> CircularProgressIndicator(color = Color.White)
                 else -> when (section) {
                     HandheldSection.GAMES -> GamesSection(
-                        entries = currentEntries.filter { it.kind in GAME_KINDS },
+                        entries = gameEntries.orEmpty(),
                         onLaunch = onLaunch,
                         onShowDetail = { detailEntry = it },
                         onDrillDownChanged = { canGoBack = it },
@@ -181,7 +198,7 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
                     HandheldSection.APPS -> {
                         canGoBack = false
                         AppsSection(
-                            entries = currentEntries.filter { it.kind in APP_KINDS },
+                            entries = appEntries.orEmpty(),
                             onLaunch = onLaunch,
                             onShowDetail = { detailEntry = it },
                             onFocusedEntryChanged = onFocusedEntryChanged,
