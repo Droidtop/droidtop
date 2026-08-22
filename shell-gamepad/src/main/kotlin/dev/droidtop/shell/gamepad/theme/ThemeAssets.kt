@@ -2,6 +2,8 @@ package dev.droidtop.shell.gamepad.theme
 
 import android.content.Context
 import android.util.Log
+import dev.droidtop.library.theme.EsDeTheme
+import dev.droidtop.library.theme.EsDeThemeParser
 import java.io.File
 
 /**
@@ -51,6 +53,64 @@ internal object ThemeAssets {
             // text-only for these, same as before this was wired in.
             Log.d("droidtop.ThemeAssets", "No DEcaffe logo for system '$systemId'")
             null
+        }
+    }
+
+    private const val THEME_ROOT_ASSET = "themes/decaffe-es-de"
+    private const val EXTRACTED_MARKER = ".extracted"
+
+    /**
+     * Parses the bundled DEcaffe theme's real theme.xml -- needs a real
+     * filesystem path (not an AssetManager stream) since
+     * [EsDeThemeParser.parse]'s own PATH-property resolution builds paths
+     * relative to the theme file's directory on disk (ES-DE's own real
+     * convention, and Compose/Coil also need a real file path to load
+     * images from, not an asset URI). Extracts the whole real theme
+     * folder (~1244 files) to [Context.getCacheDir] once, marked with a
+     * sentinel file so repeat calls don't re-copy -- a real, one-time
+     * cost, not per-recomposition.
+     */
+    fun loadDecaffeTheme(context: Context): EsDeTheme? {
+        val themeDir = File(context.cacheDir, "theme_decaffe")
+        val marker = File(themeDir, EXTRACTED_MARKER)
+        if (!marker.exists()) {
+            try {
+                extractAssetDir(context, THEME_ROOT_ASSET, themeDir)
+                marker.createNewFile()
+            } catch (t: Exception) {
+                Log.e("droidtop.ThemeAssets", "Failed to extract bundled theme", t)
+                return null
+            }
+        }
+        val themeFile = File(themeDir, "theme.xml")
+        return try {
+            EsDeThemeParser.parse(themeFile)
+        } catch (t: Exception) {
+            Log.e("droidtop.ThemeAssets", "Failed to parse bundled theme.xml", t)
+            null
+        }
+    }
+
+    private fun extractAssetDir(context: Context, assetPath: String, destDir: File) {
+        val children = context.assets.list(assetPath) ?: emptyArray()
+        if (children.isEmpty()) {
+            // A leaf file, not a directory -- AssetManager.list() returns
+            // an empty array for both "empty directory" and "not a
+            // directory," so this is the real, standard way to tell them
+            // apart: try to open it as a file.
+            destDir.parentFile?.mkdirs()
+            try {
+                context.assets.open(assetPath).use { input ->
+                    destDir.outputStream().use { output -> input.copyTo(output) }
+                }
+            } catch (t: Exception) {
+                // Genuinely empty directory (rare in this bundle) -- fine, nothing to copy.
+            }
+            return
+        }
+        destDir.mkdirs()
+        for (child in children) {
+            extractAssetDir(context, "$assetPath/$child", File(destDir, child))
         }
     }
 }
