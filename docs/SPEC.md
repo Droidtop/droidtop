@@ -845,6 +845,65 @@ seam as `NativeAppProvider`.
   `FileProvider` wouldn't be needed at all — open question, see
   `library-core/src/main/res/xml/joiplay_file_paths.xml`'s own comment.
 
+## 7e. Second-screen / ambient integrations (Spotify now-playing, Discord presence)
+
+Inspired by iiSU's second-screen widgets on the Retroid's Dual-Screen
+Add-On (and equally useful as an idle-screen/status-bar widget on a single-
+screen device) — **not yet inspected hands-on this session**: no `adb`/
+device was reachable in this environment, so iiSU's actual real UI and
+input-response behavior is still a real open item for a future on-device
+session, not something to guess at or fabricate from memory. What follows
+is a real, buildable integration design based on each service's own actual
+public API, same research standard as §7b's scraper clients.
+
+- **Spotify — real, self-service, implementable now.** Spotify's Web API
+  is free, self-registered at developer.spotify.com, and exposes exactly
+  what a now-playing widget needs: `GET /v1/me/player/currently-playing`
+  (track/artist/album art URL/progress). The correct real auth flow for a
+  native app that can't safely embed a client secret is Authorization Code
+  **with PKCE** (Spotify's own documented recommendation for mobile/desktop
+  clients) — not the client-credentials flow §7b's `IgdbScraperClient`
+  uses, since that flow can't authenticate as a specific user's currently-
+  playing session. Scaffolded this session as `library-core/.../presence/
+  SpotifyPresenceClient.kt` (PKCE code-verifier/challenge generation, the
+  authorization-URL builder, code-for-token exchange, refresh, and the
+  currently-playing poll) plus `PresencePrefs.kt` for the client ID +
+  stored tokens — **not wired to any UI or tested against a real account
+  this session**, same "credentials next time" caution as §7b's scrapers.
+  Remaining real work: an in-app browser/Custom Tabs screen to complete the
+  authorization redirect, a background poll (foreground service or
+  WorkManager) to refresh the widget, and the actual second-screen/idle-
+  screen widget surface itself.
+- **Discord — real, but genuinely harder; not implemented this session.**
+  There is no legitimate lightweight way to read a user's live voice-
+  channel/rich-presence state from outside Discord itself:
+  - Discord's **local RPC** (the named-pipe/Unix-socket protocol real
+    desktop Rich Presence integrations use) only exists next to a running
+    desktop Discord client — not applicable to Android directly, but
+    potentially real and reachable later from inside a Linux container
+    once Desktop mode (§1, "best laptop replacement... later") runs a real
+    Linux Discord build alongside droidtop's own Wayland compositor (§2).
+    Worth revisiting then, not now.
+  - The only real path that works from Android today is a **bot the user
+    creates and invites to their own server**, connected over Discord's
+    Gateway websocket, relaying `VOICE_STATE_UPDATE`/presence events back
+    to droidtop — real, sanctioned, self-service (Discord Developer Portal,
+    free), but meaningfully more infrastructure than Spotify's flow (a
+    persistent Gateway connection needs to live somewhere — either a small
+    always-on relay service the user hosts, or droidtop itself holding a
+    Gateway connection open, which has real battery/background-execution
+    implications on Android worth designing around rather than bolting on).
+  - **Explicitly not doing**: reading Discord's own local client storage
+    for a user token, or any approach that impersonates the official
+    client to get presence data without a real bot — both violate
+    Discord's ToS and this project's own copyright/reverse-engineering
+    boundary ("don't steal", real APIs and real user-owned credentials
+    only, same standard §7b already applied to ScreenScraper/TheGamesDB's
+    registration walls rather than trying to route around them).
+  - Real next step, deferred: scope a minimal bot-relay design once
+    Spotify's flow proves the widget surface out end-to-end — no sense
+    building the harder integration's UI twice.
+
 ## 8. Licensing
 
 `vendor/gamenative`, `vendor/droidspaces`, and `vendor/moonlight-common-c`
