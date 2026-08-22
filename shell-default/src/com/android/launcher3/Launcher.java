@@ -446,6 +446,35 @@ public class Launcher extends StatefulActivity<LauncherState>
     @Override
     @TargetApi(Build.VERSION_CODES.S)
     protected void onCreate(Bundle savedInstanceState) {
+        // droidtop patch (not upstream Murine/Launcher3): resume the user's
+        // last-used shell mode (Desktop/Handheld) instead of always landing
+        // on Standard's own home grid, so a device reboot or a launcher
+        // process restart returns to where the user actually left off.
+        // Only redirects on a genuine fresh task start (isTaskRoot() +
+        // no saved state) -- not on every warm onCreate/config change/
+        // multi-window reattach -- and only away from Standard: picking
+        // "Android" from BackButtonMenu records "standard" as the last
+        // mode first, which is what stops this from immediately bouncing
+        // back. isTaskRoot() is safe to call before super.onCreate() (the
+        // task token is attached before onCreate runs); super.onCreate()
+        // itself is still called exactly once either way -- here when
+        // redirecting, or further down in this method's own original body
+        // when not. See dev.droidtop.shell.standard.ModePrefs's own doc
+        // comment for the follow-up this closes out (auto-redirect was
+        // deliberately deferred, then asked for explicitly).
+        if (savedInstanceState == null && isTaskRoot()) {
+            String lastMode = dev.droidtop.shell.standard.ModePrefs.lastMode(this);
+            if (!dev.droidtop.shell.standard.BackButtonMenu.MODE_STANDARD.equals(lastMode)) {
+                super.onCreate(savedInstanceState);
+                Intent redirect = new Intent(Intent.ACTION_MAIN);
+                redirect.setClassName(getPackageName(), "dev.droidtop.app.MainActivity");
+                redirect.putExtra(dev.droidtop.shell.standard.BackButtonMenu.EXTRA_MODE, lastMode);
+                redirect.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(redirect);
+                finish();
+                return;
+            }
+        }
         mIsReCreated = true;
         // TODO why did Lawnchair comment async sections? https://github.com/LawnchairLauncher/lawnchair/commit/c8cdde1531a603890fdac8fb948102b1f1cd25fe
         mStartupLatencyLogger = createStartupLatencyLogger(
