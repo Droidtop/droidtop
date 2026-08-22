@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,9 +36,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -340,6 +343,8 @@ private fun ActionChip(label: String, highlighted: Boolean, modifier: Modifier =
         modifier = modifier
             .onFocusChanged { focused = it.isFocused }
             .focusable()
+            // Same real touch-input fix as GameCard -- see its own comment.
+            .clickable(onClick = onClick)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp &&
                     (event.key == Key.ButtonA || event.key == Key.DirectionCenter || event.key == Key.Enter)
@@ -438,6 +443,10 @@ private fun SectionTabBar(current: HandheldSection, onSelect: (HandheldSection) 
                 style = MaterialTheme.typography.titleMedium,
                 modifier = (if (entrySection == current) Modifier.focusRequester(currentTabFocus) else Modifier)
                     .focusable()
+                    // Same real touch-input fix as GameCard -- see its own
+                    // comment. This is the top-level Games/Apps/Settings
+                    // tab bar, the very first thing a user taps.
+                    .clickable(onClick = { onSelect(entrySection) })
                     .onKeyEvent { event ->
                         if (event.type == KeyEventType.KeyUp &&
                             (event.key == Key.ButtonA || event.key == Key.DirectionCenter || event.key == Key.Enter)
@@ -659,9 +668,38 @@ private fun GamesSection(
                         FilterChip("$recentCount recent", selected = recentOnly, onClick = { recentOnly = true })
                     }
                 }
+                val focusManager = LocalFocusManager.current
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 220.dp),
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 48.dp),
+                    // Real bug fix, reported directly: arrow keys couldn't
+                    // actually move focus between games at all -- GameCard
+                    // only ever handles A/Center/Enter/Y, never Up/Down/
+                    // Left/Right, and Compose has no automatic arrow-key
+                    // focus movement in a grid by default. Without this,
+                    // every directional keypress bubbled straight past this
+                    // grid to the outer Box's sibling-system switcher (see
+                    // GamesSection's own onKeyEvent above), which
+                    // unconditionally treated Left/Right as "switch system"
+                    // on *every* press, not just at a real grid edge.
+                    // FocusManager.moveFocus's own real return value (true =
+                    // moved, false = no further focusable target that
+                    // direction) is exactly what onKeyEvent needs: false
+                    // lets Left/Right correctly bubble up to that outer
+                    // handler only once focus genuinely can't move further
+                    // right/left within the grid, matching ES-DE's real
+                    // "switch system at the edge" convention instead of
+                    // hijacking every keypress.
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 48.dp)
+                        .onKeyEvent { event ->
+                            if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
+                            when (event.key) {
+                                Key.DirectionUp -> focusManager.moveFocus(FocusDirection.Up)
+                                Key.DirectionDown -> focusManager.moveFocus(FocusDirection.Down)
+                                Key.DirectionLeft -> focusManager.moveFocus(FocusDirection.Left)
+                                Key.DirectionRight -> focusManager.moveFocus(FocusDirection.Right)
+                                else -> false
+                            }
+                        },
                     horizontalArrangement = Arrangement.spacedBy(24.dp),
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                 ) {
@@ -691,6 +729,8 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
         modifier = Modifier
             .onFocusChanged { focused = it.isFocused }
             .focusable()
+            // Same real touch-input fix as GameCard -- see its own comment.
+            .clickable(onClick = onClick)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp &&
                     (event.key == Key.ButtonA || event.key == Key.DirectionCenter || event.key == Key.Enter)
@@ -827,6 +867,8 @@ private fun AppIconTile(entry: LibraryEntry, modifier: Modifier = Modifier, onLa
                 if (it.isFocused) onFocused()
             }
             .focusable()
+            // Same real touch-input fix as GameCard -- see its own comment.
+            .clickable(onClick = onLaunch)
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
                 when (event.key) {
@@ -916,6 +958,8 @@ private fun SettingsLink(title: String, summary: String, modifier: Modifier = Mo
             .fillMaxWidth()
             .onFocusChanged { focused = it.isFocused }
             .focusable()
+            // Same real touch-input fix as GameCard -- see its own comment.
+            .clickable(onClick = onClick)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp &&
                     (event.key == Key.ButtonA || event.key == Key.DirectionCenter || event.key == Key.Enter)
@@ -1001,11 +1045,18 @@ private fun GameCard(entry: LibraryEntry, modifier: Modifier = Modifier, onLaunc
                 if (it.isFocused) onFocused()
             }
             .focusable()
-            // DPAD_CENTER/Enter already trigger Modifier.clickable's default
-            // key handling on a focused node, but a controller's face button
-            // (A / cross) reports as a distinct keycode on most Android
-            // gamepad mappings — handled explicitly here rather than relying
-            // on clickable() to cover it. Y opens the detail screen (§7).
+            // Real bug fix, reported directly: touch input didn't work
+            // anywhere in Handheld mode -- .clickable() was never actually
+            // applied here (an older comment claimed it was, but it wasn't;
+            // .focusable() alone doesn't respond to taps, only to real
+            // focus + the onKeyEvent below). This also gives DPAD_CENTER/
+            // Enter clickable's own default key handling on a focused node
+            // "for free" — a controller's face button (A / cross) still
+            // reports as a distinct keycode on most Android gamepad
+            // mappings, so it's still handled explicitly below rather than
+            // relying on clickable() to cover it. Y opens the detail screen
+            // (§7).
+            .clickable(onClick = onLaunch)
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
                 when (event.key) {
