@@ -15,7 +15,7 @@ import com.android.launcher3.util.DisplayController
  */
 public final class SettingsDesktopFragment : AbstractSettingsFragment() {
 
-    override fun getPreferenceScreenResId() = R.xml.murine_prefs_desktop
+    override fun getPreferenceScreenResId() = R.xml.droidtop_desktop_prefs
 
     override fun getPreferenceTitle(): Int = R.string.pref_category_desktop_title
 
