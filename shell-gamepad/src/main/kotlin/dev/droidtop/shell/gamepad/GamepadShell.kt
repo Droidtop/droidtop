@@ -484,8 +484,13 @@ private sealed interface GameGroup {
     }
 }
 
+// systemId-based grouping isn't CONSOLE_ROM-specific: PcGameProvider tags
+// its real WINE_PROFILE entries with systemId = "pc" (ES-DE's own system
+// id) specifically so they render through this same System -> Game
+// carousel/theming, not a generic "Windows" engine bucket -- any future
+// kind that sets systemId gets the same real theming for free.
 private fun LibraryEntry.gameGroup(): GameGroup =
-    if (kind == LibraryEntryKind.CONSOLE_ROM) GameGroup.System(systemId ?: "unknown") else GameGroup.Engine(kind)
+    if (systemId != null) GameGroup.System(systemId) else GameGroup.Engine(kind)
 
 /**
  * System-first, then per-system game grid — ES-DE's System → Game
@@ -513,7 +518,10 @@ private fun GamesSection(
     // Left/Right sibling-system switching below).
     val byGroup = entries.groupBy { it.gameGroup() }
     val orderedEngineGroups = GAME_KINDS
-        .filter { it != LibraryEntryKind.CONSOLE_ROM }
+        // Both real systemId-bearing kinds -- CONSOLE_ROM always, WINE_PROFILE
+        // via PcGameProvider's "pc" tagging -- route through GameGroup.System
+        // above, not this generic engine bucket.
+        .filter { it != LibraryEntryKind.CONSOLE_ROM && it != LibraryEntryKind.WINE_PROFILE }
         .map { GameGroup.Engine(it) }
         .filter { byGroup.containsKey(it) }
     val orderedSystemGroups = byGroup.keys

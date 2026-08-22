@@ -63,6 +63,11 @@ android {
 
 dependencies {
     implementation(project(":runtime-common"))
+    // PcGameProvider.kt's own real LibraryProvider/LibraryEntry/
+    // LibraryEntryKind implementation -- this module supplying "pc"-system
+    // library entries to the same seam every other source (native apps,
+    // console ROMs, engine games) already goes through.
+    implementation(project(":library-core"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
 
