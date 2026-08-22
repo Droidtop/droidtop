@@ -864,36 +864,57 @@ on what's happening rather than competing for one fixed layout:
   game list), registered per-context by whichever shell/screen owns
   primary-screen focus at the time. Not built this session.
 - **`PresencePanel`** — a deliberate, always-visible panel a user opens,
-  hosting Spotify's now-playing state and (eventually) Discord's
-  friends/voice presence behind one small `PresenceProvider` seam (mirrors
-  the existing `LibraryProvider` pattern in `library-core`) — one card per
-  linked service, shown/hidden per whether that service's credentials are
-  actually configured. Not built this session.
+  hosting now-playing state and controls for linked media apps and
+  (eventually) Discord's friends/voice presence, one card per connected
+  app. Not built this session.
 - **Routed notifications** — real Android notifications (Discord already
-  posts real ones for DMs/mentions; Spotify posts a real persistent
-  media-style now-playing notification) plus per-display-aware heads-up/
-  toast routing, on top of whatever `WindowPlacement` (§4) has assigned to
-  each physical output. This gets ambient presence "for free" from the
-  platform without a custom polling overlay, complementary to the
-  `PresencePanel` rather than a replacement for it.
+  posts real ones for DMs/mentions; media apps post a real persistent
+  now-playing notification) plus per-display-aware heads-up/toast routing,
+  on top of whatever `WindowPlacement` (§4) has assigned to each physical
+  output. This gets ambient presence "for free" from the platform without
+  a custom polling overlay, complementary to the `PresencePanel` rather
+  than a replacement for it.
 
-**Spotify — real, self-service, scaffolded this session.** Spotify's Web
-API is free, self-registered at developer.spotify.com, and exposes exactly
-what a now-playing widget needs: `GET /v1/me/player/currently-playing`
-(track/artist/album art URL/progress). The correct real auth flow for a
-native app that can't safely embed a client secret is Authorization Code
-**with PKCE** (Spotify's own documented recommendation for mobile/desktop
-clients) — not the client-credentials flow §7b's `IgdbScraperClient` uses,
-since that flow can't authenticate as a specific user's currently-playing
-session. Scaffolded as `library-core/.../presence/SpotifyPresenceClient.kt`
-(PKCE code-verifier/challenge generation, the authorization-URL builder,
-code-for-token exchange, refresh, and the currently-playing poll) plus
-`PresencePrefs.kt` for the client ID + stored tokens — **not wired to any
-UI or tested against a real account this session**, same "credentials next
-time" caution as §7b's scrapers. Remaining real work: an in-app browser/
-Custom Tabs screen to complete the authorization redirect, a background
-poll (foreground service or WorkManager) to refresh the widget, and the
-`PresencePanel` surface itself.
+**Media app control — real, local, no credentials handled by droidtop.**
+Per explicit direction: droidtop must never hold a streaming service's own
+credentials (no OAuth, no developer app registration, no stored tokens),
+and control needs to be real — search, playlist/library browsing, and
+transport control (play/pause/skip/seek) against whatever's actually
+running in the installed app, not just a read-only now-playing display.
+An initial design scaffolded a Spotify-specific OAuth/Web-API client for
+this; removed once a better real option was confirmed: the standard
+Android `android.media.browse.MediaBrowserService` API (`MediaBrowserCompat`
+/`MediaControllerCompat`, `androidx.media`) — exactly the mechanism Android
+Auto, Wear OS, and Google Assistant use to browse and control a media app
+without ever seeing its login. droidtop binds directly to the target app's
+own exported service over local IPC; no network calls, no credentials, the
+user's session stays entirely inside that app's own process.
+
+Generalized beyond Spotify per direction, since this is a standard Android
+API any compliant app can implement, not a Spotify-specific integration.
+`library-core/.../presence/MediaAppBrowserClient.kt` is the one client
+(package/service-agnostic, parameterized by a `KnownMediaApps.Target`);
+`KnownMediaApps` holds the real, **device-verified** targets found this
+session (`adb shell dumpsys package <pkg>`, filtered for `android.media.
+browse.MediaBrowserService` on this project's own real test device, not
+guessed):
+- **Spotify** (`com.spotify.music`) — verified.
+- **YouTube** — verified against this device's actual installed build,
+  which happens to be a ReVanced-patched APK; not yet confirmed whether
+  the official `com.google.android.youtube` package uses an identical
+  service class name.
+- **Jellyfin** (`org.jellyfin.mobile`) — verified.
+- Tidal and YouTube Music were asked about too, but neither is installed
+  on the test device, so — same standard as everything else in this spec —
+  they're deliberately left out of `KnownMediaApps` rather than guessed at;
+  add once confirmed against a real install.
+
+Real remaining work: browse/search/playback-control behavior hasn't been
+run end-to-end against a real connected session of any of these three
+apps yet (the component names are verified real, but what each app's
+content tree actually looks like, and whether each really implements
+`onPlayFromSearch`, isn't confirmed), plus the `PresencePanel` surface
+itself.
 
 **Discord — real, official, self-service: the Discord Social SDK, not a
 bot.** Discord publishes an official Social SDK for embedding real social/
