@@ -12,7 +12,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.library.theme.EsDeThemeElement
 import dev.droidtop.library.theme.EsDeThemeValue
@@ -62,11 +64,13 @@ fun EsDeThemedView(view: EsDeThemeView, modifier: Modifier = Modifier) {
 @Composable
 private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp) {
     val path = element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved ?: return
-    val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight)
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
+    val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
+    val tint = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) }
     AsyncImage(
         model = path,
         contentDescription = null,
+        colorFilter = tint?.let { ColorFilter.tint(it) },
         modifier = Modifier
             .absoluteOffset(x = offsetX, y = offsetY)
             .size(width = width, height = height),
@@ -98,11 +102,13 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
         ?: element.valueOrNull<EsDeThemeValue.Path>("defaultImage")?.resolved
         ?: element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved
         ?: return
-    val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight)
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
+    val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
+    val tint = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) }
     AsyncImage(
         model = path,
         contentDescription = null,
+        colorFilter = tint?.let { ColorFilter.tint(it) },
         modifier = Modifier
             .absoluteOffset(x = offsetX, y = offsetY)
             .size(width = width, height = height),
@@ -138,9 +144,25 @@ private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     )
 }
 
-private fun positionOf(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp): kotlin.Pair<Dp, Dp> {
+/**
+ * `origin` is ES-DE's real anchor-point convention: a 0-1 fraction of the
+ * element's OWN size that `pos` refers to, not always the top-left corner
+ * (DEcaffe uses `origin="0.5 0.5"` -- center-anchoring -- throughout).
+ * Defaults to "0 0" (top-left), matching ES-DE's own default when an
+ * element omits the property.
+ */
+private fun positionOf(
+    element: EsDeThemeElement,
+    viewWidth: Dp,
+    viewHeight: Dp,
+    width: Dp = 0.dp,
+    height: Dp = 0.dp,
+): kotlin.Pair<Dp, Dp> {
     val pos = element.valueOrNull<EsDeThemeValue.Pair>("pos") ?: EsDeThemeValue.Pair(0f, 0f)
-    return viewWidth * pos.x to viewHeight * pos.y
+    val origin = element.valueOrNull<EsDeThemeValue.Pair>("origin") ?: EsDeThemeValue.Pair(0f, 0f)
+    val x = viewWidth * pos.x - width * origin.x
+    val y = viewHeight * pos.y - height * origin.y
+    return x to y
 }
 
 private fun sizeOf(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp): kotlin.Pair<Dp, Dp> {
