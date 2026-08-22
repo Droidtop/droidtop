@@ -20,7 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.lifecycleScope
-import dev.droidtop.library.JoiPlayGameProvider
+import dev.droidtop.library.EngineGameProvider
 import dev.droidtop.library.Library
 import dev.droidtop.library.NativeAppProvider
 import dev.droidtop.library.consoles.ConsoleRomProvider
@@ -75,7 +75,7 @@ class MainActivity : AppCompatActivity() {
         // picks (GamesRootPrefs.resolveStoragePath -- primary storage or a
         // real SD card, see that function's own doc comment), zero or more
         // of them -- ROM/game support is opt-in per direction, so an empty
-        // set here is a completely normal, expected state (JoiPlayGameProvider
+        // set here is a completely normal, expected state (EngineGameProvider
         // just finds nothing to scan), not a fallback-worthy problem. Falls
         // back to the old app-private default only for a fresh install that
         // hasn't been through onboarding at all yet.
@@ -85,8 +85,8 @@ class MainActivity : AppCompatActivity() {
         library = Library(
             listOf(
                 NativeAppProvider(applicationContext),
-                JoiPlayGameProvider(applicationContext, gamesRoots),
-                // Same roots as JoiPlayGameProvider -- a folder can hold
+                EngineGameProvider(applicationContext, gamesRoots),
+                // Same roots as EngineGameProvider -- a folder can hold
                 // real console ROMs (<root>/<systemId>/<romFile>), engine
                 // games (<root>/<gameFolder>/...), or both; each provider
                 // only ever matches what's actually its own shape.
