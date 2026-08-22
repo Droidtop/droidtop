@@ -31,6 +31,7 @@ object DefaultPlayers {
             argumentsTemplate = "-n $RETROARCH_ACTIVITY " +
                 "--es ROM {file.path} " +
                 "--es LIBRETRO $RETROARCH_CORES_DIR/${core}_android.so",
+            packageName = RETROARCH_PACKAGE,
         )
     }
 }

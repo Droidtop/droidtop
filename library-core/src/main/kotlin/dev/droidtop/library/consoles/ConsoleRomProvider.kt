@@ -10,6 +10,42 @@ import kotlinx.coroutines.coroutineScope
 import java.io.File
 
 /**
+ * Real, installed apps only -- a [KnownPlayers]/[DefaultPlayers] preset
+ * existing doesn't mean the emulator is actually on this device (the whole
+ * point of pulling in Daijishō's real, comprehensive preset list is
+ * covering "whatever's actually installed," not assuming any one is).
+ */
+private fun isPackageInstalled(context: Context, packageName: String): Boolean = try {
+    context.packageManager.getApplicationInfo(packageName, 0)
+    true
+} catch (e: android.content.pm.PackageManager.NameNotFoundException) {
+    false
+}
+
+/**
+ * Every real, currently-usable [Player.AmStart] for [system] -- droidtop's
+ * own custom players (see [CustomPlayerPrefs]) first (a user who bothered
+ * to add one clearly wants it offered), then [KnownPlayers]' real presets
+ * pulled from Daijishō's own wiki, then [DefaultPlayers.retroArch] last (a
+ * broad-coverage fallback via libretro cores, not most frontends' first
+ * choice when a dedicated standalone port is also installed) -- filtered to
+ * only players whose app is actually installed.
+ */
+fun availablePlayers(context: Context, system: ConsoleSystemDef): List<Player.AmStart> {
+    val custom = CustomPlayerPrefs.getForSystem(context, system.id)
+    val known = KnownPlayers.forSystem(system.id).map { it.player }
+    val retroArch = DefaultPlayers.retroArch(system)
+    return (custom + known + listOfNotNull(retroArch)).filter { isPackageInstalled(context, it.packageName) }
+}
+
+/** [PlayerOverridePrefs]'s choice if it's still a real, available candidate; otherwise the first available one. */
+fun resolvePlayer(context: Context, system: ConsoleSystemDef): Player.AmStart? {
+    val candidates = availablePlayers(context, system)
+    val overrideId = PlayerOverridePrefs.get(context, system.id)
+    return candidates.firstOrNull { it.id == overrideId } ?: candidates.firstOrNull()
+}
+
+/**
  * Folder-name mismatches actually confirmed between a real ROMs
  * collection (checked against a real test device this session) and
  * ES-DE's own canonical system ids -- not a guessed/exhaustive list, just
@@ -36,15 +72,16 @@ internal fun resolveSystem(folderName: String): ConsoleSystemDef? {
  * real device's existing ROMs folder this session), so an existing
  * collection works with no reorganizing.
  *
- * Launch strategy per system: [DefaultPlayers.retroArch] when ES-DE's data
- * says a RetroArch core exists for that system, via the real, working
- * [AmStartCommandToIntentConverter]. Systems with no known RetroArch core
- * (standalone-emulator-only systems like PS3/Switch -- see
- * EsDeConsoleSystems.kt's own data) currently have no Player at all and
- * are skipped during scan, not shown as broken entries -- a real per-
- * system Player override (letting a user point a system at a specific
- * standalone emulator's own am-start command) is the next real gap here,
- * not attempted in this pass.
+ * Launch strategy per system: [availablePlayers] resolves every real,
+ * currently-installed [Player.AmStart] for that system (custom players from
+ * [CustomPlayerPrefs], real presets from [KnownPlayers] -- generated from
+ * Daijishō's own public wiki, covering standalone emulators for systems
+ * with no RetroArch core at all, like PS2/3DS/Switch/GameCube/PSP -- and
+ * [DefaultPlayers.retroArch] as a broad libretro-core fallback), and
+ * [resolvePlayer] picks [PlayerOverridePrefs]'s explicit choice if set,
+ * else the first available one. A system with zero available players
+ * (nothing installed that can run it) is skipped during scan, not shown as
+ * broken entries.
  */
 class ConsoleRomProvider(
     private val context: Context,
@@ -78,7 +115,15 @@ class ConsoleRomProvider(
     // every file under the system folder at any depth is still found and
     // still counted as belonging to that one system.
     private fun scanSystemFolder(systemFolder: File, system: ConsoleSystemDef): List<LibraryEntry> {
-        if (DefaultPlayers.retroArch(system) == null) return emptyList()
+        // Real fix, not just a refactor: this used to only check
+        // DefaultPlayers.retroArch(system) != null, which silently skipped
+        // scanning every system with no RetroArch libretro core at all --
+        // PS2, PS3, 3DS, Switch, GameCube/Wii, PSP among them (see that
+        // function's own doc comment) -- exactly the systems KnownPlayers'
+        // real standalone-emulator presets exist for. A system now scans as
+        // long as ANY real, installed player (custom, known-preset, or
+        // RetroArch) can handle it.
+        if (availablePlayers(context, system).isEmpty()) return emptyList()
         return systemFolder.walkTopDown()
             .filter { it.isFile && it.extension.lowercase() in system.extensions }
             .map { romFile ->
@@ -97,9 +142,26 @@ class ConsoleRomProvider(
         val parentFolder = romFile.parentFile
         val system = SystemOverridePrefs.resolveForFolder(context, parentFolder?.absolutePath ?: "", parentFolder?.name ?: "")
             ?: error("Couldn't resolve a console system for ${entry.id}")
-        val player = DefaultPlayers.retroArch(system)
-            ?: error("No Player configured for system ${system.id}")
+        val player = resolvePlayer(context, system)
+            ?: error("No installed Player available for system ${system.id}")
+        if (player.killPackageProcesses) killPackageProcessesBestEffort(player.packageName)
         val intent = AmStartCommandToIntentConverter.toIntent(player.argumentsTemplate, romFile.absolutePath)
         context.startActivity(intent)
+    }
+
+    // `ActivityManager.forceStopPackage()` needs the signature-level
+    // FORCE_STOP_PACKAGES permission -- not grantable to a normal app, so
+    // this real Daijishō-preset flag (several of KnownPlayers' real
+    // entries, e.g. DuckStation, set it -- a workaround for emulators that
+    // don't reset their own state cleanly on a repeat launch) can only
+    // actually do anything on a rooted device. Best-effort and silent on
+    // failure (debug-level log only) rather than erroring the whole
+    // launch over a real, expected no-root case.
+    private fun killPackageProcessesBestEffort(packageName: String) {
+        try {
+            Runtime.getRuntime().exec(arrayOf("su", "-c", "am force-stop $packageName")).waitFor()
+        } catch (t: Throwable) {
+            android.util.Log.d("droidtop.ConsoleRomProvider", "Couldn't force-stop $packageName (likely no root)", t)
+        }
     }
 }
