@@ -33,12 +33,39 @@ import java.io.StringReader
  *    theme file using a property outside that subset shouldn't fail to
  *    load entirely because of it (a real difference from ES-DE's own
  *    stricter behavior, deliberate given the smaller scope here).
+ *  - `<include>path</include>` pulls in another XML file's own top-level
+ *    content (variables/views/nested includes) as if it were inlined at
+ *    that point -- confirmed real: DEcaffe's own theme.xml is mostly a
+ *    shell of `<include>` tags (colors.xml, font.xml, per-aspect-ratio
+ *    layout files, per-system metadata files), not inline content. Missing
+ *    this entirely was a real bug: most of a real theme's variables and
+ *    view elements never got parsed at all, since they live in included
+ *    files. `<aspectRatio name="...">` wraps includes that only apply for
+ *    a matching device aspect ratio (ES-DE's own real per-shape-screen
+ *    layout mechanism) -- only the block matching [parse]'s `aspectRatio`
+ *    argument is followed, others are skipped entirely.
  */
 object EsDeThemeParser {
-    fun parse(themeFile: File): EsDeTheme {
-        val baseDir = themeFile.parentFile ?: File(".")
+    private const val MAX_INCLUDE_DEPTH = 24
+
+    fun parse(themeFile: File, aspectRatio: String = "16:9"): EsDeTheme {
         val variables = mutableMapOf<String, String>()
         val views = mutableMapOf<String, MutableMap<String, EsDeThemeElement>>()
+        parseDocument(themeFile, aspectRatio, variables, views, depth = 0)
+        return EsDeTheme(variables, views.mapValues { EsDeThemeView(it.value) })
+    }
+
+    private fun parseDocument(
+        themeFile: File,
+        aspectRatio: String,
+        variables: MutableMap<String, String>,
+        views: MutableMap<String, MutableMap<String, EsDeThemeElement>>,
+        depth: Int,
+    ) {
+        // Real safety net against include cycles or pathological nesting --
+        // ES-DE's own theme files never nest anywhere close to this deep.
+        if (depth >= MAX_INCLUDE_DEPTH || !themeFile.isFile) return
+        val baseDir = themeFile.parentFile ?: File(".")
 
         val parser = Xml.newPullParser().apply {
             setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
@@ -51,12 +78,71 @@ object EsDeThemeParser {
                 when (parser.name) {
                     "variables" -> parseVariables(parser, variables)
                     "view" -> parseView(parser, variables, baseDir, views)
+                    "include" -> {
+                        val rawPath = resolvePlaceholders(readText(parser), variables)
+                        resolveIncludePath(baseDir, rawPath)?.let { included ->
+                            parseDocument(included, aspectRatio, variables, views, depth + 1)
+                        }
+                    }
+                    "aspectRatio" -> {
+                        val name = parser.getAttributeValue(null, "name")
+                        if (name == aspectRatio) {
+                            parseAspectRatioBlock(parser, aspectRatio, baseDir, variables, views, depth)
+                        } else {
+                            skipSubtree(parser)
+                        }
+                    }
                 }
             }
             event = parser.next()
         }
+    }
 
-        return EsDeTheme(variables, views.mapValues { EsDeThemeView(it.value) })
+    /**
+     * An `<aspectRatio>` block's own children are the same top-level tags a
+     * theme document can have (mostly `<include>` in practice) -- walked
+     * the same way [parseDocument] walks a whole file, just scoped to this
+     * subtree instead of the whole document.
+     */
+    private fun parseAspectRatioBlock(
+        parser: XmlPullParser,
+        aspectRatio: String,
+        baseDir: File,
+        variables: MutableMap<String, String>,
+        views: MutableMap<String, MutableMap<String, EsDeThemeElement>>,
+        depth: Int,
+    ) {
+        val blockDepth = parser.depth
+        var event = parser.next()
+        while (!(event == XmlPullParser.END_TAG && parser.depth == blockDepth)) {
+            if (event == XmlPullParser.START_TAG) {
+                when (parser.name) {
+                    "variables" -> parseVariables(parser, variables)
+                    "view" -> parseView(parser, variables, baseDir, views)
+                    "include" -> {
+                        val rawPath = resolvePlaceholders(readText(parser), variables)
+                        resolveIncludePath(baseDir, rawPath)?.let { included ->
+                            parseDocument(included, aspectRatio, variables, views, depth + 1)
+                        }
+                    }
+                }
+            }
+            event = parser.next()
+        }
+    }
+
+    /**
+     * Null when the resolved path still contains an unresolved `${...}`
+     * placeholder (real ES-DE cases like `${system.theme}.xml` need a
+     * per-system context this theme-wide parse doesn't have -- see
+     * [EsDeThemeParser]'s own doc comment) or when nothing exists at that
+     * path. Both are expected/real, not error conditions -- skipping the
+     * include is the honest behavior rather than crashing the whole parse.
+     */
+    private fun resolveIncludePath(baseDir: File, rawPath: String): File? {
+        if (rawPath.contains("\${")) return null
+        val file = File(baseDir, rawPath).normalize()
+        return file.takeIf { it.isFile }
     }
 
     private fun parseVariables(parser: XmlPullParser, variables: MutableMap<String, String>) {
