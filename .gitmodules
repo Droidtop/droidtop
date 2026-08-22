@@ -1,6 +1,6 @@
 [submodule "vendor/gamenative"]
 	path = vendor/gamenative
-	url = https://github.com/utkarshdalal/GameNative.git
+	url = https://github.com/bi0shacker001/gamenative-tux.git
 [submodule "vendor/droidspaces"]
 	path = vendor/droidspaces
 	url = https://github.com/ravindu644/Droidspaces-OSS.git
