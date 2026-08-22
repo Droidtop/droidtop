@@ -795,55 +795,91 @@ Two concrete references to build from rather than design blind:
   focused launchers are UX references for `:shell-gamepad` rather than
   code to port.
 
-## 7d. JoiPlay: Ren'Py and RPG Maker games (`library-core`)
+## 7d. VN/RPG-Maker engine games — JoiPlay support + `enginehost`
 
-JoiPlay is a Ren'Py/RPG Maker interpreter for Android — the same category
-of integration as RetroArch or DuckStation (§7): droidtop detects games
-and hands them off, it doesn't interpret any of these itself (§7b's "not
-a backend" boundary). Implemented in `library-core` (`GameEngineDetector`,
-`JoiPlay`, `JoiPlayGameProvider`), same `LibraryProvider`/`LibraryEntry`
-seam as `NativeAppProvider`.
+Superseded, corrected understanding — this section previously assumed an
+undocumented JoiPlay launch API existed and hadn't been verified.
+Verification here stayed at the manifest/structural level (`aapt dump`,
+`dumpsys` — what any Android app's public-facing package inspection
+tools show), not a full decompile of JoiPlay's own closed-source
+implementation, since that would likely violate its own ToS/EULA and
+wasn't cleared with the user first.
 
-- **Engine detection signatures are ported from the user's own Pythia
-  project** (`G:\Support\GameManagement\RenPyPatch\pythia`), verified
-  there against real games in the user's library, not guessed:
-  - **Ren'Py**: `renpy/` and `game/` subdirectories both present directly
-    under the game root.
-  - **RPG Maker MV**: `js/rpg_core.js`, or `www/js/rpg_core.js` if
-    exported with the `www/` wrapper (MV/MZ are Electron/NW.js apps, not
-    the older engine's native format — a detector that only checks
-    `.rxdata`/`.rgss*a`-style signatures misses these, a real gap the
-    Pythia signatures avoid).
-  - **RPG Maker MZ**: same shape, `rmmz_core.js`.
-  - **RPG Maker VX Ace**: a filename containing `.rgss3a` *anywhere*
-    (substring, not exact suffix) — Pythia's own fix for a real install
-    where a patcher had renamed the archive to `Game.rgss3a.old`.
-  - **RPG Maker XP and VX are deliberately not detected** — Pythia never
-    implemented them either, for the same reason: no real sample to
-    verify a signature against. Same standard applied here rather than
-    fabricating a signature from a secondhand tool's docs.
-- **`LibraryEntryKind` is named per-engine, not per-launcher** (`RENPY`,
-  `RPG_MAKER_MV`, `RPG_MAKER_MZ`, `RPG_MAKER_VX_ACE`) — JoiPlay is what
-  droidtop uses today, but isn't assumed to be the only option forever
-  (e.g. RPG Maker MV/MZ being Electron/NW.js Windows apps under the hood
-  means a Wine prefix is a real alternate launch path too, same "prefer
-  the best available path" pattern as §5a's Steam-depot selection) — a
-  different provider could serve the same kind later without a rename.
-- **No documented add-game/launch API found for JoiPlay** — what IS real
-  and widely used: JoiPlay registers as an "Open With" handler for a
-  game's executable, so `JoiPlay.launchViaJoiPlay` fires a plain
-  `ACTION_VIEW` at the executable (via `FileProvider`, since scoped
-  storage needs a `content://` Uri across the app boundary) targeting
-  JoiPlay's package directly. **Not yet run against a real installed
-  JoiPlay to confirm it actually resolves** — needs a real device.
-- **Storage-access design tension, not resolved**: the current
-  implementation assumes direct filesystem `File` access to wherever game
-  folders live. If droidtop's actual game-storage approach ends up being
-  SAF-based (`ACTION_OPEN_DOCUMENT_TREE`, the mechanism §7b already uses
-  for ES-DE library sync) rather than a plain external-storage path, a
-  `DocumentFile`'s own `content://` Uri would be used directly and
-  `FileProvider` wouldn't be needed at all — open question, see
-  `library-core/src/main/res/xml/joiplay_file_paths.xml`'s own comment.
+**Real, confirmed at the manifest/behavioral level** (not guessed):
+- JoiPlay's own "Add Game" import flow is documented (its own site/wiki)
+  to work by picking a game archive through its file browser, and it
+  extracts into its own app storage — **droidtop never observed or relied
+  on any way to add a game to JoiPlay's catalog without a real copy
+  landing in JoiPlay's own storage.**
+- **Per explicit, repeated, non-negotiable direction: droidtop must never
+  copy, move, or otherwise duplicate a user's game files as part of any
+  integration** — this rules out driving JoiPlay's own import
+  automatically, copy-based or otherwise. Symlinks on Android shared
+  storage were tested directly on a real device and don't work either
+  (`ln`: "Function not implemented" — a FUSE storage-layer limitation,
+  not a permissions issue). Root was considered and explicitly rejected
+  as a "solution" — it works on the one dev device, but isn't a real
+  answer for other users.
+- JoiPlay ships separate plugin APKs per engine (RPG Maker, Ren'Py, Flash,
+  etc., confirmed via `pm list packages` on the real test device) — a
+  real, standard Android app-plugin pattern (a shared intent-filter
+  action + package discovery), the same general shape `enginehost`'s own
+  plugin system below uses. No shipped JoiPlay plugin exists for KiriKiri
+  anywhere (confirmed: not installed on the real test device, and the
+  one public attempt in JoiPlay's own GitHub org has been inactive since
+  2022 with no real plugin wiring committed) — a real, confirmed gap
+  worth droidtop filling itself.
+
+**Conclusion, and the actual current design**: JoiPlay is a good,
+independent, user-facing project worth supporting as-is, not routing
+around — droidtop does not try to automate its import. **`enginehost`**
+(a separate, standalone repo — `bi0shacker001/enginehost`, deliberately
+NOT droidtop-branded, since it's meant to be usable by anything, not just
+droidtop) is droidtop's own answer for the cases JoiPlay doesn't cover
+programmatically:
+
+- **The whole contract**: fire `ACTION dev.enginehost.LAUNCH` with a
+  `path` extra (an absolute folder) and optionally an inline `config`
+  JSON extra (used only if the folder has no `enginehost.json` of its
+  own — the folder's own file always wins). No catalog, no import step,
+  nothing about the folder ever copied or moved.
+- **Plugins are separate, manually-installed apps, each its own repo**,
+  discovered via `PackageManager` (the same real mechanism JoiPlay's own
+  plugin system uses) — identified by `(engine, engineVersion,
+  pluginVersion)`. Resolution: exact `engineVersion` match, else nearest;
+  an optional per-game `pluginVersion` constraint (comma-separated exact
+  versions and/or ranges) lets a game exclude specific plugin builds it's
+  known to regress on, independent of engine version — the real
+  motivating case being JoiPlay's own RPG Maker plugin reportedly
+  regressing specific games in newer builds.
+- **Full detail, methodology, and current status**: see
+  `/root/coordination/HANDOFF.md`'s own "ES-DE theme engine" and
+  "enginehost" sections (kept up to date there, not duplicated here) —
+  and `enginehost`'s own README for the real contract spec.
+- **Real engine coverage plan, replacing the old Pythia-derived
+  RENPY/RPG_MAKER_MV/MZ/VX_ACE-only detection**:
+  - **KiriKiri** (`kirikiroid2-joiplay`, a fork of Kirikiroid2Yuri) — the
+    one confirmed real gap in JoiPlay's own ecosystem. Plugin shell real
+    and discovered correctly by enginehost; engine not wired up yet
+    (blocked on finding how to point Kirikiroid2's native init at an
+    arbitrary runtime folder — see handoff doc).
+  - **RPG Maker XP/VX/VX Ace** via `mkxp-z` (the same real open-source
+    engine JoiPlay's own plugin wraps) — covers Monster Girl Quest
+    Paradox (confirmed VX Ace). Not started.
+  - **Ren'Py** via a fork of the real upstream engine
+    (`bi0shacker001/renpy`) — `master` auto-syncs with upstream,
+    `plugin/renpy8` branch exists for the real Android patches (not
+    written yet).
+  - Detection signatures for these (and RPG Maker 2000/2003 via
+    EasyRPG's own real engine, WOLF RPG, TyranoBuilder, NScripter) were
+    researched and confirmed against real project docs this session —
+    see handoff doc for the verified per-engine file signatures.
+- **`LibraryEntryKind` stays named per-engine, not per-launcher** (as
+  before) — a droidtop `LibraryProvider` detecting a folder can hand off
+  either to JoiPlay (foreground-launch only, letting the user add it via
+  JoiPlay's own UI if they choose) or to an installed enginehost plugin
+  via the contract above, without the entry's own kind needing to know
+  which.
 
 ## 7e. Second-screen / ambient integrations (Spotify now-playing, Discord presence)
 
