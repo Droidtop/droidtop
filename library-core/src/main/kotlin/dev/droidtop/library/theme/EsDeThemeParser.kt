@@ -6,6 +6,29 @@ import java.io.File
 import java.io.StringReader
 
 /**
+ * One real ES-DE "variant axis" -- confirmed against ES-DE's own
+ * ThemeData.cpp (`parseVariants`/`parseColorSchemes`/`parseFontSizes`, and
+ * `aspectRatio` handled the same way inline): a tag with a `name`
+ * attribute, matched against a currently-selected value for that axis,
+ * mutually recursive with every OTHER axis -- a `<colorScheme>` block can
+ * contain an `<aspectRatio>` block and vice versa, since each of ES-DE's
+ * own parse functions re-invokes every other one on a matched subtree,
+ * not just its own tag type. [selected] `null` means no selection exists
+ * for this axis at all -- every block for that tag name is skipped
+ * unconditionally (real for `language`: no per-user language selection to
+ * thread through yet).
+ *
+ * Earlier revisions of this parser handled aspectRatio/colorScheme/
+ * fontSize as three near-identical, hand-duplicated `when` branches
+ * (found and fixed one at a time as each one's absence caused a real,
+ * separately-diagnosed rendering bug) -- this list is the fix for *that*
+ * pattern, not just the individual bugs: a new axis is one line here, not
+ * a new branch duplicated across every place a theme document gets
+ * walked.
+ */
+private data class VariantAxis(val tagName: String, val selected: String?)
+
+/**
  * Real ES-DE theme.xml parser -- a clean-room Kotlin port of the parsing
  * *rules* in ES-DE's own open-source `ThemeData::parseView`/`parseElement`
  * (verified against the actual source, not guessed; see [EsDeTheme]'s own
@@ -34,47 +57,41 @@ import java.io.StringReader
  *    load entirely because of it (a real difference from ES-DE's own
  *    stricter behavior, deliberate given the smaller scope here).
  *  - `<include>path</include>` pulls in another XML file's own top-level
- *    content (variables/views/nested includes) as if it were inlined at
- *    that point -- confirmed real: DEcaffe's own theme.xml is mostly a
- *    shell of `<include>` tags (colors.xml, font.xml, per-aspect-ratio
- *    layout files, per-system metadata files), not inline content. Missing
- *    this entirely was a real bug: most of a real theme's variables and
- *    view elements never got parsed at all, since they live in included
- *    files. `<aspectRatio name="...">`, `<colorScheme name="...">` and
- *    `<language name="...">` all wrap content that's only meant to apply
- *    for a matching device shape / user color choice / UI language (ES-DE's
- *    own real variant mechanisms) -- only the block matching [parse]'s own
- *    `aspectRatio`/`colorScheme`/`language` argument is descended into,
- *    every other variant is skipped entirely. Missing this for
- *    colorScheme/language was a second real bug found alongside the
- *    missing-include one: with no dedicated handling, an unrecognized tag
- *    name simply fell through the same top-level loop instead of being
- *    skipped, so EVERY colorScheme's and EVERY language's own <variables>
- *    block got flattened into the same map in file order -- last one in
- *    the file always won, silently overriding real values (e.g. DEcaffe's
- *    English `langLabel*` defaults getting overwritten by zh_TW, its last
- *    `<language>` block, and every `mainFontColor`-style color variable
- *    staying unresolved because colors.xml defines them ONLY inside
- *    `<colorScheme>` blocks with no top-level default to fall back on).
- *    `language` has no matching-argument case here -- there's no per-user
- *    language selection to thread through yet, so every `<language>` block
- *    is unconditionally skipped, leaving only the base (English)
- *    `<variables>` block that sits outside all of them.
+ *    content as if it were inlined at that point -- confirmed real:
+ *    DEcaffe's own theme.xml is mostly a shell of `<include>` tags, not
+ *    inline content.
+ *  - `<variant>`, `<colorScheme>`, `<fontSize>`, and `<aspectRatio>` --
+ *    each with a real `name` attribute -- are ES-DE's own variant axes
+ *    (see [VariantAxis]); `<language>` is treated the same way but with
+ *    no selection at all. All five are handled by ONE generic mechanism
+ *    (see [parseNode]), not per-tag special cases.
  */
 object EsDeThemeParser {
     private const val MAX_INCLUDE_DEPTH = 24
 
-    fun parse(themeFile: File, aspectRatio: String = "16:9", colorScheme: String = "1"): EsDeTheme {
+    fun parse(
+        themeFile: File,
+        aspectRatio: String = "16:9",
+        colorScheme: String = "1",
+        fontSize: String = "medium",
+        variant: String? = null,
+    ): EsDeTheme {
+        val axes = listOf(
+            VariantAxis("variant", variant),
+            VariantAxis("colorScheme", colorScheme),
+            VariantAxis("fontSize", fontSize),
+            VariantAxis("aspectRatio", aspectRatio),
+            VariantAxis("language", null),
+        )
         val variables = mutableMapOf<String, String>()
         val views = mutableMapOf<String, MutableMap<String, EsDeThemeElement>>()
-        parseDocument(themeFile, aspectRatio, colorScheme, variables, views, depth = 0)
+        parseDocument(themeFile, axes, variables, views, depth = 0)
         return EsDeTheme(variables, views.mapValues { EsDeThemeView(it.value) })
     }
 
     private fun parseDocument(
         themeFile: File,
-        aspectRatio: String,
-        colorScheme: String,
+        axes: List<VariantAxis>,
         variables: MutableMap<String, String>,
         views: MutableMap<String, MutableMap<String, EsDeThemeElement>>,
         depth: Int,
@@ -92,50 +109,60 @@ object EsDeThemeParser {
         var event = parser.eventType
         while (event != XmlPullParser.END_DOCUMENT) {
             if (event == XmlPullParser.START_TAG) {
-                when (parser.name) {
-                    "variables" -> parseVariables(parser, variables)
-                    "view" -> parseView(parser, variables, baseDir, views)
-                    "include" -> {
-                        val rawPath = resolvePlaceholders(readText(parser), variables)
-                        resolveIncludePath(baseDir, rawPath)?.let { included ->
-                            parseDocument(included, aspectRatio, colorScheme, variables, views, depth + 1)
-                        }
-                    }
-                    "aspectRatio" -> {
-                        val name = parser.getAttributeValue(null, "name")
-                        if (name == aspectRatio) {
-                            parseVariantBlock(parser, aspectRatio, colorScheme, baseDir, variables, views, depth)
-                        } else {
-                            skipSubtree(parser)
-                        }
-                    }
-                    "colorScheme" -> {
-                        val name = parser.getAttributeValue(null, "name")
-                        if (name == colorScheme) {
-                            parseVariantBlock(parser, aspectRatio, colorScheme, baseDir, variables, views, depth)
-                        } else {
-                            skipSubtree(parser)
-                        }
-                    }
-                    "language" -> skipSubtree(parser)
-                }
+                parseNode(parser, axes, baseDir, variables, views, depth)
             }
             event = parser.next()
         }
     }
 
     /**
-     * A matching `<aspectRatio>`/`<colorScheme>` block's own children are
-     * the same top-level tags a theme document can have -- walked the same
-     * way [parseDocument] walks a whole file, just scoped to this subtree.
-     * A nested variant tag (e.g. a `<colorScheme>` inside an `<aspectRatio>`
-     * block, real in some themes) gets the same matching/skipping treatment
-     * recursively.
+     * Dispatches ONE already-positioned START_TAG node -- either a real
+     * variant axis (see [VariantAxis]: matches and descends, or skips),
+     * or one of the fixed structural tags (`variables`/`view`/`include`),
+     * or anything else (silently skipped by the caller's own loop just
+     * moving past it, same permissive-subset behavior as an unrecognized
+     * element/property elsewhere in this parser).
      */
-    private fun parseVariantBlock(
+    private fun parseNode(
         parser: XmlPullParser,
-        aspectRatio: String,
-        colorScheme: String,
+        axes: List<VariantAxis>,
+        baseDir: File,
+        variables: MutableMap<String, String>,
+        views: MutableMap<String, MutableMap<String, EsDeThemeElement>>,
+        depth: Int,
+    ) {
+        val axis = axes.find { it.tagName == parser.name }
+        when {
+            axis != null -> {
+                val name = parser.getAttributeValue(null, "name")
+                if (axis.selected != null && name == axis.selected) {
+                    parseScopedBlock(parser, axes, baseDir, variables, views, depth)
+                } else {
+                    skipSubtree(parser)
+                }
+            }
+            parser.name == "variables" -> parseVariables(parser, variables)
+            parser.name == "view" -> parseView(parser, variables, baseDir, views)
+            parser.name == "include" -> {
+                val rawPath = resolvePlaceholders(readText(parser), variables)
+                resolveIncludePath(baseDir, rawPath)?.let { included ->
+                    parseDocument(included, axes, variables, views, depth + 1)
+                }
+            }
+        }
+    }
+
+    /**
+     * A matched variant block's own children are the same real node types
+     * a whole document can have -- walked with the exact same [parseNode]
+     * dispatch, just scoped to this element's subtree instead of the
+     * whole file. This is what makes every axis mutually recursive with
+     * every other one for free: a `<colorScheme>` matched here can itself
+     * contain an `<aspectRatio>`, which hits this same function again.
+     */
+    private fun parseScopedBlock(
+        parser: XmlPullParser,
+        axes: List<VariantAxis>,
         baseDir: File,
         variables: MutableMap<String, String>,
         views: MutableMap<String, MutableMap<String, EsDeThemeElement>>,
@@ -145,33 +172,7 @@ object EsDeThemeParser {
         var event = parser.next()
         while (!(event == XmlPullParser.END_TAG && parser.depth == blockDepth)) {
             if (event == XmlPullParser.START_TAG) {
-                when (parser.name) {
-                    "variables" -> parseVariables(parser, variables)
-                    "view" -> parseView(parser, variables, baseDir, views)
-                    "include" -> {
-                        val rawPath = resolvePlaceholders(readText(parser), variables)
-                        resolveIncludePath(baseDir, rawPath)?.let { included ->
-                            parseDocument(included, aspectRatio, colorScheme, variables, views, depth + 1)
-                        }
-                    }
-                    "aspectRatio" -> {
-                        val name = parser.getAttributeValue(null, "name")
-                        if (name == aspectRatio) {
-                            parseVariantBlock(parser, aspectRatio, colorScheme, baseDir, variables, views, depth)
-                        } else {
-                            skipSubtree(parser)
-                        }
-                    }
-                    "colorScheme" -> {
-                        val name = parser.getAttributeValue(null, "name")
-                        if (name == colorScheme) {
-                            parseVariantBlock(parser, aspectRatio, colorScheme, baseDir, variables, views, depth)
-                        } else {
-                            skipSubtree(parser)
-                        }
-                    }
-                    "language" -> skipSubtree(parser)
-                }
+                parseNode(parser, axes, baseDir, variables, views, depth)
             }
             event = parser.next()
         }
