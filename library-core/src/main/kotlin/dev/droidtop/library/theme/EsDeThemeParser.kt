@@ -75,6 +75,17 @@ object EsDeThemeParser {
         colorScheme: String = "1",
         fontSize: String = "medium",
         variant: String? = null,
+        // Real ES-DE per-system metadata (systemName/systemManufacturer/
+        // systemReleaseYear/...) lives in include paths like
+        // "./system/metadata/${system.theme}.xml" -- unresolvable, and
+        // therefore skipped (see resolveIncludePath), for a theme-wide
+        // parse with no system context. Real ES-DE itself resolves these
+        // by parsing per system, substituting the real system id here
+        // before parsing starts, not by a single global parse -- this
+        // parameter is that same real per-system parse, used by
+        // ThemeAssets to get one EsDeTheme per system id rather than one
+        // theme-wide object with these fields permanently unresolved.
+        systemTheme: String? = null,
     ): EsDeTheme {
         val axes = listOf(
             VariantAxis("variant", variant),
@@ -84,6 +95,7 @@ object EsDeThemeParser {
             VariantAxis("language", null),
         )
         val variables = mutableMapOf<String, String>()
+        if (systemTheme != null) variables["system.theme"] = systemTheme
         val views = mutableMapOf<String, MutableMap<String, EsDeThemeElement>>()
         parseDocument(themeFile, axes, variables, views, depth = 0)
         return EsDeTheme(variables, views.mapValues { EsDeThemeView(it.value) })

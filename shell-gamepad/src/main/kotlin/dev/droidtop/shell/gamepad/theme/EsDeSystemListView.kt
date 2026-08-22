@@ -68,14 +68,20 @@ fun EsDeSystemListView(
     items: List<EsDeListItem>,
     firstItemFocus: FocusRequester?,
     modifier: Modifier = Modifier,
+    onFocusedIndexChanged: (Int) -> Unit = {},
 ) {
     when (element?.type) {
+        // Grid/textlist don't get onFocusedIndexChanged wired through --
+        // real per-system theme reloading (what that callback drives) only
+        // matters for the "system" view's own primary list; a per-game
+        // grid/textlist browsing one already-selected system's games has
+        // no equivalent "which system's metadata" question to answer.
         "grid" -> EsDeGrid(element, items, firstItemFocus, modifier)
         "textlist" -> EsDeTextList(element, items, firstItemFocus, modifier)
         // "carousel", or no theme-declared element at all -- carousel is
         // ES-DE's own real default shape and the one droidtop already
         // shipped, so it's the honest fallback rather than an arbitrary one.
-        else -> EsDeCarousel(element, items, firstItemFocus, modifier)
+        else -> EsDeCarousel(element, items, firstItemFocus, modifier, onFocusedIndexChanged)
     }
 }
 
@@ -106,7 +112,13 @@ fun EsDeSystemListView(
  * scoped follow-up work, not attempted in this pass.
  */
 @Composable
-private fun EsDeCarousel(element: EsDeThemeElement?, items: List<EsDeListItem>, firstItemFocus: FocusRequester?, modifier: Modifier) {
+private fun EsDeCarousel(
+    element: EsDeThemeElement?,
+    items: List<EsDeListItem>,
+    firstItemFocus: FocusRequester?,
+    modifier: Modifier,
+    onFocusedIndexChanged: (Int) -> Unit = {},
+) {
     val textColor = element?.valueOrNull<EsDeThemeValue.Color>("textColor")?.let { colorOf(it) } ?: Color.White
     val uppercase = element?.valueOrNull<EsDeThemeValue.Str>("letterCase")?.value == "uppercase"
     val unfocusedOpacity = element?.valueOrNull<EsDeThemeValue.FloatValue>("unfocusedItemOpacity")?.value ?: 1f
@@ -161,7 +173,12 @@ private fun EsDeCarousel(element: EsDeThemeElement?, items: List<EsDeListItem>, 
                 modifier = (if (index == 0 && firstItemFocus != null) Modifier.focusRequester(firstItemFocus) else Modifier)
                     .absoluteOffset(x = xDp, y = yDp)
                     .graphicsLayer { scaleX = rawScale; scaleY = rawScale; alpha = opacity }
-                    .onFocusChanged { if (it.isFocused) focusedIndex = index },
+                    .onFocusChanged {
+                        if (it.isFocused) {
+                            focusedIndex = index
+                            onFocusedIndexChanged(index)
+                        }
+                    },
             )
         }
     }

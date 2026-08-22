@@ -602,7 +602,17 @@ private fun GamesSection(
                 // own addition layered over the theme rather than part of it.
                 Box(modifier = Modifier.fillMaxSize()) {
                     val context = LocalContext.current
-                    val theme = remember { ThemeAssets.loadDecaffeTheme(context) }
+                    // Real per-system metadata (systemName/systemManufacturer/
+                    // systemReleaseYear/...) needs a theme parsed with the
+                    // CURRENTLY FOCUSED system's own ${system.theme}
+                    // substituted -- see ThemeAssets.loadDecaffeTheme's own
+                    // doc comment for why this can't be one static parse.
+                    // focusedSystemIndex is fed by EsDeThemedView's own
+                    // onFocusedIndexChanged, driven by whichever carousel
+                    // item actually has focus right now.
+                    var focusedSystemIndex by remember { mutableStateOf(0) }
+                    val focusedSystemId = (orderedGroups.getOrNull(focusedSystemIndex) as? GameGroup.System)?.systemId
+                    val theme = remember(focusedSystemId) { ThemeAssets.loadDecaffeTheme(context, focusedSystemId) }
                     val listElement = remember(theme) { theme?.views?.get("system")?.primaryListElement() }
                     val items = orderedGroups.map { entryGroup ->
                         EsDeListItem(
@@ -637,6 +647,7 @@ private fun GamesSection(
                             items = items,
                             firstItemFocus = firstFocus,
                             modifier = Modifier.fillMaxSize(),
+                            onFocusedIndexChanged = { focusedSystemIndex = it },
                         )
                     } ?: EsDeSystemListView(
                         element = listElement,
