@@ -34,3 +34,6 @@
 [submodule "vendor/lemuroid"]
 	path = vendor/lemuroid
 	url = https://github.com/Swordfish90/Lemuroid.git
+[submodule "vendor/kirikiroid2"]
+	path = vendor/kirikiroid2
+	url = https://github.com/bi0shacker001/kirikiroid2-joiplay.git
