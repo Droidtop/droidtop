@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -190,12 +191,17 @@ private fun EsDeCarousel(
  * (see [EsDeCarousel]'s own doc comment) -- ES-DE's real GridComponent
  * (GridComponent.h's own `calculateLayout`/`input`) genuinely scrolls
  * whole rows as the cursor moves, the same real interaction a
- * `LazyVerticalGrid` already gives for free. The real gap fixed here is
- * narrower: `itemSpacing` was hardcoded (16dp) instead of reading the
- * theme's own real property, and the focused item never scaled up at all
- * -- ES-DE's own default `itemScale` is 1.05 (GridComponent's real
- * constructor default), applied only to the focused item, not ported
- * here before this pass.
+ * `LazyVerticalGrid` already gives for free.
+ *
+ * Column count is now real ES-DE math (`calculateLayout`'s own greedy
+ * fit-as-many-as-fit loop: `width = margin*2; while (true) { width +=
+ * itemSize.x; if (columns != 0) width += itemSpacing.x; if (width >
+ * containerWidth) break; ++columns }`), not `GridCells.Adaptive` (a
+ * Compose heuristic that doesn't reserve the same real margin ES-DE
+ * applies around scaled-up items -- see [margin] below). `itemSpacing`
+ * was hardcoded (16dp) before this pass; the focused item's scale-up is
+ * ES-DE's own real default `itemScale` (1.05, `GridComponent`'s
+ * constructor default).
  */
 @Composable
 private fun EsDeGrid(element: EsDeThemeElement, items: List<EsDeListItem>, firstItemFocus: FocusRequester?, modifier: Modifier) {
@@ -209,34 +215,71 @@ private fun EsDeGrid(element: EsDeThemeElement, items: List<EsDeListItem>, first
     val itemSpacingX = itemSpacingFraction?.let { (it.x * 1920).dp } ?: 16.dp
     val itemSpacingY = itemSpacingFraction?.let { (it.y * 1080).dp } ?: 16.dp
     val itemScale = (element.valueOrNull<EsDeThemeValue.FloatValue>("itemScale")?.value ?: 1.05f).coerceIn(0.5f, 3f)
+    // Real formula (calculateLayout, scaleInwards not modeled/read here so
+    // treated as false, ES-DE's own default): margin only reserved when
+    // itemScale >= 1 (items scale up and need room to grow without
+    // overlapping their neighbors); items that scale down need none.
+    val margin = if (itemScale >= 1f) (itemWidth * (itemScale - 1f)) / 2f else 0.dp
 
     var focusedIndex by remember { mutableStateOf(0) }
 
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = itemWidth),
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(itemSpacingX),
-        verticalArrangement = Arrangement.spacedBy(itemSpacingY),
-    ) {
-        gridItemsIndexed(items, key = { _, item -> item.key }) { index, item ->
-            val scale = if (index == focusedIndex) itemScale else 1f
-            EsDeListTile(
-                item = item,
-                width = itemWidth,
-                height = itemWidth * 0.75f,
-                textColor = textColor,
-                uppercase = uppercase,
-                unfocusedOpacity = unfocusedOpacity,
-                unfocusedSaturation = unfocusedSaturation,
-                modifier = (if (index == 0 && firstItemFocus != null) Modifier.focusRequester(firstItemFocus) else Modifier)
-                    .graphicsLayer { scaleX = scale; scaleY = scale }
-                    .onFocusChanged { if (it.isFocused) focusedIndex = index },
-            )
+    BoxWithConstraints(modifier = modifier) {
+        val density = LocalDensity.current
+        val containerWidthPx = with(density) { maxWidth.toPx() }
+        val itemWidthPx = with(density) { itemWidth.toPx() }
+        val itemSpacingXPx = with(density) { itemSpacingX.toPx() }
+        val marginPx = with(density) { margin.toPx() }
+
+        var columns = 0
+        var widthPx = marginPx * 2f
+        while (true) {
+            widthPx += itemWidthPx
+            if (columns != 0) widthPx += itemSpacingXPx
+            if (widthPx > containerWidthPx) break
+            columns++
+        }
+        if (columns == 0) columns = 1
+
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(columns),
+            horizontalArrangement = Arrangement.spacedBy(itemSpacingX),
+            verticalArrangement = Arrangement.spacedBy(itemSpacingY),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = margin),
+        ) {
+            gridItemsIndexed(items, key = { _, item -> item.key }) { index, item ->
+                val scale = if (index == focusedIndex) itemScale else 1f
+                EsDeListTile(
+                    item = item,
+                    width = itemWidth,
+                    height = itemWidth * 0.75f,
+                    textColor = textColor,
+                    uppercase = uppercase,
+                    unfocusedOpacity = unfocusedOpacity,
+                    unfocusedSaturation = unfocusedSaturation,
+                    modifier = (if (index == 0 && firstItemFocus != null) Modifier.focusRequester(firstItemFocus) else Modifier)
+                        .graphicsLayer { scaleX = scale; scaleY = scale }
+                        .onFocusChanged { if (it.isFocused) focusedIndex = index },
+                )
+            }
         }
     }
 }
 
-/** Daijishō/ES-DE's real "textlist" shape -- a plain vertical list of names, no artwork, matching a live Daijishō screenshot examined this session (its own "List view" toggle). */
+/**
+ * Daijishō/ES-DE's real "textlist" shape -- a plain vertical list of
+ * names, no artwork, matching a live Daijishō screenshot examined this
+ * session (its own "List view" toggle).
+ *
+ * Row height is real ES-DE math now, not an arbitrary fixed gap:
+ * `TextListComponent::render`'s own `entrySize = mFont->getSize() *
+ * mLineSpacing` is the actual per-row height ES-DE uses to decide how
+ * many rows fit on screen -- `fontSize` (a fraction of screen height,
+ * same real convention as every other ES-DE size property) and
+ * `lineSpacing` (real default 1.5, clamped 0.5-3.0 by the real parser)
+ * are both already-parsed real theme properties that were simply unread
+ * before this pass, replaced by a hardcoded `MaterialTheme.typography`
+ * size and a flat 4.dp gap.
+ */
 @Composable
 private fun EsDeTextList(element: EsDeThemeElement, items: List<EsDeListItem>, firstItemFocus: FocusRequester?, modifier: Modifier) {
     val primaryColor = element.valueOrNull<EsDeThemeValue.Color>("primaryColor")?.let { colorOf(it) } ?: Color.White
@@ -249,8 +292,15 @@ private fun EsDeTextList(element: EsDeThemeElement, items: List<EsDeListItem>, f
     // stood in for it).
     val selectorColor = element.valueOrNull<EsDeThemeValue.Color>("selectorColor")?.let { colorOf(it) }
         ?: Color(0x33, 0x33, 0x33, 0xFF)
+    // Real ES-DE default font size for a textlist (its own theme docs).
+    val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
+    val lineSpacing = (element.valueOrNull<EsDeThemeValue.FloatValue>("lineSpacing")?.value ?: 1.5f).coerceIn(0.5f, 3f)
+    val fontSizeDp = (fontSizeFraction * 1080).dp
+    val fontSizeSp = with(LocalDensity.current) { fontSizeDp.toSp() }
+    // Real formula (TextListComponent::render): entrySize = fontSize * lineSpacing.
+    val rowHeight = fontSizeDp * lineSpacing
 
-    LazyColumn(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    LazyColumn(modifier = modifier) {
         itemsIndexed(items, key = { _, item -> item.key }) { index, item ->
             EsDeTextListRow(
                 item = item,
@@ -258,6 +308,8 @@ private fun EsDeTextList(element: EsDeThemeElement, items: List<EsDeListItem>, f
                 selectedColor = selectedColor,
                 selectorColor = selectorColor,
                 uppercase = uppercase,
+                fontSize = fontSizeSp,
+                rowHeight = rowHeight,
                 modifier = if (index == 0 && firstItemFocus != null) Modifier.focusRequester(firstItemFocus) else Modifier,
             )
         }
@@ -271,15 +323,18 @@ private fun EsDeTextListRow(
     selectedColor: Color,
     selectorColor: Color,
     uppercase: Boolean,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    rowHeight: androidx.compose.ui.unit.Dp,
     modifier: Modifier,
 ) {
     var focused by remember { mutableStateOf(false) }
     Text(
         if (uppercase) item.label.uppercase() else item.label,
         color = if (focused) selectedColor else primaryColor,
-        style = MaterialTheme.typography.titleMedium,
+        fontSize = fontSize,
         modifier = modifier
             .fillMaxWidth()
+            .height(rowHeight)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             // Real touch-input fix, reported directly: nothing in Handheld
@@ -297,7 +352,7 @@ private fun EsDeTextListRow(
                 }
             }
             .background(if (focused) selectorColor else Color.Transparent)
-            .padding(horizontal = 48.dp, vertical = 10.dp),
+            .padding(horizontal = 48.dp),
     )
 }
 
