@@ -2,6 +2,7 @@ package dev.droidtop.shell.gamepad.theme
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -167,6 +168,10 @@ private fun EsDeTextListRow(item: EsDeListItem, primaryColor: Color, selectedCol
             .fillMaxWidth()
             .onFocusChanged { focused = it.isFocused }
             .focusable()
+            // Real touch-input fix, reported directly: nothing in Handheld
+            // mode responded to taps -- .focusable() alone only covers
+            // real D-pad/gamepad focus+key input, never touch.
+            .clickable(onClick = item.onSelect)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp &&
                     (event.key == Key.ButtonA || event.key == Key.DirectionCenter || event.key == Key.Enter)
@@ -200,6 +205,8 @@ private fun EsDeListTile(
             .size(width = width, height = height)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
+            // Same real touch-input fix as EsDeTextListRow above.
+            .clickable(onClick = item.onSelect)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp &&
                     (event.key == Key.ButtonA || event.key == Key.DirectionCenter || event.key == Key.Enter)
