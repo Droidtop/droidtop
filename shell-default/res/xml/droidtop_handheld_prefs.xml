@@ -26,4 +26,9 @@
         android:defaultValue="true"
         android:persistent="true" />
 
+    <Preference
+        android:key="pref_handheld_console_systems"
+        android:title="@string/pref_handheld_console_systems_title"
+        android:summary="@string/pref_handheld_console_systems_desc" />
+
 </androidx.preference.PreferenceScreen>
