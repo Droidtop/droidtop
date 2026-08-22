@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.IBinder
 import dev.droidtop.hostbridge.HostBridge
 import dev.droidtop.runtime.BundledImageRepositories
+import dev.droidtop.runtime.Container
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.DisplayOutput
 import dev.droidtop.runtime.DisplayOutputKind
@@ -34,7 +35,13 @@ import kotlinx.coroutines.launch
 sealed interface DesktopSessionState {
     data object Idle : DesktopSessionState
     data object Connecting : DesktopSessionState
-    data class Connected(val hostBridge: HostBridge, val primaryOutput: DisplayOutput) : DesktopSessionState
+    data class Connected(
+        val hostBridge: HostBridge,
+        val primaryOutput: DisplayOutput,
+        /** The running primary container + the runtime that created it — what `:runtime-windows`'s `WineSession`/`PcGameProvider` need to launch a Windows game as a Wayland client sharing this same desktop. */
+        val runtime: ContainerRuntime,
+        val container: Container,
+    ) : DesktopSessionState
     data class Failed(val message: String) : DesktopSessionState
 }
 
@@ -121,7 +128,7 @@ class DesktopSessionService : Service() {
             return
         }
 
-        _stateHolder.value = DesktopSessionState.Connected(hostBridge, primaryDisplayOutput())
+        _stateHolder.value = DesktopSessionState.Connected(hostBridge, primaryDisplayOutput(), runtime, primary)
     }
 
     /**
