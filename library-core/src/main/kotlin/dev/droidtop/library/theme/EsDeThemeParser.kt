@@ -40,24 +40,41 @@ import java.io.StringReader
  *    layout files, per-system metadata files), not inline content. Missing
  *    this entirely was a real bug: most of a real theme's variables and
  *    view elements never got parsed at all, since they live in included
- *    files. `<aspectRatio name="...">` wraps includes that only apply for
- *    a matching device aspect ratio (ES-DE's own real per-shape-screen
- *    layout mechanism) -- only the block matching [parse]'s `aspectRatio`
- *    argument is followed, others are skipped entirely.
+ *    files. `<aspectRatio name="...">`, `<colorScheme name="...">` and
+ *    `<language name="...">` all wrap content that's only meant to apply
+ *    for a matching device shape / user color choice / UI language (ES-DE's
+ *    own real variant mechanisms) -- only the block matching [parse]'s own
+ *    `aspectRatio`/`colorScheme`/`language` argument is descended into,
+ *    every other variant is skipped entirely. Missing this for
+ *    colorScheme/language was a second real bug found alongside the
+ *    missing-include one: with no dedicated handling, an unrecognized tag
+ *    name simply fell through the same top-level loop instead of being
+ *    skipped, so EVERY colorScheme's and EVERY language's own <variables>
+ *    block got flattened into the same map in file order -- last one in
+ *    the file always won, silently overriding real values (e.g. DEcaffe's
+ *    English `langLabel*` defaults getting overwritten by zh_TW, its last
+ *    `<language>` block, and every `mainFontColor`-style color variable
+ *    staying unresolved because colors.xml defines them ONLY inside
+ *    `<colorScheme>` blocks with no top-level default to fall back on).
+ *    `language` has no matching-argument case here -- there's no per-user
+ *    language selection to thread through yet, so every `<language>` block
+ *    is unconditionally skipped, leaving only the base (English)
+ *    `<variables>` block that sits outside all of them.
  */
 object EsDeThemeParser {
     private const val MAX_INCLUDE_DEPTH = 24
 
-    fun parse(themeFile: File, aspectRatio: String = "16:9"): EsDeTheme {
+    fun parse(themeFile: File, aspectRatio: String = "16:9", colorScheme: String = "1"): EsDeTheme {
         val variables = mutableMapOf<String, String>()
         val views = mutableMapOf<String, MutableMap<String, EsDeThemeElement>>()
-        parseDocument(themeFile, aspectRatio, variables, views, depth = 0)
+        parseDocument(themeFile, aspectRatio, colorScheme, variables, views, depth = 0)
         return EsDeTheme(variables, views.mapValues { EsDeThemeView(it.value) })
     }
 
     private fun parseDocument(
         themeFile: File,
         aspectRatio: String,
+        colorScheme: String,
         variables: MutableMap<String, String>,
         views: MutableMap<String, MutableMap<String, EsDeThemeElement>>,
         depth: Int,
@@ -81,17 +98,26 @@ object EsDeThemeParser {
                     "include" -> {
                         val rawPath = resolvePlaceholders(readText(parser), variables)
                         resolveIncludePath(baseDir, rawPath)?.let { included ->
-                            parseDocument(included, aspectRatio, variables, views, depth + 1)
+                            parseDocument(included, aspectRatio, colorScheme, variables, views, depth + 1)
                         }
                     }
                     "aspectRatio" -> {
                         val name = parser.getAttributeValue(null, "name")
                         if (name == aspectRatio) {
-                            parseAspectRatioBlock(parser, aspectRatio, baseDir, variables, views, depth)
+                            parseVariantBlock(parser, aspectRatio, colorScheme, baseDir, variables, views, depth)
                         } else {
                             skipSubtree(parser)
                         }
                     }
+                    "colorScheme" -> {
+                        val name = parser.getAttributeValue(null, "name")
+                        if (name == colorScheme) {
+                            parseVariantBlock(parser, aspectRatio, colorScheme, baseDir, variables, views, depth)
+                        } else {
+                            skipSubtree(parser)
+                        }
+                    }
+                    "language" -> skipSubtree(parser)
                 }
             }
             event = parser.next()
@@ -99,14 +125,17 @@ object EsDeThemeParser {
     }
 
     /**
-     * An `<aspectRatio>` block's own children are the same top-level tags a
-     * theme document can have (mostly `<include>` in practice) -- walked
-     * the same way [parseDocument] walks a whole file, just scoped to this
-     * subtree instead of the whole document.
+     * A matching `<aspectRatio>`/`<colorScheme>` block's own children are
+     * the same top-level tags a theme document can have -- walked the same
+     * way [parseDocument] walks a whole file, just scoped to this subtree.
+     * A nested variant tag (e.g. a `<colorScheme>` inside an `<aspectRatio>`
+     * block, real in some themes) gets the same matching/skipping treatment
+     * recursively.
      */
-    private fun parseAspectRatioBlock(
+    private fun parseVariantBlock(
         parser: XmlPullParser,
         aspectRatio: String,
+        colorScheme: String,
         baseDir: File,
         variables: MutableMap<String, String>,
         views: MutableMap<String, MutableMap<String, EsDeThemeElement>>,
@@ -122,9 +151,26 @@ object EsDeThemeParser {
                     "include" -> {
                         val rawPath = resolvePlaceholders(readText(parser), variables)
                         resolveIncludePath(baseDir, rawPath)?.let { included ->
-                            parseDocument(included, aspectRatio, variables, views, depth + 1)
+                            parseDocument(included, aspectRatio, colorScheme, variables, views, depth + 1)
                         }
                     }
+                    "aspectRatio" -> {
+                        val name = parser.getAttributeValue(null, "name")
+                        if (name == aspectRatio) {
+                            parseVariantBlock(parser, aspectRatio, colorScheme, baseDir, variables, views, depth)
+                        } else {
+                            skipSubtree(parser)
+                        }
+                    }
+                    "colorScheme" -> {
+                        val name = parser.getAttributeValue(null, "name")
+                        if (name == colorScheme) {
+                            parseVariantBlock(parser, aspectRatio, colorScheme, baseDir, variables, views, depth)
+                        } else {
+                            skipSubtree(parser)
+                        }
+                    }
+                    "language" -> skipSubtree(parser)
                 }
             }
             event = parser.next()

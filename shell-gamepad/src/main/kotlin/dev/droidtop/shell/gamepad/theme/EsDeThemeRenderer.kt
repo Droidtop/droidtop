@@ -124,7 +124,7 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
  */
 @Composable
 private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp) {
-    val format = element.valueOrNull<EsDeThemeValue.Str>("format")?.value ?: "HH:mm"
+    val format = element.valueOrNull<EsDeThemeValue.Str>("format")?.value ?: "%H:%M"
     var now by remember { mutableStateOf(Date()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -133,7 +133,9 @@ private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         }
     }
     val formatted = remember(now, format) {
-        runCatching { SimpleDateFormat(format, Locale.getDefault()).format(now) }.getOrDefault("")
+        runCatching {
+            SimpleDateFormat(strftimeToJavaPattern(format), Locale.getDefault()).format(now)
+        }.getOrDefault("")
     }
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight)
     val color = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color.White
@@ -151,6 +153,46 @@ private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight
  * Defaults to "0 0" (top-left), matching ES-DE's own default when an
  * element omits the property.
  */
+/**
+ * ES-DE's real `datetime`/`clock` `format` property uses C strftime-style
+ * `%`-specifiers (its own renderer calls through to strftime under the
+ * hood), not Java's SimpleDateFormat letters -- feeding one straight into
+ * SimpleDateFormat produced real garbage (e.g. a real theme's "%H:%M"-style
+ * default rendered as literal "%2026", since SimpleDateFormat treats '%' as
+ * a literal character and 'Y'/'H'/etc. as its OWN unrelated pattern
+ * letters). Covers the common specifiers ES-DE's own themes actually use;
+ * anything else passes through as a SimpleDateFormat literal (quoted), the
+ * same honest-fallback approach used elsewhere in this renderer.
+ */
+private val STRFTIME_TO_JAVA = listOf(
+    "%Y" to "yyyy", "%y" to "yy",
+    "%m" to "MM", "%d" to "dd",
+    "%H" to "HH", "%I" to "hh",
+    "%M" to "mm", "%S" to "ss",
+    "%p" to "a",
+    "%A" to "EEEE", "%a" to "EEE",
+    "%B" to "MMMM", "%b" to "MMM",
+    "%%" to "%",
+)
+
+private fun strftimeToJavaPattern(format: String): String {
+    val sb = StringBuilder()
+    var i = 0
+    outer@ while (i < format.length) {
+        for ((strftime, java) in STRFTIME_TO_JAVA) {
+            if (format.startsWith(strftime, i)) {
+                sb.append(java)
+                i += strftime.length
+                continue@outer
+            }
+        }
+        val c = format[i]
+        if (c.isLetter()) sb.append('\'').append(c).append('\'') else sb.append(c)
+        i++
+    }
+    return sb.toString()
+}
+
 private fun positionOf(
     element: EsDeThemeElement,
     viewWidth: Dp,
