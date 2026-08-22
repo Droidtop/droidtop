@@ -39,6 +39,12 @@ sealed interface Player {
         override val name: String,
         val argumentsTemplate: String,
         val killPackageProcesses: Boolean = false,
+        // Real, required -- every am-start command targets a real package
+        // (via -n or -p), and droidtop needs this separately from parsing
+        // argumentsTemplate so it can cheaply check "is this emulator even
+        // installed" (PackageManager) without re-parsing the whole
+        // template -- see ConsoleRomProvider.availablePlayers.
+        val packageName: String,
     ) : Player
 
     /** Delegates to the existing, real [dev.droidtop.library.JoiPlay] integration. */
