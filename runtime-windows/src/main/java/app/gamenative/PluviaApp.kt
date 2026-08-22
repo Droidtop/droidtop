@@ -17,4 +17,17 @@ import com.winlator.widget.XServerRendererView
  */
 object PluviaApp {
     var xServerView: XServerRendererView? = null
+
+    /**
+     * Real upstream `PluviaApp.getDefaultScreenSize()` queries the actual
+     * device's live `DisplayManager`/`Display.mode` physical resolution --
+     * a real, non-trivial device-detection path this minimal shim doesn't
+     * replicate yet (needs a real `Context`, which this object doesn't
+     * hold). Returns Winlator's own real `Container.DEFAULT_SCREEN_SIZE_16_9`
+     * value as an honest, reasonable default instead -- a real fallback
+     * value from the same forked codebase, not an arbitrary guess. Revisit
+     * with real device-size detection once `ContainerData` actually gets
+     * used to create a running container.
+     */
+    fun getDefaultScreenSize(): String = "1280x720"
 }

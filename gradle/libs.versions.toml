@@ -1,6 +1,7 @@
 [versions]
 agp = "8.13.1"
 timber = "5.0.1"
+datastorePreferences = "1.1.7"
 protobuf = "0.9.5"
 kotlin = "2.2.21"
 appcompat = "1.7.1"
@@ -155,6 +156,7 @@ uiautomator-v18 = { module = "com.android.support.test.uiautomator:uiautomator-v
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
+androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
