@@ -52,10 +52,18 @@ fun EsDeThemedView(view: EsDeThemeView, modifier: Modifier = Modifier) {
                 // own real default/poster PATH property as a static image
                 // instead of silently rendering nothing.
                 "video", "animation" -> EsDeThemedFallbackImage(element, viewWidth, viewHeight)
-                // Real, live-rendered -- doesn't need per-game metadata,
-                // unlike badges/rating/gamelistinfo (parsed, not rendered
-                // here -- see EsDeTheme's own doc comment for why).
-                "datetime", "clock" -> EsDeThemedClock(element, viewWidth, viewHeight)
+                // Real, live-rendered -- ES-DE's own "clock" type has no
+                // "metadata" property at all (confirmed against its real
+                // schema), unlike "datetime". "datetime" is a genuinely
+                // different element: it's metadata-bound (release date,
+                // last played, ...), and rendering it as a live clock was
+                // a real bug -- a theme's own <datetime metadata=
+                // "releasedate" format="%Y"> was showing today's actual
+                // year, since droidtop's LibraryEntry doesn't model
+                // release dates. Bucketed with badges/rating/gamelistinfo
+                // below instead: parsed, not rendered, until real
+                // per-game metadata exists to bind it to.
+                "clock" -> EsDeThemedClock(element, viewWidth, viewHeight)
             }
         }
     }
