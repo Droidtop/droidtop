@@ -16,29 +16,56 @@ import java.io.File
  * own on-disk conventions, which are the same across platforms; nothing
  * here is derived from the Android app itself.
  *
- * Layout: `<mediaRoot>/<system>/<mediaType>/<romBaseName>.<ext>`, checked
- * in ES-DE's own priority order for picking "the one representative image"
- * (miximages -- ES-DE's own generated composite art -- first, then covers,
- * then screenshots, then titlescreens).
+ * The single, shared media-lookup droidtop uses -- previously duplicated
+ * (a separate `GameMediaResolver` existed briefly for
+ * [dev.droidtop.library.consoles.ConsoleRomProvider] alone, assuming
+ * `downloaded_media` sits directly under the ROMs root); merged back into
+ * this one real implementation rather than carrying two silently-different
+ * conventions. Real ES-DE installs place `downloaded_media` in two
+ * different real places depending on setup (a sibling `ES-DE/` folder next
+ * to the ROMs root -- ES-DE's own portable-install convention -- or
+ * directly under the ROMs root itself), so [resolve] checks both rather
+ * than assuming either one is *the* real layout.
  *
- * [system] here is whatever folder name droidtop scans a game under (see
- * [GameEngine.esDeSystemName]) -- ES-DE's own systems list (es_systems.xml)
- * is console/emulator-shaped and has no built-in "Ren'Py"/"RPG Maker"
- * system, so this is droidtop's own convention, not something ES-DE ships
- * out of the box. A user who wants droidtop and a real ES-DE install to
- * share scraped media for these engines would need to define a matching
- * custom system in their own es_systems.xml (ES-DE supports this per its
- * "Game system customizations" docs) -- not assumed to already exist.
+ * Media-type folder names (miximages, covers, screenshots, titlescreens,
+ * marquees, physicalmedia, fanart) are ES-DE's own real `<imageType>`
+ * values, cross-checked against the bundled DEcaffe theme's own theme.xml
+ * (which references screenshot/cover/titlescreen/marquee/physicalmedia/
+ * fanart directly) plus ES-DE's own documented default scrape set
+ * (miximages -- its own generated composite hero image -- first, the
+ * closest to what a background/detail-view card actually wants).
+ *
+ * [system] is whatever folder name droidtop scans a game under -- a real
+ * console system id (see [dev.droidtop.library.consoles.ConsoleSystemDef])
+ * for ROMs, or [GameEngine.esDeSystemName]'s own convention for engine
+ * games (Ren'Py/RPG Maker/Kirikiri have no built-in ES-DE system, so this
+ * is droidtop's own naming for those -- a user wanting droidtop and a real
+ * ES-DE install to share scraped media for these would need a matching
+ * custom system in their own es_systems.xml, ES-DE supports this per its
+ * "Game system customizations" docs, not assumed to already exist).
  */
 object EsDeArtwork {
-    private val MEDIA_TYPES_BY_PRIORITY = listOf("miximages", "covers", "screenshots", "titlescreens")
+    private val MEDIA_TYPES_BY_PRIORITY =
+        listOf("miximages", "covers", "screenshots", "titlescreens", "marquees", "physicalmedia", "fanart")
     private val EXTENSIONS = listOf("png", "jpg", "jpeg")
 
-    fun resolve(mediaRoot: File, system: String, romBaseName: String): String? {
-        for (mediaType in MEDIA_TYPES_BY_PRIORITY) {
-            for (ext in EXTENSIONS) {
-                val candidate = File(mediaRoot, "$system/$mediaType/$romBaseName.$ext")
-                if (candidate.isFile) return candidate.toURI().toString()
+    /**
+     * [gamesRoot] is the folder directly containing the per-system ROM/game
+     * folders (e.g. `.../Roms`, the parent of `.../Roms/nes`). Checks the
+     * sibling `ES-DE/downloaded_media` layout first, then a direct
+     * `downloaded_media` under [gamesRoot] itself.
+     */
+    fun resolve(gamesRoot: File, system: String, romBaseName: String): String? {
+        val candidateMediaRoots = listOf(
+            File(gamesRoot.parentFile ?: gamesRoot, "ES-DE/downloaded_media"),
+            File(gamesRoot, "downloaded_media"),
+        )
+        for (mediaRoot in candidateMediaRoots) {
+            for (mediaType in MEDIA_TYPES_BY_PRIORITY) {
+                for (ext in EXTENSIONS) {
+                    val candidate = File(mediaRoot, "$system/$mediaType/$romBaseName.$ext")
+                    if (candidate.isFile) return candidate.absolutePath
+                }
             }
         }
         return null
