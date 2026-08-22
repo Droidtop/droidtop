@@ -167,6 +167,19 @@ private fun EsDeCarousel(element: EsDeThemeElement?, items: List<EsDeListItem>, 
     }
 }
 
+/**
+ * `LazyVerticalGrid`'s own scroll-to-keep-cursor-visible behavior is
+ * actually the right architecture here, unlike the carousel's real model
+ * (see [EsDeCarousel]'s own doc comment) -- ES-DE's real GridComponent
+ * (GridComponent.h's own `calculateLayout`/`input`) genuinely scrolls
+ * whole rows as the cursor moves, the same real interaction a
+ * `LazyVerticalGrid` already gives for free. The real gap fixed here is
+ * narrower: `itemSpacing` was hardcoded (16dp) instead of reading the
+ * theme's own real property, and the focused item never scaled up at all
+ * -- ES-DE's own default `itemScale` is 1.05 (GridComponent's real
+ * constructor default), applied only to the focused item, not ported
+ * here before this pass.
+ */
 @Composable
 private fun EsDeGrid(element: EsDeThemeElement, items: List<EsDeListItem>, firstItemFocus: FocusRequester?, modifier: Modifier) {
     val textColor = element.valueOrNull<EsDeThemeValue.Color>("textColor")?.let { colorOf(it) } ?: Color.White
@@ -175,14 +188,21 @@ private fun EsDeGrid(element: EsDeThemeElement, items: List<EsDeListItem>, first
     val unfocusedSaturation = element.valueOrNull<EsDeThemeValue.FloatValue>("unfocusedItemSaturation")?.value ?: 1f
     val itemSizeFraction = element.valueOrNull<EsDeThemeValue.Pair>("itemSize")
     val itemWidth = itemSizeFraction?.let { (it.x * 1920).dp } ?: 160.dp
+    val itemSpacingFraction = element.valueOrNull<EsDeThemeValue.Pair>("itemSpacing")
+    val itemSpacingX = itemSpacingFraction?.let { (it.x * 1920).dp } ?: 16.dp
+    val itemSpacingY = itemSpacingFraction?.let { (it.y * 1080).dp } ?: 16.dp
+    val itemScale = (element.valueOrNull<EsDeThemeValue.FloatValue>("itemScale")?.value ?: 1.05f).coerceIn(0.5f, 3f)
+
+    var focusedIndex by remember { mutableStateOf(0) }
 
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = itemWidth),
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(itemSpacingX),
+        verticalArrangement = Arrangement.spacedBy(itemSpacingY),
     ) {
         gridItemsIndexed(items, key = { _, item -> item.key }) { index, item ->
+            val scale = if (index == focusedIndex) itemScale else 1f
             EsDeListTile(
                 item = item,
                 width = itemWidth,
@@ -191,7 +211,9 @@ private fun EsDeGrid(element: EsDeThemeElement, items: List<EsDeListItem>, first
                 uppercase = uppercase,
                 unfocusedOpacity = unfocusedOpacity,
                 unfocusedSaturation = unfocusedSaturation,
-                modifier = if (index == 0 && firstItemFocus != null) Modifier.focusRequester(firstItemFocus) else Modifier,
+                modifier = (if (index == 0 && firstItemFocus != null) Modifier.focusRequester(firstItemFocus) else Modifier)
+                    .graphicsLayer { scaleX = scale; scaleY = scale }
+                    .onFocusChanged { if (it.isFocused) focusedIndex = index },
             )
         }
     }
