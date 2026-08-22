@@ -8,7 +8,10 @@ package app.gamenative.service
  * usage this session): the `keepAlive` companion var (Java call site
  * `SteamService.setKeepAlive(...)`, matching upstream's real `@JvmStatic`
  * property) and `getAppDirPath(gameId)` (Java call site `SteamService.
- * Companion.getAppDirPath(...)`). Upstream's real `SteamService` is a huge
+ * Companion.getAppDirPath(...)`, which needs a real nested `companion
+ * object` -- not a plain Kotlin `object`, which has no `Companion` member
+ * for Java to see -- matching upstream's real `class SteamService :
+ * Service() { companion object { ... } }` shape). Upstream's real `SteamService` is a huge
  * (3600+ line) JavaSteam/Hilt-backed foreground service -- not forked in,
  * per this session's direction to keep droidtop's own code separate from
  * gamenative's app-level Steam/library layer. `getAppDirPath` returns an
@@ -17,10 +20,12 @@ package app.gamenative.service
  * clearSteamDllMarkers`) is wrapped in a try/catch that already tolerates
  * failures, so this is an honest "not wired up yet," not a silent lie.
  */
-object SteamService {
-    @JvmStatic
-    var keepAlive: Boolean = false
+class SteamService {
+    companion object {
+        @JvmStatic
+        var keepAlive: Boolean = false
 
-    @JvmStatic
-    fun getAppDirPath(gameId: Int): String = ""
+        @JvmStatic
+        fun getAppDirPath(gameId: Int): String = ""
+    }
 }

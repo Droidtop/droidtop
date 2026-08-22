@@ -30,4 +30,11 @@ object BuildConfig {
     // real per-device SDK-version wiring is future work once this module
     // actually spawns processes.
     const val MODERN_ANDROID: Boolean = false
+
+    // Real upstream buildConfigField, product-flavor-gated: "libredirect-bionic.so"
+    // for the plain modern/legacy flavors, "libredirect-bionic-wx.so" for the W^X
+    // (write-xor-execute, newer Android hardening) flavor variants. Hardcoded to
+    // the plain (non-W^X) name here, matching MODERN_ANDROID's own conservative
+    // default -- no W^X-specific flavor wiring exists in this module yet.
+    const val PRELOAD_BIONIC_SO: String = "libredirect-bionic.so"
 }
