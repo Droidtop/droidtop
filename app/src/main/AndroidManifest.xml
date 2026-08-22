@@ -26,6 +26,24 @@
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
 
+    <!--
+      Real bug this fixes: dev.droidtop.library.NativeAppProvider's
+      queryIntentActivities() call was returning an empty/filtered list on
+      real devices, showing as an empty Apps section regardless of what's
+      actually installed; confirmed real behavior of Android 11+'s
+      package visibility restrictions (targetSdk 34 here), not a
+      hypothetical concern: an app can't see other apps' launcher
+      activities without either a matching queries declaration or this
+      permission. Verified this is the real, working fix Daijishō itself
+      uses for the identical need (its own decompiled manifest declares
+      the same permission) rather than guessed. Legitimate here the same
+      way it's legitimate for Daijishō: droidtop's own package genuinely
+      ships a real HOME/LAUNCHER activity (shell-default's Launcher3
+      fork), which is exactly the class of app Android grants this
+      exemption to.
+    -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
+
     <application
         android:label="@string/droidtop_app_name"
         android:icon="@mipmap/ic_launcher"
