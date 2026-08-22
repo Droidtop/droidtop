@@ -35,6 +35,10 @@ dependencies {
     implementation(libs.androidx.compose.foundation)
     implementation(libs.coil.compose)
     implementation(libs.coil.android)
+    // Real system logos (see theme/ThemeAssets.kt) are the bundled DEcaffe
+    // theme's own SVGs -- coil3's default decoders are raster-only, so this
+    // is needed for AsyncImage to actually render them rather than fail.
+    implementation(libs.coil.svg)
 
     testImplementation(libs.junit)
 }

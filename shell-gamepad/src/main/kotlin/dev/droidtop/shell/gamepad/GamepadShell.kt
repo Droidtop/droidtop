@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -53,6 +54,7 @@ import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.consoles.ES_DE_CONSOLE_SYSTEMS
+import dev.droidtop.shell.gamepad.theme.ThemeAssets
 import kotlinx.coroutines.launch
 
 /**
@@ -581,6 +583,7 @@ private fun GamesSection(
                     // distinct from Daijishō's vertical-list settings-style
                     // browsing. "Wiring in ES-DE" is about this structural
                     // shape, not just the underlying system/ROM data.
+                    val context = LocalContext.current
                     LazyRow(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp),
                         horizontalArrangement = Arrangement.spacedBy(24.dp),
@@ -589,6 +592,12 @@ private fun GamesSection(
                             GroupCard(
                                 label = entryGroup.label,
                                 count = byGroup.getValue(entryGroup).size,
+                                // Real DEcaffe theme artwork (see ThemeAssets'
+                                // own doc comment) -- only real console
+                                // systems have a matching asset, so this is
+                                // null (plain text card, same as before) for
+                                // droidtop's own engine groups.
+                                logoPath = (entryGroup as? GameGroup.System)?.let { ThemeAssets.systemLogoPath(context, it.systemId) },
                                 modifier = if (index == 0) Modifier.focusRequester(firstFocus) else Modifier,
                                 onSelect = { selectedGroup = entryGroup },
                             )
@@ -665,7 +674,7 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun GroupCard(label: String, count: Int, modifier: Modifier = Modifier, onSelect: () -> Unit) {
+private fun GroupCard(label: String, count: Int, logoPath: String? = null, modifier: Modifier = Modifier, onSelect: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
@@ -691,7 +700,18 @@ private fun GroupCard(label: String, count: Int, modifier: Modifier = Modifier, 
             .padding(20.dp),
         verticalArrangement = Arrangement.Bottom,
     ) {
-        Text(label, color = Color.White, style = MaterialTheme.typography.titleMedium)
+        // Real DEcaffe theme logo when this system has one (see
+        // ThemeAssets); falls back to text-only (the original layout) when
+        // it doesn't, rather than leaving empty space for a missing asset.
+        if (logoPath != null) {
+            AsyncImage(
+                model = logoPath,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxWidth().weight(1f).padding(bottom = 8.dp),
+            )
+        }
+        Text(label, color = Color.White, style = MaterialTheme.typography.titleMedium, maxLines = 1)
         Text("$count items", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
     }
 }
