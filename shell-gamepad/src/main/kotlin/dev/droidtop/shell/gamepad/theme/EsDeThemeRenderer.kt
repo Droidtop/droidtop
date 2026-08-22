@@ -45,6 +45,16 @@ fun EsDeThemedView(
     items: List<EsDeListItem>,
     firstItemFocus: FocusRequester?,
     modifier: Modifier = Modifier,
+    // Real per-system metadata (systemName/systemManufacturer/
+    // systemReleaseYear/...) needs a theme parsed with THAT system's own
+    // ${system.theme} substituted (see ThemeAssets.loadDecaffeTheme's own
+    // doc comment) -- this bubbles the carousel/grid/textlist's own
+    // focused-item index up to whoever owns [view] itself, so it can load
+    // and pass down the right per-system-parsed EsDeThemeView. A no-op
+    // default since most callers of this composable don't have a
+    // per-system theme concept at all (e.g. anything that isn't the
+    // "system" view).
+    onFocusedIndexChanged: (Int) -> Unit = {},
 ) {
     BoxWithConstraints(modifier = modifier) {
         val viewWidth = maxWidth
@@ -76,7 +86,7 @@ fun EsDeThemedView(
                 // theme's own itemSize/colors -- only the outer placement
                 // was ever wrong.
                 "carousel", "grid", "textlist" -> EsDeThemedListElement(
-                    element, items, firstItemFocus, viewWidth, viewHeight,
+                    element, items, firstItemFocus, viewWidth, viewHeight, onFocusedIndexChanged,
                 )
             }
         }
@@ -90,6 +100,7 @@ private fun EsDeThemedListElement(
     firstItemFocus: FocusRequester?,
     viewWidth: Dp,
     viewHeight: Dp,
+    onFocusedIndexChanged: (Int) -> Unit,
 ) {
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
@@ -98,6 +109,7 @@ private fun EsDeThemedListElement(
         items = items,
         firstItemFocus = firstItemFocus,
         modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY).size(width = width, height = height),
+        onFocusedIndexChanged = onFocusedIndexChanged,
     )
 }
 

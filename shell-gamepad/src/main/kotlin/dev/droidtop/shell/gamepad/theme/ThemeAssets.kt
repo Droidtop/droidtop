@@ -69,8 +69,24 @@ internal object ThemeAssets {
      * folder (~1244 files) to [Context.getCacheDir] once, marked with a
      * sentinel file so repeat calls don't re-copy -- a real, one-time
      * cost, not per-recomposition.
+     *
+     * [systemId] is real ES-DE's own `${system.theme}` value (droidtop's
+     * [dev.droidtop.library.consoles.ConsoleSystemDef.id] IS that value,
+     * generated from the same real system list DEcaffe's own asset
+     * filenames are keyed by -- see that class's own doc comment) --
+     * passing it resolves per-system metadata includes (systemName/
+     * systemManufacturer/systemReleaseYear/...) that a `null` (theme-wide,
+     * no system context) parse can't reach at all, since their real
+     * include paths are literally `.../${system.theme}.xml`. Real ES-DE
+     * itself parses a theme once PER SYSTEM for exactly this reason, not
+     * once globally -- [systemThemeCache] mirrors that (one real,
+     * relatively expensive multi-file parse per system id, cached rather
+     * than repeated every recomposition/focus change).
      */
-    fun loadDecaffeTheme(context: Context): EsDeTheme? {
+    private val systemThemeCache = mutableMapOf<String?, EsDeTheme?>()
+
+    fun loadDecaffeTheme(context: Context, systemId: String? = null): EsDeTheme? {
+        systemThemeCache[systemId]?.let { return it }
         val themeDir = File(context.cacheDir, "theme_decaffe")
         val marker = File(themeDir, EXTRACTED_MARKER)
         if (!marker.exists()) {
@@ -83,12 +99,14 @@ internal object ThemeAssets {
             }
         }
         val themeFile = File(themeDir, "theme.xml")
-        return try {
-            EsDeThemeParser.parse(themeFile)
+        val theme = try {
+            EsDeThemeParser.parse(themeFile, systemTheme = systemId)
         } catch (t: Exception) {
             Log.e("droidtop.ThemeAssets", "Failed to parse bundled theme.xml", t)
             null
         }
+        systemThemeCache[systemId] = theme
+        return theme
     }
 
     private fun extractAssetDir(context: Context, assetPath: String, destDir: File) {
