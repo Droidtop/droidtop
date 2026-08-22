@@ -53,6 +53,7 @@ import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.consoles.ES_DE_CONSOLE_SYSTEMS
+import dev.droidtop.library.theme.SystemThemeColors
 import dev.droidtop.shell.gamepad.theme.ThemeAssets
 import kotlinx.coroutines.launch
 
@@ -597,6 +598,17 @@ private fun GamesSection(
                                 // null (plain text card, same as before) for
                                 // droidtop's own engine groups.
                                 logoPath = (entryGroup as? GameGroup.System)?.let { ThemeAssets.systemLogoPath(context, it.systemId) },
+                                // Real per-system accent (see
+                                // SystemThemeColors) instead of a uniform
+                                // white focus border for every system --
+                                // matches Daijishō's own real per-platform
+                                // colored tiles (confirmed via a live iiSU
+                                // screenshot this session) and the bundled
+                                // ES-DE theme's own per-system color data,
+                                // rather than one flat look for everything.
+                                accentColor = (entryGroup as? GameGroup.System)
+                                    ?.let { SystemThemeColors.forSystem(context, it.systemId) }
+                                    ?.let { Color(it) },
                                 modifier = if (index == 0) Modifier.focusRequester(firstFocus) else Modifier,
                                 onSelect = { selectedGroup = entryGroup },
                             )
@@ -612,7 +624,23 @@ private fun GamesSection(
             // as the system-list view above -- games can be empty here too
             // (the "recent" filter selected with zero recently-played entries).
             LaunchedEffect(group, recentOnly) { if (games.isNotEmpty()) firstFocus.requestFocus() }
-            Column(modifier = Modifier.fillMaxSize()) {
+            // Same real per-system accent as GroupCard's own border, applied
+            // as a subtle top-down vignette behind the whole grid -- carries
+            // the "dynamic per-system," not just per-card, through into the
+            // actual game-browsing view rather than stopping at the system
+            // list.
+            val drillDownAccent = (group as? GameGroup.System)
+                ?.let { SystemThemeColors.forSystem(LocalContext.current, it.systemId) }
+                ?.let { Color(it) }
+            Column(
+                modifier = Modifier.fillMaxSize().let {
+                    if (drillDownAccent != null) {
+                        it.background(Brush.verticalGradient(listOf(drillDownAccent.copy(alpha = 0.16f), Color.Transparent)))
+                    } else {
+                        it
+                    }
+                },
+            ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 48.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -673,7 +701,7 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun GroupCard(label: String, count: Int, logoPath: String? = null, modifier: Modifier = Modifier, onSelect: () -> Unit) {
+private fun GroupCard(label: String, count: Int, logoPath: String? = null, accentColor: Color? = null, modifier: Modifier = Modifier, onSelect: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
@@ -692,7 +720,7 @@ private fun GroupCard(label: String, count: Int, logoPath: String? = null, modif
             }
             .border(
                 width = if (focused) 4.dp else 1.dp,
-                color = if (focused) Color.White else Color.DarkGray,
+                color = if (focused) (accentColor ?: Color.White) else Color.DarkGray,
                 shape = RoundedCornerShape(12.dp),
             )
             .background(if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A), RoundedCornerShape(12.dp))
