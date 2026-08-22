@@ -63,12 +63,40 @@ object GameEngineDetector {
      * slow enough to be the real cause of a reported frozen-UI bug (see
      * also [dev.droidtop.library.Library.scanAll]'s own fix for the other
      * half of that: running this on the wrong dispatcher entirely).
+     *
+     * Checks one level deeper when the top folder itself doesn't detect --
+     * a real, confirmed case, not theoretical: a real Ren'Py download
+     * ("BeingADik/BeingADIK-0.8.3-scrappy/{renpy,game}") had its actual
+     * `renpy`/`game` markers one folder deeper than the outer, nicely-named
+     * folder droidtop wants to show as the game's title (some Ren'Py
+     * distribution zips wrap everything in an extra version-named folder,
+     * others don't -- checked against several real downloads in the same
+     * library this session, inconsistent, so this has to handle both
+     * shapes rather than assuming either one). [DetectedGame.displayFolder]
+     * stays the outer folder either way (the nicer name); only
+     * [DetectedGame.gameRoot] moves to wherever the markers actually are.
      */
-    fun scan(root: File): List<Pair<File, GameEngine>> =
+    fun scan(root: File): List<DetectedGame> =
         (root.listFiles() ?: emptyArray())
             .filter { it.isDirectory && resolveSystem(it.name) == null }
-            .mapNotNull { folder -> detect(folder)?.let { folder to it } }
+            .mapNotNull { top ->
+                detect(top)?.let { DetectedGame(top, top, it) }
+                    ?: (top.listFiles() ?: emptyArray())
+                        .asSequence()
+                        .filter { it.isDirectory }
+                        .mapNotNull { nested -> detect(nested)?.let { DetectedGame(top, nested, it) } }
+                        .firstOrNull()
+            }
 }
+
+/**
+ * [displayFolder] is what a user picked as the game's own folder (used for
+ * [dev.droidtop.library.LibraryEntry.id]/title) -- [gameRoot] is wherever
+ * the engine's real marker files (and so the real launch file) actually
+ * live, which is the same folder for almost every real game but not
+ * always (see [GameEngineDetector.scan]'s own doc comment).
+ */
+data class DetectedGame(val displayFolder: File, val gameRoot: File, val engine: GameEngine)
 
 /**
  * Ways droidtop knows of to actually run a detected game — deliberately
@@ -160,19 +188,46 @@ class JoiPlayGameProvider(
     override suspend fun scan(): List<LibraryEntry> =
         gamesRoots.flatMap { root ->
             val mediaRoot = esDeMediaRoots[root] ?: File(root.parentFile, "ES-DE/downloaded_media")
-            GameEngineDetector.scan(root).map { (folder, engine) ->
+            GameEngineDetector.scan(root).map { detected ->
                 LibraryEntry(
-                    id = folder.absolutePath,
-                    title = folder.name,
-                    kind = engine.toLibraryEntryKind(),
-                    artworkUri = EsDeArtwork.resolve(mediaRoot, engine.esDeSystemName(), folder.name),
+                    id = detected.displayFolder.absolutePath,
+                    title = detected.displayFolder.name,
+                    kind = detected.engine.toLibraryEntryKind(),
+                    artworkUri = EsDeArtwork.resolve(mediaRoot, detected.engine.esDeSystemName(), detected.displayFolder.name),
                 )
             }
         }
 
     override suspend fun launch(entry: LibraryEntry) {
-        val folder = File(entry.id)
-        val executable = File(folder, "${folder.name}.exe")
+        val displayFolder = File(entry.id)
+        // Re-detect rather than caching gameRoot on LibraryEntry -- cheap
+        // (a handful of listFiles() calls), and keeps LibraryEntry's shape
+        // shared/uniform across every provider rather than growing an
+        // engine-games-only field. See GameEngineDetector.scan's own doc
+        // comment for why gameRoot isn't always displayFolder itself.
+        val gameRoot = GameEngineDetector.detect(displayFolder)?.let { displayFolder }
+            ?: (displayFolder.listFiles() ?: emptyArray())
+                .firstOrNull { it.isDirectory && GameEngineDetector.detect(it) != null }
+            ?: displayFolder
+        val executable = findJoiPlayExecutable(gameRoot)
+            ?: error("No JoiPlay-launchable file (.sh/.exe/.py/.html/.swf) found in ${gameRoot.absolutePath}")
         JoiPlay.launchViaJoiPlay(context, executable, JoiPlay.FILE_PROVIDER_AUTHORITY)
+    }
+
+    companion object {
+        // Real, exact extensions JoiPlay's own manifest matches (confirmed
+        // via `adb shell dumpsys package cyou.joiplay.joiplay`'s real
+        // intent-filter path patterns against a real installed copy this
+        // session) -- not guessed. Order matters: `sh` first since every
+        // real Ren'Py download checked this session shipped one and it's
+        // Ren'Py's own intended cross-platform launcher; `exe` next since
+        // it's the only one RPG Maker MV/MZ (Electron/NW.js) and Kirikiri
+        // exports ship at all.
+        private val JOIPLAY_EXTENSIONS = listOf("sh", "exe", "py", "html", "swf")
+
+        private fun findJoiPlayExecutable(gameRoot: File): File? =
+            JOIPLAY_EXTENSIONS.firstNotNullOfOrNull { ext ->
+                gameRoot.listFiles()?.firstOrNull { it.isFile && it.extension.lowercase() == ext }
+            }
     }
 }
