@@ -74,6 +74,16 @@ class DroidSpacesRuntime(
      */
     private val socketsDir = File(rootDir, "sockets/primary")
 
+    /**
+     * The app's own private-storage root (`Context.getFilesDir()`), bind-
+     * mounted read-write into every container at [CONTAINER_APP_STORAGE_DIR]
+     * so a host path under it — most notably gamenative's own per-container
+     * Wine prefixes, see [ContainerRuntime.hostStorageToContainerPath]'s own
+     * doc comment — is actually reachable from inside the container's mount
+     * namespace, not just on the Android host side.
+     */
+    private val appStorageDir = context.filesDir
+
     // [image] must actually have a compositor pre-installed and configured
     // to start on boot with XDG_RUNTIME_DIR/WAYLAND_DISPLAY already pointed
     // at CONTAINER_SOCKET_DIR (see docs/SPEC.md §3a's PRIMARY-role entries)
@@ -104,7 +114,10 @@ class DroidSpacesRuntime(
         val config = DroidSpacesContainerConfig(
             name = name,
             rootfsPath = rootfsPath,
-            bindMounts = listOf(socketsDir.absolutePath to CONTAINER_SOCKET_DIR),
+            bindMounts = listOf(
+                socketsDir.absolutePath to CONTAINER_SOCKET_DIR,
+                appStorageDir.absolutePath to CONTAINER_APP_STORAGE_DIR,
+            ),
             envFilePath = envFile.absolutePath,
         )
         config.writeTo(File(configsDir, "$name.config"))
@@ -166,10 +179,17 @@ class DroidSpacesRuntime(
     override fun primaryWaylandSocketPath(): String =
         File(socketsDir, WAYLAND_SOCKET_NAME).absolutePath
 
+    override fun hostStorageToContainerPath(hostPath: File): String {
+        val relative = hostPath.absoluteFile.toRelativeString(appStorageDir.absoluteFile)
+        require(!relative.startsWith("..")) { "$hostPath isn't under the app storage root $appStorageDir" }
+        return "$CONTAINER_APP_STORAGE_DIR/$relative"
+    }
+
     companion object {
         private const val PRIMARY_NAME = "droidtop-primary"
 
         private const val CONTAINER_SOCKET_DIR = "/run/droidtop-sockets"
+        private const val CONTAINER_APP_STORAGE_DIR = "/run/droidtop-app-storage"
         private const val WAYLAND_SOCKET_NAME = "wayland-0"
     }
 }

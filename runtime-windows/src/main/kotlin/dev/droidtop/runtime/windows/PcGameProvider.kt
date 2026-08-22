@@ -6,6 +6,8 @@ import com.winlator.container.Shortcut
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
+import dev.droidtop.runtime.PrimaryContainerSession
+import java.io.File
 
 /**
  * Real "PC" games -- ES-DE's own `"pc"` system id (per direction: "PC", not
@@ -23,22 +25,31 @@ import dev.droidtop.library.LibraryProvider
  * [WineSession]'s own doc comment describes retaining). This is real,
  * working code already forked in and compiling -- not fabricated.
  *
- * [launch] is honestly NOT wired yet, matching [WineSession.launch]'s own
- * documented scope. Per direction: droidtop isn't using gamenative
- * wholesale -- the forked `com.winlator.container` tree itself gets
- * patched to add real Linux/proot environment support alongside Wine
- * prefixes (droidtop already has the real proot backend, `runtime-linux-
- * noroot`, and the real container-management backend, this forked-in
- * `ContainerManager`), so a "container" stops meaning "Wine prefix only."
- * [WineSession] currently runs inside `dev.droidtop.runtime.Container`
- * (droidtop's own generic Linux-namespace abstraction) while a [Shortcut]
- * belongs to `com.winlator.container.Container` (Winlator's own Wine-
- * prefix object) -- reconciling those, and extending the fork with real
- * Linux-target support, is the actual next real work, not done here. An
- * honest error here beats a fabricated "it worked" for a launch path that
- * doesn't actually run anything yet.
+ * [launch] bridges [Shortcut] (`com.winlator.container.Container`,
+ * Winlator's own Wine-prefix object -- physically stored under the app's
+ * private storage, entirely outside any `dev.droidtop.runtime.Container`'s
+ * own rootfs) to a real running [dev.droidtop.runtime.Container] via
+ * [primarySession]: [WineSession] runs `wine` as a process *inside* that
+ * container (so it shares its Wayland socket, per [WineSession]'s own doc
+ * comment), pointed at the Wine prefix's host path translated into an
+ * in-container path by [dev.droidtop.runtime.ContainerRuntime.
+ * hostStorageToContainerPath] (see `runtime-linux-root`'s
+ * `DroidSpacesRuntime`, which bind-mounts the whole app-storage directory
+ * into every container it creates, to make that translation possible). Per
+ * direction: droidtop isn't using gamenative wholesale -- extending the
+ * forked `com.winlator.container` tree itself with real Linux-target
+ * support (not just Wine prefixes) is real, separate future work, not
+ * needed for this launch path.
+ *
+ * [primarySession] is a supplier rather than a constructor value because
+ * the primary container doesn't exist until `:app`'s
+ * `DesktopSessionService` finishes connecting -- often after this provider
+ * itself is constructed (see `MainActivity`'s own provider list).
  */
-class PcGameProvider(private val context: Context) : LibraryProvider {
+class PcGameProvider(
+    private val context: Context,
+    private val primarySession: () -> PrimaryContainerSession?,
+) : LibraryProvider {
     override val kinds: Set<LibraryEntryKind> = setOf(LibraryEntryKind.WINE_PROFILE)
 
     override suspend fun scan(): List<LibraryEntry> =
@@ -53,12 +64,21 @@ class PcGameProvider(private val context: Context) : LibraryProvider {
     )
 
     override suspend fun launch(entry: LibraryEntry) {
-        error(
-            "PC game launch isn't wired up yet: ${entry.title} -- " +
-                "needs a real bridge from com.winlator.container.Container " +
-                "(gamenative's own Wine-prefix model) to " +
-                "dev.droidtop.runtime.Container (what WineSession actually " +
-                "runs inside). See PcGameProvider's own doc comment.",
+        val session = primarySession()
+            ?: error("Can't launch ${entry.title}: the desktop session isn't running yet -- Wine needs a live primary container to run inside.")
+
+        val shortcut = ContainerManager(context).loadShortcuts().find { it.file.absolutePath == entry.id }
+            ?: error("Can't launch ${entry.title}: no shortcut found at ${entry.id} (may have been deleted).")
+
+        val wineprefixHostPath = File(shortcut.container.rootDir, ".wine")
+        val wineprefixContainerPath = session.runtime.hostStorageToContainerPath(wineprefixHostPath)
+
+        val wineSession = WineSession(
+            container = session.container,
+            runtime = session.runtime,
+            prefixPath = wineprefixContainerPath,
         )
+        val result = wineSession.launch(shortcut.path)
+        check(result.succeeded) { "Launching ${entry.title} failed (exit ${result.exitCode}): ${result.stderr.ifBlank { result.stdout }}" }
     }
 }

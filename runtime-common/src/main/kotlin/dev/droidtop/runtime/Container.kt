@@ -1,5 +1,7 @@
 package dev.droidtop.runtime
 
+import java.io.File
+
 /**
  * A running Linux container, regardless of which backend created it
  * (runtime-linux-root's DroidSpaces fork, runtime-linux-noroot's proot
@@ -81,4 +83,37 @@ interface ContainerRuntime {
      * needs to expose where the result landed on the Android side.
      */
     fun primaryWaylandSocketPath(): String
+
+    /**
+     * Translates a host-visible path under the app's own private storage
+     * (`Context.getFilesDir()` or a subtree of it — e.g. gamenative's
+     * `com.winlator.container.Container.getRootDir()`, which is where a
+     * per-game Wine prefix physically lives, entirely outside any Linux
+     * container's own rootfs) into the equivalent path visible *inside* a
+     * running container.
+     *
+     * Needed because `:runtime-windows`'s [dev.droidtop.runtime.windows.
+     * WineSession] runs `wine` via [exec] — a process inside the container's
+     * own mount namespace — but the Wine prefix it needs (`WINEPREFIX`) is
+     * gamenative's own on-host storage, not anything already inside the
+     * container's rootfs. Backends that isolate containers behind a real
+     * mount namespace can't just hand that host path to `exec` unmodified;
+     * they instead bind-mount the whole app-storage directory into every
+     * container they create at a fixed in-container path (see
+     * DroidSpacesRuntime's own doc comment) and this method does the prefix
+     * substitution. [hostPath] must be under the app's private storage root
+     * — passing anything else is a caller bug.
+     */
+    fun hostStorageToContainerPath(hostPath: File): String
 }
+
+/**
+ * The live primary [Container] + the [ContainerRuntime] that owns it — what
+ * a Wayland-client workload (`:runtime-windows`'s `WineSession`/
+ * `PcGameProvider`, in particular) needs to actually launch a game alongside
+ * the running desktop. Owned by `:app`'s `DesktopSessionService`; exposed as
+ * this plain value type (rather than `runtime-windows` depending on `:app`'s
+ * `DesktopSessionState` directly, which would be a circular module
+ * dependency — `:app` depends on `:runtime-windows`, not the reverse).
+ */
+data class PrimaryContainerSession(val runtime: ContainerRuntime, val container: Container)
