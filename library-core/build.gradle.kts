@@ -41,6 +41,11 @@ dependencies {
     implementation(project(":IconLoader"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
+    // Real android.support.v4.media (MediaBrowserCompat/MediaControllerCompat)
+    // -- SpotifyMediaBrowserClient's own local, credential-free control of
+    // the real installed Spotify app, the same mechanism Android Auto/Wear/
+    // Assistant use.
+    implementation(libs.androidx.media)
 
     testImplementation(libs.junit)
 }

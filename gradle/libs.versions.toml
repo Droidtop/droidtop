@@ -84,6 +84,7 @@ collection-ktx = "1.6.0-beta01"
 # own catalog, used by :app/:host-bridge/:shell-desktop/:shell-gamepad.
 lifecycleRuntimeKtx = "2.8.4"
 composeBom = "2024.09.00"
+media = "1.7.0"
 
 [libraries]
 # Lawnchair-TODO: Migrate it to the latest version once jitpack publishing is fixed
@@ -162,6 +163,7 @@ androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version = "1.9.2" }
+androidx-media = { group = "androidx.media", name = "media", version.ref = "media" }
 
 [plugins]
 rikka-refine = { id = "dev.rikka.tools.refine", version.ref = "refine" }
