@@ -32,6 +32,8 @@
     <string name="pref_handheld_show_hints_desc">Show the A/B/Y button legend at the bottom of the Handheld shell</string>
     <string name="pref_handheld_console_systems_title">Console systems</string>
     <string name="pref_handheld_console_systems_desc">Assign game folders to a console system by hand</string>
+    <string name="pref_handheld_apps_grid_columns_title">Apps grid columns</string>
+    <string name="pref_handheld_apps_grid_columns_desc">Icon density for the Apps tab, independent of the launcher app drawer\'s own grid width</string>
     <string-array name="pref_handheld_default_section_entries">
         <item>Games</item>
         <item>Apps</item>
