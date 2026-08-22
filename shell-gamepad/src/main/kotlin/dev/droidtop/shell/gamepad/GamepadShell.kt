@@ -234,6 +234,8 @@ private object HandheldPrefs {
     private const val PREFS_NAME = "com.android.launcher3.prefs"
     private const val KEY_DEFAULT_SECTION = "pref_handheld_default_section"
     private const val KEY_SHOW_HINTS = "pref_handheld_show_hints"
+    private const val KEY_APPS_GRID_COLUMNS = "pref_handheld_apps_grid_columns"
+    private const val DEFAULT_APPS_GRID_COLUMNS = 5
 
     fun defaultSection(context: Context): HandheldSection {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -245,6 +247,17 @@ private object HandheldPrefs {
 
     fun showHints(context: Context): Boolean =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_SHOW_HINTS, true)
+
+    // Deliberately separate from :shell-default's own drawer grid-width
+    // override (SettingsDrawerFragment's GRID_SIZE_WIDTH_DRAWER_OVERRIDE) --
+    // that one sizes Standard's app drawer, an entirely different view with
+    // its own icon size/screen-real-estate needs. Same SharedPreferences
+    // file as every other Handheld pref here, set via SettingsHandheldFragment
+    // (:shell-default) through the shared CustomSeekBarPreference widget,
+    // which self-persists as an int.
+    fun appsGridColumns(context: Context): Int =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getInt(KEY_APPS_GRID_COLUMNS, DEFAULT_APPS_GRID_COLUMNS)
 }
 
 /**
@@ -691,6 +704,7 @@ private fun AppsSection(
     onShowDetail: (LibraryEntry) -> Unit,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
 ) {
+    val context = LocalContext.current
     val sections = buildAppSections(entries)
     val firstFocus = remember { FocusRequester() }
     // Same "don't request focus on an unattached FocusRequester" fix as
@@ -708,15 +722,136 @@ private fun AppsSection(
         verticalArrangement = Arrangement.spacedBy(32.dp),
     ) {
         items(sections, key = { it.title }) { homeSection ->
-            HomeSectionRow(
-                homeSection,
-                firstCardFocus = if (!firstAssigned) firstFocus else null,
-                onLaunch = onLaunch,
-                onShowDetail = onShowDetail,
-                onFocusedEntryChanged = onFocusedEntryChanged,
-            )
+            // Native Android apps get their own dense, icon-first grid
+            // (columns configurable via SettingsHandheldFragment's
+            // "Apps grid columns" -- see HandheldPrefs.appsGridColumns),
+            // separate from the artwork-carousel HomeSectionRow every other
+            // kind still uses: apps have square launcher icons, not
+            // portrait artwork, so the same 220x260 GameCard layout wastes
+            // most of a real handheld's screen on empty card background.
+            if (homeSection.entries.firstOrNull()?.kind == LibraryEntryKind.NATIVE_ANDROID_APP) {
+                AppIconGrid(
+                    homeSection,
+                    columns = HandheldPrefs.appsGridColumns(context),
+                    firstTileFocus = if (!firstAssigned) firstFocus else null,
+                    onLaunch = onLaunch,
+                    onFocusedEntryChanged = onFocusedEntryChanged,
+                )
+            } else {
+                HomeSectionRow(
+                    homeSection,
+                    firstCardFocus = if (!firstAssigned) firstFocus else null,
+                    onLaunch = onLaunch,
+                    onShowDetail = onShowDetail,
+                    onFocusedEntryChanged = onFocusedEntryChanged,
+                )
+            }
             firstAssigned = true
         }
+    }
+}
+
+/**
+ * Dense, non-scrolling-per-row icon grid for the Apps tab — Android app
+ * drawer style (icon + label, no artwork card), unlike [HomeSectionRow]'s
+ * portrait-artwork carousel. [columns] comes from
+ * [HandheldPrefs.appsGridColumns] so density is user-configurable
+ * independent of :shell-default's own app-drawer grid width.
+ */
+@Composable
+private fun AppIconGrid(
+    section: HomeSection,
+    columns: Int,
+    firstTileFocus: FocusRequester?,
+    onLaunch: (LibraryEntry) -> Unit,
+    onFocusedEntryChanged: (LibraryEntry?) -> Unit,
+) {
+    Column {
+        Text(
+            section.title,
+            color = Color.White,
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(horizontal = 48.dp, vertical = 8.dp),
+        )
+        // Sized to fit every row with no internal scrolling of its own --
+        // this grid lives inside AppsSection's outer LazyColumn (one item
+        // per kind-section), and a LazyVerticalGrid can't nest inside
+        // another scrollable without a fixed height. Row count is exact
+        // (no clamping), so every app is always reachable, just via the
+        // outer LazyColumn's scroll rather than this grid's own.
+        val rowCount = (section.entries.size + columns - 1) / columns.coerceAtLeast(1)
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(columns.coerceAtLeast(1)),
+            userScrollEnabled = false,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp * rowCount.coerceAtLeast(1))
+                .padding(horizontal = 48.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            gridItemsIndexed(section.entries, key = { _, entry -> entry.id }) { index, entry ->
+                AppIconTile(
+                    entry = entry,
+                    modifier = if (index == 0 && firstTileFocus != null) Modifier.focusRequester(firstTileFocus) else Modifier,
+                    onLaunch = { onLaunch(entry) },
+                    onFocused = { onFocusedEntryChanged(entry) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppIconTile(entry: LibraryEntry, modifier: Modifier = Modifier, onLaunch: () -> Unit, onFocused: () -> Unit = {}) {
+    var focused by remember { mutableStateOf(false) }
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .onFocusChanged {
+                focused = it.isFocused
+                if (it.isFocused) onFocused()
+            }
+            .focusable()
+            .onKeyEvent { event ->
+                if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
+                when (event.key) {
+                    Key.ButtonA, Key.DirectionCenter, Key.Enter -> {
+                        onLaunch()
+                        true
+                    }
+                    else -> false
+                }
+            }
+            .border(
+                width = if (focused) 3.dp else 0.dp,
+                color = if (focused) Color.White else Color.Transparent,
+                shape = RoundedCornerShape(16.dp),
+            )
+            .padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .background(Color(0xFF1A1A1A), RoundedCornerShape(16.dp)),
+        ) {
+            if (entry.artworkUri != null) {
+                AsyncImage(
+                    model = entry.artworkUri,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize().padding(8.dp),
+                )
+            }
+        }
+        Text(
+            entry.title,
+            color = Color.White,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            modifier = Modifier.padding(top = 6.dp),
+        )
     }
 }
 
