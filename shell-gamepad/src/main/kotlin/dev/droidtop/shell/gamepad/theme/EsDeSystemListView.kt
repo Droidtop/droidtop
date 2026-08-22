@@ -5,12 +5,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
@@ -35,6 +36,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.library.theme.EsDeThemeElement
@@ -77,6 +79,32 @@ fun EsDeSystemListView(
     }
 }
 
+/**
+ * Real ES-DE carousel positioning/scale/opacity math -- a clean-room port
+ * of the horizontal-type formulas in ES-DE's own CarouselComponent.h
+ * (`render()`), not a guess. This replaces a real bug: the previous
+ * implementation was a plain `LazyRow`, which ignores the theme's real
+ * `pos`/`size` entirely (fixed by [EsDeThemedListElement] positioning
+ * this whole composable) AND lays items out via normal list scrolling
+ * rather than ES-DE's actual model -- a fixed set of items, each
+ * individually positioned at `index * itemSpacing + xOffBase`, where
+ * `itemSpacing` is derived from the carousel's own real width and
+ * `maxItemCount` (confirmed real formula: `((carouselWidth - itemWidth *
+ * maxItemCount) / maxItemCount) + itemWidth`). A `LazyRow` showing only
+ * one item for an `itemSize="1 1"` carousel (Art Book Next's real
+ * full-screen "hero" carousel style, confirmed by reading its own
+ * theme.xml) was a direct, confirmed symptom of this gap -- the real
+ * formula above naturally handles that same case without a special case,
+ * since `itemSpacing` there equals the carousel's own full width.
+ *
+ * Real, honestly-deferred gaps: [focusedIndex] jumps directly to whatever
+ * item currently has Compose focus rather than ES-DE's own continuously-
+ * animated `camOffset` (a float that eases from the old selected index to
+ * the new one, producing a real glide/settle animation) -- items snap
+ * instead of gliding. `itemStacking`/wheel carousel types/reflections are
+ * real ES-DE features not ported here at all. All genuinely separate,
+ * scoped follow-up work, not attempted in this pass.
+ */
 @Composable
 private fun EsDeCarousel(element: EsDeThemeElement?, items: List<EsDeListItem>, firstItemFocus: FocusRequester?, modifier: Modifier) {
     val textColor = element?.valueOrNull<EsDeThemeValue.Color>("textColor")?.let { colorOf(it) } ?: Color.White
@@ -90,9 +118,38 @@ private fun EsDeCarousel(element: EsDeThemeElement?, items: List<EsDeListItem>, 
     val itemSizeFraction = element?.valueOrNull<EsDeThemeValue.Pair>("itemSize")
     val itemWidth = itemSizeFraction?.let { (it.x * 1920).dp } ?: 200.dp
     val itemHeight = itemSizeFraction?.let { (it.y * 1080).dp } ?: 140.dp
+    // Real ES-DE defaults (CarouselComponent's own constructor): 3.0 and 1.2.
+    val maxItemCount = (element?.valueOrNull<EsDeThemeValue.FloatValue>("maxItemCount")?.value ?: 3f).coerceIn(0.5f, 30f)
+    val itemScale = (element?.valueOrNull<EsDeThemeValue.FloatValue>("itemScale")?.value ?: 1.2f).coerceIn(0.2f, 3f)
 
-    LazyRow(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-        itemsIndexed(items, key = { _, item -> item.key }) { index, item ->
+    var focusedIndex by remember { mutableStateOf(0) }
+    val density = LocalDensity.current
+
+    BoxWithConstraints(modifier = modifier) {
+        val carouselWidthPx = with(density) { maxWidth.toPx() }
+        val itemWidthPx = with(density) { itemWidth.toPx() }
+        val itemSpacingPx = ((carouselWidthPx - itemWidthPx * maxItemCount) / maxItemCount) + itemWidthPx
+        val xOffBasePx = (carouselWidthPx - itemWidthPx) / 2f - focusedIndex * itemSpacingPx
+        val yOffPx = with(density) { (maxHeight - itemHeight).toPx() / 2f }
+
+        items.forEachIndexed { index, item ->
+            val distance = (index - focusedIndex).toFloat()
+            val absDistance = kotlin.math.abs(distance)
+            // Real formula, ported as-is: itemScale >= 1 scales UP toward
+            // the focused item; itemScale < 1 scales DOWN away from it.
+            val rawScale = if (itemScale >= 1f) {
+                (1f + (itemScale - 1f) * (1f - absDistance)).coerceIn(1f, itemScale) / itemScale
+            } else {
+                (1f + (1f - itemScale) * (absDistance - 1f)).coerceIn(itemScale, 1f)
+            }
+            val opacity = when {
+                distance == 0f || unfocusedOpacity == 1f -> 1f
+                absDistance >= 1f -> unfocusedOpacity
+                else -> unfocusedOpacity + ((1f - unfocusedOpacity) - (1f - unfocusedOpacity) * absDistance)
+            }
+            val xDp = with(density) { (index * itemSpacingPx + xOffBasePx).toDp() }
+            val yDp = with(density) { yOffPx.toDp() }
+
             EsDeListTile(
                 item = item,
                 width = itemWidth,
@@ -101,7 +158,10 @@ private fun EsDeCarousel(element: EsDeThemeElement?, items: List<EsDeListItem>, 
                 uppercase = uppercase,
                 unfocusedOpacity = unfocusedOpacity,
                 unfocusedSaturation = unfocusedSaturation,
-                modifier = if (index == 0 && firstItemFocus != null) Modifier.focusRequester(firstItemFocus) else Modifier,
+                modifier = (if (index == 0 && firstItemFocus != null) Modifier.focusRequester(firstItemFocus) else Modifier)
+                    .absoluteOffset(x = xDp, y = yDp)
+                    .graphicsLayer { scaleX = rawScale; scaleY = rawScale; alpha = opacity }
+                    .onFocusChanged { if (it.isFocused) focusedIndex = index },
             )
         }
     }
