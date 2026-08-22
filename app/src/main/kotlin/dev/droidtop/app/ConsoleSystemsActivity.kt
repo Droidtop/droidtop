@@ -9,9 +9,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
@@ -27,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntrinsicSize
 import androidx.compose.ui.unit.dp
 import dev.droidtop.library.consoles.ConsoleSystemDef
 import dev.droidtop.library.consoles.CustomPlayerPrefs
@@ -36,6 +40,7 @@ import dev.droidtop.library.consoles.PlayerOverridePrefs
 import dev.droidtop.library.consoles.SystemOverridePrefs
 import dev.droidtop.library.consoles.availablePlayers
 import dev.droidtop.library.consoles.resolvePlayer
+import dev.droidtop.library.theme.SystemThemeColors
 import java.io.File
 
 /**
@@ -156,27 +161,43 @@ private fun FolderRow(
     onClickSystem: () -> Unit,
     onClickPlayer: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFF1A1A1A))
-            .padding(16.dp),
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().clickable(onClick = onClickSystem)) {
-            Text(folderName, color = Color.White, style = MaterialTheme.typography.titleMedium)
-            Text(
-                resolvedSystem?.displayName ?: "Unrecognized -- tap to assign a system",
-                color = if (resolvedSystem != null) Color.LightGray else Color(0xFFCC8800),
-                style = MaterialTheme.typography.bodySmall,
-            )
+    val context = LocalContext.current
+    // Real per-system accent (see SystemThemeColors) instead of a flat
+    // gray card for every row -- matches both the bundled DEcaffe/ES-DE
+    // theme's own per-system color data and Daijishō's real per-platform
+    // colored borders (a live iiSU screenshot this session showed distinct
+    // red/pink/purple/teal/green tiles per system, not one uniform color).
+    // A low-alpha tint, not the raw saturated color -- this is a settings
+    // list of many rows at once, not a single-item hero card, so full
+    // saturation would be visually loud rather than a subtle system cue.
+    val accent = resolvedSystem?.let { SystemThemeColors.forSystem(context, it.id) }?.let { Color(it) }
+
+    Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(Color(0xFF161616))) {
+        if (accent != null) {
+            Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(accent))
         }
-        if (resolvedSystem != null) {
-            Text(
-                resolvedPlayer?.let { "Player: ${it.name}" } ?: "No installed player for this system -- tap to add one",
-                color = if (resolvedPlayer != null) Color(0xFF8AB4FF) else Color(0xFFCC8800),
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.fillMaxWidth().clickable(onClick = onClickPlayer).padding(top = 6.dp),
-            )
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .background(if (accent != null) accent.copy(alpha = 0.14f) else Color(0xFF1A1A1A))
+                .padding(16.dp),
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().clickable(onClick = onClickSystem)) {
+                Text(folderName, color = Color.White, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    resolvedSystem?.displayName ?: "Unrecognized -- tap to assign a system",
+                    color = if (resolvedSystem != null) Color.LightGray else Color(0xFFCC8800),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            if (resolvedSystem != null) {
+                Text(
+                    resolvedPlayer?.let { "Player: ${it.name}" } ?: "No installed player for this system -- tap to add one",
+                    color = if (resolvedPlayer != null) (accent ?: Color(0xFF8AB4FF)) else Color(0xFFCC8800),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.fillMaxWidth().clickable(onClick = onClickPlayer).padding(top = 6.dp),
+                )
+            }
         }
     }
 }
