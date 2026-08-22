@@ -32,6 +32,13 @@ dependencies {
     // direction -- shell-default has no dependency back on library-core,
     // confirmed before adding this.
     implementation(project(":shell-default"))
+    // shell-default's own IconCache/CacheLookupFlag/BitmapInfo classes
+    // actually live in this separate module (shell-default itself depends
+    // on it with `implementation`, not `api`, so it doesn't leak
+    // transitively through the dependency above -- confirmed via a real
+    // CI failure: "Cannot access class 'CacheLookupFlag'" until this was
+    // added directly).
+    implementation(project(":IconLoader"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
 
