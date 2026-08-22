@@ -20,4 +20,14 @@ object BuildConfig {
     // (no release build type wired up), not read from Gradle's actual
     // build type the way AGP's real generated BuildConfig would.
     const val DEBUG: Boolean = true
+
+    // Real, meaningful upstream flag (its own "modern"/"modernXr" product
+    // flavors set this true, targetSdk 36, arm64-only; "legacy"/"legacyXr"
+    // set it false, targetSdk 28, arm64+armeabi-v7a) -- ProcessHelper.java
+    // uses it to decide whether to prefix spawned commands with
+    // "/system/bin/linker64" for compatibility. Hardcoded false here
+    // (the more conservative/compatible default) rather than guessed --
+    // real per-device SDK-version wiring is future work once this module
+    // actually spawns processes.
+    const val MODERN_ANDROID: Boolean = false
 }
