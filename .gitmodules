@@ -31,3 +31,6 @@
 [submodule "vendor/libffi"]
 	path = vendor/libffi
 	url = https://github.com/libffi/libffi.git
+[submodule "vendor/lemuroid"]
+	path = vendor/lemuroid
+	url = https://github.com/Swordfish90/Lemuroid.git
