@@ -5,6 +5,7 @@ import dev.droidtop.runtime.ContainerBackend
 import dev.droidtop.runtime.ContainerExecResult
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.RootfsImage
+import java.io.File
 
 /**
  * No-root Linux container backend. No existing project is a clean fork
@@ -37,4 +38,9 @@ class ProotRuntime : ContainerRuntime {
         TODO("re-enter the proot rootfs and run $command (env=$env) inside it")
 
     override fun primaryWaylandSocketPath(): String = TODO()
+
+    // proot's own -b/--bind is the equivalent primitive DroidSpacesRuntime's
+    // bind-mount-the-whole-app-storage-dir approach relies on; same TODO as
+    // the rest of this class until proot bootstrap itself is real.
+    override fun hostStorageToContainerPath(hostPath: File): String = TODO()
 }

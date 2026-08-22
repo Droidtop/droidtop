@@ -29,6 +29,7 @@ import dev.droidtop.runtime.DisplayOutputRepository
 import dev.droidtop.runtime.DualScreenCoordinator
 import dev.droidtop.runtime.DualScreenRole
 import dev.droidtop.runtime.PrefsDualScreenAssignmentStore
+import dev.droidtop.runtime.PrimaryContainerSession
 import dev.droidtop.runtime.windows.PcGameProvider
 import dev.droidtop.shell.gamepad.GamepadShell
 import dev.droidtop.shell.standard.BackButtonMenu
@@ -95,9 +96,14 @@ class MainActivity : AppCompatActivity() {
                 ConsoleRomProvider(applicationContext, gamesRoots),
                 // Real discovery (com.winlator.container.ContainerManager's
                 // own shortcut scan), themed as ES-DE's "pc" system like
-                // any other -- launch is honestly not wired yet, see
-                // PcGameProvider's own doc comment for the real gap.
-                PcGameProvider(applicationContext),
+                // any other. primarySession is a supplier, not a value,
+                // because DesktopSessionService may still be Connecting (or
+                // not started at all) at this point -- see PcGameProvider's
+                // own doc comment.
+                PcGameProvider(applicationContext) {
+                    (DesktopSessionService.state.value as? DesktopSessionState.Connected)
+                        ?.let { PrimaryContainerSession(it.runtime, it.container) }
+                },
             ),
         )
         mode = resolveMode(intent)
