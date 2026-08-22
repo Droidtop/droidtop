@@ -1,6 +1,14 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    // Real, needed by the forked app.gamenative.powercontrol.* tree's own
+    // @Serializable data classes (PowerBaseline, PowerBaselineEntry, ...)
+    // -- the runtime library alone (kotlinx-serialization-json, already
+    // depended on below) isn't enough; @Serializable codegen needs this
+    // compiler plugin too, confirmed via a real CI failure this session
+    // ("Unresolved reference 'serializer'") once traced back to its root
+    // cause rather than guessed.
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -71,4 +79,22 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
+    // com.winlator.PrefManager.kt's own real Preferences DataStore usage.
+    implementation(libs.androidx.datastore.preferences)
+    // com.winlator.container.ContainerData.kt's own real
+    // androidx.compose.runtime.saveable.mapSaver usage (Compose's state-
+    // saving API) -- ui transitively pulls in runtime + runtime-saveable,
+    // and this module has no @Composable functions of its own yet so the
+    // Compose compiler plugin itself isn't needed, only the library.
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+
+    // Real, proprietary Samsung Performance SDK jar, copied unmodified from
+    // vendor/gamenative's own src/main/lib/ (same real file, same real
+    // dependency declaration pattern as upstream's own build.gradle.kts) --
+    // SamsungPerformanceDriver.kt (forked in with the rest of powercontrol)
+    // needs it to compile. A real, optional device-specific driver: on any
+    // non-Samsung device this SDK's own runtime checks make it a no-op,
+    // not something droidtop's build assumes will always be present.
+    implementation(files("src/main/lib/perfsdk-v1.0.0.jar"))
 }
