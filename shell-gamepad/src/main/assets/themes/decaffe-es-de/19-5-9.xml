@@ -1,0 +1,16 @@
+<theme>
+    <view name="system">
+        <text name="game">
+            <container>true</container>
+            <containerType>horizontal</containerType>
+            </text>
+        <text name="gamecount">
+            <visible>false</visible>
+        </text>
+    </view>
+
+    <view name="gamelist">
+       
+    </view>
+        
+</theme>

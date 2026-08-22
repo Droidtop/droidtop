@@ -1,0 +1,110 @@
+<theme>
+
+   
+    <view name="system">
+        <text name="game">
+            <container>true</container>
+            <containerType>horizontal</containerType>
+            </text>
+        <text name="gamecount">
+            <visible>false</visible>
+        </text>
+        <image name="rightband1">
+        
+        <visible>false</visible>
+    </image>
+    <image name="rightband2">        
+        <visible>false</visible>
+    </image>
+        <video name="screen2">
+            <maxSize>0.79 0.77</maxSize>
+            <pos>0.605 0.385</pos>
+        </video>
+        <text name="desc">
+            
+            <visible>false</visible>
+        </text>
+    </view>
+
+    <view name="gamelist">
+        <text name="desc">
+            
+            <visible>false</visible>
+        </text>
+        <image name="syslogo2">
+            
+            <visible>false</visible>
+        </image>
+        <video name="gamedisplay">
+            <maxSize>0.79 0.77</maxSize>
+            <pos>0.605 0.385</pos>
+        </video>
+        <image name="rightband1">
+            
+            <visible>false</visible>
+        </image>
+        <image name="rightband2">
+            
+            <visible>false</visible>
+        </image>
+    </view>
+    <variant name="colorWithMeta, solidWithMeta">
+        <view name="gamelist">
+            <text name="players1">
+               
+                <pos>0.125 0.3</pos>
+                <size>0.0755 0.06</size>
+                <origin>0 0</origin>
+            </text>
+            <text name="players2">
+               
+                <pos>0.01 0.25</pos>
+                <origin>0 0</origin>
+            </text>
+            <datetime name="release1">
+                
+                <pos>0.075 0.4</pos>
+                <size>0.125 0.06</size>
+                <origin>0 0</origin>
+            </datetime>
+            <text name="release2">
+                
+                <pos>0.01 0.35</pos>
+                <origin>0 0</origin>
+            </text>
+            <text name="rating">
+                
+                <pos>0.01 0.45</pos>
+                <origin>0 0</origin>
+            </text>
+            <rating name="rating">
+                <pos>0.06 0.52</pos>
+                <size>0.08 0.04</size>
+                
+            </rating>
+            <text name="genre1">
+                
+                <visible>false</visible>
+            </text>
+            <text name="genre2">
+                <visible>false</visible>
+            </text>
+            <text name="publisher1">
+                
+                <visible>false</visible>
+            </text>
+            <text name="publisher2">
+                
+                <visible>false</visible>
+            </text>
+            <text name="developer1">
+               
+                <visible>false</visible>
+            </text>
+            <text name="developer2">
+                
+                <visible>false</visible>
+            </text>
+            </view>
+            </variant>
+</theme>

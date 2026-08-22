@@ -1,0 +1,13 @@
+<theme>
+    <view name="system">
+       
+    </view>
+
+    <view name="gamelist">
+        <badges name="all">
+            <pos>0.01 0.675</pos>
+            <origin>0 0.5</origin>
+            </badges>
+    </view>
+        
+</theme>
