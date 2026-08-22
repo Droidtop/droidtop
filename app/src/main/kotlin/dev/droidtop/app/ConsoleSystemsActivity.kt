@@ -82,7 +82,11 @@ private fun ConsoleSystemsScreen() {
             .sortedBy { it.name.lowercase() }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0B1220))) {
+    // Plain black, matching GamepadShell's own background -- this screen is
+    // reached from inside Handheld (Settings tab -> Console systems), so a
+    // different dark-navy background here read as a visual inconsistency,
+    // not an intentional design choice.
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         val pickingFor = pickerForFolder
         val pickingPlayerFor = playerPickerForSystem
         val addingCustomFor = addCustomPlayerForSystem
