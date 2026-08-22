@@ -115,7 +115,7 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
     // The extra .filter is real, not redundant: Library.scanKinds matches
     // at the provider level (does this provider produce any requested
     // kind), not per-entry -- a provider spanning kinds on both sides of
-    // the Games/Apps split (JoiPlayGameProvider currently covers RENPY/
+    // the Games/Apps split (EngineGameProvider currently covers RENPY/
     // RPG_MAKER_*/KIRIKIRI, and GAME_KINDS is a subset missing KIRIKIRI)
     // could otherwise leak an entry into the wrong section.
     LaunchedEffect(library) { gameEntries = library.scanKinds(GAME_KINDS).filter { it.kind in GAME_KINDS } }

@@ -47,7 +47,7 @@ object GamesRootPrefs {
      * back to the raw SAF URI" behavior as before) instead of silently
      * pointing at a folder that isn't really there.
      *
-     * [GameEngineDetector]/[JoiPlayGameProvider] work on `java.io.File`
+     * [GameEngineDetector]/[EngineGameProvider] work on `java.io.File`
      * today, not `DocumentFile`; a folder that genuinely can't resolve to
      * a real path (an unusual mount layout, a cloud-backed provider) isn't
      * usable yet -- a real SAF-based rework (scanning via

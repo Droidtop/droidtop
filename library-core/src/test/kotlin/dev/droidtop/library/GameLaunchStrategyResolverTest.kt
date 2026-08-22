@@ -56,6 +56,19 @@ class GameLaunchStrategyResolverTest {
     }
 
     @Test
+    fun `Kirikiri offers KIRIKIROID2 when it's installed, other engines never do`() {
+        val kirikiriStrategies = GameLaunchStrategyResolver.resolve(
+            GameEngine.KIRIKIRI, tmp.root, joiPlayInstalled = false, kirikiroid2Installed = true,
+        )
+        assertTrue(GameLaunchStrategy.KIRIKIROID2 in kirikiriStrategies)
+
+        val renPyStrategies = GameLaunchStrategyResolver.resolve(
+            GameEngine.RENPY, tmp.root, joiPlayInstalled = false, kirikiroid2Installed = true,
+        )
+        assertFalse(GameLaunchStrategy.KIRIKIROID2 in renPyStrategies)
+    }
+
+    @Test
     fun `a Ren'Py game can offer all three strategies at once`() {
         File(tmp.root, "Game.exe").createNewFile()
         File(tmp.root, "lib/py3-linux-x86_64").mkdirs()
