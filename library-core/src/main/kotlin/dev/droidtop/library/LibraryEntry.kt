@@ -80,7 +80,7 @@ enum class LibraryEntryKind {
  * plugin in the Playnite sense: the library aggregates across all
  * registered providers into one list. [kinds] is a set, not a single
  * value, because one physical provider can genuinely cover several kinds
- * — [JoiPlayGameProvider] alone covers five different [GameEngine]s.
+ * — [EngineGameProvider] alone covers five different [GameEngine]s.
  */
 interface LibraryProvider {
     val kinds: Set<LibraryEntryKind>

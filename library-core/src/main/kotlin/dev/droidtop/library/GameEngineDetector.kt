@@ -110,6 +110,9 @@ enum class GameLaunchStrategy {
     /** Hand off to the third-party JoiPlay interpreter — see [JoiPlay]. Real, wired to an actual launch today. */
     JOIPLAY,
 
+    /** Hand off to the third-party Kirikiroid2/krkr2 interpreter — see [Kirikiroid2]. Real, wired today, but generic-open-only (opens the app, not a specific game — see that class's own doc comment for why). */
+    KIRIKIROID2,
+
     /** Run inside a Wine prefix (`:runtime-windows`'s `WineSession`) — works for any engine's Windows/.exe export. Recognized as available; not wired to an actual running container/prefix yet (needs a real `WineSession` instance, which nothing in `library-core` has access to). */
     WINE_PREFIX,
 
@@ -120,7 +123,8 @@ enum class GameLaunchStrategy {
 /**
  * Engines JoiPlay is known to interpret (per its own advertised feature
  * set) — Kirikiri is deliberately excluded, not an oversight: nothing
- * found in this session's research indicates JoiPlay covers it.
+ * found in this session's research indicates JoiPlay covers it. Kirikiri
+ * has its own real interpreter instead -- see [Kirikiroid2].
  */
 private val JOIPLAY_ENGINES = setOf(GameEngine.RENPY, GameEngine.RPG_MAKER_MV, GameEngine.RPG_MAKER_MZ, GameEngine.RPG_MAKER_VX_ACE)
 
@@ -131,13 +135,23 @@ private val JOIPLAY_ENGINES = setOf(GameEngine.RENPY, GameEngine.RPG_MAKER_MV, G
  * available strategies (one shipped a Linux build, the other didn't).
  */
 object GameLaunchStrategyResolver {
-    fun resolve(engine: GameEngine, folder: File, joiPlayInstalled: Boolean): List<GameLaunchStrategy> {
+    fun resolve(
+        engine: GameEngine,
+        folder: File,
+        joiPlayInstalled: Boolean,
+        kirikiroid2Installed: Boolean = false,
+    ): List<GameLaunchStrategy> {
         val strategies = mutableListOf<GameLaunchStrategy>()
         if (joiPlayInstalled && engine in JOIPLAY_ENGINES) strategies += GameLaunchStrategy.JOIPLAY
+        if (kirikiroid2Installed && engine == GameEngine.KIRIKIRI) strategies += GameLaunchStrategy.KIRIKIROID2
         if (hasWindowsExecutable(folder)) strategies += GameLaunchStrategy.WINE_PREFIX
-        // Kirikiri is a Windows-native engine with no official Linux port
-        // (confirmed, not assumed) -- LINUX_CONTAINER is never offered for
-        // it regardless of folder contents, unlike the other engines here.
+        // Kirikiri (the original commercial engine) is Windows-native with
+        // no official Linux port of the *engine itself* (confirmed, not
+        // assumed) -- LINUX_CONTAINER (running a game's own Linux export
+        // inside a container) is never offered for it regardless of folder
+        // contents. Unrelated to Kirikiroid2 above, a real independent
+        // third-party interpreter (like JoiPlay is for Ren'Py) rather than
+        // an official Linux build of the engine.
         if (engine != GameEngine.KIRIKIRI && hasLinuxLibraryBuild(folder)) strategies += GameLaunchStrategy.LINUX_CONTAINER
         return strategies
     }
@@ -159,12 +173,18 @@ private fun GameEngine.toLibraryEntryKind(): LibraryEntryKind = when (this) {
 }
 
 /**
- * [LibraryProvider] for detected engine games — currently only ever
- * launches via [GameLaunchStrategy.JOIPLAY] (the one strategy with a real
- * implementation, see [GameLaunchStrategyResolver]'s own doc comment for
- * the other two's status), regardless of what [GameLaunchStrategyResolver]
- * says is available for a given entry. Picking among multiple available
- * strategies (a real UI concern, not solved here) is the next real gap.
+ * [LibraryProvider] for detected engine games — launches via whichever
+ * real interpreter actually handles the entry's [GameEngine] ([JoiPlay]
+ * for Ren'Py/RPG Maker, [Kirikiroid2] for Kirikiri; [GameLaunchStrategy.
+ * WINE_PREFIX]/[GameLaunchStrategy.LINUX_CONTAINER] are recognized by
+ * [GameLaunchStrategyResolver] but not wired to an actual running session
+ * yet), not a single hardcoded path for every kind — a real bug fixed
+ * this session: every entry used to route through JoiPlay regardless of
+ * kind, silently misfiring for Kirikiri (which JoiPlay doesn't support)
+ * on top of being named after a launcher it doesn't exclusively use
+ * (hence "EngineGameProvider", not "JoiPlayGameProvider" anymore). Picking
+ * among multiple *available* strategies when more than one applies (a
+ * real UI concern) is the next real gap.
  *
  * [gamesRoots] is deliberately plural, not one folder -- games/ROMs aren't
  * necessarily all in one place (a real SD card folder plus an internal
@@ -173,7 +193,7 @@ private fun GameEngine.toLibraryEntryKind(): LibraryEntryKind = when (this) {
  * configured too (an empty list just means [scan] returns nothing, not an
  * error).
  */
-class JoiPlayGameProvider(
+class EngineGameProvider(
     private val context: Context,
     private val gamesRoots: List<File>,
 ) : LibraryProvider {
@@ -202,9 +222,52 @@ class JoiPlayGameProvider(
             ?: (displayFolder.listFiles() ?: emptyArray())
                 .firstOrNull { it.isDirectory && GameEngineDetector.detect(it) != null }
             ?: displayFolder
-        val executable = findJoiPlayExecutable(gameRoot)
-            ?: error("No JoiPlay-launchable file (.sh/.exe/.py/.html/.swf) found in ${gameRoot.absolutePath}")
-        JoiPlay.launchViaJoiPlay(context, executable, JoiPlay.FILE_PROVIDER_AUTHORITY)
+        val engine = GameEngineDetector.detect(gameRoot)
+            ?: error("Couldn't re-detect an engine for ${gameRoot.absolutePath}")
+
+        // Real bug this fixes: launch() used to hardcode exactly one path
+        // per kind (JoiPlay, or Kirikiroid2 for KIRIKIRI) regardless of
+        // what GameLaunchStrategyResolver actually says is available --
+        // silently forcing a game into whichever third-party interpreter
+        // this provider happened to hardcode, even when a Windows .exe or
+        // a real Linux build made Wine/a Linux container a genuinely
+        // available (if not yet actually wired) alternative. Real per-entry
+        // choice (a UI picker, same shape as ConsoleSystemsActivity's real
+        // PlayerPicker for ROMs) is the natural next step, not built yet --
+        // this at least stops the wrong-path-forcing and picks in a real,
+        // documented priority order with an honest error for the two
+        // strategies that exist architecturally but have no running
+        // session to launch into yet.
+        val available = GameLaunchStrategyResolver.resolve(
+            engine = engine,
+            folder = gameRoot,
+            joiPlayInstalled = JoiPlay.isInstalled(context),
+            kirikiroid2Installed = Kirikiroid2.isInstalled(context),
+        )
+        val overrideStrategy = LaunchStrategyOverridePrefs.get(context, entry.id)
+        val strategy = available.firstOrNull { it.name == overrideStrategy } ?: available.firstOrNull()
+            ?: error(
+                "No way to launch ${entry.title} -- install JoiPlay (Ren'Py/RPG Maker) or " +
+                    "Kirikiroid2 (Kirikiri), or point it at a Windows .exe (Wine) or a Linux " +
+                    "build (Linux container) once those are wired to a running session.",
+            )
+
+        when (strategy) {
+            GameLaunchStrategy.JOIPLAY -> {
+                val executable = findJoiPlayExecutable(gameRoot)
+                    ?: error("No JoiPlay-launchable file (.sh/.exe/.py/.html/.swf) found in ${gameRoot.absolutePath}")
+                JoiPlay.launchViaJoiPlay(context, executable, JoiPlay.FILE_PROVIDER_AUTHORITY)
+            }
+            GameLaunchStrategy.KIRIKIROID2 -> Kirikiroid2.open(context)
+            GameLaunchStrategy.WINE_PREFIX -> error(
+                "Wine/Box64 launching isn't wired to a running session yet (needs a real " +
+                    "WineSession instance, which library-core has no access to -- see SPEC.md §5a).",
+            )
+            GameLaunchStrategy.LINUX_CONTAINER -> error(
+                "Linux-container launching isn't wired to a running session yet (needs a real " +
+                    "ContainerRuntime instance, which library-core has no access to -- see SPEC.md §5a).",
+            )
+        }
     }
 
     companion object {
