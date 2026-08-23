@@ -5,6 +5,7 @@ import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,22 +18,33 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.key.KeyEventType
 import dev.droidtop.library.consoles.ConsoleSystemDef
 import dev.droidtop.library.consoles.CustomPlayerPrefs
 import dev.droidtop.library.consoles.ES_DE_CONSOLE_SYSTEMS
@@ -78,6 +90,37 @@ class ConsoleSystemsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContent { ConsoleSystemsScreen() }
     }
+}
+
+/**
+ * Real, confirmed gap this fixes: every row in this screen was a plain
+ * `Modifier.clickable{}` with zero focus handling -- functionally
+ * unusable with a D-pad/gamepad alone (no visible focus indicator, and
+ * nothing here ever requested initial focus, so a real controller had no
+ * starting point to navigate from). Same pattern GamepadShell's own
+ * SettingsLink/GameCard already use; duplicated here rather than shared
+ * across modules since :app has no compile-time dependency on
+ * :shell-gamepad (same reasoning as HandheldPrefs' own doc comment for
+ * why settings-adjacent code in different modules reads/duplicates
+ * rather than depends).
+ */
+private fun Modifier.gamepadFocusable(onClick: () -> Unit): Modifier = composed {
+    var focused by remember { mutableStateOf(false) }
+    this
+        .onFocusChanged { focused = it.isFocused }
+        .focusable()
+        .clickable(onClick = onClick)
+        .onKeyEvent { event ->
+            if (event.type == KeyEventType.KeyUp &&
+                (event.key == Key.ButtonA || event.key == Key.DirectionCenter || event.key == Key.Enter)
+            ) {
+                onClick()
+                true
+            } else {
+                false
+            }
+        }
+        .background(if (focused) Color.White.copy(alpha = 0.10f) else Color.Transparent, RoundedCornerShape(6.dp))
 }
 
 @Composable
@@ -155,10 +198,13 @@ private fun ConsoleSystemsScreen() {
                 if (folders.isEmpty()) {
                     Text("No game folders configured yet.", color = Color.Gray)
                 }
+                val firstFolderFocus = remember { FocusRequester() }
+                LaunchedEffect(folders) { if (folders.isNotEmpty()) firstFolderFocus.requestFocus() }
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(folders) { folder ->
                         val resolved = SystemOverridePrefs.resolveForFolder(context, folder.absolutePath, folder.name)
                         FolderRow(
+                            modifier = if (folder == folders.firstOrNull()) Modifier.focusRequester(firstFolderFocus) else Modifier,
                             folderName = folder.name,
                             resolvedSystem = resolved,
                             resolvedPlayer = resolved?.let { resolvePlayer(context, it) },
@@ -247,6 +293,7 @@ private fun FolderRow(
     onClickSystem: () -> Unit,
     onClickPlayer: () -> Unit,
     onScrape: (() -> Unit)?,
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     // Real per-system accent (see SystemThemeColors) instead of a flat
@@ -259,7 +306,7 @@ private fun FolderRow(
     // saturation would be visually loud rather than a subtle system cue.
     val accent = resolvedSystem?.let { SystemThemeColors.forSystem(context, it.id) }?.let { Color(it) }
 
-    Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(Color(0xFF161616))) {
+    Row(modifier = modifier.fillMaxWidth().height(IntrinsicSize.Min).background(Color(0xFF161616))) {
         if (accent != null) {
             Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(accent))
         }
@@ -269,7 +316,7 @@ private fun FolderRow(
                 .background(if (accent != null) accent.copy(alpha = 0.14f) else Color(0xFF1A1A1A))
                 .padding(16.dp),
         ) {
-            Column(modifier = Modifier.fillMaxWidth().clickable(onClick = onClickSystem)) {
+            Column(modifier = Modifier.fillMaxWidth().gamepadFocusable(onClickSystem)) {
                 Text(folderName, color = Color.White, style = MaterialTheme.typography.titleMedium)
                 Text(
                     resolvedSystem?.displayName ?: "Unrecognized -- tap to assign a system",
@@ -282,7 +329,7 @@ private fun FolderRow(
                     resolvedPlayer?.let { "Player: ${it.name}" } ?: "No installed player for this system -- tap to add one",
                     color = if (resolvedPlayer != null) (accent ?: Color(0xFF8AB4FF)) else Color(0xFFCC8800),
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.fillMaxWidth().clickable(onClick = onClickPlayer).padding(top = 6.dp),
+                    modifier = Modifier.fillMaxWidth().gamepadFocusable(onClickPlayer).padding(top = 6.dp),
                 )
             }
             if (onScrape != null) {
@@ -292,7 +339,7 @@ private fun FolderRow(
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .let { if (!isScraping) it.clickable(onClick = onScrape) else it }
+                        .let { if (!isScraping) it.gamepadFocusable(onScrape) else it }
                         .padding(top = 6.dp),
                 )
             }
@@ -376,7 +423,11 @@ private fun SystemPicker(onPick: (ConsoleSystemDef?) -> Unit, onDismiss: () -> U
                 .background(Color(0xFF1A1A1A))
                 .padding(12.dp),
         )
-        TextButton(onClick = { onPick(null) }) { Text("Clear override (use automatic matching)") }
+        val firstItemFocus = remember { FocusRequester() }
+        LaunchedEffect(Unit) { firstItemFocus.requestFocus() }
+        TextButton(onClick = { onPick(null) }, modifier = Modifier.focusRequester(firstItemFocus)) {
+            Text("Clear override (use automatic matching)")
+        }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             items(filtered) { system ->
                 Text(
@@ -384,7 +435,7 @@ private fun SystemPicker(onPick: (ConsoleSystemDef?) -> Unit, onDismiss: () -> U
                     color = Color.White,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onPick(system) }
+                        .gamepadFocusable { onPick(system) }
                         .padding(vertical = 10.dp),
                 )
             }
@@ -417,7 +468,11 @@ private fun PlayerPicker(system: ConsoleSystemDef, onPick: (Player.AmStart?) -> 
         if (players.isEmpty()) {
             Text("No installed emulator can run ${system.displayName} yet.", color = Color(0xFFCC8800))
         } else {
-            TextButton(onClick = { onPick(null) }) { Text("Clear override (use first installed)") }
+            val firstItemFocus = remember { FocusRequester() }
+            LaunchedEffect(Unit) { firstItemFocus.requestFocus() }
+            TextButton(onClick = { onPick(null) }, modifier = Modifier.focusRequester(firstItemFocus)) {
+                Text("Clear override (use first installed)")
+            }
             LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 items(players) { player ->
                     Text(
@@ -425,7 +480,7 @@ private fun PlayerPicker(system: ConsoleSystemDef, onPick: (Player.AmStart?) -> 
                         color = Color.White,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onPick(player) }
+                            .gamepadFocusable { onPick(player) }
                             .padding(vertical = 10.dp),
                     )
                 }
