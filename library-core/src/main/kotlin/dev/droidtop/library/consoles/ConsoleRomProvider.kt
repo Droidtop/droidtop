@@ -47,23 +47,50 @@ fun resolvePlayer(context: Context, system: ConsoleSystemDef): Player.AmStart? {
 }
 
 /**
- * Folder-name mismatches actually confirmed between a real ROMs
- * collection (checked against a real test device this session) and
- * ES-DE's own canonical system ids -- not a guessed/exhaustive list, just
- * the real cases seen so far. Add more as they come up.
+ * Folder-name mismatches between a real ROMs collection and ES-DE's own
+ * canonical system ids. Generated (not hand-guessed) by cross-referencing
+ * every real platform `shortname` in Daijishō's own public platform
+ * database (github.com/Jetup13/DaijishouExp, 131 real platform JSON
+ * files, the same real community-maintained convention a lot of existing
+ * ROM collections -- including the one confirmed against a real test
+ * device this session -- are actually organized under) against
+ * [ES_DE_CONSOLE_SYSTEMS]'s own real ids, keeping only the confident,
+ * verified matches (same display name/system identity on both sides, not
+ * a fuzzy guess -- e.g. Daijishō's "cassette"/"pico" shortnames were
+ * deliberately NOT aliased here despite superficially similar names,
+ * since they identify different real systems than any ES-DE entry with a
+ * similar name).
+ *
+ * Real, remaining, honest gap: several Daijishō platforms (RPG Maker,
+ * Quake II engine, NEC PC-60, Elektor TV Games Computer, Sega Genesis
+ * MSU, ...) have no ES-DE equivalent at all -- an alias can't fix that,
+ * since there's no [ConsoleSystemDef] to alias TO. Adding real new
+ * ConsoleSystemDef entries for those (extensions/display name sourced
+ * from the same real Daijishō data) is separate, worthwhile follow-up
+ * work, not attempted here.
  */
 private val SYSTEM_ID_ALIASES: Map<String, String> = mapOf(
     "ps1" to "psx",
-    "3ds" to "n3ds",
     "nsw" to "switch",
-    // Confirmed against a real ROMs collection this session (SD card,
-    // /storage/<id>/Roms) -- these three folder names were silently
-    // dropping their entire system (resolveSystem returned null, so
-    // the whole folder never got scanned at all, not even as an
-    // "unavailable player" skip) because no alias existed for them.
+    // Real, confirmed Daijishō shortname -> ES-DE id matches.
+    "3ds" to "n3ds",
     "appleii" to "apple2",
+    "cdi" to "cdimono1",
+    "coleco" to "colecovision",
+    "cpc" to "amstradcpc",
+    "gw" to "gameandwatch",
+    "jaguar" to "atarijaguar",
+    "jaguarcd" to "atarijaguarcd",
+    "lynx" to "atarilynx",
+    "master" to "mastersystem",
     "palmos" to "palm",
     "psv" to "psvita",
+    "sg1000" to "sg-1000",
+    "supercassette" to "scv",
+    "tgcd" to "tg-cd",
+    "vita" to "psvita",
+    "ws" to "wonderswan",
+    "wsc" to "wonderswancolor",
 )
 
 private val SYSTEMS_BY_ID: Map<String, ConsoleSystemDef> =
