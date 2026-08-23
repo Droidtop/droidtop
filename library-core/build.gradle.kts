@@ -52,9 +52,16 @@ dependencies {
     // RomDetectUtils/SerialScanner's own real Timber.d/i logging, forked
     // from Lemuroid unmodified -- see SerialScanner.kt's own doc comment.
     implementation(libs.timber)
-    // RomDatabase's own real persistent ROM-scan cache (Room).
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
+    // RomDatabase's own real persistent ROM-scan cache (Room). `api`, not
+    // `implementation` -- real, confirmed-necessary: :app calls
+    // ConsoleSystemsDatabase.get(context) directly (ConsoleSystemsActivity's
+    // PlatformsScreen), and Kotlin needs RoomDatabase (its declared
+    // supertype) resolvable on :app's own compile classpath for that, not
+    // just library-core's internal one. `implementation` alone produced a
+    // real CI failure: "Cannot access 'RoomDatabase' which is a supertype
+    // of 'ConsoleSystemsDatabase'."
+    api(libs.androidx.room.runtime)
+    api(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
     testImplementation(libs.junit)
