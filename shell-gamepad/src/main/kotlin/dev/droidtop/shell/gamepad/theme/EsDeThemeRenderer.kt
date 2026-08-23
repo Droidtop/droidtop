@@ -76,7 +76,7 @@ fun EsDeThemedView(
             // per-type renderer below.
             .filter { it.valueOrNull<EsDeThemeValue.Bool>("visible")?.value != false }
             .sortedBy { zIndexOf(it) }.forEach { element ->
-            if (element.key in setOf("backart3", "leftband1", "carback")) {
+            if (element.key in setOf("image_backart3", "image_leftband1", "image_carback")) {
                 android.util.Log.d(
                     "droidtop.ThemeDebug",
                     "${element.key}: path=${element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved} " +
