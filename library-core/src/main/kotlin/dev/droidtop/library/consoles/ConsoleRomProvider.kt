@@ -12,8 +12,12 @@ import dev.droidtop.library.romdetect.toConsoleSystemId
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.launch as coroutineLaunch
 import java.io.File
 import java.io.FileInputStream
+import java.util.Collections
 
 /**
  * Real, installed apps only -- a [KnownPlayers]/[DefaultPlayers] preset
@@ -101,9 +105,6 @@ private val SYSTEM_ID_ALIASES: Map<String, String> = mapOf(
 private val SYSTEMS_BY_ID: Map<String, ConsoleSystemDef> =
     ES_DE_CONSOLE_SYSTEMS.associateBy { it.id }
 
-/** Every real [ConsoleSystemDef] id Lemuroid's bundled libretro-db.sqlite could ever match against -- see [ConsoleRomProvider.detectSystemIdFromFilename]'s own doc comment for why this matters. */
-private val LIBRETRO_COVERED_SYSTEM_IDS: Set<String> = SystemID.entries.mapNotNull { it.toConsoleSystemId() }.toSet()
-
 /** Resolves a ROMs subfolder name to a known [ConsoleSystemDef], checking [SYSTEM_ID_ALIASES] first. */
 internal fun resolveSystem(folderName: String): ConsoleSystemDef? {
     val id = folderName.lowercase()
@@ -157,6 +158,53 @@ class ConsoleRomProvider(
         val cached = dao.getEntries(scannedRootPaths).map { it.toLibraryEntry() }
         val fresh = scanRootsFresh(unscannedRoots)
         return cached + fresh
+    }
+
+    // Real, reported UX request this answers: the Games screen used to
+    // show nothing but a spinner until every root's every system folder
+    // finished, even though most individual folders (nes/gba/psx, a few
+    // hundred files) are fast -- a real device's one pathologically large
+    // folder (a real "j2me" directory, 18,128 files) held the whole
+    // screen hostage behind it. Cached rows emit immediately; each fresh
+    // system folder then emits its own entries the moment it finishes,
+    // independently of every other folder still running -- a fast folder
+    // never waits on a slow one. The per-root cache write (dao.insertEntries
+    // + markScanned) still only happens once that root's own folders have
+    // all completed, same as [scanRootsFresh] -- this only changes when
+    // the *caller* sees results, not when the persistent cache is written.
+    override fun scanProgressive(): Flow<List<LibraryEntry>> = channelFlow {
+        val scannedRootPaths = dao.getScannedRoots(romsRoots.map { it.absolutePath })
+        val unscannedRoots = romsRoots.filter { it.absolutePath !in scannedRootPaths }
+        val cached = dao.getEntries(scannedRootPaths).map { it.toLibraryEntry() }
+        val accumulated = Collections.synchronizedList(cached.toMutableList())
+        send(accumulated.toList())
+        coroutineScope {
+            unscannedRoots.forEach { root ->
+                val systemFolders = (root.listFiles() ?: emptyArray()).filter { it.isDirectory }
+                    .mapNotNull { systemFolder ->
+                        SystemOverridePrefs.resolveForFolder(context, systemFolder.absolutePath, systemFolder.name)
+                            ?.let { systemFolder to it }
+                    }
+                val rootAccumulated = Collections.synchronizedList(mutableListOf<LibraryEntry>())
+                val deferreds = systemFolders.map { (systemFolder, system) ->
+                    async { scanSystemFolder(systemFolder, system) }
+                }
+                deferreds.forEach { deferred ->
+                    coroutineLaunch {
+                        val folderEntries = deferred.await()
+                        rootAccumulated += folderEntries
+                        accumulated += folderEntries
+                        send(accumulated.toList())
+                    }
+                }
+                coroutineLaunch {
+                    deferreds.awaitAll()
+                    dao.clearRoot(root.absolutePath)
+                    dao.insertEntries(rootAccumulated.map { it.toRomEntity(root.absolutePath) })
+                    dao.markScanned(ScanMetadataEntity(root.absolutePath, System.currentTimeMillis()))
+                }
+            }
+        }
     }
 
     /**
@@ -262,7 +310,7 @@ class ConsoleRomProvider(
         romFiles.map { romFile ->
             async {
                 val effectiveSystemId = detectSystemIdFromContent(romFile)
-                    ?: detectSystemIdFromFilename(romFile, system)
+                    ?: detectSystemIdFromFilename(romFile)
                     ?: system.id
                 LibraryEntry(
                     id = romFile.absolutePath,
@@ -310,19 +358,7 @@ class ConsoleRomProvider(
      * pattern as [detectSystemIdFromContent] -- one bad lookup never
      * fails the whole scan).
      */
-    private suspend fun detectSystemIdFromFilename(romFile: File, system: ConsoleSystemDef): String? {
-        // Real, confirmed-necessary skip, found via actual on-device
-        // testing: [LIBRETRO_COVERED_SYSTEM_IDS] is the full, real set of
-        // systems Lemuroid's libretro-db.sqlite could ever match (it's a
-        // classic-console ROM database -- it has zero knowledge of J2ME,
-        // for example). Querying it for every file in a system it can
-        // never cover is pure waste that can't ever return a match -- a
-        // real device's 18,128-file "j2me" folder turned into 18,128
-        // guaranteed-null queries, which is what actually caused the
-        // multi-minute stall this same pass's concurrency fix didn't fully
-        // solve on its own (concurrent-but-pointless is still slow at that
-        // volume).
-        if (system.id !in LIBRETRO_COVERED_SYSTEM_IDS) return null
+    private suspend fun detectSystemIdFromFilename(romFile: File): String? {
         return try {
             val rom = libretroDao.findByFileName(romFile.name) ?: return null
             SystemID.entries.firstOrNull { it.dbname == rom.system }?.toConsoleSystemId()
