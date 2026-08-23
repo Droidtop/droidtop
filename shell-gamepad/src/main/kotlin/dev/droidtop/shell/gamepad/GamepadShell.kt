@@ -152,9 +152,16 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
         val flow = if (rescanTrigger == 0) library.scanKindsProgressive(APP_KINDS) else library.rescanKindsProgressive(APP_KINDS)
         flow.collect { appEntries = it.filter { entry -> entry.kind in APP_KINDS } }
     }
+    // Real bug this fixes, reported directly: nulling gameEntries/appEntries
+    // here made the entire already-known library disappear the instant
+    // "Rescan library" was pressed, showing the loading spinner for
+    // however long the fresh walk took -- a rescan should never make a
+    // user's existing library vanish. Bumping rescanTrigger alone is
+    // enough: it restarts the LaunchedEffects above against
+    // rescanKindsProgressive, whose own first emission is the real,
+    // already-known cached data (see ConsoleRomProvider.rescanProgressive's
+    // own doc comment), not an empty list.
     val onRescan: () -> Unit = {
-        gameEntries = null
-        appEntries = null
         rescanTrigger++
     }
     // Real bug this fixes: onKeyEvent modifiers (L1/R1 section-switching
