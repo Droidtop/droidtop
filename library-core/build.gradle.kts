@@ -1,6 +1,9 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    // Real use: RomDatabase (persistent ROM-scan cache, see
+    // consoles/RomDatabase.kt's own doc comment).
+    alias(libs.plugins.google.ksp)
 }
 
 android {
@@ -49,6 +52,10 @@ dependencies {
     // RomDetectUtils/SerialScanner's own real Timber.d/i logging, forked
     // from Lemuroid unmodified -- see SerialScanner.kt's own doc comment.
     implementation(libs.timber)
+    // RomDatabase's own real persistent ROM-scan cache (Room).
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 
     testImplementation(libs.junit)
 }

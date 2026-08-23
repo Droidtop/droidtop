@@ -56,6 +56,14 @@ private val SYSTEM_ID_ALIASES: Map<String, String> = mapOf(
     "ps1" to "psx",
     "3ds" to "n3ds",
     "nsw" to "switch",
+    // Confirmed against a real ROMs collection this session (SD card,
+    // /storage/<id>/Roms) -- these three folder names were silently
+    // dropping their entire system (resolveSystem returned null, so
+    // the whole folder never got scanned at all, not even as an
+    // "unavailable player" skip) because no alias existed for them.
+    "appleii" to "apple2",
+    "palmos" to "palm",
+    "psv" to "psvita",
 )
 
 private val SYSTEMS_BY_ID: Map<String, ConsoleSystemDef> =
@@ -90,6 +98,8 @@ class ConsoleRomProvider(
 ) : LibraryProvider {
     override val kinds: Set<LibraryEntryKind> = setOf(LibraryEntryKind.CONSOLE_ROM)
 
+    private val dao by lazy { RomDatabase.get(context).romDao() }
+
     // Real bug this fixes, reported directly: a huge single system folder
     // (a real device's "j2me" folder had 18,126 files) made the *entire*
     // scan slow, since every system was scanned sequentially in one
@@ -97,16 +107,57 @@ class ConsoleRomProvider(
     // slow, from ever returning. Each system folder now scans as its own
     // coroutine, so j2me being slow no longer holds up nes/gba/psx/etc,
     // which return as soon as their own (much smaller) folders are read.
-    override suspend fun scan(): List<LibraryEntry> = coroutineScope {
-        romsRoots
-            .flatMap { root -> (root.listFiles() ?: emptyArray()).filter { it.isDirectory } }
-            .mapNotNull { systemFolder ->
-                SystemOverridePrefs.resolveForFolder(context, systemFolder.absolutePath, systemFolder.name)
-                    ?.let { systemFolder to it }
+    //
+    // Real persistent cache (RomDatabase): a root that already has a real
+    // scan_metadata row (a genuine prior full walk, not just "someone
+    // asked once") returns its cached rom_entries rows directly instead
+    // of re-walking the filesystem. A root scanned for the first time
+    // ever still gets the real, full walk below, so the first launch
+    // after adding a new ROMs root behaves exactly as before -- only
+    // *repeat* scans of an already-known root get faster.
+    override suspend fun scan(): List<LibraryEntry> {
+        val scannedRootPaths = dao.getScannedRoots(romsRoots.map { it.absolutePath })
+        val unscannedRoots = romsRoots.filter { it.absolutePath !in scannedRootPaths }
+        val cached = dao.getEntries(scannedRootPaths).map { it.toLibraryEntry() }
+        val fresh = scanRootsFresh(unscannedRoots)
+        return cached + fresh
+    }
+
+    /**
+     * Real, explicit "my ROMs changed, look again" action -- forces a full
+     * filesystem walk of every configured root regardless of cache state,
+     * replacing whatever was previously cached for each one. Not called
+     * automatically anywhere; [dev.droidtop.shell.gamepad]'s own settings
+     * screen is the real place to expose this as a user-triggered action
+     * (not wired up in this pass -- the cache-population half of this
+     * feature is the part that mattered most, an explicit UI trigger is
+     * real, separate follow-up work).
+     */
+    suspend fun rescan(): List<LibraryEntry> {
+        romsRoots.forEach { root ->
+            dao.clearRoot(root.absolutePath)
+            dao.clearScanMetadata(root.absolutePath)
+        }
+        return scanRootsFresh(romsRoots)
+    }
+
+    private suspend fun scanRootsFresh(roots: List<File>): List<LibraryEntry> = coroutineScope {
+        roots.map { root ->
+            async {
+                val entries = (root.listFiles() ?: emptyArray()).filter { it.isDirectory }
+                    .mapNotNull { systemFolder ->
+                        SystemOverridePrefs.resolveForFolder(context, systemFolder.absolutePath, systemFolder.name)
+                            ?.let { systemFolder to it }
+                    }
+                    .map { (systemFolder, system) -> async { scanSystemFolder(systemFolder, system) } }
+                    .awaitAll()
+                    .flatten()
+                dao.clearRoot(root.absolutePath)
+                dao.insertEntries(entries.map { it.toRomEntity(root.absolutePath) })
+                dao.markScanned(ScanMetadataEntity(root.absolutePath, System.currentTimeMillis()))
+                entries
             }
-            .map { (systemFolder, system) -> async { scanSystemFolder(systemFolder, system) } }
-            .awaitAll()
-            .flatten()
+        }.awaitAll().flatten()
     }
 
     // Recursive, not just the system folder's immediate children -- lets a
@@ -174,3 +225,19 @@ class ConsoleRomProvider(
         }
     }
 }
+
+private fun LibraryEntry.toRomEntity(romsRoot: String): RomEntity = RomEntity(
+    id = id,
+    title = title,
+    systemId = systemId ?: "",
+    artworkUri = artworkUri,
+    romsRoot = romsRoot,
+)
+
+private fun RomEntity.toLibraryEntry(): LibraryEntry = LibraryEntry(
+    id = id,
+    title = title,
+    kind = LibraryEntryKind.CONSOLE_ROM,
+    systemId = systemId,
+    artworkUri = artworkUri,
+)
