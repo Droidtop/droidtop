@@ -104,6 +104,19 @@ interface LibraryProvider {
      * thousands of files) -- see its own doc comment.
      */
     fun scanProgressive(): Flow<List<LibraryEntry>> = flow { emit(scan()) }
+
+    /**
+     * Real, optional explicit "my ROMs/apps changed, look again" action --
+     * default just re-runs [scanProgressive] (same behavior, no real
+     * invalidation) for every provider with no persistent cache of its
+     * own to invalidate. Only [dev.droidtop.library.consoles.ConsoleRomProvider]
+     * overrides this for real, since it's the only provider with a
+     * persistent scan cache ([dev.droidtop.library.consoles.RomDatabase])
+     * a plain [scan]/[scanProgressive] call wouldn't otherwise re-walk.
+     * The real, user-facing "Rescan library" Settings action calls this,
+     * not [scanProgressive] -- see shell-gamepad's SettingsSection.
+     */
+    fun rescanProgressive(): Flow<List<LibraryEntry>> = scanProgressive()
 }
 
 class Library(private val providers: List<LibraryProvider>) {
@@ -166,7 +179,27 @@ class Library(private val providers: List<LibraryProvider>) {
      * never resets because another provider emitted), matching
      * [scanKinds]' own per-provider isolation.
      */
-    fun scanKindsProgressive(kinds: Set<LibraryEntryKind>): Flow<List<LibraryEntry>> = channelFlow {
+    fun scanKindsProgressive(kinds: Set<LibraryEntryKind>): Flow<List<LibraryEntry>> =
+        mergedProgressive(kinds) { it.scanProgressive() }
+
+    /**
+     * Real, streaming counterpart to a plain rescan -- same growing-
+     * snapshot behavior as [scanKindsProgressive], but calling each
+     * matching provider's [LibraryProvider.rescanProgressive] instead,
+     * so a provider with its own persistent cache (see that method's own
+     * doc comment) actually re-walks instead of trusting stale cached
+     * rows. The real action behind shell-gamepad's Settings "Rescan
+     * library" -- see that link's own doc comment for why a real,
+     * user-facing trigger for this matters (previously the only way to
+     * force a fresh scan was clearing app data via adb by hand).
+     */
+    fun rescanKindsProgressive(kinds: Set<LibraryEntryKind>): Flow<List<LibraryEntry>> =
+        mergedProgressive(kinds) { it.rescanProgressive() }
+
+    private fun mergedProgressive(
+        kinds: Set<LibraryEntryKind>,
+        streamFor: (LibraryProvider) -> Flow<List<LibraryEntry>>,
+    ): Flow<List<LibraryEntry>> = channelFlow {
         val matchingProviders = providers.filter { provider -> provider.kinds.any { it in kinds } }
         val perProviderResults = MutableList(matchingProviders.size) { emptyList<LibraryEntry>() }
         coroutineScope {
@@ -174,7 +207,7 @@ class Library(private val providers: List<LibraryProvider>) {
                 coroutineLaunch {
                     try {
                         val completed = withTimeoutOrNull(60_000) {
-                            provider.scanProgressive().collect { partial ->
+                            streamFor(provider).collect { partial ->
                                 perProviderResults[index] = partial
                                 send(perProviderResults.flatten())
                             }

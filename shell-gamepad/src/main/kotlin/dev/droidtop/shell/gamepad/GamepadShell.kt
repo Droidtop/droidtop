@@ -112,6 +112,13 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
     // results from ever rendering.
     var gameEntries by remember { mutableStateOf<List<LibraryEntry>?>(null) }
     var appEntries by remember { mutableStateOf<List<LibraryEntry>?>(null) }
+    // Bumped by the real, user-facing "Rescan library" Settings action --
+    // included in both LaunchedEffect keys below so bumping it restarts
+    // both collections against Library.rescanKindsProgressive instead of
+    // the plain (cache-trusting) scanKindsProgressive. Previously the
+    // only way to force a fresh scan was clearing app data by hand over
+    // adb; a real user has no such option.
+    var rescanTrigger by remember { mutableStateOf(0) }
     var section by remember { mutableStateOf(HandheldPrefs.defaultSection(context)) }
     var canGoBack by remember { mutableStateOf(false) }
     var detailEntry by remember { mutableStateOf<LibraryEntry?>(null) }
@@ -134,11 +141,18 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
     // comment), so just assigning it directly here is enough to make the
     // screen fill in gradually as real results arrive, without this file
     // needing to know anything about how the underlying scan is chunked.
-    LaunchedEffect(library) {
-        library.scanKindsProgressive(GAME_KINDS).collect { gameEntries = it.filter { entry -> entry.kind in GAME_KINDS } }
+    LaunchedEffect(library, rescanTrigger) {
+        val flow = if (rescanTrigger == 0) library.scanKindsProgressive(GAME_KINDS) else library.rescanKindsProgressive(GAME_KINDS)
+        flow.collect { gameEntries = it.filter { entry -> entry.kind in GAME_KINDS } }
     }
-    LaunchedEffect(library) {
-        library.scanKindsProgressive(APP_KINDS).collect { appEntries = it.filter { entry -> entry.kind in APP_KINDS } }
+    LaunchedEffect(library, rescanTrigger) {
+        val flow = if (rescanTrigger == 0) library.scanKindsProgressive(APP_KINDS) else library.rescanKindsProgressive(APP_KINDS)
+        flow.collect { appEntries = it.filter { entry -> entry.kind in APP_KINDS } }
+    }
+    val onRescan: () -> Unit = {
+        gameEntries = null
+        appEntries = null
+        rescanTrigger++
     }
     // Real bug this fixes: onKeyEvent modifiers (L1/R1 section-switching
     // below, GamesSection's Left/Right sibling-system switching) only ever
@@ -201,7 +215,7 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
                 )
                 section == HandheldSection.SETTINGS -> {
                     canGoBack = false
-                    SettingsSection()
+                    SettingsSection(onRescan = onRescan)
                 }
                 // Each section now gates on its own scan only (see
                 // gameEntries/appEntries' own comment) -- Games' spinner no
@@ -967,7 +981,7 @@ private fun AppIconTile(entry: LibraryEntry, modifier: Modifier = Modifier, onLa
  * a typed Intent.
  */
 @Composable
-private fun SettingsSection() {
+private fun SettingsSection(onRescan: () -> Unit) {
     val context = LocalContext.current
     val firstFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { firstFocus.requestFocus() }
@@ -983,6 +997,17 @@ private fun SettingsSection() {
             "All settings",
             "General, icons, home screen, and everything else",
             onClick = { openSettings(context, null) },
+        )
+        // Real, user-facing counterpart to Library.rescanKindsProgressive
+        // -- previously the only way to force a fresh ROM scan (pick up
+        // new files, drop deleted ones) was clearing app data by hand
+        // over adb, which isn't something a real user can do. Games/Apps
+        // re-render progressively as results stream back in, same as a
+        // first-launch scan (see GamepadShell's own onRescan comment).
+        SettingsLink(
+            "Rescan library",
+            "Look for new or changed games and apps again",
+            onClick = onRescan,
         )
     }
 }
