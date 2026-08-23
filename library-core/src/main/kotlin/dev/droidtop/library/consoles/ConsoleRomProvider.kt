@@ -101,6 +101,9 @@ private val SYSTEM_ID_ALIASES: Map<String, String> = mapOf(
 private val SYSTEMS_BY_ID: Map<String, ConsoleSystemDef> =
     ES_DE_CONSOLE_SYSTEMS.associateBy { it.id }
 
+/** Every real [ConsoleSystemDef] id Lemuroid's bundled libretro-db.sqlite could ever match against -- see [ConsoleRomProvider.detectSystemIdFromFilename]'s own doc comment for why this matters. */
+private val LIBRETRO_COVERED_SYSTEM_IDS: Set<String> = SystemID.entries.mapNotNull { it.toConsoleSystemId() }.toSet()
+
 /** Resolves a ROMs subfolder name to a known [ConsoleSystemDef], checking [SYSTEM_ID_ALIASES] first. */
 internal fun resolveSystem(folderName: String): ConsoleSystemDef? {
     val id = folderName.lowercase()
@@ -259,7 +262,7 @@ class ConsoleRomProvider(
         romFiles.map { romFile ->
             async {
                 val effectiveSystemId = detectSystemIdFromContent(romFile)
-                    ?: detectSystemIdFromFilename(romFile)
+                    ?: detectSystemIdFromFilename(romFile, system)
                     ?: system.id
                 LibraryEntry(
                     id = romFile.absolutePath,
@@ -307,7 +310,19 @@ class ConsoleRomProvider(
      * pattern as [detectSystemIdFromContent] -- one bad lookup never
      * fails the whole scan).
      */
-    private suspend fun detectSystemIdFromFilename(romFile: File): String? {
+    private suspend fun detectSystemIdFromFilename(romFile: File, system: ConsoleSystemDef): String? {
+        // Real, confirmed-necessary skip, found via actual on-device
+        // testing: [LIBRETRO_COVERED_SYSTEM_IDS] is the full, real set of
+        // systems Lemuroid's libretro-db.sqlite could ever match (it's a
+        // classic-console ROM database -- it has zero knowledge of J2ME,
+        // for example). Querying it for every file in a system it can
+        // never cover is pure waste that can't ever return a match -- a
+        // real device's 18,128-file "j2me" folder turned into 18,128
+        // guaranteed-null queries, which is what actually caused the
+        // multi-minute stall this same pass's concurrency fix didn't fully
+        // solve on its own (concurrent-but-pointless is still slow at that
+        // volume).
+        if (system.id !in LIBRETRO_COVERED_SYSTEM_IDS) return null
         return try {
             val rom = libretroDao.findByFileName(romFile.name) ?: return null
             SystemID.entries.firstOrNull { it.dbname == rom.system }?.toConsoleSystemId()
