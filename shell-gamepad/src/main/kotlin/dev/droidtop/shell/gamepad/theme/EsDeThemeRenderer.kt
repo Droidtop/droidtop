@@ -20,6 +20,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -138,6 +140,17 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
     val cornerRadiusFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("cornerRadius")?.value ?: 0f
     val cornerRadius = (cornerRadiusFraction * 1080).dp
+    // Real properties, previously not applied at all -- see this file's
+    // own EsDeThemedImage doc comment for the real, confirmed carousel
+    // outline/fade misalignment this caused (one real source image meant
+    // to be mirrored twice around the carousel, both instances rendering
+    // in the same orientation without these). Rotation applies around the
+    // element's own real `origin` point (same anchor `pos` already uses),
+    // not Compose's center-of-box default.
+    val originFraction = element.valueOrNull<EsDeThemeValue.Pair>("origin") ?: EsDeThemeValue.Pair(0f, 0f)
+    val rotation = element.valueOrNull<EsDeThemeValue.FloatValue>("rotation")?.value ?: 0f
+    val flipHorizontal = element.valueOrNull<EsDeThemeValue.Bool>("flipHorizontal")?.value ?: false
+    val flipVertical = element.valueOrNull<EsDeThemeValue.Bool>("flipVertical")?.value ?: false
     AsyncImage(
         model = path,
         contentDescription = null,
@@ -146,6 +159,12 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         modifier = Modifier
             .absoluteOffset(x = offsetX, y = offsetY)
             .size(width = width, height = height)
+            .graphicsLayer {
+                transformOrigin = TransformOrigin(originFraction.x, originFraction.y)
+                rotationZ = rotation
+                scaleX = if (flipHorizontal) -1f else 1f
+                scaleY = if (flipVertical) -1f else 1f
+            }
             .let { if (cornerRadius > 0.dp) it.clip(RoundedCornerShape(cornerRadius)) else it },
     )
 }

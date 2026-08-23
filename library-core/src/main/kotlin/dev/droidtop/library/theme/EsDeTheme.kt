@@ -112,6 +112,16 @@ internal val ES_DE_ELEMENT_SCHEMA: Map<String, Map<String, EsDePropertyType>> = 
         "maxSize" to EsDePropertyType.NORMALIZED_PAIR,
         "origin" to EsDePropertyType.NORMALIZED_PAIR,
         "rotation" to EsDePropertyType.FLOAT,
+        // Real, previously-missing properties -- DEcaffe's own carousel
+        // outline/fade decorative art (systemcar fade/fadebot,
+        // caroutlinetop/caroutline) mirrors ONE real source image around
+        // the carousel using exactly these two, one flipped, one flipped
+        // AND rotated 180 -- without them both instances render in the
+        // same orientation, a real, visually-confirmed misalignment bug
+        // (found by comparing a real on-device screenshot against
+        // theme.xml directly), not a missing-asset problem.
+        "flipHorizontal" to EsDePropertyType.BOOLEAN,
+        "flipVertical" to EsDePropertyType.BOOLEAN,
         "path" to EsDePropertyType.PATH,
         "default" to EsDePropertyType.PATH,
         "color" to EsDePropertyType.COLOR,

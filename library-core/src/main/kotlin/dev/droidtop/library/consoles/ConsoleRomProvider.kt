@@ -35,7 +35,7 @@ private fun isPackageInstalled(context: Context, packageName: String): Boolean =
 fun availablePlayers(context: Context, system: ConsoleSystemDef): List<Player.AmStart> {
     val custom = CustomPlayerPrefs.getForSystem(context, system.id)
     val known = KnownPlayers.forSystem(system.id).map { it.player }
-    val retroArch = DefaultPlayers.retroArch(system)
+    val retroArch = DefaultPlayers.retroArch(context, system)
     return (custom + known + listOfNotNull(retroArch)).filter { isPackageInstalled(context, it.packageName) }
 }
 
@@ -167,15 +167,20 @@ class ConsoleRomProvider(
     // every file under the system folder at any depth is still found and
     // still counted as belonging to that one system.
     private fun scanSystemFolder(systemFolder: File, system: ConsoleSystemDef): List<LibraryEntry> {
-        // Real fix, not just a refactor: this used to only check
-        // DefaultPlayers.retroArch(system) != null, which silently skipped
-        // scanning every system with no RetroArch libretro core at all --
-        // PS2, PS3, 3DS, Switch, GameCube/Wii, PSP among them (see that
-        // function's own doc comment) -- exactly the systems KnownPlayers'
-        // real standalone-emulator presets exist for. A system now scans as
-        // long as ANY real, installed player (custom, known-preset, or
-        // RetroArch) can handle it.
-        if (availablePlayers(context, system).isEmpty()) return emptyList()
+        // Real, deliberate design: detection (does this system show up at
+        // all) is driven ENTIRELY by the ROMs folder itself -- a real
+        // subfolder with real files is what "this system exists in my
+        // library" means, full stop. Player availability is a launch-time
+        // concern (see launch(), which errors clearly if nothing can run
+        // the entry), not a visibility gate. An earlier version of this
+        // function skipped scanning entirely when availablePlayers(...)
+        // was empty, which silently hid a real, populated system folder
+        // any time droidtop's own player detection didn't recognize an
+        // installed emulator (a real, confirmed case: RetroArch's
+        // aarch64-build package name wasn't checked at all until this same
+        // pass -- see DefaultPlayers' own doc comment) -- the ROM folder
+        // itself is the source of truth, not what droidtop happens to know
+        // how to launch today.
         // The games root is systemFolder's own parent (<gamesRoot>/<systemId>/...),
         // same directory ES-DE's own `downloaded_media` sits alongside --
         // real per-game artwork when a user's existing ES-DE (or any other
