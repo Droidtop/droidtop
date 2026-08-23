@@ -5,7 +5,9 @@ import dev.droidtop.library.EsDeArtwork
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
+import dev.droidtop.library.romdetect.LibretroDatabase
 import dev.droidtop.library.romdetect.SerialScanner
+import dev.droidtop.library.romdetect.SystemID
 import dev.droidtop.library.romdetect.toConsoleSystemId
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -129,6 +131,7 @@ class ConsoleRomProvider(
     override val kinds: Set<LibraryEntryKind> = setOf(LibraryEntryKind.CONSOLE_ROM)
 
     private val dao by lazy { RomDatabase.get(context).romDao() }
+    private val libretroDao by lazy { LibretroDatabase.get(context).gameDao() }
 
     // Real bug this fixes, reported directly: a huge single system folder
     // (a real device's "j2me" folder had 18,126 files) made the *entire*
@@ -196,7 +199,7 @@ class ConsoleRomProvider(
     // choice, without that reorganizing ever hiding files from droidtop:
     // every file under the system folder at any depth is still found and
     // still counted as belonging to that one system.
-    private fun scanSystemFolder(systemFolder: File, system: ConsoleSystemDef): List<LibraryEntry> {
+    private suspend fun scanSystemFolder(systemFolder: File, system: ConsoleSystemDef): List<LibraryEntry> {
         // Real, deliberate design: detection (does this system show up at
         // all) is driven ENTIRELY by the ROMs folder itself -- a real
         // subfolder with real files is what "this system exists in my
@@ -218,41 +221,51 @@ class ConsoleRomProvider(
         // See EsDeArtwork's own doc comment for why droidtop reads this
         // rather than scraping itself.
         val gamesRoot = systemFolder.parentFile ?: systemFolder
-        return systemFolder.walkTopDown()
+        val romFiles = systemFolder.walkTopDown()
             .filter { it.isFile && it.extension.lowercase() in system.extensions }
-            .map { romFile ->
-                // Real, genuine file-content detection, going beyond what
-                // either ES-DE or EmuDeck actually do (both confirmed this
-                // session to be purely folder+extension-based, no content
-                // sniffing at all -- SystemData::populateFolder's own real
-                // source, and EmuDeck's own real roms/<system>/ layout,
-                // which uses the same ES-DE-derived ids). For a genuinely
-                // ambiguous disc-image extension (the same .iso/.bin can be
-                // PSX, PSP, SegaCD, ...), read the file's own real magic
-                // number/embedded serial (SerialScanner, forked wholesale
-                // from Lemuroid, previously wired up nowhere) and prefer
-                // that over the folder-derived system when it disagrees --
-                // catches a ROM genuinely misfiled into the wrong system
-                // folder, which folder-only detection can never catch.
-                val detectedSystemId = detectSystemIdFromContent(romFile)
-                val effectiveSystemId = detectedSystemId ?: system.id
-                LibraryEntry(
-                    id = romFile.absolutePath,
-                    title = romFile.nameWithoutExtension,
-                    kind = LibraryEntryKind.CONSOLE_ROM,
-                    systemId = effectiveSystemId,
-                    artworkUri = EsDeArtwork.resolve(gamesRoot, effectiveSystemId, romFile.nameWithoutExtension),
-                )
-            }
             .toList()
+        val entries = mutableListOf<LibraryEntry>()
+        for (romFile in romFiles) {
+            // Real, genuine file detection beyond what either ES-DE or
+            // EmuDeck actually do (both confirmed this session to be
+            // purely folder+extension-based, no content/filename lookup
+            // at all -- SystemData::populateFolder's own real source, and
+            // EmuDeck's own real roms/<system>/ layout, which uses the
+            // same ES-DE-derived ids). A real Android ROM manager
+            // (Lemuroid, already vendored in this repo) does this
+            // properly: a prioritized cascade -- embedded disc serial/
+            // magic number first (SerialScanner, cheap, header-only read,
+            // for the disc-image extensions it covers), then a filename
+            // lookup against Lemuroid's own real, ~13MB community ROM
+            // database (libretro-db.sqlite, already vendored, now bundled
+            // as droidtop's own asset -- a single fast indexed query, no
+            // file content read at all), before falling back to trusting
+            // the folder. Full CRC32 hashing (Lemuroid's own strongest,
+            // first-priority signal) is real, deferred follow-up work --
+            // reading a multi-gigabyte disc image's entire content for a
+            // hash needs real performance tuning this pass didn't have
+            // room for; header-read serial detection and free filename
+            // lookup are the safe, cheap wins taken here.
+            val effectiveSystemId = detectSystemIdFromContent(romFile)
+                ?: detectSystemIdFromFilename(romFile)
+                ?: system.id
+            entries += LibraryEntry(
+                id = romFile.absolutePath,
+                title = romFile.nameWithoutExtension,
+                kind = LibraryEntryKind.CONSOLE_ROM,
+                systemId = effectiveSystemId,
+                artworkUri = EsDeArtwork.resolve(gamesRoot, effectiveSystemId, romFile.nameWithoutExtension),
+            )
+        }
+        return entries
     }
 
     /**
      * Real content-based system detection for the disc-image extensions
      * [SerialScanner] actually supports (iso/bin/pbp/3ds) -- returns null
-     * (meaning "trust the folder") for every other extension, and also
-     * null if content detection genuinely found nothing (a real disc
-     * image SerialScanner's magic numbers don't happen to cover, e.g. a
+     * (meaning "keep looking") for every other extension, and also null
+     * if content detection genuinely found nothing (a real disc image
+     * SerialScanner's magic numbers don't happen to cover, e.g. a
      * GameCube/Wii/generic PC .iso) or the detected [SystemID] has no
      * known real [ConsoleSystemDef] id to map to. Best-effort: any read
      * failure (a real but rare case -- a corrupt file, a permissions
@@ -266,6 +279,26 @@ class ConsoleRomProvider(
             FileInputStream(romFile).use { stream ->
                 SerialScanner.extractInfo(romFile.name, stream).systemID?.toConsoleSystemId()
             }
+        } catch (t: Throwable) {
+            null
+        }
+    }
+
+    /**
+     * Real filename lookup against Lemuroid's own real, bundled community
+     * ROM database -- a genuinely useful signal for the systems
+     * [SerialScanner] doesn't cover at all (cartridge-based ROMs --
+     * NES/SNES/GBA/N64/...), and free: a single indexed SQLite query,
+     * no file content read. Returns null (meaning "trust the folder") on
+     * no match, a stored system this pass's own [toConsoleSystemId]
+     * mapping doesn't cover, or any real DB error (best-effort, same
+     * pattern as [detectSystemIdFromContent] -- one bad lookup never
+     * fails the whole scan).
+     */
+    private suspend fun detectSystemIdFromFilename(romFile: File): String? {
+        return try {
+            val rom = libretroDao.findByFileName(romFile.name) ?: return null
+            SystemID.entries.firstOrNull { it.dbname == rom.system }?.toConsoleSystemId()
         } catch (t: Throwable) {
             null
         }
