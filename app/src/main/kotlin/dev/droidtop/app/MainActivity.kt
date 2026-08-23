@@ -36,7 +36,6 @@ import dev.droidtop.shell.standard.BackButtonMenu
 import dev.droidtop.shell.standard.ModePrefs
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import java.io.File
 
 /**
  * Not an app-drawer entry point — droidtop defaults to the normal Android
@@ -74,26 +73,19 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Every folder OnboardingActivity resolved from the user's own SAF
-        // picks (GamesRootPrefs.resolveStoragePath -- primary storage or a
-        // real SD card, see that function's own doc comment), zero or more
-        // of them -- ROM/game support is opt-in per direction, so an empty
-        // set here is a completely normal, expected state (EngineGameProvider
-        // just finds nothing to scan), not a fallback-worthy problem. Falls
-        // back to the old app-private default only for a fresh install that
-        // hasn't been through onboarding at all yet.
-        val gamesRoots = GamesRootPrefs.gamesRootPaths(this).map(::File).ifEmpty {
-            listOf(File(getExternalFilesDir(null), "games").apply { mkdirs() })
-        }
+        // Real roots are read fresh by each provider on every scan (see
+        // GamesRoots.current's own doc comment) -- not resolved once here
+        // and frozen, since that would silently ignore any root added or
+        // removed at runtime via the "ROM folders" Settings screen.
         library = Library(
             listOf(
                 NativeAppProvider(applicationContext),
-                EngineGameProvider(applicationContext, gamesRoots),
+                EngineGameProvider(applicationContext),
                 // Same roots as EngineGameProvider -- a folder can hold
                 // real console ROMs (<root>/<systemId>/<romFile>), engine
                 // games (<root>/<gameFolder>/...), or both; each provider
                 // only ever matches what's actually its own shape.
-                ConsoleRomProvider(applicationContext, gamesRoots),
+                ConsoleRomProvider(applicationContext),
                 // Real discovery (com.winlator.container.ContainerManager's
                 // own shortcut scan), themed as ES-DE's "pc" system like
                 // any other. primarySession is a supplier, not a value,

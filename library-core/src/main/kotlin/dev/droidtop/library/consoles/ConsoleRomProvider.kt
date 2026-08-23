@@ -2,6 +2,7 @@ package dev.droidtop.library.consoles
 
 import android.content.Context
 import dev.droidtop.library.EsDeArtwork
+import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
@@ -103,13 +104,18 @@ private val SYSTEM_ID_ALIASES: Map<String, String> = mapOf(
     "wsc" to "wonderswancolor",
 )
 
-private val SYSTEMS_BY_ID: Map<String, ConsoleSystemDef> =
-    ES_DE_CONSOLE_SYSTEMS.associateBy { it.id }
-
-/** Resolves a ROMs subfolder name to a known [ConsoleSystemDef], checking [SYSTEM_ID_ALIASES] first. */
-internal fun resolveSystem(folderName: String): ConsoleSystemDef? {
+/**
+ * Resolves a ROMs subfolder name to a known [ConsoleSystemDef], checking
+ * [SYSTEM_ID_ALIASES] first. [systemsById] is a live snapshot from
+ * [ConsoleSystemsRepository.allSystems] (built-in + real, user-edited/
+ * added platforms), not a compile-time constant -- the caller loads it
+ * once per scan/lookup pass and passes it in, since a plain top-level
+ * `val` computed once at class-load can't reflect platform edits made
+ * after that (see [ConsoleSystemsRepository]'s own doc comment).
+ */
+internal fun resolveSystem(folderName: String, systemsById: Map<String, ConsoleSystemDef>): ConsoleSystemDef? {
     val id = folderName.lowercase()
-    return SYSTEMS_BY_ID[SYSTEM_ID_ALIASES[id] ?: id]
+    return systemsById[SYSTEM_ID_ALIASES[id] ?: id]
 }
 
 /**
@@ -131,7 +137,6 @@ internal fun resolveSystem(folderName: String): ConsoleSystemDef? {
  */
 class ConsoleRomProvider(
     private val context: Context,
-    private val romsRoots: List<File>,
 ) : LibraryProvider {
     override val kinds: Set<LibraryEntryKind> = setOf(LibraryEntryKind.CONSOLE_ROM)
 
@@ -154,10 +159,12 @@ class ConsoleRomProvider(
     // after adding a new ROMs root behaves exactly as before -- only
     // *repeat* scans of an already-known root get faster.
     override suspend fun scan(): List<LibraryEntry> {
+        val romsRoots = GamesRoots.current(context)
+        val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         val scannedRootPaths = dao.getScannedRoots(romsRoots.map { it.absolutePath })
         val unscannedRoots = romsRoots.filter { it.absolutePath !in scannedRootPaths }
         val cached = dao.getEntries(scannedRootPaths).map { it.toLibraryEntry() }
-        val fresh = scanRootsFresh(unscannedRoots)
+        val fresh = scanRootsFresh(unscannedRoots, systemsById)
         return cached + fresh
     }
 
@@ -174,10 +181,12 @@ class ConsoleRomProvider(
     // all completed, same as [scanRootsFresh] -- this only changes when
     // the *caller* sees results, not when the persistent cache is written.
     override fun scanProgressive(): Flow<List<LibraryEntry>> = channelFlow {
+        val romsRoots = GamesRoots.current(context)
+        val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         val scannedRootPaths = dao.getScannedRoots(romsRoots.map { it.absolutePath })
         val unscannedRoots = romsRoots.filter { it.absolutePath !in scannedRootPaths }
         val cached = dao.getEntries(scannedRootPaths).map { it.toLibraryEntry() }
-        streamRootsProgressively(cached, unscannedRoots)
+        streamRootsProgressively(cached, unscannedRoots, systemsById)
     }
 
     /**
@@ -190,16 +199,19 @@ class ConsoleRomProvider(
      * could ever do.
      */
     override fun rescanProgressive(): Flow<List<LibraryEntry>> = channelFlow {
+        val romsRoots = GamesRoots.current(context)
+        val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         romsRoots.forEach { root ->
             dao.clearRoot(root.absolutePath)
             dao.clearScanMetadata(root.absolutePath)
         }
-        streamRootsProgressively(emptyList(), romsRoots)
+        streamRootsProgressively(emptyList(), romsRoots, systemsById)
     }
 
     private suspend fun ProducerScope<List<LibraryEntry>>.streamRootsProgressively(
         cached: List<LibraryEntry>,
         unscannedRoots: List<File>,
+        systemsById: Map<String, ConsoleSystemDef>,
     ) {
         val accumulated = Collections.synchronizedList(cached.toMutableList())
         send(accumulated.toList())
@@ -207,7 +219,7 @@ class ConsoleRomProvider(
             unscannedRoots.forEach { root ->
                 val systemFolders = (root.listFiles() ?: emptyArray()).filter { it.isDirectory }
                     .mapNotNull { systemFolder ->
-                        SystemOverridePrefs.resolveForFolder(context, systemFolder.absolutePath, systemFolder.name)
+                        SystemOverridePrefs.resolveForFolder(context, systemFolder.absolutePath, systemFolder.name, systemsById)
                             ?.let { systemFolder to it }
                     }
                 val rootAccumulated = Collections.synchronizedList(mutableListOf<LibraryEntry>())
@@ -238,19 +250,21 @@ class ConsoleRomProvider(
      * caller that just wants the final list, not a growing stream.
      */
     suspend fun rescan(): List<LibraryEntry> {
+        val romsRoots = GamesRoots.current(context)
+        val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         romsRoots.forEach { root ->
             dao.clearRoot(root.absolutePath)
             dao.clearScanMetadata(root.absolutePath)
         }
-        return scanRootsFresh(romsRoots)
+        return scanRootsFresh(romsRoots, systemsById)
     }
 
-    private suspend fun scanRootsFresh(roots: List<File>): List<LibraryEntry> = coroutineScope {
+    private suspend fun scanRootsFresh(roots: List<File>, systemsById: Map<String, ConsoleSystemDef>): List<LibraryEntry> = coroutineScope {
         roots.map { root ->
             async {
                 val entries = (root.listFiles() ?: emptyArray()).filter { it.isDirectory }
                     .mapNotNull { systemFolder ->
-                        SystemOverridePrefs.resolveForFolder(context, systemFolder.absolutePath, systemFolder.name)
+                        SystemOverridePrefs.resolveForFolder(context, systemFolder.absolutePath, systemFolder.name, systemsById)
                             ?.let { systemFolder to it }
                     }
                     .map { (systemFolder, system) -> async { scanSystemFolder(systemFolder, system) } }
@@ -395,8 +409,9 @@ class ConsoleRomProvider(
         // here would silently throw away, launching a misfiled disc image
         // with the wrong system's player.
         val parentFolder = romFile.parentFile
-        val system = entry.systemId?.let { SYSTEMS_BY_ID[it] }
-            ?: SystemOverridePrefs.resolveForFolder(context, parentFolder?.absolutePath ?: "", parentFolder?.name ?: "")
+        val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
+        val system = entry.systemId?.let { systemsById[it] }
+            ?: SystemOverridePrefs.resolveForFolder(context, parentFolder?.absolutePath ?: "", parentFolder?.name ?: "", systemsById)
             ?: error("Couldn't resolve a console system for ${entry.id}")
         val player = resolvePlayer(context, system)
             ?: error("No installed Player available for system ${system.id}")

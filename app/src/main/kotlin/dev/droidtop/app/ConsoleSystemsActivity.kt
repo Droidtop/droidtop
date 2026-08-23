@@ -1,7 +1,10 @@
 package dev.droidtop.app
 
+import android.content.Intent
 import android.os.Bundle
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -46,6 +49,9 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.key.KeyEventType
 import dev.droidtop.library.consoles.ConsoleSystemDef
+import dev.droidtop.library.consoles.ConsoleSystemEntity
+import dev.droidtop.library.consoles.ConsoleSystemsDatabase
+import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.consoles.CustomPlayerPrefs
 import dev.droidtop.library.consoles.ES_DE_CONSOLE_SYSTEMS
 import dev.droidtop.library.EsDeArtwork
@@ -130,10 +136,20 @@ private fun ConsoleSystemsScreen() {
     var playerPickerForSystem by remember { mutableStateOf<ConsoleSystemDef?>(null) }
     var addCustomPlayerForSystem by remember { mutableStateOf<ConsoleSystemDef?>(null) }
     var scraperSettingsOpen by remember { mutableStateOf(false) }
+    var platformsOpen by remember { mutableStateOf(false) }
+    var romFoldersOpen by remember { mutableStateOf(false) }
     var scrapingFolder by remember { mutableStateOf<File?>(null) }
     var scrapeStatus by remember { mutableStateOf<String?>(null) }
     var version by remember { mutableStateOf(0) }
+    // Bumped whenever a platform is added/edited/deleted/restored (from
+    // PlatformsScreen) -- real systems now live in ConsoleSystemsRepository,
+    // not a compile-time list, so every screen reading them has to reload
+    // rather than trust a `remember` snapshot taken once.
+    var systemsVersion by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
+
+    var systemsById by remember { mutableStateOf<Map<String, ConsoleSystemDef>>(emptyMap()) }
+    LaunchedEffect(systemsVersion) { systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id } }
 
     val folders = remember(version) {
         GamesRootPrefs.gamesRootPaths(context)
@@ -171,6 +187,7 @@ private fun ConsoleSystemsScreen() {
                 onDismiss = { playerPickerForSystem = null },
             )
             pickingFor != null -> SystemPicker(
+                systems = systemsById.values.toList(),
                 onPick = { system ->
                     SystemOverridePrefs.set(context, pickingFor.absolutePath, system?.id)
                     pickerForFolder = null
@@ -179,6 +196,12 @@ private fun ConsoleSystemsScreen() {
                 onDismiss = { pickerForFolder = null },
             )
             scraperSettingsOpen -> ScraperSettingsScreen(onDismiss = { scraperSettingsOpen = false })
+            platformsOpen -> PlatformsScreen(
+                onDismiss = { platformsOpen = false; systemsVersion++ },
+            )
+            romFoldersOpen -> RomFoldersScreen(
+                onDismiss = { romFoldersOpen = false; version++ },
+            )
             else -> Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
                 Text("Console systems", color = Color.White, style = MaterialTheme.typography.headlineSmall)
                 Text(
@@ -189,6 +212,20 @@ private fun ConsoleSystemsScreen() {
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
                 )
+                val topFocus = remember { FocusRequester() }
+                LaunchedEffect(Unit) { topFocus.requestFocus() }
+                Text(
+                    "Manage platforms (add, edit, delete)",
+                    color = Color(0xFF8AB4FF),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.fillMaxWidth().focusRequester(topFocus).gamepadFocusable { platformsOpen = true }.padding(vertical = 8.dp),
+                )
+                Text(
+                    "ROM folders (add or remove)",
+                    color = Color(0xFF8AB4FF),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.fillMaxWidth().gamepadFocusable { romFoldersOpen = true }.padding(vertical = 8.dp),
+                )
                 TextButton(onClick = { scraperSettingsOpen = true }) {
                     Text(if (ScraperPrefs.isConfigured(context)) "IGDB scraper configured -- edit" else "Set up artwork scraper (IGDB)")
                 }
@@ -198,13 +235,10 @@ private fun ConsoleSystemsScreen() {
                 if (folders.isEmpty()) {
                     Text("No game folders configured yet.", color = Color.Gray)
                 }
-                val firstFolderFocus = remember { FocusRequester() }
-                LaunchedEffect(folders) { if (folders.isNotEmpty()) firstFolderFocus.requestFocus() }
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(folders) { folder ->
-                        val resolved = SystemOverridePrefs.resolveForFolder(context, folder.absolutePath, folder.name)
+                        val resolved = SystemOverridePrefs.resolveForFolder(context, folder.absolutePath, folder.name, systemsById)
                         FolderRow(
-                            modifier = if (folder == folders.firstOrNull()) Modifier.focusRequester(firstFolderFocus) else Modifier,
                             folderName = folder.name,
                             resolvedSystem = resolved,
                             resolvedPlayer = resolved?.let { resolvePlayer(context, it) },
@@ -399,16 +433,16 @@ private fun ScraperSettingsScreen(onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun SystemPicker(onPick: (ConsoleSystemDef?) -> Unit, onDismiss: () -> Unit) {
+private fun SystemPicker(systems: List<ConsoleSystemDef>, onPick: (ConsoleSystemDef?) -> Unit, onDismiss: () -> Unit) {
     var query by remember { mutableStateOf("") }
-    val filtered = remember(query) {
+    val filtered = remember(query, systems) {
         if (query.isBlank()) {
-            ES_DE_CONSOLE_SYSTEMS
+            systems
         } else {
-            ES_DE_CONSOLE_SYSTEMS.filter {
+            systems.filter {
                 it.displayName.contains(query, ignoreCase = true) || it.id.contains(query, ignoreCase = true)
             }
-        }
+        }.sortedBy { it.displayName.lowercase() }
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
@@ -552,5 +586,264 @@ private fun AddCustomPlayerScreen(
                 enabled = name.isNotBlank() && pkg.isNotBlank() && args.isNotBlank(),
             ) { Text("Save") }
         }
+    }
+}
+
+/**
+ * Real, full platform CRUD -- the actual "Daijishō-level" ask this
+ * answers: add a brand-new platform (not just override which existing
+ * one a folder maps to), edit any platform's display name/extensions/
+ * RetroArch core (built-in ones included, same permissiveness Daijishō
+ * itself allows), delete one, or restore every built-in back to
+ * [ES_DE_CONSOLE_SYSTEMS]'s own defaults. Reads/writes exclusively
+ * through [ConsoleSystemsRepository] -- see its own doc comment for why
+ * that replaced the compile-time list as the real source of truth.
+ */
+@Composable
+private fun PlatformsScreen(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    var systems by remember { mutableStateOf<List<ConsoleSystemEntity>>(emptyList()) }
+    var editing by remember { mutableStateOf<ConsoleSystemEntity?>(null) }
+    var addingNew by remember { mutableStateOf(false) }
+    var reloadVersion by remember { mutableStateOf(0) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(reloadVersion) {
+        val dao = ConsoleSystemsDatabase.get(context).consoleSystemDao()
+        if (dao.count() == 0) ConsoleSystemsRepository.allSystems(context) // triggers the real seed-if-empty path
+        systems = dao.getAll()
+    }
+
+    val editingNow = editing
+    when {
+        addingNew || editingNow != null -> PlatformEditScreen(
+            entity = editingNow,
+            onSave = { entity ->
+                scope.launch {
+                    ConsoleSystemsDatabase.get(context).consoleSystemDao().upsert(entity)
+                    addingNew = false
+                    editing = null
+                    reloadVersion++
+                }
+            },
+            onDelete = if (editingNow != null) {
+                {
+                    scope.launch {
+                        ConsoleSystemsDatabase.get(context).consoleSystemDao().delete(editingNow.id)
+                        editing = null
+                        reloadVersion++
+                    }
+                }
+            } else {
+                null
+            },
+            onCancel = { addingNew = false; editing = null },
+        )
+        else -> Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+            Text("Manage platforms", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+            Text(
+                "Every platform droidtop recognizes -- add a new one, edit any field " +
+                    "(built-in platforms included), or delete one. \"Restore defaults\" " +
+                    "resets every built-in platform back to its original values without " +
+                    "touching any platform you added yourself.",
+                color = Color.Gray,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
+            )
+            val firstFocus = remember { FocusRequester() }
+            LaunchedEffect(Unit) { firstFocus.requestFocus() }
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+                Text(
+                    "+ Add platform",
+                    color = Color(0xFF8AB4FF),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.focusRequester(firstFocus).gamepadFocusable { addingNew = true }.padding(8.dp),
+                )
+                Text(
+                    "Restore defaults",
+                    color = Color(0xFFCC8800),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.gamepadFocusable {
+                        scope.launch {
+                            ConsoleSystemsRepository.restoreDefaults(context)
+                            reloadVersion++
+                        }
+                    }.padding(8.dp),
+                )
+            }
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                items(systems) { system ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .gamepadFocusable { editing = system }
+                            .padding(vertical = 10.dp),
+                    ) {
+                        Text("${system.displayName} (${system.id})", color = Color.White, style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            listOfNotNull(
+                                system.extensionsCsv.ifBlank { null }?.let { "extensions: $it" },
+                                system.retroArchCore?.let { "core: $it" },
+                                if (system.isBuiltIn) "built-in" else "custom",
+                            ).joinToString("  ·  "),
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+            TextButton(onClick = onDismiss) { Text("Back") }
+        }
+    }
+}
+
+@Composable
+private fun PlatformEditScreen(
+    entity: ConsoleSystemEntity?,
+    onSave: (ConsoleSystemEntity) -> Unit,
+    onDelete: (() -> Unit)?,
+    onCancel: () -> Unit,
+) {
+    var id by remember { mutableStateOf(entity?.id.orEmpty()) }
+    var displayName by remember { mutableStateOf(entity?.displayName.orEmpty()) }
+    var extensionsCsv by remember { mutableStateOf(entity?.extensionsCsv.orEmpty()) }
+    var retroArchCore by remember { mutableStateOf(entity?.retroArchCore.orEmpty()) }
+    var confirmingDelete by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+        Text(if (entity != null) "Edit platform" else "Add platform", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+        Text("Id (used as the ROMs subfolder name, e.g. \"psx\")", color = Color.Gray, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 16.dp))
+        BasicTextField(
+            value = id,
+            onValueChange = { if (entity == null) id = it }, // real id is the primary key -- editable only when adding new, never after (would silently orphan every SystemOverridePrefs entry pointing at the old id)
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = if (entity == null) Color.White else Color.Gray),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
+        )
+        Text("Display name", color = Color.Gray, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 16.dp))
+        BasicTextField(
+            value = displayName,
+            onValueChange = { displayName = it },
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
+        )
+        Text("File extensions (comma-separated, e.g. \"nes,unf\")", color = Color.Gray, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 16.dp))
+        BasicTextField(
+            value = extensionsCsv,
+            onValueChange = { extensionsCsv = it },
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
+        )
+        Text("RetroArch core (optional, e.g. \"nestopia\")", color = Color.Gray, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 16.dp))
+        BasicTextField(
+            value = retroArchCore,
+            onValueChange = { retroArchCore = it },
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
+        )
+        if (entity?.isBuiltIn == true && !confirmingDelete) {
+            Text(
+                "This is a built-in platform -- deleting it can be undone with \"Restore defaults\".",
+                color = Color(0xFFCC8800),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 16.dp),
+            )
+        }
+        Row(modifier = Modifier.fillMaxWidth().padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            TextButton(onClick = onCancel) { Text("Cancel") }
+            if (onDelete != null) {
+                TextButton(onClick = { if (confirmingDelete) onDelete() else confirmingDelete = true }) {
+                    Text(if (confirmingDelete) "Confirm delete" else "Delete")
+                }
+            }
+            TextButton(
+                onClick = {
+                    onSave(
+                        ConsoleSystemEntity(
+                            id = id.trim(),
+                            displayName = displayName.ifBlank { id }.trim(),
+                            extensionsCsv = extensionsCsv.split(",").map { it.trim() }.filter { it.isNotEmpty() }.joinToString(","),
+                            retroArchCore = retroArchCore.trim().ifBlank { null },
+                            isBuiltIn = entity?.isBuiltIn ?: false,
+                        ),
+                    )
+                },
+                enabled = id.isNotBlank(),
+            ) { Text("Save") }
+        }
+    }
+}
+
+/**
+ * Real, user-facing ROM-folder management -- previously the only way to
+ * add or remove a games root after first-run onboarding was clearing app
+ * data by hand over adb. Reuses the exact SAF `OpenDocumentTree` ->
+ * `takePersistableUriPermission` -> `resolveStoragePath` -> `addGamesRoot`
+ * sequence [OnboardingActivity]'s own GAMES_FOLDERS step already proves
+ * out -- same real, established flow, not reinvented here.
+ */
+@Composable
+private fun RomFoldersScreen(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    var roots by remember { mutableStateOf(GamesRootPrefs.gamesRootPaths(context).sorted()) }
+    var unresolvedWarning by remember { mutableStateOf(false) }
+    val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        val resolved = GamesRootPrefs.resolveStoragePath(uri)
+        if (resolved != null) {
+            GamesRootPrefs.addGamesRoot(context, resolved)
+            roots = GamesRootPrefs.gamesRootPaths(context).sorted()
+        }
+        unresolvedWarning = resolved == null
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+        Text("ROM folders", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+        Text(
+            "droidtop scans <folder>/<system>/<romFile> under each of these. Add another " +
+                "folder (an SD card, a second internal folder, ...), or remove one you no " +
+                "longer want scanned. Changes take effect next time the library rescans.",
+            color = Color.Gray,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
+        )
+        if (unresolvedWarning) {
+            Text(
+                "Couldn't resolve that folder to a real path on this device -- not added.",
+                color = Color(0xFFCC8800),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
+        val firstFocus = remember { FocusRequester() }
+        LaunchedEffect(Unit) { firstFocus.requestFocus() }
+        Text(
+            "+ Add a folder",
+            color = Color(0xFF8AB4FF),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.fillMaxWidth().focusRequester(firstFocus).gamepadFocusable { pickFolder.launch(null) }.padding(vertical = 8.dp),
+        )
+        if (roots.isEmpty()) {
+            Text("No ROM folders configured.", color = Color.Gray, modifier = Modifier.padding(top = 8.dp))
+        }
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            items(roots) { path ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(path, color = Color.White, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Text(
+                        "Remove",
+                        color = Color(0xFFCC8800),
+                        modifier = Modifier.gamepadFocusable {
+                            GamesRootPrefs.removeGamesRoot(context, path)
+                            roots = GamesRootPrefs.gamesRootPaths(context).sorted()
+                        }.padding(horizontal = 12.dp, vertical = 4.dp),
+                    )
+                }
+            }
+        }
+        TextButton(onClick = onDismiss, modifier = Modifier.padding(top = 16.dp)) { Text("Back") }
     }
 }

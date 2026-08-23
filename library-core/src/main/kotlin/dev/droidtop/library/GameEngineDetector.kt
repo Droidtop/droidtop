@@ -1,6 +1,8 @@
 package dev.droidtop.library
 
 import android.content.Context
+import dev.droidtop.library.consoles.ConsoleSystemDef
+import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.consoles.resolveSystem
 import java.io.File
 
@@ -76,9 +78,9 @@ object GameEngineDetector {
      * stays the outer folder either way (the nicer name); only
      * [DetectedGame.gameRoot] moves to wherever the markers actually are.
      */
-    fun scan(root: File): List<DetectedGame> =
+    fun scan(root: File, systemsById: Map<String, ConsoleSystemDef>): List<DetectedGame> =
         (root.listFiles() ?: emptyArray())
-            .filter { it.isDirectory && resolveSystem(it.name) == null }
+            .filter { it.isDirectory && resolveSystem(it.name, systemsById) == null }
             .mapNotNull { top ->
                 detect(top)?.let { DetectedGame(top, top, it) }
                     ?: (top.listFiles() ?: emptyArray())
@@ -195,13 +197,13 @@ private fun GameEngine.toLibraryEntryKind(): LibraryEntryKind = when (this) {
  */
 class EngineGameProvider(
     private val context: Context,
-    private val gamesRoots: List<File>,
 ) : LibraryProvider {
     override val kinds: Set<LibraryEntryKind> = GameEngine.entries.map { it.toLibraryEntryKind() }.toSet()
 
-    override suspend fun scan(): List<LibraryEntry> =
-        gamesRoots.flatMap { root ->
-            GameEngineDetector.scan(root).map { detected ->
+    override suspend fun scan(): List<LibraryEntry> {
+        val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
+        return GamesRoots.current(context).flatMap { root ->
+            GameEngineDetector.scan(root, systemsById).map { detected ->
                 LibraryEntry(
                     id = detected.displayFolder.absolutePath,
                     title = detected.displayFolder.name,
@@ -210,6 +212,7 @@ class EngineGameProvider(
                 )
             }
         }
+    }
 
     override suspend fun launch(entry: LibraryEntry) {
         val displayFolder = File(entry.id)
