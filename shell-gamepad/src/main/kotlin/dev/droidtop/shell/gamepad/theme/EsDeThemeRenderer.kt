@@ -69,23 +69,12 @@ fun EsDeThemedView(
     BoxWithConstraints(modifier = modifier) {
         val viewWidth = maxWidth
         val viewHeight = maxHeight
-        android.util.Log.d("droidtop.ThemeDebug", "view has ${view.elements.size} elements: ${view.elements.values.map { "${it.key}(${it.type})" }}")
         view.elements.values
             // Real ES-DE `visible` property, applies to every element type
             // -- checked once here rather than duplicated in each
             // per-type renderer below.
             .filter { it.valueOrNull<EsDeThemeValue.Bool>("visible")?.value != false }
             .sortedBy { zIndexOf(it) }.forEach { element ->
-            if (element.key in setOf("image_backart3", "image_leftband1", "image_carback")) {
-                android.util.Log.d(
-                    "droidtop.ThemeDebug",
-                    "${element.key}: path=${element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved} " +
-                        "color=${element.valueOrNull<EsDeThemeValue.Color>("color")} " +
-                        "size=${element.valueOrNull<EsDeThemeValue.Pair>("size")} " +
-                        "pos=${element.valueOrNull<EsDeThemeValue.Pair>("pos")} " +
-                        "zIndex=${zIndexOf(element)}",
-                )
-            }
             when (element.type) {
                 "image" -> EsDeThemedImage(element, viewWidth, viewHeight)
                 "text" -> EsDeThemedText(element, viewWidth, viewHeight)

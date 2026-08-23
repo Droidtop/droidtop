@@ -153,12 +153,23 @@ private fun EsDeCarousel(
     val carouselColorEnd = element?.valueOrNull<EsDeThemeValue.Color>("colorEnd")?.let { colorOf(it) } ?: carouselColor
     val colorGradientHorizontal = element?.valueOrNull<EsDeThemeValue.Bool>("colorGradientHorizontal")?.value ?: true
     // itemSize is a fraction of the *screen*, ES-DE's own real convention
-    // for carousel/grid geometry -- approximated here against a fixed
-    // reference width (a real handheld's landscape width) rather than
-    // wiring a live screen-size lookup through, a reasonable first cut.
+    // for carousel/grid geometry. Real, confirmed bug this fixes, found
+    // via actual on-device testing: this used to multiply the fraction
+    // against a fixed 1920/1080 reference and treat the result as `.dp`
+    // -- since `.dp` values get multiplied by the device's own density
+    // again when later converted `.toPx()` (see itemWidthPx below), this
+    // silently inflated the real on-screen item width by the device's
+    // density factor (e.g. 3x on a real xxhdpi handheld panel) relative
+    // to the carousel's own actual measured width in px, making
+    // itemSpacingPx collapse toward zero -- two adjacent real carousel
+    // items (a real device's "3ds" and "n64" systems) rendered nearly
+    // fully overlapping instead of properly spaced. Real fix: the
+    // fraction is of the *actual measured carousel size*, not a fixed
+    // reference resolution -- itemSizeFraction is kept here (still needed
+    // for the maxSize-less default below), but the real width/height are
+    // computed from live `maxWidth`/`maxHeight` inside BoxWithConstraints,
+    // in px, never re-multiplied by density.
     val itemSizeFraction = element?.valueOrNull<EsDeThemeValue.Pair>("itemSize")
-    val itemWidth = itemSizeFraction?.let { (it.x * 1920).dp } ?: 200.dp
-    val itemHeight = itemSizeFraction?.let { (it.y * 1080).dp } ?: 140.dp
     // Real ES-DE defaults (CarouselComponent's own constructor): 3.0 and 1.2.
     val maxItemCount = (element?.valueOrNull<EsDeThemeValue.FloatValue>("maxItemCount")?.value ?: 3f).coerceIn(0.5f, 30f)
     val itemScale = (element?.valueOrNull<EsDeThemeValue.FloatValue>("itemScale")?.value ?: 1.2f).coerceIn(0.2f, 3f)
@@ -197,10 +208,17 @@ private fun EsDeCarousel(
         ),
     ) {
         val carouselWidthPx = with(density) { maxWidth.toPx() }
-        val itemWidthPx = with(density) { itemWidth.toPx() }
+        val carouselHeightPx = with(density) { maxHeight.toPx() }
+        // Real px, straight from the fraction against the actual measured
+        // carousel size -- no `.dp` round-trip, no fixed reference
+        // resolution (see this function's own itemSizeFraction comment).
+        val itemWidthPx = itemSizeFraction?.let { it.x * carouselWidthPx } ?: with(density) { 200.dp.toPx() }
+        val itemHeightPx = itemSizeFraction?.let { it.y * carouselHeightPx } ?: with(density) { 140.dp.toPx() }
+        val itemWidth = with(density) { itemWidthPx.toDp() }
+        val itemHeight = with(density) { itemHeightPx.toDp() }
         val itemSpacingPx = ((carouselWidthPx - itemWidthPx * maxItemCount) / maxItemCount) + itemWidthPx
         val xOffBasePx = (carouselWidthPx - itemWidthPx) / 2f - camOffset.value * itemSpacingPx
-        val yOffPx = with(density) { (maxHeight - itemHeight).toPx() / 2f }
+        val yOffPx = (carouselHeightPx - itemHeightPx) / 2f
 
         items.forEachIndexed { index, item ->
             val distance = index - camOffset.value
