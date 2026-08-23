@@ -199,7 +199,7 @@ class ConsoleRomProvider(
     // choice, without that reorganizing ever hiding files from droidtop:
     // every file under the system folder at any depth is still found and
     // still counted as belonging to that one system.
-    private suspend fun scanSystemFolder(systemFolder: File, system: ConsoleSystemDef): List<LibraryEntry> {
+    private suspend fun scanSystemFolder(systemFolder: File, system: ConsoleSystemDef): List<LibraryEntry> = coroutineScope {
         // Real, deliberate design: detection (does this system show up at
         // all) is driven ENTIRELY by the ROMs folder itself -- a real
         // subfolder with real files is what "this system exists in my
@@ -224,40 +224,52 @@ class ConsoleRomProvider(
         val romFiles = systemFolder.walkTopDown()
             .filter { it.isFile && it.extension.lowercase() in system.extensions }
             .toList()
-        val entries = mutableListOf<LibraryEntry>()
-        for (romFile in romFiles) {
-            // Real, genuine file detection beyond what either ES-DE or
-            // EmuDeck actually do (both confirmed this session to be
-            // purely folder+extension-based, no content/filename lookup
-            // at all -- SystemData::populateFolder's own real source, and
-            // EmuDeck's own real roms/<system>/ layout, which uses the
-            // same ES-DE-derived ids). A real Android ROM manager
-            // (Lemuroid, already vendored in this repo) does this
-            // properly: a prioritized cascade -- embedded disc serial/
-            // magic number first (SerialScanner, cheap, header-only read,
-            // for the disc-image extensions it covers), then a filename
-            // lookup against Lemuroid's own real, ~13MB community ROM
-            // database (libretro-db.sqlite, already vendored, now bundled
-            // as droidtop's own asset -- a single fast indexed query, no
-            // file content read at all), before falling back to trusting
-            // the folder. Full CRC32 hashing (Lemuroid's own strongest,
-            // first-priority signal) is real, deferred follow-up work --
-            // reading a multi-gigabyte disc image's entire content for a
-            // hash needs real performance tuning this pass didn't have
-            // room for; header-read serial detection and free filename
-            // lookup are the safe, cheap wins taken here.
-            val effectiveSystemId = detectSystemIdFromContent(romFile)
-                ?: detectSystemIdFromFilename(romFile)
-                ?: system.id
-            entries += LibraryEntry(
-                id = romFile.absolutePath,
-                title = romFile.nameWithoutExtension,
-                kind = LibraryEntryKind.CONSOLE_ROM,
-                systemId = effectiveSystemId,
-                artworkUri = EsDeArtwork.resolve(gamesRoot, effectiveSystemId, romFile.nameWithoutExtension),
-            )
-        }
-        return entries
+        // Real, genuine file detection beyond what either ES-DE or EmuDeck
+        // actually do (both confirmed this session to be purely
+        // folder+extension-based, no content/filename lookup at all --
+        // SystemData::populateFolder's own real source, and EmuDeck's own
+        // real roms/<system>/ layout, which uses the same ES-DE-derived
+        // ids). A real Android ROM manager (Lemuroid, already vendored in
+        // this repo) does this properly: a prioritized cascade -- embedded
+        // disc serial/magic number first (SerialScanner, cheap,
+        // header-only read, for the disc-image extensions it covers), then
+        // a filename lookup against Lemuroid's own real, ~13MB community
+        // ROM database (libretro-db.sqlite, already vendored, now bundled
+        // as droidtop's own asset -- a single fast indexed query, no file
+        // content read at all), before falling back to trusting the
+        // folder. Full CRC32 hashing (Lemuroid's own strongest,
+        // first-priority signal) is real, deferred follow-up work --
+        // reading a multi-gigabyte disc image's entire content for a hash
+        // needs real performance tuning this pass didn't have room for;
+        // header-read serial detection and free filename lookup are the
+        // safe, cheap wins taken here.
+        //
+        // Real bug this fixes, found via actual on-device testing: this
+        // per-file cascade used to run as a sequential for-loop, meaning
+        // one suspend DB round-trip awaited before the next file's even
+        // started -- fine for a folder of a few hundred ROMs, but a real
+        // device's "j2me" folder (18,128 files) took over ten minutes wall
+        // clock and never finished before Library.scanKinds' own 15s
+        // per-provider timeout gave up waiting, permanently blank-screening
+        // Games. Concurrent per-file async (matching the same pattern
+        // scanRootsFresh already uses per-system-folder, one level up)
+        // lets Room's own executor and the filesystem overlap thousands of
+        // independent lookups instead of paying their latency one at a
+        // time.
+        romFiles.map { romFile ->
+            async {
+                val effectiveSystemId = detectSystemIdFromContent(romFile)
+                    ?: detectSystemIdFromFilename(romFile)
+                    ?: system.id
+                LibraryEntry(
+                    id = romFile.absolutePath,
+                    title = romFile.nameWithoutExtension,
+                    kind = LibraryEntryKind.CONSOLE_ROM,
+                    systemId = effectiveSystemId,
+                    artworkUri = EsDeArtwork.resolve(gamesRoot, effectiveSystemId, romFile.nameWithoutExtension),
+                )
+            }
+        }.awaitAll()
     }
 
     /**
