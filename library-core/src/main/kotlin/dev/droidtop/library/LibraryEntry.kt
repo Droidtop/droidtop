@@ -5,6 +5,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.launch as coroutineLaunch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -86,6 +91,19 @@ interface LibraryProvider {
     val kinds: Set<LibraryEntryKind>
     suspend fun scan(): List<LibraryEntry>
     suspend fun launch(entry: LibraryEntry)
+
+    /**
+     * Real, optional progressive variant of [scan] -- emits growing
+     * snapshots as results actually become available, instead of forcing
+     * the caller to wait for the single slowest part of a scan before
+     * showing anything at all. Default implementation just wraps [scan]
+     * as one single final emission, so every provider keeps working with
+     * zero changes required; only [dev.droidtop.library.consoles.ConsoleRomProvider]
+     * overrides this for real, since it's the one provider whose scan can
+     * take meaningfully long (a real SD card, a real folder with
+     * thousands of files) -- see its own doc comment.
+     */
+    fun scanProgressive(): Flow<List<LibraryEntry>> = flow { emit(scan()) }
 }
 
 class Library(private val providers: List<LibraryProvider>) {
@@ -132,6 +150,46 @@ class Library(private val providers: List<LibraryProvider>) {
                 .flatten()
         }
     }
+
+    /**
+     * Real, streaming counterpart to [scanKinds] -- emits a growing
+     * combined snapshot every time ANY matching provider produces more
+     * results, instead of making the whole section wait for every
+     * provider's single slowest part before rendering anything. Real
+     * reported UX request this fixes: shell-gamepad's Games screen used
+     * to render nothing but its loading spinner until the *entire* scan
+     * across every root and every system folder finished -- with a large
+     * real ROM collection, results the user could already be looking at
+     * (nes/gba/psx, fast to scan) sat withheld behind whatever the
+     * single slowest folder was doing. Per-provider results still
+     * accumulate independently (one provider's own partial progress
+     * never resets because another provider emitted), matching
+     * [scanKinds]' own per-provider isolation.
+     */
+    fun scanKindsProgressive(kinds: Set<LibraryEntryKind>): Flow<List<LibraryEntry>> = channelFlow {
+        val matchingProviders = providers.filter { provider -> provider.kinds.any { it in kinds } }
+        val perProviderResults = MutableList(matchingProviders.size) { emptyList<LibraryEntry>() }
+        coroutineScope {
+            matchingProviders.forEachIndexed { index, provider ->
+                coroutineLaunch {
+                    try {
+                        val completed = withTimeoutOrNull(60_000) {
+                            provider.scanProgressive().collect { partial ->
+                                perProviderResults[index] = partial
+                                send(perProviderResults.flatten())
+                            }
+                            true
+                        }
+                        if (completed == null) {
+                            Log.e("droidtop.Library", "Provider ${provider::class.simpleName} timed out scanning")
+                        }
+                    } catch (t: Throwable) {
+                        Log.e("droidtop.Library", "Provider ${provider::class.simpleName} failed to scan", t)
+                    }
+                }
+            }
+        }
+    }.flowOn(Dispatchers.IO)
 
     private suspend fun scanProviderSafely(provider: LibraryProvider): List<LibraryEntry> = try {
         // A caught exception alone doesn't cover a provider that genuinely
