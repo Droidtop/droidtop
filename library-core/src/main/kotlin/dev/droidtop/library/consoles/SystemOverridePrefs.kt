@@ -30,10 +30,16 @@ object SystemOverridePrefs {
         }
     }
 
-    /** [resolveSystem] by folder name, but an explicit override for [folderPath] wins first. */
-    fun resolveForFolder(context: Context, folderPath: String, folderName: String): ConsoleSystemDef? {
+    /**
+     * [resolveSystem] by folder name, but an explicit override for
+     * [folderPath] wins first. [systemsById] is a live snapshot from
+     * [ConsoleSystemsRepository.allSystems] -- see [resolveSystem]'s own
+     * doc comment for why this takes it as a parameter instead of reading
+     * a compile-time constant.
+     */
+    fun resolveForFolder(context: Context, folderPath: String, folderName: String, systemsById: Map<String, ConsoleSystemDef>): ConsoleSystemDef? {
         val overrideId = get(context, folderPath)
-        if (overrideId != null) return ES_DE_CONSOLE_SYSTEMS.firstOrNull { it.id == overrideId }
-        return resolveSystem(folderName)
+        if (overrideId != null) return systemsById[overrideId]
+        return resolveSystem(folderName, systemsById)
     }
 }
