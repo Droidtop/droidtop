@@ -197,15 +197,62 @@ class ConsoleRomProvider(
      * SettingsSection -- previously the only way to force a fresh scan
      * was clearing app data by hand over adb, not something a real user
      * could ever do.
+     *
+     * Real bug this fixes, reported directly: this used to clear every
+     * root's cache *before* scanning and seed the live stream with an
+     * empty list -- a real user's entire, already-known library visibly
+     * disappeared the instant they pressed "Rescan," staying blank for
+     * however long the fresh walk took (minutes, on a real device's large
+     * ROM collection), then slowly reappearing. A "look again" action
+     * should never make a user's existing library vanish. Each root's old
+     * cached rows now stay fully visible until THAT root's own fresh walk
+     * actually finishes, at which point they're atomically swapped for
+     * the fresh set -- never a gap where nothing is shown for something
+     * that was already known.
      */
     override fun rescanProgressive(): Flow<List<LibraryEntry>> = channelFlow {
         val romsRoots = GamesRoots.current(context)
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
-        romsRoots.forEach { root ->
-            dao.clearRoot(root.absolutePath)
-            dao.clearScanMetadata(root.absolutePath)
+        val cachedByRoot = romsRoots.associate { root ->
+            root.absolutePath to dao.getEntries(listOf(root.absolutePath)).map { it.toLibraryEntry() }
         }
-        streamRootsProgressively(emptyList(), romsRoots, systemsById)
+        streamRootsRescan(cachedByRoot, systemsById)
+    }
+
+    private suspend fun ProducerScope<List<LibraryEntry>>.streamRootsRescan(
+        cachedByRoot: Map<String, List<LibraryEntry>>,
+        systemsById: Map<String, ConsoleSystemDef>,
+    ) {
+        val accumulatedByRoot = Collections.synchronizedMap(cachedByRoot.toMutableMap())
+        send(accumulatedByRoot.values.flatten())
+        coroutineScope {
+            cachedByRoot.keys.forEach { rootPath ->
+                coroutineLaunch {
+                    val root = File(rootPath)
+                    val systemFolders = (root.listFiles() ?: emptyArray()).filter { it.isDirectory }
+                        .mapNotNull { systemFolder ->
+                            SystemOverridePrefs.resolveForFolder(context, systemFolder.absolutePath, systemFolder.name, systemsById)
+                                ?.let { systemFolder to it }
+                        }
+                    val freshEntries = systemFolders
+                        .map { (systemFolder, system) -> async { scanSystemFolder(systemFolder, system) } }
+                        .awaitAll()
+                        .flatten()
+                    // Real, deliberate: this root's old cached entries are
+                    // replaced only now, all at once, with its own real
+                    // fresh results -- not incrementally per system
+                    // folder (unlike a brand-new root's first-ever scan,
+                    // see streamRootsProgressively), since a partial swap
+                    // would mean folders not yet re-walked this pass
+                    // briefly vanish from an otherwise-already-known root.
+                    accumulatedByRoot[rootPath] = freshEntries
+                    send(accumulatedByRoot.values.flatten())
+                    dao.clearRoot(rootPath)
+                    dao.insertEntries(freshEntries.map { it.toRomEntity(rootPath) })
+                    dao.markScanned(ScanMetadataEntity(rootPath, System.currentTimeMillis()))
+                }
+            }
+        }
     }
 
     private suspend fun ProducerScope<List<LibraryEntry>>.streamRootsProgressively(
