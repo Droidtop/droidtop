@@ -114,4 +114,14 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.activity.compose)
+
+    // Real fix (DroidtopApplication.kt): coil-svg was already a
+    // shell-gamepad dependency, but nothing ever registered
+    // SvgDecoder.Factory() with a real ImageLoader -- adding the
+    // dependency alone doesn't make Coil3 use it, it needs a
+    // SingletonImageLoader.Factory, which has to live in the actual
+    // Application class (this module, not a library module).
+    implementation(libs.coil.compose)
+    implementation(libs.coil.android)
+    implementation(libs.coil.svg)
 }
