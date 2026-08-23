@@ -119,14 +119,27 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
     val onLaunch: (LibraryEntry) -> Unit = { entry -> scope.launch { library.launch(entry) } }
     val tabBarFocus = remember { FocusRequester() }
 
-    // The extra .filter is real, not redundant: Library.scanKinds matches
-    // at the provider level (does this provider produce any requested
-    // kind), not per-entry -- a provider spanning kinds on both sides of
-    // the Games/Apps split (EngineGameProvider currently covers RENPY/
-    // RPG_MAKER_*/KIRIKIRI, and GAME_KINDS is a subset missing KIRIKIRI)
-    // could otherwise leak an entry into the wrong section.
-    LaunchedEffect(library) { gameEntries = library.scanKinds(GAME_KINDS).filter { it.kind in GAME_KINDS } }
-    LaunchedEffect(library) { appEntries = library.scanKinds(APP_KINDS).filter { it.kind in APP_KINDS } }
+    // The extra .filter is real, not redundant: Library.scanKinds(Progressive)
+    // matches at the provider level (does this provider produce any
+    // requested kind), not per-entry -- a provider spanning kinds on both
+    // sides of the Games/Apps split (EngineGameProvider currently covers
+    // RENPY/RPG_MAKER_*/KIRIKIRI, and GAME_KINDS is a subset missing
+    // KIRIKIRI) could otherwise leak an entry into the wrong section.
+    //
+    // scanKindsProgressive, not scanKinds: real, reported UX request --
+    // this screen used to show nothing but its spinner until the entire
+    // scan (every root, every system folder) finished, even though most
+    // folders individually are fast. Each collected emission is already a
+    // growing snapshot (see Library.scanKindsProgressive's own doc
+    // comment), so just assigning it directly here is enough to make the
+    // screen fill in gradually as real results arrive, without this file
+    // needing to know anything about how the underlying scan is chunked.
+    LaunchedEffect(library) {
+        library.scanKindsProgressive(GAME_KINDS).collect { gameEntries = it.filter { entry -> entry.kind in GAME_KINDS } }
+    }
+    LaunchedEffect(library) {
+        library.scanKindsProgressive(APP_KINDS).collect { appEntries = it.filter { entry -> entry.kind in APP_KINDS } }
+    }
     // Real bug this fixes: onKeyEvent modifiers (L1/R1 section-switching
     // below, GamesSection's Left/Right sibling-system switching) only ever
     // see a key event by it bubbling up from whatever's currently focused
