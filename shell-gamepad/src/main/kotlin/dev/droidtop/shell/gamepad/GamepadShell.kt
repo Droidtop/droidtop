@@ -7,9 +7,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -272,6 +275,12 @@ private object HandheldPrefs {
     private const val KEY_SHOW_HINTS = "pref_handheld_show_hints"
     private const val KEY_APPS_GRID_COLUMNS = "pref_handheld_apps_grid_columns"
     private const val DEFAULT_APPS_GRID_COLUMNS = 5
+    // Same real range as CustomSeekBarPreference's android:min/android:max
+    // in droidtop_handheld_prefs.xml -- kept in sync by hand since the two
+    // screens read/write the same underlying pref but can't share a single
+    // XML-defined range across modules (see this object's own doc comment).
+    const val MIN_APPS_GRID_COLUMNS = 2
+    const val MAX_APPS_GRID_COLUMNS = 10
 
     fun defaultSection(context: Context): HandheldSection {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -283,6 +292,20 @@ private object HandheldPrefs {
 
     fun showHints(context: Context): Boolean =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_SHOW_HINTS, true)
+
+    fun setDefaultSection(context: Context, section: HandheldSection) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putString(KEY_DEFAULT_SECTION, if (section == HandheldSection.APPS) "apps" else "games")
+            .apply()
+    }
+
+    fun setShowHints(context: Context, show: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_SHOW_HINTS, show).apply()
+    }
+
+    fun setAppsGridColumns(context: Context, columns: Int) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putInt(KEY_APPS_GRID_COLUMNS, columns).apply()
+    }
 
     // Deliberately separate from :shell-default's own drawer grid-width
     // override (SettingsDrawerFragment's GRID_SIZE_WIDTH_DRAWER_OVERRIDE) --
@@ -972,13 +995,20 @@ private fun AppIconTile(entry: LibraryEntry, modifier: Modifier = Modifier, onLa
 }
 
 /**
- * Opens droidtop's one real settings surface (:shell-default's
- * SettingsActivity, a Fragment/Preference-based screen) instead of building
- * a second, parallel settings UI here — see SettingsHandheldFragment for
- * the actual Handheld-specific preferences this section jumps straight to.
- * No compile-time dependency on :shell-default (see HandheldPrefs' own doc
- * comment for why), so this launches by component/fragment name instead of
- * a typed Intent.
+ * Real, comprehensive, in-shell Settings menu -- one place for every
+ * droidtop-specific setting, fully gamepad-navigable throughout (a real,
+ * reported gap this fixes: this used to be two bare links out to
+ * :shell-default's touch-first Android Preference screens, and
+ * ConsoleSystemsActivity -- reachable only from inside one of those --
+ * had zero focus/key handling at all, unusable without a touchscreen).
+ * Grouped into titled sections (Library/Display/General), matching
+ * Lemuroid's real `LemuroidCardSettingsGroup` convention rather than one
+ * long flat list. The three Handheld prefs (default section, show hints,
+ * apps grid columns) are edited inline here AND still readable/editable
+ * from :shell-default's SettingsHandheldFragment -- both read/write the
+ * exact same "com.android.launcher3.prefs" SharedPreferences keys (see
+ * HandheldPrefs' own doc comment), so neither surface can drift out of
+ * sync with the other.
  */
 @Composable
 private fun SettingsSection(onRescan: () -> Unit) {
@@ -986,30 +1016,158 @@ private fun SettingsSection(onRescan: () -> Unit) {
     val firstFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { firstFocus.requestFocus() }
 
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        SettingsLink(
-            "Handheld settings",
-            "Default section, button hints, console systems",
-            modifier = Modifier.focusRequester(firstFocus),
-            onClick = { openSettings(context, "app.murinelauncher.settings.SettingsHandheldFragment") },
-        )
-        SettingsLink(
-            "All settings",
-            "General, icons, home screen, and everything else",
-            onClick = { openSettings(context, null) },
-        )
-        // Real, user-facing counterpart to Library.rescanKindsProgressive
-        // -- previously the only way to force a fresh ROM scan (pick up
-        // new files, drop deleted ones) was clearing app data by hand
-        // over adb, which isn't something a real user can do. Games/Apps
-        // re-render progressively as results stream back in, same as a
-        // first-launch scan (see GamepadShell's own onRescan comment).
-        SettingsLink(
-            "Rescan library",
-            "Look for new or changed games and apps again",
-            onClick = onRescan,
-        )
+    var defaultSection by remember { mutableStateOf(HandheldPrefs.defaultSection(context)) }
+    var showHints by remember { mutableStateOf(HandheldPrefs.showHints(context)) }
+    var appsGridColumns by remember { mutableStateOf(HandheldPrefs.appsGridColumns(context)) }
+
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp).verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(28.dp),
+    ) {
+        SettingsGroup("Library") {
+            SettingsLink(
+                "Console systems",
+                "Fix a folder's detected system, choose which emulator runs it, scrape artwork",
+                modifier = Modifier.focusRequester(firstFocus),
+                onClick = {
+                    val intent = Intent(Intent.ACTION_MAIN).apply {
+                        component = ComponentName(context.packageName, "dev.droidtop.app.ConsoleSystemsActivity")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                },
+            )
+            // Real, user-facing counterpart to Library.rescanKindsProgressive
+            // -- previously the only way to force a fresh ROM scan (pick up
+            // new files, drop deleted ones) was clearing app data by hand
+            // over adb, which isn't something a real user can do. Games/Apps
+            // re-render progressively as results stream back in, same as a
+            // first-launch scan (see GamepadShell's own onRescan comment).
+            SettingsLink(
+                "Rescan library",
+                "Look for new or changed games and apps again",
+                onClick = onRescan,
+            )
+        }
+        SettingsGroup("Display") {
+            SettingsChoiceLink(
+                title = "Default section",
+                value = if (defaultSection == HandheldSection.APPS) "Apps" else "Games",
+                onCycle = {
+                    val next = if (defaultSection == HandheldSection.APPS) HandheldSection.GAMES else HandheldSection.APPS
+                    defaultSection = next
+                    HandheldPrefs.setDefaultSection(context, next)
+                },
+            )
+            SettingsToggleLink(
+                title = "Show button hints",
+                value = showHints,
+                onToggle = {
+                    showHints = !showHints
+                    HandheldPrefs.setShowHints(context, showHints)
+                },
+            )
+            SettingsStepperLink(
+                title = "Apps grid columns",
+                value = appsGridColumns,
+                range = HandheldPrefs.MIN_APPS_GRID_COLUMNS..HandheldPrefs.MAX_APPS_GRID_COLUMNS,
+                onChange = {
+                    appsGridColumns = it
+                    HandheldPrefs.setAppsGridColumns(context, it)
+                },
+            )
+        }
+        SettingsGroup("General") {
+            SettingsLink(
+                "All settings",
+                "General, icons, home screen, and everything else",
+                onClick = { openSettings(context, null) },
+            )
+        }
     }
+}
+
+@Composable
+private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            title.uppercase(),
+            color = Color.Gray,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(start = 4.dp, bottom = 2.dp),
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
+    }
+}
+
+/** Base chrome every settings row shares -- focus ring, background, title/value layout. [onKeyLeftRight] lets stepper/choice rows respond to D-pad left/right in place, without opening anything. */
+@Composable
+private fun SettingsRow(
+    title: String,
+    valueText: String? = null,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+    onKeyLeftRight: ((left: Boolean) -> Boolean)? = null,
+) {
+    var focused by remember { mutableStateOf(false) }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
+            .onFocusChanged { focused = it.isFocused }
+            .focusable()
+            .clickable(onClick = onClick)
+            .onKeyEvent { event ->
+                if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
+                when (event.key) {
+                    Key.ButtonA, Key.DirectionCenter, Key.Enter -> {
+                        onClick()
+                        true
+                    }
+                    Key.DirectionLeft -> onKeyLeftRight?.invoke(true) ?: false
+                    Key.DirectionRight -> onKeyLeftRight?.invoke(false) ?: false
+                    else -> false
+                }
+            }
+            .border(
+                width = if (focused) 4.dp else 1.dp,
+                color = if (focused) Color.White else Color.DarkGray,
+                shape = RoundedCornerShape(12.dp),
+            )
+            .background(if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A), RoundedCornerShape(12.dp))
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+    ) {
+        Text(title, color = Color.White, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        if (valueText != null) {
+            Text(valueText, color = Color(0xFF8AB4FF), style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}
+
+@Composable
+private fun SettingsToggleLink(title: String, value: Boolean, onToggle: () -> Unit) {
+    SettingsRow(title = title, valueText = if (value) "On" else "Off", onClick = onToggle, onKeyLeftRight = { onToggle(); true })
+}
+
+/** D-pad left/right cycles [onChange] without opening a picker -- clamped, matching CustomSeekBarPreference's own real min/max range. */
+@Composable
+private fun SettingsStepperLink(title: String, value: Int, range: IntRange, onChange: (Int) -> Unit) {
+    SettingsRow(
+        title = title,
+        valueText = value.toString(),
+        onClick = {},
+        onKeyLeftRight = { left ->
+            val next = (if (left) value - 1 else value + 1).coerceIn(range)
+            if (next != value) onChange(next)
+            true
+        },
+    )
+}
+
+/** Two-choice cycle (e.g. Games/Apps) -- A/Enter and D-pad left/right all cycle, since there's nowhere else to go for a binary choice. */
+@Composable
+private fun SettingsChoiceLink(title: String, value: String, onCycle: () -> Unit) {
+    SettingsRow(title = title, valueText = value, onClick = onCycle, onKeyLeftRight = { onCycle(); true })
 }
 
 private fun openSettings(context: Context, fragment: String?) {
