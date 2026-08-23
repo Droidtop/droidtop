@@ -1,8 +1,12 @@
 package dev.droidtop.shell.gamepad.theme
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.absoluteOffset
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -10,10 +14,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -59,7 +67,12 @@ fun EsDeThemedView(
     BoxWithConstraints(modifier = modifier) {
         val viewWidth = maxWidth
         val viewHeight = maxHeight
-        view.elements.values.sortedBy { zIndexOf(it) }.forEach { element ->
+        view.elements.values
+            // Real ES-DE `visible` property, applies to every element type
+            // -- checked once here rather than duplicated in each
+            // per-type renderer below.
+            .filter { it.valueOrNull<EsDeThemeValue.Bool>("visible")?.value != false }
+            .sortedBy { zIndexOf(it) }.forEach { element ->
             when (element.type) {
                 "image" -> EsDeThemedImage(element, viewWidth, viewHeight)
                 "text" -> EsDeThemedText(element, viewWidth, viewHeight)
@@ -119,26 +132,98 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
     val tint = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) }
+    // Real properties (ImageComponent's own opacity/cornerRadius), already
+    // parsed but previously unread -- opacity in particular matters a lot
+    // for real themes that fade decorative art in/out.
+    val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
+    val cornerRadiusFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("cornerRadius")?.value ?: 0f
+    val cornerRadius = (cornerRadiusFraction * 1080).dp
     AsyncImage(
         model = path,
         contentDescription = null,
         colorFilter = tint?.let { ColorFilter.tint(it) },
+        alpha = opacity,
         modifier = Modifier
             .absoluteOffset(x = offsetX, y = offsetY)
-            .size(width = width, height = height),
+            .size(width = width, height = height)
+            .let { if (cornerRadius > 0.dp) it.clip(RoundedCornerShape(cornerRadius)) else it },
     )
 }
 
+/**
+ * Real ES-DE `TextComponent` behavior, ported properly -- the previous
+ * version only read `text`/`color`/`pos`, ignoring every other property
+ * the parser already extracts correctly (`fontSize`, `horizontalAlignment`,
+ * `verticalAlignment`, `letterCase`, `backgroundColor`, `opacity`,
+ * `lineSpacing`). That gap mattered far more than it looks: `text`
+ * elements are how a theme renders every plain label (headers, info-panel
+ * fields, ...), and rendering them at Compose's default ~14sp regardless
+ * of the theme's own real `fontSize` (a fraction of screen height, same
+ * convention already ported for textlist rows) made a lot of real theme
+ * content either invisibly small or wildly mis-scaled relative to the
+ * rest of the screen -- a real, likely explanation for content that
+ * "looked wrong" without an obvious crash or missing element.
+ *
+ * `size`, when the theme declares one, becomes both a real wrap width
+ * (`fillMaxWidth` + `TextAlign`) and a real box for `verticalAlignment`
+ * to position within (`Box`'s own `contentAlignment`) -- matching real
+ * ES-DE's own "mSize.y acts as a bounding box the text centers/aligns
+ * within" behavior (`TextComponent::onTextUpdated`). An element with no
+ * `size` at all (common for a single short label) keeps the old
+ * point-anchored `pos`-only placement, since there's no real box to
+ * align within.
+ */
 @Composable
 private fun EsDeThemedText(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp) {
-    val text = element.valueOrNull<EsDeThemeValue.Str>("text")?.value ?: return
-    val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight)
-    val color = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color.White
-    Text(
-        text = text,
-        color = color,
-        modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY),
+    val rawText = element.valueOrNull<EsDeThemeValue.Str>("text")?.value ?: return
+    val uppercase = element.valueOrNull<EsDeThemeValue.Str>("letterCase")?.value == "uppercase"
+    val text = if (uppercase) rawText.uppercase() else rawText
+
+    val hasSize = element.valueOrNull<EsDeThemeValue.Pair>("size") != null
+    val (width, height) = sizeOf(element, viewWidth, viewHeight)
+    val (offsetX, offsetY) = positionOf(
+        element, viewWidth, viewHeight,
+        if (hasSize) width else 0.dp, if (hasSize) height else 0.dp,
     )
+
+    val color = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color.White
+    val backgroundColor = element.valueOrNull<EsDeThemeValue.Color>("backgroundColor")?.let { colorOf(it) }
+    val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
+
+    // Real ES-DE default text size convention (same as textlist rows):
+    // fontSize is a fraction of screen height.
+    val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
+    val fontSizeDp = (fontSizeFraction * 1080).dp
+    val fontSizeSp = with(LocalDensity.current) { fontSizeDp.toSp() }
+    val lineSpacing = (element.valueOrNull<EsDeThemeValue.FloatValue>("lineSpacing")?.value ?: 1.5f).coerceIn(0.5f, 3f)
+
+    val textAlign = when (element.valueOrNull<EsDeThemeValue.Str>("horizontalAlignment")?.value) {
+        "center" -> TextAlign.Center
+        "right" -> TextAlign.End
+        else -> TextAlign.Start
+    }
+    val boxAlignment = when (element.valueOrNull<EsDeThemeValue.Str>("verticalAlignment")?.value) {
+        "center" -> Alignment.CenterStart
+        "bottom" -> Alignment.BottomStart
+        else -> Alignment.TopStart
+    }
+
+    Box(
+        modifier = Modifier
+            .absoluteOffset(x = offsetX, y = offsetY)
+            .let { if (hasSize) it.size(width = width, height = height) else it }
+            .let { if (backgroundColor != null) it.background(backgroundColor.copy(alpha = backgroundColor.alpha * opacity)) else it },
+        contentAlignment = boxAlignment,
+    ) {
+        Text(
+            text = text,
+            color = color.copy(alpha = color.alpha * opacity),
+            fontSize = fontSizeSp,
+            lineHeight = fontSizeSp * lineSpacing,
+            textAlign = textAlign,
+            modifier = if (hasSize) Modifier.fillMaxWidth() else Modifier,
+        )
+    }
 }
 
 /**
@@ -157,13 +242,20 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
     val tint = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) }
+    val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
+    // "video" real property is imageCornerRadius; "animation" real property is cornerRadius -- different keys, same real concept.
+    val cornerRadiusFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("imageCornerRadius")?.value
+        ?: element.valueOrNull<EsDeThemeValue.FloatValue>("cornerRadius")?.value ?: 0f
+    val cornerRadius = (cornerRadiusFraction * 1080).dp
     AsyncImage(
         model = path,
         contentDescription = null,
         colorFilter = tint?.let { ColorFilter.tint(it) },
+        alpha = opacity,
         modifier = Modifier
             .absoluteOffset(x = offsetX, y = offsetY)
-            .size(width = width, height = height),
+            .size(width = width, height = height)
+            .let { if (cornerRadius > 0.dp) it.clip(RoundedCornerShape(cornerRadius)) else it },
     )
 }
 
@@ -191,9 +283,14 @@ private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     }
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight)
     val color = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color.White
+    val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
+    // Same real fontSize convention as EsDeThemedText/textlist rows.
+    val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
+    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * 1080).dp.toSp() }
     Text(
         text = formatted,
-        color = color,
+        color = color.copy(alpha = color.alpha * opacity),
+        fontSize = fontSizeSp,
         modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY),
     )
 }
