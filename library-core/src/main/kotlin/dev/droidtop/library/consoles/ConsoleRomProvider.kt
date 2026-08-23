@@ -11,6 +11,7 @@ import dev.droidtop.library.romdetect.SystemID
 import dev.droidtop.library.romdetect.toConsoleSystemId
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
@@ -176,6 +177,30 @@ class ConsoleRomProvider(
         val scannedRootPaths = dao.getScannedRoots(romsRoots.map { it.absolutePath })
         val unscannedRoots = romsRoots.filter { it.absolutePath !in scannedRootPaths }
         val cached = dao.getEntries(scannedRootPaths).map { it.toLibraryEntry() }
+        streamRootsProgressively(cached, unscannedRoots)
+    }
+
+    /**
+     * Real, explicit "my ROMs changed, look again" action -- forces a full
+     * filesystem walk of every configured root regardless of cache state,
+     * replacing whatever was previously cached for each one. Wired to a
+     * real, user-facing "Rescan library" action in shell-gamepad's
+     * SettingsSection -- previously the only way to force a fresh scan
+     * was clearing app data by hand over adb, not something a real user
+     * could ever do.
+     */
+    override fun rescanProgressive(): Flow<List<LibraryEntry>> = channelFlow {
+        romsRoots.forEach { root ->
+            dao.clearRoot(root.absolutePath)
+            dao.clearScanMetadata(root.absolutePath)
+        }
+        streamRootsProgressively(emptyList(), romsRoots)
+    }
+
+    private suspend fun ProducerScope<List<LibraryEntry>>.streamRootsProgressively(
+        cached: List<LibraryEntry>,
+        unscannedRoots: List<File>,
+    ) {
         val accumulated = Collections.synchronizedList(cached.toMutableList())
         send(accumulated.toList())
         coroutineScope {
@@ -208,14 +233,9 @@ class ConsoleRomProvider(
     }
 
     /**
-     * Real, explicit "my ROMs changed, look again" action -- forces a full
-     * filesystem walk of every configured root regardless of cache state,
-     * replacing whatever was previously cached for each one. Not called
-     * automatically anywhere; [dev.droidtop.shell.gamepad]'s own settings
-     * screen is the real place to expose this as a user-triggered action
-     * (not wired up in this pass -- the cache-population half of this
-     * feature is the part that mattered most, an explicit UI trigger is
-     * real, separate follow-up work).
+     * Real, explicit "my ROMs changed, look again" action, non-streaming
+     * variant -- kept alongside [rescanProgressive] for any real future
+     * caller that just wants the final list, not a growing stream.
      */
     suspend fun rescan(): List<LibraryEntry> {
         romsRoots.forEach { root ->
