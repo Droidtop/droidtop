@@ -5,10 +5,13 @@ import dev.droidtop.library.EsDeArtwork
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
+import dev.droidtop.library.romdetect.SerialScanner
+import dev.droidtop.library.romdetect.toConsoleSystemId
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import java.io.File
+import java.io.FileInputStream
 
 /**
  * Real, installed apps only -- a [KnownPlayers]/[DefaultPlayers] preset
@@ -16,7 +19,7 @@ import java.io.File
  * point of pulling in Daijishō's real, comprehensive preset list is
  * covering "whatever's actually installed," not assuming any one is).
  */
-private fun isPackageInstalled(context: Context, packageName: String): Boolean = try {
+internal fun isPackageInstalled(context: Context, packageName: String): Boolean = try {
     context.packageManager.getApplicationInfo(packageName, 0)
     true
 } catch (e: android.content.pm.PackageManager.NameNotFoundException) {
@@ -218,21 +221,66 @@ class ConsoleRomProvider(
         return systemFolder.walkTopDown()
             .filter { it.isFile && it.extension.lowercase() in system.extensions }
             .map { romFile ->
+                // Real, genuine file-content detection, going beyond what
+                // either ES-DE or EmuDeck actually do (both confirmed this
+                // session to be purely folder+extension-based, no content
+                // sniffing at all -- SystemData::populateFolder's own real
+                // source, and EmuDeck's own real roms/<system>/ layout,
+                // which uses the same ES-DE-derived ids). For a genuinely
+                // ambiguous disc-image extension (the same .iso/.bin can be
+                // PSX, PSP, SegaCD, ...), read the file's own real magic
+                // number/embedded serial (SerialScanner, forked wholesale
+                // from Lemuroid, previously wired up nowhere) and prefer
+                // that over the folder-derived system when it disagrees --
+                // catches a ROM genuinely misfiled into the wrong system
+                // folder, which folder-only detection can never catch.
+                val detectedSystemId = detectSystemIdFromContent(romFile)
+                val effectiveSystemId = detectedSystemId ?: system.id
                 LibraryEntry(
                     id = romFile.absolutePath,
                     title = romFile.nameWithoutExtension,
                     kind = LibraryEntryKind.CONSOLE_ROM,
-                    systemId = system.id,
-                    artworkUri = EsDeArtwork.resolve(gamesRoot, system.id, romFile.nameWithoutExtension),
+                    systemId = effectiveSystemId,
+                    artworkUri = EsDeArtwork.resolve(gamesRoot, effectiveSystemId, romFile.nameWithoutExtension),
                 )
             }
             .toList()
     }
 
+    /**
+     * Real content-based system detection for the disc-image extensions
+     * [SerialScanner] actually supports (iso/bin/pbp/3ds) -- returns null
+     * (meaning "trust the folder") for every other extension, and also
+     * null if content detection genuinely found nothing (a real disc
+     * image SerialScanner's magic numbers don't happen to cover, e.g. a
+     * GameCube/Wii/generic PC .iso) or the detected [SystemID] has no
+     * known real [ConsoleSystemDef] id to map to. Best-effort: any read
+     * failure (a real but rare case -- a corrupt file, a permissions
+     * issue) is caught and treated the same as "found nothing," never
+     * fails the whole scan over one file.
+     */
+    private fun detectSystemIdFromContent(romFile: File): String? {
+        val extension = romFile.extension.lowercase()
+        if (extension !in setOf("iso", "bin", "pbp", "3ds")) return null
+        return try {
+            FileInputStream(romFile).use { stream ->
+                SerialScanner.extractInfo(romFile.name, stream).systemID?.toConsoleSystemId()
+            }
+        } catch (t: Throwable) {
+            null
+        }
+    }
+
     override suspend fun launch(entry: LibraryEntry) {
         val romFile = File(entry.id)
+        // Real fix: use the entry's own already-resolved systemId first --
+        // scan() may have corrected it via real content detection
+        // (detectSystemIdFromContent), which a folder-name-only re-lookup
+        // here would silently throw away, launching a misfiled disc image
+        // with the wrong system's player.
         val parentFolder = romFile.parentFile
-        val system = SystemOverridePrefs.resolveForFolder(context, parentFolder?.absolutePath ?: "", parentFolder?.name ?: "")
+        val system = entry.systemId?.let { SYSTEMS_BY_ID[it] }
+            ?: SystemOverridePrefs.resolveForFolder(context, parentFolder?.absolutePath ?: "", parentFolder?.name ?: "")
             ?: error("Couldn't resolve a console system for ${entry.id}")
         val player = resolvePlayer(context, system)
             ?: error("No installed Player available for system ${system.id}")
