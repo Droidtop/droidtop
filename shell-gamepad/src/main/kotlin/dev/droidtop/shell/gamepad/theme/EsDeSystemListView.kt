@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -33,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
@@ -42,6 +44,8 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.library.theme.EsDeThemeElement
@@ -131,10 +135,23 @@ private fun EsDeCarousel(
     modifier: Modifier,
     onFocusedIndexChanged: (Int) -> Unit = {},
 ) {
-    val textColor = element?.valueOrNull<EsDeThemeValue.Color>("textColor")?.let { colorOf(it) } ?: Color.White
+    // Real default text color/background (CarouselComponent's own real
+    // constructor defaults, distinct from a generic "text" element's own
+    // defaults): 0x000000FF (black) text, fully transparent background --
+    // NOT droidtop's own previous white-on-dark-card guess.
+    val textColor = element?.valueOrNull<EsDeThemeValue.Color>("textColor")?.let { colorOf(it) } ?: Color.Black
+    val textBackgroundColor = element?.valueOrNull<EsDeThemeValue.Color>("textBackgroundColor")?.let { colorOf(it) } ?: Color.Transparent
+    val textSelectedColor = element?.valueOrNull<EsDeThemeValue.Color>("textSelectedColor")?.let { colorOf(it) } ?: textColor
+    val textSelectedBackgroundColor = element?.valueOrNull<EsDeThemeValue.Color>("textSelectedBackgroundColor")?.let { colorOf(it) } ?: textBackgroundColor
     val uppercase = element?.valueOrNull<EsDeThemeValue.Str>("letterCase")?.value == "uppercase"
     val unfocusedOpacity = element?.valueOrNull<EsDeThemeValue.FloatValue>("unfocusedItemOpacity")?.value ?: 1f
     val unfocusedSaturation = element?.valueOrNull<EsDeThemeValue.FloatValue>("unfocusedItemSaturation")?.value ?: 1f
+    // Real carousel-wide background bar (CarouselComponent::render's own
+    // single drawRect call, behind every item) -- real default 0xFFFFFFD8
+    // (translucent white), confirmed against the real constructor default.
+    val carouselColor = element?.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color(0xFF, 0xFF, 0xFF, 0xD8)
+    val carouselColorEnd = element?.valueOrNull<EsDeThemeValue.Color>("colorEnd")?.let { colorOf(it) } ?: carouselColor
+    val colorGradientHorizontal = element?.valueOrNull<EsDeThemeValue.Bool>("colorGradientHorizontal")?.value ?: true
     // itemSize is a fraction of the *screen*, ES-DE's own real convention
     // for carousel/grid geometry -- approximated here against a fixed
     // reference width (a real handheld's landscape width) rather than
@@ -170,7 +187,15 @@ private fun EsDeCarousel(
         )
     }
 
-    BoxWithConstraints(modifier = modifier) {
+    BoxWithConstraints(
+        modifier = modifier.background(
+            if (colorGradientHorizontal) {
+                Brush.horizontalGradient(listOf(carouselColor, carouselColorEnd))
+            } else {
+                Brush.verticalGradient(listOf(carouselColor, carouselColorEnd))
+            },
+        ),
+    ) {
         val carouselWidthPx = with(density) { maxWidth.toPx() }
         val itemWidthPx = with(density) { itemWidth.toPx() }
         val itemSpacingPx = ((carouselWidthPx - itemWidthPx * maxItemCount) / maxItemCount) + itemWidthPx
@@ -195,11 +220,15 @@ private fun EsDeCarousel(
             val xDp = with(density) { (index * itemSpacingPx + xOffBasePx).toDp() }
             val yDp = with(density) { yOffPx.toDp() }
 
-            EsDeListTile(
+            EsDeCarouselItem(
                 item = item,
                 width = itemWidth,
                 height = itemHeight,
+                isFocused = index == focusedIndex,
                 textColor = textColor,
+                textBackgroundColor = textBackgroundColor,
+                textSelectedColor = textSelectedColor,
+                textSelectedBackgroundColor = textSelectedBackgroundColor,
                 uppercase = uppercase,
                 unfocusedOpacity = unfocusedOpacity,
                 unfocusedSaturation = unfocusedSaturation,
@@ -214,6 +243,68 @@ private fun EsDeCarousel(
                     },
             )
         }
+    }
+}
+
+/**
+ * Real ES-DE carousel item rendering (`CarouselComponent::addEntry`/
+ * `updateEntry`) -- an item is EITHER its own image (a real system logo/
+ * marquee) OR a text-label fallback, never both, and never wrapped in a
+ * card/border/background box the way droidtop's own generic
+ * [EsDeListTile] (still used by the grid, which has a real, different
+ * per-item chrome model) does. Real default text colors are black text on
+ * a fully transparent background -- not white-on-a-dark-rounded-rect,
+ * which was a fabricated droidtop-only look with no real ES-DE basis.
+ */
+@Composable
+private fun EsDeCarouselItem(
+    item: EsDeListItem,
+    width: Dp,
+    height: Dp,
+    isFocused: Boolean,
+    textColor: Color,
+    textBackgroundColor: Color,
+    textSelectedColor: Color,
+    textSelectedBackgroundColor: Color,
+    uppercase: Boolean,
+    unfocusedOpacity: Float,
+    unfocusedSaturation: Float,
+    modifier: Modifier,
+) {
+    val baseModifier = modifier
+        .size(width = width, height = height)
+        .focusable()
+        // Same real touch-input fix as EsDeTextListRow/EsDeListTile.
+        .clickable(onClick = item.onSelect)
+        .onKeyEvent { event ->
+            if (event.type == KeyEventType.KeyUp &&
+                (event.key == Key.ButtonA || event.key == Key.DirectionCenter || event.key == Key.Enter)
+            ) {
+                item.onSelect()
+                true
+            } else {
+                false
+            }
+        }
+
+    if (item.logoPath != null) {
+        AsyncImage(
+            model = item.logoPath,
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = baseModifier.let {
+                if (!isFocused && unfocusedSaturation < 1f) it.graphicsLayer { alpha = 0.85f } else it
+            },
+        )
+    } else {
+        Text(
+            if (uppercase) item.label.uppercase() else item.label,
+            color = if (isFocused) textSelectedColor else textColor,
+            textAlign = TextAlign.Center,
+            modifier = baseModifier
+                .background(if (isFocused) textSelectedBackgroundColor else textBackgroundColor)
+                .wrapContentHeight(),
+        )
     }
 }
 

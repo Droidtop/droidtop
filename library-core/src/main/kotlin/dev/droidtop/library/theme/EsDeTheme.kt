@@ -159,9 +159,23 @@ internal val ES_DE_ELEMENT_SCHEMA: Map<String, Map<String, EsDePropertyType>> = 
         "type" to EsDePropertyType.STRING,
         "itemSize" to EsDePropertyType.NORMALIZED_PAIR,
         "itemScale" to EsDePropertyType.FLOAT,
+        // Real carousel-wide background bar drawn ONCE behind every item
+        // (CarouselComponent::render's own single drawRect call) -- NOT a
+        // per-item box. Real default 0xFFFFFFD8 (translucent white),
+        // confirmed against the real constructor default, not guessed.
         "color" to EsDePropertyType.COLOR,
+        "colorEnd" to EsDePropertyType.COLOR,
+        "colorGradientHorizontal" to EsDePropertyType.BOOLEAN,
         "text" to EsDePropertyType.STRING,
         "textColor" to EsDePropertyType.COLOR,
+        // Real, previously-missing carousel text properties -- an item's
+        // OWN text fallback (shown only when it has no image, see
+        // CarouselComponent::onDemandTextureLoad/addEntry) has real
+        // default colors distinct from a themed "text" element's own
+        // defaults (0x000000FF text, transparent background).
+        "textBackgroundColor" to EsDePropertyType.COLOR,
+        "textSelectedColor" to EsDePropertyType.COLOR,
+        "textSelectedBackgroundColor" to EsDePropertyType.COLOR,
         "fontPath" to EsDePropertyType.PATH,
         "fontSize" to EsDePropertyType.FLOAT,
         "letterCase" to EsDePropertyType.STRING,
