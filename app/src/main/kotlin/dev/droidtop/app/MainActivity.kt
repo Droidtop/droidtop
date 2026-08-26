@@ -6,19 +6,10 @@ import android.os.Bundle
 import android.view.KeyEvent
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.lifecycleScope
 import dev.droidtop.library.EngineGameProvider
 import dev.droidtop.library.Library
@@ -31,6 +22,8 @@ import dev.droidtop.runtime.DualScreenRole
 import dev.droidtop.runtime.PrefsDualScreenAssignmentStore
 import dev.droidtop.runtime.PrimaryContainerSession
 import dev.droidtop.runtime.windows.PcGameProvider
+import dev.droidtop.shell.desktop.DesktopSessionMessage
+import dev.droidtop.shell.desktop.DesktopShell
 import dev.droidtop.shell.gamepad.GamepadShell
 import dev.droidtop.shell.standard.BackButtonMenu
 import dev.droidtop.shell.standard.ModePrefs
@@ -59,11 +52,16 @@ import kotlinx.coroutines.launch
  * (or vice versa) could ever take effect, because onCreate (where `mode` was
  * read) never ran a second time.
  *
- * Desktop mode is temporarily disconnected here while `:shell-gamepad`'s
- * Handheld UI gets real implementation work — [DesktopShell] and
- * [DesktopSessionService] are both untouched and still compile, just not
- * invoked from this Activity right now. Re-wiring them is the only change
- * needed to bring Desktop mode back once Handheld work resumes.
+ * Desktop mode starts [DesktopSessionService] and observes its
+ * [DesktopSessionService.state] instead of a hardcoded null HostBridge/
+ * DisplayOutput -- real wiring, but the session itself is still expected
+ * to land in [DesktopSessionState.Failed] on any real device right now
+ * (see that service's own doc comment for the two concrete gaps: no
+ * primary container image published yet, and the non-root runtime
+ * ([dev.droidtop.runtime.linux.noroot.ProotRuntime]) is unimplemented).
+ * [DesktopShell] renders that Idle/Connecting/Failed/Connected state
+ * distinctly via its own [dev.droidtop.shell.desktop.DesktopSessionMessage]
+ * rather than a single generic placeholder.
  */
 class MainActivity : AppCompatActivity() {
     private var secondScreenPresentation: SecondScreenPresentation? = null
@@ -100,6 +98,10 @@ class MainActivity : AppCompatActivity() {
         )
         mode = resolveMode(intent)
 
+        if (mode != BackButtonMenu.MODE_HANDHELD) {
+            startForegroundService(Intent(this, DesktopSessionService::class.java))
+        }
+
         observeSecondScreen()
 
         setContent {
@@ -108,7 +110,21 @@ class MainActivity : AppCompatActivity() {
                     library = library,
                     onFocusedEntryChanged = { secondScreenPresentation?.focusedEntry = it },
                 )
-                else -> DesktopStub()
+                else -> {
+                    val sessionState by DesktopSessionService.state.collectAsState()
+                    val connected = sessionState as? DesktopSessionState.Connected
+                    DesktopShell(
+                        library = library,
+                        hostBridge = connected?.hostBridge,
+                        primaryOutput = connected?.primaryOutput,
+                        sessionMessage = when (val state = sessionState) {
+                            is DesktopSessionState.Idle -> DesktopSessionMessage.Idle
+                            is DesktopSessionState.Connecting -> DesktopSessionMessage.Connecting
+                            is DesktopSessionState.Connected -> DesktopSessionMessage.Idle
+                            is DesktopSessionState.Failed -> DesktopSessionMessage.Failed(state.message)
+                        },
+                    )
+                }
             }
         }
     }
@@ -197,22 +213,5 @@ class MainActivity : AppCompatActivity() {
             return true
         }
         return super.onKeyLongPress(keyCode, event)
-    }
-}
-
-/**
- * Stands in for [DesktopShell] while Desktop mode is disconnected (see this
- * file's class doc comment). Deliberately doesn't start [DesktopSessionService]
- * or touch [dev.droidtop.runtime.linux.root.RootProcess] at all -- no root
- * prompt, no dimmed-screen risk, nothing to interfere with Handheld testing.
- */
-@Composable
-private fun DesktopStub() {
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-        Text(
-            "Desktop mode is temporarily disabled while Handheld is being built.",
-            color = Color.Gray,
-            style = MaterialTheme.typography.bodyMedium,
-        )
     }
 }
