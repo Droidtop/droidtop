@@ -44,18 +44,39 @@ class DisplayOutputRepository(private val context: Context) {
         awaitClose { displayManager.unregisterDisplayListener(listener) }
     }
 
-    private fun currentOutputs(): List<DisplayOutput> =
-        displayManager.displays
-            .filter { it.state == Display.STATE_ON }
-            .map { display ->
-                @Suppress("DEPRECATION") // Display.getRealSize is deprecated API 30+ (WindowMetrics instead) but works down to minSdk 26 without an Activity/Window context, which a Presentation-target Display doesn't have yet
-                val point = android.graphics.Point().also { display.getRealSize(it) }
-                DisplayOutput(
-                    id = display.displayId.toString(),
-                    androidDisplayId = display.displayId,
-                    kind = if (display.displayId == Display.DEFAULT_DISPLAY) DisplayOutputKind.PRIMARY_SCREEN else DisplayOutputKind.SECOND_SCREEN,
-                    widthPx = point.x,
-                    heightPx = point.y,
-                )
-            }
+    // Real, confirmed-necessary fix, found by reading a real reference
+    // implementation of this exact hardware class: `displayManager.displays`
+    // (the plain, unfiltered property this used to read) is a real,
+    // documented Android quirk -- a lot of secondary-display hardware
+    // paths (confirmed for this exact "dual-screen add-on" category by
+    // vendor/gamenative's own already-working
+    // ExternalDisplaySwapController.findPresentationDisplay, ported below)
+    // only reliably reports its non-default display through the
+    // `DISPLAY_CATEGORY_PRESENTATION` query, and the plain `displays`
+    // property can omit it entirely or report a non-STATE_ON state until
+    // something actively presents to it -- which nothing ever does if
+    // this repository never reports the display existing in the first
+    // place. Also drops the STATE_ON filter this same real reference
+    // implementation never applies, for the same reason.
+    private fun currentOutputs(): List<DisplayOutput> {
+        val primary = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
+        val presentationDisplays = displayManager.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
+        val displays = (listOfNotNull(primary) + presentationDisplays)
+            .distinctBy { it.displayId }
+            // Same real exclusion ExternalDisplaySwapController applies --
+            // a synthetic display Android itself creates that isn't real
+            // hardware.
+            .filter { it.name != "HiddenDisplay" }
+        return displays.map { display ->
+            @Suppress("DEPRECATION") // Display.getRealSize is deprecated API 30+ (WindowMetrics instead) but works down to minSdk 26 without an Activity/Window context, which a Presentation-target Display doesn't have yet
+            val point = android.graphics.Point().also { display.getRealSize(it) }
+            DisplayOutput(
+                id = display.displayId.toString(),
+                androidDisplayId = display.displayId,
+                kind = if (display.displayId == Display.DEFAULT_DISPLAY) DisplayOutputKind.PRIMARY_SCREEN else DisplayOutputKind.SECOND_SCREEN,
+                widthPx = point.x,
+                heightPx = point.y,
+            )
+        }
+    }
 }
