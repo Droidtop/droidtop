@@ -36,10 +36,17 @@ data class GameDepotOption(
  * macOS isn't a droidtop target and is never picked.
  *
  * This is strictly the *decision*; wiring it into gamenative's actual
- * depot-download/launch pipeline
- * (`vendor/gamenative/.../service/SteamService.kt`'s several
- * `isWindowsCompatible`-filtering call sites — always assumes Windows
- * today) is real, separate integration work not done here.
+ * depot-download/launch pipeline is real, separate integration work not
+ * done here. Partially unblocked as of gamenative-tux `78a19b61`
+ * ("Make native-Linux depot download actually reachable, as a real
+ * opt-in"): `vendor/gamenative/.../service/SteamService.kt`'s
+ * `filterForDownloadableDepots` no longer unconditionally rejects a
+ * Linux depot — it now takes a `preferLinux` flag (default `false`,
+ * user-opt-in via a new `PrefManager.preferLinuxDepots` setting), so a
+ * Linux depot CAN be downloaded, just not auto-selected yet. Droidtop
+ * still doesn't call gamenative with that flag set based on this
+ * function's own decision — that real wiring is still separate,
+ * not-yet-done work.
  */
 fun selectBestDepot(options: List<GameDepotOption>): GameDepotOption? {
     if (options.isEmpty()) return null

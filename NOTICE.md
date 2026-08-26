@@ -34,6 +34,11 @@ This project is distributed under the GNU General Public License v3.0 (see
 - **libffi** — `vendor/libffi`, https://github.com/libffi/libffi — MIT.
   Runtime dependency of `libwayland-client`, cross-compiled by
   `build-scripts/build-vendor-deps.sh`.
+- **Hacker's Keyboard** — `input-keyboard`, https://github.com/klausw/hackerskeyboard — Apache-2.0.
+  Forked in unmodified (aside from build-compat fixes) as the second
+  screen's future persistent keyboard (docs/SPEC.md §4/§6) — vendored
+  and made to compile as its own module; not yet wired up to any real
+  input surface.
 
 ## Design references (not vendored, no code copied)
 
