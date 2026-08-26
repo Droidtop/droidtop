@@ -42,4 +42,14 @@ dependencies {
     implementation(project(":library-core"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
+    // Pairing (salted-PIN AES challenge/response) and app-list retrieval are
+    // an HTTPS+XML REST layer, not part of vendor/moonlight-common-c (that's
+    // streaming-protocol only) -- ported from moonlight-android's real,
+    // public NvHTTP/PairingManager. OkHttp for the mutual-TLS HTTP client;
+    // BouncyCastle only for generating the self-signed client certificate
+    // (java.security has no public API to build a *new* X509 cert, only to
+    // parse existing ones -- the actual AES/signature crypto below uses
+    // plain JCE, no BC needed there).
+    implementation(libs.okhttp)
+    implementation(libs.bouncycastle.bcpkix)
 }

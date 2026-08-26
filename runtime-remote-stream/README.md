@@ -3,8 +3,13 @@
 Remote PC game streaming, GameStream-protocol compatible — targets Sunshine
 (and Apollo, a Sunshine fork) hosts primarily, since real NVIDIA GameStream
 is discontinued. Vendors [vendor/moonlight-common-c](../vendor/moonlight-common-c)
-(GPL-3.0) for the actual protocol work: pairing, app-list retrieval, stream
-session setup.
+(GPL-3.0) for the actual video/audio streaming session. Pairing and app-list
+retrieval are NOT part of that library (confirmed by inspecting its public
+headers — it's streaming-protocol/RTP/RTSP only); they're a plain HTTPS+XML
+REST layer, implemented directly in Kotlin here (`MoonlightPairing.kt`,
+`GameStreamHttpClient.kt`, `ClientIdentity.kt`, `AppListParser.kt`), ported
+from moonlight-android's real, public `NvHTTP`/`PairingManager`/
+`AndroidCryptoProvider`.
 
 Surfaces every app on every paired host as a `REMOTE_STREAM` `LibraryEntry`
 (`library-core`) — a remote game is not a special case in the UI, it's the
@@ -48,7 +53,14 @@ cross-compiles through the same NDK toolchain file Gradle already passes
 in, no separate Configure/Perl step needed) plus `vendor/moonlight-common-c`
 and its pinned ENet fork all compile and link into `libremotestream.so`.
 
-What's still not done: `remotestream_jni.cpp`'s three JNI entry points
-(`nativePair`, `nativeFetchAppList`, `nativeStartStream`) are unimplemented
-— the native library builds, but doesn't do anything yet. That's the actual
-next piece of work here, not any further build/toolchain setup.
+Real pairing (`MoonlightClient.pair`) and app-list retrieval
+(`MoonlightClient.fetchAppList`) are implemented in pure Kotlin, faithfully
+ported from moonlight-android's reference source — not stubs. Neither one
+touches the native library at all.
+
+What's still not done: `remotestream_jni.cpp`'s one remaining JNI entry
+point, `nativeStartStream`, is unimplemented — the native library builds,
+but doesn't stream anything yet. That's the actual next piece of work here,
+not any further build/toolchain setup. `RemoteHostDiscovery` (LAN host
+discovery) is also still unimplemented — see "What's NOT in
+moonlight-common-c" above.
