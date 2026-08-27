@@ -79,4 +79,13 @@ fun GameEngine.esDeSystemName(): String = when (this) {
     GameEngine.RPG_MAKER_MZ -> "rpgmaker_mz"
     GameEngine.RPG_MAKER_VX_ACE -> "rpgmaker_vxace"
     GameEngine.KIRIKIRI -> "kirikiri"
+    GameEngine.AUGUST -> "august"
+    GameEngine.BURIKO -> "buriko"
+    GameEngine.CATSYSTEM2 -> "catsystem2"
+    GameEngine.CMVS -> "cmvs"
+    GameEngine.FLASH_AIR -> "flash_air"
+    GameEngine.GODOT -> "godot"
+    GameEngine.TWINE -> "twine"
+    GameEngine.UNREAL -> "unreal"
+    GameEngine.UNITY -> "unity"
 }
