@@ -80,4 +80,50 @@ class GameLaunchStrategyResolverTest {
             strategies.toSet(),
         )
     }
+
+    @Test
+    fun `ENGINEHOST is offered first when installed and a version is known`() {
+        val strategies = GameLaunchStrategyResolver.resolve(
+            GameEngine.KIRIKIRI, tmp.root, joiPlayInstalled = false,
+            engineHostInstalled = true, engineHostEngineVersion = "2.32",
+        )
+        assertEquals(GameLaunchStrategy.ENGINEHOST, strategies.first())
+    }
+
+    @Test
+    fun `ENGINEHOST is not offered when installed but no version is known and no enginehost json exists`() {
+        val strategies = GameLaunchStrategyResolver.resolve(
+            GameEngine.KIRIKIRI, tmp.root, joiPlayInstalled = false,
+            engineHostInstalled = true, engineHostEngineVersion = null,
+        )
+        assertFalse(GameLaunchStrategy.ENGINEHOST in strategies)
+    }
+
+    @Test
+    fun `ENGINEHOST is offered with no known version when the folder has its own enginehost json`() {
+        File(tmp.root, "enginehost.json").writeText("""{"engine":"kirikiri2","engineVersion":"2.32"}""")
+        val strategies = GameLaunchStrategyResolver.resolve(
+            GameEngine.KIRIKIRI, tmp.root, joiPlayInstalled = false,
+            engineHostInstalled = true, engineHostEngineVersion = null,
+        )
+        assertTrue(GameLaunchStrategy.ENGINEHOST in strategies)
+    }
+
+    @Test
+    fun `ENGINEHOST is never offered for an engine it doesn't cover`() {
+        val strategies = GameLaunchStrategyResolver.resolve(
+            GameEngine.UNITY, tmp.root, joiPlayInstalled = false,
+            engineHostInstalled = true, engineHostEngineVersion = "1.0.0",
+        )
+        assertFalse(GameLaunchStrategy.ENGINEHOST in strategies)
+    }
+
+    @Test
+    fun `ENGINEHOST is not offered when enginehost isn't installed even with a known version`() {
+        val strategies = GameLaunchStrategyResolver.resolve(
+            GameEngine.KIRIKIRI, tmp.root, joiPlayInstalled = false,
+            engineHostInstalled = false, engineHostEngineVersion = "2.32",
+        )
+        assertFalse(GameLaunchStrategy.ENGINEHOST in strategies)
+    }
 }

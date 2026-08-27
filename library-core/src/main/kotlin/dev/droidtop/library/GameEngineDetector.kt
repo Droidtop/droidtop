@@ -234,7 +234,17 @@ data class DetectedGame(val displayFolder: File, val gameRoot: File, val engine:
  * offer all of them, not assume one.
  */
 enum class GameLaunchStrategy {
-    /** Hand off to the third-party JoiPlay interpreter — see [JoiPlay]. Real, wired to an actual launch today. */
+    /**
+     * Hand off to `dev.enginehost` — see [EngineHost]. The real default
+     * for the 11 VN-shaped engines it covers ([ENGINEHOST_ENGINE_IDS]):
+     * the user reported JoiPlay's own direct launch isn't reliably
+     * working on their real device, which is the actual motivation for
+     * making this the priority strategy rather than [JOIPLAY] — not a
+     * decision to remove JoiPlay support, which stays available below.
+     */
+    ENGINEHOST,
+
+    /** Hand off to the third-party JoiPlay interpreter — see [JoiPlay]. Real, wired to an actual launch today. Kept as a fallback strategy (selectable via [LaunchStrategyOverridePrefs]) now that [ENGINEHOST] is the default for the engines both cover. */
     JOIPLAY,
 
     /** Hand off to the third-party Kirikiroid2/krkr2 interpreter — see [Kirikiroid2]. Real, wired today, but generic-open-only (opens the app, not a specific game — see that class's own doc comment for why). */
@@ -262,13 +272,33 @@ private val JOIPLAY_ENGINES = setOf(GameEngine.RENPY, GameEngine.RPG_MAKER_MV, G
  * available strategies (one shipped a Linux build, the other didn't).
  */
 object GameLaunchStrategyResolver {
+    /**
+     * [engineHostInstalled]/[engineHostEngineVersion] are plain facts the
+     * caller computes from a real `Context` before calling this ([EngineHost
+     * .isInstalled]/[resolveEngineVersion]) — deliberately, matching how
+     * [joiPlayInstalled]/[kirikiroid2Installed] already work: this resolver
+     * stays pure/Android-free so [GameLaunchStrategyResolverTest]'s plain
+     * JVM unit tests keep working with zero Robolectric/mocking setup, not
+     * a Context threaded in just for this one new strategy.
+     */
     fun resolve(
         engine: GameEngine,
         folder: File,
         joiPlayInstalled: Boolean,
         kirikiroid2Installed: Boolean = false,
+        engineHostInstalled: Boolean = false,
+        engineHostEngineVersion: String? = null,
     ): List<GameLaunchStrategy> {
         val strategies = mutableListOf<GameLaunchStrategy>()
+        // Only offered when there's an actual engineVersion to launch
+        // with -- a folder with no enginehost.json of its own and no
+        // per-folder override set isn't a real available option yet, see
+        // resolveEngineVersion's own doc comment.
+        if (engineHostInstalled && engine in ENGINEHOST_ENGINE_IDS &&
+            (File(folder, "enginehost.json").isFile || engineHostEngineVersion != null)
+        ) {
+            strategies += GameLaunchStrategy.ENGINEHOST
+        }
         if (joiPlayInstalled && engine in JOIPLAY_ENGINES) strategies += GameLaunchStrategy.JOIPLAY
         if (kirikiroid2Installed && engine == GameEngine.KIRIKIRI) strategies += GameLaunchStrategy.KIRIKIROID2
         if (hasWindowsExecutable(folder)) strategies += GameLaunchStrategy.WINE_PREFIX
@@ -380,16 +410,27 @@ class EngineGameProvider(
             folder = gameRoot,
             joiPlayInstalled = JoiPlay.isInstalled(context),
             kirikiroid2Installed = Kirikiroid2.isInstalled(context),
+            engineHostInstalled = EngineHost.isInstalled(context),
+            engineHostEngineVersion = resolveEngineVersion(context, gameRoot, engine),
         )
         val overrideStrategy = LaunchStrategyOverridePrefs.get(context, entry.id)
         val strategy = available.firstOrNull { it.name == overrideStrategy } ?: available.firstOrNull()
             ?: error(
-                "No way to launch ${entry.title} -- install JoiPlay (Ren'Py/RPG Maker) or " +
-                    "Kirikiroid2 (Kirikiri), or point it at a Windows .exe (Wine) or a Linux " +
-                    "build (Linux container) once those are wired to a running session.",
+                "No way to launch ${entry.title} -- install enginehost or JoiPlay " +
+                    "(Ren'Py/RPG Maker/etc) or Kirikiroid2 (Kirikiri), or point it at a Windows " +
+                    ".exe (Wine) or a Linux build (Linux container) once those are wired to a " +
+                    "running session.",
             )
 
         when (strategy) {
+            GameLaunchStrategy.ENGINEHOST -> {
+                // engineVersion may be null here (a folder with its own
+                // enginehost.json doesn't need one) -- EngineHost.launch
+                // itself only requires it when actually building a config
+                // extra, and fails loudly then, not before.
+                val engineId = ENGINEHOST_ENGINE_IDS.getValue(engine)
+                EngineHost.launch(context, gameRoot, engineId, resolveEngineVersion(context, gameRoot, engine))
+            }
             GameLaunchStrategy.JOIPLAY -> {
                 val executable = findJoiPlayExecutable(gameRoot)
                     ?: error("No JoiPlay-launchable file (.sh/.exe/.py/.html/.swf) found in ${gameRoot.absolutePath}")
