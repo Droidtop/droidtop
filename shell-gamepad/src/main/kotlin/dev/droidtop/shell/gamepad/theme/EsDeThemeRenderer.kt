@@ -18,15 +18,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.theme.EsDeThemeElement
 import dev.droidtop.library.theme.EsDeThemeValue
 import dev.droidtop.library.theme.EsDeThemeView
@@ -65,10 +68,29 @@ fun EsDeThemedView(
     // per-system theme concept at all (e.g. anything that isn't the
     // "system" view).
     onFocusedIndexChanged: (Int) -> Unit = {},
+    // The focused system's own real games (from the SAME LibraryEntry list
+    // Games already shows elsewhere), feeding <gameselector>-driven
+    // elements (the game-preview poster/mosaic/title in DEcaffe's real
+    // "system" view) -- empty by default since most callers of this
+    // composable (anything that isn't the "system" view) have no
+    // gameselector elements to feed at all.
+    focusedSystemEntries: List<LibraryEntry> = emptyList(),
 ) {
     BoxWithConstraints(modifier = modifier) {
         val viewWidth = maxWidth
         val viewHeight = maxHeight
+        // Selected ONCE per focused-system change (remember's key is the
+        // entries list itself -- structurally stable across recompositions
+        // for the same system, changes when focus moves to a different
+        // one), not re-randomized every frame -- see GameSelector's own
+        // doc comment for why that distinction matters for a real
+        // "stable until you change platform" game-preview collage.
+        val gameSelector = view.elements.values.firstOrNull { it.type == "gameselector" }
+        val gameCount = gameSelector?.valueOrNull<EsDeThemeValue.UInt>("gameCount")?.value?.toInt() ?: 1
+        val allowDuplicates = gameSelector?.valueOrNull<EsDeThemeValue.Bool>("allowDuplicates")?.value ?: true
+        val gameSelection = remember(focusedSystemEntries) {
+            GameSelector.select(focusedSystemEntries, gameCount, allowDuplicates)
+        }
         view.elements.values
             // Real ES-DE `visible` property, applies to every element type
             // -- checked once here rather than duplicated in each
@@ -76,13 +98,15 @@ fun EsDeThemedView(
             .filter { it.valueOrNull<EsDeThemeValue.Bool>("visible")?.value != false }
             .sortedBy { zIndexOf(it) }.forEach { element ->
             when (element.type) {
-                "image" -> EsDeThemedImage(element, viewWidth, viewHeight)
-                "text" -> EsDeThemedText(element, viewWidth, viewHeight)
+                "image" -> EsDeThemedImage(element, viewWidth, viewHeight, gameSelection)
+                "text" -> EsDeThemedText(element, viewWidth, viewHeight, gameSelection)
                 // Real, honest fallback: no video/GIF playback engine
                 // wired up (real, separate work) -- shows the element's
-                // own real default/poster PATH property as a static image
-                // instead of silently rendering nothing.
-                "video", "animation" -> EsDeThemedFallbackImage(element, viewWidth, viewHeight)
+                // own real default/poster PATH property, or the
+                // gameselector-resolved artwork for its selected game when
+                // gameselectorEntry is set, as a static image instead of
+                // silently rendering nothing.
+                "video", "animation" -> EsDeThemedFallbackImage(element, viewWidth, viewHeight, gameSelection)
                 // Real, live-rendered -- ES-DE's own "clock" type has no
                 // "metadata" property at all (confirmed against its real
                 // schema), unlike "datetime". "datetime" is a genuinely
@@ -129,15 +153,63 @@ private fun EsDeThemedListElement(
 }
 
 @Composable
-private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp) {
-    val path = element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved ?: return
+private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp, gameSelection: List<LibraryEntry>) {
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
+    val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
+
+    // Real gradient-band rendering (DEcaffe's own leftband/rightband
+    // elements: a thin vertical divider fading from `color` to
+    // `colorEnd`) -- previously fell through to the plain path-image
+    // branch below, which only ever applies ONE static tint color via
+    // ColorFilter.tint, producing a solid flat-colored bar instead of a
+    // real fade. `path` is deliberately ignored here: real ES-DE's own
+    // technique tints a plain filler image with the gradient, which for
+    // this renderer is simplest to reproduce as a plain gradient-filled
+    // box at the same real pos/size -- visually equivalent, no image
+    // decode needed.
+    val gradientType = element.valueOrNull<EsDeThemeValue.Str>("gradientType")?.value
+    val startColor = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) }
+    if (gradientType != null && startColor != null) {
+        val endColor = element.valueOrNull<EsDeThemeValue.Color>("colorEnd")?.let { colorOf(it) } ?: startColor.copy(alpha = 0f)
+        val brush = if (gradientType == "horizontal") {
+            Brush.horizontalGradient(listOf(startColor, endColor))
+        } else {
+            Brush.verticalGradient(listOf(startColor, endColor))
+        }
+        Box(
+            modifier = Modifier
+                .absoluteOffset(x = offsetX, y = offsetY)
+                .size(width = width, height = height)
+                .graphicsLayer { alpha = opacity }
+                .background(brush),
+        )
+        return
+    }
+
+    // Real gameselector-driven artwork: an element with `gameselectorEntry`
+    // (DEcaffe's own game1..game9 mosaic tiles) has no static `path` of
+    // its own at all -- its real image comes from whichever game
+    // GameSelector picked for that slot, using that game's OWN already-
+    // resolved artwork (LibraryEntry.artworkUri, the same real per-game
+    // media EsDeArtwork.resolve found at scan time). This uses droidtop's
+    // default miximage/cover/screenshot/... priority rather than THIS
+    // element's own real `imageType` ordering (e.g. "screenshot,cover,
+    // titlescreen") -- a real, honest simplification: re-deriving the
+    // exact gamesRoot/system/romBaseName EsDeArtwork.resolve's imageTypes
+    // overload needs from a LibraryEntry alone isn't reliably possible
+    // for every provider today, so this reuses the artwork already
+    // resolved once at scan time instead of re-resolving per element.
+    val gameselectorEntry = element.valueOrNull<EsDeThemeValue.UInt>("gameselectorEntry")?.value?.toInt()
+    val path = if (gameselectorEntry != null) {
+        gameSelection.getOrNull(gameselectorEntry)?.artworkUri
+    } else {
+        element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved
+    } ?: return
     val tint = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) }
     // Real properties (ImageComponent's own opacity/cornerRadius), already
     // parsed but previously unread -- opacity in particular matters a lot
     // for real themes that fade decorative art in/out.
-    val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
     val cornerRadiusFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("cornerRadius")?.value ?: 0f
     val cornerRadius = (cornerRadiusFraction * 1080).dp
     // Real properties, previously not applied at all -- see this file's
@@ -151,11 +223,21 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     val rotation = element.valueOrNull<EsDeThemeValue.FloatValue>("rotation")?.value ?: 0f
     val flipHorizontal = element.valueOrNull<EsDeThemeValue.Bool>("flipHorizontal")?.value ?: false
     val flipVertical = element.valueOrNull<EsDeThemeValue.Bool>("flipVertical")?.value ?: false
+    // Real cropSize property (game1..game9's own mosaic tiles all declare
+    // one): real ES-DE crops the source image to a specific sub-rectangle
+    // before display. This renderer doesn't decode the source image's own
+    // intrinsic size, so an exact sub-rectangle crop isn't implemented --
+    // ContentScale.Crop (fill the given box, cropping equally from the
+    // overflowing dimension) is an honest approximation, not a precise
+    // match, same "no intrinsic-size decode" limitation sizeOf's own doc
+    // comment already notes for maxSize.
+    val hasCropSize = element.valueOrNull<EsDeThemeValue.Pair>("cropSize") != null
     AsyncImage(
         model = path,
         contentDescription = null,
         colorFilter = tint?.let { ColorFilter.tint(it) },
         alpha = opacity,
+        contentScale = if (hasCropSize) ContentScale.Crop else ContentScale.Fit,
         modifier = Modifier
             .absoluteOffset(x = offsetX, y = offsetY)
             .size(width = width, height = height)
@@ -193,8 +275,29 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
  * align within.
  */
 @Composable
-private fun EsDeThemedText(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp) {
-    val rawText = element.valueOrNull<EsDeThemeValue.Str>("text")?.value ?: return
+private fun EsDeThemedText(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp, gameSelection: List<LibraryEntry>) {
+    // Real gameselector-bound title text (DEcaffe's own `text name="game"`,
+    // `metadata=name`): previously fell through the plain `?: return`
+    // below every single time, since a metadata-bound element has no
+    // static `text` property of its own at all -- silently rendering
+    // nothing despite being a real, positioned "text" element, not one of
+    // the deferred badges/rating/gamelistinfo types. Real ES-DE convention
+    // when `gameselectorEntry` is omitted on a metadata-bound element:
+    // implicitly entry 0 of whichever gameselector is in scope (matches
+    // DEcaffe's own pairing of this element with `screen2`'s explicit
+    // `gameselectorEntry=0` poster -- same featured game, paired caption).
+    val metadata = element.valueOrNull<EsDeThemeValue.Str>("metadata")?.value
+    val resolvedText = if (metadata == "name") {
+        val gameselectorEntry = element.valueOrNull<EsDeThemeValue.UInt>("gameselectorEntry")?.value?.toInt() ?: 0
+        gameSelection.getOrNull(gameselectorEntry)?.title
+            ?: element.valueOrNull<EsDeThemeValue.Str>("defaultValue")?.value
+    } else {
+        element.valueOrNull<EsDeThemeValue.Str>("text")?.value
+    } ?: return
+    // Real ES-DE convention: ":space:" renders as blank (reserves the
+    // element's own position/size, shows no visible text) rather than the
+    // literal string.
+    val rawText = if (resolvedText == ":space:") "" else resolvedText
     val uppercase = element.valueOrNull<EsDeThemeValue.Str>("letterCase")?.value == "uppercase"
     val text = if (uppercase) rawText.uppercase() else rawText
 
@@ -247,17 +350,27 @@ private fun EsDeThemedText(element: EsDeThemeElement, viewWidth: Dp, viewHeight:
 
 /**
  * Real fallback for `video`/`animation` elements: their own `default`/
- * `defaultImage`/`path` PATH property (whichever is present), shown as a
- * plain static image. Real ES-DE plays these as actual video/GIF content;
+ * `defaultImage`/`path` PATH property when present, shown as a plain
+ * static image -- or, for a gameselector-driven element (DEcaffe's own
+ * `screen2`, the large game-preview poster, which has NO static path
+ * property of its own at all), the selected game's own already-resolved
+ * artwork, same real per-game-image approach as [EsDeThemedImage]'s own
+ * gameselectorEntry handling (see that function's doc comment for the
+ * same "default priority order, not this element's own imageType"
+ * simplification). Real ES-DE plays these as actual video/GIF content;
  * this pass doesn't build a media-playback engine, so a static poster is
  * the honest alternative to rendering nothing at all.
  */
 @Composable
-private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp) {
-    val path = element.valueOrNull<EsDeThemeValue.Path>("default")?.resolved
-        ?: element.valueOrNull<EsDeThemeValue.Path>("defaultImage")?.resolved
-        ?: element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved
-        ?: return
+private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp, gameSelection: List<LibraryEntry>) {
+    val gameselectorEntry = element.valueOrNull<EsDeThemeValue.UInt>("gameselectorEntry")?.value?.toInt()
+    val path = if (gameselectorEntry != null) {
+        gameSelection.getOrNull(gameselectorEntry)?.artworkUri
+    } else {
+        element.valueOrNull<EsDeThemeValue.Path>("default")?.resolved
+            ?: element.valueOrNull<EsDeThemeValue.Path>("defaultImage")?.resolved
+            ?: element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved
+    } ?: return
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
     val tint = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) }
@@ -266,11 +379,15 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
     val cornerRadiusFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("imageCornerRadius")?.value
         ?: element.valueOrNull<EsDeThemeValue.FloatValue>("cornerRadius")?.value ?: 0f
     val cornerRadius = (cornerRadiusFraction * 1080).dp
+    // Same real cropSize approximation as EsDeThemedImage -- see that
+    // function's own doc comment.
+    val hasCropSize = element.valueOrNull<EsDeThemeValue.Pair>("cropSize") != null
     AsyncImage(
         model = path,
         contentDescription = null,
         colorFilter = tint?.let { ColorFilter.tint(it) },
         alpha = opacity,
+        contentScale = if (hasCropSize) ContentScale.Crop else ContentScale.Fit,
         modifier = Modifier
             .absoluteOffset(x = offsetX, y = offsetY)
             .size(width = width, height = height)

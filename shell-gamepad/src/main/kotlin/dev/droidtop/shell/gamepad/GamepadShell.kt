@@ -794,6 +794,16 @@ private fun GamesSection(
                     // label anymore -- the theme's own carousel title
                     // treatment is the real visual identity for "what's
                     // selected," matching the reference theme.
+                    // The real games backing whichever system the carousel
+                    // currently has focus on -- feeds EsDeThemedView's own
+                    // gameselector-driven elements (screen2's game-preview
+                    // poster, the game1..game9 mosaic, the metadata-bound
+                    // title caption). Empty for a non-System group (an
+                    // engine bucket like "Ren'Py") since there's no single
+                    // real games-folder game list for those; those groups
+                    // legitimately just show no game preview.
+                    val focusedSystemEntries = orderedGroups.getOrNull(focusedSystemIndex)
+                        ?.let { byGroup[it] } ?: emptyList()
                     theme?.views?.get("system")?.let { systemView ->
                         EsDeThemedView(
                             view = systemView,
@@ -801,6 +811,7 @@ private fun GamesSection(
                             firstItemFocus = firstFocus,
                             modifier = Modifier.fillMaxSize(),
                             onFocusedIndexChanged = { focusedSystemIndex = it },
+                            focusedSystemEntries = focusedSystemEntries,
                         )
                     } ?: EsDeSystemListView(
                         element = listElement,

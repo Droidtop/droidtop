@@ -50,18 +50,53 @@ object EsDeArtwork {
     private val EXTENSIONS = listOf("png", "jpg", "jpeg")
 
     /**
+     * Real ES-DE `<imageType>` values (singular, as a theme writes them --
+     * e.g. DEcaffe's own `screenshot,cover,titlescreen`) to the real
+     * on-disk media folder name (plural, matching [MEDIA_TYPES_BY_PRIORITY]
+     * and ES-DE's own `downloaded_media` layout). Cross-checked against the
+     * bundled DEcaffe theme.xml's own real `<imageType>` values, not
+     * guessed at beyond that — an imageType this map doesn't recognize is
+     * skipped by [resolve], not a parse/lookup failure.
+     */
+    private val IMAGE_TYPE_TO_FOLDER = mapOf(
+        "miximage" to "miximages",
+        "cover" to "covers",
+        "screenshot" to "screenshots",
+        "titlescreen" to "titlescreens",
+        "marquee" to "marquees",
+        "physicalmedia" to "physicalmedia",
+        "fanart" to "fanart",
+    )
+
+    /**
      * [gamesRoot] is the folder directly containing the per-system ROM/game
      * folders (e.g. `.../Roms`, the parent of `.../Roms/nes`). Checks the
      * sibling `ES-DE/downloaded_media` layout first, then a direct
      * `downloaded_media` under [gamesRoot] itself.
      */
-    fun resolve(gamesRoot: File, system: String, romBaseName: String): String? {
+    fun resolve(gamesRoot: File, system: String, romBaseName: String): String? =
+        resolve(gamesRoot, system, romBaseName, MEDIA_TYPES_BY_PRIORITY.mapNotNull { folder ->
+            IMAGE_TYPE_TO_FOLDER.entries.firstOrNull { it.value == folder }?.key
+        })
+
+    /**
+     * Same real lookup, but walking [imageTypes] in the CALLER's own order
+     * instead of [MEDIA_TYPES_BY_PRIORITY]'s fixed priority — for a
+     * gameselector-driven element honoring its own theme-declared
+     * `<imageType>screenshot,cover,titlescreen</imageType>` ordering rather
+     * than droidtop's own generic default. Falls back to
+     * [MEDIA_TYPES_BY_PRIORITY] if [imageTypes] is empty or contains
+     * nothing this crate recognizes, same as the no-imageTypes overload.
+     */
+    fun resolve(gamesRoot: File, system: String, romBaseName: String, imageTypes: List<String>): String? {
+        val folders = imageTypes.mapNotNull { IMAGE_TYPE_TO_FOLDER[it.trim().lowercase()] }
+            .ifEmpty { MEDIA_TYPES_BY_PRIORITY }
         val candidateMediaRoots = listOf(
             File(gamesRoot.parentFile ?: gamesRoot, "ES-DE/downloaded_media"),
             File(gamesRoot, "downloaded_media"),
         )
         for (mediaRoot in candidateMediaRoots) {
-            for (mediaType in MEDIA_TYPES_BY_PRIORITY) {
+            for (mediaType in folders) {
                 for (ext in EXTENSIONS) {
                     val candidate = File(mediaRoot, "$system/$mediaType/$romBaseName.$ext")
                     if (candidate.isFile) return candidate.absolutePath
