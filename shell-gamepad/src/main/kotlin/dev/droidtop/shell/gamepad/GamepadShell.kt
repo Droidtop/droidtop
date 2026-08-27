@@ -55,10 +55,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import dev.droidtop.library.EngineGameProvider
+import dev.droidtop.library.GameLaunchStrategy
+import dev.droidtop.library.LaunchStrategyOverridePrefs
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.consoles.ES_DE_CONSOLE_SYSTEMS
+import dev.droidtop.library.displayName as launchStrategyDisplayName
 import dev.droidtop.library.theme.SystemThemeColors
 import dev.droidtop.library.theme.primaryListElement
 import dev.droidtop.shell.gamepad.theme.EsDeListItem
@@ -333,8 +337,42 @@ private object HandheldPrefs {
  */
 @Composable
 private fun EntryDetailScreen(entry: LibraryEntry, onLaunch: () -> Unit, onClose: () -> Unit) {
+    val context = LocalContext.current
     val launchFocus = remember { FocusRequester() }
     LaunchedEffect(entry) { launchFocus.requestFocus() }
+
+    // Real choice, not a silent default -- enginehost/JoiPlay/Kirikiroid2/
+    // Wine/a Linux container are all genuinely available strategies for an
+    // engine-detected game depending on what's installed and what the
+    // folder actually ships (see GameLaunchStrategyResolver); this picker
+    // is what makes that a real, user-visible option instead of something
+    // only settable by hand-editing LaunchStrategyOverridePrefs. Bumped to
+    // force re-reading the override after a pick.
+    var overrideVersion by remember { mutableStateOf(0) }
+    var pickingStrategy by remember { mutableStateOf(false) }
+    val engineProvider = remember(context) { EngineGameProvider(context) }
+    val isEngineGame = remember(entry.kind) { entry.kind in engineProvider.kinds }
+    val availableStrategies = remember(entry, isEngineGame) {
+        if (isEngineGame) engineProvider.availableStrategies(entry) else emptyList()
+    }
+    val currentStrategy = remember(entry, availableStrategies, overrideVersion) {
+        val overrideName = LaunchStrategyOverridePrefs.get(context, entry.id)
+        availableStrategies.firstOrNull { it.name == overrideName } ?: availableStrategies.firstOrNull()
+    }
+
+    if (pickingStrategy) {
+        LaunchStrategyPicker(
+            strategies = availableStrategies,
+            current = currentStrategy,
+            onPick = { strategy ->
+                LaunchStrategyOverridePrefs.set(context, entry.id, strategy)
+                overrideVersion++
+                pickingStrategy = false
+            },
+            onDismiss = { pickingStrategy = false },
+        )
+        return
+    }
 
     Column(
         modifier = Modifier
@@ -387,6 +425,64 @@ private fun EntryDetailScreen(entry: LibraryEntry, onLaunch: () -> Unit, onClose
         Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             ActionChip("Launch", highlighted = true, modifier = Modifier.focusRequester(launchFocus), onClick = onLaunch)
             ActionChip("Back", highlighted = false, onClick = onClose)
+        }
+        // Only shown when there's an actual choice to make -- a single
+        // available strategy (or none) has nothing for a picker to offer.
+        if (isEngineGame && availableStrategies.size > 1 && currentStrategy != null) {
+            Text("Launch via", color = Color.Gray, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
+            ActionChip(currentStrategy.launchStrategyDisplayName(), highlighted = false, onClick = { pickingStrategy = true })
+        }
+    }
+}
+
+/** Real per-entry choice among [GameLaunchStrategy]s -- same shape as ConsoleSystemsActivity's PlayerPicker for ROMs, just local to shell-gamepad since that one lives in :app. */
+@Composable
+private fun LaunchStrategyPicker(
+    strategies: List<GameLaunchStrategy>,
+    current: GameLaunchStrategy?,
+    onPick: (GameLaunchStrategy) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .padding(48.dp)
+            .onKeyEvent { event ->
+                if (event.type == KeyEventType.KeyUp && (event.key == Key.Back || event.key == Key.ButtonB)) {
+                    onDismiss()
+                    true
+                } else {
+                    false
+                }
+            },
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text("Launch via", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+        strategies.forEach { strategy ->
+            var focused by remember(strategy) { mutableStateOf(false) }
+            Text(
+                strategy.launchStrategyDisplayName() + if (strategy == current) " (current)" else "",
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { focused = it.isFocused }
+                    .focusable()
+                    .clickable { onPick(strategy) }
+                    .onKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyUp &&
+                            (event.key == Key.ButtonA || event.key == Key.DirectionCenter || event.key == Key.Enter)
+                        ) {
+                            onPick(strategy)
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    .background(if (focused) Color(0xFF2A2A2A) else Color.Transparent, RoundedCornerShape(8.dp))
+                    .padding(12.dp),
+            )
         }
     }
 }
