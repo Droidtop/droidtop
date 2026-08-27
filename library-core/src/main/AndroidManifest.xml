@@ -4,7 +4,7 @@
     <queries>
         <package android:name="cyou.joiplay.joiplay" />
         <package android:name="dev.enginehost" />
-        <!-- Also needed for Kirikiroid2.isInstalled(), missing here before this pass -- a real, pre-existing gap on API 30+, not caused by this change. -->
+        <!-- Also needed for Kirikiroid2.isInstalled(), missing here before this pass: a real, pre-existing gap on API 30+, not caused by this change. -->
         <package android:name="org.github.krkr2" />
     </queries>
 
