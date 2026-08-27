@@ -257,6 +257,15 @@ enum class GameLaunchStrategy {
     LINUX_CONTAINER,
 }
 
+/** For a real per-entry picker UI — see [EngineGameProvider.availableStrategies]. */
+fun GameLaunchStrategy.displayName(): String = when (this) {
+    GameLaunchStrategy.ENGINEHOST -> "enginehost"
+    GameLaunchStrategy.JOIPLAY -> "JoiPlay"
+    GameLaunchStrategy.KIRIKIROID2 -> "Kirikiroid2"
+    GameLaunchStrategy.WINE_PREFIX -> "Wine"
+    GameLaunchStrategy.LINUX_CONTAINER -> "Linux container"
+}
+
 /**
  * Engines JoiPlay is known to interpret (per its own advertised feature
  * set) — Kirikiri is deliberately excluded, not an oversight: nothing
@@ -378,34 +387,36 @@ class EngineGameProvider(
         }
     }
 
-    override suspend fun launch(entry: LibraryEntry) {
+    /** [gameRoot] to [detectedEngine] -- see [GameEngineDetector.scan]'s own doc comment for why [gameRoot] isn't always [entry]'s own [LibraryEntry.id] folder. */
+    private data class ResolvedEntry(val gameRoot: File, val detectedEngine: GameEngine)
+
+    private fun resolveEntry(entry: LibraryEntry): ResolvedEntry {
         val displayFolder = File(entry.id)
         // Re-detect rather than caching gameRoot on LibraryEntry -- cheap
         // (a handful of listFiles() calls), and keeps LibraryEntry's shape
         // shared/uniform across every provider rather than growing an
-        // engine-games-only field. See GameEngineDetector.scan's own doc
-        // comment for why gameRoot isn't always displayFolder itself.
+        // engine-games-only field.
         val gameRoot = GameEngineDetector.detect(displayFolder)?.let { displayFolder }
             ?: (displayFolder.listFiles() ?: emptyArray())
                 .firstOrNull { it.isDirectory && GameEngineDetector.detect(it) != null }
             ?: displayFolder
         val engine = GameEngineDetector.detect(gameRoot)
             ?: error("Couldn't re-detect an engine for ${gameRoot.absolutePath}")
+        return ResolvedEntry(gameRoot, engine)
+    }
 
-        // Real bug this fixes: launch() used to hardcode exactly one path
-        // per kind (JoiPlay, or Kirikiroid2 for KIRIKIRI) regardless of
-        // what GameLaunchStrategyResolver actually says is available --
-        // silently forcing a game into whichever third-party interpreter
-        // this provider happened to hardcode, even when a Windows .exe or
-        // a real Linux build made Wine/a Linux container a genuinely
-        // available (if not yet actually wired) alternative. Real per-entry
-        // choice (a UI picker, same shape as ConsoleSystemsActivity's real
-        // PlayerPicker for ROMs) is the natural next step, not built yet --
-        // this at least stops the wrong-path-forcing and picks in a real,
-        // documented priority order with an honest error for the two
-        // strategies that exist architecturally but have no running
-        // session to launch into yet.
-        val available = GameLaunchStrategyResolver.resolve(
+    /**
+     * Every [GameLaunchStrategy] genuinely available for [entry] right
+     * now, in the same real priority order [launch] would pick from --
+     * exposed so a real UI picker (matching ConsoleSystemsActivity's own
+     * PlayerPicker for ROMs) can show the user an actual choice instead of
+     * [launch] silently resolving one. Enginehost being the *default*
+     * pick doesn't make it the *only* option: every strategy this returns
+     * stays real and selectable via [LaunchStrategyOverridePrefs.set].
+     */
+    fun availableStrategies(entry: LibraryEntry): List<GameLaunchStrategy> {
+        val (gameRoot, engine) = resolveEntry(entry)
+        return GameLaunchStrategyResolver.resolve(
             engine = engine,
             folder = gameRoot,
             joiPlayInstalled = JoiPlay.isInstalled(context),
@@ -413,6 +424,11 @@ class EngineGameProvider(
             engineHostInstalled = EngineHost.isInstalled(context),
             engineHostEngineVersion = resolveEngineVersion(context, gameRoot, engine),
         )
+    }
+
+    override suspend fun launch(entry: LibraryEntry) {
+        val (gameRoot, engine) = resolveEntry(entry)
+        val available = availableStrategies(entry)
         val overrideStrategy = LaunchStrategyOverridePrefs.get(context, entry.id)
         val strategy = available.firstOrNull { it.name == overrideStrategy } ?: available.firstOrNull()
             ?: error(
