@@ -11,8 +11,11 @@ import java.io.File
  * developed programmatic multi-engine VN/RPG-Maker game host, NOT a
  * droidtop-owned project (see `/root/coordination/HANDOFF.md` and
  * `ENGINEHOST_CODEX_BRIEF.md`). droidtop fires its real, documented
- * Intent contract rather than launching JoiPlay/Kirikiroid2 directly for
- * the engines it covers — see [ENGINEHOST_ENGINE_IDS].
+ * Intent contract rather than launching a third-party interpreter
+ * directly for the engines it covers — see [ENGINEHOST_ENGINE_IDS].
+ * (A prior direct-JoiPlay integration was removed entirely: JoiPlay
+ * doesn't expose an intent contract that lets an external caller launch
+ * a specific game, so that integration never actually worked.)
  *
  * The contract (`enginehost`'s own README, read directly, not guessed):
  * fire `ACTION dev.enginehost.LAUNCH` with a `path` extra (the game

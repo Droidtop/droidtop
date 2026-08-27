@@ -5,8 +5,8 @@ package dev.droidtop.library.consoles
  * after Daijishō's own real "Player" concept (PlayerEntity in its
  * decompiled sources: a named launch config with an am-start-style command
  * template, matched to files by a regex), generalized here to also cover
- * droidtop's own runtime backends (JoiPlay, the GameNative-derived Wine/
- * Box64 runtime, droidtop's Linux containers) as first-class Player types
+ * droidtop's own runtime backends (the GameNative-derived Wine/Box64
+ * runtime, droidtop's Linux containers) as first-class Player types
  * alongside the generic am-start one -- droidtop's whole differentiator is
  * treating every kind of "thing that runs a game" as equally first-class,
  * not just emulators.
@@ -46,9 +46,6 @@ sealed interface Player {
         // template -- see ConsoleRomProvider.availablePlayers.
         val packageName: String,
     ) : Player
-
-    /** Delegates to the existing, real [dev.droidtop.library.JoiPlay] integration. */
-    data class JoiPlayLauncher(override val id: String = "joiplay", override val name: String = "JoiPlay") : Player
 
     /**
      * Delegates to `runtime-windows`'s GameNative-derived Wine/Box64

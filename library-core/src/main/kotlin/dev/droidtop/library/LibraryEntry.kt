@@ -59,7 +59,7 @@ enum class LibraryEntryKind {
      * A detected engine game — kind named after the engine, not any one
      * launcher, since the same engine can be reachable through several
      * real paths (see [GameLaunchStrategy]/[GameLaunchStrategyResolver]):
-     * JoiPlay today, a Wine prefix or a Linux container where the
+     * enginehost today, a Wine prefix or a Linux container where the
      * engine/export actually supports it.
      */
     RENPY,
@@ -74,7 +74,7 @@ enum class LibraryEntryKind {
      * [GameEngineDetector]'s doc comment) but no dedicated launch
      * strategy of their own yet — same generic
      * [GameLaunchStrategy.WINE_PREFIX]/[GameLaunchStrategy.LINUX_CONTAINER]
-     * resolution every engine gets, no JoiPlay/Kirikiroid2-style
+     * resolution every engine gets, no enginehost/Kirikiroid2-style
      * dedicated interpreter for any of these.
      */
     AUGUST,

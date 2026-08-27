@@ -341,8 +341,8 @@ private fun EntryDetailScreen(entry: LibraryEntry, onLaunch: () -> Unit, onClose
     val launchFocus = remember { FocusRequester() }
     LaunchedEffect(entry) { launchFocus.requestFocus() }
 
-    // Real choice, not a silent default -- enginehost/JoiPlay/Kirikiroid2/
-    // Wine/a Linux container are all genuinely available strategies for an
+    // Real choice, not a silent default -- enginehost/Kirikiroid2/Wine/a
+    // Linux container are all genuinely available strategies for an
     // engine-detected game depending on what's installed and what the
     // folder actually ships (see GameLaunchStrategyResolver); this picker
     // is what makes that a real, user-visible option instead of something
