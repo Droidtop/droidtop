@@ -59,10 +59,15 @@ sealed interface DesktopSessionState {
  * gaps this can't get past regardless of code correctness:
  *  - [selectPrimaryImage] resolves the bundled seed list's PRIMARY entry
  *    against the real registry via [ImageCatalogResolver] (docs/SPEC.md
- *    §3a's "populate at runtime, don't prepopulate" model), but that
- *    entry's `repository` is still a placeholder (see runtime-common's
- *    `known-image-repositories.json`) — nothing is actually published
- *    there yet, so resolution itself fails, not just the later pull.
+ *    §3a's "populate at runtime, don't prepopulate" model). The
+ *    `debian-sway` entry (runtime-common's `known-image-repositories.json`)
+ *    now points at a real, droidtop-published image
+ *    (`images/primary/Dockerfile` + `.github/workflows/publish-primary-image.yml`,
+ *    pushed to `ghcr.io/bi0shacker001/droidtop-primary`) instead of a
+ *    placeholder — but the GHCR package still needs a one-time manual
+ *    visibility change to Public before `crane`'s unauthenticated pulls
+ *    can reach it (see that workflow's own comment); until then this still
+ *    fails the same way.
  *  - [ProotRuntime] (the non-root path) is still `TODO()` throughout.
  *
  * [state] is how `:shell-desktop`'s `DesktopShell`/`:app`'s `MainActivity`

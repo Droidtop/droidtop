@@ -32,10 +32,11 @@
       "compositorFamily": "WLROOTS",
       "headlessSupport": "CONFIRMED",
       "role": "PRIMARY",
-      "repository": "TODO/droidtop-primary-debian-sway",
-      "officialSource": true,
+      "repository": "bi0shacker001/droidtop-primary",
+      "registry": "ghcr.io",
+      "officialSource": false,
       "arm64Available": true,
-      "notes": "Not published anywhere yet. Same sway headless-backend facts as the Alpine+sway entry; glibc base instead of musl for anyone who needs it."
+      "notes": "Published by droidtop itself (images/primary/Dockerfile, .github/workflows/publish-primary-image.yml) -- debian:bookworm-slim + sway + seatd + a minimal dumb-init-based /sbin/init (droidspaces requires a real /sbin/init in the rootfs, confirmed from its own Documentation/Linux-CLI.md). officialSource=false since this is droidtop's own build, not Debian's own namespace. UNVERIFIED end to end -- never booted against a live droidspaces container (no rooted test device in this environment); see droidtop-boot.sh's own comments for the specific assumptions (env_file injection timing, seatd sufficing without systemd-logind)."
     },
     {
       "id": "alpine-hyprland",
