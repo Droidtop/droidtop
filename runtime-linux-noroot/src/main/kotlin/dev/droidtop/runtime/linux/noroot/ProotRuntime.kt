@@ -22,8 +22,8 @@ import java.io.File
 class ProotRuntime : ContainerRuntime {
     override val backend: ContainerBackend = ContainerBackend.PROOT
 
-    override suspend fun createPrimary(image: RootfsImage): Container {
-        TODO("proot rootfs bootstrap from $image + a compositor (see docs/SPEC.md §2/§3a) as the primary display owner")
+    override suspend fun createPrimary(image: RootfsImage, provisionCommand: String?): Container {
+        TODO("proot rootfs bootstrap from $image, then run $provisionCommand (see dev.droidtop.runtime.CompositorProvisioning) to install a compositor (see docs/SPEC.md §2/§3a) as the primary display owner")
     }
 
     override suspend fun createSibling(image: RootfsImage): Container {

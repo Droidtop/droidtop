@@ -8,10 +8,10 @@
       "compositorFamily": "WLROOTS",
       "headlessSupport": "CONFIRMED",
       "role": "PRIMARY",
-      "repository": "TODO/droidtop-primary-alpine-sway",
+      "repository": "library/alpine",
       "officialSource": true,
       "arm64Available": true,
-      "notes": "Not published anywhere yet -- nothing to resolve tags against until droidtop actually publishes a base+sway image. sway's headless backend (WLR_BACKENDS=headless) is well-documented (ArchWiki, Gentoo wiki) and is already droidtop's own reference compositor (vendor/sway)."
+      "notes": "Same real, stock image as the plain \"alpine\" SIBLING entry below -- no droidtop-published image needed. sway isn't preinstalled; DroidSpacesRuntime provisions it into the pulled rootfs on first boot via this distro's own package manager (see CompositorProvisioning, keyed on os+desktopEnvironment), matching docs/SPEC.md §2a's \"OCI images stay stock, injected at runtime\" -- not baked into a custom image. sway's headless backend (WLR_BACKENDS=headless) is well-documented (ArchWiki, Gentoo wiki) and is already droidtop's own reference compositor (vendor/sway)."
     },
     {
       "id": "alpine-labwc",
@@ -20,10 +20,10 @@
       "compositorFamily": "WLROOTS",
       "headlessSupport": "CONFIRMED",
       "role": "PRIMARY",
-      "repository": "TODO/droidtop-primary-alpine-labwc",
+      "repository": "library/alpine",
       "officialSource": true,
       "arm64Available": true,
-      "notes": "Not published anywhere yet. labwc supports WLR_BACKENDS=headless + WLR_LIBINPUT_NO_DEVICES=1 (labwc's own actions docs, real wayvnc use). A 2022 headless assertion-failure report (labwc/labwc#605) may or may not still apply to current releases -- not independently re-verified by droidtop."
+      "notes": "Same stock image as \"alpine-sway\" -- provisioned with labwc instead via CompositorProvisioning. labwc supports WLR_BACKENDS=headless + WLR_LIBINPUT_NO_DEVICES=1 (labwc's own actions docs, real wayvnc use). A 2022 headless assertion-failure report (labwc/labwc#605) may or may not still apply to current releases -- not independently re-verified by droidtop."
     },
     {
       "id": "debian-sway",
@@ -32,11 +32,10 @@
       "compositorFamily": "WLROOTS",
       "headlessSupport": "CONFIRMED",
       "role": "PRIMARY",
-      "repository": "bi0shacker001/droidtop-primary",
-      "registry": "ghcr.io",
-      "officialSource": false,
+      "repository": "library/debian",
+      "officialSource": true,
       "arm64Available": true,
-      "notes": "Published by droidtop itself (images/primary/Dockerfile, .github/workflows/publish-primary-image.yml) -- debian:bookworm-slim + sway + seatd + a minimal dumb-init-based /sbin/init (droidspaces requires a real /sbin/init in the rootfs, confirmed from its own Documentation/Linux-CLI.md). officialSource=false since this is droidtop's own build, not Debian's own namespace. UNVERIFIED end to end -- never booted against a live droidspaces container (no rooted test device in this environment); see droidtop-boot.sh's own comments for the specific assumptions (env_file injection timing, seatd sufficing without systemd-logind)."
+      "notes": "Same real, stock image as the plain \"debian\" SIBLING entry below -- provisioned with sway on first boot the same way as \"alpine-sway\" (see CompositorProvisioning); glibc base instead of musl for anyone who needs it. UNVERIFIED end to end -- never booted against a live droidspaces container (no rooted test device in this environment); see DroidSpacesRuntime's own doc comment for the specific assumptions (env_file injection timing, seatd sufficing without systemd-logind, first-boot network access for the package install)."
     },
     {
       "id": "alpine-hyprland",
@@ -45,10 +44,10 @@
       "compositorFamily": "AQUAMARINE",
       "headlessSupport": "REGRESSED",
       "role": "PRIMARY",
-      "repository": "TODO/droidtop-primary-alpine-hyprland",
+      "repository": "library/alpine",
       "officialSource": true,
       "arm64Available": true,
-      "notes": "Not published anywhere yet, and not recommended if it were: multiple open upstream issues report headless/virtual outputs broken on current Hyprland (hyprwm/Hyprland#7917, #8806) since it forked off wlroots onto its own Aquamarine backend in 2024. Listed for visibility/filtering, not as a working recommendation."
+      "notes": "Same stock image as \"alpine-sway\"; not actually provisionable yet -- CompositorProvisioning has no alpine/hyprland entry, so selecting this fails fast with a clear error rather than silently falling back. Not recommended even if it were: multiple open upstream issues report headless/virtual outputs broken on current Hyprland (hyprwm/Hyprland#7917, #8806) since it forked off wlroots onto its own Aquamarine backend in 2024. Listed for visibility/filtering, not as a working recommendation."
     },
     {
       "id": "alpine",
