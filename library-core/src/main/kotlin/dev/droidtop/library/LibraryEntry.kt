@@ -69,6 +69,25 @@ enum class LibraryEntryKind {
     KIRIKIRI,
 
     /**
+     * Visual-novel-adjacent engines with real, verified detection
+     * signatures (ported from the user's own Pythia project, see
+     * [GameEngineDetector]'s doc comment) but no dedicated launch
+     * strategy of their own yet — same generic
+     * [GameLaunchStrategy.WINE_PREFIX]/[GameLaunchStrategy.LINUX_CONTAINER]
+     * resolution every engine gets, no JoiPlay/Kirikiroid2-style
+     * dedicated interpreter for any of these.
+     */
+    AUGUST,
+    BURIKO,
+    CATSYSTEM2,
+    CMVS,
+    FLASH_AIR,
+    GODOT,
+    TWINE,
+    UNREAL,
+    UNITY,
+
+    /**
      * A real console ROM (NES, GBA, PS1, ...), launched via
      * [dev.droidtop.library.consoles.ConsoleRomProvider] -- see that
      * class's own doc comment for the real system list (generated from
