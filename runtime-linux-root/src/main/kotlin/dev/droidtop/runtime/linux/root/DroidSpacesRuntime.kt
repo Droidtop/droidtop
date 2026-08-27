@@ -21,19 +21,26 @@ import java.util.UUID
  * droidspaces is designed and documented as a command-line tool
  * (Documentation/Linux-CLI.md), so that's the integration surface used here.
  *
- * Two changes from upstream DroidSpaces' own usage patterns, both required
+ * Three changes from upstream DroidSpaces' own usage patterns, all required
  * by the shared-desktop design in docs/SPEC.md:
  *
  *  1. [createPrimary]'s container is where a compositor (sway or labwc —
- *     user-configurable, see docs/SPEC.md §2/§3a) is meant to run as the
- *     shared desktop compositor — this class only handles the container
- *     lifecycle; actually installing/starting the compositor inside the
- *     rootfs is the caller-supplied image's job, not something orchestrated
- *     from here. Nothing enforces that the caller actually passed a
- *     PRIMARY-appropriate image — see [ContainerRuntime.createPrimary]'s
- *     own doc comment.
+ *     user-configurable, see docs/SPEC.md §2/§3a) runs as the shared
+ *     desktop compositor. [image] is expected to be a plain stock distro
+ *     image (§3a: "any OCI image works", no droidtop-maintained custom
+ *     build) — this class provisions the compositor into it itself, via
+ *     [writeInit]'s embedded `provisionCommand` (see
+ *     [dev.droidtop.runtime.CompositorProvisioning]), rather than requiring
+ *     a pre-built image. Nothing enforces that the caller actually passed
+ *     a PRIMARY-appropriate image/command pair — see
+ *     [ContainerRuntime.createPrimary]'s own doc comment.
  *
- *  2. Sibling containers do NOT use upstream DroidSpaces' own
+ *  2. Every container (primary and sibling alike) also gets a real
+ *     `/sbin/init` written onto its rootfs by [writeInit] — stock OCI
+ *     images ship none, but droidspaces requires one. See that function's
+ *     own doc comment for what it writes and why.
+ *
+ *  3. Sibling containers do NOT use upstream DroidSpaces' own
  *     `--termux-x11`/Termux:X11 auto-launch feature at all — instead, every
  *     container (primary and siblings alike) bind-mounts the SAME host
  *     directory ([socketsDir]) to a fixed in-container path
@@ -84,13 +91,13 @@ class DroidSpacesRuntime(
      */
     private val appStorageDir = context.filesDir
 
-    // [image] must actually have a compositor pre-installed and configured
-    // to start on boot with XDG_RUNTIME_DIR/WAYLAND_DISPLAY already pointed
-    // at CONTAINER_SOCKET_DIR (see docs/SPEC.md §3a's PRIMARY-role entries)
-    // — this class doesn't validate that, it just pulls whatever reference
-    // the caller hands it and boots the container.
-    override suspend fun createPrimary(image: RootfsImage): Container =
-        createContainer(name = PRIMARY_NAME, role = ContainerRole.PRIMARY, image = image)
+    // [image] is a stock distro image (see docs/SPEC.md §3a's PRIMARY-role
+    // entries) with no compositor preinstalled -- [provisionCommand]
+    // (see CompositorProvisioning) is embedded into the /sbin/init this
+    // class writes onto the pulled rootfs (see [writeInit]) and runs once,
+    // on first boot, to actually install one.
+    override suspend fun createPrimary(image: RootfsImage, provisionCommand: String?): Container =
+        createContainer(name = PRIMARY_NAME, role = ContainerRole.PRIMARY, image = image, provisionCommand = provisionCommand)
 
     override suspend fun createSibling(image: RootfsImage): Container =
         createContainer(
@@ -99,9 +106,15 @@ class DroidSpacesRuntime(
             image = image,
         )
 
-    private suspend fun createContainer(name: String, role: ContainerRole, image: RootfsImage): Container {
+    private suspend fun createContainer(
+        name: String,
+        role: ContainerRole,
+        image: RootfsImage,
+        provisionCommand: String? = null,
+    ): Container {
         val rootfsPath = File(rootfsDir, name).absolutePath
         rootfsPuller.pullAndUnpack(image, rootfsPath, imageCache, cachePolicy)
+        writeInit(rootfsPath, provisionCommand)
 
         socketsDir.mkdirs()
         val envFile = File(configsDir, "$name.env")
@@ -123,6 +136,64 @@ class DroidSpacesRuntime(
         config.writeTo(File(configsDir, "$name.config"))
 
         return Container(id = name, role = role, backend = backend, rootfsPath = rootfsPath)
+    }
+
+    /**
+     * Stock OCI images (any distro, any role) ship no real init at all —
+     * Docker Hub bases are built for single-process containers, but
+     * droidspaces requires a real `/sbin/init` in the rootfs (its own
+     * Documentation/Linux-CLI.md: "Must contain /sbin/init"). Written
+     * directly onto the pulled rootfs at container-creation time — never
+     * baked into any image — matching docs/SPEC.md §2a's "OCI images stay
+     * stock, injected at runtime" principle.
+     *
+     * [provisionCommand] (only ever non-null for the PRIMARY role — see
+     * [CompositorProvisioning]) is the chosen distro's own real package-
+     * manager command to install a compositor; it runs once, guarded by a
+     * marker file, the first time this container actually boots — real
+     * network access is required for that (same "host networking, real
+     * internet" assumption [CraneRootfsPuller]'s own `crane` calls already
+     * depend on), so a fresh primary container's first boot is genuinely
+     * slower than later ones. A SIBLING (or a hand-supplied PRIMARY image
+     * that already has a compositor — [provisionCommand] null either way)
+     * gets a plain idle init instead — matching distrobox's own sibling
+     * containers, which sit up doing nothing until something [exec]s into
+     * them.
+     *
+     * UNVERIFIED against a live droidspaces container — no rooted device
+     * available in this environment; specifically unconfirmed: that
+     * `env_file`'s XDG_RUNTIME_DIR/WAYLAND_DISPLAY are actually exported
+     * into this script's environment before it runs (droidspaces' own docs
+     * describe the config key but not the exact injection point), and that
+     * seatd alone (no systemd-logind) is sufficient for sway's libseat to
+     * open a headless session.
+     */
+    private suspend fun writeInit(rootfsPath: String, provisionCommand: String?) {
+        val script = buildString {
+            appendLine("#!/bin/sh")
+            appendLine("set -e")
+            if (provisionCommand != null) {
+                appendLine("if [ ! -f /var/lib/droidtop-provisioned ]; then")
+                appendLine("  $provisionCommand")
+                appendLine("  mkdir -p /var/lib")
+                appendLine("  touch /var/lib/droidtop-provisioned")
+                appendLine("fi")
+                appendLine("mkdir -p /run/seatd")
+                appendLine("seatd -g seat &")
+                appendLine("export WLR_BACKENDS=headless")
+                appendLine("export WLR_LIBINPUT_NO_DEVICES=1")
+                appendLine("exec sway")
+            } else {
+                appendLine("exec sleep infinity")
+            }
+        }
+
+        val initPath = "$rootfsPath/sbin/init"
+        val writeCommand = "mkdir -p '$rootfsPath/sbin' && cat > '$initPath' <<'DROIDTOP_INIT_EOF'\n" +
+            script +
+            "DROIDTOP_INIT_EOF\nchmod 755 '$initPath'"
+        val result = RootProcess.run("sh", "-c", writeCommand)
+        check(result.succeeded) { "Writing /sbin/init into $rootfsPath failed: ${result.stderr}" }
     }
 
     override suspend fun start(container: Container) {

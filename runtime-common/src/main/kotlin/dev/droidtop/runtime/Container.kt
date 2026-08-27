@@ -50,12 +50,17 @@ interface ContainerRuntime {
     /**
      * [image] is caller-chosen — from the live-resolved catalog
      * ([ResolvedImage.toRootfsImage], see docs/SPEC.md §3a) or a hand-typed
-     * custom OCI reference alike. For the PRIMARY role this must be an
-     * image with a compositor pre-installed (a stock distro image has
-     * none); this interface doesn't validate that — the caller is
-     * responsible for picking a PRIMARY-appropriate entry.
+     * custom OCI reference alike. [image] is expected to be a stock distro
+     * image with no compositor preinstalled — [provisionCommand] (see
+     * [CompositorProvisioning]) is what a backend runs, once, on the
+     * container's first boot to actually install one, so the same "any OCI
+     * image works" story (§3a) holds for the PRIMARY role too, not just
+     * siblings. Null means "assume [image] already has a working
+     * compositor + init" (e.g. a hand-typed custom reference) — this
+     * interface doesn't validate either way, the caller is responsible for
+     * picking a PRIMARY-appropriate entry and the matching command.
      */
-    suspend fun createPrimary(image: RootfsImage): Container
+    suspend fun createPrimary(image: RootfsImage, provisionCommand: String? = null): Container
 
     /** [image] is any SIBLING/BOTH-appropriate reference — no compositor needed. */
     suspend fun createSibling(image: RootfsImage): Container
