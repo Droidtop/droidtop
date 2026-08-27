@@ -236,16 +236,9 @@ data class DetectedGame(val displayFolder: File, val gameRoot: File, val engine:
 enum class GameLaunchStrategy {
     /**
      * Hand off to `dev.enginehost` — see [EngineHost]. The real default
-     * for the 11 VN-shaped engines it covers ([ENGINEHOST_ENGINE_IDS]):
-     * the user reported JoiPlay's own direct launch isn't reliably
-     * working on their real device, which is the actual motivation for
-     * making this the priority strategy rather than [JOIPLAY] — not a
-     * decision to remove JoiPlay support, which stays available below.
+     * for the 11 VN-shaped engines it covers ([ENGINEHOST_ENGINE_IDS]).
      */
     ENGINEHOST,
-
-    /** Hand off to the third-party JoiPlay interpreter — see [JoiPlay]. Real, wired to an actual launch today. Kept as a fallback strategy (selectable via [LaunchStrategyOverridePrefs]) now that [ENGINEHOST] is the default for the engines both cover. */
-    JOIPLAY,
 
     /** Hand off to the third-party Kirikiroid2/krkr2 interpreter — see [Kirikiroid2]. Real, wired today, but generic-open-only (opens the app, not a specific game — see that class's own doc comment for why). */
     KIRIKIROID2,
@@ -260,19 +253,10 @@ enum class GameLaunchStrategy {
 /** For a real per-entry picker UI — see [EngineGameProvider.availableStrategies]. */
 fun GameLaunchStrategy.displayName(): String = when (this) {
     GameLaunchStrategy.ENGINEHOST -> "enginehost"
-    GameLaunchStrategy.JOIPLAY -> "JoiPlay"
     GameLaunchStrategy.KIRIKIROID2 -> "Kirikiroid2"
     GameLaunchStrategy.WINE_PREFIX -> "Wine"
     GameLaunchStrategy.LINUX_CONTAINER -> "Linux container"
 }
-
-/**
- * Engines JoiPlay is known to interpret (per its own advertised feature
- * set) — Kirikiri is deliberately excluded, not an oversight: nothing
- * found in this session's research indicates JoiPlay covers it. Kirikiri
- * has its own real interpreter instead -- see [Kirikiroid2].
- */
-private val JOIPLAY_ENGINES = setOf(GameEngine.RENPY, GameEngine.RPG_MAKER_MV, GameEngine.RPG_MAKER_MZ, GameEngine.RPG_MAKER_VX_ACE)
 
 /**
  * Determines which [GameLaunchStrategy] options are actually plausible for
@@ -283,17 +267,16 @@ private val JOIPLAY_ENGINES = setOf(GameEngine.RENPY, GameEngine.RPG_MAKER_MV, G
 object GameLaunchStrategyResolver {
     /**
      * [engineHostInstalled]/[engineHostEngineVersion] are plain facts the
-     * caller computes from a real `Context` before calling this ([EngineHost
-     * .isInstalled]/[resolveEngineVersion]) — deliberately, matching how
-     * [joiPlayInstalled]/[kirikiroid2Installed] already work: this resolver
+     * caller computes from a real `Context` before calling this
+     * ([EngineHost.isInstalled]/[resolveEngineVersion]) — deliberately,
+     * matching how [kirikiroid2Installed] already works: this resolver
      * stays pure/Android-free so [GameLaunchStrategyResolverTest]'s plain
      * JVM unit tests keep working with zero Robolectric/mocking setup, not
-     * a Context threaded in just for this one new strategy.
+     * a Context threaded in just for this one strategy.
      */
     fun resolve(
         engine: GameEngine,
         folder: File,
-        joiPlayInstalled: Boolean,
         kirikiroid2Installed: Boolean = false,
         engineHostInstalled: Boolean = false,
         engineHostEngineVersion: String? = null,
@@ -308,7 +291,6 @@ object GameLaunchStrategyResolver {
         ) {
             strategies += GameLaunchStrategy.ENGINEHOST
         }
-        if (joiPlayInstalled && engine in JOIPLAY_ENGINES) strategies += GameLaunchStrategy.JOIPLAY
         if (kirikiroid2Installed && engine == GameEngine.KIRIKIRI) strategies += GameLaunchStrategy.KIRIKIROID2
         if (hasWindowsExecutable(folder)) strategies += GameLaunchStrategy.WINE_PREFIX
         // Kirikiri (the original commercial engine) is Windows-native with
@@ -316,8 +298,8 @@ object GameLaunchStrategyResolver {
         // assumed) -- LINUX_CONTAINER (running a game's own Linux export
         // inside a container) is never offered for it regardless of folder
         // contents. Unrelated to Kirikiroid2 above, a real independent
-        // third-party interpreter (like JoiPlay is for Ren'Py) rather than
-        // an official Linux build of the engine.
+        // third-party interpreter rather than an official Linux build of
+        // the engine.
         if (engine != GameEngine.KIRIKIRI && hasLinuxLibraryBuild(folder)) strategies += GameLaunchStrategy.LINUX_CONTAINER
         return strategies
     }
@@ -349,17 +331,21 @@ private fun GameEngine.toLibraryEntryKind(): LibraryEntryKind = when (this) {
 
 /**
  * [LibraryProvider] for detected engine games — launches via whichever
- * real interpreter actually handles the entry's [GameEngine] ([JoiPlay]
- * for Ren'Py/RPG Maker, [Kirikiroid2] for Kirikiri; [GameLaunchStrategy.
- * WINE_PREFIX]/[GameLaunchStrategy.LINUX_CONTAINER] are recognized by
- * [GameLaunchStrategyResolver] but not wired to an actual running session
- * yet), not a single hardcoded path for every kind — a real bug fixed
- * this session: every entry used to route through JoiPlay regardless of
- * kind, silently misfiring for Kirikiri (which JoiPlay doesn't support)
- * on top of being named after a launcher it doesn't exclusively use
- * (hence "EngineGameProvider", not "JoiPlayGameProvider" anymore). Picking
- * among multiple *available* strategies when more than one applies (a
- * real UI concern) is the next real gap.
+ * real interpreter actually handles the entry's [GameEngine] ([EngineHost]
+ * for the 11 VN-shaped engines it covers, [Kirikiroid2] for Kirikiri;
+ * [GameLaunchStrategy.WINE_PREFIX]/[GameLaunchStrategy.LINUX_CONTAINER]
+ * are recognized by [GameLaunchStrategyResolver] but not wired to an
+ * actual running session yet), not a single hardcoded path for every
+ * kind. JoiPlay direct-launch support was removed entirely (not just
+ * deprioritized) — real, confirmed: JoiPlay doesn't expose an intent
+ * contract that lets an external caller launch a specific game, so the
+ * old `ACTION_VIEW`-at-the-executable integration never actually worked,
+ * only looked plausible. [Kirikiroid2]'s own generic-open-only launch has
+ * the same real limitation for a different reason (documented on that
+ * class) but is kept since opening the app at all is still real,
+ * working, useful — guessing at a launchable file inside a folder to feed
+ * an `ACTION_VIEW` intent isn't, once there's no real intent contract on
+ * the other end for it to reach.
  *
  * [gamesRoots] is deliberately plural, not one folder -- games/ROMs aren't
  * necessarily all in one place (a real SD card folder plus an internal
@@ -419,7 +405,6 @@ class EngineGameProvider(
         return GameLaunchStrategyResolver.resolve(
             engine = engine,
             folder = gameRoot,
-            joiPlayInstalled = JoiPlay.isInstalled(context),
             kirikiroid2Installed = Kirikiroid2.isInstalled(context),
             engineHostInstalled = EngineHost.isInstalled(context),
             engineHostEngineVersion = resolveEngineVersion(context, gameRoot, engine),
@@ -432,10 +417,9 @@ class EngineGameProvider(
         val overrideStrategy = LaunchStrategyOverridePrefs.get(context, entry.id)
         val strategy = available.firstOrNull { it.name == overrideStrategy } ?: available.firstOrNull()
             ?: error(
-                "No way to launch ${entry.title} -- install enginehost or JoiPlay " +
-                    "(Ren'Py/RPG Maker/etc) or Kirikiroid2 (Kirikiri), or point it at a Windows " +
-                    ".exe (Wine) or a Linux build (Linux container) once those are wired to a " +
-                    "running session.",
+                "No way to launch ${entry.title} -- install enginehost (Ren'Py/RPG Maker/etc) " +
+                    "or Kirikiroid2 (Kirikiri), or point it at a Windows .exe (Wine) or a Linux " +
+                    "build (Linux container) once those are wired to a running session.",
             )
 
         when (strategy) {
@@ -447,11 +431,6 @@ class EngineGameProvider(
                 val engineId = ENGINEHOST_ENGINE_IDS.getValue(engine)
                 EngineHost.launch(context, gameRoot, engineId, resolveEngineVersion(context, gameRoot, engine))
             }
-            GameLaunchStrategy.JOIPLAY -> {
-                val executable = findJoiPlayExecutable(gameRoot)
-                    ?: error("No JoiPlay-launchable file (.sh/.exe/.py/.html/.swf) found in ${gameRoot.absolutePath}")
-                JoiPlay.launchViaJoiPlay(context, executable, JoiPlay.FILE_PROVIDER_AUTHORITY)
-            }
             GameLaunchStrategy.KIRIKIROID2 -> Kirikiroid2.open(context)
             GameLaunchStrategy.WINE_PREFIX -> error(
                 "Wine/Box64 launching isn't wired to a running session yet (needs a real " +
@@ -462,22 +441,5 @@ class EngineGameProvider(
                     "ContainerRuntime instance, which library-core has no access to -- see SPEC.md §5a).",
             )
         }
-    }
-
-    companion object {
-        // Real, exact extensions JoiPlay's own manifest matches (confirmed
-        // via `adb shell dumpsys package cyou.joiplay.joiplay`'s real
-        // intent-filter path patterns against a real installed copy this
-        // session) -- not guessed. Order matters: `sh` first since every
-        // real Ren'Py download checked this session shipped one and it's
-        // Ren'Py's own intended cross-platform launcher; `exe` next since
-        // it's the only one RPG Maker MV/MZ (Electron/NW.js) and Kirikiri
-        // exports ship at all.
-        private val JOIPLAY_EXTENSIONS = listOf("sh", "exe", "py", "html", "swf")
-
-        private fun findJoiPlayExecutable(gameRoot: File): File? =
-            JOIPLAY_EXTENSIONS.firstNotNullOfOrNull { ext ->
-                gameRoot.listFiles()?.firstOrNull { it.isFile && it.extension.lowercase() == ext }
-            }
     }
 }
