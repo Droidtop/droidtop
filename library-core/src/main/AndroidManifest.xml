@@ -1,22 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Package visibility (API 30+) so JoiPlay.isInstalled()/EngineHost.isInstalled() actually work. -->
+    <!-- Package visibility (API 30+) so EngineHost.isInstalled()/Kirikiroid2.isInstalled() actually work. -->
     <queries>
-        <package android:name="cyou.joiplay.joiplay" />
         <package android:name="dev.enginehost" />
-        <!-- Also needed for Kirikiroid2.isInstalled(), missing here before this pass: a real, pre-existing gap on API 30+, not caused by this change. -->
         <package android:name="org.github.krkr2" />
     </queries>
 
-    <application>
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="dev.droidtop.app.joiplay.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/joiplay_file_paths" />
-        </provider>
-    </application>
 </manifest>
