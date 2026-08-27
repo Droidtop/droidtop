@@ -129,6 +129,31 @@ private fun Modifier.gamepadFocusable(onClick: () -> Unit): Modifier = composed 
         .background(if (focused) Color.White.copy(alpha = 0.10f) else Color.Transparent, RoundedCornerShape(6.dp))
 }
 
+/**
+ * Whether [folder] is worth surfacing as an assignable ROM-system
+ * candidate at all -- checked recursively (every file up to
+ * [ROM_LOOKALIKE_MAX_DEPTH] folders under [folder], not just its own
+ * immediate children), matching ConsoleRomProvider.scanSystemFolder's own
+ * recursive walk, since a real collection can nest ROMs under
+ * per-letter/per-collection subfolders. [knownExtensions] is the union of
+ * every real [ConsoleSystemDef]'s own extensions (built-in + user-added
+ * platforms), not a fixed list -- a folder only counts as ROM-like if it
+ * contains a file some real, currently-known system would actually claim.
+ *
+ * Depth is bounded, unlike [ConsoleRomProvider]'s own unlimited walk of an
+ * already-*confirmed* system folder: this runs against every folder whose
+ * name *didn't* resolve, including ones that are provably not ROM folders
+ * at all (a real case this fixes: a GameNative-managed game-library sync
+ * folder's own category subfolder, which can hold many real Windows game
+ * installs, each with its own deep internal folder structure) -- walking
+ * one of those to full depth just to conclude "no ROMs here" would be real,
+ * needless work for a folder this check was always going to reject anyway.
+ */
+private const val ROM_LOOKALIKE_MAX_DEPTH = 4
+
+private fun folderLooksRomLike(folder: File, knownExtensions: Set<String>): Boolean =
+    folder.walkTopDown().maxDepth(ROM_LOOKALIKE_MAX_DEPTH).any { it.isFile && it.extension.lowercase() in knownExtensions }
+
 @Composable
 private fun ConsoleSystemsScreen() {
     val context = LocalContext.current
@@ -151,11 +176,43 @@ private fun ConsoleSystemsScreen() {
     var systemsById by remember { mutableStateOf<Map<String, ConsoleSystemDef>>(emptyMap()) }
     LaunchedEffect(systemsVersion) { systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id } }
 
-    val folders = remember(version) {
-        GamesRootPrefs.gamesRootPaths(context)
-            .map(::File)
-            .flatMap { root -> (root.listFiles() ?: emptyArray()).filter { it.isDirectory }.toList() }
-            .sortedBy { it.name.lowercase() }
+    // Real bug this fixes: every immediate subfolder of every configured
+    // root used to be shown here regardless of what's actually inside it --
+    // a folder a root shares for a completely different purpose (e.g. a
+    // GameNative-managed game-library sync folder's own category
+    // subfolders, which contain zero ROM files) got flagged "Unrecognized
+    // -- tap to assign a system" just because its name didn't happen to
+    // match a known platform id/alias. Detection should drive this, not a
+    // folder's name: a folder whose name doesn't resolve is only worth
+    // surfacing here if it genuinely contains at least one file with a
+    // known ROM extension SOMEWHERE under it -- checked recursively (not
+    // just the folder's own top level), since a real collection can nest
+    // ROMs under per-letter/per-collection subfolders the same way
+    // ConsoleRomProvider.scanSystemFolder already has to handle. A folder
+    // that resolves by name is always kept regardless of content -- a
+    // recognized-but-currently-empty system folder is still worth showing
+    // (e.g. to fix its player assignment ahead of adding ROMs later).
+    // Off the composition/Main thread, not a plain `remember` block --
+    // folderLooksRomLike does a real recursive filesystem walk, and a
+    // large unresolved folder doing that synchronously during recomposition
+    // is exactly the same "j2me, 18,128 files" UI-freeze class of bug
+    // already fixed elsewhere in this codebase (Library.scanKinds,
+    // ConsoleRomProvider's per-file cascade) -- not something to reintroduce
+    // here just because this is a settings screen, not the main scan path.
+    var folders by remember { mutableStateOf<List<File>>(emptyList()) }
+    LaunchedEffect(version, systemsById) {
+        if (systemsById.isEmpty()) return@LaunchedEffect
+        folders = withContext(Dispatchers.IO) {
+            val knownExtensions = systemsById.values.flatMap { it.extensions }.toSet()
+            GamesRootPrefs.gamesRootPaths(context)
+                .map(::File)
+                .flatMap { root -> (root.listFiles() ?: emptyArray()).filter { it.isDirectory }.toList() }
+                .filter { folder ->
+                    SystemOverridePrefs.resolveForFolder(context, folder.absolutePath, folder.name, systemsById) != null ||
+                        folderLooksRomLike(folder, knownExtensions)
+                }
+                .sortedBy { it.name.lowercase() }
+        }
     }
 
     // Plain black, matching GamepadShell's own background -- this screen is

@@ -1233,9 +1233,16 @@ private fun LibraryEntryKind.displayName(): String = when (this) {
     LibraryEntryKind.WINE_PROFILE -> "Windows"
     LibraryEntryKind.LINUX_CONTAINER_APP -> "Linux"
     LibraryEntryKind.REMOTE_STREAM -> "Remote PC"
-    LibraryEntryKind.RENPY, LibraryEntryKind.KIRIKIRI -> "Visual Novels"
+    LibraryEntryKind.RENPY, LibraryEntryKind.KIRIKIRI,
+    LibraryEntryKind.AUGUST, LibraryEntryKind.BURIKO, LibraryEntryKind.CATSYSTEM2,
+    LibraryEntryKind.CMVS, LibraryEntryKind.FLASH_AIR, LibraryEntryKind.TWINE,
+    -> "Visual Novels"
     LibraryEntryKind.RPG_MAKER_MV, LibraryEntryKind.RPG_MAKER_MZ, LibraryEntryKind.RPG_MAKER_VX_ACE -> "RPG Maker"
     LibraryEntryKind.CONSOLE_ROM -> "Consoles"
+    // Not visual-novel-shaped -- general game engines, kept as their own
+    // section rather than folded into "Visual Novels" where they'd be a
+    // real mismatch.
+    LibraryEntryKind.GODOT, LibraryEntryKind.UNREAL, LibraryEntryKind.UNITY -> "PC Games"
 }
 
 @Composable
