@@ -5,14 +5,18 @@ import dev.droidtop.library.consoles.ConsoleSystemDef
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.consoles.resolveSystem
 import java.io.File
+import java.io.RandomAccessFile
 
 /** Which engine a game folder was built with — decoupled from how it gets launched (see [GameLaunchStrategy]/[GameLaunchStrategyResolver]): several launch paths can exist for the same engine. */
-enum class GameEngine { RENPY, RPG_MAKER_MV, RPG_MAKER_MZ, RPG_MAKER_VX_ACE, KIRIKIRI }
+enum class GameEngine {
+    RENPY, RPG_MAKER_MV, RPG_MAKER_MZ, RPG_MAKER_VX_ACE, KIRIKIRI,
+    AUGUST, BURIKO, CATSYSTEM2, CMVS, FLASH_AIR, GODOT, TWINE, UNREAL, UNITY,
+}
 
 /**
  * Signatures ported from the user's own Pythia project
- * (G:\Support\GameManagement\RenPyPatch\pythia), verified there against
- * real games in their library, not guessed:
+ * (G:\Support\GameManagement\RenPyPatch\pythia\pythia\plugin_sources\engine\),
+ * verified there against real games in their library, not guessed:
  *
  * - Ren'Py: `renpy/` and `game/` subdirectories both present directly
  *   under the game root (Pythia's `RenpyEnginePlugin.is_root`).
@@ -24,6 +28,28 @@ enum class GameEngine { RENPY, RPG_MAKER_MV, RPG_MAKER_MZ, RPG_MAKER_VX_ACE, KIR
  *   patcher had renamed the archive to `Game.rgss3a.old`.
  * - Kirikiri/KAG3: any `.xp3` file (the engine's own data-archive format)
  *   directly in the game root.
+ * - AUGUST engine: at least 2 directories whose name starts with "aug"
+ *   (case-insensitive) — Pythia requires more than one to avoid a false
+ *   positive on a single coincidentally-named folder.
+ * - Buriko General Interpreter (BGI/Ethornell): `BGI.gdb` or `BGI.hvl`.
+ * - CatSystem2: `cs2conf.dll`.
+ * - CMVS: `cmvs32.exe`, `cmvs64.exe`, or `cmvs.cfg`.
+ * - Flash (Adobe AIR package): `META-INF/` directory plus a `mimetype` file.
+ * - Godot: a loose `.pck` file, OR an executable (`.exe`/`.x86_64`/`.x86`/
+ *   extensionless) whose last 4 bytes are the ASCII magic `GDPC` (Godot's
+ *   embedded-pack export) with a valid offset in the preceding 8
+ *   little-endian bytes — Pythia's own real fix for an export shape the
+ *   loose-`.pck` check alone can't see, verified against a real install.
+ *   Only ever reads the last 12 bytes of a candidate file, not the whole
+ *   thing, so this stays cheap against multi-gigabyte executables.
+ * - Twine/HTML: an `.html` file in the game root whose first 512KB
+ *   contains `<tw-storydata`, `twinejs`, `SugarCube`, or `Harlowe` — a
+ *   real gap Pythia closed after finding real games with no matching
+ *   engine plugin at all.
+ * - Unreal Engine: an `Engine/Binaries` directory.
+ * - Unity: `UnityPlayer.dll`/`.so`/`.dylib` present up to 3 folders deep —
+ *   Pythia's own real fix for a Linux export (`.so` instead of `.dll`) and
+ *   a real install packaging the runtime several folders down.
  *
  * RPG Maker XP and VX are deliberately not included: Pythia never
  * implemented them either, for the same reason — no real sample to
@@ -38,6 +64,15 @@ object GameEngineDetector {
         hasCoreScript(folder, "rmmz_core.js") -> GameEngine.RPG_MAKER_MZ
         isRpgMakerVxAce(folder) -> GameEngine.RPG_MAKER_VX_ACE
         isKirikiri(folder) -> GameEngine.KIRIKIRI
+        isAugust(folder) -> GameEngine.AUGUST
+        isBuriko(folder) -> GameEngine.BURIKO
+        isCatSystem2(folder) -> GameEngine.CATSYSTEM2
+        isCmvs(folder) -> GameEngine.CMVS
+        isFlashAir(folder) -> GameEngine.FLASH_AIR
+        isGodot(folder) -> GameEngine.GODOT
+        isTwine(folder) -> GameEngine.TWINE
+        isUnreal(folder) -> GameEngine.UNREAL
+        isUnity(folder) -> GameEngine.UNITY
         else -> null
     }
 
@@ -52,6 +87,96 @@ object GameEngineDetector {
 
     private fun isKirikiri(folder: File): Boolean =
         folder.listFiles()?.any { it.isFile && it.extension.lowercase() == "xp3" } == true
+
+    private fun isAugust(folder: File): Boolean =
+        (folder.listFiles()?.count { it.isDirectory && it.name.lowercase().startsWith("aug") } ?: 0) >= 2
+
+    private fun isBuriko(folder: File): Boolean =
+        File(folder, "BGI.gdb").isFile || File(folder, "BGI.hvl").isFile
+
+    private fun isCatSystem2(folder: File): Boolean =
+        File(folder, "cs2conf.dll").isFile
+
+    private val CMVS_MARKER_NAMES = setOf("cmvs32.exe", "cmvs64.exe", "cmvs.cfg")
+
+    private fun isCmvs(folder: File): Boolean =
+        folder.listFiles()?.any { it.isFile && it.name.lowercase() in CMVS_MARKER_NAMES } == true
+
+    private fun isFlashAir(folder: File): Boolean =
+        File(folder, "META-INF").isDirectory && File(folder, "mimetype").isFile
+
+    private val GODOT_EXECUTABLE_SUFFIXES = setOf("exe", "x86_64", "x86", "")
+    private val GODOT_EMBEDDED_PCK_MAGIC = byteArrayOf('G'.code.toByte(), 'D'.code.toByte(), 'P'.code.toByte(), 'C'.code.toByte())
+
+    private fun isGodot(folder: File): Boolean {
+        val candidates = folder.listFiles()?.filter { it.isFile } ?: return false
+        if (candidates.any { it.extension.lowercase() == "pck" }) return true
+        return candidates.any { it.extension.lowercase() in GODOT_EXECUTABLE_SUFFIXES && hasEmbeddedPckTrailer(it) }
+    }
+
+    private fun hasEmbeddedPckTrailer(file: File): Boolean {
+        val size = file.length()
+        if (size < 12) return false
+        return try {
+            RandomAccessFile(file, "r").use { raf ->
+                val magic = ByteArray(4)
+                raf.seek(size - 4)
+                raf.readFully(magic)
+                if (!magic.contentEquals(GODOT_EMBEDDED_PCK_MAGIC)) return false
+
+                val offsetBytes = ByteArray(8)
+                raf.seek(size - 12)
+                raf.readFully(offsetBytes)
+                // Little-endian u64, per Godot's own export format.
+                var offset = 0L
+                for (i in 7 downTo 0) offset = (offset shl 8) or (offsetBytes[i].toLong() and 0xFF)
+                offset in 1 until size
+            }
+        } catch (e: java.io.IOException) {
+            false
+        }
+    }
+
+    private const val TWINE_READ_WINDOW = 512 * 1024
+    private val TWINE_MARKERS = listOf("<tw-storydata", "twinejs", "SugarCube", "Harlowe").map { it.toByteArray(Charsets.US_ASCII) }
+
+    private fun isTwine(folder: File): Boolean =
+        folder.listFiles()?.filter { it.isFile && it.extension.lowercase() == "html" }
+            ?.any { looksLikeTwineExport(it) } == true
+
+    private fun looksLikeTwineExport(file: File): Boolean {
+        val chunk = try {
+            file.inputStream().use { it.readNBytes(TWINE_READ_WINDOW) }
+        } catch (e: java.io.IOException) {
+            return false
+        }
+        return TWINE_MARKERS.any { marker -> chunk.indexOfSubsequence(marker) >= 0 }
+    }
+
+    private fun ByteArray.indexOfSubsequence(needle: ByteArray): Int {
+        if (needle.isEmpty() || needle.size > size) return -1
+        outer@ for (i in 0..size - needle.size) {
+            for (j in needle.indices) {
+                if (this[i + j] != needle[j]) continue@outer
+            }
+            return i
+        }
+        return -1
+    }
+
+    private fun isUnreal(folder: File): Boolean =
+        File(folder, "Engine/Binaries").isDirectory
+
+    private val UNITY_PLAYER_FILENAMES = setOf("UnityPlayer.dll", "UnityPlayer.so", "UnityPlayer.dylib")
+
+    private fun isUnity(folder: File): Boolean = hasUnityPlayerRuntime(folder, maxDepth = 3)
+
+    private fun hasUnityPlayerRuntime(folder: File, maxDepth: Int): Boolean {
+        val entries = folder.listFiles() ?: return false
+        if (entries.any { it.isFile && it.name in UNITY_PLAYER_FILENAMES }) return true
+        if (maxDepth <= 0) return false
+        return entries.any { it.isDirectory && hasUnityPlayerRuntime(it, maxDepth - 1) }
+    }
 
     /**
      * Every immediate subdirectory of [root] that [detect]s as some
@@ -172,6 +297,15 @@ private fun GameEngine.toLibraryEntryKind(): LibraryEntryKind = when (this) {
     GameEngine.RPG_MAKER_MZ -> LibraryEntryKind.RPG_MAKER_MZ
     GameEngine.RPG_MAKER_VX_ACE -> LibraryEntryKind.RPG_MAKER_VX_ACE
     GameEngine.KIRIKIRI -> LibraryEntryKind.KIRIKIRI
+    GameEngine.AUGUST -> LibraryEntryKind.AUGUST
+    GameEngine.BURIKO -> LibraryEntryKind.BURIKO
+    GameEngine.CATSYSTEM2 -> LibraryEntryKind.CATSYSTEM2
+    GameEngine.CMVS -> LibraryEntryKind.CMVS
+    GameEngine.FLASH_AIR -> LibraryEntryKind.FLASH_AIR
+    GameEngine.GODOT -> LibraryEntryKind.GODOT
+    GameEngine.TWINE -> LibraryEntryKind.TWINE
+    GameEngine.UNREAL -> LibraryEntryKind.UNREAL
+    GameEngine.UNITY -> LibraryEntryKind.UNITY
 }
 
 /**
