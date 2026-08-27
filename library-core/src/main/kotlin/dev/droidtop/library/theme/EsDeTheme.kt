@@ -125,6 +125,23 @@ internal val ES_DE_ELEMENT_SCHEMA: Map<String, Map<String, EsDePropertyType>> = 
         "path" to EsDePropertyType.PATH,
         "default" to EsDePropertyType.PATH,
         "color" to EsDePropertyType.COLOR,
+        // Real gameselector-driven properties (ThemeData.cpp's own
+        // ImageComponent entries for the system view's game-preview
+        // grid/collage) -- previously missing entirely, meaning an
+        // element like DEcaffe's own `game1`..`game9`/`screen2` (real
+        // per-game preview art, not static background) fell through to
+        // the plain static-`path` renderer and rendered nothing, since
+        // those elements have no `path` of their own at all. `colorEnd`/
+        // `gradientType` cover the OTHER real use of "image" for a
+        // gradient-filled decorative band (DEcaffe's own leftband/
+        // rightband elements), a second, unrelated real use of the same
+        // element type -- both fell through the same gap for different
+        // reasons.
+        "gameselectorEntry" to EsDePropertyType.UNSIGNED_INTEGER,
+        "imageType" to EsDePropertyType.STRING,
+        "cropSize" to EsDePropertyType.NORMALIZED_PAIR,
+        "gradientType" to EsDePropertyType.STRING,
+        "colorEnd" to EsDePropertyType.COLOR,
         "cornerRadius" to EsDePropertyType.FLOAT,
         "brightness" to EsDePropertyType.FLOAT,
         "opacity" to EsDePropertyType.FLOAT,
@@ -246,6 +263,13 @@ internal val ES_DE_ELEMENT_SCHEMA: Map<String, Map<String, EsDePropertyType>> = 
         "default" to EsDePropertyType.PATH,
         "defaultImage" to EsDePropertyType.PATH,
         "color" to EsDePropertyType.COLOR,
+        // Same real gameselector-driven properties as "image" -- DEcaffe's
+        // own `screen2` element (the large game-preview poster) is a
+        // "video", not an "image", and was missing these for the same
+        // reason.
+        "gameselectorEntry" to EsDePropertyType.UNSIGNED_INTEGER,
+        "imageType" to EsDePropertyType.STRING,
+        "cropSize" to EsDePropertyType.NORMALIZED_PAIR,
         "imageCornerRadius" to EsDePropertyType.FLOAT,
         "opacity" to EsDePropertyType.FLOAT,
         "visible" to EsDePropertyType.BOOLEAN,
