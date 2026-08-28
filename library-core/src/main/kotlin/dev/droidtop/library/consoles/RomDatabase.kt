@@ -21,13 +21,24 @@ import androidx.room.RoomDatabase
  * for data that doesn't change between app launches in the common case.
  *
  * [RomEntity] rows are keyed by the ROM file's own absolute path (stable
- * across app restarts, and naturally unique). [ScanMetadataEntity] tracks,
- * per configured root, whether that root has ever been walked for real --
- * [ConsoleRomProvider.scan] only performs the real filesystem walk for a
- * root with no metadata row yet (first-ever scan), returning cached
- * [RomEntity] rows for anything already scanned. [ConsoleRomProvider.rescan]
- * forces a real walk regardless of cache state, for an explicit
- * user-triggered "my ROMs changed, rescan" action.
+ * across app restarts, and naturally unique). [ScanMetadataEntity] tracks
+ * completion per (root, system folder) pair, not per root -- a real,
+ * reported problem with the earlier per-root granularity: one pathological
+ * folder (a real device's "j2me" folder turned out to contain a corrupted
+ * directory entry that hung even a plain `ls` indefinitely) meant
+ * [kotlinx.coroutines.awaitAll] over that root's folders never returned,
+ * so nothing for that root -- not even the fast, already-finished
+ * nes/gba/psx folders sitting right next to it -- ever got persisted.
+ * [ConsoleRomProvider.scan]/[ConsoleRomProvider.scanProgressive] now treat
+ * each system folder as its own independently cacheable unit: a folder
+ * with a metadata row is skipped and served from cache, a folder without
+ * one is walked and persisted the moment ITS OWN scan finishes, regardless
+ * of whether sibling folders in the same root are still running or stuck.
+ * [ConsoleRomProvider.rescan]/[ConsoleRomProvider.rescanProgressive] force
+ * a real walk regardless of cache state, for an explicit user-triggered
+ * "my ROMs changed, rescan" action -- same per-folder persistence timing,
+ * so one stuck folder can't block every other folder's fresh results from
+ * being saved during a rescan either.
  */
 @Entity(tableName = "rom_entries")
 data class RomEntity(
@@ -36,12 +47,27 @@ data class RomEntity(
     val systemId: String,
     val artworkUri: String?,
     @ColumnInfo(name = "roms_root") val romsRoot: String,
+    // The folder actually scanned to produce this row -- deliberately
+    // separate from [systemId], which may have been corrected by
+    // [ConsoleRomProvider]'s own content/filename detection to a
+    // *different* system than the folder it was found in. Clearing/
+    // re-inserting a folder's rows on rescan has to key off which folder
+    // produced them, not each row's own possibly-reassigned systemId, or
+    // a misfiled disc image could get silently orphaned or double-counted
+    // across two folders' cache slices.
+    @ColumnInfo(name = "system_folder_id") val systemFolderId: String,
 )
 
-@Entity(tableName = "scan_metadata")
+@Entity(tableName = "scan_metadata", primaryKeys = ["roms_root", "system_folder_id"])
 data class ScanMetadataEntity(
-    @PrimaryKey @ColumnInfo(name = "roms_root") val romsRoot: String,
+    @ColumnInfo(name = "roms_root") val romsRoot: String,
+    @ColumnInfo(name = "system_folder_id") val systemFolderId: String,
     @ColumnInfo(name = "last_scanned_epoch_ms") val lastScannedEpochMs: Long,
+)
+
+data class ScannedFolderKey(
+    @ColumnInfo(name = "roms_root") val romsRoot: String,
+    @ColumnInfo(name = "system_folder_id") val systemFolderId: String,
 )
 
 @Dao
@@ -52,11 +78,14 @@ interface RomDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEntries(entries: List<RomEntity>)
 
+    @Query("DELETE FROM rom_entries WHERE roms_root = :romsRoot AND system_folder_id = :systemFolderId")
+    suspend fun clearSystemFolder(romsRoot: String, systemFolderId: String)
+
     @Query("DELETE FROM rom_entries WHERE roms_root = :romsRoot")
     suspend fun clearRoot(romsRoot: String)
 
-    @Query("SELECT roms_root FROM scan_metadata WHERE roms_root IN (:romsRoots)")
-    suspend fun getScannedRoots(romsRoots: List<String>): List<String>
+    @Query("SELECT roms_root, system_folder_id FROM scan_metadata WHERE roms_root IN (:romsRoots)")
+    suspend fun getScannedSystemFolders(romsRoots: List<String>): List<ScannedFolderKey>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun markScanned(metadata: ScanMetadataEntity)
@@ -65,7 +94,7 @@ interface RomDao {
     suspend fun clearScanMetadata(romsRoot: String)
 }
 
-@Database(entities = [RomEntity::class, ScanMetadataEntity::class], version = 1, exportSchema = false)
+@Database(entities = [RomEntity::class, ScanMetadataEntity::class], version = 2, exportSchema = false)
 abstract class RomDatabase : RoomDatabase() {
     abstract fun romDao(): RomDao
 
@@ -78,7 +107,14 @@ abstract class RomDatabase : RoomDatabase() {
                     context.applicationContext,
                     RomDatabase::class.java,
                     "droidtop-rom-cache.db",
-                ).build().also { instance = it }
+                )
+                    // Pure cache, safely rebuildable by rescanning -- no
+                    // real user data to preserve across the v1 -> v2
+                    // schema change (root-level -> per-folder metadata
+                    // granularity), so a destructive wipe-and-rebuild is
+                    // the correct migration, not a real handwritten one.
+                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    .build().also { instance = it }
             }
     }
 }

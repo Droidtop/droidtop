@@ -1328,11 +1328,23 @@ private fun SettingsLink(title: String, summary: String, modifier: Modifier = Mo
 
 internal data class HomeSection(val title: String, val entries: List<LibraryEntry>)
 
-/** One section per display name actually present among [entries], in [LibraryEntryKind] declaration order. */
+/**
+ * One section per display name actually present among [entries], in
+ * [LibraryEntryKind] declaration order. Entries within each section are
+ * sorted alphabetically by title -- without this, [NativeAppProvider]'s
+ * scan order (raw [android.content.pm.LauncherApps.getActivityList] order,
+ * effectively install/registration order) leaked straight through to the
+ * Apps tab and looked completely random; every other kind had the same
+ * latent gap (only [GameGroup.System]'s system-list ordering, a separate
+ * code path, was ever sorted), so this sorts generally rather than just
+ * patching Apps.
+ */
 internal fun buildAppSections(entries: List<LibraryEntry>): List<HomeSection> {
     val byDisplayName = entries.groupBy { it.kind.displayName() }
     val order = LibraryEntryKind.entries.map { it.displayName() }.distinct()
-    return order.mapNotNull { name -> byDisplayName[name]?.let { HomeSection(name, it) } }
+    return order.mapNotNull { name ->
+        byDisplayName[name]?.let { HomeSection(name, it.sortedBy { entry -> entry.title.lowercase() }) }
+    }
 }
 
 private fun LibraryEntryKind.displayName(): String = when (this) {

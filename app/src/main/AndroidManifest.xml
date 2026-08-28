@@ -66,10 +66,23 @@
           Intent with an EXTRA_MODE extra — not a separate entry point a
           user would ever tap directly from the app drawer.
         -->
+        <!--
+          configChanges: without this, a real rotation (confirmed live via
+          adb, WindowManager logged "relaunch") destroys and recreates this
+          Activity from scratch, restarting Library's entire multi-provider
+          scan from zero and discarding all Compose state (selectedGroup
+          drill-down position, focus) every time. Compose already
+          recomposes reactively off LocalConfiguration, so nothing here
+          actually needs the recreation; declaring these dimensions handled
+          keeps the single MainActivity instance (and its already-scanned
+          Library state) alive across rotation/multi-window/keyboard
+          changes instead.
+        -->
         <activity
             android:name="dev.droidtop.app.MainActivity"
             android:exported="true"
-            android:launchMode="singleTask" />
+            android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|navigation" />
 
         <!--
           Started by dev.droidtop.shell.standard.OnboardingGate (:shell-default,
