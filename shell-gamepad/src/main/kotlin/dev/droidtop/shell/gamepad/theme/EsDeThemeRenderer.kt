@@ -237,7 +237,7 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // parsed but previously unread -- opacity in particular matters a lot
     // for real themes that fade decorative art in/out.
     val cornerRadiusFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("cornerRadius")?.value ?: 0f
-    val cornerRadius = (cornerRadiusFraction * 1080).dp
+    val cornerRadius = (cornerRadiusFraction * viewHeight.value).dp
     // Real properties, previously not applied at all -- see this file's
     // own EsDeThemedImage doc comment for the real, confirmed carousel
     // outline/fade misalignment this caused (one real source image meant
@@ -341,7 +341,7 @@ private fun EsDeThemedText(element: EsDeThemeElement, viewWidth: Dp, viewHeight:
     // Real ES-DE default text size convention (same as textlist rows):
     // fontSize is a fraction of screen height.
     val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
-    val fontSizeDp = (fontSizeFraction * 1080).dp
+    val fontSizeDp = (fontSizeFraction * viewHeight.value).dp
     val fontSizeSp = with(LocalDensity.current) { fontSizeDp.toSp() }
     val lineSpacing = (element.valueOrNull<EsDeThemeValue.FloatValue>("lineSpacing")?.value ?: 1.5f).coerceIn(0.5f, 3f)
 
@@ -404,7 +404,7 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
     // "video" real property is imageCornerRadius; "animation" real property is cornerRadius -- different keys, same real concept.
     val cornerRadiusFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("imageCornerRadius")?.value
         ?: element.valueOrNull<EsDeThemeValue.FloatValue>("cornerRadius")?.value ?: 0f
-    val cornerRadius = (cornerRadiusFraction * 1080).dp
+    val cornerRadius = (cornerRadiusFraction * viewHeight.value).dp
     // Same real cropSize approximation as EsDeThemedImage -- see that
     // function's own doc comment.
     val hasCropSize = element.valueOrNull<EsDeThemeValue.Pair>("cropSize") != null
@@ -448,7 +448,7 @@ private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
     // Same real fontSize convention as EsDeThemedText/textlist rows.
     val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
-    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * 1080).dp.toSp() }
+    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * viewHeight.value).dp.toSp() }
     Text(
         text = formatted,
         color = color.copy(alpha = color.alpha * opacity),
@@ -481,10 +481,10 @@ private fun EsDeThemedHelpSystem(
     val backgroundColor = element.valueOrNull<EsDeThemeValue.Color>("backgroundColor")?.let { colorOf(it) }
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
     val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.025f
-    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * 1080).dp.toSp() }
+    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * viewHeight.value).dp.toSp() }
     // Real ES-DE entrySpacing convention: a screen-height fraction, same
     // as fontSize -- not a flat dp gap.
-    val entrySpacing = (element.valueOrNull<EsDeThemeValue.FloatValue>("entrySpacing")?.value ?: 0.02f) * 1080
+    val entrySpacing = (element.valueOrNull<EsDeThemeValue.FloatValue>("entrySpacing")?.value ?: 0.02f) * viewHeight.value
 
     Row(
         modifier = Modifier
