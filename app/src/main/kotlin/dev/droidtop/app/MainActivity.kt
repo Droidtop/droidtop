@@ -105,11 +105,7 @@ class MainActivity : AppCompatActivity() {
                 },
             ),
         )
-        mode = resolveMode(intent)
-
-        if (mode != BackButtonMenu.MODE_HANDHELD) {
-            startForegroundService(Intent(this, DesktopSessionService::class.java))
-        }
+        refreshModeIfUndecided()
 
         observeSecondScreen()
 
@@ -142,6 +138,42 @@ class MainActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         mode = resolveMode(intent)
+        if (mode != BackButtonMenu.MODE_HANDHELD) {
+            startForegroundService(Intent(this, DesktopSessionService::class.java))
+        }
+    }
+
+    /**
+     * Real bug this closes, confirmed on a real device: `mode` used to be
+     * resolved exactly once, in `onCreate`, and never re-checked. When
+     * `OnboardingGate.launchIfNeeded` (called just above, in `onCreate`)
+     * pushes `OnboardingActivity` on top of this same task *before*
+     * onboarding has actually set `ModePrefs.lastMode` to anything real,
+     * [resolveMode] has nothing to resolve to yet and returns `null` --
+     * which the `when(mode)` below's `else` branch silently treats as
+     * Desktop. That's the correct behavior for "genuinely undecided," but
+     * this Activity instance never got a chance to reconsider once the
+     * user actually finished onboarding and picked Handheld: finishing a
+     * child Activity that was merely stacked on top (not `startActivity`'d
+     * with new-task/single-top semantics against *this* Activity) resumes
+     * this Activity via `onResume`, not `onNewIntent` -- so `mode` stayed
+     * frozen at its original `null` forever, and the user landed on
+     * Desktop (which then fails outright, since it was never set up)
+     * instead of the Handheld they actually chose. Re-resolving here,
+     * gated on `mode == null` so an already-decided mode is never stomped
+     * mid-session, is what actually fixes it.
+     */
+    override fun onResume() {
+        super.onResume()
+        refreshModeIfUndecided()
+    }
+
+    private fun refreshModeIfUndecided() {
+        if (mode != null) return
+        mode = resolveMode(intent)
+        if (mode != BackButtonMenu.MODE_HANDHELD) {
+            startForegroundService(Intent(this, DesktopSessionService::class.java))
+        }
     }
 
     /**
