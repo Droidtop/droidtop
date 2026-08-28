@@ -1,5 +1,11 @@
 package dev.droidtop.shell.gamepad.theme
 
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.BatteryManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +32,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -180,6 +187,11 @@ fun EsDeThemedView(
                 // comment for exactly which of real ES-DE's nine real
                 // badge slot types this actually covers (one: favorite).
                 "badges" -> EsDeThemedBadges(element, viewWidth, viewHeight, gameSelection)
+                // Real, honestly PARTIAL -- see EsDeThemedSystemStatus'
+                // own doc comment for which of real ES-DE's four real
+                // entry types this covers (wifi/cellular/battery; not
+                // bluetooth).
+                "systemstatus" -> EsDeThemedSystemStatus(element, viewWidth, viewHeight)
             }
         }
     }
@@ -619,6 +631,89 @@ private fun EsDeThemedBadges(element: EsDeThemeElement, viewWidth: Dp, viewHeigh
             color = color.copy(alpha = color.alpha * opacity),
             fontSize = with(LocalDensity.current) { height.toSp() },
             modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY),
+        )
+    }
+}
+
+/**
+ * Real, honestly PARTIAL `systemstatus` rendering. Real ES-DE's own
+ * `SystemStatusComponent` shows up to four real entry types (wifi/
+ * cellular/bluetooth/battery, confirmed from `SystemStatusComponent.cpp`'s
+ * own real `entries` handling). droidtop genuinely IS the host device
+ * (unlike ES-DE's own desktop OS-status queries, this is real, live
+ * on-device status, not fabricated) -- wifi/cellular via
+ * `ConnectivityManager.getNetworkCapabilities` (real `ACCESS_NETWORK_STATE`,
+ * already declared app-wide via `runtime-remote-stream`'s manifest), and
+ * battery percent/charging via the real sticky `ACTION_BATTERY_CHANGED`
+ * broadcast (no permission needed at all). Bluetooth is a real, deliberate
+ * gap: reading adapter state needs `BLUETOOTH_CONNECT`, a dangerous
+ * Android 12+ runtime permission -- not worth requesting for one
+ * decorative status icon without checking with the user first, so it's
+ * simply never included regardless of what a theme's own `entries`
+ * property requests.
+ *
+ * Polled every 3s (matching [EsDeThemedClock]'s own live-tick pattern) --
+ * real device status genuinely changes over time, unlike per-game data.
+ * Icons are plain unicode glyphs, not real ES-DE's own bundled Qt-resource
+ * SVGs (same real licensing/IP reason [EsDeThemedBadges] documents) and
+ * not a theme's own `customIcon` override either (real ES-DE's
+ * per-entry-type `icon_wifi`/`icon_cellular`/etc. attribute-prefix scheme
+ * isn't replicated here -- a real, separate, smaller gap).
+ */
+@Composable
+private fun EsDeThemedSystemStatus(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp) {
+    val context = LocalContext.current
+    val entriesRaw = element.valueOrNull<EsDeThemeValue.Str>("entries")?.value?.lowercase()
+    val entries = entriesRaw?.split(Regex("[,\\s]+"))?.filter { it.isNotBlank() }
+        ?: listOf("wifi", "cellular", "battery")
+    val showAll = entries.contains("all")
+
+    var wifiConnected by remember { mutableStateOf(false) }
+    var cellularConnected by remember { mutableStateOf(false) }
+    var batteryPercent by remember { mutableStateOf<Int?>(null) }
+    var batteryCharging by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            val caps = cm?.activeNetwork?.let { cm.getNetworkCapabilities(it) }
+            wifiConnected = caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+            cellularConnected = caps?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true
+
+            val batteryStatus = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            val level = batteryStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val scale = batteryStatus?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+            batteryPercent = if (level >= 0 && scale > 0) (level * 100 / scale) else null
+            val status = batteryStatus?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+            batteryCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+
+            delay(3000)
+        }
+    }
+
+    val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
+    val color = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color.White
+    // Real ES-DE property for this element specifically is "height" (a
+    // single float, no "size" pair at all -- confirmed against its real
+    // schema), unlike most other element types.
+    val heightFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("height")?.value ?: 0.03f
+    val heightDp = (heightFraction * viewHeight.value).dp
+    val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, height = heightDp)
+
+    val parts = buildList {
+        if (showAll || entries.contains("wifi")) { if (wifiConnected) add("📶") }
+        if (showAll || entries.contains("cellular")) { if (cellularConnected) add("📱") }
+        if (showAll || entries.contains("battery")) {
+            batteryPercent?.let { add((if (batteryCharging) "⚡" else "🔋") + "$it%") }
+        }
+    }
+    if (parts.isEmpty()) return
+
+    Row(modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY)) {
+        Text(
+            text = parts.joinToString("  "),
+            color = color.copy(alpha = color.alpha * opacity),
+            fontSize = with(LocalDensity.current) { heightDp.toSp() },
         )
     }
 }
