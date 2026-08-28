@@ -1227,30 +1227,46 @@ Verified: a real built APK contains distinct `lib/arm64-v8a/` and
 
 Raised directly by the user, not yet designed or scoped -- recorded here
 so it isn't lost, matching this project's own "real decisions land in
-SPEC.md" convention, even though this one isn't a decision yet, just a
-real, worthwhile direction.
+SPEC.md" convention, even though this one isn't a fully scoped decision
+yet, just a real, worthwhile direction with a real shape already given.
 
 The core idea: let a user hook OTHER real Android apps into droidtop for
 data exchange, substitution, or rendering, rather than droidtop only ever
-calling its own fixed, hardcoded set of players/tools. Concrete real
+calling its own fixed, hardcoded set of players/tools. Integrations don't
+reach into droidtop's internals directly -- droidtop exposes an internal
+API surface, and an integration talks to that surface. Concrete real
 examples already given:
 - A preferred video player (a specific real app) substituted wherever
   droidtop would otherwise launch its own default.
 - A preferred browser substituted the same way.
-- A ROM downloader integration: search for and add a ROM to a real
-  download queue AND droidtop's own configured ROMs folder, directly from
-  droidtop's own UI, without leaving it.
+- A content-acquisition integration: search a third-party source and add
+  the result into one of droidtop's own configured library folders,
+  directly from droidtop's own UI, without leaving it.
 - Spotify (real now-playing/control integration -- droidtop already has
   a real, working Spotify presence client per §7e, a real, concrete
   precedent for "talk to one specific real third-party app's real API").
 - A hotspot/tethering app, similarly hookable.
 
-Real open questions a genuine design pass needs to answer (not resolved
-here): what the actual integration surface is (Android Intents/
-content providers/a real plugin API a third-party app author implements
-against?), how droidtop discovers what's installed and integration-
-capable, what a real permission/trust model looks like for letting a
-third-party app receive data from or act on behalf of droidtop, and
-whether this is one general mechanism or several real per-category ones
-(a "search+download+add-to-library" contract is a very different shape
+**Two real integration types, per the user's own direction:**
+- **JSON integrations** -- droidtop drives another already-installed app
+  directly through its own real Android Activities/Intents. This covers
+  apps whose interface droidtop can already operate itself (launch with
+  the right extras, hand off a search query, etc.) -- the integration is
+  just a declarative JSON description of which Intent/Activity to call
+  and how, no new code running.
+- **PLUGIN integrations** -- separate code (either a real APK, or a
+  Python module) supplies whatever droidtop doesn't already know how to
+  do on its own. This is for cases a bare Intent/Activity call can't
+  cover -- richer data exchange, a real API client for a specific
+  service, logic droidtop has no built-in equivalent for.
+
+Real open questions a genuine design pass still needs to answer (not
+resolved here): the exact shape of droidtop's internal API surface both
+integration types talk to, how a JSON integration's manifest is
+structured, how a PLUGIN integration (APK or Python module) is
+sandboxed/invoked and what it's allowed to call back into, how droidtop
+discovers what's installed and integration-capable, and what a real
+permission/trust model looks like for letting a third-party integration
+receive data from or act on behalf of droidtop (a "search+add-to-library"
+JSON integration is a very different trust shape
 than "render this video" or "show now-playing controls").
