@@ -37,7 +37,6 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
@@ -50,6 +49,8 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.library.theme.EsDeThemeElement
 import dev.droidtop.library.theme.EsDeThemeValue
+import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 
 /** One item [EsDeSystemListView] can browse -- deliberately generic (not tied to [dev.droidtop.library.LibraryEntry]) so both the Games system list and, later, a per-system game list can reuse the same real theme-driven renderers. */
 data class EsDeListItem(
@@ -296,7 +297,7 @@ private fun EsDeCarouselItem(
         .clickable(onClick = item.onSelect)
         .onKeyEvent { event ->
             if (event.type == KeyEventType.KeyUp &&
-                (event.key == Key.ButtonA || event.key == Key.DirectionCenter || event.key == Key.Enter)
+                GamepadKeyMap.actionFor(event.key) == GamepadAction.A
             ) {
                 item.onSelect()
                 true
@@ -484,7 +485,7 @@ private fun EsDeTextListRow(
             .clickable(onClick = item.onSelect)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp &&
-                    (event.key == Key.ButtonA || event.key == Key.DirectionCenter || event.key == Key.Enter)
+                    GamepadKeyMap.actionFor(event.key) == GamepadAction.A
                 ) {
                     item.onSelect()
                     true
@@ -519,7 +520,7 @@ private fun EsDeListTile(
             .clickable(onClick = item.onSelect)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp &&
-                    (event.key == Key.ButtonA || event.key == Key.DirectionCenter || event.key == Key.Enter)
+                    GamepadKeyMap.actionFor(event.key) == GamepadAction.A
                 ) {
                     item.onSelect()
                     true
