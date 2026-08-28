@@ -43,4 +43,17 @@ class GamepadShellTest {
     fun `empty entries produce no sections`() {
         assertEquals(emptyList<Any>(), buildAppSections(emptyList()))
     }
+
+    @Test
+    fun `entries within a section are sorted alphabetically by title, not scan order`() {
+        val entries = listOf(
+            entry("zebra", LibraryEntryKind.NATIVE_ANDROID_APP).copy(title = "Zebra"),
+            entry("apple", LibraryEntryKind.NATIVE_ANDROID_APP).copy(title = "apple"),
+            entry("mango", LibraryEntryKind.NATIVE_ANDROID_APP).copy(title = "Mango"),
+        )
+
+        val sections = buildAppSections(entries)
+
+        assertEquals(listOf("apple", "Mango", "Zebra"), sections.single().entries.map { it.title })
+    }
 }

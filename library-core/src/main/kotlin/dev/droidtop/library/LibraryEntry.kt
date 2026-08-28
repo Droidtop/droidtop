@@ -227,7 +227,6 @@ class Library(
         streamFor: (LibraryProvider) -> Flow<List<LibraryEntry>>,
     ): Flow<List<LibraryEntry>> = channelFlow {
         val matchingProviders = providers.filter { provider -> provider.kinds.any { it in kinds } }
-        Log.d("droidtop.DIAG", "mergedProgressive: kinds=$kinds matchingProviders=${matchingProviders.map { it::class.simpleName }}")
         val perProviderResults = MutableList(matchingProviders.size) { emptyList<LibraryEntry>() }
         coroutineScope {
             matchingProviders.forEachIndexed { index, provider ->

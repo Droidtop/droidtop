@@ -78,7 +78,7 @@ class GameEngineDetectorTest {
         File(tmp.root, "RPG1/js/rpg_core.js").createNewFile()
         File(tmp.root, "NotAGame").mkdirs()
 
-        val results = GameEngineDetector.scan(tmp.root)
+        val results = GameEngineDetector.scan(tmp.root, emptyMap())
 
         assertEquals(2, results.size)
         val vn1 = results.first { it.displayFolder.name == "VN1" }
@@ -100,7 +100,7 @@ class GameEngineDetectorTest {
         File(tmp.root, "BeingADik/BeingADIK-0.8.3-scrappy/game").mkdirs()
         File(tmp.root, "BeingADik/BeingADIK-0.8.3-scrappy/game/.keep").createNewFile()
 
-        val results = GameEngineDetector.scan(tmp.root)
+        val results = GameEngineDetector.scan(tmp.root, emptyMap())
 
         assertEquals(1, results.size)
         val game = results.first()
