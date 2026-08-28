@@ -31,6 +31,9 @@ data class LibraryEntry(
     val artworkUri: String? = null,
     val playtimeSeconds: Long = 0,
     val lastPlayedEpochMs: Long? = null,
+    // Real, persisted count of how many times this entry has actually been
+    // launched via Library.launch() -- see PlayHistoryStore/PlayHistoryDatabase.
+    val playCount: Int = 0,
     // Only set for LibraryEntryKind.CONSOLE_ROM -- the real console system
     // id (see dev.droidtop.library.consoles.ConsoleSystemDef), since
     // CONSOLE_ROM alone doesn't distinguish NES from GBA from PS1 the way
@@ -138,7 +141,10 @@ interface LibraryProvider {
     fun rescanProgressive(): Flow<List<LibraryEntry>> = scanProgressive()
 }
 
-class Library(private val providers: List<LibraryProvider>) {
+class Library(
+    private val providers: List<LibraryProvider>,
+    private val playHistory: PlayHistoryStore = NoOpPlayHistoryStore,
+) {
     // Two real, separate bugs this fixes, found by actually reading how
     // Daijishō does the equivalent (its DaijishouSynchronizationModel):
     //
@@ -174,13 +180,14 @@ class Library(private val providers: List<LibraryProvider>) {
      * from ever rendering.
      */
     suspend fun scanKinds(kinds: Set<LibraryEntryKind>): List<LibraryEntry> = withContext(Dispatchers.IO) {
-        coroutineScope {
+        val scanned = coroutineScope {
             providers
                 .filter { provider -> provider.kinds.any { it in kinds } }
                 .map { provider -> async { scanProviderSafely(provider) } }
                 .awaitAll()
                 .flatten()
         }
+        withPlayHistory(scanned)
     }
 
     /**
@@ -228,7 +235,7 @@ class Library(private val providers: List<LibraryProvider>) {
                         val completed = withTimeoutOrNull(60_000) {
                             streamFor(provider).collect { partial ->
                                 perProviderResults[index] = partial
-                                send(perProviderResults.flatten())
+                                send(withPlayHistory(perProviderResults.flatten()))
                             }
                             true
                         }
@@ -263,9 +270,28 @@ class Library(private val providers: List<LibraryProvider>) {
         emptyList()
     }
 
+    /**
+     * Recorded only after the provider's own [LibraryProvider.launch] call
+     * returns without throwing -- a failed launch (a missing player, a
+     * container session that isn't running, ...) must never be counted as
+     * a real play. This is the one real signal available without deeper
+     * OS-level foreground/process tracking (out of scope here, see
+     * [PlayHistoryRecord]'s own doc comment): the launch was at least
+     * successfully dispatched.
+     */
     suspend fun launch(entry: LibraryEntry) {
         withContext(Dispatchers.IO) {
             providers.first { entry.kind in it.kinds }.launch(entry)
+            playHistory.recordPlay(entry.id, System.currentTimeMillis())
+        }
+    }
+
+    private suspend fun withPlayHistory(entries: List<LibraryEntry>): List<LibraryEntry> {
+        if (entries.isEmpty()) return entries
+        val history = playHistory.getAll(entries.map { it.id })
+        if (history.isEmpty()) return entries
+        return entries.map { entry ->
+            history[entry.id]?.let { entry.copy(lastPlayedEpochMs = it.lastPlayedEpochMs, playCount = it.playCount) } ?: entry
         }
     }
 }

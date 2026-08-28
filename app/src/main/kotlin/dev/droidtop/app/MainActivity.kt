@@ -14,6 +14,7 @@ import androidx.lifecycle.lifecycleScope
 import dev.droidtop.library.EngineGameProvider
 import dev.droidtop.library.Library
 import dev.droidtop.library.NativeAppProvider
+import dev.droidtop.library.RoomPlayHistoryStore
 import dev.droidtop.library.consoles.ConsoleRomProvider
 import dev.droidtop.runtime.DisplayOutputKind
 import dev.droidtop.runtime.DisplayOutputRepository
@@ -104,6 +105,7 @@ class MainActivity : AppCompatActivity() {
                         ?.let { PrimaryContainerSession(it.runtime, it.container) }
                 },
             ),
+            playHistory = RoomPlayHistoryStore(applicationContext),
         )
         refreshModeIfUndecided()
 
