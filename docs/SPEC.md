@@ -1011,6 +1011,76 @@ integration docs from Discord and scope a `library-core/.../presence/
 DiscordPresenceClient` wrapper, same shape as the Spotify client, feeding
 the same `PresencePanel`.
 
+## 7f. Handheld mode: real, generic ES-DE theme engine
+
+droidtop's Handheld mode renders a real, vendored ES-DE (EmulationStation
+Desktop Edition) theme (`shell-gamepad/src/main/assets/themes/
+decaffe-es-de/`, real `theme.xml`/`capabilities.xml`/`colors.xml`/
+`font.xml`, CC-BY-NC-SA), parsed by a real clean-room port of ES-DE's own
+theme.xml parsing rules (`library-core/.../theme/EsDeThemeParser.kt`,
+`EsDeTheme.kt`'s `ES_DE_ELEMENT_SCHEMA`) and rendered by
+`shell-gamepad/.../theme/EsDeThemeRenderer.kt`.
+
+Confirmed live (2026-08-27/28), comparing droidtop's actual render against
+the theme's own bundled `sys.png`/`gamelist.png` reference screenshots:
+droidtop was rendering only a small fraction of what these views declare.
+Root causes and the decision to fix them, in dependency order:
+
+1. `EsDeThemeParser.parse`'s `variant` parameter defaulted to `null`,
+   and its variant-axis matching treats `null` as "select nothing" —
+   every `<variant>` block, including the theme's real `<syslogo>`
+   positioning, was silently skipped on every parse. **Fixed**:
+   `ThemeAssets.loadDecaffeTheme` now passes a real default variant
+   (`"solidWithMeta"`, matching the module's own existing
+   `system-logo-white` fallback asset path).
+2. The `gamelist` view (the per-game detail screen: box art/video,
+   metadata sidebar, description, adjacent-game logo strip) is parsed
+   but never rendered — droidtop's actual "drill into a system" UI is a
+   hand-built `LazyVerticalGrid`, not theme-driven at all. **Decision**:
+   make it theme-driven, reusing `EsDeThemeRenderer` for both `system`
+   and `gamelist` views rather than maintaining a second, parallel,
+   hand-built game-grid UI.
+3. `LibraryEntry` has no fields for the metadata (description/developer/
+   publisher/genre/release date/rating/ESRB/player count) real theme
+   elements bind to. **Decision**: extend `LibraryEntry` and
+   `RomEntity`/`RomDao`'s schema, and extend the existing, real, working
+   cover-art scrapers (`LutrisScraperClient`/`IgdbScraperClient`, wired
+   into `ConsoleSystemsActivity.kt`'s manual per-folder scrape action) to
+   also fetch this metadata, which their real APIs already return
+   alongside cover-art URLs today (currently discarded).
+4. `<helpsystem>` (the theme's own real, styled button-hint bar) is
+   fully parsed (`EsDeTheme.kt`'s schema) but never dispatched by the
+   renderer — droidtop's actual button hints are a fully hardcoded
+   `ButtonHintFooter` with no theme styling and no relationship to any
+   real button-mapping data. **Decision**: implement the `helpsystem`
+   render path, and build a real input-mapping abstraction (a logical
+   `GamepadAction` enum + default key mapping, modeled on real ES-DE's
+   own `es_input.xml` device→logical-action convention) that both real
+   input handling and the help-icon labels read from, replacing the ~10
+   scattered raw `Key.Button*`/`Key.Direction*` checks currently
+   hardcoded directly in `GamepadShell.kt`/`EsDeSystemListView.kt`.
+5. Only one theme (decaffe) is loadable, ever, hardcoded by name.
+   **Decision**: generalize `ThemeAssets` to load whichever theme a new
+   `ThemePrefs` selects (same `"com.android.launcher3.prefs"`
+   SharedPreferences convention used throughout droidtop), with decaffe
+   staying the bundled default/fallback, and add a real theme download/
+   browse/install UI so users can apply other real, community ES-DE
+   themes — reusing the plain `HttpURLConnection` pattern the scraper
+   clients already establish (no new HTTP dependency), with real
+   progress reporting following `scrapeSystemArtwork`'s own
+   `(done, total) ->` callback convention, and defensive extraction
+   (path-traversal-safe) since a downloaded theme is untrusted content.
+   **Open, unresolved**: which real theme source(s) to support — a
+   product/licensing decision, not assumed here.
+
+Full phased implementation plan (superseded by whichever phase's own
+commits land, kept here as the record of the decision and reasoning, not
+as a live TODO list): see the session's own plan file at the time of
+writing, `melodic-tumbling-mochi.md` in the planning tool's plan
+directory — reproduced in spirit above; this SPEC section is the
+authoritative, durable record per this project's own convention of
+writing real decisions into SPEC.md itself, not just a plan file.
+
 ## 8. Licensing
 
 `vendor/gamenative`, `vendor/droidspaces`, and `vendor/moonlight-common-c`
