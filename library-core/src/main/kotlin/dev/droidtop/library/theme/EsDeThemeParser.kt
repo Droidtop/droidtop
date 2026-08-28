@@ -159,23 +159,83 @@ object EsDeThemeParser {
     }
 
     /**
+     * Real ES-DE's own `sAspectRatioMap` (`ThemeData.cpp`), landscape
+     * width/height ratios plus their `_vertical` (height/width)
+     * counterparts -- used only to resolve a real theme's `"automatic"`
+     * aspectRatio capability (below), never guessed.
+     */
+    private val ES_DE_ASPECT_RATIO_MAP: Map<String, Float> = mapOf(
+        "16:9" to 1.7777f, "16:9_vertical" to 0.5625f,
+        "16:10" to 1.6f, "16:10_vertical" to 0.625f,
+        "3:2" to 1.5f, "3:2_vertical" to 0.6667f,
+        "4:3" to 1.3333f, "4:3_vertical" to 0.75f,
+        "5:3" to 1.6667f, "5:3_vertical" to 0.6f,
+        "5:4" to 1.25f, "5:4_vertical" to 0.8f,
+        "8:7" to 1.1429f, "8:7_vertical" to 0.875f,
+        "19.5:9" to 2.1667f, "19.5:9_vertical" to 0.4615f,
+        "20:9" to 2.2222f, "20:9_vertical" to 0.45f,
+        "21:9" to 2.3703f, "21:9_vertical" to 0.4219f,
+        "32:9" to 3.5555f, "32:9_vertical" to 0.2813f,
+        "1:1" to 1.0f,
+    )
+
+    /**
      * Real entry point: reads [themeFile]'s sibling `capabilities.xml`
      * (real ES-DE convention: always alongside theme.xml, same
      * directory) and parses using each axis's real front-of-declared-list
      * default -- see [EsDeThemeCapabilities]'s own doc comment. Falls
      * back to [parse]'s own hardcoded defaults for any axis
      * capabilities.xml doesn't declare (or doesn't exist at all).
+     *
+     * [screenAspectRatio] is the real, live device screen's own
+     * width/height ratio (landscape convention, matching
+     * [ES_DE_ASPECT_RATIO_MAP]'s own values -- pass height/width instead
+     * for a portrait device) -- [ThemeAssets] supplies this from real
+     * display metrics. Real ES-DE convention: a theme's own first-listed
+     * aspectRatio capability is very commonly the literal string
+     * `"automatic"` (confirmed against real ES-DE source,
+     * `ThemeData::loadFile`'s own handling), which means "pick whichever
+     * of this theme's OTHER declared aspect ratios is numerically closest
+     * to the real device's actual screen" -- not a literal `<aspectRatio
+     * name="automatic">` block to match against theme.xml (which no real
+     * theme declares). Skipping this real resolution step and using the
+     * literal string "automatic" as the selected axis value (an earlier,
+     * real bug this fixes) would silently match NO real aspectRatio block
+     * in theme.xml at all for any theme using this common convention.
      */
-    fun parseWithCapabilities(themeFile: File, systemTheme: String? = null): EsDeTheme {
+    fun parseWithCapabilities(themeFile: File, systemTheme: String? = null, screenAspectRatio: Float? = null): EsDeTheme {
         val capabilities = parseCapabilities(File(themeFile.parentFile, "capabilities.xml"))
+        val rawAspectRatio = capabilities.aspectRatios.firstOrNull() ?: "16:9"
+        val resolvedAspectRatio = if (rawAspectRatio == "automatic") {
+            resolveAutomaticAspectRatio(capabilities.aspectRatios, screenAspectRatio)
+        } else {
+            rawAspectRatio
+        }
         return parse(
             themeFile = themeFile,
-            aspectRatio = capabilities.aspectRatios.firstOrNull() ?: "16:9",
+            aspectRatio = resolvedAspectRatio,
             colorScheme = capabilities.colorSchemes.firstOrNull() ?: "1",
             fontSize = capabilities.fontSizes.firstOrNull() ?: "medium",
             variant = capabilities.variants.firstOrNull(),
             systemTheme = systemTheme,
         )
+    }
+
+    /** Real ES-DE algorithm (`ThemeData::loadFile`): closest real match by |declared - actual|, real "16:9" fallback when there's no real screen ratio to match against at all. */
+    private fun resolveAutomaticAspectRatio(declared: List<String>, screenAspectRatio: Float?): String {
+        if (screenAspectRatio == null) return "16:9"
+        var selected = "16:9"
+        var diff = kotlin.math.abs((ES_DE_ASPECT_RATIO_MAP["16:9"] ?: 1.7777f) - screenAspectRatio)
+        for (aspectRatio in declared) {
+            if (aspectRatio == "automatic") continue
+            val value = ES_DE_ASPECT_RATIO_MAP[aspectRatio] ?: continue
+            val newDiff = kotlin.math.abs(value - screenAspectRatio)
+            if (newDiff < diff) {
+                diff = newDiff
+                selected = aspectRatio
+            }
+        }
+        return selected
     }
 
     fun parse(
