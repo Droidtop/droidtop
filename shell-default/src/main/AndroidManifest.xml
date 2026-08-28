@@ -148,6 +148,33 @@
                 android:value="${packageName}.grid_control" />
         </activity>
 
+        <!--
+          "Alternative" mode (docs/SPEC.md Onboarding section): droidtop
+          holds the HOME role but forwards to a different installed
+          launcher instead of rendering its own UI -- verified against
+          farmerbb/Taskbar's real, shipping HSLActivity. Disabled by
+          default; HomeRolePrefs.setActiveHomeImplementation toggles this
+          and com.android.launcher3.Launcher above oppositely, so exactly
+          one (or neither) is ever an actual HOME candidate. Package
+          enumeration (PackageManager.queryIntentActivities on
+          ACTION_MAIN+CATEGORY_HOME) needs no separate <queries> block here
+          -- android.permission.QUERY_ALL_PACKAGES is already declared
+          above for the app drawer's own real need to see every installed
+          app, and already covers this.
+        -->
+        <activity
+            android:name="dev.droidtop.shell.standard.AlternativeLauncherActivity"
+            android:exported="true"
+            android:enabled="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <activity android:name="com.android.launcher3.widgetpicker.WidgetPickerActivity"
             android:theme="@style/WidgetPickerActivityTheme"
             android:excludeFromRecents="true"

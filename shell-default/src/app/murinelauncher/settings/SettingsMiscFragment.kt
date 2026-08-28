@@ -1,6 +1,7 @@
 package app.murinelauncher.settings
 
 import android.app.AlertDialog
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -25,6 +26,7 @@ public final class SettingsMiscFragment: AbstractSettingsFragment() {
 
     companion object {
         const val PREF_DEFAULT_LAUNCHER: String = "pref_default_launcher"
+        const val PREF_DROIDTOP_HOME_SCREEN: String = "pref_droidtop_home_screen"
         const val BACKUP_EXPORT: String = "pref_backup_export"
         const val BACKUP_IMPORT: String = "pref_backup_import"
         private const val BACKUP_MIME = "application/octet-stream"
@@ -83,6 +85,26 @@ public final class SettingsMiscFragment: AbstractSettingsFragment() {
                     resolveInfo.loadLabel(pm).toString()
                 preference.setOnPreferenceClickListener {
                     context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
+                    true
+                }
+                return true
+            }
+            PREF_DROIDTOP_HOME_SCREEN -> {
+                preference.summary = when (dev.droidtop.shell.standard.HomeRolePrefs.activeHomeImplementation(context)) {
+                    dev.droidtop.shell.standard.HomeRolePrefs.HomeImplementation.STANDARD -> "droidtop's own launcher"
+                    dev.droidtop.shell.standard.HomeRolePrefs.HomeImplementation.ALTERNATIVE -> "Forwarding to another launcher"
+                    dev.droidtop.shell.standard.HomeRolePrefs.HomeImplementation.NONE -> "Not set up yet"
+                }
+                preference.setOnPreferenceClickListener {
+                    // Re-entry into onboarding's own HOME_CHOICE step -- same
+                    // explicit-component-name pattern as
+                    // PREF_CONSOLE_SYSTEMS/PREF_GAME_FOLDERS.
+                    val intent = Intent(Intent.ACTION_MAIN).apply {
+                        component = ComponentName(context.packageName, "dev.droidtop.app.OnboardingActivity")
+                        putExtra("dev.droidtop.app.EXTRA_START_STEP", "HOME_CHOICE")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
                     true
                 }
                 return true
