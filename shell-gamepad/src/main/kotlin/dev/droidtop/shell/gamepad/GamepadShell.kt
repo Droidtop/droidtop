@@ -63,11 +63,17 @@ import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.consoles.ES_DE_CONSOLE_SYSTEMS
 import dev.droidtop.library.displayName as launchStrategyDisplayName
 import dev.droidtop.library.theme.SystemThemeColors
+import dev.droidtop.library.theme.ThemeDownloader
 import dev.droidtop.library.theme.primaryListElement
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.theme.EsDeListItem
 import dev.droidtop.shell.gamepad.theme.EsDeSystemListView
+import dev.droidtop.shell.gamepad.theme.ThemeAssets
+import dev.droidtop.shell.gamepad.theme.ThemePrefs
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import dev.droidtop.shell.gamepad.theme.EsDeThemedView
 import dev.droidtop.shell.gamepad.theme.ThemeAssets
 import kotlinx.coroutines.launch
@@ -786,7 +792,12 @@ private fun GamesSection(
                     // item actually has focus right now.
                     var focusedSystemIndex by remember { mutableStateOf(0) }
                     val focusedSystemId = (orderedGroups.getOrNull(focusedSystemIndex) as? GameGroup.System)?.systemId
-                    val theme = remember(focusedSystemId) { ThemeAssets.loadActiveTheme(context, focusedSystemId) }
+                    // Keyed by ThemePrefs.version too, not just
+                    // focusedSystemId -- otherwise switching the active
+                    // theme from Settings has no effect until some
+                    // unrelated recomposition happens to also fire (see
+                    // ThemePrefs.version's own doc comment).
+                    val theme = remember(focusedSystemId, ThemePrefs.version) { ThemeAssets.loadActiveTheme(context, focusedSystemId) }
                     val listElement = remember(theme) { theme?.views?.get("system")?.primaryListElement() }
                     val items = orderedGroups.map { entryGroup ->
                         EsDeListItem(
@@ -1173,6 +1184,23 @@ private fun SettingsSection(onRescan: () -> Unit) {
     var showHints by remember { mutableStateOf(HandheldPrefs.showHints(context)) }
     var appsGridColumns by remember { mutableStateOf(HandheldPrefs.appsGridColumns(context)) }
 
+    // Real theme names discovered on disk right now (bundled + any
+    // downloaded), not a compiled-in list -- see ThemeAssets.discoverThemes's
+    // own doc comment. Refreshed after a sync completes, since a real
+    // download can change what's available.
+    var themeNames by remember { mutableStateOf<List<String>>(emptyList()) }
+    var activeTheme by remember { mutableStateOf<String?>(null) }
+    var themeSyncStatus by remember { mutableStateOf<String?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+
+    suspend fun refreshThemeState() {
+        withContext(Dispatchers.IO) {
+            themeNames = ThemeAssets.discoverThemes(context).map { it.name }
+            activeTheme = ThemeAssets.activeThemeName(context)
+        }
+    }
+    LaunchedEffect(Unit) { refreshThemeState() }
+
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(28.dp),
@@ -1200,6 +1228,47 @@ private fun SettingsSection(onRescan: () -> Unit) {
                 "Rescan library",
                 "Look for new or changed games and apps again",
                 onClick = onRescan,
+            )
+        }
+        // Real, distinct group -- matches Daijishō's own actual settings
+        // structure (Library vs. a separate Appearance section for
+        // themes/wallpapers), not droidtop's own invention. Previously
+        // this whole real, working theme-discovery/download stack
+        // (ThemeAssets/ThemePrefs/ThemeDownloader) had NO settings entry
+        // point at all -- a user could never actually pick a theme or
+        // pull in new ones.
+        SettingsGroup("Appearance") {
+            SettingsChoiceLink(
+                title = "Theme",
+                value = activeTheme ?: "(none found)",
+                onCycle = {
+                    if (themeNames.size > 1) {
+                        val currentIndex = themeNames.indexOf(activeTheme).coerceAtLeast(0)
+                        val next = themeNames[(currentIndex + 1) % themeNames.size]
+                        ThemePrefs.set(context, next)
+                        activeTheme = next
+                    }
+                },
+            )
+            SettingsLink(
+                "Sync theme index",
+                themeSyncStatus ?: "Download/update the real ES-DE theme list (browsing and installing individual themes isn't built yet)",
+                onClick = {
+                    themeSyncStatus = "Checking..."
+                    coroutineScope.launch {
+                        val result = withContext(Dispatchers.IO) {
+                            ThemeDownloader.syncThemesList(ThemeAssets.userThemesDir(context))
+                        }
+                        themeSyncStatus = when (result.status) {
+                            ThemeDownloader.ThemeSyncStatus.CLONED -> "Theme index downloaded"
+                            ThemeDownloader.ThemeSyncStatus.UPDATED -> "Theme index updated"
+                            ThemeDownloader.ThemeSyncStatus.UP_TO_DATE -> "Theme index already up to date"
+                            ThemeDownloader.ThemeSyncStatus.DIVERGED -> "Theme index has local changes -- skipped"
+                            ThemeDownloader.ThemeSyncStatus.FAILED -> "Failed: ${result.error?.message ?: "unknown error"}"
+                        }
+                        refreshThemeState()
+                    }
+                },
             )
         }
         SettingsGroup("Display") {

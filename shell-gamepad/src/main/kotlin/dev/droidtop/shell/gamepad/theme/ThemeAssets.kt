@@ -110,6 +110,9 @@ internal object ThemeAssets {
         return discovered.firstOrNull { it.name == selected } ?: discovered.first()
     }
 
+    /** Public read of [resolveActiveTheme]'s own name -- the real, resolved active theme, for UI display/cycling, not just the raw (possibly unset) [ThemePrefs] value. */
+    fun activeThemeName(context: Context): String? = resolveActiveTheme(context)?.name
+
     private val systemThemeCache = mutableMapOf<Pair<String, String?>, EsDeTheme?>()
 
     /**
