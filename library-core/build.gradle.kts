@@ -63,6 +63,10 @@ dependencies {
     api(libs.androidx.room.runtime)
     api(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
+    // ThemeDownloader's own real git clone/fetch of the same repos real
+    // ES-DE's GuiThemeDownloader clones via libgit2 -- see its own doc
+    // comment.
+    implementation(libs.jgit)
 
     testImplementation(libs.junit)
 }
