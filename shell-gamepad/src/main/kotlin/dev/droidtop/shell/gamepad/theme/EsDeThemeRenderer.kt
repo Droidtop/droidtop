@@ -1,6 +1,7 @@
 package dev.droidtop.shell.gamepad.theme
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.absoluteOffset
@@ -28,11 +29,15 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.shape.CircleShape
 import coil3.compose.AsyncImage
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.theme.EsDeThemeElement
 import dev.droidtop.library.theme.EsDeThemeValue
 import dev.droidtop.library.theme.EsDeThemeView
+import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -75,6 +80,16 @@ fun EsDeThemedView(
     // composable (anything that isn't the "system" view) have no
     // gameselector elements to feed at all.
     focusedSystemEntries: List<LibraryEntry> = emptyList(),
+    // Real, currently-relevant button hints for whatever screen [view] is
+    // rendering (e.g. A/Select, Y/Info, L-R/Switch section) -- the theme's
+    // own real <helpsystem> element (see EsDeTheme.kt's schema) only
+    // supplies WHERE/HOW to draw them (pos/origin/colors/font/spacing);
+    // WHICH actions are currently valid is app state this renderer has no
+    // way to know on its own, same reason [items]/[firstItemFocus] are
+    // threaded through for the list element rather than owned here.
+    // Empty by default: most EsDeThemedView callers render a view with no
+    // real helpsystem element at all.
+    hints: List<kotlin.Pair<GamepadAction, String>> = emptyList(),
 ) {
     BoxWithConstraints(modifier = modifier) {
         val viewWidth = maxWidth
@@ -127,6 +142,16 @@ fun EsDeThemedView(
                 "carousel", "grid", "textlist" -> EsDeThemedListElement(
                     element, items, firstItemFocus, viewWidth, viewHeight, onFocusedIndexChanged,
                 )
+                // Real, previously-dead theme data (see this file's own
+                // history): EsDeTheme.kt's schema already parses a real
+                // <helpsystem> block (pos/origin/textColor/iconColor/
+                // fontPath/fontSize/entrySpacing/backgroundColor/opacity),
+                // but nothing here ever rendered it -- droidtop's actual
+                // button-hint bar was a fully hardcoded, unthemed
+                // ButtonHintFooter instead. [hints] (see this composable's
+                // own doc comment) is the only piece this renderer can't
+                // get from the theme alone.
+                "helpsystem" -> EsDeThemedHelpSystem(element, viewWidth, viewHeight, hints)
             }
         }
     }
@@ -429,6 +454,58 @@ private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         fontSize = fontSizeSp,
         modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY),
     )
+}
+
+/**
+ * Real, theme-styled button-hint bar -- reads the theme's own real
+ * `<helpsystem>` pos/origin/textColor/iconColor/fontSize/entrySpacing/
+ * backgroundColor/opacity (see EsDeTheme.kt's schema), applied to
+ * whichever [hints] the caller says are currently valid for this screen.
+ * `fontPath`/`customButtonIcon` (real per-theme font/icon assets) aren't
+ * applied yet -- real fonts/glyph icons are separate, later work; the
+ * button pill + label shape below matches droidtop's own pre-existing
+ * (now themed instead of hardcoded-black-and-white) button-hint look.
+ */
+@Composable
+private fun EsDeThemedHelpSystem(
+    element: EsDeThemeElement,
+    viewWidth: Dp,
+    viewHeight: Dp,
+    hints: List<kotlin.Pair<GamepadAction, String>>,
+) {
+    if (hints.isEmpty()) return
+    val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight)
+    val textColor = element.valueOrNull<EsDeThemeValue.Color>("textColor")?.let { colorOf(it) } ?: Color.White
+    val iconColor = element.valueOrNull<EsDeThemeValue.Color>("iconColor")?.let { colorOf(it) } ?: Color.Black
+    val backgroundColor = element.valueOrNull<EsDeThemeValue.Color>("backgroundColor")?.let { colorOf(it) }
+    val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
+    val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.025f
+    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * 1080).dp.toSp() }
+    // Real ES-DE entrySpacing convention: a screen-height fraction, same
+    // as fontSize -- not a flat dp gap.
+    val entrySpacing = (element.valueOrNull<EsDeThemeValue.FloatValue>("entrySpacing")?.value ?: 0.02f) * 1080
+
+    Row(
+        modifier = Modifier
+            .absoluteOffset(x = offsetX, y = offsetY)
+            .let { if (backgroundColor != null) it.background(backgroundColor.copy(alpha = backgroundColor.alpha * opacity)) else it }
+            .graphicsLayer { alpha = opacity },
+        horizontalArrangement = Arrangement.spacedBy(entrySpacing.dp),
+    ) {
+        hints.forEach { (action, label) ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    GamepadKeyMap.labelFor(action),
+                    color = iconColor,
+                    fontSize = fontSizeSp,
+                    modifier = Modifier
+                        .background(textColor, CircleShape)
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+                Text(label, color = textColor, fontSize = fontSizeSp)
+            }
+        }
+    }
 }
 
 /**
