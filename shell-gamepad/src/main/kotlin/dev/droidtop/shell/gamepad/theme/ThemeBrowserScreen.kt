@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -31,13 +34,16 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import dev.droidtop.library.theme.ThemeDownloader
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.io.File
 import kotlinx.coroutines.withContext
 
 /**
@@ -111,10 +117,22 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
                         val dirName = entry.reponame.ifBlank { entry.name }
                         val installed = dirName in installedDirNames
                         val status = statusByDirName[dirName]
+                        // Real screenshot preview -- ThemeDownloader already
+                        // parses this (real ES-DE theme authors check
+                        // screenshot images straight into their own
+                        // themes-list.git entry, confirmed via
+                        // GuiThemeDownloader.cpp's own real
+                        // mThemeDirectory + "themes-list/" + image path
+                        // convention), no extra network fetch needed --
+                        // this was just never read by the UI until now.
+                        val screenshotPath = entry.screenshots.firstOrNull()?.let {
+                            File(ThemeDownloader.themesListDir(ThemeAssets.userThemesDir(context)), it.image).path
+                        }
                         ThemeBrowserRow(
                             entry = entry,
                             installed = installed,
                             status = status,
+                            screenshotPath = screenshotPath,
                             modifier = if (index == 0) Modifier.focusRequester(firstFocus) else Modifier,
                             onDownload = {
                                 statusByDirName = statusByDirName + (dirName to "Downloading...")
@@ -145,11 +163,12 @@ private fun ThemeBrowserRow(
     entry: ThemeDownloader.ThemeDownloadEntry,
     installed: Boolean,
     status: String?,
+    screenshotPath: String?,
     modifier: Modifier,
     onDownload: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    Column(
+    Row(
         modifier = modifier
             .fillMaxWidth()
             .onFocusChanged { focused = it.isFocused }
@@ -167,20 +186,31 @@ private fun ThemeBrowserRow(
             }
             .background(if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A), RoundedCornerShape(12.dp))
             .padding(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(entry.name, color = Color.White, style = MaterialTheme.typography.titleMedium)
-            if (entry.deprecated) {
-                Text("DEPRECATED", color = Color(0xFFAA5555), style = MaterialTheme.typography.labelSmall)
+        if (screenshotPath != null) {
+            AsyncImage(
+                model = screenshotPath,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.width(140.dp).height(90.dp).clip(RoundedCornerShape(8.dp)),
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(entry.name, color = Color.White, style = MaterialTheme.typography.titleMedium)
+                if (entry.deprecated) {
+                    Text("DEPRECATED", color = Color(0xFFAA5555), style = MaterialTheme.typography.labelSmall)
+                }
             }
+            if (entry.author.isNotBlank()) {
+                Text("by ${entry.author}", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+            }
+            Text(
+                status ?: if (installed) "Installed -- select to check for updates" else "Not installed -- select to download",
+                color = Color(0xFF8AB4FF),
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
-        if (entry.author.isNotBlank()) {
-            Text("by ${entry.author}", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
-        }
-        Text(
-            status ?: if (installed) "Installed -- select to check for updates" else "Not installed -- select to download",
-            color = Color(0xFF8AB4FF),
-            style = MaterialTheme.typography.bodySmall,
-        )
     }
 }
