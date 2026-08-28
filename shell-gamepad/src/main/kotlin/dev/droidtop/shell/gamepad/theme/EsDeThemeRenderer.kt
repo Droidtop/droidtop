@@ -237,7 +237,11 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // parsed but previously unread -- opacity in particular matters a lot
     // for real themes that fade decorative art in/out.
     val cornerRadiusFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("cornerRadius")?.value ?: 0f
-    val cornerRadius = (cornerRadiusFraction * viewHeight.value).dp
+    // Real ImageComponent.cpp: cornerRadius scales against screen WIDTH,
+    // not height -- confirmed against real ES-DE source (glm::clamp(...) *
+    // mRenderer->getScreenWidth()), the one axis-exception also found for
+    // help-bar entrySpacing (see EsDeThemedHelpSystem's own comment).
+    val cornerRadius = (cornerRadiusFraction * viewWidth.value).dp
     // Real properties, previously not applied at all -- see this file's
     // own EsDeThemedImage doc comment for the real, confirmed carousel
     // outline/fade misalignment this caused (one real source image meant
@@ -404,7 +408,11 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
     // "video" real property is imageCornerRadius; "animation" real property is cornerRadius -- different keys, same real concept.
     val cornerRadiusFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("imageCornerRadius")?.value
         ?: element.valueOrNull<EsDeThemeValue.FloatValue>("cornerRadius")?.value ?: 0f
-    val cornerRadius = (cornerRadiusFraction * viewHeight.value).dp
+    // Real ImageComponent.cpp: cornerRadius scales against screen WIDTH,
+    // not height -- confirmed against real ES-DE source (glm::clamp(...) *
+    // mRenderer->getScreenWidth()), the one axis-exception also found for
+    // help-bar entrySpacing (see EsDeThemedHelpSystem's own comment).
+    val cornerRadius = (cornerRadiusFraction * viewWidth.value).dp
     // Same real cropSize approximation as EsDeThemedImage -- see that
     // function's own doc comment.
     val hasCropSize = element.valueOrNull<EsDeThemeValue.Pair>("cropSize") != null
@@ -446,8 +454,12 @@ private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight)
     val color = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color.White
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
-    // Same real fontSize convention as EsDeThemedText/textlist rows.
-    val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
+    // Same real scaling axis as EsDeThemedText/textlist rows, but a
+    // different real default: DateTimeComponent.cpp's own real default is
+    // FONT_SIZE_SMALL (0.035), not TextComponent's FONT_SIZE_MEDIUM
+    // (0.045) -- droidtop previously borrowed the wrong component's
+    // default for this element type, confirmed against real ES-DE source.
+    val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.035f
     val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * viewHeight.value).dp.toSp() }
     Text(
         text = formatted,
@@ -476,15 +488,26 @@ private fun EsDeThemedHelpSystem(
 ) {
     if (hints.isEmpty()) return
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight)
-    val textColor = element.valueOrNull<EsDeThemeValue.Color>("textColor")?.let { colorOf(it) } ?: Color.White
-    val iconColor = element.valueOrNull<EsDeThemeValue.Color>("iconColor")?.let { colorOf(it) } ?: Color.Black
+    // Real HelpComponent.cpp defaults (0x777777FF, gray) for BOTH colors --
+    // droidtop previously guessed White/Black, confirmed wrong against real
+    // ES-DE source: a theme that sets only one of textColor/iconColor would
+    // have paired it with an arbitrary, wrong color for the other.
+    val defaultHelpColor = Color(0xFF777777)
+    val textColor = element.valueOrNull<EsDeThemeValue.Color>("textColor")?.let { colorOf(it) } ?: defaultHelpColor
+    val iconColor = element.valueOrNull<EsDeThemeValue.Color>("iconColor")?.let { colorOf(it) } ?: defaultHelpColor
     val backgroundColor = element.valueOrNull<EsDeThemeValue.Color>("backgroundColor")?.let { colorOf(it) }
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
-    val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.025f
+    // Real default: HelpComponent constructs with FONT_SIZE_SMALL (0.035),
+    // not 0.025 -- confirmed against real ES-DE source (Font.h/HelpComponent.h).
+    val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.035f
     val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * viewHeight.value).dp.toSp() }
-    // Real ES-DE entrySpacing convention: a screen-height fraction, same
-    // as fontSize -- not a flat dp gap.
-    val entrySpacing = (element.valueOrNull<EsDeThemeValue.FloatValue>("entrySpacing")?.value ?: 0.02f) * viewHeight.value
+    // Real ES-DE HelpComponent.cpp: entrySpacing is a fraction of screen
+    // WIDTH, not height (droidtop previously used height, matching every
+    // other element's own real height-based convention, but help-bar
+    // spacing is confirmed real-source to be the one exception) -- real
+    // default is 0.00833, not 0.02 (droidtop's own earlier guess was
+    // ~2.4x too large).
+    val entrySpacing = (element.valueOrNull<EsDeThemeValue.FloatValue>("entrySpacing")?.value ?: 0.00833f) * viewWidth.value
 
     Row(
         modifier = Modifier
