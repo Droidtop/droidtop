@@ -135,7 +135,16 @@ internal object ThemeAssets {
 
         val themeFile = File(themeDir, "theme.xml")
         val theme = try {
-            EsDeThemeParser.parseWithCapabilities(themeFile, systemTheme = systemId)
+            // Real device screen ratio (landscape width/height, matching
+            // ES_DE_ASPECT_RATIO_MAP's own convention) -- resolves a real
+            // theme's own "automatic" aspectRatio capability to whichever
+            // declared ratio is actually closest to THIS device, instead
+            // of a droidtop-invented fallback. See parseWithCapabilities'
+            // own doc comment for why skipping this silently breaks any
+            // theme using that common real convention.
+            val metrics = context.resources.displayMetrics
+            val screenAspectRatio = metrics.widthPixels.toFloat() / metrics.heightPixels.toFloat()
+            EsDeThemeParser.parseWithCapabilities(themeFile, systemTheme = systemId, screenAspectRatio = screenAspectRatio)
         } catch (t: Exception) {
             Log.e("droidtop.ThemeAssets", "Failed to parse theme '${active.name}'", t)
             null
