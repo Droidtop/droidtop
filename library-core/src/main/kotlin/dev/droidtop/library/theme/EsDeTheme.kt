@@ -67,12 +67,22 @@ data class EsDeThemeElement(
 
 /**
  * Which real browsing shape (carousel/grid/textlist) this view actually
- * uses, per ES-DE's own convention: a real theme.xml declares exactly one
- * of these per system/gamelist view (confirmed against the bundled DEcaffe
- * theme's own real system view, which declares one `<carousel>` and
- * nothing else in [ES_DE_PRIMARY_LIST_TYPES]) -- droidtop's own Games
- * system list should render whichever shape the loaded theme actually
- * specifies, not a hardcoded app-level choice.
+ * uses, per ES-DE's own convention -- a real theme.xml declares AT MOST
+ * one of these per view, never a hardcoded app-level choice. For the
+ * "system" view it's effectively always present (confirmed against the
+ * bundled DEcaffe theme's own real system view: one `<carousel>`).
+ * For "gamelist" it's genuinely OPTIONAL -- confirmed directly against
+ * DEcaffe's own real gamelist view, which declares NEITHER a list widget
+ * NOR a `<gameselector>` at all: every element there implicitly binds to
+ * game index 0, relying on real ES-DE's own always-present underlying
+ * per-game navigation cursor rather than any visual widget (real ES-DE
+ * itself always tracks a "current game" regardless of whether the theme
+ * renders anything for it). ArtBookNext's own gamelist view, by contrast,
+ * DOES declare a real `<textlist>`/`<grid>` -- both are real, valid
+ * theme designs. A `null` result here for a gamelist view is a normal,
+ * expected case, not a parse gap -- see `EsDeThemedView`'s own
+ * `focusedGameIndex` parameter for how droidtop drives navigation in the
+ * no-widget case.
  */
 fun EsDeThemeView.primaryListElement(): EsDeThemeElement? =
     elements.values.firstOrNull { it.type in ES_DE_PRIMARY_LIST_TYPES }
