@@ -91,6 +91,7 @@ data class EsDeThemeCapabilities(
     val colorSchemes: List<String>,
     val fontSizes: List<String>,
     val variants: List<String>,
+    val languages: List<String> = emptyList(),
 )
 
 object EsDeThemeParser {
@@ -110,6 +111,7 @@ object EsDeThemeParser {
         val colorSchemes = mutableListOf<String>()
         val fontSizes = mutableListOf<String>()
         val variants = mutableListOf<String>()
+        val languages = mutableListOf<String>()
         val parser = Xml.newPullParser().apply {
             setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
             setInput(StringReader(capabilitiesFile.readText()))
@@ -122,11 +124,12 @@ object EsDeThemeParser {
                     "fontSize" -> fontSizes += readText(parser)
                     "colorScheme" -> parser.getAttributeValue(null, "name")?.let { colorSchemes += it }
                     "variant" -> parser.getAttributeValue(null, "name")?.let { variants += it }
+                    "language" -> languages += readText(parser)
                 }
             }
             event = parser.next()
         }
-        return EsDeThemeCapabilities(aspectRatios, colorSchemes, fontSizes, variants)
+        return EsDeThemeCapabilities(aspectRatios, colorSchemes, fontSizes, variants, languages)
     }
 
     /**
@@ -202,14 +205,36 @@ object EsDeThemeParser {
      * literal string "automatic" as the selected axis value (an earlier,
      * real bug this fixes) would silently match NO real aspectRatio block
      * in theme.xml at all for any theme using this common convention.
+     *
+     * [deviceLocale] is the real device's own current locale, real
+     * `language_COUNTRY` format matching capabilities.xml's own real
+     * entries (e.g. `"en_US"`) -- [ThemeAssets] supplies this from
+     * `Locale.getDefault()`. Only consulted when the theme actually
+     * declares `<language>` capabilities at all (most views have none to
+     * match against either way, matching real ES-DE's own behavior of
+     * only running this resolution when `capabilities.languages` is
+     * non-empty). Real ES-DE algorithm (`ThemeData::loadFile`): exact
+     * `language_COUNTRY` match, else same-language (first two chars)
+     * match against a different country, else the real mandatory
+     * `"en_US"` fallback -- ported unchanged.
      */
-    fun parseWithCapabilities(themeFile: File, systemTheme: String? = null, screenAspectRatio: Float? = null): EsDeTheme {
+    fun parseWithCapabilities(
+        themeFile: File,
+        systemTheme: String? = null,
+        screenAspectRatio: Float? = null,
+        deviceLocale: String? = null,
+    ): EsDeTheme {
         val capabilities = parseCapabilities(File(themeFile.parentFile, "capabilities.xml"))
         val rawAspectRatio = capabilities.aspectRatios.firstOrNull() ?: "16:9"
         val resolvedAspectRatio = if (rawAspectRatio == "automatic") {
             resolveAutomaticAspectRatio(capabilities.aspectRatios, screenAspectRatio)
         } else {
             rawAspectRatio
+        }
+        val resolvedLanguage = if (capabilities.languages.isNotEmpty()) {
+            resolveLanguage(capabilities.languages, deviceLocale)
+        } else {
+            null
         }
         return parse(
             themeFile = themeFile,
@@ -218,7 +243,17 @@ object EsDeThemeParser {
             fontSize = capabilities.fontSizes.firstOrNull() ?: "medium",
             variant = capabilities.variants.firstOrNull(),
             systemTheme = systemTheme,
+            language = resolvedLanguage,
         )
+    }
+
+    /** Real ES-DE algorithm (`ThemeData::loadFile`): exact match, else same-language-prefix match, else the real mandatory "en_US" fallback. */
+    private fun resolveLanguage(declared: List<String>, deviceLocale: String?): String {
+        val setting = deviceLocale ?: "en_US"
+        if (declared.contains(setting)) return setting
+        val prefix = setting.take(2)
+        declared.firstOrNull { it.take(2) == prefix }?.let { return it }
+        return "en_US"
     }
 
     /** Real ES-DE algorithm (`ThemeData::loadFile`): closest real match by |declared - actual|, real "16:9" fallback when there's no real screen ratio to match against at all. */
@@ -255,13 +290,19 @@ object EsDeThemeParser {
         // ThemeAssets to get one EsDeTheme per system id rather than one
         // theme-wide object with these fields permanently unresolved.
         systemTheme: String? = null,
+        // Real ES-DE resolution (see parseWithCapabilities' own doc
+        // comment) -- null means "no real language match," matching
+        // real ES-DE's own behavior for a theme that declares NO
+        // <language> capabilities at all (most themes/views -- language-
+        // scoped blocks simply don't exist to match against either way).
+        language: String? = null,
     ): EsDeTheme {
         val axes = listOf(
             VariantAxis("variant", variant),
             VariantAxis("colorScheme", colorScheme),
             VariantAxis("fontSize", fontSize),
             VariantAxis("aspectRatio", aspectRatio),
-            VariantAxis("language", null),
+            VariantAxis("language", language),
         )
         val variables = mutableMapOf<String, String>()
         if (systemTheme != null) variables["system.theme"] = systemTheme
