@@ -779,14 +779,14 @@ private fun GamesSection(
                     // Real per-system metadata (systemName/systemManufacturer/
                     // systemReleaseYear/...) needs a theme parsed with the
                     // CURRENTLY FOCUSED system's own ${system.theme}
-                    // substituted -- see ThemeAssets.loadDecaffeTheme's own
+                    // substituted -- see ThemeAssets.loadActiveTheme's own
                     // doc comment for why this can't be one static parse.
                     // focusedSystemIndex is fed by EsDeThemedView's own
                     // onFocusedIndexChanged, driven by whichever carousel
                     // item actually has focus right now.
                     var focusedSystemIndex by remember { mutableStateOf(0) }
                     val focusedSystemId = (orderedGroups.getOrNull(focusedSystemIndex) as? GameGroup.System)?.systemId
-                    val theme = remember(focusedSystemId) { ThemeAssets.loadDecaffeTheme(context, focusedSystemId) }
+                    val theme = remember(focusedSystemId) { ThemeAssets.loadActiveTheme(context, focusedSystemId) }
                     val listElement = remember(theme) { theme?.views?.get("system")?.primaryListElement() }
                     val items = orderedGroups.map { entryGroup ->
                         EsDeListItem(
