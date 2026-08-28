@@ -67,7 +67,7 @@ fun EsDeThemedView(
     modifier: Modifier = Modifier,
     // Real per-system metadata (systemName/systemManufacturer/
     // systemReleaseYear/...) needs a theme parsed with THAT system's own
-    // ${system.theme} substituted (see ThemeAssets.loadDecaffeTheme's own
+    // ${system.theme} substituted (see ThemeAssets.loadActiveTheme's own
     // doc comment) -- this bubbles the carousel/grid/textlist's own
     // focused-item index up to whoever owns [view] itself, so it can load
     // and pass down the right per-system-parsed EsDeThemeView. A no-op
