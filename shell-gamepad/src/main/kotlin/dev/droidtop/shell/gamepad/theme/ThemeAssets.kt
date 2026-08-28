@@ -89,7 +89,13 @@ internal object ThemeAssets {
             false
         }
 
-    private fun userThemesDir(context: Context): File = File(context.filesDir, "themes")
+    /**
+     * Real, writable install target for downloaded themes -- [dev.droidtop.library.theme.ThemeDownloader]
+     * (JGit-based, real ES-DE theme-downloader parity) clones into this
+     * exact directory so downloaded themes show up in [discoverThemes]
+     * immediately, no separate registration step.
+     */
+    fun userThemesDir(context: Context): File = File(context.filesDir, "themes")
 
     /**
      * Resolves [ThemePrefs]' selected theme name against real discovery,

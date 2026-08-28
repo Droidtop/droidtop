@@ -88,6 +88,12 @@ composeBom = "2024.09.00"
 media = "1.7.0"
 okhttp = "4.12.0"
 bouncycastle = "1.78.1"
+# Real ES-DE theme downloader parity -- ThemeDownloader.kt (library-core)
+# git-clones the same real gitlab.com/es-de/themes/themes-list.git index
+# and per-theme repos real ES-DE itself clones (GuiThemeDownloader.cpp),
+# via libgit2 there -- JGit is the pure-Java equivalent for Android, no
+# native git binding available.
+jgit = "7.7.1.202607240634-r"
 
 [libraries]
 # Lawnchair-TODO: Migrate it to the latest version once jitpack publishing is fixed
@@ -97,6 +103,7 @@ rikka-annotation = { module = "dev.rikka.tools.refine:annotation", version.ref =
 rikka-annotation-processor = { module = "dev.rikka.tools.refine:annotation-processor", version.ref = "refine" }
 rikka-refine-runtime = { group = "dev.rikka.tools.refine", name = "runtime", version.ref = "refine" }
 intuit-sdp = { group = "com.intuit.sdp", name = "sdp-android", version.ref = "sdp-android" }
+jgit = { module = "org.eclipse.jgit:org.eclipse.jgit", version.ref = "jgit" }
 
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 androidx-palette-ktx =  { module = "androidx.palette:palette-ktx", version.ref = "palette" }
