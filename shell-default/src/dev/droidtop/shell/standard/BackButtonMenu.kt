@@ -27,29 +27,48 @@ import android.content.Intent
 object BackButtonMenu {
     private const val APP_MAIN_ACTIVITY = "dev.droidtop.app.MainActivity"
     private const val STANDARD_LAUNCHER_ACTIVITY = "com.android.launcher3.Launcher"
+    private const val ALTERNATIVE_LAUNCHER_ACTIVITY = "dev.droidtop.shell.standard.AlternativeLauncherActivity"
     const val EXTRA_MODE = "dev.droidtop.app.EXTRA_MODE"
     const val MODE_DESKTOP = "desktop"
     const val MODE_HANDHELD = "handheld"
     const val MODE_STANDARD = "standard"
 
+    /**
+     * "Android" is only offered when droidtop actually holds a HOME role
+     * (see [HomeRolePrefs]) — a user who chose "neither" during onboarding
+     * has nothing for this entry to point to, so it's hidden rather than
+     * shown broken.
+     */
     @JvmStatic
     fun show(activity: Activity) {
+        val homeImplementation = HomeRolePrefs.activeHomeImplementation(activity)
+        val items = buildList {
+            if (homeImplementation != HomeRolePrefs.HomeImplementation.NONE) add("Android")
+            add("Desktop")
+            add("Handheld")
+            add("Settings")
+        }
         AlertDialog.Builder(activity)
-            .setItems(arrayOf("Android", "Desktop", "Handheld", "Settings")) { _, which ->
-                when (which) {
-                    0 -> launchStandard(activity)
-                    1 -> launchAppMode(activity, MODE_DESKTOP)
-                    2 -> launchAppMode(activity, MODE_HANDHELD)
-                    3 -> launchSettings(activity)
+            .setItems(items.toTypedArray()) { _, which ->
+                when (items[which]) {
+                    "Android" -> launchHomeImplementation(activity, homeImplementation)
+                    "Desktop" -> launchAppMode(activity, MODE_DESKTOP)
+                    "Handheld" -> launchAppMode(activity, MODE_HANDHELD)
+                    "Settings" -> launchSettings(activity)
                 }
             }
             .show()
     }
 
-    private fun launchStandard(activity: Activity) {
+    private fun launchHomeImplementation(activity: Activity, implementation: HomeRolePrefs.HomeImplementation) {
+        val activityName = when (implementation) {
+            HomeRolePrefs.HomeImplementation.STANDARD -> STANDARD_LAUNCHER_ACTIVITY
+            HomeRolePrefs.HomeImplementation.ALTERNATIVE -> ALTERNATIVE_LAUNCHER_ACTIVITY
+            HomeRolePrefs.HomeImplementation.NONE -> return
+        }
         ModePrefs.setLastMode(activity, MODE_STANDARD)
         val intent = Intent(Intent.ACTION_MAIN).apply {
-            component = ComponentName(activity.packageName, STANDARD_LAUNCHER_ACTIVITY)
+            component = ComponentName(activity.packageName, activityName)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         activity.startActivity(intent)

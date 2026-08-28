@@ -746,25 +746,69 @@ reading actual code/formats, not assumed):
   needs an explicit mapping table, not yet built since no such schema is
   confirmed yet — see above) rather than droidtop carrying several
   incompatible per-source taxonomies side by side.
-- **Onboarding flow** (not designed in detail yet) needs to cover, roughly
-  in order: root detection (determines `:runtime-linux-root` vs.
-  `:runtime-linux-noroot` availability, §3), display detection/
-  configuration (§4's per-output roles, physical upper/lower position —
-  the "which screen is which" question needs resolving here, not
-  post-hoc), the two import paths above (offered, not forced), and initial
-  shell-paradigm choice (Standard/Desktop/Handheld, and — once the
-  Handheld multi-paradigm split from §7 is real — which
-  paradigm). **Configuration itself has no separate settings app** (§7) —
-  onboarding is a first-run wizard around the exact same settings surface
-  (`com.android.launcher3.settings.SettingsActivity`) a user would reach
-  later through the normal back-button menu, not a parallel or
-  disposable-after-first-run UI.
-- **Opened from a different launcher** (droidtop isn't the user's actual
-  home screen — they use something else and just tap droidtop's own app
-  icon) **defaults to the Desktop shell**, not Standard — Standard doesn't
-  make sense as the thing that opens when droidtop isn't the home screen
-  in the first place. Configurable, like every other default in this
-  section, not hardcoded.
+- **Onboarding flow (real, built)** — `app/src/main/kotlin/dev/droidtop/app/OnboardingActivity.kt`.
+  Onboards the *device*, not one mode: a user shouldn't have to visit
+  Settings right after first run just to finish setting up a second mode
+  they also want, since configuring a mode and picking the default are
+  independent questions. Real flow:
+  `WELCOME → HOME_CHOICE → [STANDARD_SETUP | ALTERNATIVE_SETUP] →
+  CONFIGURE_MORE (multi-select: Desktop, Handheld) → [DESKTOP_SETUP] →
+  [STORAGE_PERMISSION/GAMES_FOLDERS] → DEFAULT_MODE_CHOICE`.
+  - **HOME_CHOICE**: how the Android home screen itself should work —
+    droidtop's own Standard launcher, a new **Alternative** mode (see
+    below), or neither (droidtop claims no `CATEGORY_HOME` role at all;
+    its icon just opens `:app`'s `MainActivity` directly like any other
+    app). Every mode-specific setup step below is independently
+    skippable and re-enterable later from Settings — see each Settings
+    fragment's own `PREF_*` entries
+    (`SettingsHandheldFragment.PREF_GAME_FOLDERS`,
+    `SettingsDesktopFragment.PREF_ROOT_COMPOSITOR_SETUP`,
+    `SettingsMiscFragment.PREF_DROIDTOP_HOME_SCREEN`), each relaunching
+    `OnboardingActivity` at one step via
+    `EXTRA_START_STEP`, not onboarding-only.
+  - **DESKTOP_SETUP** runs a live root-capability check
+    (`DroidSpacesRuntime.checkSystemRequirements()`) and lets the user
+    pick which catalog entry (distro + compositor) to use, stored via
+    `DesktopSetupPrefs` and honored by
+    `DesktopSessionService.selectPrimaryImage` — closes what used to be
+    "no user-facing compositor-choice setting yet."
+  - **DEFAULT_MODE_CHOICE** calls `ModePrefs.setLastMode` — this is what
+    `com.android.launcher3.Launcher`'s own real cold-boot redirect
+    (`mDroidtopPendingModeRedirect`, already shipping) and
+    `AlternativeLauncherActivity`'s equivalent redirect (see below) both
+    read to send a user straight to their actual default mode instead of
+    always landing on whichever HOME activity is currently active.
+- **"Alternative" mode — droidtop holds HOME, forwards to a different
+  installed launcher.** Real, verified mechanism (not guessed) — confirmed
+  against `farmerbb/Taskbar`'s actual shipping source (`HSLActivity.java`):
+  a second `CATEGORY_HOME` activity
+  (`shell-default`'s `AlternativeLauncherActivity`), disabled by default,
+  mutually exclusive with `com.android.launcher3.Launcher` via
+  `HomeRolePrefs.setActiveHomeImplementation` (`PackageManager.setComponentEnabledSetting`
+  on each, opposite states — never both enabled). On launch it resolves
+  the user's saved target (`HomeRolePrefs.alternativeTarget`, picked from
+  `PackageManager.queryIntentActivities` on `ACTION_MAIN`+`CATEGORY_HOME`,
+  no extra `<queries>` block needed since `shell-default`'s manifest
+  already holds `QUERY_ALL_PACKAGES` for its own app-drawer needs) to an
+  explicit `ComponentName` and forwards via `startActivity`. Falls back to
+  Settings if the saved target is missing/uninstalled rather than looping
+  or crashing. `BackButtonMenu`'s "Android" menu entry resolves to
+  whichever of Standard/Alternative is currently active
+  (`HomeRolePrefs.activeHomeImplementation`), and is hidden entirely when
+  neither is. A separately-considered "Secondary Launcher"/`SECONDARY_HOME`
+  AOSP concept (`com.android.launcher3.secondarydisplay.SecondaryDisplayLauncher`)
+  turned out to be unrelated — that's Launcher3 itself rendering on an
+  *external display*, not forwarding to a different launcher app.
+- **`shell-default`'s Standard shell is already a full-featured Murine
+  Launcher/Launcher3 fork**, not a bare-bones fallback — real settings
+  already exist (`SettingsGeneralFragment`, `SettingsHomeFragment`,
+  `SettingsDrawerFragment`, `SettingsIconPackFragment`,
+  `SettingsIconsFragment`, `SettingsQsbFragment`,
+  `SettingsHiddenAppsFragment`, `SettingsMiscFragment` — backup/restore,
+  default-launcher picker). Onboarding's `STANDARD_SETUP` step points here
+  rather than re-inventing any of it; if the user can't use droidtop's own
+  launcher the way they want, choosing it isn't a real option, so it needs
+  to be genuinely full-featured, not an implicit no-setup-needed fallback.
 
 ## 7c. Wine prefix / container configuration UI
 

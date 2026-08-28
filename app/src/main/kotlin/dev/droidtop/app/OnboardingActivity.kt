@@ -1,5 +1,6 @@
 package dev.droidtop.app
 
+import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -11,6 +12,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,10 +22,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,42 +38,67 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import dev.droidtop.runtime.BundledImageRepositories
+import dev.droidtop.runtime.ImageCachePolicy
+import dev.droidtop.runtime.ImageCatalogRole
+import dev.droidtop.runtime.KnownImageRepository
+import dev.droidtop.runtime.linux.root.CraneRootfsPuller
+import dev.droidtop.runtime.linux.root.DroidSpacesRuntime
+import dev.droidtop.runtime.linux.root.FileImageCache
+import dev.droidtop.shell.standard.BackButtonMenu
+import dev.droidtop.shell.standard.HomeRolePrefs
+import dev.droidtop.shell.standard.ModePrefs
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
- * droidtop's real first-run flow -- previously nonexistent (see
- * OnboardingGate's own doc comment: before this, the only way to get games
- * into droidtop's library was `adb push`ing directly into the app's
- * private external-files dir). Gated by [OnboardingGate] from
- * `:shell-default`'s `LauncherApplication.onCreate()`, launched by
- * explicit component name since `:shell-default` can't compile-depend on
- * `:app`.
+ * droidtop's real first-run flow — onboards the DEVICE, not one mode.
+ * Real correction from an earlier draft: this used to force a single mode
+ * choice and only ever configured Handheld's games folders. Per direction,
+ * it now: (1) asks how the Android home screen itself should work (its own
+ * Standard launcher / forward to a different installed launcher via
+ * "Alternative" mode / neither), (2) lets the user independently choose to
+ * also set up Desktop and/or Handheld, each with its own real setup step,
+ * (3) asks which of everything actually configured should be the default
+ * when droidtop is launched — configuring and defaulting are separate
+ * questions, so a user shouldn't have to visit Settings right after first
+ * run just to finish setting up a second mode they also want.
  *
- * ROM/game folder setup is entirely opt-in, decided on the welcome screen
- * itself -- not everyone using droidtop games at all (per direction), so
- * nothing game-related (including the storage permission request below)
- * is shown unless a user actively chooses to set it up. Two real,
- * documented limitations, not oversights:
- *  - [GamesRootPrefs.resolveStoragePath] resolves both primary shared
- *    storage and a real SD card (via the standard `/storage/<volumeId>/`
- *    mount convention most AOSP-based devices use), verified to actually
- *    exist before being trusted -- but a cloud-backed provider or an
- *    unusual mount layout still won't resolve to a `java.io.File`, since
- *    [dev.droidtop.library.GameEngineDetector] scans via `File`, not
- *    `DocumentFile`. Picking one of those shows an explicit message
- *    instead of silently doing nothing.
- *  - No app-picker/other library-source setup here yet (native Android
- *    apps are already auto-discovered by [dev.droidtop.library.NativeAppProvider]
- *    with no folder needed) -- only games folders, since that's the one
- *    real, currently-unreachable gap.
+ * Gated by [dev.droidtop.shell.standard.OnboardingGate] from both
+ * `:shell-default`'s `LauncherApplication.onCreate()` AND `:app`'s own
+ * `MainActivity.onCreate()` — a user who never boots through Standard
+ * still needs to see this once.
+ *
+ * [EXTRA_START_STEP] supports re-entry from Settings (each mode's setup
+ * step is independently re-runnable later, not onboarding-only, per
+ * direction): when set, onboarding jumps straight to that one step and
+ * `finish()`es right after it instead of continuing through the rest of
+ * the pipeline.
  */
 class OnboardingActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { OnboardingScreen(onDone = { finish() }) }
+        val startStep = intent.getStringExtra(EXTRA_START_STEP)
+            ?.let { name -> OnboardingStep.entries.firstOrNull { it.name == name } }
+        setContent {
+            OnboardingScreen(
+                startStep = startStep,
+                isReEntry = startStep != null,
+                onDone = { finish() },
+            )
+        }
+    }
+
+    companion object {
+        const val EXTRA_START_STEP = "dev.droidtop.app.EXTRA_START_STEP"
     }
 }
 
-private enum class OnboardingStep { WELCOME, STORAGE_PERMISSION, GAMES_FOLDERS }
+private enum class OnboardingStep {
+    WELCOME, HOME_CHOICE, STANDARD_SETUP, ALTERNATIVE_SETUP,
+    CONFIGURE_MORE, DESKTOP_SETUP, STORAGE_PERMISSION, GAMES_FOLDERS,
+    DEFAULT_MODE_CHOICE,
+}
 
 /**
  * [GamesRootPrefs.resolveStoragePath] can compute a perfectly correct real
@@ -90,14 +120,13 @@ private fun hasAllFilesAccess(): Boolean =
     Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager()
 
 @Composable
-private fun OnboardingScreen(onDone: () -> Unit) {
+private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onDone: () -> Unit) {
     val context = LocalContext.current
-    var step by remember { mutableStateOf(OnboardingStep.WELCOME) }
+    var step by remember { mutableStateOf(startStep ?: OnboardingStep.WELCOME) }
+    var configureDesktop by remember { mutableStateOf(false) }
+    var configureHandheld by remember { mutableStateOf(false) }
     var unresolvedFolderWarning by remember { mutableStateOf(false) }
     var storageAccessGranted by remember { mutableStateOf(hasAllFilesAccess()) }
-    // Re-read fresh each recomposition rather than held in isolated state --
-    // GamesRootPrefs is the single source of truth, and MainActivity reads
-    // it the same way, so there's no separate in-memory copy to drift.
     var rootsVersion by remember { mutableStateOf(0) }
     val roots = remember(rootsVersion) { GamesRootPrefs.gamesRootPaths(context) }
 
@@ -120,7 +149,31 @@ private fun OnboardingScreen(onDone: () -> Unit) {
         unresolvedFolderWarning = resolved == null
     }
 
-    fun finish() {
+    // Advances to the pipeline's next real step after [current] -- or
+    // finishes outright when re-entering a single step from Settings.
+    fun advanceFrom(current: OnboardingStep) {
+        if (isReEntry) {
+            onDone()
+            return
+        }
+        step = when (current) {
+            OnboardingStep.WELCOME -> OnboardingStep.HOME_CHOICE
+            OnboardingStep.HOME_CHOICE -> OnboardingStep.CONFIGURE_MORE
+            OnboardingStep.STANDARD_SETUP -> OnboardingStep.CONFIGURE_MORE
+            OnboardingStep.ALTERNATIVE_SETUP -> OnboardingStep.CONFIGURE_MORE
+            OnboardingStep.CONFIGURE_MORE ->
+                if (configureDesktop) OnboardingStep.DESKTOP_SETUP
+                else if (configureHandheld) OnboardingStep.STORAGE_PERMISSION
+                else OnboardingStep.DEFAULT_MODE_CHOICE
+            OnboardingStep.DESKTOP_SETUP ->
+                if (configureHandheld) OnboardingStep.STORAGE_PERMISSION else OnboardingStep.DEFAULT_MODE_CHOICE
+            OnboardingStep.STORAGE_PERMISSION -> OnboardingStep.GAMES_FOLDERS
+            OnboardingStep.GAMES_FOLDERS -> OnboardingStep.DEFAULT_MODE_CHOICE
+            OnboardingStep.DEFAULT_MODE_CHOICE -> OnboardingStep.DEFAULT_MODE_CHOICE
+        }
+    }
+
+    fun finishOnboarding() {
         GamesRootPrefs.markOnboardingComplete(context)
         onDone()
     }
@@ -132,69 +185,314 @@ private fun OnboardingScreen(onDone: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             when (step) {
-                OnboardingStep.WELCOME -> {
-                    Text("Welcome to droidtop", color = Color.White, style = MaterialTheme.typography.headlineMedium)
-                    Text(
-                        "droidtop turns this device into a real desktop, with a library " +
-                            "that covers apps and, if you want it, games too.",
-                        color = Color.Gray,
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    Button(onClick = {
-                        step = if (storageAccessGranted) OnboardingStep.GAMES_FOLDERS else OnboardingStep.STORAGE_PERMISSION
-                    }) { Text("Set up game folders") }
-                    TextButton(onClick = { finish() }) { Text("Skip -- I'm not using this for games") }
-                }
-                OnboardingStep.STORAGE_PERMISSION -> {
-                    Text("One permission needed", color = Color.White, style = MaterialTheme.typography.headlineSmall)
-                    Text(
-                        "droidtop needs full storage access to read game files directly " +
-                            "(including from an SD card) -- a folder picker alone isn't " +
-                            "enough for that.",
-                        color = Color.Gray,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Button(onClick = {
+                OnboardingStep.WELCOME -> WelcomeStep(onContinue = { advanceFrom(OnboardingStep.WELCOME) })
+
+                OnboardingStep.HOME_CHOICE -> HomeChoiceStep(
+                    onStandard = { step = OnboardingStep.STANDARD_SETUP },
+                    onAlternative = { step = OnboardingStep.ALTERNATIVE_SETUP },
+                    onNeither = {
+                        HomeRolePrefs.setActiveHomeImplementation(context, HomeRolePrefs.HomeImplementation.NONE)
+                        advanceFrom(OnboardingStep.HOME_CHOICE)
+                    },
+                )
+
+                OnboardingStep.STANDARD_SETUP -> StandardSetupStep(
+                    onContinue = {
+                        HomeRolePrefs.setActiveHomeImplementation(context, HomeRolePrefs.HomeImplementation.STANDARD)
+                        advanceFrom(OnboardingStep.STANDARD_SETUP)
+                    },
+                )
+
+                OnboardingStep.ALTERNATIVE_SETUP -> AlternativeSetupStep(
+                    onPicked = { component ->
+                        HomeRolePrefs.setAlternativeTarget(context, component)
+                        HomeRolePrefs.setActiveHomeImplementation(context, HomeRolePrefs.HomeImplementation.ALTERNATIVE)
+                        advanceFrom(OnboardingStep.ALTERNATIVE_SETUP)
+                    },
+                    onBack = { step = OnboardingStep.HOME_CHOICE },
+                )
+
+                OnboardingStep.CONFIGURE_MORE -> ConfigureMoreStep(
+                    desktopChecked = configureDesktop,
+                    handheldChecked = configureHandheld,
+                    onDesktopChanged = { configureDesktop = it },
+                    onHandheldChanged = { configureHandheld = it },
+                    onContinue = { advanceFrom(OnboardingStep.CONFIGURE_MORE) },
+                )
+
+                OnboardingStep.DESKTOP_SETUP -> DesktopSetupStep(
+                    onContinue = { advanceFrom(OnboardingStep.DESKTOP_SETUP) },
+                )
+
+                OnboardingStep.STORAGE_PERMISSION -> StoragePermissionStep(
+                    onGrant = {
                         requestStorageAccess.launch(
                             Intent(
                                 Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
                                 Uri.parse("package:${context.packageName}"),
                             ),
                         )
-                    }) { Text("Grant access") }
-                    TextButton(onClick = { finish() }) { Text("Skip -- I'm not using this for games") }
-                }
-                OnboardingStep.GAMES_FOLDERS -> {
-                    Text("Game folders", color = Color.White, style = MaterialTheme.typography.headlineSmall)
-                    Text(
-                        "Add every folder where your Ren'Py, RPG Maker, or Kirikiri games " +
-                            "live -- an SD card and internal storage both work. You can add " +
-                            "more, or change these, later in Settings.",
-                        color = Color.Gray,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    if (roots.isNotEmpty()) {
-                        LazyColumn(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                            items(roots.toList()) { path ->
-                                Text(path, color = Color.LightGray, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 4.dp))
-                            }
-                        }
-                    }
-                    if (unresolvedFolderWarning) {
-                        Text(
-                            "That folder couldn't be used directly (this device's storage " +
-                                "or SD card layout doesn't match what droidtop expects yet, " +
-                                "or it's a cloud-backed folder).",
-                            color = Color.Gray,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                    Button(onClick = { pickFolder.launch(null) }) {
-                        Text(if (roots.isEmpty()) "Add a folder" else "Add another folder")
-                    }
-                    TextButton(onClick = { finish() }) { Text(if (roots.isEmpty()) "Skip for now" else "Done") }
+                    },
+                    onSkip = { advanceFrom(OnboardingStep.STORAGE_PERMISSION) },
+                )
+
+                OnboardingStep.GAMES_FOLDERS -> GamesFoldersStep(
+                    roots = roots,
+                    unresolvedFolderWarning = unresolvedFolderWarning,
+                    onAddFolder = { pickFolder.launch(null) },
+                    onDone = { advanceFrom(OnboardingStep.GAMES_FOLDERS) },
+                )
+
+                OnboardingStep.DEFAULT_MODE_CHOICE -> DefaultModeChoiceStep(
+                    homeImplementation = HomeRolePrefs.activeHomeImplementation(context),
+                    onPicked = { mode ->
+                        ModePrefs.setLastMode(context, mode)
+                        finishOnboarding()
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WelcomeStep(onContinue: () -> Unit) {
+    Text("Welcome to droidtop", color = Color.White, style = MaterialTheme.typography.headlineMedium)
+    Text(
+        "droidtop turns this device into a real desktop, a gamepad-driven " +
+            "library, or your normal Android home screen -- you choose what " +
+            "to set up, and you can change any of it later in Settings.",
+        color = Color.Gray,
+        style = MaterialTheme.typography.bodyLarge,
+    )
+    Button(onClick = onContinue) { Text("Get started") }
+}
+
+@Composable
+private fun HomeChoiceStep(onStandard: () -> Unit, onAlternative: () -> Unit, onNeither: () -> Unit) {
+    Text("Your Android home screen", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+    Text(
+        "How should the home screen work when you press Home?",
+        color = Color.Gray,
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    Button(onClick = onStandard) { Text("Use droidtop's own launcher") }
+    Button(onClick = onAlternative) { Text("Use a different launcher I already have") }
+    TextButton(onClick = onNeither) { Text("Neither -- decide later") }
+}
+
+@Composable
+private fun StandardSetupStep(onContinue: () -> Unit) {
+    val context = LocalContext.current
+    Text("droidtop's launcher", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+    Text(
+        "It's a full-featured launcher -- icon packs, grid density, app " +
+            "drawer folders, backup/restore, and more all live in Settings " +
+            "under Home Screen, App Drawer, and Icons.",
+        color = Color.Gray,
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    Button(onClick = {
+        val intent = Intent(Intent.ACTION_MAIN).apply {
+            component = ComponentName(context.packageName, "com.android.launcher3.settings.SettingsActivity")
+            putExtra(":settings:fragment", "app.murinelauncher.settings.SettingsHomeFragment")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    }) { Text("Customize now") }
+    TextButton(onClick = onContinue) { Text("Continue") }
+}
+
+@Composable
+private fun AlternativeSetupStep(onPicked: (ComponentName) -> Unit, onBack: () -> Unit) {
+    val context = LocalContext.current
+    var launchers by remember { mutableStateOf<List<Pair<ComponentName, String>>?>(null) }
+
+    LaunchedEffect(Unit) {
+        launchers = withContext(Dispatchers.IO) {
+            val pm = context.packageManager
+            val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            pm.queryIntentActivities(homeIntent, 0)
+                .filter { it.activityInfo.packageName != context.packageName }
+                .map { info -> ComponentName(info.activityInfo.packageName, info.activityInfo.name) to info.loadLabel(pm).toString() }
+                .distinctBy { it.first }
+        }
+    }
+
+    Text("Pick a launcher", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+    Text(
+        "droidtop will still handle switching between Desktop and Handheld " +
+            "mode -- pressing Home will open whichever launcher you pick here.",
+        color = Color.Gray,
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    val current = launchers
+    if (current == null) {
+        Text("Looking for installed launchers…", color = Color.Gray)
+    } else if (current.isEmpty()) {
+        Text("No other launcher is installed on this device.", color = Color.Gray)
+        TextButton(onClick = onBack) { Text("Back") }
+    } else {
+        LazyColumn(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+            items(current) { (component, label) ->
+                Text(
+                    label,
+                    color = Color.White,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable { onPicked(component) },
+                )
+            }
+        }
+        TextButton(onClick = onBack) { Text("Back") }
+    }
+}
+
+@Composable
+private fun ConfigureMoreStep(
+    desktopChecked: Boolean,
+    handheldChecked: Boolean,
+    onDesktopChanged: (Boolean) -> Unit,
+    onHandheldChanged: (Boolean) -> Unit,
+    onContinue: () -> Unit,
+) {
+    Text("Anything else to set up?", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+    Text(
+        "Desktop (Wine/Linux containers) and Handheld (a gamepad-driven " +
+            "library) both stay reachable from droidtop's mode switcher " +
+            "regardless of what you picked for your home screen.",
+        color = Color.Gray,
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    LabeledCheckbox("Desktop", desktopChecked, onDesktopChanged)
+    LabeledCheckbox("Handheld", handheldChecked, onHandheldChanged)
+    Button(onClick = onContinue) { Text("Continue") }
+}
+
+@Composable
+private fun LabeledCheckbox(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    androidx.compose.foundation.layout.Row(
+        modifier = Modifier.fillMaxWidth().clickable { onCheckedChange(!checked) },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
+        Text(label, color = Color.White)
+    }
+}
+
+@Composable
+private fun DesktopSetupStep(onContinue: () -> Unit) {
+    val context = LocalContext.current
+    var checkResult by remember { mutableStateOf<Boolean?>(null) }
+    var checkMessage by remember { mutableStateOf("") }
+    var repositories by remember { mutableStateOf<List<KnownImageRepository>>(emptyList()) }
+    var selectedId by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        repositories = withContext(Dispatchers.IO) {
+            BundledImageRepositories.load(context).repositories
+                .filter { it.role == ImageCatalogRole.PRIMARY || it.role == ImageCatalogRole.BOTH }
+        }
+        selectedId = DesktopSetupPrefs.preferredPrimaryImageId(context) ?: repositories.firstOrNull()?.id
+        val result = withContext(Dispatchers.IO) {
+            val runtime = DroidSpacesRuntime(
+                context = context,
+                rootfsPuller = CraneRootfsPuller(context),
+                imageCache = FileImageCache(context),
+                cachePolicy = ImageCachePolicy(enabled = true),
+            )
+            runtime.checkSystemRequirements()
+        }
+        checkResult = result.succeeded
+        checkMessage = if (result.succeeded) "Root access looks good." else result.stderr.ifBlank { result.stdout }
+    }
+
+    Text("Desktop setup", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+    when (checkResult) {
+        null -> Text("Checking root access…", color = Color.Gray)
+        true -> Text(checkMessage, color = Color(0xFF8AB4FF))
+        false -> Text(
+            "Desktop mode needs root (Magisk/KernelSU/APatch): $checkMessage",
+            color = Color(0xFFCC8800),
+        )
+    }
+    Text("Which distro + compositor should droidtop use?", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
+    LazyColumn(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        items(repositories) { repo ->
+            Box(modifier = Modifier.fillMaxWidth().clickable { selectedId = repo.id }) {
+                androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = repo.id == selectedId, onClick = { selectedId = repo.id })
+                    Text("${repo.os} + ${repo.desktopEnvironment}", color = Color.White)
                 }
             }
         }
     }
+    Button(onClick = {
+        DesktopSetupPrefs.setPreferredPrimaryImageId(context, selectedId)
+        onContinue()
+    }) { Text("Continue") }
+    TextButton(onClick = onContinue) { Text("Skip for now") }
+}
+
+@Composable
+private fun StoragePermissionStep(onGrant: () -> Unit, onSkip: () -> Unit) {
+    Text("One permission needed", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+    Text(
+        "droidtop needs full storage access to read game files directly " +
+            "(including from an SD card) -- a folder picker alone isn't " +
+            "enough for that.",
+        color = Color.Gray,
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    Button(onClick = onGrant) { Text("Grant access") }
+    TextButton(onClick = onSkip) { Text("Skip -- I'm not using this for games") }
+}
+
+@Composable
+private fun GamesFoldersStep(
+    roots: Set<String>,
+    unresolvedFolderWarning: Boolean,
+    onAddFolder: () -> Unit,
+    onDone: () -> Unit,
+) {
+    Text("Game folders", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+    Text(
+        "Add every folder where your Ren'Py, RPG Maker, or Kirikiri games " +
+            "live -- an SD card and internal storage both work. You can add " +
+            "more, or change these, later in Settings.",
+        color = Color.Gray,
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    if (roots.isNotEmpty()) {
+        LazyColumn(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+            items(roots.toList()) { path ->
+                Text(path, color = Color.LightGray, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 4.dp))
+            }
+        }
+    }
+    if (unresolvedFolderWarning) {
+        Text(
+            "That folder couldn't be used directly (this device's storage " +
+                "or SD card layout doesn't match what droidtop expects yet, " +
+                "or it's a cloud-backed folder).",
+            color = Color.Gray,
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+    Button(onClick = onAddFolder) { Text(if (roots.isEmpty()) "Add a folder" else "Add another folder") }
+    TextButton(onClick = onDone) { Text(if (roots.isEmpty()) "Skip for now" else "Done") }
+}
+
+@Composable
+private fun DefaultModeChoiceStep(homeImplementation: HomeRolePrefs.HomeImplementation, onPicked: (String) -> Unit) {
+    Text("Which should droidtop open into?", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+    Text(
+        "This is what happens when you launch droidtop -- everything else " +
+            "you set up stays reachable from the mode switcher (long-press Back).",
+        color = Color.Gray,
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    if (homeImplementation != HomeRolePrefs.HomeImplementation.NONE) {
+        Button(onClick = { onPicked(BackButtonMenu.MODE_STANDARD) }) { Text("My home screen") }
+    }
+    Button(onClick = { onPicked(BackButtonMenu.MODE_DESKTOP) }) { Text("Desktop") }
+    Button(onClick = { onPicked(BackButtonMenu.MODE_HANDHELD) }) { Text("Handheld") }
 }

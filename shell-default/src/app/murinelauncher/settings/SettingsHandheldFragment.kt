@@ -22,6 +22,7 @@ public final class SettingsHandheldFragment : AbstractSettingsFragment() {
         const val PREF_DEFAULT_SECTION: String = "pref_handheld_default_section"
         const val PREF_CONSOLE_SYSTEMS: String = "pref_handheld_console_systems"
         const val PREF_APPS_GRID_COLUMNS: String = "pref_handheld_apps_grid_columns"
+        const val PREF_GAME_FOLDERS: String = "pref_handheld_game_folders"
     }
 
     override fun getPreferenceScreenResId() = R.xml.droidtop_handheld_prefs
@@ -52,6 +53,21 @@ public final class SettingsHandheldFragment : AbstractSettingsFragment() {
                 preference.setOnPreferenceClickListener {
                     val intent = Intent(Intent.ACTION_MAIN).apply {
                         component = ComponentName(requireContext().packageName, "dev.droidtop.app.ConsoleSystemsActivity")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(intent)
+                    true
+                }
+            }
+            PREF_GAME_FOLDERS -> {
+                // Re-entry into onboarding's own GAMES_FOLDERS step (per
+                // direction: mode-specific setup must be re-runnable later,
+                // not onboarding-only) -- same explicit-component-name
+                // pattern as PREF_CONSOLE_SYSTEMS above, same reasoning.
+                preference.setOnPreferenceClickListener {
+                    val intent = Intent(Intent.ACTION_MAIN).apply {
+                        component = ComponentName(requireContext().packageName, "dev.droidtop.app.OnboardingActivity")
+                        putExtra("dev.droidtop.app.EXTRA_START_STEP", "GAMES_FOLDERS")
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
                     startActivity(intent)
