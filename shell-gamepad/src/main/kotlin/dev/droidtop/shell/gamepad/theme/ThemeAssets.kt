@@ -4,115 +4,149 @@ import android.content.Context
 import android.util.Log
 import dev.droidtop.library.theme.EsDeTheme
 import dev.droidtop.library.theme.EsDeThemeParser
+import dev.droidtop.library.theme.EsDeThemeValue
+import dev.droidtop.library.theme.primaryListElement
 import java.io.File
 
 /**
- * Resolves real per-system logo artwork from the bundled DEcaffe theme
- * (see README.md's "Bundled theme" section for attribution/license) for
- * [dev.droidtop.shell.gamepad.GamesSection]'s system carousel -- the
- * `<syslogo>` path ES-DE's own theme.xml resolves via `${system.theme}`
- * (`./system/logos/system-logo-white/${system.theme}.svg`, confirmed by
- * reading the bundled theme.xml directly), applied here the same way:
- * [ConsoleSystemDef.id] *is* that `${system.theme}` value, since
- * EsDeConsoleSystems.kt was generated from the same real ES-DE system list
- * DEcaffe's own asset filenames are keyed by.
+ * Real, generic multi-theme discovery/loading -- deliberately mirrors real
+ * ES-DE's own actual mechanism (`ThemeData::populateThemes`/
+ * `ThemeData::loadFile`, `es-core/src/ThemeData.cpp`, read directly from
+ * the local reference clone, not guessed):
  *
- * Only covers real console systems for now -- droidtop's own invented
- * "systems" (RENPY, RPG_MAKER_*, KIRIKIRI) have no DEcaffe asset to draw
- * from; giving those their own logo/metadata in DEcaffe's exact format is
- * separately scoped, real per-engine design work, not attempted here (see
- * docs/SPEC.md's open items).
+ * - Real ES-DE scans a small list of real theme-holding directories (on
+ *   Android specifically: `getProgramDataPath()+"/themes"`,
+ *   `getAppDataDirectory()+"/themes"`, and a real user theme directory
+ *   under its internal app-data dir) for immediate subdirectories, and
+ *   treats a subdirectory as a valid theme iff it has a real
+ *   `capabilities.xml` file directly inside it (`ThemeData::
+ *   parseThemeCapabilities`'s own `validTheme` flag -- literally just
+ *   "does capabilities.xml exist", nothing deeper). Mirrored here as
+ *   [BUNDLED_THEMES_ASSET_ROOT] (droidtop's APK-bundled equivalent of
+ *   real ES-DE's read-only program-data theme dir) plus [userThemesDir]
+ *   (droidtop's equivalent of real ES-DE's writable user theme
+ *   directory -- where a future real theme downloader, not yet built,
+ *   would extract downloaded themes to).
+ * - A theme's real name is its own folder name (`Theme::getName()` is
+ *   literally `Utils::FileSystem::getStem(path)`) -- never a
+ *   droidtop-invented display name.
+ * - The active theme is a real stored *setting* (`Settings::getString
+ *   ("Theme")` in real ES-DE), looked up against the discovered set by
+ *   name; if unset or no longer present, real ES-DE falls back to
+ *   `sThemes.begin()` -- the FIRST theme alphabetically, case-insensitive
+ *   (`ThemeData::StringComparator` sorts via `toUpper`), not any single
+ *   hardcoded theme. [ThemePrefs] mirrors that exact fallback rule
+ *   instead of hardcoding a specific folder name anywhere.
+ *
+ * Real ES-DE also supports an OLDER, legacy per-system-subfolder theme
+ * layout (`Theme::getThemePath(system)` = `path/<system>/theme.xml`) for
+ * backward compatibility with pre-3.0 "theme sets" -- not mirrored here;
+ * every real theme droidtop has bundled (decaffe, ArtBookNext) uses the
+ * modern single-root-`theme.xml`-with-`${system.theme}`-driven-`<include>`
+ * layout, which [EsDeThemeParser.parseWithCapabilities] already handles.
+ * A real, honest gap, not a guess -- flagged the same way this project
+ * flags other deliberately-deferred real ES-DE behavior.
  */
 internal object ThemeAssets {
-    private const val ASSET_PREFIX = "themes/decaffe-es-de/system/logos/system-logo-white"
-
-    /**
-     * Copies the matching bundled SVG to [Context.getCacheDir] (Coil/Compose
-     * load from a real file path, not an AssetManager stream directly) and
-     * returns that path, or null if this system has no DEcaffe logo asset.
-     * Cached on disk across calls -- these assets never change at runtime,
-     * so there's no reason to re-copy on every recomposition/scan.
-     */
-    fun systemLogoPath(context: Context, systemId: String): String? {
-        val assetPath = "$ASSET_PREFIX/$systemId.svg"
-        val cacheFile = File(File(context.cacheDir, "theme_logos"), "$systemId.svg")
-        if (cacheFile.exists()) return cacheFile.absolutePath
-
-        return try {
-            context.assets.open(assetPath).use { input ->
-                cacheFile.parentFile?.mkdirs()
-                cacheFile.outputStream().use { output -> input.copyTo(output) }
-            }
-            cacheFile.absolutePath
-        } catch (t: Exception) {
-            // Real, expected case for most systems -- DEcaffe's own asset
-            // set (204 real logos) doesn't cover every one of ES-DE's 195
-            // systems 1:1 with droidtop's alias list, and definitely
-            // doesn't cover droidtop's invented engine "systems". Not an
-            // error worth logging above debug: GroupCard just renders
-            // text-only for these, same as before this was wired in.
-            Log.d("droidtop.ThemeAssets", "No DEcaffe logo for system '$systemId'")
-            null
-        }
-    }
-
-    private const val THEME_ROOT_ASSET = "themes/decaffe-es-de"
+    private const val BUNDLED_THEMES_ASSET_ROOT = "themes"
     private const val EXTRACTED_MARKER = ".extracted"
 
-    /**
-     * Parses the bundled DEcaffe theme's real theme.xml -- needs a real
-     * filesystem path (not an AssetManager stream) since
-     * [EsDeThemeParser.parse]'s own PATH-property resolution builds paths
-     * relative to the theme file's directory on disk (ES-DE's own real
-     * convention, and Compose/Coil also need a real file path to load
-     * images from, not an asset URI). Extracts the whole real theme
-     * folder (~1244 files) to [Context.getCacheDir] once, marked with a
-     * sentinel file so repeat calls don't re-copy -- a real, one-time
-     * cost, not per-recomposition.
-     *
-     * [systemId] is real ES-DE's own `${system.theme}` value (droidtop's
-     * [dev.droidtop.library.consoles.ConsoleSystemDef.id] IS that value,
-     * generated from the same real system list DEcaffe's own asset
-     * filenames are keyed by -- see that class's own doc comment) --
-     * passing it resolves per-system metadata includes (systemName/
-     * systemManufacturer/systemReleaseYear/...) that a `null` (theme-wide,
-     * no system context) parse can't reach at all, since their real
-     * include paths are literally `.../${system.theme}.xml`. Real ES-DE
-     * itself parses a theme once PER SYSTEM for exactly this reason, not
-     * once globally -- [systemThemeCache] mirrors that (one real,
-     * relatively expensive multi-file parse per system id, cached rather
-     * than repeated every recomposition/focus change).
-     */
-    private val systemThemeCache = mutableMapOf<String?, EsDeTheme?>()
+    data class ThemeDescriptor(val name: String, val bundledAssetFolder: String?, val userDir: File?)
 
-    fun loadDecaffeTheme(context: Context, systemId: String? = null): EsDeTheme? {
-        systemThemeCache[systemId]?.let { return it }
-        val themeDir = File(context.cacheDir, "theme_decaffe")
-        val marker = File(themeDir, EXTRACTED_MARKER)
-        if (!marker.exists()) {
-            try {
-                extractAssetDir(context, THEME_ROOT_ASSET, themeDir)
-                marker.createNewFile()
-            } catch (t: Exception) {
-                Log.e("droidtop.ThemeAssets", "Failed to extract bundled theme", t)
-                return null
+    /**
+     * Real, filesystem-driven discovery -- no compiled-in list of theme
+     * names. Bundled (APK asset) themes are scanned first, then real user
+     * themes (a future downloader's install target) -- a same-named user
+     * theme shadows a bundled one, matching real ES-DE's own scan order
+     * (user theme directory scanned last, so `sThemes[name] = theme`
+     * naturally lets it win).
+     */
+    fun discoverThemes(context: Context): List<ThemeDescriptor> {
+        val byName = linkedMapOf<String, ThemeDescriptor>()
+        val bundledFolders = try {
+            context.assets.list(BUNDLED_THEMES_ASSET_ROOT) ?: emptyArray()
+        } catch (t: Exception) {
+            emptyArray()
+        }
+        for (folder in bundledFolders) {
+            if (assetHasCapabilities(context, folder)) {
+                byName[folder] = ThemeDescriptor(name = folder, bundledAssetFolder = folder, userDir = null)
             }
         }
+        val userDirs = userThemesDir(context).listFiles { f -> f.isDirectory } ?: emptyArray()
+        for (dir in userDirs) {
+            if (File(dir, "capabilities.xml").isFile) {
+                byName[dir.name] = ThemeDescriptor(name = dir.name, bundledAssetFolder = null, userDir = dir)
+            }
+        }
+        return byName.values.sortedBy { it.name.uppercase() }
+    }
+
+    private fun assetHasCapabilities(context: Context, folder: String): Boolean =
+        try {
+            context.assets.list("$BUNDLED_THEMES_ASSET_ROOT/$folder")?.contains("capabilities.xml") == true
+        } catch (t: Exception) {
+            false
+        }
+
+    private fun userThemesDir(context: Context): File = File(context.filesDir, "themes")
+
+    /**
+     * Resolves [ThemePrefs]' selected theme name against real discovery,
+     * falling back to the first theme alphabetically (mirroring real
+     * ES-DE's `sThemes.begin()` fallback) when the stored name is unset or
+     * no longer present -- never a hardcoded folder name.
+     */
+    private fun resolveActiveTheme(context: Context): ThemeDescriptor? {
+        val discovered = discoverThemes(context)
+        if (discovered.isEmpty()) return null
+        val selected = ThemePrefs.get(context)
+        return discovered.firstOrNull { it.name == selected } ?: discovered.first()
+    }
+
+    private val systemThemeCache = mutableMapOf<Pair<String, String?>, EsDeTheme?>()
+
+    /**
+     * Loads the currently active theme (real, discovered + selected per
+     * [resolveActiveTheme]), parsed for [systemId] specifically -- real
+     * ES-DE parses a theme once PER SYSTEM (its own `${system.theme}`
+     * substitution differs per system), so this is cached per (theme
+     * name, systemId) pair rather than parsed fresh every call.
+     */
+    fun loadActiveTheme(context: Context, systemId: String? = null): EsDeTheme? {
+        val active = resolveActiveTheme(context) ?: return null
+        val cacheKey = active.name to systemId
+        systemThemeCache[cacheKey]?.let { return it }
+
+        val themeDir = when {
+            active.userDir != null -> active.userDir
+            active.bundledAssetFolder != null -> extractedBundledThemeDir(context, active.bundledAssetFolder)
+            else -> null
+        } ?: return null
+
         val themeFile = File(themeDir, "theme.xml")
-        // Real ES-DE default-selection rule for every axis (aspectRatio/
-        // colorScheme/fontSize/variant): whichever value the theme's own
-        // real capabilities.xml declares FIRST -- confirmed against real
-        // ES-DE source (ThemeData.cpp's own `mSelectedX = mXs.front()`
-        // pattern for each axis). Extracted alongside theme.xml above, so
-        // it's already sitting in themeDir with the same real path.
         val theme = try {
             EsDeThemeParser.parseWithCapabilities(themeFile, systemTheme = systemId)
         } catch (t: Exception) {
-            Log.e("droidtop.ThemeAssets", "Failed to parse bundled theme.xml", t)
+            Log.e("droidtop.ThemeAssets", "Failed to parse theme '${active.name}'", t)
             null
         }
-        systemThemeCache[systemId] = theme
+        systemThemeCache[cacheKey] = theme
         return theme
+    }
+
+    private fun extractedBundledThemeDir(context: Context, assetFolder: String): File {
+        val themeDir = File(context.cacheDir, "theme_$assetFolder")
+        val marker = File(themeDir, EXTRACTED_MARKER)
+        if (!marker.exists()) {
+            try {
+                extractAssetDir(context, "$BUNDLED_THEMES_ASSET_ROOT/$assetFolder", themeDir)
+                marker.createNewFile()
+            } catch (t: Exception) {
+                Log.e("droidtop.ThemeAssets", "Failed to extract bundled theme '$assetFolder'", t)
+            }
+        }
+        return themeDir
     }
 
     private fun extractAssetDir(context: Context, assetPath: String, destDir: File) {
@@ -128,7 +162,7 @@ internal object ThemeAssets {
                     destDir.outputStream().use { output -> input.copyTo(output) }
                 }
             } catch (t: Exception) {
-                // Genuinely empty directory (rare in this bundle) -- fine, nothing to copy.
+                // Genuinely empty directory -- fine, nothing to copy.
             }
             return
         }
@@ -136,5 +170,24 @@ internal object ThemeAssets {
         for (child in children) {
             extractAssetDir(context, "$assetPath/$child", File(destDir, child))
         }
+    }
+
+    /**
+     * Real per-system carousel/syslogo art, resolved generically from
+     * whichever theme is active -- NOT a hardcoded decaffe-specific asset
+     * path. Real ES-DE themes declare their system-logo image as a
+     * `staticImage` property (or a `<syslogo>`-named `<image>`'s `path`,
+     * for themes using the older split-element convention) on the
+     * "system" view's own primary browsing element (carousel/grid/
+     * textlist), already resolved per-system by [loadActiveTheme]'s own
+     * `${system.theme}` substitution -- this just reads that value back
+     * out instead of maintaining a second, separate lookup.
+     */
+    fun systemLogoPath(context: Context, systemId: String): String? {
+        val theme = loadActiveTheme(context, systemId) ?: return null
+        val listElement = theme.views["system"]?.primaryListElement() ?: return null
+        val path = listElement.valueOrNull<EsDeThemeValue.Path>("staticImage")
+            ?: listElement.valueOrNull<EsDeThemeValue.Path>("path")
+        return path?.resolved
     }
 }

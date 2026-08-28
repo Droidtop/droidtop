@@ -1,0 +1,208 @@
+<theme>
+   <!-- colors -->
+   <colorScheme name="dark-screenshots,dark-noir,dark-circuit,dark-outline,dark-original,custom">
+      <variables>
+         <!-- System View -->
+         <logoSource>./_inc/systems/logos</logoSource>
+         <systemBackgroundColor>000000</systemBackgroundColor>
+         <systemArtSaturation>1</systemArtSaturation>
+         <systemArtColor>ffffffdd</systemArtColor>
+         <systemLogoColor>ffffff</systemLogoColor>
+         <!-- Gamelist View - List Variants -->
+         <gamelistListBackgroundColor>222222</gamelistListBackgroundColor>
+         <gamelistListLogoColor>ffffffaa</gamelistListLogoColor>
+         <gamelistListTextlistBackgroundColor>111111</gamelistListTextlistBackgroundColor>
+         <gamelistListTextlistSelectedColor>ffffff</gamelistListTextlistSelectedColor>
+         <gamelistListTextlistSelectedBackgroundColor>444444</gamelistListTextlistSelectedBackgroundColor>
+         <gamelistListTextlistUnselectedColor>ffffff55</gamelistListTextlistUnselectedColor>
+         <gamelistListMetadataColor>ffffff88</gamelistListMetadataColor>
+         <gamelistListMetadataIconColor>ffffff33</gamelistListMetadataIconColor>
+         <gamelistListRatingColor>ffffff33</gamelistListRatingColor>
+         <gamelistListDescriptionColor>ffffffee</gamelistListDescriptionColor>
+         <!-- Help System -->
+         <helpBackgroundColor>111111ee</helpBackgroundColor>
+         <helpIconColor>ffffff</helpIconColor>
+         <helpTextColor>999999</helpTextColor>
+         <!-- System Status -->
+         <statusColor>ffffff</statusColor>
+         <statusBackgroundColor>111111ee</statusBackgroundColor>
+      </variables>
+   </colorScheme>
+   <colorScheme name="light-screenshots,light-noir,light-circuit,light-outline,light-original">
+      <variables>
+         <!-- System View -->
+         <logoSource>./_inc/systems/logos</logoSource>
+         <systemBackgroundColor>000000</systemBackgroundColor>
+         <systemArtSaturation>1</systemArtSaturation>
+         <systemArtColor>ffffff</systemArtColor>
+         <systemLogoColor>ffffff</systemLogoColor>
+         <!-- Gamelist View - List Variants -->
+         <gamelistListBackgroundColor>dddddd</gamelistListBackgroundColor>
+         <gamelistListLogoColor>000000cc</gamelistListLogoColor>
+         <gamelistListTextlistBackgroundColor>eeeeee</gamelistListTextlistBackgroundColor>
+         <gamelistListTextlistSelectedColor>ffffff</gamelistListTextlistSelectedColor>
+         <gamelistListTextlistSelectedBackgroundColor>111111</gamelistListTextlistSelectedBackgroundColor>
+         <gamelistListTextlistUnselectedColor>444444</gamelistListTextlistUnselectedColor>
+         <gamelistListMetadataColor>000000</gamelistListMetadataColor>
+         <gamelistListMetadataIconColor>00000055</gamelistListMetadataIconColor>
+         <gamelistListRatingColor>000000cc</gamelistListRatingColor>
+         <gamelistListDescriptionColor>000000</gamelistListDescriptionColor>
+         <!-- Help System -->
+         <helpBackgroundColor>eeeeee</helpBackgroundColor>
+         <helpIconColor>111111</helpIconColor>
+         <helpTextColor>444444</helpTextColor>
+         <!-- System Status -->
+         <statusColor>111111</statusColor>
+         <statusBackgroundColor>eeeeee</statusBackgroundColor>
+      </variables>
+   </colorScheme>
+   <colorScheme name="steam-os-screenshots,steam-os-noir,steam-os-circuit,steam-os-outline,steam-os-original">
+      <variables>
+         <!-- System View -->
+         <logoSource>./_inc/systems/logos</logoSource>
+         <systemBackgroundColor>070a0f</systemBackgroundColor>
+         <systemArtSaturation>1</systemArtSaturation>
+         <systemArtColor>ffffffdd</systemArtColor>
+         <systemLogoColor>ffffff</systemLogoColor>
+         <!-- Gamelist View - List Variants -->
+         <gamelistListBackgroundColor>23262F</gamelistListBackgroundColor>
+         <gamelistListLogoColor>ffffffcc</gamelistListLogoColor>
+         <gamelistListTextlistBackgroundColor>0D141C</gamelistListTextlistBackgroundColor>
+         <gamelistListTextlistSelectedColor>ffffff</gamelistListTextlistSelectedColor>
+         <gamelistListTextlistSelectedBackgroundColor>3D434F</gamelistListTextlistSelectedBackgroundColor>
+         <gamelistListTextlistUnselectedColor>3D434F</gamelistListTextlistUnselectedColor>
+         <gamelistListMetadataColor>ffffffaa</gamelistListMetadataColor>
+         <gamelistListMetadataIconColor>ffffff33</gamelistListMetadataIconColor>
+         <gamelistListRatingColor>ffffff33</gamelistListRatingColor>
+         <gamelistListDescriptionColor>ffffff</gamelistListDescriptionColor>
+         <!-- Help System -->
+         <helpBackgroundColor>0D141C</helpBackgroundColor>
+         <helpIconColor>ffffff</helpIconColor>
+         <helpTextColor>ffffffaa</helpTextColor>
+         <!-- System Status -->
+         <statusColor>ffffff</statusColor>
+         <statusBackgroundColor>0D141C</statusBackgroundColor>
+      </variables>
+   </colorScheme>
+   <colorScheme name="snes-screenshots,snes-noir,snes-circuit,snes-outline,snes-original">
+      <variables>
+         <!-- System View -->
+         <logoSource>./_inc/systems/logos</logoSource>
+         <systemBackgroundColor>140e26</systemBackgroundColor>
+         <systemArtSaturation>1</systemArtSaturation>
+         <systemArtColor>ffffffdd</systemArtColor>
+         <systemLogoColor>ffffff</systemLogoColor>
+         <!-- Gamelist View - List Variants -->
+         <gamelistListBackgroundColor>231942</gamelistListBackgroundColor>
+         <gamelistListLogoColor>ffffffaa</gamelistListLogoColor>
+         <gamelistListTextlistBackgroundColor>140e26</gamelistListTextlistBackgroundColor>
+         <gamelistListTextlistSelectedColor>ffffff</gamelistListTextlistSelectedColor>
+         <gamelistListTextlistSelectedBackgroundColor>402e79</gamelistListTextlistSelectedBackgroundColor>
+         <gamelistListTextlistUnselectedColor>ffffff55</gamelistListTextlistUnselectedColor>
+         <gamelistListMetadataColor>ffffff88</gamelistListMetadataColor>
+         <gamelistListMetadataIconColor>a293d5</gamelistListMetadataIconColor>
+         <gamelistListRatingColor>a293d5</gamelistListRatingColor>
+         <gamelistListDescriptionColor>ffffff</gamelistListDescriptionColor>
+         <!-- Help System -->
+         <helpBackgroundColor>140e26</helpBackgroundColor>
+         <helpIconColor>a293d5</helpIconColor>
+         <helpTextColor>ffffffaa</helpTextColor>
+         <!-- System Status -->
+         <statusColor>ffffff</statusColor>
+         <statusBackgroundColor>140e26</statusBackgroundColor>
+      </variables>
+   </colorScheme>
+   <colorScheme name="famicom-screenshots,famicom-noir,famicom-circuit,famicom-outline,famicom-original">
+      <variables>
+         <!-- System View -->
+         <logoSource>./_inc/systems/logos</logoSource>
+         <systemBackgroundColor>000000</systemBackgroundColor>
+         <systemArtSaturation>0</systemArtSaturation>
+         <systemArtColor>DCD6B6dd</systemArtColor>
+         <systemLogoColor>DCD6B6</systemLogoColor>
+         <!-- Gamelist View - List Variants -->
+         <gamelistListBackgroundColor>DCD6B6</gamelistListBackgroundColor>
+         <gamelistListLogoColor>DCD6B6</gamelistListLogoColor>
+         <gamelistListTextlistBackgroundColor>2f090e</gamelistListTextlistBackgroundColor>
+         <gamelistListTextlistSelectedColor>DCD6B6</gamelistListTextlistSelectedColor>
+         <gamelistListTextlistSelectedBackgroundColor>090203</gamelistListTextlistSelectedBackgroundColor>
+         <gamelistListTextlistUnselectedColor>DCD6B655</gamelistListTextlistUnselectedColor>
+         <gamelistListMetadataColor>2f090e</gamelistListMetadataColor>
+         <gamelistListMetadataIconColor>4d1116</gamelistListMetadataIconColor>
+         <gamelistListRatingColor>4d1116</gamelistListRatingColor>
+         <gamelistListDescriptionColor>0e0304</gamelistListDescriptionColor>
+         <!-- Help System -->
+         <helpBackgroundColor>2f090e</helpBackgroundColor>
+         <helpIconColor>DCD6B6</helpIconColor>
+         <helpTextColor>DCD6B6aa</helpTextColor>
+         <!-- System Status -->
+         <statusColor>DCD6B6</statusColor>
+         <statusBackgroundColor>2f090e</statusBackgroundColor>
+      </variables>
+   </colorScheme>
+   <colorScheme name="oled-screenshots,oled-noir,oled-circuit,oled-outline,oled-original">
+      <variables>
+         <!-- System View -->
+         <logoSource>./_inc/systems/logos</logoSource>
+         <systemBackgroundColor>000000</systemBackgroundColor>
+         <systemArtSaturation>1</systemArtSaturation>
+         <systemArtColor>ffffff</systemArtColor>
+         <systemLogoColor>ffffff</systemLogoColor>
+         <!-- Gamelist View - List Variants -->
+         <gamelistListBackgroundColor>111111</gamelistListBackgroundColor>
+         <gamelistListLogoColor>ffffffcc</gamelistListLogoColor>
+         <gamelistListTextlistBackgroundColor>000000</gamelistListTextlistBackgroundColor>
+         <gamelistListTextlistSelectedColor>000000</gamelistListTextlistSelectedColor>
+         <gamelistListTextlistSelectedBackgroundColor>ffffff</gamelistListTextlistSelectedBackgroundColor>
+         <gamelistListTextlistUnselectedColor>ffffff55</gamelistListTextlistUnselectedColor>
+         <gamelistListMetadataColor>ffffff</gamelistListMetadataColor>
+         <gamelistListMetadataIconColor>ffffff44</gamelistListMetadataIconColor>
+         <gamelistListDescriptionColor>ffffff</gamelistListDescriptionColor>
+         <gamelistListRatingColor>ffffff33</gamelistListRatingColor>
+         <!-- Help System -->
+         <helpBackgroundColor>000000ee</helpBackgroundColor>
+         <helpIconColor>ffffff</helpIconColor>
+         <helpTextColor>999999</helpTextColor>
+         <!-- System Status -->
+         <statusColor>ffffff</statusColor>
+         <statusBackgroundColor>000000ee</statusBackgroundColor>
+      </variables>
+   </colorScheme>
+   <!-- artwork settings -->
+   <colorScheme name="dark-screenshots,light-screenshots,steam-os-screenshots,snes-screenshots,famicom-screenshots,oled-screenshots,custom">
+      <variables>
+         <artworkSource>./_inc/systems/artwork-screenshots</artworkSource>
+         <systemViewLogoPos>0.5 0.5</systemViewLogoPos>
+      </variables>
+   </colorScheme>
+   <colorScheme name="dark-noir,light-noir,steam-os-noir,snes-noir,famicom-noir,oled-noir">
+      <variables>
+         <artworkSource>./_inc/systems/artwork-noir</artworkSource>
+         <systemViewLogoPos>0.5 0.5</systemViewLogoPos>
+      </variables>
+   </colorScheme>
+   <colorScheme name="dark-circuit,light-circuit,steam-os-circuit,snes-circuit,famicom-circuit,oled-circuit">
+      <variables>
+         <artworkSource>./_inc/systems/artwork-circuit</artworkSource>
+         <systemViewLogoPos>0.5 0.5</systemViewLogoPos>
+      </variables>
+   </colorScheme>
+   <colorScheme name="dark-outline,light-outline,steam-os-outline,snes-outline,famicom-outline,oled-outline">
+      <variables>
+         <artworkSource>./_inc/systems/artwork-outline</artworkSource>
+         <systemViewLogoPos>0.5 0.33</systemViewLogoPos>
+      </variables>
+   </colorScheme>
+   <colorScheme name="dark-original,light-original,steam-os-original,snes-original,famicom-original,oled-original">
+      <variables>
+         <artworkSource>./_inc/systems/artwork</artworkSource>
+         <systemViewLogoPos>0.5 0.5</systemViewLogoPos>
+      </variables>
+   </colorScheme>
+   <colorScheme name="custom">
+      <variables>
+         <customizationPath>./theme-customizations/colors.xml</customizationPath>
+      </variables>
+   </colorScheme>
+   <include>${customizationPath}</include>
+</theme>

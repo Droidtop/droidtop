@@ -1,0 +1,155 @@
+<theme>
+   <include>./../theme.xml</include>
+   <view name="gamelist">
+      <text name="custom-collection-name">
+         <origin>0.5 0</origin>
+         <metadata>systemFullname</metadata>
+         <color>${gamelistListLogoColor}</color>
+         <letterCase>uppercase</letterCase>
+         <horizontalAlignment>center</horizontalAlignment>
+         <lineSpacing>1</lineSpacing>
+      </text>
+   </view>
+   <variant name="
+      gamelist-list-basic,
+      gamelist-list-basic-nh
+      ">
+      <view name="gamelist">
+         <text name="custom-collection-name">
+            <pos>0.5 0.15625</pos><!-- 50% 75 -->
+            <fontSize>0.041666666666667</fontSize><!-- 20 -->
+         </text>
+      </view>
+      <aspectRatio name="4:3">
+         <view name="gamelist">
+            <text name="custom-collection-name">
+               <size>0.359375 0.041666666666667</size><!-- 230 80 -->
+            </text>
+         </view>
+      </aspectRatio>
+      <aspectRatio name="16:9">
+         <view name="gamelist">
+            <text name="custom-collection-name">
+               <size>0.269636576787808 0.041666666666667</size><!-- 230 80 -->
+            </text>
+         </view>
+      </aspectRatio>
+      <aspectRatio name="16:10">
+         <view name="gamelist">
+            <text name="custom-collection-name">
+               <size>0.2734375 0.041666666666667</size><!-- 210 80 -->
+            </text>
+         </view>
+      </aspectRatio>
+      <aspectRatio name="1:1">
+         <view name="gamelist">
+            <text name="custom-collection-name">
+               <size>0.359375 0.041666666666667</size><!-- 195 80 -->
+            </text>
+         </view>
+      </aspectRatio>
+      <aspectRatio name="8:7">
+         <view name="gamelist">
+            <text name="custom-collection-name">
+               <size>0.359375 0.041666666666667</size><!-- 195 80 -->
+            </text>
+         </view>
+      </aspectRatio>
+      <aspectRatio name="5:3_vertical">
+         <view name="gamelist">
+            <text name="custom-collection-name">
+               <visible>false</visible>
+            </text>
+         </view>
+      </aspectRatio>
+   </variant>
+   <variant name="
+      gamelist-list-metadata-miximage,
+      gamelist-list-metadata-miximage-nh,
+      gamelist-list-metadata-cover,
+      gamelist-list-metadata-cover-nh,
+      gamelist-list-metadata-screenshot-marquee,
+      gamelist-list-metadata-screenshot-marquee-nh,
+      gamelist-list-metadata-screenshot-cover,
+      gamelist-list-metadata-screenshot-cover-nh,
+      gamelist-list-cover,
+      gamelist-list-cover-nh,
+      gamelist-list-screenshot-marquee,
+      gamelist-list-screenshot-marquee-nh
+      ">
+      <view name="gamelist">
+         <text name="custom-collection-name">
+            <fontSize>0.041666666666667</fontSize><!-- 20 -->
+         </text>
+      </view>
+      <aspectRatio name="4:3">
+         <view name="gamelist">
+            <text name="custom-collection-name">
+               <pos>0.25 0.15625</pos><!-- 160 75 -->
+               <size>0.359375 0.041666666666667</size><!-- 230 80 -->
+            </text>
+         </view>
+      </aspectRatio>
+      <aspectRatio name="16:9">
+         <view name="gamelist">
+            <text name="custom-collection-name">
+               <pos>0.18757327080891 0.15625</pos><!-- 160 75 -->
+               <size>0.269636576787808 0.041666666666667</size><!-- 230 80 -->
+            </text>
+         </view>
+      </aspectRatio>
+      <aspectRatio name="16:10">
+         <view name="gamelist">
+            <text name="custom-collection-name">
+               <pos>0.1875 0.15625</pos><!-- 144 75 -->
+               <size>0.2734375 0.036666666666667</size><!-- 210 80 -->
+            </text>
+         </view>
+      </aspectRatio>
+      <aspectRatio name="19.5:9">
+         <view name="gamelist">
+            <text name="custom-collection-name">
+               <pos>0.153846153846154 0.156666666666667</pos><!-- 360 188 -->
+               <size>0.226495726495726 0.036666666666667</size><!-- 530 44 -->
+            </text>
+         </view>
+      </aspectRatio>
+      <aspectRatio name="1:1">
+         <view name="gamelist">
+            <text name="custom-collection-name">
+               <pos>0.25 0.15625</pos><!-- 120 75 -->
+               <size>0.359375 0.041666666666667</size><!-- 195 80 -->
+            </text>
+         </view>
+      </aspectRatio>
+      <aspectRatio name="8:7">
+         <view name="gamelist">
+            <text name="custom-collection-name">
+               <pos>0.25 0.15625</pos><!-- 120 75 -->
+               <size>0.359375 0.041666666666667</size><!-- 195 80 -->
+            </text>
+         </view>
+      </aspectRatio>
+      <aspectRatio name="5:3_vertical">
+         <view name="gamelist">
+            <text name="custom-collection-name">
+               <visible>false</visible>
+            </text>
+         </view>
+      </aspectRatio>
+   </variant>
+   <variant name="
+      gamelist-grid-cover,
+      gamelist-grid-cover-nh,
+      gamelist-grid-cover-steamgriddb,
+      gamelist-grid-cover-steamgriddb-nh,
+      gamelist-grid-screenshot,
+      gamelist-grid-screenshot-nh
+      ">
+      <view name="gamelist">
+         <text name="custom-collection-name">
+            <visible>false</visible>
+         </text>
+      </view>
+   </variant>
+</theme>
