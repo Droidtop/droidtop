@@ -30,11 +30,13 @@ package dev.droidtop.library.theme
  *
  * Parsing coverage and rendering coverage are real, separate things: every
  * type here parses into the real data model, but rendering
- * ([dev.droidtop.shell.gamepad.theme.EsDeThemedView]) is honestly partial
- * for `badges`/`rating`/`gamelistinfo`/`gameselector` -- they need real
- * per-game metadata (favorites, ratings, play counts) droidtop's own
- * [dev.droidtop.library.LibraryEntry] doesn't model yet, so rendering them
- * would mean fabricating data, not a real gap in the parser itself.
+ * ([dev.droidtop.shell.gamepad.theme.EsDeThemedView]) is still honestly
+ * partial for `badges`/`gamelistinfo` -- `rating`/`datetime` are now real,
+ * rendered (LibraryEntry.rating/releaseDate exist, populated by real
+ * ScreenScraper/TheGamesDB scrapes), but `badges`/`gamelistinfo` need
+ * real favorite/kidgame/hidden flags and a real list-count context this
+ * element type alone doesn't carry, respectively -- still not modeled,
+ * so rendering them would still mean fabricating data.
  */
 data class EsDeTheme(
     val variables: Map<String, String>,
