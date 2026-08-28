@@ -292,13 +292,26 @@ private fun ConsoleSystemsScreen() {
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.fillMaxWidth().gamepadFocusable { romFoldersOpen = true }.padding(vertical = 8.dp),
                 )
-                TextButton(onClick = { scraperSettingsOpen = true }) {
+                // Real, matching this screen's other two rows -- this used
+                // to be a plain TextButton (Material's touch-ripple
+                // widget), the only row on this whole screen with no
+                // .gamepadFocusable and no shared visual style, an actual
+                // D-pad navigation dead end on a screen that's otherwise
+                // fully gamepad-navigable. Not a hypothetical: reported
+                // directly as the settings menu being "wired together
+                // weirdly."
+                run {
                     // ScreenScraper (the real default) works with zero
                     // configuration -- only TheGamesDB genuinely needs a
                     // key before it can scrape at all, so "not yet set up"
                     // only applies when TheGamesDB is the selected source.
                     val needsSetup = ScraperSourcePrefs.get(context) == ScraperSource.THEGAMESDB && !TheGamesDbPrefs.isConfigured(context)
-                    Text(if (needsSetup) "Set up ROM scraper credentials" else "ROM scraper credentials -- edit")
+                    Text(
+                        if (needsSetup) "Set up ROM scraper credentials" else "ROM scraper credentials -- edit",
+                        color = Color(0xFF8AB4FF),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.fillMaxWidth().gamepadFocusable { scraperSettingsOpen = true }.padding(vertical = 8.dp),
+                    )
                 }
                 scrapeStatus?.let {
                     Text(it, color = Color(0xFF8AB4FF), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
