@@ -43,6 +43,7 @@ import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 /**
  * Renders a parsed [EsDeThemeView] as ONE coherent screen -- every
@@ -125,16 +126,20 @@ fun EsDeThemedView(
                 "video", "animation" -> EsDeThemedFallbackImage(element, viewWidth, viewHeight, gameSelection)
                 // Real, live-rendered -- ES-DE's own "clock" type has no
                 // "metadata" property at all (confirmed against its real
-                // schema), unlike "datetime". "datetime" is a genuinely
-                // different element: it's metadata-bound (release date,
-                // last played, ...), and rendering it as a live clock was
-                // a real bug -- a theme's own <datetime metadata=
-                // "releasedate" format="%Y"> was showing today's actual
-                // year, since droidtop's LibraryEntry doesn't model
-                // release dates. Bucketed with badges/rating/gamelistinfo
-                // below instead: parsed, not rendered, until real
-                // per-game metadata exists to bind it to.
+                // schema), unlike "datetime".
                 "clock" -> EsDeThemedClock(element, viewWidth, viewHeight)
+                // Real, now-unblocked: LibraryEntry.releaseDate exists
+                // (see that field's own doc comment -- real per-game
+                // metadata, scraped via ScreenScraper/TheGamesDB), so a
+                // theme's own real <datetime metadata="releasedate"> can
+                // finally bind to real data instead of parsing-but-never-
+                // rendering. Genuinely different from "clock": this reads
+                // one static value once, not a live-ticking wall clock.
+                "datetime" -> EsDeThemedDateTime(element, viewWidth, viewHeight, gameSelection)
+                // Real, now-unblocked the same way: LibraryEntry.rating
+                // exists (0.0-1.0, same real convention real ES-DE's own
+                // MD_RATING uses).
+                "rating" -> EsDeThemedRating(element, viewWidth, viewHeight, gameSelection)
                 // The real fix described above: positioned/sized exactly
                 // like any other themed element, using the SAME EsDeCarousel/
                 // EsDeGrid/EsDeTextList composables that already read the
@@ -316,11 +321,26 @@ private fun EsDeThemedText(element: EsDeThemeElement, viewWidth: Dp, viewHeight:
     // implicitly entry 0 of whichever gameselector is in scope (matches
     // DEcaffe's own pairing of this element with `screen2`'s explicit
     // `gameselectorEntry=0` poster -- same featured game, paired caption).
+    // Real, extended beyond just "name" now that LibraryEntry actually
+    // models the rest of real ES-DE's own MetaData fields (description/
+    // developer/publisher/genre/players -- see that field's own doc
+    // comment): every metadata-bound `text` element real ES-DE themes use
+    // for these keys now resolves to real scraped data instead of always
+    // falling through to `defaultValue`.
     val metadata = element.valueOrNull<EsDeThemeValue.Str>("metadata")?.value
-    val resolvedText = if (metadata == "name") {
-        val gameselectorEntry = element.valueOrNull<EsDeThemeValue.UInt>("gameselectorEntry")?.value?.toInt() ?: 0
-        gameSelection.getOrNull(gameselectorEntry)?.title
-            ?: element.valueOrNull<EsDeThemeValue.Str>("defaultValue")?.value
+    val gameselectorEntry = element.valueOrNull<EsDeThemeValue.UInt>("gameselectorEntry")?.value?.toInt() ?: 0
+    val selectedGame = gameSelection.getOrNull(gameselectorEntry)
+    val metadataText = when (metadata) {
+        "name" -> selectedGame?.title
+        "desc" -> selectedGame?.description
+        "developer" -> selectedGame?.developer
+        "publisher" -> selectedGame?.publisher
+        "genre" -> selectedGame?.genre
+        "players" -> selectedGame?.players
+        else -> null
+    }
+    val resolvedText = if (metadata != null) {
+        metadataText ?: element.valueOrNull<EsDeThemeValue.Str>("defaultValue")?.value
     } else {
         element.valueOrNull<EsDeThemeValue.Str>("text")?.value
     } ?: return
@@ -430,11 +450,12 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
 }
 
 /**
- * Real, live-updating `datetime`/`clock` rendering -- current wall-clock
- * time, formatted via the element's own real `format` property when
- * present (ES-DE's own strftime-style format string; falls back to a
- * plain default). Ticks every second via a real Compose
- * LaunchedEffect/delay loop, not a one-shot render.
+ * Real, live-updating `clock` rendering -- current wall-clock time,
+ * formatted via the element's own real `format` property when present
+ * (ES-DE's own strftime-style format string; falls back to a plain
+ * default). Ticks every second via a real Compose LaunchedEffect/delay
+ * loop, not a one-shot render. See [EsDeThemedDateTime] for the
+ * genuinely different, metadata-bound (not live) `datetime` element.
  */
 @Composable
 private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp) {
@@ -467,6 +488,100 @@ private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         fontSize = fontSizeSp,
         modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY),
     )
+}
+
+/**
+ * Real, metadata-bound `datetime` rendering -- genuinely different from
+ * [EsDeThemedClock]: reads one static real per-game date value (currently
+ * only `releasedate`, real ES-DE's own "YYYYMMDDT000000" MD_DATE
+ * convention -- see [LibraryEntry.releaseDate]'s own doc comment) and
+ * formats it via the element's own real strftime-style `format` property
+ * ONCE, not a live-ticking clock. Other real ES-DE datetime metadata keys
+ * (`lastplayed`) aren't modeled on [LibraryEntry] yet -- a real, honest
+ * gap, not silently pretended away.
+ */
+@Composable
+private fun EsDeThemedDateTime(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp, gameSelection: List<LibraryEntry>) {
+    val metadata = element.valueOrNull<EsDeThemeValue.Str>("metadata")?.value
+    // Real ES-DE's own datetime schema has no gameselectorEntry property
+    // (confirmed against EsDeTheme.kt's schema) -- implicit entry 0,
+    // same real convention already used for text's own metadata binding.
+    val rawDate = when (metadata) {
+        "releasedate" -> gameSelection.getOrNull(0)?.releaseDate
+        else -> null
+    }
+    val format = element.valueOrNull<EsDeThemeValue.Str>("format")?.value ?: "%Y-%m-%d"
+    val formatted = remember(rawDate, format) {
+        rawDate?.let {
+            runCatching {
+                val sourceFormat = SimpleDateFormat("yyyyMMdd'T'HHmmss", Locale.US)
+                sourceFormat.timeZone = TimeZone.getTimeZone("UTC")
+                val parsed = sourceFormat.parse(it) ?: return@runCatching null
+                SimpleDateFormat(strftimeToJavaPattern(format), Locale.getDefault()).format(parsed)
+            }.getOrNull()
+        }
+    } ?: element.valueOrNull<EsDeThemeValue.Str>("defaultValue")?.value
+    if (formatted.isNullOrBlank()) return
+
+    val hasSize = element.valueOrNull<EsDeThemeValue.Pair>("size") != null
+    val (width, height) = sizeOf(element, viewWidth, viewHeight)
+    val (offsetX, offsetY) = positionOf(
+        element, viewWidth, viewHeight,
+        if (hasSize) width else 0.dp, if (hasSize) height else 0.dp,
+    )
+    val color = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color.White
+    val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
+    // Same real DateTimeComponent default (0.035) as EsDeThemedClock.
+    val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.035f
+    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * viewHeight.value).dp.toSp() }
+    Text(
+        text = formatted,
+        color = color.copy(alpha = color.alpha * opacity),
+        fontSize = fontSizeSp,
+        modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY),
+    )
+}
+
+/**
+ * Real `rating` rendering -- [LibraryEntry.rating] (0.0-1.0, the same
+ * real convention real ES-DE's own scrapers already normalize to, see
+ * that field's own doc comment) drives a real 5-star row. Real ES-DE's
+ * own `RatingComponent` renders actual `filledPath`/`unfilledPath` star
+ * images when a theme declares them; falls back to a plain unicode star
+ * string otherwise -- an honest simplification for the common case, not a
+ * full per-theme custom-star-shape renderer.
+ */
+@Composable
+private fun EsDeThemedRating(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp, gameSelection: List<LibraryEntry>) {
+    val rating = gameSelection.getOrNull(0)?.rating ?: return
+    val hideIfZero = element.valueOrNull<EsDeThemeValue.Bool>("hideIfZero")?.value ?: false
+    if (hideIfZero && rating <= 0f) return
+    val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
+    val (width, height) = sizeOf(element, viewWidth, viewHeight)
+    val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
+    val filledPath = element.valueOrNull<EsDeThemeValue.Path>("filledPath")?.resolved
+    val unfilledPath = element.valueOrNull<EsDeThemeValue.Path>("unfilledPath")?.resolved
+    val filledStars = kotlin.math.round(rating * 5).toInt().coerceIn(0, 5)
+
+    if (filledPath != null && unfilledPath != null) {
+        Row(modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY).graphicsLayer { alpha = opacity }) {
+            repeat(5) { i ->
+                AsyncImage(
+                    model = if (i < filledStars) filledPath else unfilledPath,
+                    contentDescription = null,
+                    modifier = Modifier.size(height),
+                )
+            }
+        }
+    } else {
+        val color = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color.White
+        Text(
+            text = "★".repeat(filledStars) + "☆".repeat(5 - filledStars),
+            color = color.copy(alpha = color.alpha * opacity),
+            fontSize = with(LocalDensity.current) { height.toSp() },
+            modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY),
+        )
+    }
 }
 
 /**
