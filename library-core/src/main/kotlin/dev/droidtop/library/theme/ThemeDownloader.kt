@@ -4,7 +4,7 @@ import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.api.MergeCommand
 import org.eclipse.jgit.api.ResetCommand
 import org.eclipse.jgit.api.errors.GitAPIException
-import org.eclipse.jgit.merge.MergeResult
+import org.eclipse.jgit.api.MergeResult
 import org.json.JSONObject
 import java.io.File
 
