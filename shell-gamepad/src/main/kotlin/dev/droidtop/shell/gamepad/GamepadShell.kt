@@ -69,14 +69,12 @@ import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.theme.EsDeListItem
 import dev.droidtop.shell.gamepad.theme.EsDeSystemListView
+import dev.droidtop.shell.gamepad.theme.EsDeThemedView
 import dev.droidtop.shell.gamepad.theme.ThemeAssets
 import dev.droidtop.shell.gamepad.theme.ThemePrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import dev.droidtop.shell.gamepad.theme.EsDeThemedView
-import dev.droidtop.shell.gamepad.theme.ThemeAssets
-import kotlinx.coroutines.launch
 
 /**
  * Full-screen, controller-first library shell — the "handheld style" UI.
