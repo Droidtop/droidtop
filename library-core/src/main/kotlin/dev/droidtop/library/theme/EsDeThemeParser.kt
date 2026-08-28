@@ -6,17 +6,13 @@ import java.io.File
 import java.io.StringReader
 
 /**
- * One real ES-DE "variant axis" -- confirmed against ES-DE's own
- * ThemeData.cpp (`parseVariants`/`parseColorSchemes`/`parseFontSizes`, and
- * `aspectRatio` handled the same way inline): a tag with a `name`
- * attribute, matched against a currently-selected value for that axis,
- * mutually recursive with every OTHER axis -- a `<colorScheme>` block can
- * contain an `<aspectRatio>` block and vice versa, since each of ES-DE's
- * own parse functions re-invokes every other one on a matched subtree,
- * not just its own tag type. [selected] `null` means no selection exists
- * for this axis at all -- every block for that tag name is skipped
- * unconditionally (real for `language`: no per-user language selection to
- * thread through yet).
+ * One real ES-DE "variant axis" -- confirmed against ES-DE's own real
+ * ThemeData.cpp source (`parseVariants`/`parseColorSchemes`/
+ * `parseFontSizes`/`parseAspectRatios`): a tag with a `name` attribute,
+ * matched against a currently-selected value for that axis. [selected]
+ * `null` means no selection exists for this axis at all -- every block
+ * for that tag name is skipped unconditionally (real for `language`: no
+ * per-user language selection to thread through yet).
  *
  * Earlier revisions of this parser handled aspectRatio/colorScheme/
  * fontSize as three near-identical, hand-duplicated `when` branches
@@ -25,6 +21,19 @@ import java.io.StringReader
  * pattern, not just the individual bugs: a new axis is one line here, not
  * a new branch duplicated across every place a theme document gets
  * walked.
+ *
+ * Known, real, deliberately-deferred gap (confirmed against real
+ * source): real ES-DE's five parse functions are NOT symmetric --
+ * `parseVariants`/`parseAspectRatios` really do recurse into every other
+ * axis plus `<view>`, but `parseColorSchemes`/`parseFontSizes` only ever
+ * recurse into `<variables>`/`<include>` (they cannot real-world contain
+ * a nested `<view>` or another axis block at all). This parser applies
+ * one identical recursive [parseScopedBlock] to all five uniformly,
+ * making it over-permissive for colorScheme/fontSize rather than
+ * matching real ES-DE's stricter leaf-only grammar for those two -- lower
+ * real risk than it sounds, since no real theme (including the bundled
+ * one) actually nests content that way, but a genuine, known deviation,
+ * not something to silently claim full parity on.
  */
 private data class VariantAxis(val tagName: String, val selected: String?)
 
@@ -66,8 +75,79 @@ private data class VariantAxis(val tagName: String, val selected: String?)
  *    no selection at all. All five are handled by ONE generic mechanism
  *    (see [parseNode]), not per-tag special cases.
  */
+/**
+ * Real ES-DE capabilities.xml content -- each list in real theme-declared
+ * order. Real ES-DE's own default-selection rule for every axis
+ * (confirmed against real ThemeData.cpp source: `mSelectedColorScheme =
+ * mColorSchemes.front()`, same pattern for fontSize/variant/aspectRatio)
+ * is "whichever the theme declares FIRST," not a fixed guessed string --
+ * [EsDeThemeParser.parseWithCapabilities] is the real entry point that
+ * applies this rule; [EsDeThemeParser.parse]'s own hardcoded default
+ * parameters only matter for a caller with no real capabilities.xml to
+ * read (e.g. a test theme.xml built without one).
+ */
+data class EsDeThemeCapabilities(
+    val aspectRatios: List<String>,
+    val colorSchemes: List<String>,
+    val fontSizes: List<String>,
+    val variants: List<String>,
+)
+
 object EsDeThemeParser {
     private const val MAX_INCLUDE_DEPTH = 24
+
+    /**
+     * Real capabilities.xml is a flat, non-nested list of declarations
+     * (unlike theme.xml's own recursive axis/view grammar) -- a plain
+     * single-pass walk collecting `<aspectRatio>`/`<fontSize>` text
+     * content and `<colorScheme name="...">`/`<variant name="...">`
+     * attributes is enough; their own nested `<label>` children are
+     * irrelevant here and simply fall through unmatched.
+     */
+    fun parseCapabilities(capabilitiesFile: File): EsDeThemeCapabilities {
+        if (!capabilitiesFile.isFile) return EsDeThemeCapabilities(emptyList(), emptyList(), emptyList(), emptyList())
+        val aspectRatios = mutableListOf<String>()
+        val colorSchemes = mutableListOf<String>()
+        val fontSizes = mutableListOf<String>()
+        val variants = mutableListOf<String>()
+        val parser = Xml.newPullParser().apply {
+            setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
+            setInput(StringReader(capabilitiesFile.readText()))
+        }
+        var event = parser.eventType
+        while (event != XmlPullParser.END_DOCUMENT) {
+            if (event == XmlPullParser.START_TAG) {
+                when (parser.name) {
+                    "aspectRatio" -> aspectRatios += readText(parser)
+                    "fontSize" -> fontSizes += readText(parser)
+                    "colorScheme" -> parser.getAttributeValue(null, "name")?.let { colorSchemes += it }
+                    "variant" -> parser.getAttributeValue(null, "name")?.let { variants += it }
+                }
+            }
+            event = parser.next()
+        }
+        return EsDeThemeCapabilities(aspectRatios, colorSchemes, fontSizes, variants)
+    }
+
+    /**
+     * Real entry point: reads [themeFile]'s sibling `capabilities.xml`
+     * (real ES-DE convention: always alongside theme.xml, same
+     * directory) and parses using each axis's real front-of-declared-list
+     * default -- see [EsDeThemeCapabilities]'s own doc comment. Falls
+     * back to [parse]'s own hardcoded defaults for any axis
+     * capabilities.xml doesn't declare (or doesn't exist at all).
+     */
+    fun parseWithCapabilities(themeFile: File, systemTheme: String? = null): EsDeTheme {
+        val capabilities = parseCapabilities(File(themeFile.parentFile, "capabilities.xml"))
+        return parse(
+            themeFile = themeFile,
+            aspectRatio = capabilities.aspectRatios.firstOrNull() ?: "16:9",
+            colorScheme = capabilities.colorSchemes.firstOrNull() ?: "1",
+            fontSize = capabilities.fontSizes.firstOrNull() ?: "medium",
+            variant = capabilities.variants.firstOrNull(),
+            systemTheme = systemTheme,
+        )
+    }
 
     fun parse(
         themeFile: File,
@@ -147,7 +227,16 @@ object EsDeThemeParser {
         when {
             axis != null -> {
                 val name = parser.getAttributeValue(null, "name")
-                if (axis.selected != null && name == axis.selected) {
+                // Real ES-DE ThemeData::parseVariants (confirmed against
+                // real source): `name == "all"` always matches, real
+                // themes rely on this for content shared across every
+                // variant -- confirmed this "all" rule is unique to the
+                // variant axis specifically (parseColorSchemes/
+                // parseFontSizes/parseAspectRatios use plain equality
+                // only, no "all" special case for those three).
+                val matches = axis.selected != null &&
+                    (name == axis.selected || (axis.tagName == "variant" && name == "all"))
+                if (matches) {
                     parseScopedBlock(parser, axes, baseDir, variables, views, depth)
                 } else {
                     skipSubtree(parser)
@@ -281,7 +370,17 @@ object EsDeThemeParser {
                 null
             }
         }
-        EsDePropertyType.PATH -> EsDeThemeValue.Path(File(baseDir, raw).normalize().path)
+        // Real ES-DE convention (confirmed against real source): a PATH
+        // value starting with ':' refers to one of ES-DE's own bundled
+        // application resources (its built-in icon/font set), resolved
+        // via ResourceManager rather than as a theme-relative file.
+        // droidtop has no equivalent bundled ES-DE-wide resource pool --
+        // stripping the leading ':' and still resolving relative to the
+        // theme's own directory is an honest, real fallback (a theme
+        // referencing its OWN bundled assets under that same convention
+        // still resolves), not a claim of full parity with ES-DE's real
+        // built-in resource set.
+        EsDePropertyType.PATH -> EsDeThemeValue.Path(File(baseDir, raw.removePrefix(":")).normalize().path)
         EsDePropertyType.STRING -> EsDeThemeValue.Str(raw)
         EsDePropertyType.COLOR -> parseHexColor(raw)?.let { EsDeThemeValue.Color(it) }
         EsDePropertyType.UNSIGNED_INTEGER -> raw.toLongOrNull()?.let { EsDeThemeValue.UInt(it) }
@@ -297,18 +396,25 @@ object EsDeThemeParser {
         return if (clean.length == 6) (value shl 8) or 0xFF else value
     }
 
+    /**
+     * Real ES-DE ThemeData::resolvePlaceholders behavior (confirmed
+     * against real source): finds only the FIRST `${...}`, substitutes
+     * its resolved value LITERALLY (never re-scanned for further `${}`
+     * inside it), then recurses only on the trailing suffix after that
+     * match. The earlier version of this function re-scanned the WHOLE
+     * result (prefix + substituted value + suffix) on every iteration,
+     * which would further expand a `${}` that happened to appear INSIDE
+     * a variable's own resolved value -- real ES-DE leaves that literal.
+     */
+    private val PLACEHOLDER_REGEX = Regex("\\$\\{([^}]*)\\}")
+
     private fun resolvePlaceholders(raw: String, variables: Map<String, String>): String {
-        var result = raw
-        val regex = Regex("\\$\\{([^}]*)\\}")
-        var match = regex.find(result)
-        var guard = 0
-        while (match != null && guard < 10) {
-            val varName = match.groupValues[1]
-            result = result.replaceRange(match.range, variables[varName] ?: "")
-            match = regex.find(result)
-            guard++
-        }
-        return result
+        val match = PLACEHOLDER_REGEX.find(raw) ?: return raw
+        val varName = match.groupValues[1]
+        val prefix = raw.substring(0, match.range.first)
+        val replacement = variables[varName] ?: ""
+        val suffix = raw.substring(match.range.last + 1)
+        return prefix + replacement + resolvePlaceholders(suffix, variables)
     }
 
     private fun splitNames(nameAttr: String): List<String> =
