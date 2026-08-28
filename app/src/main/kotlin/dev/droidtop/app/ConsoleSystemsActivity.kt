@@ -9,6 +9,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -60,9 +62,16 @@ import dev.droidtop.library.consoles.PlayerOverridePrefs
 import dev.droidtop.library.consoles.SystemOverridePrefs
 import dev.droidtop.library.consoles.availablePlayers
 import dev.droidtop.library.consoles.resolvePlayer
-import dev.droidtop.library.scraper.IgdbScraperClient
-import dev.droidtop.library.scraper.LutrisScraperClient
-import dev.droidtop.library.scraper.ScraperPrefs
+import dev.droidtop.library.consoles.RomDatabase
+import dev.droidtop.library.consoles.GameMetadataEntity
+import dev.droidtop.library.scraper.ScraperSource
+import dev.droidtop.library.scraper.ScraperSourcePrefs
+import dev.droidtop.library.scraper.ScreenScraperClient
+import dev.droidtop.library.scraper.ScreenScraperPrefs
+import dev.droidtop.library.scraper.ScreenScraperSystemIds
+import dev.droidtop.library.scraper.TheGamesDbClient
+import dev.droidtop.library.scraper.TheGamesDbPrefs
+import dev.droidtop.library.scraper.TheGamesDbSystemIds
 import dev.droidtop.library.theme.SystemThemeColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -284,7 +293,12 @@ private fun ConsoleSystemsScreen() {
                     modifier = Modifier.fillMaxWidth().gamepadFocusable { romFoldersOpen = true }.padding(vertical = 8.dp),
                 )
                 TextButton(onClick = { scraperSettingsOpen = true }) {
-                    Text(if (ScraperPrefs.isConfigured(context)) "IGDB scraper configured -- edit" else "Set up artwork scraper (IGDB)")
+                    // ScreenScraper (the real default) works with zero
+                    // configuration -- only TheGamesDB genuinely needs a
+                    // key before it can scrape at all, so "not yet set up"
+                    // only applies when TheGamesDB is the selected source.
+                    val needsSetup = ScraperSourcePrefs.get(context) == ScraperSource.THEGAMESDB && !TheGamesDbPrefs.isConfigured(context)
+                    Text(if (needsSetup) "Set up ROM scraper credentials" else "ROM scraper credentials -- edit")
                 }
                 scrapeStatus?.let {
                     Text(it, color = Color(0xFF8AB4FF), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
@@ -337,6 +351,26 @@ private fun ConsoleSystemsScreen() {
  * parallel -- IGDB's own rate limiting is per-second, not something to
  * hammer from N concurrent coroutines).
  */
+/**
+ * Real ROM metadata/cover-art scrape -- uses exactly ONE scraper source,
+ * matching real ES-DE's own actual architecture (confirmed against real
+ * source, `es-app/src/scrapers/Scraper.cpp`): ES-DE has no automatic
+ * multi-source fallback/priority chain at all, just a real single
+ * user-selected source ([ScraperSourcePrefs], default "screenscraper",
+ * ES-DE's own real default too). Both real scrapers ported directly from
+ * real ES-DE source this session (see [ScreenScraperClient]/
+ * [TheGamesDbClient]'s own doc comments) -- Lutris/IGDB are deliberately
+ * NOT used here: they're droidtop's real scrapers for PC/Wine/Linux/
+ * engine games, a different real content category from console ROMs.
+ *
+ * Persists BOTH the cover image (existing `downloaded_media` layout
+ * [EsDeArtwork] already reads) AND real per-game metadata (via
+ * [GameMetadataEntity]/[RomDao.upsertGameMetadata] -- see that entity's
+ * own doc comment for why it's a separate, rescan-durable table). Skips a
+ * ROM only when it already has BOTH real artwork AND real metadata,
+ * matching a real "actually still missing something" check rather than
+ * artwork alone.
+ */
 private suspend fun scrapeSystemArtwork(
     context: android.content.Context,
     folder: File,
@@ -345,34 +379,94 @@ private suspend fun scrapeSystemArtwork(
 ): String = withContext(Dispatchers.IO) {
     val gamesRoot = folder.parentFile ?: folder
     val romFiles = folder.walkTopDown().filter { it.isFile && it.extension.lowercase() in system.extensions }.toList()
-    val missing = romFiles.filter { EsDeArtwork.resolve(gamesRoot, system.id, it.nameWithoutExtension) == null }
-    if (missing.isEmpty()) return@withContext "${system.displayName}: every ROM already has real artwork."
+    val dao = RomDatabase.get(context).romDao()
+    val existingMetadataIds = dao.getGameMetadata(romFiles.map { it.absolutePath }).map { it.id }.toSet()
+    val missing = romFiles.filter {
+        EsDeArtwork.resolve(gamesRoot, system.id, it.nameWithoutExtension) == null || it.absolutePath !in existingMetadataIds
+    }
+    if (missing.isEmpty()) return@withContext "${system.displayName}: every ROM already has real artwork and metadata."
 
-    val igdbConfigured = ScraperPrefs.isConfigured(context)
-    val clientId = ScraperPrefs.clientId(context)
-    val clientSecret = ScraperPrefs.clientSecret(context)
+    val source = ScraperSourcePrefs.get(context)
+    val screenScraperSystemId = if (source == ScraperSource.SCREENSCRAPER) ScreenScraperSystemIds.forSystemId(system.id) else null
+    val gamesDbSystemId = if (source == ScraperSource.THEGAMESDB) TheGamesDbSystemIds.forSystemId(system.id) else null
+    val gamesDbApiKey = TheGamesDbPrefs.apiKey(context)
+    val devId = ScreenScraperPrefs.devId(context)
+    val devPassword = ScreenScraperPrefs.devPassword(context)
+    val userId = ScreenScraperPrefs.userId(context)
+    val userPassword = ScreenScraperPrefs.userPassword(context)
+    if (source == ScraperSource.SCREENSCRAPER && screenScraperSystemId == null) {
+        return@withContext "${system.displayName}: ScreenScraper has no platform id for this system."
+    }
+    if (source == ScraperSource.THEGAMESDB && (gamesDbSystemId == null || !TheGamesDbPrefs.isConfigured(context))) {
+        return@withContext "${system.displayName}: TheGamesDB needs a configured API key and platform support for this system."
+    }
+
     var found = 0
     var failed = 0
     missing.forEachIndexed { index, romFile ->
         onProgress(index, missing.size)
         try {
-            // Lutris first -- real, genuinely keyless (see LutrisScraperClient),
-            // no setup friction at all. IGDB only as a fallback when Lutris
-            // has nothing and the user has actually configured it -- IGDB
-            // needs a real, self-service-but-still-manual Twitch dev app.
-            val coverUrl = LutrisScraperClient.findCoverUrl(romFile.nameWithoutExtension)
-                ?: if (igdbConfigured) IgdbScraperClient.findCoverUrl(clientId, clientSecret, romFile.nameWithoutExtension) else null
-            if (coverUrl != null) {
-                val destination = File(File(File(gamesRoot, "downloaded_media"), system.id), "covers/${romFile.nameWithoutExtension}.png")
-                IgdbScraperClient.downloadImage(coverUrl, destination)
-                found++
+            val screenScraperResult = screenScraperSystemId?.let {
+                ScreenScraperClient.findMetadata(
+                    systemeId = it.toString(),
+                    romName = romFile.name,
+                    romSizeBytes = romFile.length(),
+                    devId = devId,
+                    devPassword = devPassword,
+                    userId = userId,
+                    userPassword = userPassword,
+                )
             }
+            val gamesDbResult = gamesDbSystemId?.let {
+                TheGamesDbClient.findMetadata(gamesDbApiKey, context.cacheDir, it, romFile.nameWithoutExtension)
+            }
+
+            val coverUrl = screenScraperResult?.coverUrl ?: gamesDbResult?.coverUrl
+            if (coverUrl != null && EsDeArtwork.resolve(gamesRoot, system.id, romFile.nameWithoutExtension) == null) {
+                val destination = File(File(File(gamesRoot, "downloaded_media"), system.id), "covers/${romFile.nameWithoutExtension}.png")
+                downloadImage(coverUrl, destination)
+            }
+
+            val description = screenScraperResult?.description ?: gamesDbResult?.description
+            val developer = screenScraperResult?.developer ?: gamesDbResult?.developer
+            val publisher = screenScraperResult?.publisher ?: gamesDbResult?.publisher
+            val genre = screenScraperResult?.genre ?: gamesDbResult?.genre
+            val releaseDate = screenScraperResult?.releaseDate ?: gamesDbResult?.releaseDate
+            val players = screenScraperResult?.players ?: gamesDbResult?.players
+            val rating = screenScraperResult?.rating
+            val hasAnyMetadata = listOfNotNull(description, developer, publisher, genre, releaseDate, players, rating).isNotEmpty()
+            if (hasAnyMetadata) {
+                dao.upsertGameMetadata(
+                    GameMetadataEntity(
+                        id = romFile.absolutePath,
+                        description = description,
+                        developer = developer,
+                        publisher = publisher,
+                        genre = genre,
+                        releaseDate = releaseDate,
+                        rating = rating,
+                        players = players,
+                        favorite = false,
+                    ),
+                )
+            }
+            if (coverUrl != null || hasAnyMetadata) found++
         } catch (t: Exception) {
             failed++
             android.util.Log.e("droidtop.Scraper", "Failed to scrape ${romFile.name}", t)
         }
     }
-    "${system.displayName}: found $found, no match for ${missing.size - found - failed}, $failed failed (of ${missing.size} missing artwork)."
+    "${system.displayName}: found $found, no match for ${missing.size - found - failed}, $failed failed (of ${missing.size} missing artwork/metadata)."
+}
+
+/** Downloads [imageUrl] straight to [destination], creating parent directories as needed -- a plain generic helper, not tied to any one scraper source. */
+private fun downloadImage(imageUrl: String, destination: File) {
+    destination.parentFile?.mkdirs()
+    val connection = (java.net.URL(imageUrl).openConnection() as java.net.HttpURLConnection)
+    if (connection.responseCode != 200) {
+        throw java.io.IOException("Image download failed: HTTP ${connection.responseCode}")
+    }
+    connection.inputStream.use { input -> destination.outputStream().use { output -> input.copyTo(output) } }
 }
 
 @Composable
@@ -439,41 +533,81 @@ private fun FolderRow(
 }
 
 /**
- * IGDB Client ID/Secret entry -- see [IgdbScraperClient]'s own doc comment
- * for why this is the one scraper source that actually needs a settings
- * screen tonight (self-service but still a real, one-time Twitch developer
- * app a user has to create; Lutris needs nothing at all, so it has no
- * settings surface here).
+ * Real credential entry for ROM metadata scraping -- ScreenScraper (real
+ * ES-DE's own default/primary scraper) and TheGamesDB (real ES-DE's other
+ * real scraper), both ported directly from real ES-DE source this session
+ * (see [ScreenScraperClient]/[TheGamesDbClient]'s own doc comments).
+ * ScreenScraper's four fields are all real but optional (a real anonymous
+ * mode exists at a lower rate limit); TheGamesDB needs its own real,
+ * self-service API key before it can be used at all. IGDB/Lutris are
+ * deliberately NOT configured here -- they're droidtop's real scrapers for
+ * PC/Wine/Linux/engine games, a different real content category from the
+ * console ROMs this screen scrapes (see [scrapeSystemArtwork]'s own doc
+ * comment).
  */
 @Composable
 private fun ScraperSettingsScreen(onDismiss: () -> Unit) {
     val context = LocalContext.current
-    var clientId by remember { mutableStateOf(ScraperPrefs.clientId(context)) }
-    var clientSecret by remember { mutableStateOf(ScraperPrefs.clientSecret(context)) }
+    var source by remember { mutableStateOf(ScraperSourcePrefs.get(context)) }
+    var devId by remember { mutableStateOf(ScreenScraperPrefs.devId(context)) }
+    var devPassword by remember { mutableStateOf(ScreenScraperPrefs.devPassword(context)) }
+    var userId by remember { mutableStateOf(ScreenScraperPrefs.userId(context)) }
+    var userPassword by remember { mutableStateOf(ScreenScraperPrefs.userPassword(context)) }
+    var gamesDbApiKey by remember { mutableStateOf(TheGamesDbPrefs.apiKey(context)) }
 
-    Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-        Text("Artwork scraper", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+    Column(modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState())) {
+        Text("ROM artwork/metadata scraper", color = Color.White, style = MaterialTheme.typography.headlineSmall)
         Text(
-            "Cover art is scraped from Lutris (lutris.net) automatically, no setup needed. " +
-                "IGDB adds a second source for anything Lutris doesn't have -- it needs your own " +
-                "free Twitch developer app (dev.twitch.tv/console -> Register Your Application, " +
-                "Client Type: Confidential) for a Client ID and Client Secret. This is a one-time, " +
-                "self-service step on Twitch's own site -- droidtop can't create this for you.",
+            "Real ES-DE only ever uses ONE scraper source at a time, not an automatic " +
+                "fallback chain -- pick one below, matching ES-DE's own real behavior exactly. " +
+                "ScreenScraper works with everything below left blank (a real, lower-rate-limit " +
+                "anonymous mode) -- fill in your own account (ssid/sspassword, a free " +
+                "screenscraper.fr account) for a higher personal limit. TheGamesDB needs its own " +
+                "free API key (thegamesdb.net -> sign up -> API key) before it can be used at all.",
             color = Color.Gray,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
         )
-        Text("IGDB Client ID", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
+            Checkbox(checked = source == ScraperSource.SCREENSCRAPER, onCheckedChange = { source = ScraperSource.SCREENSCRAPER })
+            Text("ScreenScraper (ES-DE's own real default)", color = Color.White, style = MaterialTheme.typography.bodyMedium)
+        }
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.padding(bottom = 16.dp)) {
+            Checkbox(checked = source == ScraperSource.THEGAMESDB, onCheckedChange = { source = ScraperSource.THEGAMESDB })
+            Text("TheGamesDB", color = Color.White, style = MaterialTheme.typography.bodyMedium)
+        }
+        Text("ScreenScraper dev ID (optional)", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
         BasicTextField(
-            value = clientId,
-            onValueChange = { clientId = it },
+            value = devId,
+            onValueChange = { devId = it },
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
             modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 16.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
         )
-        Text("IGDB Client Secret", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+        Text("ScreenScraper dev password (optional)", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
         BasicTextField(
-            value = clientSecret,
-            onValueChange = { clientSecret = it },
+            value = devPassword,
+            onValueChange = { devPassword = it },
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 16.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
+        )
+        Text("ScreenScraper account ssid (optional)", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+        BasicTextField(
+            value = userId,
+            onValueChange = { userId = it },
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 16.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
+        )
+        Text("ScreenScraper account sspassword (optional)", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+        BasicTextField(
+            value = userPassword,
+            onValueChange = { userPassword = it },
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 24.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
+        )
+        Text("TheGamesDB API key", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+        BasicTextField(
+            value = gamesDbApiKey,
+            onValueChange = { gamesDbApiKey = it },
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
             modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
         )
@@ -481,7 +615,9 @@ private fun ScraperSettingsScreen(onDismiss: () -> Unit) {
             TextButton(onClick = onDismiss) { Text("Cancel") }
             TextButton(
                 onClick = {
-                    ScraperPrefs.set(context, clientId.trim(), clientSecret.trim())
+                    ScraperSourcePrefs.set(context, source)
+                    ScreenScraperPrefs.set(context, devId.trim(), devPassword.trim(), userId.trim(), userPassword.trim())
+                    TheGamesDbPrefs.set(context, gamesDbApiKey.trim())
                     onDismiss()
                 },
             ) { Text("Save") }

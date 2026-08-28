@@ -58,6 +58,43 @@ data class RomEntity(
     @ColumnInfo(name = "system_folder_id") val systemFolderId: String,
 )
 
+/**
+ * Real per-game metadata, scraped by [dev.droidtop.library.scraper.
+ * LutrisScraperClient]/[dev.droidtop.library.scraper.IgdbScraperClient]
+ * (wired into `:app`'s `ConsoleSystemsActivity`'s existing manual "scrape
+ * artwork" action) -- deliberately a SEPARATE table from [RomEntity], not
+ * more columns bolted onto it: [RomEntity] rows are a pure filesystem-scan
+ * cache, destructively cleared and rebuilt every time
+ * [ConsoleRomProvider.scanSystemFolder]'s own folder gets rescanned (see
+ * [RomEntity]'s own doc comment) -- scraped metadata is real, separately
+ * fetched network data that a filesystem rescan can neither regenerate
+ * nor should ever silently discard. Keyed by the same real id
+ * ([RomEntity.id], the ROM file's own absolute path) so it survives
+ * indefinitely across rescans of the folder it lives in, merged back onto
+ * the scanned [dev.droidtop.library.LibraryEntry] at read time (see
+ * [ConsoleRomProvider]'s own metadata-merge helper) rather than being
+ * part of the scan-and-replace cycle at all.
+ *
+ * Field set confirmed directly against real ES-DE source
+ * (`es-app/src/MetaData.cpp`'s own `gameDecls` table -- a real local
+ * clone kept at /root/es-de-reference for ongoing reference), not
+ * guessed: matches ES-DE's own real `desc`/`developer`/`publisher`/
+ * `genre`/`releasedate`/`rating`/`players`/`favorite` scraped fields
+ * exactly. No ESRB/age-rating field -- confirmed real ES-DE has none.
+ */
+@Entity(tableName = "game_metadata")
+data class GameMetadataEntity(
+    @PrimaryKey val id: String,
+    val description: String?,
+    val developer: String?,
+    val publisher: String?,
+    val genre: String?,
+    @ColumnInfo(name = "release_date") val releaseDate: String?,
+    val rating: Float?,
+    val players: String?,
+    val favorite: Boolean,
+)
+
 @Entity(tableName = "scan_metadata", primaryKeys = ["roms_root", "system_folder_id"])
 data class ScanMetadataEntity(
     @ColumnInfo(name = "roms_root") val romsRoot: String,
@@ -92,9 +129,15 @@ interface RomDao {
 
     @Query("DELETE FROM scan_metadata WHERE roms_root = :romsRoot")
     suspend fun clearScanMetadata(romsRoot: String)
+
+    @Query("SELECT * FROM game_metadata WHERE id IN (:ids)")
+    suspend fun getGameMetadata(ids: List<String>): List<GameMetadataEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertGameMetadata(metadata: GameMetadataEntity)
 }
 
-@Database(entities = [RomEntity::class, ScanMetadataEntity::class], version = 2, exportSchema = false)
+@Database(entities = [RomEntity::class, ScanMetadataEntity::class, GameMetadataEntity::class], version = 3, exportSchema = false)
 abstract class RomDatabase : RoomDatabase() {
     abstract fun romDao(): RomDao
 
@@ -111,8 +154,19 @@ abstract class RomDatabase : RoomDatabase() {
                     // Pure cache, safely rebuildable by rescanning -- no
                     // real user data to preserve across the v1 -> v2
                     // schema change (root-level -> per-folder metadata
-                    // granularity), so a destructive wipe-and-rebuild is
-                    // the correct migration, not a real handwritten one.
+                    // granularity), or the v2 -> v3 change (adding
+                    // GameMetadataEntity, empty at v3's introduction), so
+                    // a destructive wipe-and-rebuild is the correct
+                    // migration, not a real handwritten one. Real,
+                    // forward-looking caveat: once GameMetadataEntity
+                    // actually holds real user-scraped data (descriptions/
+                    // ratings a user waited on a real network fetch for),
+                    // it stops being a "safely rebuildable, nothing lost"
+                    // table like RomEntity/ScanMetadataEntity are -- a
+                    // FUTURE schema bump touching this database for real
+                    // needs a real handwritten Migration preserving
+                    // game_metadata specifically, not another blanket
+                    // destructive wipe.
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build().also { instance = it }
             }
