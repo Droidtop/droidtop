@@ -43,6 +43,42 @@ data class LibraryEntry(
     // -- real per-system browsing (using this field) is the next UI step,
     // not built in this pass.
     val systemId: String? = null,
+    // Real per-game metadata -- field set and conventions confirmed
+    // directly against real ES-DE source (es-app/src/MetaData.cpp's own
+    // `gameDecls` table, cloned locally at /root/es-de-reference for
+    // ongoing reference), not guessed:
+    //   desc -> description, developer, publisher, genre, players (all
+    //   MD_STRING/MD_MULTILINE_STRING, real scraped fields)
+    //   releasedate -> releaseDate (MD_DATE)
+    //   rating -> rating (MD_RATING)
+    // Real ES-DE's own ScreenScraper.cpp confirmed no ESRB/age-rating
+    // field exists anywhere in its schema at all -- an earlier version of
+    // this list guessed one; dropped, not real ES-DE parity.
+    // Populated by a real scraper (LutrisScraperClient/IgdbScraperClient
+    // in library-core/scraper/, wired into ConsoleSystemsActivity's
+    // existing manual "scrape artwork" action) -- null/default until a
+    // user actually scrapes a folder, same as artworkUri already was.
+    val description: String? = null,
+    val developer: String? = null,
+    val publisher: String? = null,
+    val genre: String? = null,
+    // Real ES-DE MD_DATE default/format: "YYYYMMDDT000000" (see
+    // DateTimeComponent's own real format handling, already ported in
+    // EsDeThemedClock's strftimeToJavaPattern) -- stored as the theme's
+    // own real raw string rather than a parsed Date, since that's what a
+    // <datetime metadata="releasedate"> element's own real format
+    // property expects to format directly.
+    val releaseDate: String? = null,
+    // Real ES-DE MD_RATING convention (confirmed via ScreenScraper.cpp's
+    // own real computation): 0.0-1.0, rounded to the nearest 0.1 --
+    // ScreenScraper's own real 0-20 "note" score divided by 20 then
+    // rounded, not a 0-5/0-10 star count.
+    val rating: Float? = null,
+    // Real ES-DE MD_STRING "players" key -- a free-form string ("1",
+    // "1-2", "1-4"), not a parsed integer/range type, matching how real
+    // scraper sources themselves report it.
+    val players: String? = null,
+    val favorite: Boolean = false,
 )
 
 enum class LibraryEntryKind {

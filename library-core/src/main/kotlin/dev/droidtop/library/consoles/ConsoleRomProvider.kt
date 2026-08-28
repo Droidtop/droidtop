@@ -165,7 +165,7 @@ class ConsoleRomProvider(
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         val scannedFolders = dao.getScannedSystemFolders(romsRoots.map { it.absolutePath })
             .map { it.romsRoot to it.systemFolderId }.toSet()
-        val cached = dao.getEntries(romsRoots.map { it.absolutePath }).map { it.toLibraryEntry() }
+        val cached = dao.getEntries(romsRoots.map { it.absolutePath }).map { it.toLibraryEntry() }.withMetadata()
         val fresh = scanRootsFresh(romsRoots, systemsById, scannedFolders)
         return cached + fresh
     }
@@ -185,7 +185,7 @@ class ConsoleRomProvider(
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         val scannedFolders = dao.getScannedSystemFolders(romsRoots.map { it.absolutePath })
             .map { it.romsRoot to it.systemFolderId }.toSet()
-        val cached = dao.getEntries(romsRoots.map { it.absolutePath }).map { it.toLibraryEntry() }
+        val cached = dao.getEntries(romsRoots.map { it.absolutePath }).map { it.toLibraryEntry() }.withMetadata()
         streamRootsProgressively(cached, romsRoots, systemsById, scannedFolders)
     }
 
@@ -217,7 +217,7 @@ class ConsoleRomProvider(
         val romsRoots = GamesRoots.current(context)
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         val cachedByRoot = romsRoots.associate { root ->
-            root.absolutePath to dao.getEntries(listOf(root.absolutePath)).map { it.toLibraryEntry() }
+            root.absolutePath to dao.getEntries(listOf(root.absolutePath)).map { it.toLibraryEntry() }.withMetadata()
         }
         streamRootsRescan(cachedByRoot, systemsById)
     }
@@ -413,7 +413,34 @@ class ConsoleRomProvider(
                     artworkUri = EsDeArtwork.resolve(gamesRoot, effectiveSystemId, romFile.nameWithoutExtension),
                 )
             }
-        }.awaitAll()
+        }.awaitAll().withMetadata()
+    }
+
+    /**
+     * Merges in real, previously-scraped [GameMetadataEntity] rows (see
+     * that class's own doc comment for why this lives in a separate
+     * table from the filesystem-scan cache) for every entry -- applied
+     * uniformly at every real point entries reach a caller (cached reads
+     * in [scan]/[scanProgressive]/[rescanProgressive], and fresh scans
+     * via [scanSystemFolder]) so a rescan of a folder never silently
+     * drops metadata a user already waited on a real network scrape for.
+     */
+    private suspend fun List<LibraryEntry>.withMetadata(): List<LibraryEntry> {
+        if (isEmpty()) return this
+        val metadataById = dao.getGameMetadata(map { it.id }).associateBy { it.id }
+        return map { entry ->
+            val meta = metadataById[entry.id] ?: return@map entry
+            entry.copy(
+                description = meta.description,
+                developer = meta.developer,
+                publisher = meta.publisher,
+                genre = meta.genre,
+                releaseDate = meta.releaseDate,
+                rating = meta.rating,
+                players = meta.players,
+                favorite = meta.favorite,
+            )
+        }
     }
 
     /**

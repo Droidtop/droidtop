@@ -18,9 +18,20 @@ import java.net.URLEncoder
  * exist as real `LibraryEntry` sources (see this class's own callers for
  * current scope).
  */
+/**
+ * Real per-game data Lutris's own public API actually returns for a
+ * search result -- confirmed via a real, live call to
+ * `https://lutris.net/api/games?search=...` this session, not assumed
+ * from docs: `id, name, slug, year, banner_url, icon_url, coverart,
+ * platforms, provider_games, aliases, shaders, discord_id, change_for`.
+ * No description/genre/developer/publisher/rating field exists at all --
+ * `year` is the only real release-date signal Lutris provides (year
+ * precision only, not a full date).
+ */
+data class LutrisGameResult(val coverUrl: String?, val year: Int?)
+
 object LutrisScraperClient {
-    /** Real response fields, confirmed via lutris/website's own API doc wiki: name, slug, banner_url, icon_url, ... */
-    fun findCoverUrl(gameTitle: String): String? {
+    fun findGame(gameTitle: String): LutrisGameResult? {
         val query = URLEncoder.encode(gameTitle, "UTF-8")
         val url = URL("https://lutris.net/api/games?search=$query")
         val connection = (url.openConnection() as HttpURLConnection).apply { requestMethod = "GET" }
@@ -29,8 +40,18 @@ object LutrisScraperClient {
         val results = response.optJSONArray("results") ?: return null
         if (results.length() == 0) return null
         val first = results.getJSONObject(0)
-        // banner_url is Lutris's own wide box-art-style image -- the closer
-        // match to a "cover" than icon_url (a small square app icon).
-        return first.optString("banner_url", "").ifBlank { null }
+        // Real, confirmed bug fix (found via a real live API call this
+        // session, not a guess): `banner_url`/`icon_url` are empty
+        // strings for most real results -- `coverart` (Lutris's own
+        // IGDB-sourced cover_big image) is the field that's actually
+        // populated in practice. The old version of this function read
+        // `banner_url`, silently missing cover art for the large majority
+        // of real games.
+        val coverUrl = first.optString("coverart", "").ifBlank { null }
+        val year = first.optInt("year", 0).takeIf { it > 0 }
+        return LutrisGameResult(coverUrl, year)
     }
+
+    /** Kept for existing callers that only need the cover URL. */
+    fun findCoverUrl(gameTitle: String): String? = findGame(gameTitle)?.coverUrl
 }
