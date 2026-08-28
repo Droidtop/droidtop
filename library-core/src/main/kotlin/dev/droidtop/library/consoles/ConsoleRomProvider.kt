@@ -186,6 +186,7 @@ class ConsoleRomProvider(
         val scannedRootPaths = dao.getScannedRoots(romsRoots.map { it.absolutePath })
         val unscannedRoots = romsRoots.filter { it.absolutePath !in scannedRootPaths }
         val cached = dao.getEntries(scannedRootPaths).map { it.toLibraryEntry() }
+        android.util.Log.d("droidtop.DIAG", "scanProgressive: romsRoots=${romsRoots.map { it.absolutePath }} systemsById.size=${systemsById.size} scannedRootPaths=$scannedRootPaths unscannedRoots=${unscannedRoots.map { it.absolutePath }} cached.size=${cached.size}")
         streamRootsProgressively(cached, unscannedRoots, systemsById)
     }
 
@@ -264,11 +265,14 @@ class ConsoleRomProvider(
         send(accumulated.toList())
         coroutineScope {
             unscannedRoots.forEach { root ->
-                val systemFolders = (root.listFiles() ?: emptyArray()).filter { it.isDirectory }
+                val listed = root.listFiles()
+                android.util.Log.d("droidtop.DIAG", "streamRootsProgressively: root=${root.absolutePath} exists=${root.exists()} isDirectory=${root.isDirectory} canRead=${root.canRead()} listFiles()=${listed?.map { it.name }}")
+                val systemFolders = (listed ?: emptyArray()).filter { it.isDirectory }
                     .mapNotNull { systemFolder ->
                         SystemOverridePrefs.resolveForFolder(context, systemFolder.absolutePath, systemFolder.name, systemsById)
                             ?.let { systemFolder to it }
                     }
+                android.util.Log.d("droidtop.DIAG", "streamRootsProgressively: root=${root.absolutePath} systemFolders=${systemFolders.map { it.first.name to it.second.id }}")
                 val rootAccumulated = Collections.synchronizedList(mutableListOf<LibraryEntry>())
                 val deferreds = systemFolders.map { (systemFolder, system) ->
                     async { scanSystemFolder(systemFolder, system) }
@@ -282,10 +286,15 @@ class ConsoleRomProvider(
                     }
                 }
                 coroutineLaunch {
-                    deferreds.awaitAll()
-                    dao.clearRoot(root.absolutePath)
-                    dao.insertEntries(rootAccumulated.map { it.toRomEntity(root.absolutePath) })
-                    dao.markScanned(ScanMetadataEntity(root.absolutePath, System.currentTimeMillis()))
+                    try {
+                        deferreds.awaitAll()
+                        dao.clearRoot(root.absolutePath)
+                        dao.insertEntries(rootAccumulated.map { it.toRomEntity(root.absolutePath) })
+                        dao.markScanned(ScanMetadataEntity(root.absolutePath, System.currentTimeMillis()))
+                        android.util.Log.d("droidtop.DIAG", "streamRootsProgressively: root=${root.absolutePath} DONE rootAccumulated.size=${rootAccumulated.size}")
+                    } catch (t: Throwable) {
+                        android.util.Log.e("droidtop.DIAG", "streamRootsProgressively: root=${root.absolutePath} FAILED", t)
+                    }
                 }
             }
         }
@@ -353,9 +362,9 @@ class ConsoleRomProvider(
         // See EsDeArtwork's own doc comment for why droidtop reads this
         // rather than scraping itself.
         val gamesRoot = systemFolder.parentFile ?: systemFolder
-        val romFiles = systemFolder.walkTopDown()
-            .filter { it.isFile && it.extension.lowercase() in system.extensions }
-            .toList()
+        val allFiles = systemFolder.walkTopDown().filter { it.isFile }.toList()
+        val romFiles = allFiles.filter { it.extension.lowercase() in system.extensions }
+        android.util.Log.d("droidtop.DIAG", "scanSystemFolder: folder=${systemFolder.absolutePath} system=${system.id} extensions=${system.extensions} allFiles=${allFiles.map { it.name }} romFiles=${romFiles.map { it.name }}")
         // Real, genuine file detection beyond what either ES-DE or EmuDeck
         // actually do (both confirmed this session to be purely
         // folder+extension-based, no content/filename lookup at all --
