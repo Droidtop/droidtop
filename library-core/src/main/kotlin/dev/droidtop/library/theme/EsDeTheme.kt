@@ -404,13 +404,19 @@ internal val ES_DE_ELEMENT_SCHEMA: Map<String, Map<String, EsDePropertyType>> = 
         "opacity" to EsDePropertyType.FLOAT,
         "customButtonIcon" to EsDePropertyType.PATH,
     ),
-    // Parses real; rendering deferred -- ES-DE's own real network/
-    // Bluetooth/battery status row needs real device-status plumbing this
-    // pass doesn't build.
+    // Real, honestly PARTIAL -- droidtop genuinely runs as the real host
+    // device (unlike a desktop ES-DE build's own OS-status queries, no
+    // fabrication involved), so wifi/cellular/battery are real device
+    // status. Bluetooth is a real, deliberate gap: reading adapter state
+    // needs BLUETOOTH_CONNECT on Android 12+, a dangerous runtime
+    // permission not worth requesting for one decorative status icon
+    // without checking with the user first -- see EsDeThemedSystemStatus'
+    // own doc comment.
     "systemstatus" to mapOf(
         "pos" to EsDePropertyType.NORMALIZED_PAIR,
         "height" to EsDePropertyType.FLOAT,
         "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "entries" to EsDePropertyType.STRING,
         "fontPath" to EsDePropertyType.PATH,
         "color" to EsDePropertyType.COLOR,
         "backgroundColor" to EsDePropertyType.COLOR,
