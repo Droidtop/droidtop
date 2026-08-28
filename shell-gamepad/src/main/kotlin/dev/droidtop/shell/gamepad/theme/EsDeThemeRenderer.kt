@@ -192,6 +192,12 @@ fun EsDeThemedView(
                 // entry types this covers (wifi/cellular/battery; not
                 // bluetooth).
                 "systemstatus" -> EsDeThemedSystemStatus(element, viewWidth, viewHeight)
+                // Real, honestly PARTIAL -- see EsDeThemedGamelistInfo's
+                // own doc comment. focusedSystemEntries (not gameSelection)
+                // is the real total-count context this needs -- every game
+                // in the currently browsed system, not just the one/few
+                // gameSelector picked.
+                "gamelistinfo" -> EsDeThemedGamelistInfo(element, viewWidth, viewHeight, focusedSystemEntries)
             }
         }
     }
@@ -716,6 +722,42 @@ private fun EsDeThemedSystemStatus(element: EsDeThemeElement, viewWidth: Dp, vie
             fontSize = with(LocalDensity.current) { heightDp.toSp() },
         )
     }
+}
+
+/**
+ * Real, honestly PARTIAL `gamelistinfo` rendering. Real ES-DE's own
+ * `GamelistView::onFileChanged` (the actual source, confirmed directly)
+ * builds this string as, in the real unfiltered case: a controller-glyph
+ * icon + the system's total real game count, plus a separate favorites
+ * count when any exist. Two real real cases NOT covered here, both
+ * genuinely separate features droidtop doesn't have yet: the filtered
+ * case (`N + M / Total`, needs a real gamelist filter UI -- the
+ * headless/widget gamelist screens this renders on have no filtering at
+ * all) and the folder-entered case (a folder-char prefix -- droidtop's
+ * own real game groups are flat, no folder concept). [entries] is the
+ * real, FULL per-system game list ([focusedSystemEntries], not
+ * `gameSelection`) -- gamelistinfo's whole point is a total count, not a
+ * per-selected-game value.
+ */
+@Composable
+private fun EsDeThemedGamelistInfo(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp, entries: List<LibraryEntry>) {
+    if (entries.isEmpty()) return
+    val favoriteCount = entries.count { it.favorite }
+    val text = if (favoriteCount > 0) "${entries.size} games  ♥ $favoriteCount" else "${entries.size} games"
+
+    val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
+    val color = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color.White
+    val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.035f
+    val fontSizeDp = (fontSizeFraction * viewHeight.value).dp
+    val (width, height) = sizeOf(element, viewWidth, viewHeight)
+    val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
+
+    Text(
+        text = text,
+        color = color.copy(alpha = color.alpha * opacity),
+        fontSize = with(LocalDensity.current) { fontSizeDp.toSp() },
+        modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY),
+    )
 }
 
 /**

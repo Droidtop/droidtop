@@ -38,9 +38,14 @@ package dev.droidtop.library.theme
  * renders (see `EsDeThemedBadges`' own doc comment); the other eight
  * (completed/kidgame/broken/collection/folder/controller/altemulator/
  * manual) need real flags/data droidtop doesn't have yet. `gamelistinfo`
- * needs a real list-count context this element type alone doesn't carry
- * -- still not modeled, so rendering it would still mean fabricating
- * data.
+ * is likewise PARTIALLY real -- the plain "N games" + favorites-count
+ * case renders (real per-system counts, [EsDeThemedGamelistInfo]'s own
+ * doc comment); the filtered and folder-entered cases don't, since
+ * droidtop's themed gamelist screens have no filter UI or folder concept
+ * at all yet. `systemstatus` is likewise PARTIALLY real -- wifi/
+ * cellular/battery render (droidtop genuinely IS the host device, real
+ * live status); bluetooth doesn't (a dangerous runtime permission not
+ * requested without checking with the user first).
  */
 data class EsDeTheme(
     val variables: Map<String, String>,
@@ -349,8 +354,10 @@ internal val ES_DE_ELEMENT_SCHEMA: Map<String, Map<String, EsDePropertyType>> = 
         "visible" to EsDePropertyType.BOOLEAN,
         "zIndex" to EsDePropertyType.FLOAT,
     ),
-    // Parses real; rendering deferred -- "X/Y games" summary needs a real
-    // list-count context this element type alone doesn't carry.
+    // Real, honestly PARTIAL (2026-08-28 session) -- see
+    // EsDeThemedGamelistInfo's own doc comment for exactly which real
+    // ES-DE case this covers (a plain "N games" + favorites count) vs.
+    // which two it doesn't (filtered, folder-entered).
     "gamelistinfo" to mapOf(
         "pos" to EsDePropertyType.NORMALIZED_PAIR,
         "size" to EsDePropertyType.NORMALIZED_PAIR,
