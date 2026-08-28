@@ -30,6 +30,16 @@
         android:key="pref_default_launcher"
         android:title="@string/pref_default_launcher_title" />
 
+    <!-- droidtop's own internal concern -- which of ITS TWO home
+         activities (Standard vs. Alternative-forwarding) is even a
+         candidate -- separate from pref_default_launcher above, which is
+         the OS-level "which app does the system resolve HOME to" setting.
+         See HomeRolePrefs.kt and OnboardingActivity's own HOME_CHOICE step. -->
+    <Preference
+        android:key="pref_droidtop_home_screen"
+        android:title="@string/pref_droidtop_home_screen_title"
+        android:summary="@string/pref_droidtop_home_screen_desc" />
+
     <app.murinelauncher.widget.RestartPreference
         android:key="pref_restart"
         android:title="@string/pref_restart_title"

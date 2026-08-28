@@ -27,6 +27,7 @@ import dev.droidtop.shell.desktop.DesktopShell
 import dev.droidtop.shell.gamepad.GamepadShell
 import dev.droidtop.shell.standard.BackButtonMenu
 import dev.droidtop.shell.standard.ModePrefs
+import dev.droidtop.shell.standard.OnboardingGate
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -70,6 +71,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Real gap this closes: OnboardingGate was only ever called from
+        // LauncherApplication.java (Standard's own boot) -- a user who
+        // launches straight into Desktop/Handheld (droidtop not set as
+        // system HOME, or opened via BackButtonMenu/EXTRA_MODE directly)
+        // never saw onboarding at all. Both real entry points need this,
+        // not just one.
+        OnboardingGate.launchIfNeeded(this)
 
         // Real roots are read fresh by each provider on every scan (see
         // GamesRoots.current's own doc comment) -- not resolved once here

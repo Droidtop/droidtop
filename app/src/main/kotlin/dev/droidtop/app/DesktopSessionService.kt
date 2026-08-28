@@ -150,20 +150,24 @@ class DesktopSessionService : Service() {
     }
 
     /**
-     * Picks a PRIMARY-role repository from the bundled seed list (first
-     * match, no real choice logic — there's no user-facing compositor-
-     * choice setting yet; §2/§3a both call that a user config decision, not
-     * something droidtop hardcodes) and resolves it against the real
-     * registry via [resolver] — the catalog is populated live, not
-     * prepopulated with pinned versions (docs/SPEC.md §3a). Picks whatever
-     * tag the registry lists first; no "latest stable" ordering logic yet.
-     * Returns the full [ResolvedImage] (not just a [dev.droidtop.runtime.RootfsImage])
-     * so [connect] can still see which distro/desktopEnvironment was picked
-     * — needed to look up the right [CompositorProvisioning] command.
+     * Picks a PRIMARY-role repository — the user's own choice from
+     * onboarding's `DESKTOP_SETUP` step (or its Settings re-entry point),
+     * via [DesktopSetupPrefs], when one was actually made; first
+     * PRIMARY/BOTH match otherwise (unset, or a stale id a catalog edit
+     * removed — never a hard failure over a preference that no longer
+     * resolves) — and resolves it against the real registry via [resolver]
+     * — the catalog is populated live, not prepopulated with pinned
+     * versions (docs/SPEC.md §3a). Picks whatever tag the registry lists
+     * first; no "latest stable" ordering logic yet. Returns the full
+     * [ResolvedImage] (not just a [dev.droidtop.runtime.RootfsImage]) so
+     * [connect] can still see which distro/desktopEnvironment was picked —
+     * needed to look up the right [CompositorProvisioning] command.
      */
     private suspend fun selectPrimaryImage(resolver: ImageCatalogResolver): ResolvedImage {
         val repositories = BundledImageRepositories.load(applicationContext).repositories
-        val repo = repositories.firstOrNull { it.role == ImageCatalogRole.PRIMARY || it.role == ImageCatalogRole.BOTH }
+        val preferredId = DesktopSetupPrefs.preferredPrimaryImageId(applicationContext)
+        val repo = repositories.firstOrNull { it.id == preferredId }
+            ?: repositories.firstOrNull { it.role == ImageCatalogRole.PRIMARY || it.role == ImageCatalogRole.BOTH }
             ?: error("No PRIMARY-role repository in the bundled seed list")
         val tags = resolver.listTags(repo)
         val tag = tags.firstOrNull() ?: error("No tags published under ${repo.registry}/${repo.repository}")

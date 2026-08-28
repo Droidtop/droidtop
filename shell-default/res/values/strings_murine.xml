@@ -26,12 +26,16 @@
 
     <string name="pref_desktop_taskbar_top_title">Taskbar at top</string>
     <string name="pref_desktop_taskbar_top_desc">Move the desktop taskbar to the top of the screen instead of the bottom</string>
+    <string name="pref_desktop_root_compositor_setup_title">Root &amp; compositor setup</string>
+    <string name="pref_desktop_root_compositor_setup_desc">Re-check root access and choose which distro + compositor to use</string>
 
     <string name="pref_handheld_default_section_title">Default section</string>
     <string name="pref_handheld_show_hints_title">Show button hints</string>
     <string name="pref_handheld_show_hints_desc">Show the A/B/Y button legend at the bottom of the Handheld shell</string>
     <string name="pref_handheld_console_systems_title">Console systems</string>
     <string name="pref_handheld_console_systems_desc">Assign game folders to a console system by hand</string>
+    <string name="pref_handheld_game_folders_title">Game folders</string>
+    <string name="pref_handheld_game_folders_desc">Add or remove the folders droidtop scans for games</string>
     <string name="pref_handheld_apps_grid_columns_title">Apps grid columns</string>
     <string name="pref_handheld_apps_grid_columns_desc">Icon density for the Apps tab, independent of the launcher app drawer\'s own grid width</string>
     <string-array name="pref_handheld_default_section_entries">
@@ -184,6 +188,8 @@
 
     <!-- Misc -->
     <string name="pref_default_launcher_title">Default launcher</string>
+    <string name="pref_droidtop_home_screen_title">droidtop home screen</string>
+    <string name="pref_droidtop_home_screen_desc">Choose whether droidtop\'s own launcher, a different installed launcher, or neither owns your home screen</string>
     <string name="pref_restart_title">Restart</string>
     <string name="pref_restart_summary">Restart the launcher</string>
 </resources>
