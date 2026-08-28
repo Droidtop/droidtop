@@ -721,15 +721,38 @@ private fun GamesSection(
     }
     // Real, headless gamelist browsing (no on-screen carousel/grid/
     // textlist to own focus) is only active when the theme actually has a
-    // real gamelist view AND that view has no list widget of its own --
-    // the OLD hand-built grid stays the real fallback for "no theme" and
-    // "theme HAS a real list widget" (ArtBookNext-style; generalizing this
-    // renderer's own list-widget path to game entries, not just system
-    // groups, is separate, not-yet-done work -- see GamesSection's own
-    // render branch below).
+    // real gamelist view AND that view has no list widget of its own
+    // (DEcaffe's real case). When the theme DOES have a real list widget
+    // (Art Book Next's own real <textlist>/<grid>), useWidgetGamelistTheme
+    // below renders it via the same EsDeThemedView/EsDeSystemListView
+    // path the system-list screen already uses, fed real game entries
+    // instead of system groups (EsDeListItem is deliberately generic --
+    // see its own doc comment). The OLD hand-built grid is now only the
+    // real fallback for "no active theme" or "theme has no real gamelist
+    // view at all."
     val useHeadlessGamelistTheme = gamelistView != null && !gamelistHasListWidget
+    val useWidgetGamelistTheme = gamelistView != null && gamelistHasListWidget
     val gamelistHasHelpSystem = remember(gamelistView) {
         gamelistView?.elements?.values?.any { it.type == "helpsystem" } == true
+    }
+    // Real EsDeListItem per game, only built when actually needed (the
+    // widget-driven render path) -- boxart as the item's "logo" image,
+    // no item count (a real game has none, unlike a system group).
+    // onSelect matches the system-list screen's own real convention (A
+    // activates the focused item) -- launching directly on select, since
+    // a themed gamelist view has no separate "drill in further" step the
+    // way the system list's onSelect (open this system) does.
+    val gamelistWidgetItems = remember(systemGamesForGroup) {
+        systemGamesForGroup.map { entry ->
+            EsDeListItem(
+                key = entry.id,
+                label = entry.title,
+                count = null,
+                logoPath = entry.artworkUri,
+                accentColor = null,
+                onSelect = { onLaunch(entry) },
+            )
+        }
     }
     // Present-and-non-empty groups -- engines first (in GAME_KINDS'
     // declaration order), then real console systems (alphabetical by
@@ -749,20 +772,24 @@ private fun GamesSection(
         .sortedBy { it.label.lowercase() }
     val orderedGroups: List<GameGroup> = orderedEngineGroups + orderedSystemGroups
 
-    LaunchedEffect(selectedGroup, useHeadlessGamelistTheme, focusedGameIndex) {
-        if (useHeadlessGamelistTheme) onFocusedEntryChanged(systemGamesForGroup.getOrNull(focusedGameIndex))
+    LaunchedEffect(selectedGroup, useHeadlessGamelistTheme || useWidgetGamelistTheme, focusedGameIndex) {
+        // Real for BOTH themed paths now -- the widget-driven case's own
+        // onFocusedIndexChanged (wired at the render call site below)
+        // updates the same focusedGameIndex state the headless case uses.
+        if (useHeadlessGamelistTheme || useWidgetGamelistTheme) {
+            onFocusedEntryChanged(systemGamesForGroup.getOrNull(focusedGameIndex))
+        }
     }
-    LaunchedEffect(selectedGroup, useHeadlessGamelistTheme) {
+    LaunchedEffect(selectedGroup, useHeadlessGamelistTheme, useWidgetGamelistTheme) {
         onDrillDownChanged(selectedGroup != null)
         if (selectedGroup != null) {
-            // Real, conditional now -- the headless themed gamelist path
-            // below draws its own real <helpsystem> only when the theme
-            // actually declares one there, same as the system-list
-            // screen. The OLD hand-built grid (still the fallback for "no
-            // theme" / "theme has a real list widget") has no theme-drawn
-            // hints of its own, so ButtonHintFooter keeps drawing those
-            // cases.
-            onThemeHandlesHints(useHeadlessGamelistTheme && gamelistHasHelpSystem)
+            // Real, conditional now -- either themed gamelist path draws
+            // its own real <helpsystem> only when the theme actually
+            // declares one there, same as the system-list screen. The OLD
+            // hand-built grid (the fallback for "no active theme" / "theme
+            // has no real gamelist view at all") has no theme-drawn hints
+            // of its own, so ButtonHintFooter keeps drawing that case.
+            onThemeHandlesHints((useHeadlessGamelistTheme || useWidgetGamelistTheme) && gamelistHasHelpSystem)
         }
     }
 
@@ -950,11 +977,7 @@ private fun GamesSection(
             // every element bound to whichever single game
             // focusedGameIndex currently points at (driven by the real
             // Up/Down handling above, since there's no on-screen widget
-            // to delegate that to). A theme WITH a real list widget
-            // (ArtBookNext-style) still falls through to the old grid
-            // below -- generalizing this renderer's list-widget path to
-            // game entries (not just system groups) is separate,
-            // deliberately not attempted here.
+            // to delegate that to).
             EsDeThemedView(
                 view = gamelistView,
                 items = emptyList(),
@@ -965,6 +988,37 @@ private fun GamesSection(
                 hints = listOf(
                     GamepadAction.A to "Launch",
                     GamepadAction.Y to "Info",
+                    GamepadAction.B to "Back",
+                ),
+            )
+        } else if (useWidgetGamelistTheme && gamelistView != null) {
+            // Real, theme-driven per-game LIST screen -- Art Book Next's
+            // own real case: a genuine <textlist>/<grid> as the gamelist
+            // view's primary browsing widget. Reuses the exact same
+            // EsDeThemedView/EsDeSystemListView path the system-list
+            // screen already uses (EsDeListItem is deliberately generic
+            // -- see its own doc comment), fed real per-game items instead
+            // of system groups. onFocusedIndexChanged updates the same
+            // focusedGameIndex the headless case uses -- confirmed real
+            // and correct against Art Book Next's own theme.xml: it
+            // declares NO <gameselector> anywhere, so (same as DEcaffe)
+            // metadata/description/rating elements implicitly bind to
+            // index 0 of gameSelection, which needs to track whichever
+            // game the list widget itself currently has focused, exactly
+            // what focusedGameIndex already does.
+            LaunchedEffect(group, gamelistWidgetItems) {
+                if (gamelistWidgetItems.isNotEmpty()) firstFocus.requestFocus()
+            }
+            EsDeThemedView(
+                view = gamelistView,
+                items = gamelistWidgetItems,
+                firstItemFocus = firstFocus,
+                modifier = Modifier.fillMaxSize(),
+                onFocusedIndexChanged = { focusedGameIndex = it },
+                focusedSystemEntries = systemGamesForGroup,
+                focusedGameIndex = focusedGameIndex,
+                hints = listOf(
+                    GamepadAction.A to "Launch",
                     GamepadAction.B to "Back",
                 ),
             )

@@ -52,11 +52,20 @@ import dev.droidtop.library.theme.EsDeThemeValue
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 
-/** One item [EsDeSystemListView] can browse -- deliberately generic (not tied to [dev.droidtop.library.LibraryEntry]) so both the Games system list and, later, a per-system game list can reuse the same real theme-driven renderers. */
+/**
+ * One item [EsDeSystemListView] can browse -- deliberately generic (not
+ * tied to [dev.droidtop.library.LibraryEntry]) so both the Games system
+ * list and a per-system game list (real, wired in
+ * `GamepadShell.kt`'s `GamesSection` for themes with a real gamelist
+ * list widget -- e.g. Art Book Next's own `<textlist>`/`<grid>`) reuse
+ * the same real theme-driven renderers. [count] is null for a GAME item
+ * (a real game has no "N items" concept the way a system GROUP does) --
+ * [EsDeListTile] only renders that line when it's non-null.
+ */
 data class EsDeListItem(
     val key: String,
     val label: String,
-    val count: Int,
+    val count: Int?,
     val logoPath: String?,
     val accentColor: Color?,
     val onSelect: () -> Unit,
@@ -564,7 +573,9 @@ private fun EsDeListTile(
             style = MaterialTheme.typography.titleMedium,
             maxLines = 1,
         )
-        Text("${item.count} items", color = textColor.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
+        item.count?.let {
+            Text("$it items", color = textColor.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
+        }
     }
 }
 
