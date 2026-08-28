@@ -31,12 +31,16 @@ package dev.droidtop.library.theme
  * Parsing coverage and rendering coverage are real, separate things: every
  * type here parses into the real data model, but rendering
  * ([dev.droidtop.shell.gamepad.theme.EsDeThemedView]) is still honestly
- * partial for `badges`/`gamelistinfo` -- `rating`/`datetime` are now real,
- * rendered (LibraryEntry.rating/releaseDate exist, populated by real
- * ScreenScraper/TheGamesDB scrapes), but `badges`/`gamelistinfo` need
- * real favorite/kidgame/hidden flags and a real list-count context this
- * element type alone doesn't carry, respectively -- still not modeled,
- * so rendering them would still mean fabricating data.
+ * partial. `rating`/`datetime` are fully real (LibraryEntry.rating/
+ * releaseDate exist, populated by real ScreenScraper/TheGamesDB scrapes).
+ * `badges` is PARTIALLY real -- LibraryEntry only models one of real
+ * ES-DE's nine real badge slot types (`favorite`), so only that one ever
+ * renders (see `EsDeThemedBadges`' own doc comment); the other eight
+ * (completed/kidgame/broken/collection/folder/controller/altemulator/
+ * manual) need real flags/data droidtop doesn't have yet. `gamelistinfo`
+ * needs a real list-count context this element type alone doesn't carry
+ * -- still not modeled, so rendering it would still mean fabricating
+ * data.
  */
 data class EsDeTheme(
     val variables: Map<String, String>,
@@ -310,6 +314,14 @@ internal val ES_DE_ELEMENT_SCHEMA: Map<String, Map<String, EsDePropertyType>> = 
         "lines" to EsDePropertyType.UNSIGNED_INTEGER,
         "itemsPerLine" to EsDePropertyType.UNSIGNED_INTEGER,
         "itemMargin" to EsDePropertyType.NORMALIZED_PAIR,
+        // Real ES-DE default (BadgeComponent's own constructor, when a
+        // theme declares no <slots> at all): every real badge type --
+        // collection/folder/favorite/completed/kidgame/broken/controller/
+        // altemulator/manual. droidtop only actually models `favorite`
+        // (LibraryEntry.favorite) -- see EsDeThemedBadges' own doc
+        // comment for why every other real slot type is a real, honest,
+        // unrendered gap rather than fabricated.
+        "slots" to EsDePropertyType.STRING,
         "customBadgeIcon" to EsDePropertyType.PATH,
         "customControllerIcon" to EsDePropertyType.PATH,
         "badgeIconColor" to EsDePropertyType.COLOR,

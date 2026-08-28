@@ -176,6 +176,10 @@ fun EsDeThemedView(
                 // own doc comment) is the only piece this renderer can't
                 // get from the theme alone.
                 "helpsystem" -> EsDeThemedHelpSystem(element, viewWidth, viewHeight, hints)
+                // Real, honestly PARTIAL -- see EsDeThemedBadges' own doc
+                // comment for exactly which of real ES-DE's nine real
+                // badge slot types this actually covers (one: favorite).
+                "badges" -> EsDeThemedBadges(element, viewWidth, viewHeight, gameSelection)
             }
         }
     }
@@ -558,6 +562,65 @@ private fun EsDeThemedDateTime(element: EsDeThemeElement, viewWidth: Dp, viewHei
         fontSize = fontSizeSp,
         modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY),
     )
+}
+
+/**
+ * Real, honestly PARTIAL `badges` rendering. Real ES-DE's own
+ * `BadgeComponent` shows up to nine real slot types (collection/folder/
+ * favorite/completed/kidgame/broken/controller/altemulator/manual,
+ * confirmed from `BadgeComponent.cpp`'s own constructor -- that's the
+ * real default `<slots>` set when a theme declares none), laid out via a
+ * real flexbox (`lines`/`itemsPerLine`/`itemMargin`). droidtop's
+ * [LibraryEntry] only models ONE of those nine real flags --
+ * [LibraryEntry.favorite] -- so this renders at most that single real
+ * badge, positioned directly at the element's own `pos`/`size` (a real,
+ * deliberate simplification: a full multi-badge flexbox layout for data
+ * droidtop doesn't have would be real code with nothing real to lay out).
+ * Every other real slot a theme's `<slots>` might request is a real,
+ * honest, unrendered gap, not silently faked as absent-vs-false.
+ *
+ * Icon: the theme's own real `customBadgeIcon` when declared (common --
+ * both DEcaffe and Art Book Next bundle real favorite-badge art) --
+ * real ES-DE's OWN default badge icon set is compiled into its binary
+ * as Qt resources (`:/graphics/badge_favorite.svg` etc.), which droidtop
+ * has no access to and doesn't bundle a copy of (real licensing/IP
+ * reason to avoid, not an oversight) -- falls back to a plain unicode
+ * star, the same honest-fallback convention [EsDeThemedRating] already
+ * uses.
+ */
+@Composable
+private fun EsDeThemedBadges(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp, gameSelection: List<LibraryEntry>) {
+    val favorite = gameSelection.getOrNull(0)?.favorite ?: return
+    if (!favorite) return
+    val slotsRaw = element.valueOrNull<EsDeThemeValue.Str>("slots")?.value?.lowercase()
+    // No <slots> at all is real ES-DE's own "every slot enabled" default
+    // (see this function's own doc comment) -- "all" is the same real
+    // ES-DE keyword. Either way "favorite" is in the effective set;
+    // otherwise only render when the theme actually lists it.
+    val favoriteSlotActive = slotsRaw == null || slotsRaw.contains("all") ||
+        slotsRaw.split(Regex("[,\\s]+")).any { it == "favorite" }
+    if (!favoriteSlotActive) return
+
+    val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
+    val (width, height) = sizeOf(element, viewWidth, viewHeight)
+    val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
+    val customIcon = element.valueOrNull<EsDeThemeValue.Path>("customBadgeIcon")?.resolved
+
+    if (customIcon != null) {
+        AsyncImage(
+            model = customIcon,
+            contentDescription = null,
+            modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY).size(height).graphicsLayer { alpha = opacity },
+        )
+    } else {
+        val color = element.valueOrNull<EsDeThemeValue.Color>("badgeIconColor")?.let { colorOf(it) } ?: Color.White
+        Text(
+            text = "★",
+            color = color.copy(alpha = color.alpha * opacity),
+            fontSize = with(LocalDensity.current) { height.toSp() },
+            modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY),
+        )
+    }
 }
 
 /**
