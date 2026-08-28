@@ -1222,3 +1222,35 @@ Verified: a real built APK contains distinct `lib/arm64-v8a/` and
 - Whether DroidSpaces' namespace/cgroup model tolerates two containers
   (primary + sibling) sharing a Wayland socket via bind mount cleanly, or
   whether that needs patching in DroidSpaces itself.
+
+## 12. Idea, not yet designed: a real third-party app integration system
+
+Raised directly by the user, not yet designed or scoped -- recorded here
+so it isn't lost, matching this project's own "real decisions land in
+SPEC.md" convention, even though this one isn't a decision yet, just a
+real, worthwhile direction.
+
+The core idea: let a user hook OTHER real Android apps into droidtop for
+data exchange, substitution, or rendering, rather than droidtop only ever
+calling its own fixed, hardcoded set of players/tools. Concrete real
+examples already given:
+- A preferred video player (a specific real app) substituted wherever
+  droidtop would otherwise launch its own default.
+- A preferred browser substituted the same way.
+- A ROM downloader integration: search for and add a ROM to a real
+  download queue AND droidtop's own configured ROMs folder, directly from
+  droidtop's own UI, without leaving it.
+- Spotify (real now-playing/control integration -- droidtop already has
+  a real, working Spotify presence client per §7e, a real, concrete
+  precedent for "talk to one specific real third-party app's real API").
+- A hotspot/tethering app, similarly hookable.
+
+Real open questions a genuine design pass needs to answer (not resolved
+here): what the actual integration surface is (Android Intents/
+content providers/a real plugin API a third-party app author implements
+against?), how droidtop discovers what's installed and integration-
+capable, what a real permission/trust model looks like for letting a
+third-party app receive data from or act on behalf of droidtop, and
+whether this is one general mechanism or several real per-category ones
+(a "search+download+add-to-library" contract is a very different shape
+than "render this video" or "show now-playing controls").
