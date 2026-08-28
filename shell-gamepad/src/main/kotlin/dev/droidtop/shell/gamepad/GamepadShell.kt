@@ -71,6 +71,7 @@ import dev.droidtop.shell.gamepad.theme.EsDeListItem
 import dev.droidtop.shell.gamepad.theme.EsDeSystemListView
 import dev.droidtop.shell.gamepad.theme.EsDeThemedView
 import dev.droidtop.shell.gamepad.theme.ThemeAssets
+import dev.droidtop.shell.gamepad.theme.ThemeBrowserScreen
 import dev.droidtop.shell.gamepad.theme.ThemePrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -1332,6 +1333,7 @@ private fun SettingsSection(onRescan: () -> Unit) {
     var themeNames by remember { mutableStateOf<List<String>>(emptyList()) }
     var activeTheme by remember { mutableStateOf<String?>(null) }
     var themeSyncStatus by remember { mutableStateOf<String?>(null) }
+    var themeBrowserOpen by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
     suspend fun refreshThemeState() {
@@ -1341,6 +1343,16 @@ private fun SettingsSection(onRescan: () -> Unit) {
         }
     }
     LaunchedEffect(Unit) { refreshThemeState() }
+
+    if (themeBrowserOpen) {
+        ThemeBrowserScreen(onDismiss = {
+            themeBrowserOpen = false
+            // A download may have just added a new theme -- real refresh,
+            // not stale until the next unrelated recomposition.
+            coroutineScope.launch { refreshThemeState() }
+        })
+        return
+    }
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp).verticalScroll(rememberScrollState()),
@@ -1393,7 +1405,7 @@ private fun SettingsSection(onRescan: () -> Unit) {
             )
             SettingsLink(
                 "Sync theme index",
-                themeSyncStatus ?: "Download/update the real ES-DE theme list (browsing and installing individual themes isn't built yet)",
+                themeSyncStatus ?: "Update the real ES-DE theme list -- run this before Browse themes if that list is empty",
                 onClick = {
                     themeSyncStatus = "Checking..."
                     coroutineScope.launch {
@@ -1410,6 +1422,11 @@ private fun SettingsSection(onRescan: () -> Unit) {
                         refreshThemeState()
                     }
                 },
+            )
+            SettingsLink(
+                "Browse themes",
+                "Download or update an individual theme from the real ES-DE community index",
+                onClick = { themeBrowserOpen = true },
             )
         }
         SettingsGroup("Display") {
