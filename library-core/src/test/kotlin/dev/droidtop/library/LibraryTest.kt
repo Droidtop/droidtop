@@ -8,14 +8,30 @@ import org.junit.Test
 private class FakeProvider(
     kind: LibraryEntryKind,
     private val entries: List<LibraryEntry>,
+    private val failLaunch: Boolean = false,
 ) : LibraryProvider {
     override val kinds = setOf(kind)
     val launched = mutableListOf<LibraryEntry>()
 
     override suspend fun scan(): List<LibraryEntry> = entries
     override suspend fun launch(entry: LibraryEntry) {
+        if (failLaunch) error("launch failed")
         launched += entry
     }
+}
+
+private class FakePlayHistoryStore : PlayHistoryStore {
+    private val records = mutableMapOf<String, PlayHistoryRecord>()
+    val recordCalls = mutableListOf<String>()
+
+    override suspend fun recordPlay(id: String, epochMs: Long) {
+        recordCalls += id
+        val previousCount = records[id]?.playCount ?: 0
+        records[id] = PlayHistoryRecord(epochMs, previousCount + 1)
+    }
+
+    override suspend fun getAll(ids: Collection<String>): Map<String, PlayHistoryRecord> =
+        records.filterKeys { it in ids }
 }
 
 class LibraryTest {
@@ -49,5 +65,36 @@ class LibraryTest {
 
         assertEquals(listOf(wineEntry), wineProvider.launched)
         assertTrue(nativeProvider.launched.isEmpty())
+    }
+
+    @Test
+    fun `launch records real play history, and a successful scan reflects it`() = runBlocking {
+        val nativeProvider = FakeProvider(LibraryEntryKind.NATIVE_ANDROID_APP, listOf(nativeEntry))
+        val playHistory = FakePlayHistoryStore()
+        val library = Library(listOf(nativeProvider), playHistory)
+
+        library.launch(nativeEntry)
+        library.launch(nativeEntry)
+        val entries = library.scanAll()
+
+        assertEquals(listOf(nativeEntry.id, nativeEntry.id), playHistory.recordCalls)
+        val rescored = entries.single { it.id == nativeEntry.id }
+        assertEquals(2, rescored.playCount)
+        assertTrue(rescored.lastPlayedEpochMs != null)
+    }
+
+    @Test
+    fun `a failed launch is never recorded as a real play`() = runBlocking {
+        val failingProvider = FakeProvider(LibraryEntryKind.NATIVE_ANDROID_APP, listOf(nativeEntry), failLaunch = true)
+        val playHistory = FakePlayHistoryStore()
+        val library = Library(listOf(failingProvider), playHistory)
+
+        try {
+            library.launch(nativeEntry)
+        } catch (t: Throwable) {
+            // Expected -- the fake provider's launch() always throws.
+        }
+
+        assertTrue(playHistory.recordCalls.isEmpty())
     }
 }
