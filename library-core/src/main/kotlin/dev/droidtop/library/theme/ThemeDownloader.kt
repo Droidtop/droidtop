@@ -39,6 +39,13 @@ object ThemeDownloader {
     private const val THEMES_LIST_URL = "https://gitlab.com/es-de/themes/themes-list.git"
     private const val THEMES_LIST_DIR_NAME = "themes-list"
 
+    // Real per-system metadata overlay for droidtop's own invented engine
+    // systems (Ren'Py, RPG Maker variants, KiriKiri) -- no real ES-DE
+    // theme has any metadata for these, since they're not consoles. See
+    // https://github.com/bi0shacker001/droidtop-theme-patches's own
+    // README for the real overlay format/mechanism.
+    private const val THEME_PATCHES_URL = "https://github.com/bi0shacker001/droidtop-theme-patches.git"
+
     enum class ThemeSyncStatus { CLONED, UPDATED, UP_TO_DATE, DIVERGED, FAILED }
     data class ThemeSyncResult(val status: ThemeSyncStatus, val error: Throwable? = null)
 
@@ -62,6 +69,15 @@ object ThemeDownloader {
 
     fun syncThemesList(userThemesDir: File): ThemeSyncResult =
         syncRepository(themesListDir(userThemesDir), THEMES_LIST_URL, allowReset = true)
+
+    /**
+     * Same "always hard reset, it's read-only to the app" treatment as
+     * [syncThemesList] -- droidtop never commits into its own clone of
+     * this repo, so a diverged/local-changes state can only mean a
+     * corrupted local clone, not real user work to preserve.
+     */
+    fun syncThemePatches(patchesDir: File): ThemeSyncResult =
+        syncRepository(patchesDir, THEME_PATCHES_URL, allowReset = true)
 
     fun downloadOrUpdateTheme(
         userThemesDir: File,

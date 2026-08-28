@@ -136,9 +136,36 @@ internal object ThemeAssets {
         } catch (t: Exception) {
             Log.e("droidtop.ThemeAssets", "Failed to parse theme '${active.name}'", t)
             null
-        }
+        }?.let { applyThemePatchesOverlay(context, it, systemId) }
         systemThemeCache[cacheKey] = theme
         return theme
+    }
+
+    /**
+     * Real, writable clone target for `droidtop-theme-patches` -- synced
+     * explicitly (network I/O, see [dev.droidtop.library.theme.ThemeDownloader.syncThemePatches]),
+     * never from inside this hot, synchronous load path. Reading here is
+     * purely local-disk and safe to call unconditionally: an
+     * unsynced/absent clone just means [applyThemePatchesOverlay] has
+     * nothing to overlay yet, which is a real, valid state, not an error.
+     */
+    fun themePatchesDir(context: Context): File = File(context.filesDir, "theme_patches")
+
+    /**
+     * Additive-only overlay: fills in real per-system metadata
+     * (`systemName`/`systemDescription`/...) for [systemId]s no real
+     * ES-DE theme has any metadata for at all (droidtop's own invented
+     * engine systems) -- never overrides a key the loaded theme already
+     * declares itself, so this can never corrupt a real theme's own real
+     * per-system data.
+     */
+    private fun applyThemePatchesOverlay(context: Context, theme: EsDeTheme, systemId: String?): EsDeTheme {
+        if (systemId == null) return theme
+        val overlay = EsDeThemeParser.parseVariablesFragment(
+            File(themePatchesDir(context), "system/metadata/$systemId.xml")
+        )
+        if (overlay.isEmpty()) return theme
+        return theme.copy(variables = overlay + theme.variables)
     }
 
     private fun extractedBundledThemeDir(context: Context, assetFolder: String): File {
