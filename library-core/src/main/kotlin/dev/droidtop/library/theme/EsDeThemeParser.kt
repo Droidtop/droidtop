@@ -130,6 +130,35 @@ object EsDeThemeParser {
     }
 
     /**
+     * Parses a bare `<theme><variables>...</variables></theme>` overlay
+     * fragment -- the real per-system metadata XML format ES-DE themes
+     * use (`system/metadata/<id>.xml`), but read standalone rather than
+     * as part of a full theme parse. Used by droidtop's own
+     * `droidtop-theme-patches` overlay (see `ThemeAssets`'s own doc
+     * comment) to supply this same real metadata shape for droidtop's
+     * invented engine systems, which no real ES-DE theme has any
+     * metadata for at all. Returns an empty map if the file doesn't
+     * exist or has no `<variables>` block -- both real, honest "nothing
+     * to overlay" cases, not errors.
+     */
+    fun parseVariablesFragment(fragmentFile: File): Map<String, String> {
+        if (!fragmentFile.isFile) return emptyMap()
+        val variables = mutableMapOf<String, String>()
+        val parser = Xml.newPullParser().apply {
+            setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
+            setInput(StringReader(fragmentFile.readText()))
+        }
+        var event = parser.eventType
+        while (event != XmlPullParser.END_DOCUMENT) {
+            if (event == XmlPullParser.START_TAG && parser.name == "variables") {
+                parseVariables(parser, variables)
+            }
+            event = parser.next()
+        }
+        return variables
+    }
+
+    /**
      * Real entry point: reads [themeFile]'s sibling `capabilities.xml`
      * (real ES-DE convention: always alongside theme.xml, same
      * directory) and parses using each axis's real front-of-declared-list
