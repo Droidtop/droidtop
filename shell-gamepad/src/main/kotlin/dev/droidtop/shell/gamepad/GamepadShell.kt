@@ -46,7 +46,6 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
@@ -65,6 +64,8 @@ import dev.droidtop.library.consoles.ES_DE_CONSOLE_SYSTEMS
 import dev.droidtop.library.displayName as launchStrategyDisplayName
 import dev.droidtop.library.theme.SystemThemeColors
 import dev.droidtop.library.theme.primaryListElement
+import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.theme.EsDeListItem
 import dev.droidtop.shell.gamepad.theme.EsDeSystemListView
 import dev.droidtop.shell.gamepad.theme.EsDeThemedView
@@ -128,6 +129,12 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
     var rescanTrigger by remember { mutableStateOf(0) }
     var section by remember { mutableStateOf(HandheldPrefs.defaultSection(context)) }
     var canGoBack by remember { mutableStateOf(false) }
+    // True only while GamesSection's own themed system-view render (the
+    // real, loaded theme's <helpsystem> element, see EsDeThemedHelpSystem)
+    // is actually drawing button hints itself -- lets the hardcoded
+    // ButtonHintFooter below step aside instead of drawing a second,
+    // redundant, differently-styled hint bar on top of the theme's own.
+    var themeHandlesHints by remember { mutableStateOf(false) }
     var detailEntry by remember { mutableStateOf<LibraryEntry?>(null) }
     val scope = rememberCoroutineScope()
     val onLaunch: (LibraryEntry) -> Unit = { entry -> scope.launch { library.launch(entry) } }
@@ -198,12 +205,12 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
                 if (event.type != KeyEventType.KeyUp || detailEntry != null) return@onKeyEvent false
                 val sections = HandheldSection.entries
                 val currentIndex = sections.indexOf(section)
-                when (event.key) {
-                    Key.ButtonL1 -> {
+                when (GamepadKeyMap.actionFor(event.key)) {
+                    GamepadAction.L -> {
                         section = sections[(currentIndex - 1 + sections.size) % sections.size]
                         true
                     }
-                    Key.ButtonR1 -> {
+                    GamepadAction.R -> {
                         section = sections[(currentIndex + 1) % sections.size]
                         true
                     }
@@ -229,6 +236,7 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
                 )
                 section == HandheldSection.SETTINGS -> {
                     canGoBack = false
+                    themeHandlesHints = false
                     SettingsSection(onRescan = onRescan)
                 }
                 // Each section now gates on its own scan only (see
@@ -244,9 +252,11 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
                         onShowDetail = { detailEntry = it },
                         onDrillDownChanged = { canGoBack = it },
                         onFocusedEntryChanged = onFocusedEntryChanged,
+                        onThemeHandlesHints = { themeHandlesHints = it },
                     )
                     HandheldSection.APPS -> {
                         canGoBack = false
+                        themeHandlesHints = false
                         AppsSection(
                             entries = appEntries.orEmpty(),
                             onLaunch = onLaunch,
@@ -260,7 +270,7 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
                 }
             }
         }
-        if (HandheldPrefs.showHints(context)) {
+        if (HandheldPrefs.showHints(context) && !themeHandlesHints) {
             ButtonHintFooter(
                 canGoBack = canGoBack || detailEntry != null,
                 showInfo = detailEntry == null,
@@ -379,7 +389,8 @@ private fun EntryDetailScreen(entry: LibraryEntry, onLaunch: () -> Unit, onClose
             .fillMaxSize()
             .padding(48.dp)
             .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp && (event.key == Key.Back || event.key == Key.ButtonB)) {
+                val action = GamepadKeyMap.actionFor(event.key)
+                if (event.type == KeyEventType.KeyUp && (action == GamepadAction.BACK || action == GamepadAction.B)) {
                     onClose()
                     true
                 } else {
@@ -449,7 +460,8 @@ private fun LaunchStrategyPicker(
             .background(Color.Black)
             .padding(48.dp)
             .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp && (event.key == Key.Back || event.key == Key.ButtonB)) {
+                val action = GamepadKeyMap.actionFor(event.key)
+                if (event.type == KeyEventType.KeyUp && (action == GamepadAction.BACK || action == GamepadAction.B)) {
                     onDismiss()
                     true
                 } else {
@@ -472,7 +484,7 @@ private fun LaunchStrategyPicker(
                     .clickable { onPick(strategy) }
                     .onKeyEvent { event ->
                         if (event.type == KeyEventType.KeyUp &&
-                            (event.key == Key.ButtonA || event.key == Key.DirectionCenter || event.key == Key.Enter)
+                            GamepadKeyMap.actionFor(event.key) == GamepadAction.A
                         ) {
                             onPick(strategy)
                             true
@@ -501,7 +513,7 @@ private fun ActionChip(label: String, highlighted: Boolean, modifier: Modifier =
             .clickable(onClick = onClick)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp &&
-                    (event.key == Key.ButtonA || event.key == Key.DirectionCenter || event.key == Key.Enter)
+                    GamepadKeyMap.actionFor(event.key) == GamepadAction.A
                 ) {
                     onClick()
                     true
@@ -603,7 +615,7 @@ private fun SectionTabBar(current: HandheldSection, onSelect: (HandheldSection) 
                     .clickable(onClick = { onSelect(entrySection) })
                     .onKeyEvent { event ->
                         if (event.type == KeyEventType.KeyUp &&
-                            (event.key == Key.ButtonA || event.key == Key.DirectionCenter || event.key == Key.Enter)
+                            GamepadKeyMap.actionFor(event.key) == GamepadAction.A
                         ) {
                             onSelect(entrySection)
                             true
@@ -676,6 +688,7 @@ private fun GamesSection(
     onShowDetail: (LibraryEntry) -> Unit,
     onDrillDownChanged: (Boolean) -> Unit,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
+    onThemeHandlesHints: (Boolean) -> Unit = {},
 ) {
     var selectedGroup by remember { mutableStateOf<GameGroup?>(null) }
     var recentOnly by remember { mutableStateOf(false) }
@@ -698,7 +711,14 @@ private fun GamesSection(
         .sortedBy { it.label.lowercase() }
     val orderedGroups: List<GameGroup> = orderedEngineGroups + orderedSystemGroups
 
-    LaunchedEffect(selectedGroup) { onDrillDownChanged(selectedGroup != null) }
+    LaunchedEffect(selectedGroup) {
+        onDrillDownChanged(selectedGroup != null)
+        // The drilled-into-a-system game grid is still the hardcoded
+        // LazyVerticalGrid/ButtonHintFooter path (real gamelist-view
+        // theming is separate, later work) -- only the system-list
+        // screen below can possibly hand hint-drawing off to the theme.
+        if (selectedGroup != null) onThemeHandlesHints(false)
+    }
 
     Box(
         modifier = Modifier
@@ -706,8 +726,9 @@ private fun GamesSection(
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
                 val group = selectedGroup
+                val action = GamepadKeyMap.actionFor(event.key)
                 when {
-                    (event.key == Key.Back || event.key == Key.ButtonB) && group != null -> {
+                    (action == GamepadAction.BACK || action == GamepadAction.B) && group != null -> {
                         selectedGroup = null
                         true
                     }
@@ -715,12 +736,12 @@ private fun GamesSection(
                     // Left/Right inside a gamelist jumps directly to the
                     // adjacent system's gamelist rather than requiring a
                     // Back-then-reselect round trip through the system list.
-                    event.key == Key.DirectionLeft && group != null && orderedGroups.size > 1 -> {
+                    action == GamepadAction.LEFT && group != null && orderedGroups.size > 1 -> {
                         val index = orderedGroups.indexOf(group)
                         selectedGroup = orderedGroups[(index - 1 + orderedGroups.size) % orderedGroups.size]
                         true
                     }
-                    event.key == Key.DirectionRight && group != null && orderedGroups.size > 1 -> {
+                    action == GamepadAction.RIGHT && group != null && orderedGroups.size > 1 -> {
                         val index = orderedGroups.indexOf(group)
                         selectedGroup = orderedGroups[(index + 1) % orderedGroups.size]
                         true
@@ -804,6 +825,23 @@ private fun GamesSection(
                     // legitimately just show no game preview.
                     val focusedSystemEntries = orderedGroups.getOrNull(focusedSystemIndex)
                         ?.let { byGroup[it] } ?: emptyList()
+                    // Real hints for THIS exact screen state, matching what
+                    // ButtonHintFooter would compute for it (canGoBack=false,
+                    // showInfo=true, showSectionSwitch=true, showSystemSwitch=
+                    // false -- there's no drilled-into system yet to switch
+                    // siblings of). L/R and the old compound "L/R" glyph
+                    // collapse to a single representative L icon here -- a
+                    // real, deliberate simplification (see
+                    // EsDeThemedHelpSystem's own doc comment), not a hack.
+                    val systemListHints = listOf(
+                        GamepadAction.A to "Select",
+                        GamepadAction.Y to "Info",
+                        GamepadAction.L to "Switch section",
+                    )
+                    val hasThemeHelpSystem = remember(theme) {
+                        theme?.views?.get("system")?.elements?.values?.any { it.type == "helpsystem" } == true
+                    }
+                    LaunchedEffect(hasThemeHelpSystem) { onThemeHandlesHints(hasThemeHelpSystem) }
                     theme?.views?.get("system")?.let { systemView ->
                         EsDeThemedView(
                             view = systemView,
@@ -812,6 +850,7 @@ private fun GamesSection(
                             modifier = Modifier.fillMaxSize(),
                             onFocusedIndexChanged = { focusedSystemIndex = it },
                             focusedSystemEntries = focusedSystemEntries,
+                            hints = systemListHints,
                         )
                     } ?: EsDeSystemListView(
                         element = listElement,
@@ -889,11 +928,11 @@ private fun GamesSection(
                     modifier = Modifier.fillMaxSize().padding(horizontal = 48.dp)
                         .onKeyEvent { event ->
                             if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
-                            when (event.key) {
-                                Key.DirectionUp -> focusManager.moveFocus(FocusDirection.Up)
-                                Key.DirectionDown -> focusManager.moveFocus(FocusDirection.Down)
-                                Key.DirectionLeft -> focusManager.moveFocus(FocusDirection.Left)
-                                Key.DirectionRight -> focusManager.moveFocus(FocusDirection.Right)
+                            when (GamepadKeyMap.actionFor(event.key)) {
+                                GamepadAction.UP -> focusManager.moveFocus(FocusDirection.Up)
+                                GamepadAction.DOWN -> focusManager.moveFocus(FocusDirection.Down)
+                                GamepadAction.LEFT -> focusManager.moveFocus(FocusDirection.Left)
+                                GamepadAction.RIGHT -> focusManager.moveFocus(FocusDirection.Right)
                                 else -> false
                             }
                         },
@@ -930,7 +969,7 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp &&
-                    (event.key == Key.ButtonA || event.key == Key.DirectionCenter || event.key == Key.Enter)
+                    GamepadKeyMap.actionFor(event.key) == GamepadAction.A
                 ) {
                     onClick()
                     true
@@ -1068,8 +1107,8 @@ private fun AppIconTile(entry: LibraryEntry, modifier: Modifier = Modifier, onLa
             .clickable(onClick = onLaunch)
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
-                when (event.key) {
-                    Key.ButtonA, Key.DirectionCenter, Key.Enter -> {
+                when (GamepadKeyMap.actionFor(event.key)) {
+                    GamepadAction.A -> {
                         onLaunch()
                         true
                     }
@@ -1233,13 +1272,13 @@ private fun SettingsRow(
             .clickable(onClick = onClick)
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
-                when (event.key) {
-                    Key.ButtonA, Key.DirectionCenter, Key.Enter -> {
+                when (GamepadKeyMap.actionFor(event.key)) {
+                    GamepadAction.A -> {
                         onClick()
                         true
                     }
-                    Key.DirectionLeft -> onKeyLeftRight?.invoke(true) ?: false
-                    Key.DirectionRight -> onKeyLeftRight?.invoke(false) ?: false
+                    GamepadAction.LEFT -> onKeyLeftRight?.invoke(true) ?: false
+                    GamepadAction.RIGHT -> onKeyLeftRight?.invoke(false) ?: false
                     else -> false
                 }
             }
@@ -1305,7 +1344,7 @@ private fun SettingsLink(title: String, summary: String, modifier: Modifier = Mo
             .clickable(onClick = onClick)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp &&
-                    (event.key == Key.ButtonA || event.key == Key.DirectionCenter || event.key == Key.Enter)
+                    GamepadKeyMap.actionFor(event.key) == GamepadAction.A
                 ) {
                     onClick()
                     true
@@ -1422,12 +1461,12 @@ private fun GameCard(entry: LibraryEntry, modifier: Modifier = Modifier, onLaunc
             .clickable(onClick = onLaunch)
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
-                when (event.key) {
-                    Key.ButtonA, Key.DirectionCenter, Key.Enter -> {
+                when (GamepadKeyMap.actionFor(event.key)) {
+                    GamepadAction.A -> {
                         onLaunch()
                         true
                     }
-                    Key.ButtonY -> {
+                    GamepadAction.Y -> {
                         onShowDetail()
                         true
                     }
