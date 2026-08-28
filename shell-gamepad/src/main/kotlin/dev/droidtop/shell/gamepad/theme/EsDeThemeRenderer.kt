@@ -92,6 +92,20 @@ fun EsDeThemedView(
     // Empty by default: most EsDeThemedView callers render a view with no
     // real helpsystem element at all.
     hints: List<kotlin.Pair<GamepadAction, String>> = emptyList(),
+    // Real gamelist-view case, confirmed against the bundled DEcaffe theme
+    // directly: its own real gamelist view declares NO <carousel>/<grid>/
+    // <textlist> (see EsDeThemeView.primaryListElement's own updated doc
+    // comment) AND NO <gameselector> either -- every metadata/image/video
+    // element there just implicitly binds to index 0 with no selection
+    // mechanism of its own. Real ES-DE itself always has an underlying
+    // navigable per-game cursor regardless of whether the theme renders
+    // any visual widget for it; a caller with no on-screen list widget to
+    // delegate that to (see GamesSection's own headless gamelist-
+    // navigation branch) passes the real, currently-focused index here.
+    // Only takes effect when the view genuinely has no <gameselector> of
+    // its own -- never overrides a real, theme-declared one (e.g. the
+    // "system" view's random game-preview collage).
+    focusedGameIndex: Int? = null,
 ) {
     BoxWithConstraints(modifier = modifier) {
         val viewWidth = maxWidth
@@ -105,8 +119,12 @@ fun EsDeThemedView(
         val gameSelector = view.elements.values.firstOrNull { it.type == "gameselector" }
         val gameCount = gameSelector?.valueOrNull<EsDeThemeValue.UInt>("gameCount")?.value?.toInt() ?: 1
         val allowDuplicates = gameSelector?.valueOrNull<EsDeThemeValue.Bool>("allowDuplicates")?.value ?: true
-        val gameSelection = remember(focusedSystemEntries) {
-            GameSelector.select(focusedSystemEntries, gameCount, allowDuplicates)
+        val gameSelection = if (gameSelector == null && focusedGameIndex != null) {
+            listOfNotNull(focusedSystemEntries.getOrNull(focusedGameIndex))
+        } else {
+            remember(focusedSystemEntries) {
+                GameSelector.select(focusedSystemEntries, gameCount, allowDuplicates)
+            }
         }
         view.elements.values
             // Real ES-DE `visible` property, applies to every element type
