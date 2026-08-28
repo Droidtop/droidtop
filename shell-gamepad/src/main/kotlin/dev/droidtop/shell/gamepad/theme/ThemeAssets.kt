@@ -7,6 +7,7 @@ import dev.droidtop.library.theme.EsDeThemeParser
 import dev.droidtop.library.theme.EsDeThemeValue
 import dev.droidtop.library.theme.primaryListElement
 import java.io.File
+import java.util.Locale
 
 /**
  * Real, generic multi-theme discovery/loading -- deliberately mirrors real
@@ -144,7 +145,20 @@ internal object ThemeAssets {
             // theme using that common real convention.
             val metrics = context.resources.displayMetrics
             val screenAspectRatio = metrics.widthPixels.toFloat() / metrics.heightPixels.toFloat()
-            EsDeThemeParser.parseWithCapabilities(themeFile, systemTheme = systemId, screenAspectRatio = screenAspectRatio)
+            // Real device locale, "language_COUNTRY" format matching real
+            // capabilities.xml entries -- see parseWithCapabilities' own
+            // doc comment for why this needs real resolution instead of
+            // the earlier, always-null language axis (any theme with real
+            // <language>-scoped content, e.g. DEcaffe's own per-system
+            // metadata translations, never surfaced any of it before this).
+            val locale = Locale.getDefault()
+            val deviceLocale = "${locale.language}_${locale.country}"
+            EsDeThemeParser.parseWithCapabilities(
+                themeFile,
+                systemTheme = systemId,
+                screenAspectRatio = screenAspectRatio,
+                deviceLocale = deviceLocale,
+            )
         } catch (t: Exception) {
             Log.e("droidtop.ThemeAssets", "Failed to parse theme '${active.name}'", t)
             null
