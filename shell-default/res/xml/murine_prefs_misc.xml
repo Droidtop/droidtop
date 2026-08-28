@@ -30,9 +30,9 @@
         android:key="pref_default_launcher"
         android:title="@string/pref_default_launcher_title" />
 
-    <!-- droidtop's own internal concern -- which of ITS TWO home
+    <!-- droidtop's own internal concern: which of ITS TWO home
          activities (Standard vs. Alternative-forwarding) is even a
-         candidate -- separate from pref_default_launcher above, which is
+         candidate. Separate from pref_default_launcher above, which is
          the OS-level "which app does the system resolve HOME to" setting.
          See HomeRolePrefs.kt and OnboardingActivity's own HOME_CHOICE step. -->
     <Preference

@@ -31,7 +31,7 @@
         android:title="@string/pref_handheld_console_systems_title"
         android:summary="@string/pref_handheld_console_systems_desc" />
 
-    <!-- Re-entry into onboarding's own game-folder picker -- see
+    <!-- Re-entry into onboarding's own game-folder picker: see
          SettingsHandheldFragment.kt's own PREF_GAME_FOLDERS handling. -->
     <Preference
         android:key="pref_handheld_game_folders"

@@ -18,7 +18,7 @@
         android:persistent="true" />
 
     <!-- Re-entry into onboarding's own DESKTOP_SETUP step (root check +
-         distro/compositor picker) -- see
+         distro/compositor picker): see
          SettingsDesktopFragment.kt's own PREF_ROOT_COMPOSITOR_SETUP handling. -->
     <Preference
         android:key="pref_desktop_root_compositor_setup"

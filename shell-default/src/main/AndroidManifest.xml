@@ -151,14 +151,14 @@
         <!--
           "Alternative" mode (docs/SPEC.md Onboarding section): droidtop
           holds the HOME role but forwards to a different installed
-          launcher instead of rendering its own UI -- verified against
+          launcher instead of rendering its own UI: verified against
           farmerbb/Taskbar's real, shipping HSLActivity. Disabled by
           default; HomeRolePrefs.setActiveHomeImplementation toggles this
           and com.android.launcher3.Launcher above oppositely, so exactly
           one (or neither) is ever an actual HOME candidate. Package
           enumeration (PackageManager.queryIntentActivities on
-          ACTION_MAIN+CATEGORY_HOME) needs no separate <queries> block here
-          -- android.permission.QUERY_ALL_PACKAGES is already declared
+          ACTION_MAIN+CATEGORY_HOME) needs no separate queries block here:
+          android.permission.QUERY_ALL_PACKAGES is already declared
           above for the app drawer's own real need to see every installed
           app, and already covers this.
         -->
