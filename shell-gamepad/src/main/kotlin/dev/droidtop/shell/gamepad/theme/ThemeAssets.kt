@@ -85,26 +85,6 @@ internal object ThemeAssets {
      */
     private val systemThemeCache = mutableMapOf<String?, EsDeTheme?>()
 
-    // Real, confirmed bug (not a guess): EsDeThemeParser.parse's own
-    // `variant` parameter defaults to null, and VariantAxis's matching
-    // rule (see that class's own doc comment) treats null as "select
-    // nothing" -- every single <variant> block in theme.xml, including
-    // the ones containing DEcaffe's own real <syslogo> positioning
-    // (theme.xml's "solidWithMeta"/"colorWithMeta" blocks), was silently
-    // skipped on every parse. Confirmed live: the on-screen system-logo/
-    // title overlap bug traced directly to this -- droidtop was drawing
-    // its own hand-rolled carousel logo instead of ever loading the
-    // theme's real one. capabilities.xml declares four real,
-    // user-selectable variants (solidWithMeta/solidWithoutMeta/
-    // colorWithMeta/colorWithoutMeta, no theme-declared default) --
-    // "solidWithMeta" is picked here to match this same object's own
-    // existing "system-logo-white" fallback asset path above (solid/
-    // white logos, not colored ones), so the two stay consistent instead
-    // of silently disagreeing on style. Real per-user variant selection
-    // is separate, future work (see docs/SPEC.md) -- this fixes the
-    // "nothing was ever selected at all" bug first.
-    private const val DEFAULT_VARIANT = "solidWithMeta"
-
     fun loadDecaffeTheme(context: Context, systemId: String? = null): EsDeTheme? {
         systemThemeCache[systemId]?.let { return it }
         val themeDir = File(context.cacheDir, "theme_decaffe")
@@ -119,8 +99,14 @@ internal object ThemeAssets {
             }
         }
         val themeFile = File(themeDir, "theme.xml")
+        // Real ES-DE default-selection rule for every axis (aspectRatio/
+        // colorScheme/fontSize/variant): whichever value the theme's own
+        // real capabilities.xml declares FIRST -- confirmed against real
+        // ES-DE source (ThemeData.cpp's own `mSelectedX = mXs.front()`
+        // pattern for each axis). Extracted alongside theme.xml above, so
+        // it's already sitting in themeDir with the same real path.
         val theme = try {
-            EsDeThemeParser.parse(themeFile, variant = DEFAULT_VARIANT, systemTheme = systemId)
+            EsDeThemeParser.parseWithCapabilities(themeFile, systemTheme = systemId)
         } catch (t: Exception) {
             Log.e("droidtop.ThemeAssets", "Failed to parse bundled theme.xml", t)
             null
