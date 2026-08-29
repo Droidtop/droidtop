@@ -38,6 +38,10 @@
     <string name="pref_handheld_game_folders_desc">Add or remove the folders droidtop scans for games</string>
     <string name="pref_handheld_apps_grid_columns_title">Apps grid columns</string>
     <string name="pref_handheld_apps_grid_columns_desc">Icon density for the Apps tab, independent of the launcher app drawer\'s own grid width</string>
+    <string name="pref_handheld_rescan_library_title">Rescan library</string>
+    <string name="pref_handheld_rescan_library_desc">Look for new or changed games and apps again</string>
+    <string name="pref_handheld_appearance_title">Appearance</string>
+    <string name="pref_handheld_appearance_desc">Pick an ES-DE theme, sync the theme index, or browse and download more</string>
     <string-array name="pref_handheld_default_section_entries">
         <item>Games</item>
         <item>Apps</item>

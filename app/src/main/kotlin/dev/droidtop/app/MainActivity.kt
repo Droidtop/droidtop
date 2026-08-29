@@ -66,12 +66,49 @@ import kotlinx.coroutines.launch
  * rather than a single generic placeholder.
  */
 class MainActivity : AppCompatActivity() {
+
+    companion object {
+        // Real deep-link extras from :shell-default's SettingsHandheldFragment
+        // (a different module, no compile dependency on this one -- same
+        // explicit-component-name pattern already used for
+        // ConsoleSystemsActivity/OnboardingActivity) -- lets the unified
+        // real Preference-based settings screen reach GamepadShell's own
+        // Compose-only actions (jumping to a section, triggering a rescan)
+        // it has no other way to invoke.
+        const val EXTRA_HANDHELD_START_SECTION = "dev.droidtop.app.EXTRA_HANDHELD_START_SECTION"
+        const val EXTRA_HANDHELD_RESCAN = "dev.droidtop.app.EXTRA_HANDHELD_RESCAN"
+    }
+
     private var secondScreenPresentation: SecondScreenPresentation? = null
     private lateinit var library: Library
     private var mode by mutableStateOf<String?>(null)
 
+    // Real bug this avoids: MainActivity is android:launchMode="singleTask",
+    // so a deep-link Intent from SettingsHandheldFragment (FLAG_ACTIVITY_
+    // NEW_TASK against this same Activity) almost always resolves through
+    // onNewIntent, not onCreate, whenever Handheld mode is already running
+    // -- the common case, not an edge case, since the whole point of these
+    // deep links is jumping back INTO an already-open Handheld session.
+    // Reading `intent.getStringExtra(...)` directly inside `setContent`
+    // would silently do nothing then: `mode` often doesn't change (already
+    // MODE_HANDHELD), so nothing triggers GamepadShell to recompose with
+    // the new extras. A separate token, bumped on every onCreate/onNewIntent
+    // and read by GamepadShell via LaunchedEffect(token), fires every real
+    // deep-link regardless of whether `mode` itself changed or the extras'
+    // own values happen to repeat (e.g. "Rescan library" pressed twice).
+    private var handheldDeepLinkToken by mutableStateOf(0)
+    private var handheldStartSection by mutableStateOf<String?>(null)
+    private var handheldTriggerRescan by mutableStateOf(false)
+
+    private fun applyHandheldDeepLink(intent: Intent) {
+        handheldStartSection = intent.getStringExtra(EXTRA_HANDHELD_START_SECTION)
+        handheldTriggerRescan = intent.getBooleanExtra(EXTRA_HANDHELD_RESCAN, false)
+        handheldDeepLinkToken++
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        applyHandheldDeepLink(intent)
 
         // Real gap this closes: OnboardingGate was only ever called from
         // LauncherApplication.java (Standard's own boot) -- a user who
@@ -116,6 +153,9 @@ class MainActivity : AppCompatActivity() {
                 BackButtonMenu.MODE_HANDHELD -> GamepadShell(
                     library = library,
                     onFocusedEntryChanged = { secondScreenPresentation?.focusedEntry = it },
+                    deepLinkToken = handheldDeepLinkToken,
+                    startSectionName = handheldStartSection,
+                    triggerRescan = handheldTriggerRescan,
                 )
                 else -> {
                     val sessionState by DesktopSessionService.state.collectAsState()
@@ -139,6 +179,7 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        applyHandheldDeepLink(intent)
         mode = resolveMode(intent)
         if (mode != BackButtonMenu.MODE_HANDHELD) {
             startForegroundService(Intent(this, DesktopSessionService::class.java))
