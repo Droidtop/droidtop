@@ -83,6 +83,19 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
         loading = true
         refresh()
         loading = false
+    }
+    // Real, confirmed-live crash this fixes: requesting focus in the SAME
+    // LaunchedEffect that just set `entries` raced ahead of Compose actually
+    // recomposing the list and attaching firstFocus to its own first row --
+    // "FocusRequester is not initialized" whenever this screen is entered
+    // directly (no longer masked by an intermediate list screen's own
+    // earlier LaunchedEffect giving recomposition a free extra frame first,
+    // now that "Browse themes" jumps straight in -- see GamepadShell's own
+    // SettingsSection). Same real fix already used elsewhere in this
+    // codebase for the identical race (GamesSection's own firstFocus
+    // handling): key a SEPARATE effect off the state that must have already
+    // recomposed, not `Unit`.
+    LaunchedEffect(entries) {
         if (entries.isNotEmpty()) firstFocus.requestFocus()
     }
 
