@@ -608,11 +608,29 @@ app-drawer icon or a floating switcher button:
   blocked on `DesktopSessionService` (still a TODO — see `:app`).
 - **`:shell-gamepad` ("Handheld")** — full-screen, D-pad-navigable, reading
   the same `Library`; optional and toggleable, never the assumed default
-  experience. **Multiple selectable UI paradigms, not one merged design**:
-  a visuals-first, artwork-carousel paradigm with its own multi-display
-  awareness and a grid/list paradigm are different enough interaction
-  models that users should be able to pick between them, not get one
-  design blending cues from both. Both read the same `Library` —
+  experience. **Superseded design decision (2026-08-29): a single real
+  paradigm for game browsing specifically, not two competing whole-shell
+  designs.** An earlier draft of this section described "multiple
+  selectable UI paradigms" (a visuals-first artwork-carousel design
+  alongside a separate grid/list one, presented as two whole alternate
+  shells) as the real intended shape — that framing is now stale, but
+  Daijishō's own real INFLUENCE on Handheld's overall structure is not
+  superseded, just narrowed to where it actually applies: the real,
+  current shell shape (top-level **Games**/**Apps**/**Settings** tabs,
+  **Apps** as a flat kind-sectioned browser) is Daijishō-derived, same
+  as it's always been. What's real and current as of this update is
+  narrower and more specific: **inside the Games tab**, the actual
+  system-browsing and per-game-browsing UI is built entirely around a
+  real, generic ES-DE theme engine (§7f) — the active theme itself
+  (bundled or downloaded) decides the real browsing shape for a given
+  system/gamelist view (a real `<carousel>`/`<grid>`/`<textlist>`, or
+  neither, per §7f's own real per-theme resolution), not a droidtop-
+  level toggle between two hardcoded app paradigms. A grid/list-style
+  experience is still fully available inside Games — it's just a
+  property of WHICH real theme is active (Art Book Next's own real
+  gamelist view uses `<textlist>`/`<grid>`; DEcaffe's doesn't), not a
+  separate droidtop UI mode to build and maintain independently. Reads
+  the same `Library` —
   including native Android apps, Wine profiles, and Linux-container apps
   as equally first-class entries, not a bolted-on afterthought behind an
   emulator-frontend-shaped data model — droidtop's whole point is that
@@ -625,9 +643,12 @@ app-drawer icon or a floating switcher button:
   non-emulated — native/Wine/Linux/remote — kept as its own top-level
   section rather than folded into Games, since treating that content as
   equally first-class is the actual differentiator), and **Settings**
-  (placeholder for now). A persistent, always-visible controller-button
-  hint bar (what A/B currently do) avoids ever leaving the user guessing.
-  Real artwork rendering and full paradigm-selection UI don't exist yet.
+  (real, in-shell, gamepad-navigable — Library/Appearance/Display groups;
+  Appearance covers real theme selection + the real theme browse/download
+  UI, see §7f). A persistent, always-visible controller-button hint bar
+  (what A/B currently do) avoids ever leaving the user guessing — theme-
+  driven when the active theme declares a real `<helpsystem>`, a
+  droidtop-drawn fallback otherwise.
   - **Design direction, not yet built**: a more flexible, data-driven
     launch-mechanism model — new emulators/interpreters becoming
     configuration (a template describing how to invoke them) rather than
@@ -1013,73 +1034,86 @@ the same `PresencePanel`.
 
 ## 7f. Handheld mode: real, generic ES-DE theme engine
 
-droidtop's Handheld mode renders a real, vendored ES-DE (EmulationStation
-Desktop Edition) theme (`shell-gamepad/src/main/assets/themes/
-decaffe-es-de/`, real `theme.xml`/`capabilities.xml`/`colors.xml`/
-`font.xml`, CC-BY-NC-SA), parsed by a real clean-room port of ES-DE's own
-theme.xml parsing rules (`library-core/.../theme/EsDeThemeParser.kt`,
+**Status as of 2026-08-29 — this is Handheld's actual, current, singular
+paradigm (§2a's earlier "multiple selectable paradigms" framing is
+superseded, see that section's own updated note).** droidtop's Handheld
+mode renders real, vendored ES-DE (EmulationStation Desktop Edition)
+themes — currently `decaffe-es-de` (bundled, CC-BY-NC-SA) and
+`art-book-next-es-de` (bundled, structurally different — real multi-file
+`<include>` chain, per-aspect-ratio XML, real `<textlist>`/`<grid>`
+gamelist widget, unlike decaffe's widget-less one — deliberately kept
+bundled to stress-test the engine against more than one real theme
+shape) — parsed by a real clean-room port of ES-DE's own theme.xml
+parsing rules (`library-core/.../theme/EsDeThemeParser.kt`,
 `EsDeTheme.kt`'s `ES_DE_ELEMENT_SCHEMA`) and rendered by
 `shell-gamepad/.../theme/EsDeThemeRenderer.kt`.
 
-Confirmed live (2026-08-27/28), comparing droidtop's actual render against
-the theme's own bundled `sys.png`/`gamelist.png` reference screenshots:
-droidtop was rendering only a small fraction of what these views declare.
-Root causes and the decision to fix them, in dependency order:
+**Real, working today** (each confirmed against real ES-DE source,
+`/root/es-de-reference` in the dev container — see `coordination/
+HANDOFF.md` for full detail/citations, this section is the durable
+summary):
 
-1. `EsDeThemeParser.parse`'s `variant` parameter defaulted to `null`,
-   and its variant-axis matching treats `null` as "select nothing" —
-   every `<variant>` block, including the theme's real `<syslogo>`
-   positioning, was silently skipped on every parse. **Fixed**:
-   `ThemeAssets.loadDecaffeTheme` now passes a real default variant
-   (`"solidWithMeta"`, matching the module's own existing
-   `system-logo-white` fallback asset path).
-2. The `gamelist` view (the per-game detail screen: box art/video,
-   metadata sidebar, description, adjacent-game logo strip) is parsed
-   but never rendered — droidtop's actual "drill into a system" UI is a
-   hand-built `LazyVerticalGrid`, not theme-driven at all. **Decision**:
-   make it theme-driven, reusing `EsDeThemeRenderer` for both `system`
-   and `gamelist` views rather than maintaining a second, parallel,
-   hand-built game-grid UI.
-3. `LibraryEntry` has no fields for the metadata (description/developer/
-   publisher/genre/release date/rating/ESRB/player count) real theme
-   elements bind to. **Decision**: extend `LibraryEntry` and
-   `RomEntity`/`RomDao`'s schema, and extend the existing, real, working
-   cover-art scrapers (`LutrisScraperClient`/`IgdbScraperClient`, wired
-   into `ConsoleSystemsActivity.kt`'s manual per-folder scrape action) to
-   also fetch this metadata, which their real APIs already return
-   alongside cover-art URLs today (currently discarded).
-4. `<helpsystem>` (the theme's own real, styled button-hint bar) is
-   fully parsed (`EsDeTheme.kt`'s schema) but never dispatched by the
-   renderer — droidtop's actual button hints are a fully hardcoded
-   `ButtonHintFooter` with no theme styling and no relationship to any
-   real button-mapping data. **Decision**: implement the `helpsystem`
-   render path, and build a real input-mapping abstraction (a logical
-   `GamepadAction` enum + default key mapping, modeled on real ES-DE's
-   own `es_input.xml` device→logical-action convention) that both real
-   input handling and the help-icon labels read from, replacing the ~10
-   scattered raw `Key.Button*`/`Key.Direction*` checks currently
-   hardcoded directly in `GamepadShell.kt`/`EsDeSystemListView.kt`.
-5. Only one theme (decaffe) is loadable, ever, hardcoded by name.
-   **Decision**: generalize `ThemeAssets` to load whichever theme a new
-   `ThemePrefs` selects (same `"com.android.launcher3.prefs"`
-   SharedPreferences convention used throughout droidtop), with decaffe
-   staying the bundled default/fallback, and add a real theme download/
-   browse/install UI so users can apply other real, community ES-DE
-   themes — reusing the plain `HttpURLConnection` pattern the scraper
-   clients already establish (no new HTTP dependency), with real
-   progress reporting following `scrapeSystemArtwork`'s own
-   `(done, total) ->` callback convention, and defensive extraction
-   (path-traversal-safe) since a downloaded theme is untrusted content.
-   **Open, unresolved**: which real theme source(s) to support — a
-   product/licensing decision, not assumed here.
+- Real multi-theme discovery/selection (`ThemeAssets.discoverThemes`/
+  `resolveActiveTheme`, mirrors `ThemeData::populateThemes` exactly — a
+  folder is a valid theme iff it has `capabilities.xml`; the active
+  theme is a stored name falling back to the first theme alphabetically,
+  never a hardcoded folder name) and a real JGit-based theme downloader
+  (`ThemeDownloader`, clones the real `gitlab.com/es-de/themes/
+  themes-list.git` index the same way real ES-DE's own
+  `GuiThemeDownloader` does) with a real browse/download UI
+  (`ThemeBrowserScreen`, including real per-theme screenshot previews).
+- Real per-system (`carousel`/`grid`/`textlist` list-widget positioning/
+  scale/animation, ported from `CarouselComponent.h`/`GridComponent.h`)
+  AND per-game gamelist rendering — ONE real, generic render path
+  handles a theme with a real gamelist list widget (Art Book Next) or
+  none at all (DEcaffe, which relies on real ES-DE's own always-present
+  headless per-game cursor instead) — never a droidtop-level "which
+  theme is this" branch.
+- Real per-game metadata: `LibraryEntry` models description/developer/
+  publisher/genre/releaseDate/rating/players/favorite (explicitly NOT an
+  ESRB field — confirmed real ES-DE has none), populated by real
+  ScreenScraper and TheGamesDB scraper clients (real ES-DE's own actual
+  ROM scrapers — not Lutris/IGDB, which are reserved for PC/engine
+  content per §7d) wired into `ConsoleSystemsActivity.kt`'s manual
+  per-folder scrape action, single-selected-source only (real ES-DE has
+  no automatic multi-source fallback chain).
+- Real element rendering: `image`/`text`/`carousel`/`grid`/`textlist`/
+  `video`+`animation` (static-fallback only, no real playback yet)/
+  `clock`/`datetime`/`rating`/`helpsystem`/`badges` (favorite slot
+  only)/`systemstatus` (wifi/cellular/battery, real live device status
+  — droidtop genuinely IS the host; bluetooth deliberately excluded,
+  needs a dangerous runtime permission)/`gamelistinfo` (game+favorites
+  count, no filter/folder cases). Real input-mapping abstraction
+  (`GamepadAction` + `GamepadKeyMap`) feeds both real input handling and
+  the theme's own real `<helpsystem>` labels.
+- A real `droidtop-theme-patches` companion repo
+  (`github.com/bi0shacker001/droidtop-theme-patches`) — a deliberately
+  empty scaffold (real system-id list + real ES-DE metadata field
+  template, no filled content — no AI-generated placeholder data) for
+  community-contributed per-system metadata covering droidtop's own
+  invented engine systems (Ren'Py/RPG Maker variants/KiriKiri), which no
+  real ES-DE theme has metadata for since they aren't consoles.
 
-Full phased implementation plan (superseded by whichever phase's own
-commits land, kept here as the record of the decision and reasoning, not
-as a live TODO list): see the session's own plan file at the time of
-writing, `melodic-tumbling-mochi.md` in the planning tool's plan
-directory — reproduced in spirit above; this SPEC section is the
-authoritative, durable record per this project's own convention of
-writing real decisions into SPEC.md itself, not just a plan file.
+**Real, honestly deferred gaps** (not fabricated, not started): real
+`sound`/`video`/`animation` playback (currently static-image fallback
+only — genuine media-engine work, ExoPlayer/MediaCodec, bigger scope
+than the per-element passes above); `gamelistinfo`'s real filtered and
+folder-entered cases (no filter UI, no folder concept in droidtop's own
+data model yet); real per-COLLECTION theme overrides (confirmed real
+ES-DE themes can provide these — Art Book Next's own bundle has
+`now-playing/`/`completed/`/`custom-collections/` subfolders — droidtop
+has no "collections" concept — favorites/recently-played/custom
+collections as real pseudo-systems — in its data model at all yet, a
+bigger blocker than the theme-loading piece itself); generalizing the
+real gamelist list-widget path (`EsDeListItem`) to badge/rating overlays
+the way a real theme's own game GRID entries sometimes show them inline.
+
+Full real history/reasoning for each of the above (commit-by-commit,
+with citations to the exact real ES-DE source lines each decision was
+verified against) lives in `coordination/HANDOFF.md`'s own theme-engine
+section, not reproduced here — that file is the working log; this
+section is the durable, periodically-refreshed summary per this
+project's own convention of writing real decisions into SPEC.md itself.
 
 ## 8. Licensing
 
