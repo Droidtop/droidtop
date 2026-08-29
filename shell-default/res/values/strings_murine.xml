@@ -29,6 +29,18 @@
     <string name="pref_global_settings_title">Global settings</string>
     <string name="pref_global_home_role_title">Use droidtop as home screen</string>
     <string name="pref_global_home_role_desc">Make the Standard shell your device\'s actual Android home screen</string>
+    <string name="pref_global_default_mode_title">Default mode</string>
+    <string name="pref_global_default_mode_desc">Which mode droidtop starts in when launched fresh, instead of resuming whichever you used last</string>
+    <string name="pref_global_enable_desktop_title">Enable Desktop mode</string>
+    <string name="pref_global_enable_desktop_desc">Show Desktop as a choice in the shell switcher</string>
+    <string name="pref_global_enable_handheld_title">Enable Handheld mode</string>
+    <string name="pref_global_enable_handheld_desc">Show Handheld as a choice in the shell switcher</string>
+    <string name="pref_global_rerun_onboarding_title">Rerun onboarding</string>
+    <string name="pref_global_rerun_onboarding_desc">Go through droidtop\'s first-run setup again</string>
+    <string name="pref_global_backup_title">Back up settings</string>
+    <string name="pref_global_backup_desc">Save droidtop\'s settings to a JSON file (not games, roms, or downloaded themes)</string>
+    <string name="pref_global_restore_title">Restore settings</string>
+    <string name="pref_global_restore_desc">Load droidtop\'s settings from a previously saved JSON file</string>
     <string name="pref_global_system_settings_title">System settings</string>
     <string name="pref_global_system_settings_desc">Open your device\'s real Android Settings app</string>
 
@@ -63,6 +75,8 @@
     </string-array>
 
     <string name="pref_subcategory_other_shells">Other shells</string>
+    <string name="pref_subcategory_modes">Modes</string>
+    <string name="pref_subcategory_data">Data</string>
 
     <string name="pref_subcategory_day_night">UI theme</string>
     <string name="pref_subcategory_layout">Layout</string>

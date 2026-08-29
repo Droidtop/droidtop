@@ -210,16 +210,23 @@ class MainActivity : AppCompatActivity() {
     /**
      * Prefers an explicit [BackButtonMenu.EXTRA_MODE] (a real user choice,
      * from [BackButtonMenu] or Launcher's own cold-boot redirect — see the
-     * "droidtop patch" in `Launcher.onCreate`); falls back to
-     * [ModePrefs]'s last app-hosted mode when absent, so this Activity
-     * resumes correctly even if launched by something that didn't set the
-     * extra. Persists whatever mode is resolved as a safety net — every
-     * known real caller already does this before launching, but a null
-     * write here would be wrong (it would forget the real last mode).
+     * "droidtop patch" in `Launcher.onCreate`); then a real, user-set
+     * [ModePrefs.defaultMode] (Global settings' own "Default mode" picker),
+     * if one is set and its mode is still enabled — a disabled mode can't
+     * silently become the resolved mode just because it's still saved as
+     * the default; falls back to [ModePrefs]'s last app-hosted mode when
+     * neither applies, so this Activity resumes correctly even if launched
+     * by something that didn't set the extra. Persists whatever mode is
+     * resolved as a safety net — every known real caller already does this
+     * before launching, but a null write here would be wrong (it would
+     * forget the real last mode).
      */
     private fun resolveMode(intent: Intent): String? {
         val explicit = intent.getStringExtra(BackButtonMenu.EXTRA_MODE)
-        val resolved = explicit ?: ModePrefs.lastMode(this).takeIf {
+        val default = ModePrefs.defaultMode(this)?.takeIf {
+            (it == BackButtonMenu.MODE_HANDHELD || it == BackButtonMenu.MODE_DESKTOP) && ModePrefs.isModeEnabled(this, it)
+        }
+        val resolved = explicit ?: default ?: ModePrefs.lastMode(this).takeIf {
             it == BackButtonMenu.MODE_HANDHELD || it == BackButtonMenu.MODE_DESKTOP
         }
         if (resolved != null) ModePrefs.setLastMode(this, resolved)
