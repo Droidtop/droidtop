@@ -356,7 +356,24 @@ object EsDeThemeParser {
         val axis = axes.find { it.tagName == parser.name }
         when {
             axis != null -> {
-                val name = parser.getAttributeValue(null, "name")
+                val rawName = parser.getAttributeValue(null, "name")
+                // Real, confirmed-live bug this fixes: a variant/colorScheme/
+                // fontSize/aspectRatio block's own `name` attribute can be a
+                // real, comma-separated list declaring itself for MULTIPLE
+                // axis values at once -- exactly [parseView] already
+                // splits its own `name` attribute for (see [splitNames]) --
+                // confirmed via decaffe's own theme.xml, whose real
+                // metadata-sidebar/description/preview content lives inside
+                // <variant name="solidWithoutMeta, solidWithMeta">. Plain
+                // string equality against the RAW, unsplit name here meant
+                // that block (and any other multi-name variant/colorScheme/
+                // fontSize/aspectRatio block) never matched any single
+                // selected value, silently skipping the vast majority of
+                // decaffe's real system-view content -- confirmed live via
+                // a real device screenshot missing the metadata sidebar,
+                // description panel, game preview, and bottom info bar
+                // real ES-DE's own bundled reference screenshot shows.
+                val names = splitNames(rawName ?: "")
                 // Real ES-DE ThemeData::parseVariants (confirmed against
                 // real source): `name == "all"` always matches, real
                 // themes rely on this for content shared across every
@@ -365,7 +382,7 @@ object EsDeThemeParser {
                 // parseFontSizes/parseAspectRatios use plain equality
                 // only, no "all" special case for those three).
                 val matches = axis.selected != null &&
-                    (name == axis.selected || (axis.tagName == "variant" && name == "all"))
+                    (axis.selected in names || (axis.tagName == "variant" && "all" in names))
                 if (matches) {
                     parseScopedBlock(parser, axes, baseDir, variables, views, depth)
                 } else {
