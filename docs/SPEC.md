@@ -722,27 +722,35 @@ app-drawer icon or a floating switcher button:
     one external launcher needs supporting via `JoiPlayGameProvider`; not
     done in this pass.
 
-## 7a. Remote PC streaming (GameStream/Moonlight/Sunshine)
+## 7a. Remote PC streaming — via windowcast, not a droidtop module
 
-A remote gaming PC's library should show up in the same unified library as
-local Windows/Linux apps — same `LibraryEntry` model, a new
-`LibraryEntryKind.REMOTE_STREAM`. `:runtime-remote-stream` vendors
-[vendor/moonlight-common-c](../vendor/moonlight-common-c) (GPL-3.0, does not
-change the project's overall GPL-3.0 position — see §8) for the protocol
-work, built against its exact pinned ENet fork (`vendor/moonlight-common-c/
-enet`) — moonlight-common-c's own README states a generic ENet breaks
-connectivity to recent GFE/Sunshine hosts, so this is not optional.
+**Superseded 2026-08-29.** droidtop does not implement its own remote-
+streaming client. `:runtime-remote-stream` (a GameStream/Moonlight-
+protocol client vendoring moonlight-common-c + mbedtls) has been removed
+entirely — droidtop is always a *client* of
+[windowcast](../../windowcast) (a separate, far broader project: many
+protocols, per-window streaming, selective/adaptive codec and protocol
+switching), not a second, narrower implementation of the same job. A
+remote gaming PC's library still belongs in the same unified `LibraryEntry`
+model as local Windows/Linux apps (`LibraryEntryKind.REMOTE_STREAM` is
+kept as the data-model marker for this), but the actual streaming
+implementation is windowcast's, out of this repo's scope — see that
+project's own docs, not this section, for protocol/pairing/discovery
+detail.
 
-Two things are **not** provided by moonlight-common-c and had to be
-designed here:
-- **LAN host discovery** — ported from a platform client's approach
-  (moonlight-android is the reference), not part of the vendored library.
-- **Pairing** — the classic flow needs the PIN typed into the host's web UI,
-  but Sunshine's own REST API accepts `POST /api/pin` directly, letting
-  pairing complete entirely from the DroidTop app's side on Sunshine hosts
-  specifically.
+`vendor/moonlight-common-c` and `vendor/mbedtls` were removed along with
+`:runtime-remote-stream` (nothing else in droidtop used either).
 
 ### PC-side helper (`pc-helper/`)
+
+**Needs reconsideration** now that GameStream/Sunshine-specific streaming
+is out of scope here — the sections below describe `pc-helper` as it was
+designed *for* the removed Sunshine-specific approach (auto-registering
+apps with Sunshine's own REST API). Whether `pc-helper` still has a real
+job once windowcast is the actual streaming path (e.g. a
+protocol-agnostic "trigger a game install on this PC" helper windowcast
+itself calls into) hasn't been re-scoped yet — keeping the prior
+description below for reference, not as a still-current plan.
 
 A separate Go service (not an Android module — runs natively on the gaming
 PC) with two capabilities of deliberately different confidence, confirmed
@@ -1227,8 +1235,8 @@ project's own convention of writing real decisions into SPEC.md itself.
 
 ## 8. Licensing
 
-`vendor/gamenative`, `vendor/droidspaces`, and `vendor/moonlight-common-c`
-are GPL-3.0. `vendor/winlator-upstream` (kept only as a diff reference) is
+`vendor/gamenative` and `vendor/droidspaces` are GPL-3.0.
+`vendor/winlator-upstream` (kept only as a diff reference) is
 LGPL-2.1. `vendor/sway`, `vendor/wlroots` (protocol definitions only — not
 compiled for Android, see `:host-bridge`), and `vendor/wayland`/`vendor/
 wayland-protocols` (same — codegen/headers only) are MIT. `vendor/
@@ -1262,7 +1270,6 @@ runtime-windows         → Wine/Box64 (fork: vendor/gamenative), no display cod
 runtime-linux-root      → DroidSpaces fork (vendor/droidspaces), namespaces/cgroups, needs root
 runtime-linux-noroot    → proot-based, new code, no root required
 input-seat              → unified seat; depends on host-bridge
-runtime-remote-stream    → Moonlight/GameStream client (fork: vendor/moonlight-common-c)
 library-core            → Playnite-style unified library/metadata; depends on runtime-common
 shell-default           → "Standard" shell: forked-in Murine Launcher (real AOSP
                           Launcher3-derived UI, not from-scratch); depends on
@@ -1318,10 +1325,6 @@ Two build environments exist and are both real, not aspirational:
   comments for the specifics of each.
 
 Every module now builds and links for real:
-- `:runtime-remote-stream` — mbedTLS (chosen over OpenSSL: CMake-native,
-  cross-compiles through the same NDK toolchain file Gradle already passes
-  in) + moonlight-common-c + its pinned ENet fork, all build end to end.
-  JNI entry points still unimplemented.
 - `:host-bridge` — cross-compiled `libffi` + `libwayland-client` (Meson, a
   native-scanner-then-cross-library two-step approach), confirmed linked
   for real (`readelf -d` shows `NEEDED libwayland-client.so`). Frame

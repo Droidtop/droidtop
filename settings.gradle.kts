@@ -64,12 +64,6 @@ include(":runtime-linux-noroot")
 // :host-bridge for injection into the primary container's compositor.
 include(":input-seat")
 
-// Remote PC game streaming (GameStream/Moonlight-protocol compatible, targeting Sunshine
-// hosts). Vendors vendor/moonlight-common-c (GPL-3.0 — see docs/SPEC.md licensing notes)
-// for host discovery, PIN pairing, app-list retrieval, and stream launch. Surfaces a remote
-// host's configured apps as REMOTE_STREAM LibraryEntry items, same as any local one.
-include(":runtime-remote-stream")
-
 // Unified library/metadata layer (Playnite-style plugin model). Designed so native Android
 // apps, Wine profiles, and Linux containers are equally first-class entries — this is the
 // layer a future launcher shell (:shell-gamepad) will read from.
