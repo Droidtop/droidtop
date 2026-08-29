@@ -31,9 +31,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -299,19 +301,36 @@ private fun EsDeCarouselItem(
     unfocusedSaturation: Float,
     modifier: Modifier,
 ) {
+    val focusManager = LocalFocusManager.current
     val baseModifier = modifier
         .size(width = width, height = height)
         .focusable()
         // Same real touch-input fix as EsDeTextListRow/EsDeListTile.
         .clickable(onClick = item.onSelect)
         .onKeyEvent { event ->
-            if (event.type == KeyEventType.KeyUp &&
-                GamepadKeyMap.actionFor(event.key) == GamepadAction.A
-            ) {
-                item.onSelect()
-                true
-            } else {
-                false
+            if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
+            // Real, confirmed-live bug this fixes: absolutely-positioned
+            // focusable() carousel items (this carousel's own real
+            // pos/scale math, not a LazyRow) don't get Compose's built-in
+            // spatial arrow-key focus traversal for free the way a plain
+            // Row/LazyRow's children would -- confirmed on-device, D-pad
+            // left/right simply never moved focus off the first item.
+            // Explicit FocusManager.moveFocus is the standard real fix for
+            // exactly this gap, not a guess.
+            when (GamepadKeyMap.actionFor(event.key)) {
+                GamepadAction.A -> {
+                    item.onSelect()
+                    true
+                }
+                GamepadAction.LEFT -> {
+                    focusManager.moveFocus(FocusDirection.Left)
+                    true
+                }
+                GamepadAction.RIGHT -> {
+                    focusManager.moveFocus(FocusDirection.Right)
+                    true
+                }
+                else -> false
             }
         }
 
