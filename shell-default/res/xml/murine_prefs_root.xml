@@ -50,17 +50,12 @@
         android:summary="@string/pref_category_misc_desc"
         android:fragment="app.murinelauncher.settings.SettingsMiscFragment"/>
 
-    <!-- Real droidtop-wide config (which HOME role it holds, the real
-         Android system Settings shortcut): distinct from the General/
-         Icons/Home/Drawer/QSB/Misc entries above, which are Standard's
-         own real per-shell settings, on par with Desktop's/Handheld's
-         own screens below, not "global" in this sense. See
-         SettingsGlobalFragment.kt. -->
-    <Preference
-        android:icon="@drawable/ic_settings_general"
-        android:title="@string/pref_global_settings_title"
-        android:summary="@string/pref_global_settings_desc"
-        android:fragment="app.murinelauncher.settings.SettingsGlobalFragment"/>
+    <!-- Real, deliberate absence: "Global settings" is a real, persistent
+         action-bar item on every SettingsActivity screen now (see
+         SettingsActivity.java's own onCreateOptionsMenu), not a row
+         here: it's genuinely separate from any one screen's own real
+         settings list, General/Icons/Home/Drawer/QSB/Misc above
+         included. -->
 
     <PreferenceCategory android:title="@string/pref_subcategory_other_shells">
         <Preference
