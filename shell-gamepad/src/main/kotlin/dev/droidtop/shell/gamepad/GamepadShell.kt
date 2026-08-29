@@ -7,12 +7,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -63,14 +60,13 @@ import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.consoles.ES_DE_CONSOLE_SYSTEMS
 import dev.droidtop.library.displayName as launchStrategyDisplayName
 import dev.droidtop.library.theme.SystemThemeColors
-import dev.droidtop.library.theme.ThemeDownloader
+import dev.droidtop.library.theme.ThemeAssets
 import dev.droidtop.library.theme.primaryListElement
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.theme.EsDeListItem
 import dev.droidtop.shell.gamepad.theme.EsDeSystemListView
 import dev.droidtop.shell.gamepad.theme.EsDeThemedView
-import dev.droidtop.shell.gamepad.theme.ThemeAssets
 import dev.droidtop.shell.gamepad.theme.ThemeBrowserScreen
 import dev.droidtop.shell.gamepad.theme.ThemePrefs
 import kotlinx.coroutines.Dispatchers
@@ -310,7 +306,7 @@ fun GamepadShell(
                 section == HandheldSection.SETTINGS -> {
                     canGoBack = false
                     themeHandlesHints = false
-                    SettingsSection()
+                    SettingsSection(onBack = { section = HandheldPrefs.defaultSection(context) })
                 }
                 // Each section now gates on its own scan only (see
                 // gameEntries/appEntries' own comment) -- Games' spinner no
@@ -1371,201 +1367,35 @@ private fun AppIconTile(entry: LibraryEntry, modifier: Modifier = Modifier, onLa
 }
 
 /**
- * Real, focused Appearance screen -- the one real piece of Handheld's
+ * Real, focused theme-browser screen -- the one real piece of Handheld's
  * former in-house Settings tab that can't just become a flat Android
  * Preference entry in :shell-default's SettingsHandheldFragment (unlike
- * Library/Display, moved there -- see docs/SPEC.md's own settings-
- * architecture note): theme selection needs this shell's own real
- * ThemeAssets/ThemePrefs/ThemeDownloader stack and ThemeBrowserScreen's
- * own rich per-theme screenshot previews, neither reachable from a
+ * Library/Display/Theme/Sync theme index, all moved there -- see
+ * docs/SPEC.md's own settings-architecture note): browsing/downloading a
+ * NEW theme needs ThemeBrowserScreen's own rich, scrollable list of
+ * remote entries with real screenshot previews, not reachable from a
  * different Gradle module. Reachable ONLY via a real deep-link (the
- * "Appearance" preference in SettingsHandheldFragment, through
+ * "Browse themes" preference in SettingsHandheldFragment, through
  * MainActivity's EXTRA_HANDHELD_START_SECTION) -- selecting Settings from
  * the tab bar itself now goes straight to that real, unified Preference
  * screen instead (see GamepadShell's own selectSection).
  */
 @Composable
-private fun SettingsSection() {
-    val context = LocalContext.current
-    val firstFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { firstFocus.requestFocus() }
-
-    // Real theme names discovered on disk right now (bundled + any
-    // downloaded), not a compiled-in list -- see ThemeAssets.discoverThemes's
-    // own doc comment. Refreshed after a sync completes, since a real
-    // download can change what's available.
-    var themeNames by remember { mutableStateOf<List<String>>(emptyList()) }
-    var activeTheme by remember { mutableStateOf<String?>(null) }
-    var themeSyncStatus by remember { mutableStateOf<String?>(null) }
-    var themeBrowserOpen by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
-
-    suspend fun refreshThemeState() {
-        withContext(Dispatchers.IO) {
-            themeNames = ThemeAssets.discoverThemes(context).map { it.name }
-            activeTheme = ThemeAssets.activeThemeName(context)
-        }
-    }
-    LaunchedEffect(Unit) { refreshThemeState() }
-
-    if (themeBrowserOpen) {
-        ThemeBrowserScreen(onDismiss = {
-            themeBrowserOpen = false
-            // A download may have just added a new theme -- real refresh,
-            // not stale until the next unrelated recomposition.
-            coroutineScope.launch { refreshThemeState() }
-        })
-        return
-    }
-
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp).verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(28.dp),
-    ) {
-        // Real, distinct group -- matches Daijishō's own actual settings
-        // structure (Library vs. a separate Appearance section for
-        // themes/wallpapers), not droidtop's own invention. Previously
-        // this whole real, working theme-discovery/download stack
-        // (ThemeAssets/ThemePrefs/ThemeDownloader) had NO settings entry
-        // point at all -- a user could never actually pick a theme or
-        // pull in new ones.
-        SettingsGroup("Appearance") {
-            SettingsChoiceLink(
-                title = "Theme",
-                value = activeTheme ?: "(none found)",
-                modifier = Modifier.focusRequester(firstFocus),
-                onCycle = {
-                    if (themeNames.size > 1) {
-                        val currentIndex = themeNames.indexOf(activeTheme).coerceAtLeast(0)
-                        val next = themeNames[(currentIndex + 1) % themeNames.size]
-                        ThemePrefs.set(context, next)
-                        activeTheme = next
-                    }
-                },
-            )
-            SettingsLink(
-                "Sync theme index",
-                themeSyncStatus ?: "Update the real ES-DE theme list -- run this before Browse themes if that list is empty",
-                onClick = {
-                    themeSyncStatus = "Checking..."
-                    coroutineScope.launch {
-                        val result = withContext(Dispatchers.IO) {
-                            ThemeDownloader.syncThemesList(ThemeAssets.userThemesDir(context))
-                        }
-                        themeSyncStatus = when (result.status) {
-                            ThemeDownloader.ThemeSyncStatus.CLONED -> "Theme index downloaded"
-                            ThemeDownloader.ThemeSyncStatus.UPDATED -> "Theme index updated"
-                            ThemeDownloader.ThemeSyncStatus.UP_TO_DATE -> "Theme index already up to date"
-                            ThemeDownloader.ThemeSyncStatus.DIVERGED -> "Theme index has local changes -- skipped"
-                            ThemeDownloader.ThemeSyncStatus.FAILED -> "Failed: ${result.error?.message ?: "unknown error"}"
-                        }
-                        refreshThemeState()
-                    }
-                },
-            )
-            SettingsLink(
-                "Browse themes",
-                "Download or update an individual theme from the real ES-DE community index",
-                onClick = { themeBrowserOpen = true },
-            )
-        }
-    }
-}
-
-@Composable
-private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            title.uppercase(),
-            color = Color.Gray,
-            style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.padding(start = 4.dp, bottom = 2.dp),
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
-    }
-}
-
-/** Base chrome every settings row shares -- focus ring, background, title/value layout. [onKeyLeftRight] lets stepper/choice rows respond to D-pad left/right in place, without opening anything. */
-@Composable
-private fun SettingsRow(
-    title: String,
-    valueText: String? = null,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-    onKeyLeftRight: ((left: Boolean) -> Boolean)? = null,
-) {
-    var focused by remember { mutableStateOf(false) }
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
-            .fillMaxWidth()
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            .clickable(onClick = onClick)
-            .onKeyEvent { event ->
-                if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
-                when (GamepadKeyMap.actionFor(event.key)) {
-                    GamepadAction.A -> {
-                        onClick()
-                        true
-                    }
-                    GamepadAction.LEFT -> onKeyLeftRight?.invoke(true) ?: false
-                    GamepadAction.RIGHT -> onKeyLeftRight?.invoke(false) ?: false
-                    else -> false
-                }
-            }
-            .border(
-                width = if (focused) 4.dp else 1.dp,
-                color = if (focused) Color.White else Color.DarkGray,
-                shape = RoundedCornerShape(12.dp),
-            )
-            .background(if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A), RoundedCornerShape(12.dp))
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-    ) {
-        Text(title, color = Color.White, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-        if (valueText != null) {
-            Text(valueText, color = Color(0xFF8AB4FF), style = MaterialTheme.typography.titleMedium)
-        }
-    }
-}
-
-/** Two-choice cycle (e.g. Games/Apps) -- A/Enter and D-pad left/right all cycle, since there's nowhere else to go for a binary choice. */
-@Composable
-private fun SettingsChoiceLink(title: String, value: String, modifier: Modifier = Modifier, onCycle: () -> Unit) {
-    SettingsRow(title = title, valueText = value, modifier = modifier, onClick = onCycle, onKeyLeftRight = { onCycle(); true })
-}
-
-@Composable
-private fun SettingsLink(title: String, summary: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            // Same real touch-input fix as GameCard -- see its own comment.
-            .clickable(onClick = onClick)
-            .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp &&
-                    GamepadKeyMap.actionFor(event.key) == GamepadAction.A
-                ) {
-                    onClick()
-                    true
-                } else {
-                    false
-                }
-            }
-            .border(
-                width = if (focused) 4.dp else 1.dp,
-                color = if (focused) Color.White else Color.DarkGray,
-                shape = RoundedCornerShape(12.dp),
-            )
-            .background(if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A), RoundedCornerShape(12.dp))
-            .padding(20.dp),
-    ) {
-        Text(title, color = Color.White, style = MaterialTheme.typography.titleMedium)
-        Text(summary, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
-    }
+private fun SettingsSection(onBack: () -> Unit) {
+    // Theme selection and syncing are now real, direct Android Preference
+    // entries (SettingsHandheldFragment.kt, reading/writing
+    // dev.droidtop.library.theme.ThemeAssets/ThemePrefs/ThemeDownloader
+    // directly, :runtime-common) -- no bounce through a differently-styled
+    // Compose screen for those two anymore. The one real, deliberate
+    // exception is browsing/downloading a NEW theme: it genuinely needs a
+    // rich, scrollable list of remote entries with screenshot previews, a
+    // different interaction shape than a flat preference list, and
+    // ThemeBrowserScreen is the only place that real UI exists. Reached
+    // ONLY via the "Browse themes" preference's own deep link (see
+    // GamepadShell's own selectSection/deepLinkToken handling) -- there is
+    // nothing else left in this section, so it opens directly, no
+    // intermediate list screen with a single item in it.
+    ThemeBrowserScreen(onDismiss = onBack)
 }
 
 internal data class HomeSection(val title: String, val entries: List<LibraryEntry>)

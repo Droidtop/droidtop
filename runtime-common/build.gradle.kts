@@ -34,5 +34,18 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
+    // Real, moved-in dependency: the ES-DE theme engine (EsDeThemeParser/
+    // EsDeTheme/SystemThemeColors/ThemeAssets/ThemePrefs/ThemeDownloader,
+    // dev.droidtop.library.theme) now lives here, not :library-core --
+    // both :library-core and :shell-default need real access to it
+    // (:shell-default's SettingsHandheldFragment for its own real Theme/
+    // Sync-theme-index preferences), and :library-core already has a
+    // real, deliberate dependency on :shell-default (NativeAppProvider's
+    // IconCache integration), so the theme engine can't live in
+    // :library-core without a real circular dependency. This module has
+    // no dependency on anything else in the repo (see this file's own
+    // history), matching real ES-DE's own theme.xml parser having no
+    // dependency on the rest of ES-DE's app logic either.
+    implementation(libs.jgit)
     testImplementation(libs.junit)
 }

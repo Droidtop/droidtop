@@ -27,6 +27,13 @@ android {
 
 dependencies {
     implementation(project(":library-core"))
+    // Real, direct dependency: the ES-DE theme engine (dev.droidtop.library.theme
+    // -- EsDeThemeParser/EsDeTheme/ThemeAssets/ThemePrefs/ThemeDownloader/
+    // SystemThemeColors) lives in :runtime-common, not :library-core (see
+    // that module's own build.gradle.kts for why) -- library-core's own
+    // dependency on it is `implementation`, not `api`, so it doesn't leak
+    // transitively here; this shell needs its own explicit dependency.
+    implementation(project(":runtime-common"))
     implementation(libs.androidx.core.ktx)
 
     implementation(platform(libs.androidx.compose.bom))

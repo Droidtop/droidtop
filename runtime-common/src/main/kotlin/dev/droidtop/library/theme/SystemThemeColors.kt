@@ -14,13 +14,16 @@ import android.util.Log
  * session -- iiSU's system grid, red/pink/purple/teal/green tiles) and
  * ES-DE's own theme data being dynamic per system in the first place.
  *
- * Lives in library-core (not shell-gamepad, where the theme assets are
- * physically bundled) so both `:app` (ConsoleSystemsActivity) and
- * `:shell-gamepad` (GamepadShell) can use it -- Android merges every
- * module's `assets/` folder into one flat set in the final APK, so
- * `context.assets.open(...)` finds these files regardless of which
- * module's code is asking, as long as `:shell-gamepad` (which physically
- * bundles the DEcaffe theme) is somewhere in the app's module graph.
+ * Lives in :runtime-common (not :shell-gamepad, where the theme assets
+ * are physically bundled, and not :library-core either -- see this
+ * module's own build.gradle.kts for why the whole ES-DE theme engine
+ * lives here) so `:app` (ConsoleSystemsActivity), `:shell-gamepad`
+ * (GamepadShell), and `:shell-default` (SettingsHandheldFragment) can all
+ * use it -- Android merges every module's `assets/` folder into one flat
+ * set in the final APK, so `context.assets.open(...)` finds these files
+ * regardless of which module's code is asking, as long as
+ * `:shell-gamepad` (which physically bundles the DEcaffe theme) is
+ * somewhere in the app's module graph.
  *
  * Loaded lazily and cached in memory -- 195 small XML files is cheap once,
  * not worth re-parsing per recomposition.
