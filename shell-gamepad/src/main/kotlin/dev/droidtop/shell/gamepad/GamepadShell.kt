@@ -180,6 +180,18 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
     val onRescan: () -> Unit = {
         rescanTrigger++
     }
+    // Real, immediate in-memory update -- Library.toggleFavorite already
+    // persists the real new state (see its own doc comment); updating the
+    // held gameEntries copy directly here means the badge/UI reflects it
+    // right away, without waiting on a full rescan round-trip. null means
+    // this entry's kind has no real favorite concept (see
+    // Library.toggleFavorite's own doc comment) -- a no-op, not an error.
+    val onToggleFavorite: (LibraryEntry) -> Unit = { entry ->
+        scope.launch {
+            val newFavorite = library.toggleFavorite(entry) ?: return@launch
+            gameEntries = gameEntries?.map { if (it.id == entry.id) it.copy(favorite = newFavorite) else it }
+        }
+    }
     // Real bug this fixes: onKeyEvent modifiers (L1/R1 section-switching
     // below, GamesSection's Left/Right sibling-system switching) only ever
     // see a key event by it bubbling up from whatever's currently focused
@@ -258,6 +270,7 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
                         onDrillDownChanged = { canGoBack = it },
                         onFocusedEntryChanged = onFocusedEntryChanged,
                         onThemeHandlesHints = { themeHandlesHints = it },
+                        onToggleFavorite = onToggleFavorite,
                     )
                     HandheldSection.APPS -> {
                         canGoBack = false
@@ -694,6 +707,7 @@ private fun GamesSection(
     onDrillDownChanged: (Boolean) -> Unit,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
     onThemeHandlesHints: (Boolean) -> Unit = {},
+    onToggleFavorite: (LibraryEntry) -> Unit = {},
 ) {
     var selectedGroup by remember { mutableStateOf<GameGroup?>(null) }
     var recentOnly by remember { mutableStateOf(false) }
@@ -847,6 +861,11 @@ private fun GamesSection(
                     // headless case.
                     action == GamepadAction.Y && group != null && hasThemedGamelist -> {
                         systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onShowDetail(it) } != null
+                    }
+                    // X/favorite-toggle applies regardless of widget
+                    // presence, same reasoning as Y/Info above.
+                    action == GamepadAction.X && group != null && hasThemedGamelist -> {
+                        systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onToggleFavorite(it) } != null
                     }
                     else -> false
                 }
@@ -1009,6 +1028,7 @@ private fun GamesSection(
                 hints = listOf(
                     GamepadAction.A to "Launch",
                     GamepadAction.Y to "Info",
+                    GamepadAction.X to "Favorite",
                     GamepadAction.B to "Back",
                 ),
             )
@@ -1088,6 +1108,7 @@ private fun GamesSection(
                             onLaunch = { onLaunch(entry) },
                             onShowDetail = { onShowDetail(entry) },
                             onFocused = { onFocusedEntryChanged(entry) },
+                            onToggleFavorite = { onToggleFavorite(entry) },
                         )
                     }
                 }
@@ -1653,7 +1674,14 @@ private fun HomeSectionRow(
 }
 
 @Composable
-private fun GameCard(entry: LibraryEntry, modifier: Modifier = Modifier, onLaunch: () -> Unit, onShowDetail: () -> Unit, onFocused: () -> Unit = {}) {
+private fun GameCard(
+    entry: LibraryEntry,
+    modifier: Modifier = Modifier,
+    onLaunch: () -> Unit,
+    onShowDetail: () -> Unit,
+    onFocused: () -> Unit = {},
+    onToggleFavorite: () -> Unit = {},
+) {
     var focused by remember { mutableStateOf(false) }
     Box(
         modifier = modifier
@@ -1684,6 +1712,15 @@ private fun GameCard(entry: LibraryEntry, modifier: Modifier = Modifier, onLaunc
                     }
                     GamepadAction.Y -> {
                         onShowDetail()
+                        true
+                    }
+                    // Real, previously-dead action -- LibraryEntry.favorite
+                    // existed and even rendered as a real theme badge, but
+                    // nothing anywhere ever actually set it true (confirmed
+                    // by grep before wiring this). X was already mapped to
+                    // a real GamepadAction but unused in this whole shell.
+                    GamepadAction.X -> {
+                        onToggleFavorite()
                         true
                     }
                     else -> false
@@ -1726,6 +1763,14 @@ private fun GameCard(entry: LibraryEntry, modifier: Modifier = Modifier, onLaunc
                 Text(entry.title, color = Color.White, style = MaterialTheme.typography.titleMedium)
                 Text(entry.kind.name, color = Color.Gray, style = MaterialTheme.typography.labelSmall)
             }
+        }
+        if (entry.favorite) {
+            Text(
+                "★",
+                color = Color(0xFFFFD700),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+            )
         }
     }
 }
