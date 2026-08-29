@@ -457,9 +457,21 @@ object EsDeThemeParser {
                     val properties = parseElementProperties(parser, schema, variables, baseDir)
                     for (instanceName in splitNames(nameAttr)) {
                         val key = "${elementType}_$instanceName"
-                        val element = EsDeThemeElement(elementType, key, properties)
+                        // Real ES-DE behavior (confirmed against ThemeData::parseElement):
+                        // the same named element re-declared later (e.g. a <variant>-scoped
+                        // block overriding just staticImage/imageColor on top of a base
+                        // <view> block's pos/size/origin) MERGES its properties onto the
+                        // existing element, it doesn't replace it wholesale. A real,
+                        // confirmed bug this fixes: a plain map `put` here was wiping out
+                        // decaffe's own carousel's pos/size/origin every time its later
+                        // variant-scoped redeclaration (staticImage/imageColor only) was
+                        // parsed, making the carousel fall back to sizeOf/positionOf's
+                        // (0.2, 0.2)/(0,0) defaults -- confirmed live via a real debug log
+                        // on-device (rawSize=null rawPos=null rawOrigin=null), not guessed.
                         for (viewName in viewNames) {
-                            views.getOrPut(viewName) { mutableMapOf() }[key] = element
+                            val viewElements = views.getOrPut(viewName) { mutableMapOf() }
+                            val existingProperties = viewElements[key]?.properties ?: emptyMap()
+                            viewElements[key] = EsDeThemeElement(elementType, key, existingProperties + properties)
                         }
                     }
                 }
