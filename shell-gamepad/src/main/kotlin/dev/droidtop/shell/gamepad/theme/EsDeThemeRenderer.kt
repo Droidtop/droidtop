@@ -649,7 +649,7 @@ private fun EsDeThemedBadges(element: EsDeThemeElement, viewWidth: Dp, viewHeigh
  * (unlike ES-DE's own desktop OS-status queries, this is real, live
  * on-device status, not fabricated) -- wifi/cellular via
  * `ConnectivityManager.getNetworkCapabilities` (real `ACCESS_NETWORK_STATE`,
- * already declared app-wide via `runtime-remote-stream`'s manifest), and
+ * declared in :app's own manifest), and
  * battery percent/charging via the real sticky `ACTION_BATTERY_CHANGED`
  * broadcast (no permission needed at all). Bluetooth is a real, deliberate
  * gap: reading adapter state needs `BLUETOOTH_CONNECT`, a dangerous

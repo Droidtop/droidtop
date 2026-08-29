@@ -87,10 +87,13 @@ enum class LibraryEntryKind {
     LINUX_CONTAINER_APP,
 
     /**
-     * An app configured on a paired remote GameStream/Sunshine host, launched
-     * via runtime-remote-stream rather than run locally. Same LibraryEntry
-     * shape as anything else — the whole point of this model is that "runs
-     * on a remote PC over Moonlight" isn't a special case in the UI.
+     * An app/window streamed from elsewhere rather than run locally —
+     * launched via windowcast (droidtop's actual streaming system;
+     * a separate, broader project, not a droidtop-owned module — see
+     * docs/SPEC.md's remote-streaming note), not implemented in this repo.
+     * Same LibraryEntry shape as anything else — the whole point of this
+     * model is that "runs elsewhere and streams here" isn't a special case
+     * in the UI.
      */
     REMOTE_STREAM,
 

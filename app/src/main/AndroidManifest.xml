@@ -14,6 +14,16 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Real outbound HTTP: ScreenScraper/TheGamesDB/Lutris/IGDB metadata
+         scraping, theme-index sync (library-core, shell-gamepad). Declared
+         explicitly here now that no other droidtop module happens to carry
+         it transitively. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Real wifi/cellular connectivity check for Handheld's own
+         systemstatus theme element (EsDeThemeRenderer.kt). -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <!--
       Requested during OnboardingActivity's flow, not implicitly. Real
       games/ROM files (including on an SD card, per docs/SPEC.md's games

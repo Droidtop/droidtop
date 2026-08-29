@@ -22,12 +22,6 @@
 [submodule "vendor/wayland"]
 	path = vendor/wayland
 	url = https://gitlab.freedesktop.org/wayland/wayland.git
-[submodule "vendor/moonlight-common-c"]
-	path = vendor/moonlight-common-c
-	url = https://github.com/moonlight-stream/moonlight-common-c.git
-[submodule "vendor/mbedtls"]
-	path = vendor/mbedtls
-	url = https://github.com/Mbed-TLS/mbedtls.git
 [submodule "vendor/libffi"]
 	path = vendor/libffi
 	url = https://github.com/libffi/libffi.git
