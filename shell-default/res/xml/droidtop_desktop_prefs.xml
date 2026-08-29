@@ -10,6 +10,15 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <!-- Real cross-link: see droidtop_handheld_prefs.xml's own matching
+         entry for why this is real droidtop-wide config, not Standard's
+         own launcher preferences. -->
+    <Preference
+        android:key="pref_desktop_global_settings"
+        android:title="@string/pref_global_settings_title"
+        android:summary="@string/pref_global_settings_desc"
+        android:fragment="app.murinelauncher.settings.SettingsGlobalFragment" />
+
     <SwitchPreferenceCompat
         android:key="pref_desktop_taskbar_top"
         android:title="@string/pref_desktop_taskbar_top_title"
@@ -24,5 +33,20 @@
         android:key="pref_desktop_root_compositor_setup"
         android:title="@string/pref_desktop_root_compositor_setup_title"
         android:summary="@string/pref_desktop_root_compositor_setup_desc" />
+
+    <!-- Real shortcuts to the other two shells' own settings, matching
+         droidtop_handheld_prefs.xml's own equivalent category. -->
+    <PreferenceCategory android:title="@string/pref_subcategory_other_shells">
+        <Preference
+            android:key="pref_desktop_handheld_settings"
+            android:title="@string/pref_category_handheld_title"
+            android:summary="@string/pref_category_handheld_desc"
+            android:fragment="app.murinelauncher.settings.SettingsHandheldFragment" />
+        <Preference
+            android:key="pref_desktop_standard_settings"
+            android:title="@string/pref_standard_settings_title"
+            android:summary="@string/pref_standard_settings_desc"
+            android:fragment="app.murinelauncher.settings.SettingsRootFragment" />
+    </PreferenceCategory>
 
 </androidx.preference.PreferenceScreen>
