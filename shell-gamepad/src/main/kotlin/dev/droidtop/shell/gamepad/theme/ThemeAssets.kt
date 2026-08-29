@@ -51,6 +51,10 @@ import java.util.Locale
 internal object ThemeAssets {
     private const val BUNDLED_THEMES_ASSET_ROOT = "themes"
     private const val EXTRACTED_MARKER = ".extracted"
+    // droidtop's own real, intended default theme (see [resolveActiveTheme]'s
+    // own doc comment) -- matches the vendored folder name under
+    // [BUNDLED_THEMES_ASSET_ROOT], not a display name.
+    private const val DEFAULT_THEME_NAME = "decaffe-es-de"
 
     data class ThemeDescriptor(val name: String, val bundledAssetFolder: String?, val userDir: File?)
 
@@ -99,16 +103,30 @@ internal object ThemeAssets {
     fun userThemesDir(context: Context): File = File(context.filesDir, "themes")
 
     /**
-     * Resolves [ThemePrefs]' selected theme name against real discovery,
-     * falling back to the first theme alphabetically (mirroring real
-     * ES-DE's `sThemes.begin()` fallback) when the stored name is unset or
-     * no longer present -- never a hardcoded folder name.
+     * Real, confirmed-live bug this fixes: with no explicit [ThemePrefs]
+     * selection (true for every install until a real theme-browse UI
+     * exists -- Phase 4, still undesigned), falling back to alphabetically
+     * FIRST among every bundled theme picked "art-book-next-es-de" over
+     * "decaffe-es-de" (A < D) -- confirmed via a real on-device debug log
+     * showing art-book-next's own hero-style carousel (pos 0,0 / size 1,1)
+     * rendering instead of decaffe's, not a rendering bug in the carousel
+     * math at all. Real ES-DE's own `sThemes.begin()` fallback is a
+     * reasonable rule for a program that ships with exactly one bundled
+     * theme (or where the user picked one during setup) -- droidtop
+     * currently bundles two with no selection UI yet, so blindly following
+     * that same rule silently serves the wrong one. decaffe is droidtop's
+     * own real, intended default (see docs/SPEC.md's own Handheld section)
+     * -- prefer it by name when unset, THEN fall back to alphabetically
+     * first among whatever remains (still real ES-DE parity for any
+     * OTHER/future bundled theme set that doesn't include decaffe at all).
      */
     private fun resolveActiveTheme(context: Context): ThemeDescriptor? {
         val discovered = discoverThemes(context)
         if (discovered.isEmpty()) return null
         val selected = ThemePrefs.get(context)
-        return discovered.firstOrNull { it.name == selected } ?: discovered.first()
+        return discovered.firstOrNull { it.name == selected }
+            ?: discovered.firstOrNull { it.name == DEFAULT_THEME_NAME }
+            ?: discovered.first()
     }
 
     /** Public read of [resolveActiveTheme]'s own name -- the real, resolved active theme, for UI display/cycling, not just the raw (possibly unset) [ThemePrefs] value. */
