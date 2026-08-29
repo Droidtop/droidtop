@@ -32,7 +32,7 @@
 
     <PreferenceCategory android:title="@string/pref_subcategory_modes">
 
-        <!-- Real, dynamic entries (only currently-enabled modes) --
+        <!-- Real, dynamic entries (only currently-enabled modes),
              see SettingsGlobalFragment.refreshDefaultModeChoices. -->
         <ListPreference
             android:key="pref_global_default_mode"
