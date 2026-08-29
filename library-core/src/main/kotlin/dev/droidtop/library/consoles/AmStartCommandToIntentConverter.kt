@@ -1,8 +1,10 @@
 package dev.droidtop.library.consoles
 
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.core.content.FileProvider
 import java.io.File
 
 /**
@@ -25,18 +27,28 @@ import java.io.File
 object AmStartCommandToIntentConverter {
     class UnsupportedArgumentException(argument: String) : IllegalArgumentException("Unsupported am start argument: $argument")
 
-    fun toIntent(argumentsTemplate: String, filePath: String): Intent {
+    fun toIntent(context: Context, argumentsTemplate: String, filePath: String): Intent {
         // Real, second placeholder alongside {file.path} -- roughly half of
         // the real presets pulled from Daijishō's own wiki (KnownPlayers.kt)
         // specifically need a file:// URI, not a bare path string (several
         // emulators' own file pickers only accept a URI, not a raw path).
-        // Uri.fromFile is the plain, non-FileProvider form -- matches how
-        // these presets are documented to be used, and works for any app
-        // with legacy/all-files storage access (which is what droidtop
-        // itself already requires -- see MANAGE_EXTERNAL_STORAGE in the
-        // manifest -- and what emulator apps predating scoped storage's
-        // strict rules typically also request).
-        val fileUri = Uri.fromFile(File(filePath)).toString()
+        //
+        // A real, live crash (android.os.FileUriExposedException, confirmed
+        // via adb logcat launching a real PSP game through PPSSPP) showed
+        // Uri.fromFile is NOT safe here: modern Android (API 24+) StrictMode
+        // forbids handing a plain file:// URI to another app via an Intent,
+        // regardless of what storage permissions droidtop itself holds --
+        // that's the SENDING app's own policy, not the receiver's. The real
+        // fix is a FileProvider-issued content:// URI (see the <provider>
+        // in AndroidManifest.xml), which every actively-maintained emulator
+        // targeting a real Android version already understands via
+        // ACTION_VIEW, plus FLAG_GRANT_READ_URI_PERMISSION on the resulting
+        // Intent so the receiving app can actually read it.
+        val fileUri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            File(filePath),
+        ).toString()
         val tokens = ArrayDeque(
             argumentsTemplate
                 .replace("{file.path}", filePath)
@@ -89,6 +101,12 @@ object AmStartCommandToIntentConverter {
             throw IllegalArgumentException("am start command specified no action, component, or package")
         }
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        // Required for the receiving app to actually read a FileProvider
+        // content:// data URI (see {file.uri} above) -- without this the
+        // grant made via android:grantUriPermissions doesn't extend to
+        // this specific Intent, and the receiver gets a SecurityException
+        // instead of the earlier FileUriExposedException.
+        if (dataUri?.scheme == "content") intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         return intent
     }
 }
