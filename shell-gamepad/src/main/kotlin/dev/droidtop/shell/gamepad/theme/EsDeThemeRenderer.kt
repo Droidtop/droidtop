@@ -214,6 +214,12 @@ private fun EsDeThemedListElement(
 ) {
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
+    android.util.Log.d(
+        "EsDeThemeDebug",
+        "listElement type=${element.type} viewWidth=$viewWidth viewHeight=$viewHeight " +
+            "rawSize=${element.valueOrNull<EsDeThemeValue.Pair>("size")} rawPos=${element.valueOrNull<EsDeThemeValue.Pair>("pos")} " +
+            "rawOrigin=${element.valueOrNull<EsDeThemeValue.Pair>("origin")} width=$width height=$height offsetX=$offsetX offsetY=$offsetY",
+    )
     EsDeSystemListView(
         element = element,
         items = items,
