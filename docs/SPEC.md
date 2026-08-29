@@ -250,12 +250,15 @@ stops at "which repositories," never "which versions."
   filter dimensions the model already supports: OS, desktop environment,
   role, `headlessSupport`, `arm64Available`, `officialSource` — picking
   which of those the UI actually exposes is still open.
-- **PRIMARY entries are the one real exception**: droidtop hasn't
-  published any base+compositor image anywhere yet, so those repositories
-  are still placeholders with nothing real to resolve tags against — see
-  §11's open risks. Everything above about live resolution is fully real
-  for the SIBLING entries (plain stock distro images already exist on
-  real registries today).
+- **PRIMARY does not need a droidtop-published image.** Settled, not
+  open: PRIMARY resolves against the same recommended/off-the-shelf
+  catalog as SIBLING — any known repository with a wlroots-based
+  compositor already installed (sway, labwc; see the
+  `headlessSupport`/compositor-family metadata above) is a real,
+  resolvable PRIMARY candidate today, the same `crane ls`/`crane digest`
+  live-resolution path as everything else in this section. There is no
+  separate "droidtop's own base+compositor image" to build or publish —
+  that was an earlier framing, now corrected.
 
 ## 3b. Optional: other architectures/OSes via QEMU/libvirt — a value-add, not core
 
