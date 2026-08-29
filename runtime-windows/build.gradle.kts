@@ -79,7 +79,8 @@ android {
     sourceSets {
         getByName("main") {
             java.srcDir("../vendor/gamenative/app/src/main/java")
-            java.include(
+            java.filter {
+                include(
                 "com/winlator/**",
                 "app/gamenative/enums/Marker.kt",
                 "app/gamenative/powercontrol/autotuning/AdaptiveFpsCap.kt",
@@ -101,7 +102,8 @@ android {
                 "app/gamenative/data/TouchGestureConfig.kt",
                 "app/gamenative/utils/MarkerUtils.kt",
                 "app/gamenative/SteamBootstrap.kt",
-            )
+                )
+            }
             res.srcDir("../vendor/gamenative/app/src/main/res")
         }
     }
