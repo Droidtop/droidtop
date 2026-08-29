@@ -114,7 +114,27 @@ import kotlinx.coroutines.withContext
  * nothing here renders companion content on a second screen yet).
  */
 @Composable
-fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Unit = {}) {
+fun GamepadShell(
+    library: Library,
+    onFocusedEntryChanged: (LibraryEntry?) -> Unit = {},
+    // Real deep-link params from :app's MainActivity, which itself reads
+    // them from an Intent extra sent by :shell-default's
+    // SettingsHandheldFragment -- a different module with no compile
+    // dependency on this one, hence a plain String name here rather than
+    // HandheldSection itself (internal, module-private). Lets the real,
+    // unified Preference-based settings screen reach this Compose-only
+    // shell's own actions (jump to a section, trigger a rescan) it has no
+    // other way to invoke. deepLinkToken is real, not decorative: this
+    // Activity is singleTask, so a repeat deep-link (e.g. "Rescan library"
+    // pressed twice) almost always arrives via onNewIntent while this
+    // composition is already running -- startSectionName/triggerRescan
+    // alone wouldn't change value the second time, so nothing would
+    // recompose/react without a token that bumps on every real deep-link
+    // regardless of whether the values themselves repeat.
+    deepLinkToken: Int = 0,
+    startSectionName: String? = null,
+    triggerRescan: Boolean = false,
+) {
     val context = LocalContext.current
     // Two independent states, not one -- see Library.scanKinds' own doc
     // comment: a single combined scan meant Apps stayed empty until the
@@ -133,6 +153,42 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
     // adb; a real user has no such option.
     var rescanTrigger by remember { mutableStateOf(0) }
     var section by remember { mutableStateOf(HandheldPrefs.defaultSection(context)) }
+    // Reacts to every real deep-link (see deepLinkToken's own doc comment
+    // above), not just the first composition -- a plain `remember` initial
+    // value would only ever apply once per GamepadShell instance, silently
+    // doing nothing for every deep-link after the first while this
+    // Activity's singleTask instance stays alive.
+    LaunchedEffect(deepLinkToken) {
+        if (triggerRescan) rescanTrigger++
+        startSectionName?.let { name ->
+            HandheldSection.entries.firstOrNull { it.name == name }?.let { section = it }
+        }
+    }
+    // Real, deliberate distinction from plain `section = it`: a user
+    // actively PICKING Settings (tab click, L/R shoulder cycle) now opens
+    // the real, unified com.android.launcher3.settings.SettingsActivity
+    // (deep-linked straight to SettingsHandheldFragment) instead of this
+    // shell's own former in-house Settings tab -- see docs/SPEC.md's own
+    // settings-architecture note and SettingsHandheldFragment.kt, which
+    // now owns Library/Display, real Preference entries a user can find
+    // from ANY shell's settings, not just Handheld's. Never redirects the
+    // *initial* `section` value computed from `startSectionName` above --
+    // that's how the "Appearance" preference's own deep-link (which still
+    // needs this shell's own real Compose ThemeBrowserScreen, not
+    // reimplementable as flat XML) actually lands on real content instead
+    // of bouncing straight back out.
+    val selectSection: (HandheldSection) -> Unit = { target ->
+        if (target == HandheldSection.SETTINGS) {
+            val intent = Intent(Intent.ACTION_MAIN).apply {
+                component = ComponentName(context.packageName, "com.android.launcher3.settings.SettingsActivity")
+                putExtra(":settings:fragment", "app.murinelauncher.settings.SettingsHandheldFragment")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } else {
+            section = target
+        }
+    }
     var canGoBack by remember { mutableStateOf(false) }
     // True only while GamesSection's own themed system-view render (the
     // real, loaded theme's <helpsystem> element, see EsDeThemedHelpSystem)
@@ -176,10 +232,10 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
     // enough: it restarts the LaunchedEffects above against
     // rescanKindsProgressive, whose own first emission is the real,
     // already-known cached data (see ConsoleRomProvider.rescanProgressive's
-    // own doc comment), not an empty list.
-    val onRescan: () -> Unit = {
-        rescanTrigger++
-    }
+    // own doc comment), not an empty list. "Rescan library" itself now
+    // lives in SettingsHandheldFragment (see MainActivity's own
+    // EXTRA_HANDHELD_RESCAN, read once above into rescanTrigger's initial
+    // value) -- nothing left in this composition needs to bump it again.
     // Real, immediate in-memory update -- Library.toggleFavorite already
     // persists the real new state (see its own doc comment); updating the
     // held gameEntries copy directly here means the badge/UI reflects it
@@ -224,18 +280,18 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
                 val currentIndex = sections.indexOf(section)
                 when (GamepadKeyMap.actionFor(event.key)) {
                     GamepadAction.L -> {
-                        section = sections[(currentIndex - 1 + sections.size) % sections.size]
+                        selectSection(sections[(currentIndex - 1 + sections.size) % sections.size])
                         true
                     }
                     GamepadAction.R -> {
-                        section = sections[(currentIndex + 1) % sections.size]
+                        selectSection(sections[(currentIndex + 1) % sections.size])
                         true
                     }
                     else -> false
                 }
             },
     ) {
-        SectionTabBar(current = section, onSelect = { section = it }, currentTabFocus = tabBarFocus)
+        SectionTabBar(current = section, onSelect = selectSection, currentTabFocus = tabBarFocus)
         Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
             val entry = detailEntry
             when {
@@ -254,7 +310,7 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
                 section == HandheldSection.SETTINGS -> {
                     canGoBack = false
                     themeHandlesHints = false
-                    SettingsSection(onRescan = onRescan)
+                    SettingsSection()
                 }
                 // Each section now gates on its own scan only (see
                 // gameEntries/appEntries' own comment) -- Games' spinner no
@@ -1315,30 +1371,24 @@ private fun AppIconTile(entry: LibraryEntry, modifier: Modifier = Modifier, onLa
 }
 
 /**
- * Real, comprehensive, in-shell Settings menu -- one place for every
- * droidtop-specific setting, fully gamepad-navigable throughout (a real,
- * reported gap this fixes: this used to be two bare links out to
- * :shell-default's touch-first Android Preference screens, and
- * ConsoleSystemsActivity -- reachable only from inside one of those --
- * had zero focus/key handling at all, unusable without a touchscreen).
- * Grouped into titled sections (Library/Display/General), matching
- * Lemuroid's real `LemuroidCardSettingsGroup` convention rather than one
- * long flat list. The three Handheld prefs (default section, show hints,
- * apps grid columns) are edited inline here AND still readable/editable
- * from :shell-default's SettingsHandheldFragment -- both read/write the
- * exact same "com.android.launcher3.prefs" SharedPreferences keys (see
- * HandheldPrefs' own doc comment), so neither surface can drift out of
- * sync with the other.
+ * Real, focused Appearance screen -- the one real piece of Handheld's
+ * former in-house Settings tab that can't just become a flat Android
+ * Preference entry in :shell-default's SettingsHandheldFragment (unlike
+ * Library/Display, moved there -- see docs/SPEC.md's own settings-
+ * architecture note): theme selection needs this shell's own real
+ * ThemeAssets/ThemePrefs/ThemeDownloader stack and ThemeBrowserScreen's
+ * own rich per-theme screenshot previews, neither reachable from a
+ * different Gradle module. Reachable ONLY via a real deep-link (the
+ * "Appearance" preference in SettingsHandheldFragment, through
+ * MainActivity's EXTRA_HANDHELD_START_SECTION) -- selecting Settings from
+ * the tab bar itself now goes straight to that real, unified Preference
+ * screen instead (see GamepadShell's own selectSection).
  */
 @Composable
-private fun SettingsSection(onRescan: () -> Unit) {
+private fun SettingsSection() {
     val context = LocalContext.current
     val firstFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { firstFocus.requestFocus() }
-
-    var defaultSection by remember { mutableStateOf(HandheldPrefs.defaultSection(context)) }
-    var showHints by remember { mutableStateOf(HandheldPrefs.showHints(context)) }
-    var appsGridColumns by remember { mutableStateOf(HandheldPrefs.appsGridColumns(context)) }
 
     // Real theme names discovered on disk right now (bundled + any
     // downloaded), not a compiled-in list -- see ThemeAssets.discoverThemes's
@@ -1372,31 +1422,6 @@ private fun SettingsSection(onRescan: () -> Unit) {
         modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(28.dp),
     ) {
-        SettingsGroup("Library") {
-            SettingsLink(
-                "Console systems",
-                "Fix a folder's detected system, choose which emulator runs it, scrape artwork",
-                modifier = Modifier.focusRequester(firstFocus),
-                onClick = {
-                    val intent = Intent(Intent.ACTION_MAIN).apply {
-                        component = ComponentName(context.packageName, "dev.droidtop.app.ConsoleSystemsActivity")
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    context.startActivity(intent)
-                },
-            )
-            // Real, user-facing counterpart to Library.rescanKindsProgressive
-            // -- previously the only way to force a fresh ROM scan (pick up
-            // new files, drop deleted ones) was clearing app data by hand
-            // over adb, which isn't something a real user can do. Games/Apps
-            // re-render progressively as results stream back in, same as a
-            // first-launch scan (see GamepadShell's own onRescan comment).
-            SettingsLink(
-                "Rescan library",
-                "Look for new or changed games and apps again",
-                onClick = onRescan,
-            )
-        }
         // Real, distinct group -- matches Daijishō's own actual settings
         // structure (Library vs. a separate Appearance section for
         // themes/wallpapers), not droidtop's own invention. Previously
@@ -1408,6 +1433,7 @@ private fun SettingsSection(onRescan: () -> Unit) {
             SettingsChoiceLink(
                 title = "Theme",
                 value = activeTheme ?: "(none found)",
+                modifier = Modifier.focusRequester(firstFocus),
                 onCycle = {
                     if (themeNames.size > 1) {
                         val currentIndex = themeNames.indexOf(activeTheme).coerceAtLeast(0)
@@ -1441,41 +1467,6 @@ private fun SettingsSection(onRescan: () -> Unit) {
                 "Browse themes",
                 "Download or update an individual theme from the real ES-DE community index",
                 onClick = { themeBrowserOpen = true },
-            )
-        }
-        SettingsGroup("Display") {
-            SettingsChoiceLink(
-                title = "Default section",
-                value = if (defaultSection == HandheldSection.APPS) "Apps" else "Games",
-                onCycle = {
-                    val next = if (defaultSection == HandheldSection.APPS) HandheldSection.GAMES else HandheldSection.APPS
-                    defaultSection = next
-                    HandheldPrefs.setDefaultSection(context, next)
-                },
-            )
-            SettingsToggleLink(
-                title = "Show button hints",
-                value = showHints,
-                onToggle = {
-                    showHints = !showHints
-                    HandheldPrefs.setShowHints(context, showHints)
-                },
-            )
-            SettingsStepperLink(
-                title = "Apps grid columns",
-                value = appsGridColumns,
-                range = HandheldPrefs.MIN_APPS_GRID_COLUMNS..HandheldPrefs.MAX_APPS_GRID_COLUMNS,
-                onChange = {
-                    appsGridColumns = it
-                    HandheldPrefs.setAppsGridColumns(context, it)
-                },
-            )
-        }
-        SettingsGroup("General") {
-            SettingsLink(
-                "All settings",
-                "General, icons, home screen, and everything else",
-                onClick = { openSettings(context, null) },
             )
         }
     }
@@ -1538,39 +1529,10 @@ private fun SettingsRow(
     }
 }
 
-@Composable
-private fun SettingsToggleLink(title: String, value: Boolean, onToggle: () -> Unit) {
-    SettingsRow(title = title, valueText = if (value) "On" else "Off", onClick = onToggle, onKeyLeftRight = { onToggle(); true })
-}
-
-/** D-pad left/right cycles [onChange] without opening a picker -- clamped, matching CustomSeekBarPreference's own real min/max range. */
-@Composable
-private fun SettingsStepperLink(title: String, value: Int, range: IntRange, onChange: (Int) -> Unit) {
-    SettingsRow(
-        title = title,
-        valueText = value.toString(),
-        onClick = {},
-        onKeyLeftRight = { left ->
-            val next = (if (left) value - 1 else value + 1).coerceIn(range)
-            if (next != value) onChange(next)
-            true
-        },
-    )
-}
-
 /** Two-choice cycle (e.g. Games/Apps) -- A/Enter and D-pad left/right all cycle, since there's nowhere else to go for a binary choice. */
 @Composable
-private fun SettingsChoiceLink(title: String, value: String, onCycle: () -> Unit) {
-    SettingsRow(title = title, valueText = value, onClick = onCycle, onKeyLeftRight = { onCycle(); true })
-}
-
-private fun openSettings(context: Context, fragment: String?) {
-    val intent = Intent(Intent.ACTION_MAIN).apply {
-        component = ComponentName(context.packageName, "com.android.launcher3.settings.SettingsActivity")
-        if (fragment != null) putExtra(":settings:fragment", fragment)
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-    context.startActivity(intent)
+private fun SettingsChoiceLink(title: String, value: String, modifier: Modifier = Modifier, onCycle: () -> Unit) {
+    SettingsRow(title = title, valueText = value, modifier = modifier, onClick = onCycle, onKeyLeftRight = { onCycle(); true })
 }
 
 @Composable
