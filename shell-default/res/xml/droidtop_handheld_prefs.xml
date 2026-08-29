@@ -10,23 +10,14 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- Real cross-link, not a custom click listener: android:fragment
-         is the same real built-in AndroidX Preference navigation
-         SettingsRootFragment's own entries already use (PreferenceFragmentCompat.
-         onPreferenceTreeClick handles it automatically via the hosting
-         Activity's OnPreferenceStartFragmentCallback). "Global" means
-         real droidtop-wide config (which HOME role it holds, the real
-         Android system Settings shortcut), NOT Standard's own launcher
-         preferences (General/Icons/Home/Drawer/QSB/Misc), which are a
-         real per-shell settings surface like this one, reachable via its
-         own real shortcut below, not this link. See
-         SettingsGlobalFragment.kt/droidtop_global_prefs.xml. -->
-    <Preference
-        android:key="pref_handheld_global_settings"
-        android:title="@string/pref_global_settings_title"
-        android:summary="@string/pref_global_settings_desc"
-        android:fragment="app.murinelauncher.settings.SettingsGlobalFragment" />
-
+    <!-- Real, deliberate absence: "Global settings" used to be a plain
+         row right here, which read as though it belonged to Handheld's
+         own settings (this screen's own real title) when it's actually
+         a totally separate, droidtop-wide destination. It's a real,
+         persistent action-bar item on every SettingsActivity screen now
+         instead (see SettingsActivity.java's own onCreateOptionsMenu),
+         genuinely separate from and shown above whichever shell's
+         settings happen to be on screen. -->
     <ListPreference
         android:key="pref_handheld_default_section"
         android:title="@string/pref_handheld_default_section_title"
@@ -114,8 +105,9 @@
     <!-- Real shortcuts to the other two shells' own settings: this
          shell's own settings are what's shown first when reached from
          Handheld; these are the way to the others, not the default
-         landing point. Same real android:fragment mechanism as
-         pref_handheld_global_settings above. -->
+         landing point. Real android:fragment navigation, same mechanism
+         SettingsActivity's own persistent "Global settings" action-bar
+         item ultimately relies on too. -->
     <PreferenceCategory android:title="@string/pref_subcategory_other_shells">
         <Preference
             android:key="pref_handheld_desktop_settings"

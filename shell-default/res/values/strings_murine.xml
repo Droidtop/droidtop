@@ -27,7 +27,6 @@
     <string name="pref_standard_settings_desc">General, icons, home screen, and everything else for the Standard shell</string>
 
     <string name="pref_global_settings_title">Global settings</string>
-    <string name="pref_global_settings_desc">droidtop-wide config that isn\'t specific to any one shell</string>
     <string name="pref_global_home_role_title">Use droidtop as home screen</string>
     <string name="pref_global_home_role_desc">Make the Standard shell your device\'s actual Android home screen</string>
     <string name="pref_global_system_settings_title">System settings</string>
