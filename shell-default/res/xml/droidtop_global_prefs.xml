@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Real droidtop-wide preferences: config that affects the whole app,
+     or things outside any single shell's own UI entirely, not any one
+     shell's own settings (Standard/Desktop/Handheld each have their own
+     real screen for that, see this same res/xml/ directory). Lives in
+     :shell-default alongside every other settings screen; see
+     shell-default/src/app/murinelauncher/settings/SettingsGlobalFragment.kt
+     and docs/SPEC.md's settings-architecture note.
+-->
+<androidx.preference.PreferenceScreen
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Real, existing HomeRolePrefs (dev.droidtop.shell.standard), never
+         exposed as a user-facing preference before now: only ever set
+         once, during onboarding. Non-persistent: the real, current state
+         is HomeRolePrefs.activeHomeImplementation() itself (PackageManager
+         component-enabled state), not a separately-tracked SharedPreferences
+         value that could drift from it; see SettingsGlobalFragment.kt's
+         own PREF_HOME_ROLE handling. -->
+    <SwitchPreferenceCompat
+        android:key="pref_global_home_role"
+        android:title="@string/pref_global_home_role_title"
+        android:summary="@string/pref_global_home_role_desc"
+        android:persistent="false" />
+
+    <!-- Real Android system Settings, not droidtop's own: genuinely
+         outside every shell's own UI. -->
+    <Preference
+        android:key="pref_global_system_settings"
+        android:title="@string/pref_global_system_settings_title"
+        android:summary="@string/pref_global_system_settings_desc" />
+
+    <!-- Real shortcuts to each shell's own settings: Global has no
+         shell-specific settings of its own, so all three (not just the
+         "other two") are listed here, matching this screen's own real
+         role as the hub every shell's own screen links back to. -->
+    <PreferenceCategory android:title="@string/pref_subcategory_other_shells">
+        <Preference
+            android:key="pref_global_standard_settings"
+            android:title="@string/pref_standard_settings_title"
+            android:summary="@string/pref_standard_settings_desc"
+            android:fragment="app.murinelauncher.settings.SettingsRootFragment" />
+        <Preference
+            android:key="pref_global_desktop_settings"
+            android:title="@string/pref_category_desktop_title"
+            android:summary="@string/pref_category_desktop_desc"
+            android:fragment="app.murinelauncher.settings.SettingsDesktopFragment" />
+        <Preference
+            android:key="pref_global_handheld_settings"
+            android:title="@string/pref_category_handheld_title"
+            android:summary="@string/pref_category_handheld_desc"
+            android:fragment="app.murinelauncher.settings.SettingsHandheldFragment" />
+    </PreferenceCategory>
+
+</androidx.preference.PreferenceScreen>
