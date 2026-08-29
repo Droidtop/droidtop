@@ -78,32 +78,41 @@ android {
     // module was never wired to use at all.
     sourceSets {
         getByName("main") {
-            java.srcDir("../vendor/gamenative/app/src/main/java")
-            java.filter {
-                include(
-                "com/winlator/**",
-                "app/gamenative/enums/Marker.kt",
-                "app/gamenative/powercontrol/autotuning/AdaptiveFpsCap.kt",
-                "app/gamenative/powercontrol/autotuning/DeviceGate.kt",
-                "app/gamenative/powercontrol/autotuning/PidController.kt",
-                "app/gamenative/powercontrol/autotuning/ClusterTuner.kt",
-                "app/gamenative/powercontrol/autotuning/TunerDecisionEngine.kt",
-                "app/gamenative/powercontrol/drivers/NoOpPerformanceDriver.kt",
-                "app/gamenative/powercontrol/metrics/MetricsSnapshot.kt",
-                "app/gamenative/powercontrol/metrics/FrameTimeRing.kt",
-                "app/gamenative/powercontrol/metrics/JsonlSessionLog.kt",
-                "app/gamenative/powercontrol/metrics/PerformanceMetricsCollector.kt",
-                "app/gamenative/powercontrol/profiles/CpuGovernor.kt",
-                "app/gamenative/powercontrol/profiles/PerformancePreset.kt",
-                "app/gamenative/powercontrol/fan/FanTempController.kt",
-                "app/gamenative/powercontrol/AdaptiveFpsCapController.kt",
-                "app/gamenative/powercontrol/PowerBaseline.kt",
-                "app/gamenative/data/ShooterModeConfig.kt",
-                "app/gamenative/data/TouchGestureConfig.kt",
-                "app/gamenative/utils/MarkerUtils.kt",
-                "app/gamenative/SteamBootstrap.kt",
-                )
-            }
+            // AndroidSourceDirectorySet.java doesn't implement
+            // PatternFilterable itself (confirmed via a real CI
+            // compile-error round-trip -- neither `.include()` nor
+            // `.filter { include() }` resolve on it) -- the standard
+            // Gradle idiom for a filtered source directory is a
+            // ConfigurableFileTree (which DOES implement
+            // PatternFilterable) passed to srcDir(), not the
+            // AndroidSourceDirectorySet's own API surface.
+            java.srcDir(
+                fileTree("../vendor/gamenative/app/src/main/java") {
+                    include(
+                        "com/winlator/**",
+                        "app/gamenative/enums/Marker.kt",
+                        "app/gamenative/powercontrol/autotuning/AdaptiveFpsCap.kt",
+                        "app/gamenative/powercontrol/autotuning/DeviceGate.kt",
+                        "app/gamenative/powercontrol/autotuning/PidController.kt",
+                        "app/gamenative/powercontrol/autotuning/ClusterTuner.kt",
+                        "app/gamenative/powercontrol/autotuning/TunerDecisionEngine.kt",
+                        "app/gamenative/powercontrol/drivers/NoOpPerformanceDriver.kt",
+                        "app/gamenative/powercontrol/metrics/MetricsSnapshot.kt",
+                        "app/gamenative/powercontrol/metrics/FrameTimeRing.kt",
+                        "app/gamenative/powercontrol/metrics/JsonlSessionLog.kt",
+                        "app/gamenative/powercontrol/metrics/PerformanceMetricsCollector.kt",
+                        "app/gamenative/powercontrol/profiles/CpuGovernor.kt",
+                        "app/gamenative/powercontrol/profiles/PerformancePreset.kt",
+                        "app/gamenative/powercontrol/fan/FanTempController.kt",
+                        "app/gamenative/powercontrol/AdaptiveFpsCapController.kt",
+                        "app/gamenative/powercontrol/PowerBaseline.kt",
+                        "app/gamenative/data/ShooterModeConfig.kt",
+                        "app/gamenative/data/TouchGestureConfig.kt",
+                        "app/gamenative/utils/MarkerUtils.kt",
+                        "app/gamenative/SteamBootstrap.kt",
+                    )
+                },
+            )
             res.srcDir("../vendor/gamenative/app/src/main/res")
         }
     }
