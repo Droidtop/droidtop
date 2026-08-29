@@ -280,6 +280,7 @@ fun GamepadShell(library: Library, onFocusedEntryChanged: (LibraryEntry?) -> Uni
                             onLaunch = onLaunch,
                             onShowDetail = { detailEntry = it },
                             onFocusedEntryChanged = onFocusedEntryChanged,
+                            onToggleFavorite = onToggleFavorite,
                         )
                     }
                     // SETTINGS is handled above, before the loading gate --
@@ -992,6 +993,7 @@ private fun GamesSection(
                             onShowDetail = onShowDetail,
                             onFocusedEntryChanged = onFocusedEntryChanged,
                             modifier = Modifier.align(Alignment.TopStart).padding(top = 16.dp),
+                            onToggleFavorite = onToggleFavorite,
                         )
                     }
                 }
@@ -1156,6 +1158,7 @@ private fun AppsSection(
     onLaunch: (LibraryEntry) -> Unit,
     onShowDetail: (LibraryEntry) -> Unit,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
+    onToggleFavorite: (LibraryEntry) -> Unit = {},
 ) {
     val context = LocalContext.current
     val sections = buildAppSections(entries)
@@ -1197,6 +1200,7 @@ private fun AppsSection(
                     onLaunch = onLaunch,
                     onShowDetail = onShowDetail,
                     onFocusedEntryChanged = onFocusedEntryChanged,
+                    onToggleFavorite = onToggleFavorite,
                 )
             }
             firstAssigned = true
@@ -1648,6 +1652,7 @@ private fun HomeSectionRow(
     onShowDetail: (LibraryEntry) -> Unit,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
     modifier: Modifier = Modifier,
+    onToggleFavorite: (LibraryEntry) -> Unit = {},
 ) {
     Column(modifier = modifier) {
         Text(
@@ -1667,6 +1672,7 @@ private fun HomeSectionRow(
                     onLaunch = { onLaunch(entry) },
                     onShowDetail = { onShowDetail(entry) },
                     onFocused = { onFocusedEntryChanged(entry) },
+                    onToggleFavorite = { onToggleFavorite(entry) },
                 )
             }
         }
