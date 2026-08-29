@@ -67,18 +67,6 @@ import kotlinx.coroutines.launch
  */
 class MainActivity : AppCompatActivity() {
 
-    companion object {
-        // Real deep-link extras from :shell-default's SettingsHandheldFragment
-        // (a different module, no compile dependency on this one -- same
-        // explicit-component-name pattern already used for
-        // ConsoleSystemsActivity/OnboardingActivity) -- lets the unified
-        // real Preference-based settings screen reach GamepadShell's own
-        // Compose-only actions (jumping to a section, triggering a rescan)
-        // it has no other way to invoke.
-        const val EXTRA_HANDHELD_START_SECTION = "dev.droidtop.app.EXTRA_HANDHELD_START_SECTION"
-        const val EXTRA_HANDHELD_RESCAN = "dev.droidtop.app.EXTRA_HANDHELD_RESCAN"
-    }
-
     private var secondScreenPresentation: SecondScreenPresentation? = null
     private lateinit var library: Library
     private var mode by mutableStateOf<String?>(null)
@@ -101,8 +89,8 @@ class MainActivity : AppCompatActivity() {
     private var handheldTriggerRescan by mutableStateOf(false)
 
     private fun applyHandheldDeepLink(intent: Intent) {
-        handheldStartSection = intent.getStringExtra(EXTRA_HANDHELD_START_SECTION)
-        handheldTriggerRescan = intent.getBooleanExtra(EXTRA_HANDHELD_RESCAN, false)
+        handheldStartSection = intent.getStringExtra(BackButtonMenu.EXTRA_HANDHELD_START_SECTION)
+        handheldTriggerRescan = intent.getBooleanExtra(BackButtonMenu.EXTRA_HANDHELD_RESCAN, false)
         handheldDeepLinkToken++
     }
 

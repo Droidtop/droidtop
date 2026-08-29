@@ -33,6 +33,16 @@ object BackButtonMenu {
     const val MODE_HANDHELD = "handheld"
     const val MODE_STANDARD = "standard"
 
+    // Real, deep-link-only extras used by SettingsHandheldFragment (same
+    // module as this object) to reach :app's MainActivity/GamepadShell,
+    // which itself depends on :shell-default and reads these back off this
+    // same object -- the established real pattern for sharing an Intent
+    // contract across the one-way :app -> shells dependency edge, matching
+    // EXTRA_MODE/MODE_HANDHELD above rather than a second, duplicated copy
+    // of the same string literals.
+    const val EXTRA_HANDHELD_START_SECTION = "dev.droidtop.app.EXTRA_HANDHELD_START_SECTION"
+    const val EXTRA_HANDHELD_RESCAN = "dev.droidtop.app.EXTRA_HANDHELD_RESCAN"
+
     /**
      * "Android" is only offered when droidtop actually holds a HOME role
      * (see [HomeRolePrefs]) — a user who chose "neither" during onboarding
