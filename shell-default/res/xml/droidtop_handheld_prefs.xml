@@ -10,6 +10,23 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <!-- Real cross-link, not a custom click listener: android:fragment
+         is the same real built-in AndroidX Preference navigation
+         SettingsRootFragment's own entries already use (PreferenceFragmentCompat.
+         onPreferenceTreeClick handles it automatically via the hosting
+         Activity's OnPreferenceStartFragmentCallback). "Global" means
+         real droidtop-wide config (which HOME role it holds, the real
+         Android system Settings shortcut), NOT Standard's own launcher
+         preferences (General/Icons/Home/Drawer/QSB/Misc), which are a
+         real per-shell settings surface like this one, reachable via its
+         own real shortcut below, not this link. See
+         SettingsGlobalFragment.kt/droidtop_global_prefs.xml. -->
+    <Preference
+        android:key="pref_handheld_global_settings"
+        android:title="@string/pref_global_settings_title"
+        android:summary="@string/pref_global_settings_desc"
+        android:fragment="app.murinelauncher.settings.SettingsGlobalFragment" />
+
     <ListPreference
         android:key="pref_handheld_default_section"
         android:title="@string/pref_handheld_default_section_title"
@@ -93,5 +110,23 @@
         android:persistent="true"
         app:showIncrementButtons="false"
         app:showTicks="true" />
+
+    <!-- Real shortcuts to the other two shells' own settings: this
+         shell's own settings are what's shown first when reached from
+         Handheld; these are the way to the others, not the default
+         landing point. Same real android:fragment mechanism as
+         pref_handheld_global_settings above. -->
+    <PreferenceCategory android:title="@string/pref_subcategory_other_shells">
+        <Preference
+            android:key="pref_handheld_desktop_settings"
+            android:title="@string/pref_category_desktop_title"
+            android:summary="@string/pref_category_desktop_desc"
+            android:fragment="app.murinelauncher.settings.SettingsDesktopFragment" />
+        <Preference
+            android:key="pref_handheld_standard_settings"
+            android:title="@string/pref_standard_settings_title"
+            android:summary="@string/pref_standard_settings_desc"
+            android:fragment="app.murinelauncher.settings.SettingsRootFragment" />
+    </PreferenceCategory>
 
 </androidx.preference.PreferenceScreen>
