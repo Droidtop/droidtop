@@ -135,6 +135,50 @@ interface RomDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertGameMetadata(metadata: GameMetadataEntity)
+
+    /**
+     * Real, plain `UPDATE` -- touches only the one real column being set,
+     * never the other real scraped columns (description/rating/etc.), the
+     * same real intent SQLite's own `INSERT ... ON CONFLICT DO UPDATE`
+     * (UPSERT) syntax would express in one statement. NOT using that
+     * syntax here: UPSERT needs SQLite 3.24+, and Android's own bundled
+     * SQLite doesn't reliably reach that until API 30 -- this module's
+     * real `minSdk` is 26, so relying on it would crash at runtime on a
+     * real, non-edge-case range of devices (confirmed via real research,
+     * not assumed). Returns real affected-row-count so [setFavorite] can
+     * tell whether a row already existed.
+     */
+    @Query("UPDATE game_metadata SET favorite = :favorite WHERE id = :id")
+    suspend fun updateFavorite(id: String, favorite: Boolean): Int
+
+    /**
+     * Real, user-driven favorite toggle -- previously nothing in droidtop
+     * ever set `favorite = true` anywhere (confirmed by grep before
+     * writing this), so [GameMetadataEntity.favorite]/`EsDeThemedBadges`'
+     * own favorite-badge rendering had no real way to ever show anything
+     * but false. A plain `UPDATE`, falling back to a real `INSERT` only
+     * when no row exists yet for this game (its first-ever real write to
+     * `game_metadata`) -- see [updateFavorite]'s own doc comment for why
+     * this is two plain statements rather than one UPSERT statement.
+     */
+    @androidx.room.Transaction
+    suspend fun setFavorite(id: String, favorite: Boolean) {
+        if (updateFavorite(id, favorite) == 0) {
+            upsertGameMetadata(
+                GameMetadataEntity(
+                    id = id,
+                    description = null,
+                    developer = null,
+                    publisher = null,
+                    genre = null,
+                    releaseDate = null,
+                    rating = null,
+                    players = null,
+                    favorite = favorite,
+                )
+            )
+        }
+    }
 }
 
 @Database(entities = [RomEntity::class, ScanMetadataEntity::class, GameMetadataEntity::class], version = 3, exportSchema = false)

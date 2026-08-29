@@ -506,6 +506,21 @@ class ConsoleRomProvider(
         context.startActivity(intent)
     }
 
+    /**
+     * Real, user-driven favorite toggle -- see [RomDao.setFavorite]'s own
+     * doc comment for why this is a real upsert rather than
+     * `upsertGameMetadata`, which would silently wipe any other real
+     * scraped metadata this game already has. Returns the real, new
+     * favorite state so callers can update their own held copy of the
+     * entry without a full rescan.
+     */
+    suspend fun toggleFavorite(entryId: String): Boolean {
+        val current = dao.getGameMetadata(listOf(entryId)).firstOrNull()?.favorite ?: false
+        val next = !current
+        dao.setFavorite(entryId, next)
+        return next
+    }
+
     // `ActivityManager.forceStopPackage()` needs the signature-level
     // FORCE_STOP_PACKAGES permission -- not grantable to a normal app, so
     // this real Daijishō-preset flag (several of KnownPlayers' real

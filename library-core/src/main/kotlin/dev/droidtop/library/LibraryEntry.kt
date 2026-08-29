@@ -322,6 +322,23 @@ class Library(
         }
     }
 
+    /**
+     * Real, user-driven favorite toggle -- see
+     * [dev.droidtop.library.consoles.ConsoleRomProvider.toggleFavorite]'s
+     * own doc comment. `favorite` is real ES-DE per-game metadata
+     * (`EsDeThemedBadges`' own favorite-slot rendering, `GameMetadataEntity`),
+     * a [dev.droidtop.library.consoles.ConsoleRomProvider]-specific concept
+     * -- returns `null` (not an error) for any entry kind that isn't a
+     * real console ROM, an honest "not applicable here" rather than
+     * throwing for e.g. a native app or Wine profile entry.
+     */
+    suspend fun toggleFavorite(entry: LibraryEntry): Boolean? = withContext(Dispatchers.IO) {
+        val romProvider = providers
+            .filterIsInstance<dev.droidtop.library.consoles.ConsoleRomProvider>()
+            .firstOrNull { entry.kind in it.kinds } ?: return@withContext null
+        romProvider.toggleFavorite(entry.id)
+    }
+
     private suspend fun withPlayHistory(entries: List<LibraryEntry>): List<LibraryEntry> {
         if (entries.isEmpty()) return entries
         val history = playHistory.getAll(entries.map { it.id })
