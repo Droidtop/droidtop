@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Real, persistent toolbar action: lives in every SettingsActivity
+     instance (see that class's own onCreateOptionsMenu/onOptionsItemSelected),
+     not a row in any one screen's own preference list. Genuinely separate
+     from and above whichever shell's settings happen to be showing, not
+     something a "Handheld mode"-titled screen could visually claim as its
+     own. See SettingsGlobalFragment.kt.
+-->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/action_global_settings"
+        android:title="@string/pref_global_settings_title"
+        android:icon="@drawable/ic_settings_general"
+        android:showAsAction="always" />
+</menu>

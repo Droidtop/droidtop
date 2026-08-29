@@ -21,6 +21,7 @@ import static androidx.preference.PreferenceFragmentCompat.ARG_PREFERENCE_ROOT;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.view.Menu;
 import android.view.MenuItem;
 
 import androidx.core.view.WindowCompat;
@@ -48,6 +49,17 @@ public class SettingsActivity extends FragmentActivity
     public static final String EXTRA_FRAGMENT_HIGHLIGHT_KEY = ":settings:fragment_args_key";
     // Intent extra to indicate the pref-key of the root screen when opening the settings activity
     public static final String EXTRA_FRAGMENT_ROOT_KEY = ARG_PREFERENCE_ROOT;
+
+    // Real droidtop-wide settings hub (app.murinelauncher.settings.SettingsGlobalFragment,
+    // dev.droidtop.library.theme's own real config lives elsewhere) -- a
+    // real, persistent toolbar action on every SettingsActivity instance
+    // (see onCreateOptionsMenu/onOptionsItemSelected below), not a row in
+    // any one shell's own preference list. Directly requested: a
+    // "Handheld mode"-titled screen visually claiming a "Global settings"
+    // row as its own was confusing -- this is genuinely separate from,
+    // and shown above, whichever shell's settings happen to be showing.
+    private static final String GLOBAL_SETTINGS_FRAGMENT = "app.murinelauncher.settings.SettingsGlobalFragment";
+    private String mCurrentFragmentName;
 
     @Override
     protected void attachBaseContext(android.content.Context base) {
@@ -83,6 +95,15 @@ public class SettingsActivity extends FragmentActivity
             getActionBar().setDisplayHomeAsUpEnabled(true);
             getActionBar().setHomeAsUpIndicator(com.android.settingslib.widget.theme.R.drawable.settingslib_expressive_icon_back);
         //}
+        // Computed unconditionally, not just inside the savedInstanceState
+        // == null branch below -- this is a fresh field on every real
+        // Activity instance (a config-change recreate gets a NEW
+        // SettingsActivity object), so onCreateOptionsMenu/
+        // onPrepareOptionsMenu (which read it) would otherwise see null
+        // after a rotation even though a fragment is genuinely showing.
+        String fragmentName = intent.getStringExtra(EXTRA_FRAGMENT);
+        if (TextUtils.isEmpty(fragmentName)) fragmentName = getString(R.string.settings_fragment_name);
+        mCurrentFragmentName = fragmentName;
         if (savedInstanceState == null) {
             Bundle args = intent.getBundleExtra(EXTRA_FRAGMENT_ARGS);
             if (args == null) {
@@ -97,9 +118,6 @@ public class SettingsActivity extends FragmentActivity
             if (!TextUtils.isEmpty(root)) {
                 args.putString(EXTRA_FRAGMENT_ROOT_KEY, root);
             }
-
-            String fragmentName = intent.getStringExtra(EXTRA_FRAGMENT);
-            if (TextUtils.isEmpty(fragmentName)) fragmentName = getString(R.string.settings_fragment_name);
 
             final FragmentManager fm = getSupportFragmentManager();
             final Fragment f = fm.getFragmentFactory().instantiate(getClassLoader(), fragmentName);
@@ -142,10 +160,31 @@ public class SettingsActivity extends FragmentActivity
     }
 
     @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.settings_activity_menu, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+        // Real, deliberate: no "go to Global settings" action while
+        // already ON Global settings -- a real no-op link there would
+        // just be confusing, not harmful.
+        MenuItem globalSettings = menu.findItem(R.id.action_global_settings);
+        if (globalSettings != null) {
+            globalSettings.setVisible(!GLOBAL_SETTINGS_FRAGMENT.equals(mCurrentFragmentName));
+        }
+        return super.onPrepareOptionsMenu(menu);
+    }
+
+    @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
             onBackPressed();
             return true;
+        }
+        if (item.getItemId() == R.id.action_global_settings) {
+            return startPreference(GLOBAL_SETTINGS_FRAGMENT, null, null);
         }
         return super.onOptionsItemSelected(item);
     }

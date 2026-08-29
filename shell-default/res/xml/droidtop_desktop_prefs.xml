@@ -10,15 +10,11 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- Real cross-link: see droidtop_handheld_prefs.xml's own matching
-         entry for why this is real droidtop-wide config, not Standard's
-         own launcher preferences. -->
-    <Preference
-        android:key="pref_desktop_global_settings"
-        android:title="@string/pref_global_settings_title"
-        android:summary="@string/pref_global_settings_desc"
-        android:fragment="app.murinelauncher.settings.SettingsGlobalFragment" />
-
+    <!-- Real, deliberate absence: see droidtop_handheld_prefs.xml's own
+         matching comment. "Global settings" is a real, persistent
+         action-bar item on every SettingsActivity screen (see
+         SettingsActivity.java's own onCreateOptionsMenu), not a row
+         here. -->
     <SwitchPreferenceCompat
         android:key="pref_desktop_taskbar_top"
         android:title="@string/pref_desktop_taskbar_top_title"
