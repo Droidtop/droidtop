@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Backs the FileProvider declared in AndroidManifest.xml, used to hand
+  emulator apps a real content:// URI for a ROM file instead of a raw
+  file:// URI (see that manifest entry's own comment for why).
+
+  root-path covers the entire filesystem, not just primary external
+  storage: real ROMs roots (see docs/SPEC.md) can be on a removable SD
+  card, which external-path alone would not reach. This matches the
+  scope droidtop already holds via MANAGE_EXTERNAL_STORAGE.
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <root-path name="root" path="." />
+</paths>

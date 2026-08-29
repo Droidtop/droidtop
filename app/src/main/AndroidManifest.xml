@@ -116,5 +116,28 @@
                 android:value="Runs the primary Linux container powering droidtop's shared desktop" />
         </service>
 
+        <!--
+          Real bug this fixes: AmStartCommandToIntentConverter used to hand
+          emulator apps a plain file:// URI (Uri.fromFile), which crashes
+          with android.os.FileUriExposedException the moment the Intent
+          crosses to another app on API 24+ (StrictMode) — confirmed live
+          via adb logcat launching a real PSP game through PPSSPP. A
+          FileProvider-issued content:// URI is the real, standard fix.
+          root-path (not external-path) is deliberate: ROMs can live on a
+          removable SD card, not just primary external storage — matches
+          droidtop's own MANAGE_EXTERNAL_STORAGE (all-files) permission
+          scope rather than external-path's narrower primary-volume-only
+          coverage.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
     </application>
 </manifest>

@@ -502,7 +502,7 @@ class ConsoleRomProvider(
         val player = resolvePlayer(context, system)
             ?: error("No installed Player available for system ${system.id}")
         if (player.killPackageProcesses) killPackageProcessesBestEffort(player.packageName)
-        val intent = AmStartCommandToIntentConverter.toIntent(player.argumentsTemplate, romFile.absolutePath)
+        val intent = AmStartCommandToIntentConverter.toIntent(context, player.argumentsTemplate, romFile.absolutePath)
         context.startActivity(intent)
     }
 
