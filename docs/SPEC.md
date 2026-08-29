@@ -166,10 +166,22 @@ backends selected automatically by root availability:
 
 | | Rooted (`:runtime-linux-root`) | No root (`:runtime-linux-noroot`) |
 |---|---|---|
-| Fork base | [vendor/droidspaces](../vendor/droidspaces) (GPL-3.0) | none — new code |
+| Fork base | [vendor/droidspaces](../vendor/droidspaces) (GPL-3.0) | [vendor/gamenative](../vendor/gamenative)'s own `DefaultProotContainerBackend.java` + bundled native proot (`libproot.so`/`libproot-loader.so`) |
 | Isolation | Real kernel namespaces + cgroups | ptrace-based (proot), no true isolation |
 | Requires | KernelSU / APatch / Magisk (Daemon Mode) | nothing |
-| Pattern | DroidSpaces' own LXC-like model | Termux `proot-distro` / Box64Droid pattern |
+| Pattern | DroidSpaces' own LXC-like model | gamenative's own real, working proot backend — port/adapt, not design from nothing |
+
+`ProotRuntime` (`runtime-linux-noroot`) is not a from-scratch design: gamenative-tux
+already ships a real, working ptrace-based container backend
+(`app/src/main/java/com/winlator/linux/DefaultProotContainerBackend.java`,
+plus its vendored native proot binaries under `app/src/legacy/jniLibs/`)
+that `:runtime-windows` is already forking from for Wine support — the
+same porting relationship extends to `ProotRuntime` itself rather than
+writing a second, independent proot integration. gamenative-tux's `app`
+module is `com.android.application`, not a library (same constraint hit
+porting the enginehost KiriKiri plugin — see HANDOFF.md), so this is a
+source port into `runtime-linux-noroot`, not a Gradle `project(...)`
+dependency.
 
 Both expose the same `ContainerRole` split — exactly one `PRIMARY` container
 per device (boots the compositor + base desktop), everything else `SIBLING`
@@ -898,8 +910,10 @@ Two concrete references to build from rather than design blind:
 
 - **Wine prefix management**: [vendor/gamenative](../vendor/gamenative)
   (already `:runtime-windows`'s fork source) has its own real, working UI
-  for exactly this — Windows version selection, DXVK/VKD3D configuration,
-  installed-component tracking. Worth porting/adapting the same way
+  for exactly this — `ContainerConfigDialog.kt`/`ContainerConfigState.kt`
+  (Windows version selection, DXVK/VKD3D configuration, installed-
+  component tracking) and `ContainerStorageManagerDialog.kt` (per-
+  container storage). Worth porting/adapting the same way
   `:runtime-windows` itself is forked from gamenative's runtime, not
   designed from nothing.
 - **Linux container management**: distrobox itself is CLI-only (no
