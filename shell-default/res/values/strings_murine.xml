@@ -40,8 +40,11 @@
     <string name="pref_handheld_apps_grid_columns_desc">Icon density for the Apps tab, independent of the launcher app drawer\'s own grid width</string>
     <string name="pref_handheld_rescan_library_title">Rescan library</string>
     <string name="pref_handheld_rescan_library_desc">Look for new or changed games and apps again</string>
-    <string name="pref_handheld_appearance_title">Appearance</string>
-    <string name="pref_handheld_appearance_desc">Pick an ES-DE theme, sync the theme index, or browse and download more</string>
+    <string name="pref_handheld_theme_title">Theme</string>
+    <string name="pref_handheld_sync_theme_index_title">Sync theme index</string>
+    <string name="pref_handheld_sync_theme_index_desc">Update the real ES-DE theme list; run this before Browse themes if that list is empty</string>
+    <string name="pref_handheld_browse_themes_title">Browse themes</string>
+    <string name="pref_handheld_browse_themes_desc">Download or update an individual theme from the real ES-DE community index</string>
     <string-array name="pref_handheld_default_section_entries">
         <item>Games</item>
         <item>Apps</item>

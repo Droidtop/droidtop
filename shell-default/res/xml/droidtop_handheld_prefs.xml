@@ -38,9 +38,8 @@
         android:title="@string/pref_handheld_game_folders_title"
         android:summary="@string/pref_handheld_game_folders_desc" />
 
-    <!-- Both real, working Compose-only actions (a live library rescan,
-         the theme picker/downloader with real screenshot previews) that
-         only exist inside GamepadShell's own composition, reached the
+    <!-- A real, working Compose-only action (a live library rescan) that
+         only exists inside GamepadShell's own composition, reached the
          same way Console systems/Game folders above are: launch :app's
          MainActivity by explicit component name with a real Intent extra
          it reads on create. See SettingsHandheldFragment.kt. -->
@@ -49,10 +48,36 @@
         android:title="@string/pref_handheld_rescan_library_title"
         android:summary="@string/pref_handheld_rescan_library_desc" />
 
+    <!-- Real, direct preferences: dev.droidtop.library.theme.ThemeAssets/
+         ThemePrefs/ThemeDownloader (:runtime-common) are read/written
+         directly here, no bounce out to a differently-styled Compose
+         screen for the two most common theme actions. entries/entryValues
+         for pref_handheld_theme are set dynamically in
+         SettingsHandheldFragment.kt (real discovered themes, not a
+         compiled-in list; see ThemeAssets.discoverThemes' own doc
+         comment). -->
+    <ListPreference
+        android:key="pref_handheld_theme"
+        android:title="@string/pref_handheld_theme_title"
+        android:summary="%s" />
+
     <Preference
-        android:key="pref_handheld_appearance"
-        android:title="@string/pref_handheld_appearance_title"
-        android:summary="@string/pref_handheld_appearance_desc" />
+        android:key="pref_handheld_sync_theme_index"
+        android:title="@string/pref_handheld_sync_theme_index_title"
+        android:summary="@string/pref_handheld_sync_theme_index_desc" />
+
+    <!-- The one deliberate exception left: browsing/downloading a NEW
+         theme genuinely needs a real, rich, scrollable list of remote
+         entries with screenshot previews, a different interaction
+         shape than a flat preference list, not a shortcut around
+         building it properly. Still jumps into GamepadShell (the only
+         place ThemeBrowserScreen's real Compose UI lives), but directly
+         into the browser itself now, not an intermediate Appearance
+         sub-screen with only this one item left in it. -->
+    <Preference
+        android:key="pref_handheld_browse_themes"
+        android:title="@string/pref_handheld_browse_themes_title"
+        android:summary="@string/pref_handheld_browse_themes_desc" />
 
     <!-- Separate from pref_grid_size_width_drawer_override (murine_prefs_drawer.xml):
          that one sizes the Standard launcher's own app drawer grid; this

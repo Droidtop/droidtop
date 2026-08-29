@@ -1,11 +1,7 @@
-package dev.droidtop.shell.gamepad.theme
+package dev.droidtop.library.theme
 
 import android.content.Context
 import android.util.Log
-import dev.droidtop.library.theme.EsDeTheme
-import dev.droidtop.library.theme.EsDeThemeParser
-import dev.droidtop.library.theme.EsDeThemeValue
-import dev.droidtop.library.theme.primaryListElement
 import java.io.File
 import java.util.Locale
 
@@ -47,8 +43,21 @@ import java.util.Locale
  * layout, which [EsDeThemeParser.parseWithCapabilities] already handles.
  * A real, honest gap, not a guess -- flagged the same way this project
  * flags other deliberately-deferred real ES-DE behavior.
+ *
+ * Lives in `:runtime-common` (not `:shell-gamepad`, where it originated,
+ * and not `:library-core` either -- see this module's own build.gradle.kts
+ * for why: `:library-core` already has a real, deliberate dependency ON
+ * `:shell-default`, so the theme engine can't live in `:library-core`
+ * without a real circular dependency) so both `:shell-gamepad` (the real,
+ * Compose-driven theme renderer) and `:shell-default` (the real, unified
+ * Android Preference settings screen -- see `SettingsHandheldFragment`'s
+ * own real "Theme"/"Sync theme index" entries) can read/drive the SAME
+ * real theme discovery and selection state, rather than one of them
+ * re-implementing it a second time. Public (not `internal`) for exactly
+ * that reason -- this is a real, deliberate
+ * cross-module contract, not an accidental leak.
  */
-internal object ThemeAssets {
+object ThemeAssets {
     private const val BUNDLED_THEMES_ASSET_ROOT = "themes"
     private const val EXTRACTED_MARKER = ".extracted"
     // droidtop's own real, intended default theme (see [resolveActiveTheme]'s
@@ -95,7 +104,7 @@ internal object ThemeAssets {
         }
 
     /**
-     * Real, writable install target for downloaded themes -- [dev.droidtop.library.theme.ThemeDownloader]
+     * Real, writable install target for downloaded themes -- [ThemeDownloader]
      * (JGit-based, real ES-DE theme-downloader parity) clones into this
      * exact directory so downloaded themes show up in [discoverThemes]
      * immediately, no separate registration step.
@@ -187,7 +196,7 @@ internal object ThemeAssets {
 
     /**
      * Real, writable clone target for `droidtop-theme-patches` -- synced
-     * explicitly (network I/O, see [dev.droidtop.library.theme.ThemeDownloader.syncThemePatches]),
+     * explicitly (network I/O, see [ThemeDownloader.syncThemePatches]),
      * never from inside this hot, synchronous load path. Reading here is
      * purely local-disk and safe to call unconditionally: an
      * unsynced/absent clone just means [applyThemePatchesOverlay] has

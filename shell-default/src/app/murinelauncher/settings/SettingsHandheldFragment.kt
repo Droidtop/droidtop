@@ -2,12 +2,19 @@ package app.murinelauncher.settings
 
 import android.content.ComponentName
 import android.content.Intent
+import androidx.lifecycle.lifecycleScope
 import androidx.preference.ListPreference
 import androidx.preference.Preference
 import app.murinelauncher.settings.common.AbstractSettingsFragment
 import com.android.launcher3.R
 import com.android.launcher3.util.DisplayController
+import dev.droidtop.library.theme.ThemeAssets
+import dev.droidtop.library.theme.ThemeDownloader
+import dev.droidtop.library.theme.ThemePrefs
 import dev.droidtop.shell.standard.BackButtonMenu
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Handheld-mode preferences, reachable from the same root settings screen as
@@ -25,7 +32,9 @@ public final class SettingsHandheldFragment : AbstractSettingsFragment() {
         const val PREF_APPS_GRID_COLUMNS: String = "pref_handheld_apps_grid_columns"
         const val PREF_GAME_FOLDERS: String = "pref_handheld_game_folders"
         const val PREF_RESCAN_LIBRARY: String = "pref_handheld_rescan_library"
-        const val PREF_APPEARANCE: String = "pref_handheld_appearance"
+        const val PREF_THEME: String = "pref_handheld_theme"
+        const val PREF_SYNC_THEME_INDEX: String = "pref_handheld_sync_theme_index"
+        const val PREF_BROWSE_THEMES: String = "pref_handheld_browse_themes"
     }
 
     override fun getPreferenceScreenResId() = R.xml.droidtop_handheld_prefs
@@ -94,13 +103,67 @@ public final class SettingsHandheldFragment : AbstractSettingsFragment() {
                     true
                 }
             }
-            PREF_APPEARANCE -> {
-                // Theme selection/sync/browse is real, rich Compose UI
-                // (ThemeBrowserScreen's own screenshot previews) that
-                // belongs in GamepadShell's own composition, not
-                // reimplemented as flat XML preferences here -- this just
-                // jumps straight to Handheld's own Settings tab, which
-                // still owns that real UI.
+            PREF_THEME -> {
+                // Real, direct preference -- reads/writes
+                // dev.droidtop.library.theme.ThemeAssets/ThemePrefs
+                // (:runtime-common) directly, no bounce through a
+                // differently-styled Compose screen for what's the single
+                // most common theme action. entries/entryValues are set
+                // here, not in the XML, since the real list of installed
+                // themes is filesystem-driven (see ThemeAssets.discoverThemes's
+                // own doc comment), not a compiled-in one.
+                if (preference is ListPreference) {
+                    val context = requireContext()
+                    val themeNames = ThemeAssets.discoverThemes(context).map { it.name }.toTypedArray()
+                    preference.entries = themeNames
+                    preference.entryValues = themeNames
+                    val active = ThemeAssets.activeThemeName(context)
+                    preference.value = active
+                    preference.summary = active ?: "(none found)"
+                    preference.setOnPreferenceChangeListener { pref, newValue ->
+                        val name = newValue as String
+                        ThemePrefs.set(context, name)
+                        pref.summary = name
+                        true
+                    }
+                }
+            }
+            PREF_SYNC_THEME_INDEX -> {
+                // Real, direct network action -- same real
+                // ThemeDownloader.syncThemesList real ES-DE theme-index
+                // clone/fetch the old Compose-only "Sync theme index" used,
+                // just triggered from here now. lifecycleScope (not a
+                // fire-and-forget GlobalScope) so this can't outlive the
+                // Fragment view it updates the summary of.
+                preference.summary = getString(R.string.pref_handheld_sync_theme_index_desc)
+                preference.setOnPreferenceClickListener {
+                    val context = requireContext()
+                    preference.summary = "Checking..."
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        val result = withContext(Dispatchers.IO) {
+                            ThemeDownloader.syncThemesList(ThemeAssets.userThemesDir(context))
+                        }
+                        preference.summary = when (result.status) {
+                            ThemeDownloader.ThemeSyncStatus.CLONED -> "Theme index downloaded"
+                            ThemeDownloader.ThemeSyncStatus.UPDATED -> "Theme index updated"
+                            ThemeDownloader.ThemeSyncStatus.UP_TO_DATE -> "Theme index already up to date"
+                            ThemeDownloader.ThemeSyncStatus.DIVERGED -> "Theme index has local changes -- skipped"
+                            ThemeDownloader.ThemeSyncStatus.FAILED -> "Failed: ${result.error?.message ?: "unknown error"}"
+                        }
+                    }
+                    true
+                }
+            }
+            PREF_BROWSE_THEMES -> {
+                // The one real, deliberate exception left: browsing/
+                // downloading a NEW theme genuinely needs a rich,
+                // scrollable list of remote entries with screenshot
+                // previews -- ThemeBrowserScreen's own real Compose UI,
+                // which only exists inside GamepadShell. Jumps directly
+                // into it now (GamepadShell's own Settings section is
+                // nothing but this screen once reached via deep link --
+                // see GamepadShell.kt's own SettingsSection), not an
+                // intermediate Appearance list with a single item left.
                 preference.setOnPreferenceClickListener {
                     val intent = Intent(Intent.ACTION_MAIN).apply {
                         component = ComponentName(requireContext().packageName, "dev.droidtop.app.MainActivity")
