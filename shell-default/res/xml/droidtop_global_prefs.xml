@@ -7,6 +7,11 @@
      :shell-default alongside every other settings screen; see
      shell-default/src/app/murinelauncher/settings/SettingsGlobalFragment.kt
      and docs/SPEC.md's settings-architecture note.
+
+     Deliberately does NOT link back out to Standard/Desktop/Handheld's own
+     settings screens: each of those already links here (and to their
+     siblings), and linking both ways would just be a redundant loop, since
+     this screen isn't itself a hub between the three shells.
 -->
 <androidx.preference.PreferenceScreen
     xmlns:android="http://schemas.android.com/apk/res/android"
@@ -25,33 +30,54 @@
         android:summary="@string/pref_global_home_role_desc"
         android:persistent="false" />
 
+    <PreferenceCategory android:title="@string/pref_subcategory_modes">
+
+        <!-- Real, dynamic entries (only currently-enabled modes) --
+             see SettingsGlobalFragment.refreshDefaultModeChoices. -->
+        <ListPreference
+            android:key="pref_global_default_mode"
+            android:title="@string/pref_global_default_mode_title"
+            android:summary="@string/pref_global_default_mode_desc"
+            android:persistent="false" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_global_enable_desktop"
+            android:title="@string/pref_global_enable_desktop_title"
+            android:summary="@string/pref_global_enable_desktop_desc"
+            android:persistent="false" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_global_enable_handheld"
+            android:title="@string/pref_global_enable_handheld_title"
+            android:summary="@string/pref_global_enable_handheld_desc"
+            android:persistent="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/pref_subcategory_data">
+
+        <Preference
+            android:key="pref_global_rerun_onboarding"
+            android:title="@string/pref_global_rerun_onboarding_title"
+            android:summary="@string/pref_global_rerun_onboarding_desc" />
+
+        <Preference
+            android:key="pref_global_backup"
+            android:title="@string/pref_global_backup_title"
+            android:summary="@string/pref_global_backup_desc" />
+
+        <Preference
+            android:key="pref_global_restore"
+            android:title="@string/pref_global_restore_title"
+            android:summary="@string/pref_global_restore_desc" />
+
+    </PreferenceCategory>
+
     <!-- Real Android system Settings, not droidtop's own: genuinely
          outside every shell's own UI. -->
     <Preference
         android:key="pref_global_system_settings"
         android:title="@string/pref_global_system_settings_title"
         android:summary="@string/pref_global_system_settings_desc" />
-
-    <!-- Real shortcuts to each shell's own settings: Global has no
-         shell-specific settings of its own, so all three (not just the
-         "other two") are listed here, matching this screen's own real
-         role as the hub every shell's own screen links back to. -->
-    <PreferenceCategory android:title="@string/pref_subcategory_other_shells">
-        <Preference
-            android:key="pref_global_standard_settings"
-            android:title="@string/pref_standard_settings_title"
-            android:summary="@string/pref_standard_settings_desc"
-            android:fragment="app.murinelauncher.settings.SettingsRootFragment" />
-        <Preference
-            android:key="pref_global_desktop_settings"
-            android:title="@string/pref_category_desktop_title"
-            android:summary="@string/pref_category_desktop_desc"
-            android:fragment="app.murinelauncher.settings.SettingsDesktopFragment" />
-        <Preference
-            android:key="pref_global_handheld_settings"
-            android:title="@string/pref_category_handheld_title"
-            android:summary="@string/pref_category_handheld_desc"
-            android:fragment="app.murinelauncher.settings.SettingsHandheldFragment" />
-    </PreferenceCategory>
 
 </androidx.preference.PreferenceScreen>
