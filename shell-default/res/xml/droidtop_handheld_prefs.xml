@@ -38,6 +38,22 @@
         android:title="@string/pref_handheld_game_folders_title"
         android:summary="@string/pref_handheld_game_folders_desc" />
 
+    <!-- Both real, working Compose-only actions (a live library rescan,
+         the theme picker/downloader with real screenshot previews) that
+         only exist inside GamepadShell's own composition, reached the
+         same way Console systems/Game folders above are: launch :app's
+         MainActivity by explicit component name with a real Intent extra
+         it reads on create. See SettingsHandheldFragment.kt. -->
+    <Preference
+        android:key="pref_handheld_rescan_library"
+        android:title="@string/pref_handheld_rescan_library_title"
+        android:summary="@string/pref_handheld_rescan_library_desc" />
+
+    <Preference
+        android:key="pref_handheld_appearance"
+        android:title="@string/pref_handheld_appearance_title"
+        android:summary="@string/pref_handheld_appearance_desc" />
+
     <!-- Separate from pref_grid_size_width_drawer_override (murine_prefs_drawer.xml):
          that one sizes the Standard launcher's own app drawer grid; this
          sizes GamepadShell's Apps tab grid, a different view entirely with

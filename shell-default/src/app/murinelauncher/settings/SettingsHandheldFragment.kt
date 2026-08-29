@@ -23,6 +23,17 @@ public final class SettingsHandheldFragment : AbstractSettingsFragment() {
         const val PREF_CONSOLE_SYSTEMS: String = "pref_handheld_console_systems"
         const val PREF_APPS_GRID_COLUMNS: String = "pref_handheld_apps_grid_columns"
         const val PREF_GAME_FOLDERS: String = "pref_handheld_game_folders"
+        const val PREF_RESCAN_LIBRARY: String = "pref_handheld_rescan_library"
+        const val PREF_APPEARANCE: String = "pref_handheld_appearance"
+
+        // Must match dev.droidtop.app.MainActivity's own real constants --
+        // no compile dependency on :app exists (see PREF_CONSOLE_SYSTEMS'
+        // own doc comment for why), so these are duplicated string
+        // literals, not a shared reference.
+        private const val EXTRA_MODE = "dev.droidtop.app.EXTRA_MODE"
+        private const val MODE_HANDHELD = "handheld"
+        private const val EXTRA_HANDHELD_START_SECTION = "dev.droidtop.app.EXTRA_HANDHELD_START_SECTION"
+        private const val EXTRA_HANDHELD_RESCAN = "dev.droidtop.app.EXTRA_HANDHELD_RESCAN"
     }
 
     override fun getPreferenceScreenResId() = R.xml.droidtop_handheld_prefs
@@ -68,6 +79,41 @@ public final class SettingsHandheldFragment : AbstractSettingsFragment() {
                     val intent = Intent(Intent.ACTION_MAIN).apply {
                         component = ComponentName(requireContext().packageName, "dev.droidtop.app.OnboardingActivity")
                         putExtra("dev.droidtop.app.EXTRA_START_STEP", "GAMES_FOLDERS")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(intent)
+                    true
+                }
+            }
+            PREF_RESCAN_LIBRARY -> {
+                // Real, live rescan -- MainActivity.EXTRA_HANDHELD_RESCAN
+                // bumps GamepadShell's own rescanTrigger state on create,
+                // same real action "Rescan library" used to only be
+                // reachable through inside GamepadShell's own (now-removed)
+                // in-shell Settings tab.
+                preference.setOnPreferenceClickListener {
+                    val intent = Intent(Intent.ACTION_MAIN).apply {
+                        component = ComponentName(requireContext().packageName, "dev.droidtop.app.MainActivity")
+                        putExtra(EXTRA_MODE, MODE_HANDHELD)
+                        putExtra(EXTRA_HANDHELD_RESCAN, true)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(intent)
+                    true
+                }
+            }
+            PREF_APPEARANCE -> {
+                // Theme selection/sync/browse is real, rich Compose UI
+                // (ThemeBrowserScreen's own screenshot previews) that
+                // belongs in GamepadShell's own composition, not
+                // reimplemented as flat XML preferences here -- this just
+                // jumps straight to Handheld's own Settings tab, which
+                // still owns that real UI.
+                preference.setOnPreferenceClickListener {
+                    val intent = Intent(Intent.ACTION_MAIN).apply {
+                        component = ComponentName(requireContext().packageName, "dev.droidtop.app.MainActivity")
+                        putExtra(EXTRA_MODE, MODE_HANDHELD)
+                        putExtra(EXTRA_HANDHELD_START_SECTION, "SETTINGS")
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
                     startActivity(intent)
