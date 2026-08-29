@@ -74,7 +74,7 @@ class NsdRemoteHostDiscovery(private val context: Context) : RemoteHostDiscovery
 
                     override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
                         Log.w(TAG, "Discovery failed to start: $errorCode")
-                        if (cont.isActive) cont.resume(Unit)
+                        if (cont.isActive) cont.resumeWith(Result.success(Unit))
                     }
 
                     override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {}
@@ -84,7 +84,7 @@ class NsdRemoteHostDiscovery(private val context: Context) : RemoteHostDiscovery
                     nsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
                 } catch (t: Exception) {
                     Log.e(TAG, "discoverServices threw", t)
-                    if (cont.isActive) cont.resume(Unit) { _, _, _ -> }
+                    if (cont.isActive) cont.resumeWith(Result.success(Unit))
                     return@suspendCancellableCoroutine
                 }
 
