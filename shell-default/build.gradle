@@ -212,6 +212,11 @@ dependencies {
     implementation libs.androidx.palette.ktx
     implementation libs.material
     implementation libs.kotlinx.coroutines
+    // Real lifecycleScope, for SettingsHandheldFragment's own real
+    // "Sync theme index" action (a real coroutine-based network call --
+    // ThemeDownloader.syncThemesList -- that must not outlive the
+    // Fragment view it updates the summary of).
+    implementation libs.androidx.lifecycle.runtime.ktx
 
     implementation libs.protobuf.javalite
     implementation libs.chickenhook.restrictionbypass
@@ -243,6 +248,15 @@ dependencies {
     androidTestImplementation libs.uiautomator.v18
     androidTestImplementation libs.annotation
 
+    // Real, direct dependency: the ES-DE theme engine (dev.droidtop.library.theme
+    // -- ThemeAssets/ThemePrefs/ThemeDownloader, used by
+    // SettingsHandheldFragment's own real Theme/Sync-theme-index
+    // preferences) lives here, not :library-core -- :library-core already
+    // has a real, deliberate dependency on THIS module (NativeAppProvider's
+    // IconCache integration), so the theme engine can't live there without
+    // a real circular dependency. runtime-common has no dependency on
+    // anything else in the repo, so this direction is always safe.
+    implementation project(':runtime-common')
     implementation project(':IconLoader')
     implementation project(':Animation')
     implementation project(':Shared')

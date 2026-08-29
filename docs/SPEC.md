@@ -1094,6 +1094,39 @@ summary):
   invented engine systems (Ren'Py/RPG Maker variants/KiriKiri), which no
   real ES-DE theme has metadata for since they aren't consoles.
 
+**Real, live-device bugs found and fixed 2026-08-29** (this session,
+each confirmed via a real on-device debug log or screenshot before being
+fixed, not guessed — see git history for the individual commits):
+
+- `AmStartCommandToIntentConverter` was handing emulators a plain
+  `file://` URI, crashing with `FileUriExposedException` on modern
+  Android for any of the ~66 real player presets using `{file.uri}` —
+  fixed via a real `FileProvider`/`content://` URI.
+- `EsDeThemeParser.parseView` replaced (instead of merged) a theme
+  element re-declared across multiple `<view>`/`<variant>` blocks —
+  wiped decaffe's own carousel `pos`/`size`/`origin` every time its
+  later, narrower variant-scoped redeclaration (`staticImage`/
+  `imageColor` only) was parsed.
+- With no theme ever explicitly selected, `ThemeAssets.resolveActiveTheme`
+  fell back to alphabetically-first among bundled themes —
+  `art-book-next-es-de` (its own real, intentional full-screen "hero"
+  carousel design) was silently rendering instead of decaffe on every
+  fresh install. Now prefers decaffe by name when unset.
+- The system-list carousel's D-pad left/right never moved focus at all —
+  `EsDeCarouselItem`'s absolutely-positioned `.focusable()` items don't
+  get Compose's spatial arrow-key traversal for free the way LazyRow
+  children would; fixed via explicit `FocusManager.moveFocus`.
+- **The big one**: `parseNode`'s variant/colorScheme/fontSize/aspectRatio
+  axis matching did plain string equality against a block's RAW,
+  un-split `name` attribute — a real, comma-separated multi-name block
+  (decaffe's own `<variant name="solidWithoutMeta, solidWithMeta">`,
+  which holds the actual metadata sidebar/description panel/game-preview
+  content) never matched any single selected value, so that whole real
+  render path was silently skipped end to end. This, not a carousel
+  rendering bug, was the root cause of the system view looking almost
+  entirely blank next to `sys.png`'s own reference screenshot. Confirmed
+  fixed live: the metadata sidebar and description text both render now.
+
 **Real, honestly deferred gaps** (not fabricated, not started): real
 `sound`/`video`/`animation` playback (currently static-image fallback
 only — genuine media-engine work, ExoPlayer/MediaCodec, bigger scope
@@ -1106,7 +1139,16 @@ has no "collections" concept — favorites/recently-played/custom
 collections as real pseudo-systems — in its data model at all yet, a
 bigger blocker than the theme-loading piece itself); generalizing the
 real gamelist list-widget path (`EsDeListItem`) to badge/rating overlays
-the way a real theme's own game GRID entries sometimes show them inline.
+the way a real theme's own game GRID entries sometimes show them inline;
+droidtop's own "Continue Playing" row (a real bolt-on with no equivalent
+in real ES-DE, see its own doc comment in `GamepadShell.kt`) visually
+collides with decaffe's real metadata sidebar now that the sidebar
+actually renders — needs real per-theme-aware safe-zone placement, not
+a hardcoded top-left anchor; not yet designed. Also unverified: the
+`${helppos}`/`${helpFontSize}` `font.xml` variables (a *different*
+variant axis, `fontSize`, from the one fixed above) may still fail to
+resolve — worth re-checking now that the axis-matching fix landed, since
+it could turn out to already be fixed as a side effect.
 
 Full real history/reasoning for each of the above (commit-by-commit,
 with citations to the exact real ES-DE source lines each decision was
