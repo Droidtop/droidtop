@@ -34,6 +34,37 @@ import java.io.File
  * Manager for CPU and GPU performance control.
  * Provides a unified interface for CPU frequency, governor, and GPU power management.
  * Uses a PerformanceDriver implementation for device-specific operations.
+ *
+ * Real, deliberate divergence from vendor/gamenative's own real
+ * `app.gamenative.powercontrol.PowerManager` (an equivalent-sized, real
+ * `object` this module does NOT compile or reference -- everything else
+ * in `powercontrol/`/`com.winlator.*` this module needs IS a live
+ * reference into that submodule now, see runtime-windows/build.gradle.kts'
+ * own sourceSets comment; this one object stays local because its real
+ * divergence is structural, not stale drift):
+ *
+ * - `driver`/`currentProfile` are nullable here (`PerformanceDriver?`/
+ *   `PowerProfile?`, with `getDriver()` falling back to a real
+ *   `NoOpPerformanceDriver` and logging a warning) where upstream uses
+ *   `lateinit var`. Upstream's own init order assumes gamenative's real
+ *   Application/DI graph calls into this before anything else touches it
+ *   -- droidtop has no equivalent guaranteed bootstrap sequence (no
+ *   Hilt, no gamenative Application class), so an un-initialized access
+ *   here is a real, reachable state, not a programmer error `lateinit`
+ *   would be right to crash on.
+ * - Upstream's own `autoStart(rootDir: File)` entry point and its
+ *   `CpuInfo`/`GpuInfo`/`BusInfo` data classes are NOT ported: confirmed
+ *   via a real grep of every live-referenced `com.winlator.*` caller
+ *   that nothing here actually calls them -- `com.winlator.xenvironment.
+ *   XEnvironment`'s own `import app.gamenative.powercontrol.PowerManager`
+ *   is itself dead/unused, the same situation `AndroidEvent.kt`'s own
+ *   doc comment describes for its own dead import.
+ * - The real, load-bearing surface this object DOES need to keep exact
+ *   is `pinnedGameProcessName`/`ownsGameAffinity` -- confirmed via a real
+ *   grep that `com.winlator.core.Win32AppWorkarounds.java` (live-
+ *   referenced, unmodified) calls `PowerManager.INSTANCE.
+ *   getPinnedGameProcessName()`/`getOwnsGameAffinity()` directly. Verify
+ *   both still resolve before changing either property's name or type.
  */
 object PowerManager {
     private const val AFFINITY_SETTLE_MS = 1500L

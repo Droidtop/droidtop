@@ -45,26 +45,41 @@ android {
     //
     // The include() list below is every file this module needs from
     // vendor/gamenative that's genuinely byte-identical to upstream --
-    // confirmed file-by-file via `diff`, not assumed. com.winlator.* is
-    // included wholesale (nothing in it is droidtop-modified). Only a
-    // curated subset of app.gamenative.* is included this way: roughly
-    // half that package (PrefManager.kt, PluviaApp.kt, MainActivity.kt,
-    // service/SteamService.kt (4800+ diff lines -- essentially a
-    // different implementation), utils/ContainerUtils.kt,
-    // powercontrol/PowerManager.kt, and others) carries real, substantial
-    // droidtop-side modifications and stays as this module's own local
-    // files under src/main/java/app/gamenative/ instead -- a live
-    // reference there would silently discard that work, which is exactly
-    // the failure mode "don't copy or replace" is meant to prevent in the
-    // OTHER direction: real divergence is a legitimate fork, not
-    // needless duplication, and gets kept, not erased. Also NOT
-    // referenced live: gamenative's own Hilt/Room/Compose-Navigation/
-    // JavaSteam-dependent code elsewhere in app.gamenative.* that this
+    // confirmed file-by-file via `diff`, not assumed (line-count diffs
+    // alone are misleading here: a droidtop file that's merely SMALLER
+    // than its real upstream counterpart isn't necessarily "heavily
+    // modified" -- see below). com.winlator.* is included wholesale
+    // (nothing in it is droidtop-modified). app.gamenative.* is NOT
+    // included wholesale -- most of what stays local there isn't a fork
+    // at all: BuildConfig.kt, PluviaApp.kt, MainActivity.kt, PrefManager.kt,
+    // service/SteamService.kt, utils/ContainerUtils.kt, and
+    // utils/LsfgVkManager.kt are all real, minimal compat shims (13-36
+    // lines each, vs. upstream's 650-4800-line real files) -- the same
+    // "empty marker so a dead/unused import resolves" pattern
+    // AndroidEvent.kt's own doc comment explains, confirmed the same way
+    // for each: grepped every live-referenced com.winlator.* caller and
+    // verified none of them actually invoke the parts these shims omit.
+    // The one file here with genuine, structural, load-bearing
+    // divergence is powercontrol/PowerManager.kt -- see its own doc
+    // comment for the real reasoning (different bootstrap order, no
+    // gamenative Application/DI graph) and the real, confirmed-live
+    // surface (`Win32AppWorkarounds.java`, live-referenced) it has to
+    // keep matching. A handful of smaller powercontrol/* files
+    // (PowerProfile.kt, PerformanceDriver.kt, SamsungPerformanceDriver.kt,
+    // FanController.kt, SystemMetricsReader.kt, PerformanceAutoTuner.kt,
+    // PowerControlUiState.kt) also carry real, smaller, confirmed
+    // divergences (added methods PowerManager.kt calls, PrefManager-
+    // dependency removal, an initialization-order fix) and stay local for
+    // the same reason -- not yet individually doc-commented the way
+    // PowerManager.kt now is; a real follow-up, not an oversight being
+    // hidden. Also NOT referenced live: gamenative's own Hilt/Room/
+    // Compose-Navigation/JavaSteam-dependent code elsewhere in
+    // app.gamenative.* that this
     // module was never wired to use at all.
     sourceSets {
         getByName("main") {
             java.srcDir("../vendor/gamenative/app/src/main/java")
-            java.filter.include(
+            java.include(
                 "com/winlator/**",
                 "app/gamenative/enums/Marker.kt",
                 "app/gamenative/powercontrol/autotuning/AdaptiveFpsCap.kt",
