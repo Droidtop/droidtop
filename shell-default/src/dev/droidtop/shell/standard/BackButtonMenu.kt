@@ -54,8 +54,13 @@ object BackButtonMenu {
         val homeImplementation = HomeRolePrefs.activeHomeImplementation(activity)
         val items = buildList {
             if (homeImplementation != HomeRolePrefs.HomeImplementation.NONE) add("Android")
-            add("Desktop")
-            add("Handheld")
+            // Real, user-configurable per-mode enable/disable (Global
+            // settings, see ModePrefs.isModeEnabled's own doc comment) --
+            // a disabled mode's own entry is hidden entirely, not shown
+            // greyed out, matching how "Android" above is already hidden
+            // (not disabled-looking) when droidtop holds no HOME role.
+            if (ModePrefs.isModeEnabled(activity, MODE_DESKTOP)) add("Desktop")
+            if (ModePrefs.isModeEnabled(activity, MODE_HANDHELD)) add("Handheld")
             add("Settings")
         }
         AlertDialog.Builder(activity)
