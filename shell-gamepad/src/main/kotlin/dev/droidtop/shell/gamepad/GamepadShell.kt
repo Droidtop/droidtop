@@ -750,14 +750,29 @@ private sealed interface GameGroup {
     val key: String
     val label: String
 
+    /**
+     * The ES-DE `${system.theme}` folder this group themes as -- real
+     * ES-DE's own es_systems.xml `<theme>` mechanism (`SystemData::
+     * mThemeFolder`), where a system's theme folder is a separate,
+     * declared value rather than always its id. Droidtop's engine
+     * buckets (Ren'Py, RPG Maker, ...) and Linux-container games have
+     * no ES-DE platform identity of their own, so they all theme as
+     * "pc" -- the one metacategory every real theme already ships art
+     * for -- instead of each needing per-engine theme patches (WINE
+     * profiles already carry systemId = "pc" directly, same category).
+     */
+    val systemThemeFolder: String?
+
     data class Engine(val kind: LibraryEntryKind) : GameGroup {
         override val key get() = "engine:${kind.name}"
         override val label get() = kind.displayName()
+        override val systemThemeFolder get() = "pc"
     }
 
     data class System(val systemId: String) : GameGroup {
         override val key get() = "system:$systemId"
         override val label get() = ES_DE_CONSOLE_SYSTEMS.firstOrNull { it.id == systemId }?.displayName ?: systemId
+        override val systemThemeFolder get() = systemId
     }
 
     /**
@@ -781,6 +796,12 @@ private sealed interface GameGroup {
      */
     data class Collection(val id: String, override val label: String, val themeFolder: String) : GameGroup {
         override val key get() = "collection:$id"
+        // Same value real ES-DE uses for a collection's `${system.theme}`
+        // (SystemData.cpp:1976-2031: mThemeFolder = the collection's own
+        // folder name) -- lets a theme's per-system carousel art
+        // (`staticImage` with `${system.theme}` in it) resolve real
+        // bundled collection art (auto-allgames.png etc.) too.
+        override val systemThemeFolder get() = themeFolder
     }
 }
 
@@ -902,7 +923,7 @@ private fun GamesSection(
     // changes, matching real ES-DE's own "selection resets per gamelist"
     // convention.
     var focusedGameIndex by remember(selectedGroup) { mutableStateOf(0) }
-    val selectedGroupSystemId = (selectedGroup as? GameGroup.System)?.systemId
+    val selectedGroupSystemId = selectedGroup?.systemThemeFolder
     val selectedGroupThemeFolder = (selectedGroup as? GameGroup.Collection)?.themeFolder
     val selectedGroupLabel = selectedGroup?.label
     val gamelistTheme = remember(selectedGroup, selectedGroupSystemId, selectedGroupThemeFolder, ThemePrefs.version) {
@@ -1122,7 +1143,7 @@ private fun GamesSection(
                     // item actually has focus right now.
                     var focusedSystemIndex by remember { mutableStateOf(0) }
                     val focusedGroup = orderedGroups.getOrNull(focusedSystemIndex)
-                    val focusedSystemId = (focusedGroup as? GameGroup.System)?.systemId
+                    val focusedSystemId = focusedGroup?.systemThemeFolder
                     val focusedThemeFolder = (focusedGroup as? GameGroup.Collection)?.themeFolder
                     // Keyed by ThemePrefs.version too, not just
                     // focusedSystemId -- otherwise switching the active
@@ -1139,9 +1160,9 @@ private fun GamesSection(
                             key = entryGroup.key,
                             label = entryGroup.label,
                             count = groupItemCounts[entryGroup] ?: 0,
-                            logoPath = (entryGroup as? GameGroup.System)?.let { ThemeAssets.systemLogoPath(context, it.systemId) },
-                            accentColor = (entryGroup as? GameGroup.System)
-                                ?.let { SystemThemeColors.forSystem(context, it.systemId) }
+                            logoPath = entryGroup.systemThemeFolder?.let { ThemeAssets.systemLogoPath(context, it) },
+                            accentColor = entryGroup.systemThemeFolder
+                                ?.let { SystemThemeColors.forSystem(context, it) }
                                 ?.let { Color(it) },
                             onSelect = { selectedGroup = entryGroup },
                         )
@@ -1333,8 +1354,8 @@ private fun GamesSection(
             // the "dynamic per-system," not just per-card, through into the
             // actual game-browsing view rather than stopping at the system
             // list.
-            val drillDownAccent = (group as? GameGroup.System)
-                ?.let { SystemThemeColors.forSystem(LocalContext.current, it.systemId) }
+            val drillDownAccent = group.systemThemeFolder
+                ?.let { SystemThemeColors.forSystem(LocalContext.current, it) }
                 ?.let { Color(it) }
             Column(
                 modifier = Modifier.fillMaxSize().let {

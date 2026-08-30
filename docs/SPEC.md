@@ -1351,6 +1351,23 @@ safe-zone placement" open note. (8) `systemdata` text bindings render
 favorites/recent bare-count special case transcribed from
 `SystemView::updateGameCount`).
 
+**"pc" as the theme metacategory for non-console games (2026-08-30)**:
+droidtop's engine buckets (Ren'Py, RPG Maker, KiriKiri, …), Linux
+container games, and WINE profiles have no ES-DE platform identity of
+their own, so no theme ships art for them — previously they passed no
+`${system.theme}` at all and rendered near-empty themed views. Decision:
+they all theme as the ES-DE `pc` system, the one metacategory every
+real theme already covers, instead of droidtop patching per-engine art
+into themes. Mechanism is real ES-DE's own: `es_systems.xml`'s
+`<theme>` field (`SystemData::mThemeFolder`) already separates a
+system's theme folder from its id — mirrored as `GameGroup.
+systemThemeFolder` (System → its id; Engine/Linux → `"pc"`; WINE
+already carries `systemId = "pc"` directly; Collection → its real
+collection folder name, which also lets themes' bundled collection
+carousel art like `auto-allgames.png` resolve). Groups keep their own
+display names (`fullname` still says "Ren'Py" etc.) — only the art/
+metadata lookup folder is shared.
+
 ## 8. Licensing
 
 `vendor/gamenative` and `vendor/droidspaces` are GPL-3.0.
