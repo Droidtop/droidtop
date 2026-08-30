@@ -1248,9 +1248,16 @@ at library-merge time in `ConsoleRomProvider.withMetadata`. Real, still
 deferred: `gamelistinfo`'s folder-entered case specifically (folders
 are a different, still-unmodeled concept from collections); the badge
 `folder` slot (droidtop's ROM scan is flat, no gamelist-subfolder
-concept to detect membership in). `sound`/`video`/`animation` playback (currently static-image
-fallback only — genuine media-engine work, ExoPlayer/MediaCodec,
-bigger scope than the per-element passes above) is still open.
+concept to detect membership in). **Done (2026-08-30)**: real `video`
+element playback via ExoPlayer/media3 (`EsDeThemedVideo`), reading a new
+`LibraryEntry.videoUri` resolved at scan time
+(`EsDeArtwork.resolveVideo`, real ES-DE `videos` media-type convention),
+looped and muted (no per-view visibility signal exists yet to safely
+unmute), falling back to the existing static-image path when a game has
+no scraped video. Real, still open: `sound` and `animation` (GIF/APNG)
+playback (animation still falls back to a static image; sound elements
+are unparsed/unrendered entirely) — separate, smaller decode engines
+from real video, not attempted here.
 Generalizing the
 real gamelist list-widget path (`EsDeListItem`) to badge/rating overlays
 the way a real theme's own game GRID entries sometimes show them inline;

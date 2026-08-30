@@ -46,6 +46,10 @@ dependencies {
     // theme's own SVGs -- coil3's default decoders are raster-only, so this
     // is needed for AsyncImage to actually render them rather than fail.
     implementation(libs.coil.svg)
+    // Real "video" theme element playback -- see
+    // theme/EsDeThemeRenderer.kt's own EsDeThemedVideo doc comment.
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui)
 
     testImplementation(libs.junit)
 }
