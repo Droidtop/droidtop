@@ -32,17 +32,29 @@ class WineSession(
         internal set
 
     /**
-     * Basic `wine <executable>` launch via [ContainerRuntime.exec] — the
-     * exec-into-container plumbing this depended on ([ContainerRuntime.exec]
-     * itself) is real now, but this is still only the bare invocation, NOT
-     * a full port of gamenative's launch pipeline: no Box64/FEXCore wrapper
-     * selection (§5a), no DXVK/VKD3D env vars, no ImageFS-tracked component
-     * state. Those are real, separate porting work, not done here.
+     * `box64 wine <executable>` launch via [ContainerRuntime.exec], with
+     * the real gamenative guest environment ([WineLaunchEnvironment] — the
+     * transcribed base + Box64 env sets, adapted to droidtop's Wayland/
+     * container model; see that object's own doc comment for exactly what
+     * was kept vs. adapted). Box64 wraps wine exactly like upstream's own
+     * `"box64 " + guestExecutable`; [useBox64] = false runs a native-arm64
+     * wine build (or FEXCore-managed setup) directly instead — §5a's
+     * backend choice, decided by the caller, not here. Still honestly NOT
+     * ported: DXVK/VKD3D per-game component state (ImageFS install
+     * tracking) and Box64 preset management (Box86_64PresetManager) —
+     * real, separate porting steps.
      */
-    suspend fun launch(executablePath: String, args: List<String> = emptyList()): ContainerExecResult =
-        runtime.exec(
+    suspend fun launch(
+        executablePath: String,
+        args: List<String> = emptyList(),
+        useBox64: Boolean = true,
+        extraEnv: Map<String, String> = emptyMap(),
+    ): ContainerExecResult {
+        val wineInvocation = listOf("wine", executablePath) + args
+        return runtime.exec(
             container = container,
-            command = listOf("wine", executablePath) + args,
-            env = mapOf("WINEPREFIX" to prefixPath, "WAYLAND_DISPLAY" to "wayland-0"),
+            command = if (useBox64) listOf("box64") + wineInvocation else wineInvocation,
+            env = WineLaunchEnvironment.build(prefixPath = prefixPath, extra = extraEnv),
         )
+    }
 }
