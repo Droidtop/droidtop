@@ -33,11 +33,13 @@ package dev.droidtop.library.theme
  * ([dev.droidtop.shell.gamepad.theme.EsDeThemedView]) is still honestly
  * partial. `rating`/`datetime` are fully real (LibraryEntry.rating/
  * releaseDate exist, populated by real ScreenScraper/TheGamesDB scrapes).
- * `badges` is PARTIALLY real -- LibraryEntry only models one of real
- * ES-DE's nine real badge slot types (`favorite`), so only that one ever
- * renders (see `EsDeThemedBadges`' own doc comment); the other eight
- * (completed/kidgame/broken/collection/folder/controller/altemulator/
- * manual) need real flags/data droidtop doesn't have yet. `gamelistinfo`
+ * `badges` renders the full real flexbox layout for seven of real
+ * ES-DE's nine real badge slot types (favorite/completed/kidgame/broken/
+ * controller/altemulator/manual -- all real `LibraryEntry`/
+ * `GameMetadataEntity` fields, user-editable via `GameMetadataEditor`);
+ * `collection`/`folder` stay unrendered (no collections/folder-entry
+ * concept in droidtop's data model yet -- see `BADGE_SLOTS`' own doc
+ * comment). `gamelistinfo`
  * is likewise PARTIALLY real -- the plain "N games" + favorites-count
  * case renders (real per-system counts, [EsDeThemedGamelistInfo]'s own
  * doc comment); the filtered and folder-entered cases don't, since
@@ -309,31 +311,60 @@ internal val ES_DE_ELEMENT_SCHEMA: Map<String, Map<String, EsDePropertyType>> = 
         "visible" to EsDePropertyType.BOOLEAN,
         "zIndex" to EsDePropertyType.FLOAT,
     ),
-    // Parses real; rendering deferred -- needs real per-game favorite/
-    // controller-support/folder metadata droidtop's LibraryEntry doesn't
-    // model yet (see EsDeTheme's own doc comment).
-    "badges" to mapOf(
-        "pos" to EsDePropertyType.NORMALIZED_PAIR,
-        "size" to EsDePropertyType.NORMALIZED_PAIR,
-        "origin" to EsDePropertyType.NORMALIZED_PAIR,
-        "lines" to EsDePropertyType.UNSIGNED_INTEGER,
-        "itemsPerLine" to EsDePropertyType.UNSIGNED_INTEGER,
-        "itemMargin" to EsDePropertyType.NORMALIZED_PAIR,
-        // Real ES-DE default (BadgeComponent's own constructor, when a
-        // theme declares no <slots> at all): every real badge type --
-        // collection/folder/favorite/completed/kidgame/broken/controller/
-        // altemulator/manual. droidtop only actually models `favorite`
-        // (LibraryEntry.favorite) -- see EsDeThemedBadges' own doc
-        // comment for why every other real slot type is a real, honest,
-        // unrendered gap rather than fabricated.
-        "slots" to EsDePropertyType.STRING,
-        "customBadgeIcon" to EsDePropertyType.PATH,
-        "customControllerIcon" to EsDePropertyType.PATH,
-        "badgeIconColor" to EsDePropertyType.COLOR,
-        "opacity" to EsDePropertyType.FLOAT,
-        "visible" to EsDePropertyType.BOOLEAN,
-        "zIndex" to EsDePropertyType.FLOAT,
-    ),
+    // Full real schema, confirmed field-by-field against BadgeComponent.cpp
+    // /FlexboxComponent.cpp's own real applyTheme (a real local clone kept
+    // at /root/es-de-reference for ongoing reference) -- not the earlier
+    // partial version. Real slot-specific custom-icon keys use ES-DE's
+    // own `"badge_" + slot` / `"controller_" + shortName` naming
+    // convention exactly (see BADGE_SLOTS/EsDeControllers.all below for
+    // the full real key lists this generates).
+    "badges" to (
+        mapOf(
+            "pos" to EsDePropertyType.NORMALIZED_PAIR,
+            "size" to EsDePropertyType.NORMALIZED_PAIR,
+            "origin" to EsDePropertyType.NORMALIZED_PAIR,
+            "rotation" to EsDePropertyType.FLOAT,
+            "stationary" to EsDePropertyType.STRING,
+            "direction" to EsDePropertyType.STRING,
+            "horizontalAlignment" to EsDePropertyType.STRING,
+            "lines" to EsDePropertyType.UNSIGNED_INTEGER,
+            "itemsPerLine" to EsDePropertyType.UNSIGNED_INTEGER,
+            "itemMargin" to EsDePropertyType.NORMALIZED_PAIR,
+            "interpolation" to EsDePropertyType.STRING,
+            // Real ES-DE default (BadgeComponent's own constructor, when a
+            // theme declares no <slots> at all): every real badge type --
+            // collection/folder/favorite/completed/kidgame/broken/
+            // controller/altemulator/manual.
+            "slots" to EsDePropertyType.STRING,
+            "badgeIconColor" to EsDePropertyType.COLOR,
+            "badgeIconColorEnd" to EsDePropertyType.COLOR,
+            "badgeIconGradientType" to EsDePropertyType.STRING,
+            "controllerIconColor" to EsDePropertyType.COLOR,
+            "controllerIconColorEnd" to EsDePropertyType.COLOR,
+            "controllerIconGradientType" to EsDePropertyType.STRING,
+            "controllerPos" to EsDePropertyType.NORMALIZED_PAIR,
+            "controllerSize" to EsDePropertyType.FLOAT,
+            "folderLinkIconColor" to EsDePropertyType.COLOR,
+            "folderLinkIconColorEnd" to EsDePropertyType.COLOR,
+            "folderLinkIconGradientType" to EsDePropertyType.STRING,
+            "customFolderLinkIcon" to EsDePropertyType.PATH,
+            "folderLinkPos" to EsDePropertyType.NORMALIZED_PAIR,
+            "folderLinkSize" to EsDePropertyType.FLOAT,
+            "opacity" to EsDePropertyType.FLOAT,
+            "visible" to EsDePropertyType.BOOLEAN,
+            "zIndex" to EsDePropertyType.FLOAT,
+        ) +
+            // "badge_" + slot -- one real custom-icon-path key per real
+            // badge slot type.
+            BADGE_SLOTS.associate { "badge_$it" to EsDePropertyType.PATH } +
+            // "controller_" + shortName -- one real custom-icon-path key
+            // per real controller definition (BadgeComponent's own
+            // sControllerDefinitions, ported unchanged as
+            // EsDeControllers.all).
+            EsDeControllers.all.associate {
+                "controller_${it.shortName}" to EsDePropertyType.PATH
+            }
+        ),
     // Real, live-rendered (current date/time) -- doesn't need per-game
     // metadata, unlike badges/rating/gamelistinfo.
     "datetime" to mapOf(

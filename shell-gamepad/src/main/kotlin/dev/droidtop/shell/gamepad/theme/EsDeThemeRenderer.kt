@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.shape.CircleShape
 import coil3.compose.AsyncImage
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.theme.BADGE_SLOTS
 import dev.droidtop.library.theme.EsDeThemeElement
 import dev.droidtop.library.theme.EsDeThemeValue
 import dev.droidtop.library.theme.EsDeThemeView
@@ -607,37 +608,142 @@ private fun EsDeThemedDateTime(element: EsDeThemeElement, viewWidth: Dp, viewHei
  * uses.
  */
 @Composable
-private fun EsDeThemedBadges(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp, gameSelection: List<LibraryEntry>) {
-    val favorite = gameSelection.getOrNull(0)?.favorite ?: return
-    if (!favorite) return
-    val slotsRaw = element.valueOrNull<EsDeThemeValue.Str>("slots")?.value?.lowercase()
-    // No <slots> at all is real ES-DE's own "every slot enabled" default
-    // (see this function's own doc comment) -- "all" is the same real
-    // ES-DE keyword. Either way "favorite" is in the effective set;
-    // otherwise only render when the theme actually lists it.
-    val favoriteSlotActive = slotsRaw == null || slotsRaw.contains("all") ||
-        slotsRaw.split(Regex("[,\\s]+")).any { it == "favorite" }
-    if (!favoriteSlotActive) return
+private val BADGE_GLYPHS = mapOf(
+    "favorite" to "★",
+    "completed" to "✔",
+    "kidgame" to "☺",
+    "broken" to "⚠",
+    "controller" to "🎮",
+    "altemulator" to "⚙",
+    "manual" to "📖",
+)
 
-    val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
+/**
+ * Real, full flexbox badge layout -- ported from `BadgeComponent.cpp`/
+ * `FlexboxComponent.cpp`'s own real `calculateLayout` (a real local clone
+ * kept at /root/es-de-reference for ongoing reference), not the earlier
+ * single-slot version. Real, honest simplifications (both deliberate, not
+ * oversights):
+ * - Every cell is rendered as a SQUARE of `min(maxItemWidth,
+ *   maxItemHeight)`, not a per-image-aspect-ratio-adjusted size. Real
+ *   ES-DE's own algorithm lets the FIRST visible item's real decoded
+ *   image aspect ratio dictate uniform cell width for the rest --
+ *   droidtop's own icons are plain unicode glyphs (same real licensing/
+ *   IP reason favorite-only rendering already used) or, when a theme
+ *   supplies a real `customBadgeIcon`, an async-loaded image whose real
+ *   pixel size isn't known synchronously at layout time the way a
+ *   blocking C++ image load's is -- a square cell is the honest
+ *   approximation for both cases.
+ * - `horizontalAlignment="center"` centers the WHOLE grid uniformly
+ *   rather than real ES-DE's own per-row centering (which shifts a
+ *   partially-filled last row separately from full rows above it) --
+ *   only visibly different when the badge count doesn't evenly divide
+ *   `itemsPerLine`.
+ * - The real "controller" slot's own per-game controller-specific
+ *   OVERLAY icon (`setBadges`' own real runtime texture swap) has no
+ *   droidtop asset to render -- shows the generic controller glyph only,
+ *   same honest gap as the rest of this function's glyph fallbacks.
+ * - `collection`/`folder` slots are never active -- see
+ *   [dev.droidtop.library.theme.BADGE_SLOTS]'s own doc comment for why
+ *   (no collections/folder-entry concept in droidtop's data model yet).
+ */
+@Composable
+private fun EsDeThemedBadges(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp, gameSelection: List<LibraryEntry>) {
+    val entry = gameSelection.getOrNull(0) ?: return
+
+    val slotsRaw = element.valueOrNull<EsDeThemeValue.Str>("slots")?.value?.lowercase()
+    val requestedSlots: List<String> = if (slotsRaw == null) {
+        BADGE_SLOTS
+    } else {
+        val tokens = slotsRaw.split(Regex("[,\\s]+")).filter { it.isNotBlank() }
+        if (tokens.contains("all")) {
+            tokens.filter { it in BADGE_SLOTS } + BADGE_SLOTS.filter { it !in tokens }
+        } else {
+            tokens.filter { it in BADGE_SLOTS }
+        }
+    }
+
+    fun isActive(slot: String): Boolean = when (slot) {
+        "favorite" -> entry.favorite
+        "completed" -> entry.completed
+        "kidgame" -> entry.kidGame
+        "broken" -> entry.broken
+        "controller" -> entry.controllerShortName != null
+        "altemulator" -> entry.altEmulator != null
+        "manual" -> entry.manualUri != null
+        else -> false // collection/folder -- see this function's own doc comment
+    }
+
+    val activeSlots = requestedSlots.filter { isActive(it) }
+    if (activeSlots.isEmpty()) return
+
+    val direction = element.valueOrNull<EsDeThemeValue.Str>("direction")?.value ?: "row"
+    val alignment = element.valueOrNull<EsDeThemeValue.Str>("horizontalAlignment")?.value ?: "left"
+    val lines = (element.valueOrNull<EsDeThemeValue.UInt>("lines")?.value?.toInt() ?: 2).coerceIn(1, 10)
+    var itemsPerLine = (element.valueOrNull<EsDeThemeValue.UInt>("itemsPerLine")?.value?.toInt() ?: 4).coerceIn(1, 10)
+    // Real ES-DE behavior: too many active badges for the declared grid
+    // widens itemsPerLine to fit, rather than clipping/overflowing.
+    if (itemsPerLine * lines < activeSlots.size) itemsPerLine = activeSlots.size
+
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
-    val customIcon = element.valueOrNull<EsDeThemeValue.Path>("customBadgeIcon")?.resolved
 
-    if (customIcon != null) {
-        AsyncImage(
-            model = customIcon,
-            contentDescription = null,
-            modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY).size(height).graphicsLayer { alpha = opacity },
-        )
-    } else {
-        val color = element.valueOrNull<EsDeThemeValue.Color>("badgeIconColor")?.let { colorOf(it) } ?: Color.White
-        Text(
-            text = "★",
-            color = color.copy(alpha = color.alpha * opacity),
-            fontSize = with(LocalDensity.current) { height.toSp() },
-            modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY),
-        )
+    val itemMarginRaw = element.valueOrNull<EsDeThemeValue.Pair>("itemMargin")
+    // Real ES-DE default: 1% of the real screen's own width/height --
+    // viewWidth/viewHeight (this element's own view, usually close to
+    // full-screen for the system/gamelist views badges actually appear
+    // in) stands in for that, an honest approximation, not a literal
+    // display-metrics query.
+    val itemMarginX = if (itemMarginRaw != null) viewWidth * itemMarginRaw.x else viewWidth * 0.01f
+    val itemMarginY = if (itemMarginRaw != null) viewHeight * itemMarginRaw.y else viewHeight * 0.01f
+
+    val gridX = if (direction == "row") itemsPerLine else lines
+    val gridY = if (direction == "row") lines else itemsPerLine
+
+    val maxItemWidth = (width + itemMarginX - itemMarginX * gridX) / gridX
+    val maxItemHeight = (height + itemMarginY - itemMarginY * gridY) / gridY
+    val cellSize = if (maxItemWidth < maxItemHeight) maxItemWidth else maxItemHeight
+
+    val alignOffsetX = when {
+        alignment == "right" && direction == "row" ->
+            width - (cellSize + itemMarginX) * gridX + itemMarginX
+        alignment == "center" && direction == "row" ->
+            (width - (cellSize + itemMarginX) * gridX + itemMarginX) / 2f
+        else -> 0.dp
+    }
+
+    val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
+    val badgeColor = element.valueOrNull<EsDeThemeValue.Color>("badgeIconColor")?.let { colorOf(it) } ?: Color.White
+    val density = LocalDensity.current
+
+    activeSlots.forEachIndexed { index, slot ->
+        val gx: Int
+        val gy: Int
+        if (direction == "row") {
+            gx = index % gridX
+            gy = index / gridX
+        } else {
+            gx = index / gridY
+            gy = index % gridY
+        }
+        val cellX = offsetX + alignOffsetX + gx * (cellSize + itemMarginX)
+        val cellY = offsetY + gy * (cellSize + itemMarginY)
+
+        val customIcon = element.valueOrNull<EsDeThemeValue.Path>("badge_$slot")?.resolved
+        if (customIcon != null) {
+            AsyncImage(
+                model = customIcon,
+                contentDescription = null,
+                modifier = Modifier.absoluteOffset(x = cellX, y = cellY).size(cellSize).graphicsLayer { alpha = opacity },
+            )
+        } else {
+            Text(
+                text = BADGE_GLYPHS[slot] ?: "?",
+                color = badgeColor.copy(alpha = badgeColor.alpha * opacity),
+                fontSize = with(density) { cellSize.toSp() },
+                modifier = Modifier.absoluteOffset(x = cellX, y = cellY),
+            )
+        }
     }
 }
 

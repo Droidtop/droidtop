@@ -11,6 +11,8 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.sqlite.db.SupportSQLiteDatabase
+import androidx.room.migration.Migration
 
 /**
  * Real, persistent ROM-scan cache -- the actual fix for a real, reported
@@ -46,6 +48,11 @@ data class RomEntity(
     val title: String,
     val systemId: String,
     val artworkUri: String?,
+    // Real ES-DE `manuals` media presence (see EsDeArtwork.resolveManual's
+    // own doc comment for why this is filesystem-derived, not a metadata
+    // field) -- resolved and cached at scan time exactly like [artworkUri]
+    // already is, not part of GameMetadataEntity.
+    @ColumnInfo(name = "manual_uri", defaultValue = "NULL") val manualUri: String? = null,
     @ColumnInfo(name = "roms_root") val romsRoot: String,
     // The folder actually scanned to produce this row -- deliberately
     // separate from [systemId], which may have been corrected by
@@ -59,40 +66,92 @@ data class RomEntity(
 )
 
 /**
- * Real per-game metadata, scraped by [dev.droidtop.library.scraper.
- * LutrisScraperClient]/[dev.droidtop.library.scraper.IgdbScraperClient]
- * (wired into `:app`'s `ConsoleSystemsActivity`'s existing manual "scrape
- * artwork" action) -- deliberately a SEPARATE table from [RomEntity], not
- * more columns bolted onto it: [RomEntity] rows are a pure filesystem-scan
- * cache, destructively cleared and rebuilt every time
+ * Real per-game metadata -- deliberately a SEPARATE table from [RomEntity],
+ * not more columns bolted onto it: [RomEntity] rows are a pure filesystem-
+ * scan cache, destructively cleared and rebuilt every time
  * [ConsoleRomProvider.scanSystemFolder]'s own folder gets rescanned (see
- * [RomEntity]'s own doc comment) -- scraped metadata is real, separately
- * fetched network data that a filesystem rescan can neither regenerate
- * nor should ever silently discard. Keyed by the same real id
+ * [RomEntity]'s own doc comment) -- this table holds real user- and
+ * scraper-written data that a filesystem rescan can neither regenerate nor
+ * should ever silently discard. Keyed by the same real id
  * ([RomEntity.id], the ROM file's own absolute path) so it survives
  * indefinitely across rescans of the folder it lives in, merged back onto
  * the scanned [dev.droidtop.library.LibraryEntry] at read time (see
  * [ConsoleRomProvider]'s own metadata-merge helper) rather than being
  * part of the scan-and-replace cycle at all.
  *
- * Field set confirmed directly against real ES-DE source
+ * Full field set confirmed directly against real ES-DE source
  * (`es-app/src/MetaData.cpp`'s own `gameDecls` table -- a real local
  * clone kept at /root/es-de-reference for ongoing reference), not
- * guessed: matches ES-DE's own real `desc`/`developer`/`publisher`/
- * `genre`/`releasedate`/`rating`/`players`/`favorite` scraped fields
- * exactly. No ESRB/age-rating field -- confirmed real ES-DE has none.
+ * guessed -- matches every one of real ES-DE's own per-GAME metadata
+ * fields (the game/folder tables differ only in a handful of folder-only
+ * fields droidtop has no use for yet, since it has no folder/collection
+ * concept -- see [dev.droidtop.library.LibraryEntry]'s own doc note).
+ * `Scrape` below mirrors `MetaData.cpp`'s own real per-field `Scrape`
+ * column exactly (whether real ES-DE's scraper can ever populate this
+ * field, vs. user-editor-only):
+ *
+ * - `description`/`developer`/`publisher`/`genre`/`releaseDate`/`rating`/
+ *   `players` (Scrape=true, real): real ScreenScraper/TheGamesDB output,
+ *   also user-editable via [dev.droidtop.shell.gamepad] `GameMetadataEditor`
+ *   to correct wrong/missing scraped values -- same real dual path
+ *   `desc`/`rating`/etc. have in real ES-DE's own `GuiMetaDataEd`.
+ * - `controllerShortName` (Scrape=true, real): ES-DE's own real scraper
+ *   DOES populate `controller` for some sources -- droidtop's own
+ *   scraper clients don't extract it yet (a real, separate follow-up,
+ *   not silently claimed as done here); user-editable regardless.
+ * - `favorite`/`completed`/`kidGame`/`hidden`/`broken`/`noGameCount`/
+ *   `noMultiScrape`/`hideMetadata` (Scrape=false, real): pure user-editor
+ *   fields in real ES-DE too, never scraper-written there either.
+ * - `altEmulator` (Scrape=false, real): which registered launch provider/
+ *   emulator this specific game should use instead of its system's real
+ *   default -- see `GameMetadataEditor`'s own alt-emulator picker.
+ * - `launchScreen` (Scrape=false, real ES-DE field `screen`): which real
+ *   display output to launch this game on -- maps directly onto
+ *   droidtop's own actual multi-display work (`DisplayOutputRepository`),
+ *   more directly applicable here than in upstream ES-DE itself.
+ * - `sortName`/`collectionSortName` (Scrape=false, real): stored, real,
+ *   matching ES-DE's own field exactly -- `collectionSortName` has no
+ *   real consumer yet since droidtop has no custom-collections concept
+ *   (same honestly-tracked gap noted in `LibraryEntry`'s own doc
+ *   comment), stored now rather than invented later so a real collections
+ *   pass doesn't also need a schema migration.
+ * - No ESRB/age-rating field -- confirmed real ES-DE has none either.
+ * - Deliberately NOT modeled: `playcount`/`playtime`/`lastplayed`
+ *   (real ES-DE's own `Statistic` column marks these auto-tracked, not
+ *   editor fields -- droidtop already tracks the equivalent real data as
+ *   [dev.droidtop.library.LibraryEntry.playCount]/`playtimeSeconds`/
+ *   `lastPlayedEpochMs`, a different real mechanism, not a gap);
+ *   `folderlink` (real ES-DE folder-type-only field -- droidtop has no
+ *   folder entries to link, same collections gap as `collectionSortName`
+ *   above); a real "manual" PDF path -- confirmed against `MetaData.cpp`
+ *   this is genuinely NOT a MetaDataDecl field in real ES-DE at all
+ *   (`BadgeComponent`'s own "manual" badge slot is driven by real *media
+ *   file presence*, not per-game metadata -- see `EsDeThemedBadges`'
+ *   own doc comment for how droidtop determines it the same way).
  */
 @Entity(tableName = "game_metadata")
 data class GameMetadataEntity(
     @PrimaryKey val id: String,
-    val description: String?,
-    val developer: String?,
-    val publisher: String?,
-    val genre: String?,
-    @ColumnInfo(name = "release_date") val releaseDate: String?,
-    val rating: Float?,
-    val players: String?,
-    val favorite: Boolean,
+    val description: String? = null,
+    val developer: String? = null,
+    val publisher: String? = null,
+    val genre: String? = null,
+    @ColumnInfo(name = "release_date") val releaseDate: String? = null,
+    val rating: Float? = null,
+    val players: String? = null,
+    val favorite: Boolean = false,
+    val completed: Boolean = false,
+    @ColumnInfo(name = "kid_game") val kidGame: Boolean = false,
+    val hidden: Boolean = false,
+    val broken: Boolean = false,
+    @ColumnInfo(name = "no_game_count") val noGameCount: Boolean = false,
+    @ColumnInfo(name = "no_multi_scrape") val noMultiScrape: Boolean = false,
+    @ColumnInfo(name = "hide_metadata") val hideMetadata: Boolean = false,
+    @ColumnInfo(name = "controller_short_name") val controllerShortName: String? = null,
+    @ColumnInfo(name = "alt_emulator") val altEmulator: String? = null,
+    @ColumnInfo(name = "launch_screen") val launchScreen: Int? = null,
+    @ColumnInfo(name = "sort_name") val sortName: String? = null,
+    @ColumnInfo(name = "collection_sort_name") val collectionSortName: String? = null,
 )
 
 @Entity(tableName = "scan_metadata", primaryKeys = ["roms_root", "system_folder_id"])
@@ -164,24 +223,58 @@ interface RomDao {
     @androidx.room.Transaction
     suspend fun setFavorite(id: String, favorite: Boolean) {
         if (updateFavorite(id, favorite) == 0) {
-            upsertGameMetadata(
-                GameMetadataEntity(
-                    id = id,
-                    description = null,
-                    developer = null,
-                    publisher = null,
-                    genre = null,
-                    releaseDate = null,
-                    rating = null,
-                    players = null,
-                    favorite = favorite,
-                )
-            )
+            upsertGameMetadata(GameMetadataEntity(id = id, favorite = favorite))
         }
+    }
+
+    /**
+     * Real single-row lookup for [dev.droidtop.shell.gamepad]
+     * `GameMetadataEditor`'s own "load existing values before showing the
+     * editor" step -- [getGameMetadata] (batch, for the library-merge
+     * read path) returns nothing for a game that has no row yet, same as
+     * this; the editor treats that as "start from real ES-DE's own
+     * documented defaults" (see `GameMetadataEditor`'s own doc comment).
+     */
+    @Query("SELECT * FROM game_metadata WHERE id = :id")
+    suspend fun getGameMetadataSingle(id: String): GameMetadataEntity?
+}
+
+/**
+ * Real, handwritten migration, not a destructive wipe -- exactly the
+ * "FUTURE schema bump" [RomDatabase]'s own v1-v3 comment already warned
+ * about: `game_metadata` now holds real user-entered data (favorite
+ * toggles, and soon full [dev.droidtop.shell.gamepad] `GameMetadataEditor`
+ * edits) a rescan can't regenerate, so it has to survive this bump.
+ * `rom_entries`/`scan_metadata` are untouched (pure cache, no schema
+ * change here) -- Room still requires every table to be accounted for in
+ * a migration even when unchanged, which this one satisfies by simply not
+ * touching them. Plain `ALTER TABLE ... ADD COLUMN`, SQLite's own real,
+ * standard, non-destructive way to add nullable/defaulted columns to an
+ * existing table.
+ */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // rom_entries is pure cache (see RomEntity's own doc comment) --
+        // this column just needs to exist with the right shape for
+        // schema validation to pass; its real values get repopulated the
+        // next time each folder is (re)scanned regardless.
+        db.execSQL("ALTER TABLE rom_entries ADD COLUMN manual_uri TEXT")
+        db.execSQL("ALTER TABLE game_metadata ADD COLUMN completed INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE game_metadata ADD COLUMN kid_game INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE game_metadata ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE game_metadata ADD COLUMN broken INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE game_metadata ADD COLUMN no_game_count INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE game_metadata ADD COLUMN no_multi_scrape INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE game_metadata ADD COLUMN hide_metadata INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE game_metadata ADD COLUMN controller_short_name TEXT")
+        db.execSQL("ALTER TABLE game_metadata ADD COLUMN alt_emulator TEXT")
+        db.execSQL("ALTER TABLE game_metadata ADD COLUMN launch_screen INTEGER")
+        db.execSQL("ALTER TABLE game_metadata ADD COLUMN sort_name TEXT")
+        db.execSQL("ALTER TABLE game_metadata ADD COLUMN collection_sort_name TEXT")
     }
 }
 
-@Database(entities = [RomEntity::class, ScanMetadataEntity::class, GameMetadataEntity::class], version = 3, exportSchema = false)
+@Database(entities = [RomEntity::class, ScanMetadataEntity::class, GameMetadataEntity::class], version = 4, exportSchema = false)
 abstract class RomDatabase : RoomDatabase() {
     abstract fun romDao(): RomDao
 
@@ -195,22 +288,16 @@ abstract class RomDatabase : RoomDatabase() {
                     RomDatabase::class.java,
                     "droidtop-rom-cache.db",
                 )
-                    // Pure cache, safely rebuildable by rescanning -- no
-                    // real user data to preserve across the v1 -> v2
-                    // schema change (root-level -> per-folder metadata
-                    // granularity), or the v2 -> v3 change (adding
-                    // GameMetadataEntity, empty at v3's introduction), so
-                    // a destructive wipe-and-rebuild is the correct
-                    // migration, not a real handwritten one. Real,
-                    // forward-looking caveat: once GameMetadataEntity
-                    // actually holds real user-scraped data (descriptions/
-                    // ratings a user waited on a real network fetch for),
-                    // it stops being a "safely rebuildable, nothing lost"
-                    // table like RomEntity/ScanMetadataEntity are -- a
-                    // FUTURE schema bump touching this database for real
-                    // needs a real handwritten Migration preserving
-                    // game_metadata specifically, not another blanket
-                    // destructive wipe.
+                    // rom_entries/scan_metadata stay destructively
+                    // rebuildable (pure cache, see RomEntity's own doc
+                    // comment) -- fallbackToDestructiveMigration still
+                    // covers any FUTURE bump this file's migrations list
+                    // doesn't explicitly handle, but v3->v4 (this file's
+                    // MIGRATION_3_4) is now real and explicit specifically
+                    // because game_metadata holds real user data that
+                    // must survive it -- see that migration's own doc
+                    // comment.
+                    .addMigrations(MIGRATION_3_4)
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build().also { instance = it }
             }

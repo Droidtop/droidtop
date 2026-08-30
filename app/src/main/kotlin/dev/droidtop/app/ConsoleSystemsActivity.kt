@@ -449,17 +449,26 @@ private suspend fun scrapeSystemArtwork(
             val rating = screenScraperResult?.rating
             val hasAnyMetadata = listOfNotNull(description, developer, publisher, genre, releaseDate, players, rating).isNotEmpty()
             if (hasAnyMetadata) {
+                // Real fix: this used to build a fresh GameMetadataEntity
+                // with a hardcoded favorite=false, silently wiping out a
+                // real user's favorite toggle (and, now that
+                // GameMetadataEditor exists, every other real user-edited
+                // field too) on every rescrape. Read the existing row
+                // first and only overwrite the real scraper-owned fields
+                // -- same real "don't clobber user data with a rescan"
+                // principle RomEntity/GameMetadataEntity's own doc
+                // comments already establish for the filesystem-scan
+                // side of this database.
+                val existing = dao.getGameMetadataSingle(romFile.absolutePath)
                 dao.upsertGameMetadata(
-                    GameMetadataEntity(
-                        id = romFile.absolutePath,
-                        description = description,
-                        developer = developer,
-                        publisher = publisher,
-                        genre = genre,
-                        releaseDate = releaseDate,
-                        rating = rating,
-                        players = players,
-                        favorite = false,
+                    (existing ?: GameMetadataEntity(id = romFile.absolutePath)).copy(
+                        description = description ?: existing?.description,
+                        developer = developer ?: existing?.developer,
+                        publisher = publisher ?: existing?.publisher,
+                        genre = genre ?: existing?.genre,
+                        releaseDate = releaseDate ?: existing?.releaseDate,
+                        rating = rating ?: existing?.rating,
+                        players = players ?: existing?.players,
                     ),
                 )
             }
