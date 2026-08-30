@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
@@ -475,10 +476,7 @@ private fun EsDeThemedText(element: EsDeThemeElement, viewWidth: Dp, viewHeight:
 
     val hasSize = element.valueOrNull<EsDeThemeValue.Pair>("size") != null
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
-    val (offsetX, offsetY) = positionOf(
-        element, viewWidth, viewHeight,
-        if (hasSize) width else 0.dp, if (hasSize) height else 0.dp,
-    )
+    val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
 
     val color = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color.White
     val backgroundColor = element.valueOrNull<EsDeThemeValue.Color>("backgroundColor")?.let { colorOf(it) }
@@ -502,22 +500,115 @@ private fun EsDeThemedText(element: EsDeThemeElement, viewWidth: Dp, viewHeight:
         else -> Alignment.TopStart
     }
 
-    Box(
-        modifier = Modifier
-            .absoluteOffset(x = offsetX, y = offsetY)
-            .let { if (hasSize) it.size(width = width, height = height) else it }
-            .let { if (backgroundColor != null) it.background(backgroundColor.copy(alpha = backgroundColor.alpha * opacity)) else it },
-        contentAlignment = boxAlignment,
-    ) {
-        Text(
-            text = text,
-            color = color.copy(alpha = color.alpha * opacity),
-            fontSize = fontSizeSp,
-            fontFamily = themeFontFamily(element),
-            lineHeight = fontSizeSp * lineSpacing,
-            textAlign = textAlign,
-            modifier = if (hasSize) Modifier.fillMaxWidth() else Modifier,
-        )
+    if (hasSize) {
+        Box(
+            modifier = Modifier
+                .absoluteOffset(x = offsetX, y = offsetY)
+                .size(width = width, height = height)
+                .let { if (backgroundColor != null) it.background(backgroundColor.copy(alpha = backgroundColor.alpha * opacity)) else it },
+            contentAlignment = boxAlignment,
+        ) {
+            Text(
+                text = text,
+                color = color.copy(alpha = color.alpha * opacity),
+                fontSize = fontSizeSp,
+                fontFamily = themeFontFamily(element),
+                lineHeight = fontSizeSp * lineSpacing,
+                textAlign = textAlign,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    } else {
+        // Real bug this fixes: with no declared `size`, origin math was
+        // applied against a width/height of ZERO -- decaffe anchors
+        // nearly every label with `origin="0.5 0.5"` (center-anchored),
+        // so `pos - 0 * origin` always reduced to plain top-left
+        // placement at `pos`, silently ignoring origin entirely instead
+        // of centering the element's own REAL rendered size on `pos` the
+        // way real ES-DE's `TextComponent` does (it measures its own
+        // text first, then applies origin against that real size --
+        // confirmed against `GuiComponent::getPosition`'s real origin
+        // formula, the same one every real ES-DE component uses). This
+        // is why sidebar labels like decaffe's own "SYSTEM TITLE:"/
+        // "RELEASED:" rendered visibly offset from the reference render.
+        // EsDeAutoOriginBox measures Text FIRST (loose max-width, real
+        // rendered size), THEN positions using that real size -- the
+        // only way to get this right in Compose's own layout model,
+        // since the size genuinely isn't known before the child itself
+        // is measured.
+        // Real ES-DE draws `backgroundColor` sized to the element's own
+        // real `mSize` PLUS `backgroundMargins` on both sides
+        // (TextComponent.cpp:263-274: `drawRect(0, 0, mSize.x +
+        // margins.x + margins.y, ...)`) -- for an auto-sized element,
+        // `mSize` IS the measured text size (real ES-DE always measures
+        // it, whether from a declared `size` or from the rendered text),
+        // so background isn't a has-size-only feature. Applying it here
+        // as padding+background on the SAME child EsDeAutoOriginBox
+        // measures means the background box's real total size (text +
+        // margins) is exactly what origin math ends up centering/
+        // anchoring, matching real ES-DE with no separate pre-measure
+        // pass needed.
+        val backgroundMarginsFraction = element.valueOrNull<EsDeThemeValue.Pair>("backgroundMargins")
+        val backgroundMarginX = backgroundMarginsFraction?.let { (viewWidth * it.x) } ?: 0.dp
+        val backgroundMarginY = backgroundMarginsFraction?.let { (viewHeight * it.y) } ?: 0.dp
+        EsDeAutoOriginBox(
+            viewWidth = viewWidth,
+            viewHeight = viewHeight,
+            posFraction = element.valueOrNull<EsDeThemeValue.Pair>("pos") ?: EsDeThemeValue.Pair(0f, 0f),
+            originFraction = element.valueOrNull<EsDeThemeValue.Pair>("origin") ?: EsDeThemeValue.Pair(0f, 0f),
+        ) {
+            Box(
+                modifier = Modifier
+                    .let { if (backgroundColor != null) it.background(backgroundColor.copy(alpha = backgroundColor.alpha * opacity)) else it }
+                    .padding(horizontal = backgroundMarginX, vertical = backgroundMarginY),
+            ) {
+                Text(
+                    text = text,
+                    color = color.copy(alpha = color.alpha * opacity),
+                    fontSize = fontSizeSp,
+                    fontFamily = themeFontFamily(element),
+                    lineHeight = fontSizeSp * lineSpacing,
+                    textAlign = textAlign,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Real origin-correction for an auto-sized element -- see
+ * [EsDeThemedText]'s own doc comment for the real, confirmed bug this
+ * fixes. Measures [content] against loose constraints (bounded only by
+ * the themed area itself, so a long string still wraps rather than
+ * overflowing unbounded), THEN computes `pos*view - measuredSize*origin`
+ * using that REAL measured size, then places it there -- the standard
+ * Compose pattern (a custom [Layout]) for "position depends on this
+ * child's own rendered size," which a pre-computed `absoluteOffset`
+ * modifier genuinely cannot express since it runs before the child is
+ * ever measured.
+ */
+@Composable
+private fun EsDeAutoOriginBox(
+    viewWidth: Dp,
+    viewHeight: Dp,
+    posFraction: EsDeThemeValue.Pair,
+    originFraction: EsDeThemeValue.Pair,
+    content: @Composable () -> Unit,
+) {
+    Layout(content = content) { measurables, _ ->
+        val maxWidthPx = viewWidth.roundToPx()
+        val maxHeightPx = viewHeight.roundToPx()
+        val childConstraints = androidx.compose.ui.unit.Constraints(maxWidth = maxWidthPx, maxHeight = maxHeightPx)
+        val placeable = measurables.firstOrNull()?.measure(childConstraints)
+        val w = placeable?.width ?: 0
+        val h = placeable?.height ?: 0
+        val posXPx = (viewWidth.toPx() * posFraction.x).toInt()
+        val posYPx = (viewHeight.toPx() * posFraction.y).toInt()
+        val x = posXPx - (w * originFraction.x).toInt()
+        val y = posYPx - (h * originFraction.y).toInt()
+        layout(maxWidthPx, maxHeightPx) {
+            placeable?.place(x, y)
+        }
     }
 }
 
