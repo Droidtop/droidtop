@@ -249,23 +249,27 @@ echo "=== crane ($ABI) ==="
 # CraneRootfsPuller shells out to (runtime-linux-root). Go cross-compiles
 # to Android natively (no separate cross-toolchain download needed, unlike
 # droidspaces' musl-cross toolchains above): GOOS=android + GOARCH is
-# enough. The one wrinkle is that android/amd64 specifically requires
-# external (cgo) linking — confirmed by a real build failure ("android/amd64
-# requires external (cgo) linking, but cgo is not enabled") — while
-# android/arm64 links statically fine with CGO_ENABLED=0. Reuses the same
-# NDK clang already resolved above for $CC when cgo is needed.
+# enough — but CGO_ENABLED=1 (with the same NDK clang already resolved
+# above as $CC) is REQUIRED on every ABI, for two independent real
+# reasons: android/amd64 refuses to link without it at all ("android/amd64
+# requires external (cgo) linking, but cgo is not enabled" — a real build
+# failure), and android/arm64, which DOES link statically with
+# CGO_ENABLED=0, then ships with Go's pure-Go DNS resolver only — which
+# on Android tries [::1]:53 (there is no /etc/resolv.conf) and every
+# registry lookup fails with "dial udp [::1]:53: connect: connection
+# refused". Confirmed live on-device (GODEBUG=netdns=go+2 tracing on the
+# first real desktop-pipeline run): Android's DNS goes through bionic/
+# netd, which only the cgo resolver reaches.
 if ! command -v go >/dev/null 2>&1; then
     echo "go not found on PATH — crane needs Go >= 1.25 (see vendor/go-containerregistry/go.mod)." >&2
     exit 1
 fi
 (
     cd "$VENDOR/go-containerregistry"
-    if [ "$ABI" = "x86_64" ]; then
-        export CGO_ENABLED=1
-        export CC="$CC"
-    else
-        export CGO_ENABLED=0
-    fi
+    # cgo on EVERY ABI — see the resolver note above; CGO_ENABLED=0 on
+    # arm64 produced a crane whose DNS was dead on-device.
+    export CGO_ENABLED=1
+    export CC="$CC"
     GOOS=android GOARCH="$GOARCH" go build -trimpath -ldflags="-s -w" \
         -o "$REPO_ROOT/runtime-linux-root/src/main/assets/bin/crane-$ABI" \
         ./cmd/crane
