@@ -30,6 +30,14 @@
         android:title="@string/pref_desktop_root_compositor_setup_title"
         android:summary="@string/pref_desktop_root_compositor_setup_desc" />
 
+    <!-- The container/distro manager (docs/SPEC.md section 3d). Also on
+         the Desktop shell's own taskbar; listed here too so it's
+         reachable from Settings without the desktop session running. -->
+    <Preference
+        android:key="pref_desktop_containers"
+        android:title="@string/pref_desktop_containers_title"
+        android:summary="@string/pref_desktop_containers_desc" />
+
     <!-- Real shortcuts to the other two shells' own settings, matching
          droidtop_handheld_prefs.xml's own equivalent category. -->
     <PreferenceCategory android:title="@string/pref_subcategory_other_shells">

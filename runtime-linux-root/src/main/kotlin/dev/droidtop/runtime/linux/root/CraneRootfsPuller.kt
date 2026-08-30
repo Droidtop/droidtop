@@ -38,11 +38,8 @@ import java.io.File
 class CraneRootfsPuller(private val context: Context) : RootfsPuller {
     private val binaryPath: String by lazy { CraneBinary.ensureExtracted(context) }
 
-    override suspend fun resolve(reference: String): RootfsImage {
-        val result = PlainProcess.run(binaryPath, "digest", reference)
-        check(result.succeeded) { "crane digest failed for $reference: ${result.stderr}" }
-        return RootfsImage(reference = reference, digest = result.stdout.trim())
-    }
+    override suspend fun resolve(reference: String): RootfsImage =
+        RootfsImage(reference = reference, digest = CraneCli.digest(binaryPath, reference))
 
     override suspend fun pullAndUnpack(
         image: RootfsImage,
