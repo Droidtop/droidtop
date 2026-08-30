@@ -33,6 +33,8 @@ public final class SettingsHandheldFragment : AbstractSettingsFragment() {
         const val PREF_GAME_FOLDERS: String = "pref_handheld_game_folders"
         const val PREF_RESCAN_LIBRARY: String = "pref_handheld_rescan_library"
         const val PREF_THEME: String = "pref_handheld_theme"
+        const val PREF_THEME_COLOR_SCHEME: String = "pref_handheld_theme_colorscheme"
+        const val PREF_THEME_VARIANT: String = "pref_handheld_theme_variant"
         const val PREF_SYNC_THEME_INDEX: String = "pref_handheld_sync_theme_index"
         const val PREF_BROWSE_THEMES: String = "pref_handheld_browse_themes"
     }
@@ -125,6 +127,59 @@ public final class SettingsHandheldFragment : AbstractSettingsFragment() {
                         ThemePrefs.set(context, name)
                         pref.summary = name
                         true
+                    }
+                }
+            }
+            PREF_THEME_COLOR_SCHEME -> {
+                // Real ES-DE parity (its own UI-Settings > Theme color
+                // scheme menu): entries come from the ACTIVE theme's own
+                // capabilities.xml, labels included -- DEcaffe's showcase
+                // "Hyrule" look vs the first-declared "Blue dark" default
+                // is exactly this setting.
+                if (preference is ListPreference) {
+                    val context = requireContext()
+                    val caps = ThemeAssets.activeThemeCapabilities(context)
+                    val themeName = ThemeAssets.activeThemeName(context)
+                    val schemes = caps?.colorSchemes.orEmpty()
+                    if (schemes.size <= 1 || themeName == null) {
+                        preference.isVisible = false
+                    } else {
+                        preference.entries = schemes.map { caps?.colorSchemeLabels?.get(it) ?: it }.toTypedArray()
+                        preference.entryValues = schemes.toTypedArray()
+                        val current = ThemePrefs.colorScheme(context, themeName) ?: schemes.first()
+                        preference.value = current
+                        preference.summary = caps?.colorSchemeLabels?.get(current) ?: current
+                        preference.setOnPreferenceChangeListener { pref, newValue ->
+                            val scheme = newValue as String
+                            ThemePrefs.setColorScheme(context, themeName, scheme)
+                            pref.summary = caps?.colorSchemeLabels?.get(scheme) ?: scheme
+                            true
+                        }
+                    }
+                }
+            }
+            PREF_THEME_VARIANT -> {
+                // Same mechanism as the color scheme above, for the
+                // theme's declared variants.
+                if (preference is ListPreference) {
+                    val context = requireContext()
+                    val caps = ThemeAssets.activeThemeCapabilities(context)
+                    val themeName = ThemeAssets.activeThemeName(context)
+                    val variants = caps?.variants.orEmpty()
+                    if (variants.size <= 1 || themeName == null) {
+                        preference.isVisible = false
+                    } else {
+                        preference.entries = variants.map { caps?.variantLabels?.get(it) ?: it }.toTypedArray()
+                        preference.entryValues = variants.toTypedArray()
+                        val current = ThemePrefs.variant(context, themeName) ?: variants.first()
+                        preference.value = current
+                        preference.summary = caps?.variantLabels?.get(current) ?: current
+                        preference.setOnPreferenceChangeListener { pref, newValue ->
+                            val variant = newValue as String
+                            ThemePrefs.setVariant(context, themeName, variant)
+                            pref.summary = caps?.variantLabels?.get(variant) ?: variant
+                            true
+                        }
                     }
                 }
             }

@@ -201,6 +201,14 @@ class MainActivity : AppCompatActivity() {
         ) {
             dev.droidtop.library.LaunchDisplay.parkedDisplayId = null
         }
+        // HARD reinit (double-tap home, per direction): re-assert both
+        // displays regardless of what's running -- clear the parked
+        // display AND the relocation cooldown so the orchestration acts
+        // immediately instead of waiting out the guard window.
+        if (intent.getBooleanExtra(BackButtonMenu.EXTRA_DISPLAY_REINIT_FORCE, false)) {
+            dev.droidtop.library.LaunchDisplay.parkedDisplayId = null
+            lastRelocationAttemptMs = 0L
+        }
         roleRefresh.value++
     }
 
@@ -360,6 +368,27 @@ class MainActivity : AppCompatActivity() {
                                 android.app.ActivityOptions.makeBasic()
                                     .setLaunchDisplayId(second.androidDisplayId)
                                     .toBundle(),
+                            )
+                        } else if (currentDisplayId == second.androidDisplayId && !CompanionActivity.visible &&
+                            now - lastRelocationAttemptMs > RELOCATION_COOLDOWN_MS
+                        ) {
+                            // Same cooldown as relocation: the companion's
+                            // visible flag races its own onStart, and an
+                            // unguarded re-assert would ping-pong.
+                            lastRelocationAttemptMs = now
+                            // Already relocated but the built-in screen
+                            // lost/never showed the companion (confirmed
+                            // live: it stayed on Android Settings after
+                            // the shell moved). Re-assert it, then
+                            // re-front this shell so gamepad focus stays
+                            // here, not on the companion.
+                            startActivity(
+                                Intent(this@MainActivity, CompanionActivity::class.java)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                            startActivity(
+                                Intent(intent).setClass(this@MainActivity, MainActivity::class.java)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                             )
                         }
                     }

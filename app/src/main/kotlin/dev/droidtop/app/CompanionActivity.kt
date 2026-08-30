@@ -30,4 +30,28 @@ class CompanionActivity : AppCompatActivity() {
             }
         }
     }
+
+    override fun onStart() {
+        super.onStart()
+        visible = true
+    }
+
+    override fun onStop() {
+        visible = false
+        super.onStop()
+    }
+
+    companion object {
+        /**
+         * Whether a companion instance is currently started/visible — read
+         * by MainActivity's role orchestration so a display reinit knows
+         * to (re)assert this surface (confirmed live: the built-in screen
+         * stayed on whatever app was open there — Android Settings —
+         * because nothing ever re-asserted the companion after the shell
+         * relocated).
+         */
+        @Volatile
+        var visible: Boolean = false
+            private set
+    }
 }

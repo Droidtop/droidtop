@@ -65,4 +65,37 @@ object ThemePrefs {
             .edit().putString(KEY_ACTIVE_THEME, themeName).apply()
         changeListeners.forEach { it() }
     }
+
+    // Real ES-DE parity: colorScheme and variant are USER SETTINGS
+    // (`Settings::getString("ThemeColorScheme")`/`("ThemeVariant")`, the
+    // UI-Settings > Theme menus), not "whatever capabilities.xml happens
+    // to declare first" -- the first-declared entry is only the default.
+    // Confirmed to matter live: DEcaffe declares colorScheme "5"
+    // (Blue dark) first, so droidtop always rendered Blue dark while the
+    // theme's own showcase screenshots use "3" (Hyrule) -- the whole
+    // palette difference, not a rendering bug. Stored PER THEME (keys
+    // suffixed by theme name): scheme/variant names are meaningless
+    // across themes.
+
+    fun colorScheme(context: Context, themeName: String): String? =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString("droidtop_theme_colorscheme::$themeName", null)
+
+    fun setColorScheme(context: Context, themeName: String, scheme: String?) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .apply { if (scheme == null) remove("droidtop_theme_colorscheme::$themeName") else putString("droidtop_theme_colorscheme::$themeName", scheme) }
+            .apply()
+        changeListeners.forEach { it() }
+    }
+
+    fun variant(context: Context, themeName: String): String? =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString("droidtop_theme_variant::$themeName", null)
+
+    fun setVariant(context: Context, themeName: String, variant: String?) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .apply { if (variant == null) remove("droidtop_theme_variant::$themeName") else putString("droidtop_theme_variant::$themeName", variant) }
+            .apply()
+        changeListeners.forEach { it() }
+    }
 }
