@@ -1184,17 +1184,25 @@ private fun GamesSection(
                         ThemeAssets.loadActiveTheme(context, focusedSystemId, focusedThemeFolder, systemFullName = focusedGroupLabel)
                     }
                     val listElement = remember(theme) { theme?.views?.get("system")?.primaryListElement() }
-                    val items = orderedGroups.map { entryGroup ->
-                        EsDeListItem(
-                            key = entryGroup.key,
-                            label = entryGroup.label,
-                            count = groupItemCounts[entryGroup] ?: 0,
-                            logoPath = entryGroup.systemThemeFolder?.let { ThemeAssets.systemLogoPath(context, it) },
-                            accentColor = entryGroup.systemThemeFolder
-                                ?.let { SystemThemeColors.forSystem(context, it) }
-                                ?.let { Color(it) },
-                            onSelect = { selectedGroup = entryGroup },
-                        )
+                    // remember(): building this list runs systemLogoPath/
+                    // SystemThemeColors per group -- cache-hit lookups, but
+                    // still N of them per recomposition, and the carousel
+                    // recomposes every animation frame. Keyed on
+                    // ThemePrefs.version so a live theme switch still
+                    // rebuilds the logo paths.
+                    val items = remember(orderedGroups, groupItemCounts, ThemePrefs.version) {
+                        orderedGroups.map { entryGroup ->
+                            EsDeListItem(
+                                key = entryGroup.key,
+                                label = entryGroup.label,
+                                count = groupItemCounts[entryGroup] ?: 0,
+                                logoPath = entryGroup.systemThemeFolder?.let { ThemeAssets.systemLogoPath(context, it) },
+                                accentColor = entryGroup.systemThemeFolder
+                                    ?.let { SystemThemeColors.forSystem(context, it) }
+                                    ?.let { Color(it) },
+                                onSelect = { selectedGroup = entryGroup },
+                            )
+                        }
                     }
                     // Real fix: the theme now drives this whole screen's
                     // layout, not just a decorative background behind

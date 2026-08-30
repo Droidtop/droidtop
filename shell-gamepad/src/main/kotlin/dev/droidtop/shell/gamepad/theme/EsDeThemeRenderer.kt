@@ -1419,8 +1419,8 @@ private fun sizeOf(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp): ko
 private fun zIndexOf(element: EsDeThemeElement): Float =
     element.valueOrNull<EsDeThemeValue.FloatValue>("zIndex")?.value ?: 0f
 
-/** [EsDeThemeValue.Color.argbLikeRgba] is packed RRGGBBAA (same layout as ES-DE's own getHexColor) -- Compose's Color wants ARGB, so the channels need reordering, not just a straight reinterpret. */
-private fun colorOf(value: EsDeThemeValue.Color): Color {
+/** [EsDeThemeValue.Color.argbLikeRgba] is packed RRGGBBAA (same layout as ES-DE's own getHexColor) -- Compose's Color wants ARGB, so the channels need reordering, not just a straight reinterpret. Internal: EsDeSystemListView shares this exact conversion (it used to keep its own private copy -- one job, one implementation). */
+internal fun colorOf(value: EsDeThemeValue.Color): Color {
     val rgba = value.argbLikeRgba
     val r = (rgba shr 24) and 0xFF
     val g = (rgba shr 16) and 0xFF

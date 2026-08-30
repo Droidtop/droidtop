@@ -48,6 +48,8 @@
     <string name="pref_desktop_taskbar_top_desc">Move the desktop taskbar to the top of the screen instead of the bottom</string>
     <string name="pref_desktop_root_compositor_setup_title">Root &amp; compositor setup</string>
     <string name="pref_desktop_root_compositor_setup_desc">Re-check root access and choose which distro + compositor to use</string>
+    <string name="pref_desktop_containers_title">Containers</string>
+    <string name="pref_desktop_containers_desc">Manage Linux containers and distros: create, start, stop, delete</string>
 
     <string name="pref_handheld_default_section_title">Default section</string>
     <string name="pref_handheld_show_hints_title">Show button hints</string>

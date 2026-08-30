@@ -67,8 +67,6 @@ class CraneImageCatalogResolver(
 
     override suspend fun resolve(repository: KnownImageRepository, tag: String): ResolvedImage {
         val reference = "${repository.registry}/${repository.repository}:$tag"
-        val result = PlainProcess.run(binaryPath, "digest", reference)
-        check(result.succeeded) { "crane digest failed for $reference: ${result.stderr}" }
-        return ResolvedImage(repository = repository, tag = tag, digest = result.stdout.trim())
+        return ResolvedImage(repository = repository, tag = tag, digest = CraneCli.digest(binaryPath, reference))
     }
 }
