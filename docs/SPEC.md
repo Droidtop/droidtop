@@ -1313,6 +1313,44 @@ and theme infrastructure (discovery, JGit downloader, prefs) were
 confirmed sound in the same audit and are NOT being rewritten — this is
 a renderer + schema correction, not a rewrite.
 
+**Five-theme on-device review + fixes (2026-08-30, later same day)**:
+the theme downloader ran end-to-end for the first time — three real
+community themes (Adroit/Catppuccin/ES-DWEE) installed live through
+Browse themes, all clones succeeded, each appearing in the Theme
+picker with no extra steps. Rendering them surfaced, and this batch
+fixes: (1) a theme whose system view declares no carousel/grid/
+textlist hard-crashed the app (unattached `FocusRequester` — ES-DWEE,
+and the same signature in older device logs); focus requests are now
+gated on real attachment AND wrapped as a never-crash boundary — a
+theme must never be able to kill droidtop. (2) Art Book Next rendered
+near-black because AAPT's DEFAULT ignore-assets pattern strips
+`<dir>_*` — its entire `_inc/` tree (fonts/art/metadata/variables)
+never shipped in the APK; fixed via `ignoreAssetsPattern` overrides in
+:shell-gamepad and :app (the final merge applies the app's pattern).
+(3) helpsystem is now a real SINGLETON per view (all declarations
+merged in document order, `scope=menu` skipped), matching real
+`HelpComponent` — per-element rendering drew ABN's help bar three
+times at once. (4) textlist rows are strictly single-line
+(maxLines=1 + clip), real `TextListComponent` behavior — wrapped
+titles were painting over neighboring rows. (5) theme switches from
+Settings now propagate live to a running shell (a change-listener on
+the real `ThemePrefs` writer bumps shell-gamepad's Compose signal —
+previously every switch needed a process restart) and invalidate the
+name-keyed parse cache (also fired after a real re-download of a
+same-named theme). (6) bundled-theme cache extraction is invalidated
+per APK install (`lastUpdateTime`-keyed marker — versionCode is pinned
+at 1 in this project, so it can't be the key); the old bare-existence
+marker had devices serving extractions of long-dead asset layouts.
+(7) droidtop's "Continue Playing" overlay is REMOVED from themed
+screens entirely (it covered decaffe's real sidebar and collided on
+every theme tested) — a themed view owns its whole surface, same as
+real ES-DE; the row stays on the unthemed fallback, which is
+droidtop's own surface. This resolves the earlier "needs per-theme
+safe-zone placement" open note. (8) `systemdata` text bindings render
+(name/fullname/gamecount family, exact real format strings and the
+favorites/recent bare-count special case transcribed from
+`SystemView::updateGameCount`).
+
 ## 8. Licensing
 
 `vendor/gamenative` and `vendor/droidspaces` are GPL-3.0.
@@ -1348,7 +1386,8 @@ host-bridge             → native Wayland client + JNI; frame passthrough + inp
 runtime-common          → shared types (Container, DisplayOutput, RootfsImage); no deps
 runtime-windows         → Wine/Box64 (fork: vendor/gamenative), no display code of its own
 runtime-linux-root      → DroidSpaces fork (vendor/droidspaces), namespaces/cgroups, needs root
-runtime-linux-noroot    → proot-based, new code, no root required
+runtime-linux-noroot    → proot-based, ported from vendor/gamenative's own
+                          DefaultProotContainerBackend (see §3), no root required
 input-seat              → unified seat; depends on host-bridge
 library-core            → Playnite-style unified library/metadata; depends on runtime-common
 shell-default           → "Standard" shell: forked-in Murine Launcher (real AOSP
@@ -1419,11 +1458,20 @@ Every module now builds and links for real:
   a subprocess (`su -c`, matching how droidspaces is actually designed to
   be used — a CLI tool, not a library), with the primary/sibling
   Wayland-socket-sharing bind-mount design from §3 implemented against
-  droidspaces' real, documented `.config` format. Blocked on
-  `RootfsPuller` having no implementation yet (can't pull an OCI image) and
-  on no primary-container image (sway pre-installed) existing to pull.
-  Unverified against a real device — no rooted hardware in this
-  environment.
+  droidspaces' real, documented `.config` format. `CraneRootfsPuller`/
+  `CraneImageCatalogResolver` are real and wired (an earlier "no
+  RootfsPuller implementation" note here was stale). **First real
+  on-device executions (2026-08-30, rooted RP5, root AND su-denied
+  non-root paths both exercised)**: root check + `droidspaces check`
+  pass; both paths then stop at the same first real blocker — the
+  bundled `crane` binary's pure-Go DNS resolver is dead on Android (no
+  /etc/resolv.conf → falls back to localhost:53; cgo resolver confirmed
+  compiled out via GODEBUG). Fix direction: rebuild crane with
+  CGO_ENABLED=1 against the NDK in build-scripts/build-vendor-deps.sh,
+  or move registry networking JVM-side. Also found: `droidspaces` child
+  processes leak past app force-stop (nothing reaps them), and the
+  whole pipeline has no logging (failures render only in the Desktop
+  shell's own UI).
 
 The APK is a single fat build covering both `arm64-v8a` (real hardware —
 Retroid Pocket 5 and similar) and `x86_64` (emulators/x86 devices), rather

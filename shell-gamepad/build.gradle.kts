@@ -12,6 +12,22 @@ android {
         minSdk = 26
     }
 
+    androidResources {
+        // Real, confirmed-live packaging bug this fixes: AAPT's DEFAULT
+        // ignore-assets pattern includes `<dir>_*` -- every asset
+        // DIRECTORY whose name starts with an underscore is silently
+        // stripped from the build. Art Book Next (bundled under
+        // src/main/assets/themes/) keeps its entire include tree --
+        // fonts, per-system art, per-system metadata, per-fontSize
+        // variable files -- under `_inc/`, a common real ES-DE theme
+        // convention, so the theme shipped with its whole asset tree
+        // missing and rendered near-black on device (confirmed by
+        // listing the extraction cache: no _inc at all). This pattern is
+        // AAPT's own default minus the `<dir>_*` rule, nothing else
+        // changed.
+        ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~"
+    }
+
     buildFeatures {
         compose = true
     }
