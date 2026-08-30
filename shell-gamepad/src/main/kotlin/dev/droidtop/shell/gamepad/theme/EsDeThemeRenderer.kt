@@ -607,7 +607,6 @@ private fun EsDeThemedDateTime(element: EsDeThemeElement, viewWidth: Dp, viewHei
  * star, the same honest-fallback convention [EsDeThemedRating] already
  * uses.
  */
-@Composable
 private val BADGE_GLYPHS = mapOf(
     "favorite" to "★",
     "completed" to "✔",
@@ -726,8 +725,8 @@ private fun EsDeThemedBadges(element: EsDeThemeElement, viewWidth: Dp, viewHeigh
             gx = index / gridY
             gy = index % gridY
         }
-        val cellX = offsetX + alignOffsetX + gx * (cellSize + itemMarginX)
-        val cellY = offsetY + gy * (cellSize + itemMarginY)
+        val cellX = offsetX + alignOffsetX + (cellSize + itemMarginX) * gx
+        val cellY = offsetY + (cellSize + itemMarginY) * gy
 
         val customIcon = element.valueOrNull<EsDeThemeValue.Path>("badge_$slot")?.resolved
         if (customIcon != null) {
