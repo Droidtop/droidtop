@@ -151,22 +151,25 @@ object ThemeAssets {
      * name, systemId, collectionThemeFolder) rather than parsed fresh
      * every call.
      *
-     * [collectionThemeFolder] is real ES-DE's own per-collection theme
-     * override (confirmed against `CollectionSystemsManager::
-     * themeFolderExists` -- a real local clone kept at
-     * /root/es-de-reference): when set and the active theme actually
-     * declares that subfolder (`auto-allgames`/`auto-favorites`/
-     * `auto-lastplayed`/`custom-collections`, see `GamepadShell.kt`'s
-     * own `AutoCollections`/`GameGroup.Collection`), that subfolder's
-     * own `theme.xml` loads INSTEAD of the theme's root one -- real
-     * themes commonly `<include>` the parent unchanged (Art Book Next's
-     * own bundle does this for several collection folders) or override
-     * specific elements. Falls back to the root `theme.xml` when the
-     * theme doesn't declare that subfolder at all -- more forgiving than
-     * real ES-DE's own behavior (which hides the collection from the
-     * system carousel entirely if the active theme isn't collection-
-     * compatible), a deliberate droidtop simplification: droidtop always
-     * shows collections, just without a themed override when none exists.
+     * [collectionThemeFolder] mirrors real ES-DE's own `SystemData::
+     * getThemePath()` (SystemData.cpp:1754-1772, a real local clone kept
+     * at /root/es-de-reference): check for a real per-collection
+     * `<folder>/theme.xml` override first (`auto-allgames`/
+     * `auto-favorites`/`auto-lastplayed`/`custom-collections`, see
+     * `GamepadShell.kt`'s own `AutoCollections`/`GameGroup.Collection`),
+     * falling back to the theme's root `theme.xml` when that subfolder
+     * file doesn't exist -- exactly real ES-DE's own two-step fallback,
+     * not a droidtop invention (no bundled theme, decaffe included,
+     * actually ships such a subfolder file, but the fallback path is
+     * still the real one, not a simplification of it). What WAS a real,
+     * confirmed-live bug: `systemTheme` below used to be passed as plain
+     * `systemId` (always null for a collection), so `${system.theme}` --
+     * and therefore a real theme's own `<include>./system/metadata/
+     * ${system.theme}.xml</include>` -- never resolved for a collection
+     * at all, even via the correct root `theme.xml` fallback. Fixed by
+     * falling back to `collectionThemeFolder` there too, matching real
+     * ES-DE's own `system.theme` = `SystemData::mThemeFolder` regardless
+     * of which theme.xml file that folder name resolves against.
      */
     fun loadActiveTheme(
         context: Context,
@@ -206,7 +209,22 @@ object ThemeAssets {
             val deviceLocale = "${locale.language}_${locale.country}"
             EsDeThemeParser.parseWithCapabilities(
                 themeFile,
-                systemTheme = systemId,
+                // Real, confirmed-live bug this fixes: real ES-DE's own
+                // `${system.theme}` variable is `SystemData::mThemeFolder`
+                // (SystemData.cpp:1976), which for a COLLECTION really is
+                // that collection's own theme-folder name (`auto-allgames`
+                // etc, confirmed against SystemData.cpp:1976-2031's own
+                // `system.theme`/`.autoCollections`/`.customCollections`
+                // handling) -- not left unset. Droidtop passed `systemId`
+                // alone (always null for a collection, since a collection
+                // isn't a real console system), so `${system.theme}` never
+                // resolved for one, and the theme's own real
+                // `<include>./system/metadata/${system.theme}.xml</include>`
+                // (decaffe's own real per-collection metadata fragments --
+                // auto-allgames.xml/auto-favorites.xml/auto-lastplayed.xml/
+                // custom-collections.xml, all four bundled) silently
+                // included nothing at all for every collection view.
+                systemTheme = systemId ?: collectionThemeFolder,
                 screenAspectRatio = screenAspectRatio,
                 deviceLocale = deviceLocale,
                 systemFullName = systemFullName,
