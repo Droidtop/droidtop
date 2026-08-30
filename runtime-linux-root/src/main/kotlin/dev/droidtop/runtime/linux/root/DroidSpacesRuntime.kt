@@ -112,6 +112,13 @@ class DroidSpacesRuntime(
         image: RootfsImage,
         provisionCommand: String? = null,
     ): Container {
+        // Best-effort stale-instance stop BEFORE touching the rootfs, not
+        // only in start(): a leaked instance from a force-stopped previous
+        // process (see start()'s own comment) still holds droidspaces'
+        // mounts over this exact rootfs directory -- confirmed live:
+        // writeInit failed with "Read-only file system" on a rootfs two
+        // leaked 08-27 processes were still mounted over.
+        RootProcess.run(binaryPath, "--name=$name", "stop")
         val rootfsPath = File(rootfsDir, name).absolutePath
         rootfsPuller.pullAndUnpack(image, rootfsPath, imageCache, cachePolicy)
         writeInit(rootfsPath, provisionCommand)

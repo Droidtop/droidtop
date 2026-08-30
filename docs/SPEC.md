@@ -284,6 +284,16 @@ stops at "which repositories," never "which versions."
   live-resolution path as everything else in this section. There is no
   separate "droidtop's own base+compositor image" to build or publish —
   that was an earlier framing, now corrected.
+- **droidtop never auto-picks an image — the user chooses (reaffirmed
+  2026-08-30).** There is no default/fallback image selection anywhere:
+  the desktop session's primary image is exclusively the user's own
+  Desktop-setup choice (onboarding, re-enterable from Settings), and an
+  unset or stale choice fails with guidance to make one, never a silent
+  pick. (A "first PRIMARY-role seed entry" fallback briefly existed and
+  silently selected alpine on the first live pipeline run — removed as
+  a spec violation.) Within a chosen repository the registry's own
+  `latest` tag is the default until Desktop setup grows a real tag
+  picker.
 
 ## 3b. Optional: other architectures/OSes via QEMU/libvirt — a value-add, not core
 
@@ -1567,7 +1577,19 @@ Every module now builds and links for real:
   the newly installed APK — both now share one `BundledBinary` helper
   whose marker is keyed on the APK's `lastUpdateTime` (versionCode is
   pinned at 1, so it can't be the key). Also found and since fixed (same
-  day): `droidspaces` child processes leaked past app force-stop
+  day, from the second live run — which got further than ever: the
+  resolver worked end-to-end inside the real pipeline for the first
+  time): (a) first-listed-tag selection picked `alpine:2.6`, a 2015
+  image with long-dead package repos — `selectPrimaryImage` now prefers
+  the registry's real `latest` tag; (b) `writeInit` failed with
+  "Read-only file system" because instances leaked by the 08-27 run
+  still held droidspaces mounts over the rootfs — the stale-instance
+  reap now also runs at the top of `createContainer`, before anything
+  touches the rootfs, not only in `start()`; (c) `pullAndUnpack`
+  extracted over whatever the destination already held, silently
+  merging images — it now keeps a digest marker (written last), skips
+  extraction when the destination already matches, and wipes anything
+  else first. Separately: `droidspaces` child processes leaked past app force-stop
   (force-stop skips onDestroy, so no lifecycle hook can reap; fixed by
   a best-effort stale-instance stop at the next `start()` — container
   names are deterministic — plus a real `onDestroy` reap for normal
