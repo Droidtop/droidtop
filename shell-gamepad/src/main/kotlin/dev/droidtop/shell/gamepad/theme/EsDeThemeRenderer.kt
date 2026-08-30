@@ -367,7 +367,17 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     val path = if (gameselectorEntry != null) {
         gameSelection.getOrNull(gameselectorEntry)?.artworkUri
     } else {
-        element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved
+        // Real ImageComponent behavior: `path` applies only when its file
+        // actually exists, else the element's own `default` image does --
+        // real ES-DE's parser keeps a PATH property even when the file is
+        // missing (ThemeData.cpp:2323-2377 only logs), so the existence
+        // check must happen here at apply time. Art Book Next's system
+        // logo is the real confirmed case: `<path>` templated on
+        // ${system.theme} with a real `<default>` fallback logo for
+        // systems it has no art for -- without this check the dead path
+        // rendered nothing and the declared fallback never showed.
+        element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved?.takeIf { File(it).exists() }
+            ?: element.valueOrNull<EsDeThemeValue.Path>("default")?.resolved?.takeIf { File(it).exists() }
     } ?: return
     val tint = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) }
     // Real properties (ImageComponent's own opacity/cornerRadius), already
@@ -783,9 +793,12 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
     val path = if (gameselectorEntry != null) {
         gameSelection.getOrNull(gameselectorEntry)?.artworkUri
     } else {
-        element.valueOrNull<EsDeThemeValue.Path>("default")?.resolved
-            ?: element.valueOrNull<EsDeThemeValue.Path>("defaultImage")?.resolved
-            ?: element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved
+        // Same real apply-time existence checks as EsDeThemedImage's own
+        // path/default chain (see that comment) -- a dead templated path
+        // must fall through, not shadow the next candidate.
+        element.valueOrNull<EsDeThemeValue.Path>("default")?.resolved?.takeIf { File(it).exists() }
+            ?: element.valueOrNull<EsDeThemeValue.Path>("defaultImage")?.resolved?.takeIf { File(it).exists() }
+            ?: element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved?.takeIf { File(it).exists() }
     } ?: return
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
@@ -900,7 +913,11 @@ private fun EsDeThemedDateTime(element: EsDeThemeElement, viewWidth: Dp, viewHei
             }.getOrNull()
         }
     } ?: element.valueOrNull<EsDeThemeValue.Str>("defaultValue")?.value
-    if (formatted.isNullOrBlank()) return
+    // Same real ":space:" blank-token convention (case-insensitive) as
+    // EsDeThemedText -- decaffe's own gamelbl datetime uses it as its
+    // defaultValue, which rendered the literal ":SPACE:" on-device for
+    // any game with no release date.
+    if (formatted.isNullOrBlank() || formatted.equals(":space:", ignoreCase = true)) return
 
     val hasSize = element.valueOrNull<EsDeThemeValue.Pair>("size") != null
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
