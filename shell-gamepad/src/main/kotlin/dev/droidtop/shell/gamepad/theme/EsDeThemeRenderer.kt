@@ -556,8 +556,10 @@ private fun EsDeThemedText(
     } ?: return
     // Real ES-DE convention: ":space:" renders as blank (reserves the
     // element's own position/size, shows no visible text) rather than the
-    // literal string.
-    val rawText = if (resolvedText == ":space:") "" else resolvedText
+    // literal string. Case-insensitive -- decaffe's own theme.xml writes
+    // it as ":SPACE:" in at least one real variant block, which rendered
+    // the literal token on-device under an exact-case check.
+    val rawText = if (resolvedText.equals(":space:", ignoreCase = true)) "" else resolvedText
     val uppercase = element.valueOrNull<EsDeThemeValue.Str>("letterCase")?.value == "uppercase"
     val text = if (uppercase) rawText.uppercase() else rawText
 

@@ -1169,8 +1169,18 @@ private fun GamesSection(
                     // engine bucket like "Ren'Py") since there's no single
                     // real games-folder game list for those; those groups
                     // legitimately just show no game preview.
-                    val focusedSystemEntries = orderedGroups.getOrNull(focusedSystemIndex)
-                        ?.let { byGroup[it] } ?: emptyList()
+                    // byGroup only partitions real System/Engine groups --
+                    // a Collection's members live in collectionGroupMembers
+                    // (cross-cutting, see GameGroup.Collection's own doc
+                    // comment). Reading byGroup for a collection returned
+                    // an empty list, which showed up on-device as
+                    // "0 games (0 favorites)" in the themed gamecount strip
+                    // and an empty game-preview for every collection.
+                    val focusedSystemEntries = when (val focused = orderedGroups.getOrNull(focusedSystemIndex)) {
+                        null -> emptyList()
+                        is GameGroup.Collection -> collectionGroupMembers[focused].orEmpty()
+                        else -> byGroup[focused].orEmpty()
+                    }
                     // Real hints for THIS exact screen state, matching what
                     // ButtonHintFooter would compute for it (canGoBack=false,
                     // showInfo=true, showSectionSwitch=true, showSystemSwitch=
