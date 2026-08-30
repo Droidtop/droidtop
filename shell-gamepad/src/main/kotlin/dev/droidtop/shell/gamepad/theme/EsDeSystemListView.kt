@@ -557,6 +557,16 @@ private fun EsDeTextListRow(
         color = if (focused) selectedColor else primaryColor,
         fontSize = fontSize,
         fontFamily = fontFamily,
+        // Real ES-DE TextListComponent rows are strictly single-line --
+        // a long title clips (or horizontally scrolls, its
+        // `textHorizontalScrolling` feature, not built here yet), never
+        // wraps. Real, confirmed-live bug this fixes: without maxLines,
+        // long real titles wrapped to two lines inside a one-line-tall
+        // row, painting over the next row -- every gamelist under Art
+        // Book Next rendered as illegibly overlapping text on a real
+        // device.
+        maxLines = 1,
+        overflow = androidx.compose.ui.text.style.TextOverflow.Clip,
         modifier = modifier
             .fillMaxWidth()
             .height(rowHeight)

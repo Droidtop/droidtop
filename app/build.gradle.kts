@@ -22,6 +22,16 @@ android {
     // since there's no meaningful revision counter outside CI.
     val versionRevision = System.getenv("VERSION_REVISION") ?: "0"
 
+    androidResources {
+        // Must match shell-gamepad's own override (see that module's
+        // build.gradle.kts for the full real story): AAPT's default
+        // pattern strips `<dir>_*` asset directories, and the final APK's
+        // own asset-merge step applies THIS module's pattern -- both
+        // modules need it or the app-level merge re-strips what the
+        // library kept.
+        ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~"
+    }
+
     defaultConfig {
         applicationId = "dev.droidtop.app"
         minSdk = 26

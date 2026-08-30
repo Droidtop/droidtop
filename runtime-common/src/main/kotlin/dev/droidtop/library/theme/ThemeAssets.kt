@@ -143,6 +143,15 @@ object ThemeAssets {
 
     private val systemThemeCache = mutableMapOf<Triple<String, String?, Pair<String?, String?>>, EsDeTheme?>()
 
+    init {
+        // A theme selection change -- or a theme re-downloaded/updated in
+        // place under the same name (ThemePrefs.notifyThemesChanged, fired
+        // by ThemeBrowserScreen after a real download) -- must drop every
+        // cached parse: entries are keyed by theme NAME, so an updated
+        // theme's stale parse would otherwise keep serving forever.
+        ThemePrefs.addOnChangeListener { systemThemeCache.clear() }
+    }
+
     /**
      * Loads the currently active theme (real, discovered + selected per
      * [resolveActiveTheme]), parsed for [systemId] specifically -- real
@@ -267,10 +276,33 @@ object ThemeAssets {
     private fun extractedBundledThemeDir(context: Context, assetFolder: String): File {
         val themeDir = File(context.cacheDir, "theme_$assetFolder")
         val marker = File(themeDir, EXTRACTED_MARKER)
-        if (!marker.exists()) {
+        // Real, confirmed-live bug this fixes: the marker was a bare
+        // existence check, never invalidated by an APK update -- a device
+        // kept serving a STALE extraction of an old build's bundled theme
+        // forever (the real test device was carrying extractions from two
+        // dead legacy asset layouts, confirmed by listing its cache dir).
+        // The marker now stores the APK's own lastUpdateTime -- NOT
+        // versionCode, which this project pins at a constant 1 (see
+        // app/build.gradle.kts; only versionName varies per CI run), and
+        // NOT versionName either, since a dev reinstall of the same build
+        // number with different assets is a real, common case here --
+        // lastUpdateTime changes on every real (re)install, which is
+        // exactly the "did the bundled assets possibly change" signal.
+        val currentVersion = try {
+            context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime.toString()
+        } catch (t: Exception) {
+            "unknown"
+        }
+        val markerVersion = try {
+            if (marker.isFile) marker.readText().trim() else null
+        } catch (t: Exception) {
+            null
+        }
+        if (markerVersion != currentVersion) {
             try {
+                themeDir.deleteRecursively()
                 extractAssetDir(context, "$BUNDLED_THEMES_ASSET_ROOT/$assetFolder", themeDir)
-                marker.createNewFile()
+                marker.writeText(currentVersion)
             } catch (t: Exception) {
                 Log.e("droidtop.ThemeAssets", "Failed to extract bundled theme '$assetFolder'", t)
             }
