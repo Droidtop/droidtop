@@ -52,7 +52,7 @@ data class RomEntity(
     // own doc comment for why this is filesystem-derived, not a metadata
     // field) -- resolved and cached at scan time exactly like [artworkUri]
     // already is, not part of GameMetadataEntity.
-    @ColumnInfo(name = "manual_uri", defaultValue = "NULL") val manualUri: String? = null,
+    @ColumnInfo(name = "manual_uri") val manualUri: String? = null,
     @ColumnInfo(name = "roms_root") val romsRoot: String,
     // The folder actually scanned to produce this row -- deliberately
     // separate from [systemId], which may have been corrected by
@@ -140,13 +140,22 @@ data class GameMetadataEntity(
     val rating: Float? = null,
     val players: String? = null,
     val favorite: Boolean = false,
-    val completed: Boolean = false,
-    @ColumnInfo(name = "kid_game") val kidGame: Boolean = false,
-    val hidden: Boolean = false,
-    val broken: Boolean = false,
-    @ColumnInfo(name = "no_game_count") val noGameCount: Boolean = false,
-    @ColumnInfo(name = "no_multi_scrape") val noMultiScrape: Boolean = false,
-    @ColumnInfo(name = "hide_metadata") val hideMetadata: Boolean = false,
+    // defaultValue = "0" on every column below: real, required to match
+    // MIGRATION_3_4's own actual `NOT NULL DEFAULT 0` SQL exactly --
+    // SQLite's ALTER TABLE ADD COLUMN requires a real default for a
+    // NOT NULL column (unlike these entities' original v3 CREATE TABLE,
+    // which needs no DEFAULT clause at all since Room always supplies a
+    // value on insert) -- confirmed live: a mismatched/missing
+    // defaultValue here throws a real
+    // `IllegalStateException: Migration didn't properly handle` at
+    // runtime, caught on-device, not a guess.
+    @ColumnInfo(defaultValue = "0") val completed: Boolean = false,
+    @ColumnInfo(name = "kid_game", defaultValue = "0") val kidGame: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val hidden: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val broken: Boolean = false,
+    @ColumnInfo(name = "no_game_count", defaultValue = "0") val noGameCount: Boolean = false,
+    @ColumnInfo(name = "no_multi_scrape", defaultValue = "0") val noMultiScrape: Boolean = false,
+    @ColumnInfo(name = "hide_metadata", defaultValue = "0") val hideMetadata: Boolean = false,
     @ColumnInfo(name = "controller_short_name") val controllerShortName: String? = null,
     @ColumnInfo(name = "alt_emulator") val altEmulator: String? = null,
     @ColumnInfo(name = "launch_screen") val launchScreen: Int? = null,
