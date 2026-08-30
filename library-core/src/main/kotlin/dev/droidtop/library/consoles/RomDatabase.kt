@@ -303,6 +303,10 @@ interface RomDao {
     @Query("SELECT collection_id, game_id FROM collection_members")
     suspend fun getAllCollectionMembers(): List<CollectionMemberEntity>
 
+    /** Real reverse query for [dev.droidtop.library.LibraryEntry.inCollection] (the badge "collection" slot) -- which games are in ANY real collection, not which collection a given game is in. */
+    @Query("SELECT DISTINCT game_id FROM collection_members")
+    suspend fun getGameIdsInAnyCollection(): List<String>
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun addCollectionMember(member: CollectionMemberEntity)
 

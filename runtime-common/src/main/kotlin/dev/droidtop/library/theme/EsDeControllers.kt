@@ -2,13 +2,14 @@ package dev.droidtop.library.theme
 
 /**
  * Real ES-DE badge slot types -- `BadgeComponent.cpp`'s own real
- * `mBadgeTypes` list (`SLOT_*` defines), same order. `collection`/
- * `folder` have no real droidtop data to drive them yet (no custom-
- * collections/folder-entry concept in droidtop's data model -- same
- * tracked gap `GameMetadataEntity`'s own doc comment notes for
- * `collectionSortName`) -- `EsDeThemedBadges` never marks either active
- * regardless of what a theme's `<slots>` requests, an honest gap, not a
- * silently-dropped one.
+ * `mBadgeTypes` list (`SLOT_*` defines), same order. `collection` is
+ * real and wired -- see [dev.droidtop.library.LibraryEntry.inCollection]
+ * (`CollectionEntity`/`CollectionMemberEntity`, reverse-membership query
+ * in `ConsoleRomProvider.withMetadata`). `folder` still has no real
+ * droidtop data to drive it (droidtop's ROM scan is flat -- no
+ * gamelist-subfolder concept in droidtop's data model) --
+ * `EsDeThemedBadges` never marks it active regardless of what a theme's
+ * `<slots>` requests, an honest gap, not a silently-dropped one.
  */
 val BADGE_SLOTS = listOf(
     "collection", "folder", "favorite", "completed", "kidgame",

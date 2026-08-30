@@ -33,13 +33,13 @@ package dev.droidtop.library.theme
  * ([dev.droidtop.shell.gamepad.theme.EsDeThemedView]) is still honestly
  * partial. `rating`/`datetime` are fully real (LibraryEntry.rating/
  * releaseDate exist, populated by real ScreenScraper/TheGamesDB scrapes).
- * `badges` renders the full real flexbox layout for seven of real
+ * `badges` renders the full real flexbox layout for eight of real
  * ES-DE's nine real badge slot types (favorite/completed/kidgame/broken/
- * controller/altemulator/manual -- all real `LibraryEntry`/
- * `GameMetadataEntity` fields, user-editable via `GameMetadataEditor`);
- * `collection`/`folder` stay unrendered (no collections/folder-entry
- * concept in droidtop's data model yet -- see `BADGE_SLOTS`' own doc
- * comment). `gamelistinfo`
+ * controller/altemulator/manual/collection -- all real `LibraryEntry`/
+ * `GameMetadataEntity`/`CollectionMemberEntity` fields, user-editable via
+ * `GameMetadataEditor`/`CollectionMembershipEditor`); `folder` stays
+ * unrendered (no folder-entry concept in droidtop's data model -- see
+ * `BADGE_SLOTS`' own doc comment). `gamelistinfo`
  * is likewise PARTIALLY real -- the plain "N games" + favorites-count
  * case renders (real per-system counts, [EsDeThemedGamelistInfo]'s own
  * doc comment); the filtered and folder-entered cases don't, since
