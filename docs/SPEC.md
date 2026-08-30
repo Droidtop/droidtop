@@ -367,6 +367,62 @@ instead of a full VM guest kernel:
   step (would follow the same pattern as `CraneBinary`/`DroidSpacesBinary`
   — bundled as an APK asset, extracted at first use), no UI surface.
 
+## 3d. User-facing container/distro management (directed 2026-08-30)
+
+Explicit direction: the user must be able to manage containers/distros
+themselves, first-class — droidtop's containers are the user's machines,
+not internal plumbing only the desktop session touches. Distrobox/
+Podman-desktop are the interaction models to match, sitting directly on
+the `ContainerRuntime` interface that already exists (§3):
+
+- **Container manager surface** (in the same settings/shell UI family as
+  §7c, not a separate app): list every container with live state
+  (role, image + digest, running/stopped, disk usage), create a sibling
+  from §3a's live catalog (Recommended) or a raw OCI reference (Custom),
+  start/stop/restart, delete (with its storage), rename. Per-container
+  settings: shared-socket opt-outs (Wayland/audio — §2's defaults, but
+  inspectable and disable-able per container), bind-mounts (Android
+  shared storage in/out), autostart-with-session.
+- **A real terminal into any container** — a computer the user can't
+  open a shell on isn't a computer. One terminal-emulator surface in
+  droidtop (Compose-hosted), attached to `exec` in a chosen container
+  (root backend: `droidspaces exec`-equivalent; noroot: proot exec).
+  Which terminal-view implementation to adopt/fork is an open technical
+  choice (Termux's terminal-view and Jackpal's Android-Terminal-Emulator
+  are the two real prior-art candidates; license and embedding fit not
+  yet compared) — the requirement itself is settled.
+- The desktop session's PRIMARY container is listed like everything else
+  but guarded (can't be deleted while it's the active desktop).
+
+## 4a. Networking & VPN (directed 2026-08-30)
+
+Explicit direction: containerized VPNs should be able to serve the WHOLE
+device — a VPN client running inside a container (WireGuard, OpenVPN,
+anything the distro packages) gets hooked into Android's own VPN
+interface, so every Android app's traffic can route through it. The
+standard, root-optional mechanism is Android's `VpnService`: droidtop
+implements one `DroidtopVpnService` that owns the device tun fd and
+bridges packets to/from the container's VPN:
+
+- **Noroot path (the baseline)**: `VpnService` tun fd ↔ the container's
+  VPN endpoint via a userspace packet bridge (tun2socks-style, or
+  WireGuard's own userspace implementation consuming the fd directly —
+  wireguard-android's backend does exactly this and is the reference
+  implementation to study first). No root required; this is the same
+  architecture every Android VPN app uses.
+- **Root path (value-add)**: with real namespaces (`DroidSpacesRuntime`),
+  the container's own tun device + routing rules can be wired to the
+  device via iptables/NAT instead — finer-grained (per-container
+  egress), but never required for the headline feature.
+- Per-app routing (Android's own `VpnService.Builder.addAllowedApplication`)
+  is a natural setting once the base works — "route only these apps
+  through the container VPN."
+- **Not designed in implementation detail yet**: which packet-bridge
+  implementation (fork vs. write), config UX (import a .conf/.ovpn into
+  the container vs. point droidtop at an already-running container VPN),
+  and kill-switch semantics are open. The product decision — containers
+  can be the device's VPN — is settled.
+
 ## 4. Display
 
 - One `DisplayOutput` per Android `Display` the device currently has: the
@@ -1483,9 +1539,12 @@ Every module now builds and links for real:
   pass; both paths then stop at the same first real blocker — the
   bundled `crane` binary's pure-Go DNS resolver is dead on Android (no
   /etc/resolv.conf → falls back to localhost:53; cgo resolver confirmed
-  compiled out via GODEBUG). Fix direction: rebuild crane with
-  CGO_ENABLED=1 against the NDK in build-scripts/build-vendor-deps.sh,
-  or move registry networking JVM-side. Also found: `droidspaces` child
+  compiled out via GODEBUG). **Fixed (2026-08-30, later same day):**
+  build-vendor-deps.sh now builds crane `CGO_ENABLED=1` against the NDK
+  clang on EVERY ABI (arm64 included — x86_64 already required it), and
+  the workflow's deps-cache key is bumped (v7) so the cached no-cgo
+  binary can't keep being served; on-device DNS re-verification still
+  pending the next installed build. Also found: `droidspaces` child
   processes leak past app force-stop (nothing reaps them), and the
   whole pipeline has no logging (failures render only in the Desktop
   shell's own UI).

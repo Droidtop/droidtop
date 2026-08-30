@@ -153,7 +153,11 @@ jobs:
           # crane (v6); bumping the version suffix too, since the v5 key
           # (unaffected by this submodule addition) would otherwise cache-hit
           # on an old assets/bin that never had crane-* built into it at all.
-          key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD') }}-v6
+          # v7: crane is now built CGO_ENABLED=1 on arm64 too (the v6
+          # binary's pure-Go DNS resolver was dead on-device — see
+          # build-vendor-deps.sh's crane section); the cached v6 assets/bin
+          # would keep serving that broken binary forever otherwise.
+          key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD') }}-v7
 
       - name: Build cross-compiled vendor deps (libffi, libwayland-client, droidspaces)
         if: steps.deps-cache.outputs.cache-hit != 'true'
