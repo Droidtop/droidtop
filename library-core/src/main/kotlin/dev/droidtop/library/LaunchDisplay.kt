@@ -22,6 +22,22 @@ object LaunchDisplay {
     @Volatile
     var targetDisplayId: Int? = null
 
+    /**
+     * The display the most recent launch was sent to, kept until the shell
+     * deliberately reclaims it — the "don't interfere with apps we've
+     * launched" half of the home-press display reinit (see MainActivity's
+     * role orchestration): a reinit re-asserts droidtop's surfaces on
+     * every display EXCEPT one still parked here, so a game running on
+     * the addon isn't covered by the shell or the widgets panel. Cleared
+     * by an explicit shell entry (BackButtonMenu's Handheld item).
+     */
+    @Volatile
+    var parkedDisplayId: Int? = null
+
+    /** Invoked after every [start] — the shell hooks this to re-run its display-role orchestration (e.g. dismissing the widgets Presentation off a display a game just went to). */
+    @Volatile
+    var onLaunched: ((Int?) -> Unit)? = null
+
     fun start(context: Context, intent: Intent) {
         val displayId = targetDisplayId
         if (displayId != null) {
@@ -29,5 +45,7 @@ object LaunchDisplay {
         } else {
             context.startActivity(intent)
         }
+        parkedDisplayId = displayId
+        onLaunched?.invoke(displayId)
     }
 }

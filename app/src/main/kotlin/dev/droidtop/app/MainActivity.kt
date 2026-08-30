@@ -86,6 +86,20 @@ class MainActivity : AppCompatActivity() {
     private var handheldStartSection by mutableStateOf<String?>(null)
     private var handheldTriggerRescan by mutableStateOf(false)
 
+    // Re-runs the dual-screen role orchestration on demand (home-press
+    // reinit, explicit shell re-entry, a game launch) -- display
+    // attach/detach events alone don't cover those triggers.
+    private val roleRefresh = kotlinx.coroutines.flow.MutableStateFlow(0)
+
+    companion object DisplayRelocation {
+        // Process-wide (companion), not per-instance: the relaunch loop
+        // recreates the Activity, so an instance field would reset each
+        // hop and guard nothing.
+        @Volatile
+        private var lastRelocationAttemptMs = 0L
+        private const val RELOCATION_COOLDOWN_MS = 5000L
+    }
+
     private fun applyHandheldDeepLink(intent: Intent) {
         handheldStartSection = intent.getStringExtra(BackButtonMenu.EXTRA_HANDHELD_START_SECTION)
         handheldTriggerRescan = intent.getBooleanExtra(BackButtonMenu.EXTRA_HANDHELD_RESCAN, false)
@@ -176,6 +190,18 @@ class MainActivity : AppCompatActivity() {
         if (mode != BackButtonMenu.MODE_HANDHELD) {
             startForegroundService(Intent(this, DesktopSessionService::class.java))
         }
+        // Display reinit on every re-entry (a HOME press routes here via
+        // Launcher.onNewIntent's forwarding, carrying EXTRA_DISPLAY_REINIT).
+        // An EXPLICIT shell entry (BackButtonMenu's Handheld item, no
+        // reinit extra) also reclaims a display an app was launched onto;
+        // the home-press reinit deliberately does NOT -- "fix my screens"
+        // must never cover a running game (see LaunchDisplay.parkedDisplayId).
+        if (!intent.getBooleanExtra(BackButtonMenu.EXTRA_DISPLAY_REINIT, false) &&
+            mode == BackButtonMenu.MODE_HANDHELD
+        ) {
+            dev.droidtop.library.LaunchDisplay.parkedDisplayId = null
+        }
+        roleRefresh.value++
     }
 
     /**
@@ -259,11 +285,24 @@ class MainActivity : AppCompatActivity() {
         val displayOutputs = DisplayOutputRepository(applicationContext)
         val displayManager = getSystemService(DisplayManager::class.java)
 
+        // A game launch also retriggers orchestration (so the widgets
+        // Presentation is dismissed off a display a game just went to --
+        // Presentation windows layer ABOVE activities on that display).
+        dev.droidtop.library.LaunchDisplay.onLaunched = { roleRefresh.value++ }
+
         lifecycleScope.launch {
-            displayOutputs.observe().collectLatest { outputs ->
+            kotlinx.coroutines.flow.combine(displayOutputs.observe(), roleRefresh) { outputs, _ -> outputs }
+                .collectLatest { outputs ->
                 val second = outputs.firstOrNull { it.kind == DisplayOutputKind.SECOND_SCREEN }
                 val handheld = mode == BackButtonMenu.MODE_HANDHELD
-                val shellOnSecond = handheld && second != null &&
+                // A display an app was launched onto is PARKED: droidtop
+                // keeps its hands off it entirely (no shell relocation, no
+                // widgets Presentation over the running app) until an
+                // explicit shell entry reclaims it -- the "don't interfere
+                // with apps we've launched" half of the home-press reinit.
+                val parked = dev.droidtop.library.LaunchDisplay.parkedDisplayId
+                val secondAvailable = second != null && second.androidDisplayId != parked
+                val shellOnSecond = handheld && secondAvailable &&
                     DisplayRolePrefs.shellTarget(this@MainActivity) == DisplayRolePrefs.ShellTarget.SECOND_WHEN_PRESENT
 
                 dev.droidtop.library.LaunchDisplay.targetDisplayId = when {
@@ -277,7 +316,11 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 when {
-                    second == null -> {
+                    // No second display -- or one an app was launched onto
+                    // (parked): tear our Presentation down (it would layer
+                    // ABOVE the running app's window) and touch nothing
+                    // else on it.
+                    second == null || !secondAvailable -> {
                         secondScreenPresentation?.dismiss()
                         secondScreenPresentation = null
                     }
@@ -290,7 +333,20 @@ class MainActivity : AppCompatActivity() {
                             @Suppress("DEPRECATION")
                             windowManager.defaultDisplay.displayId
                         }
-                        if (currentDisplayId != second.androidDisplayId) {
+                        // ONE relocation attempt per cooldown window --
+                        // confirmed-live relaunch loop this guards: right
+                        // after the relocation startActivity, the
+                        // (re)created instance can still read its display
+                        // as DEFAULT before window attach, see a mismatch
+                        // here, and relaunch again, forever. If relocation
+                        // genuinely didn't take after an attempt (some
+                        // displays refuse activity launches), the shell
+                        // stays where it is instead of looping.
+                        val now = android.os.SystemClock.elapsedRealtime()
+                        if (currentDisplayId != second.androidDisplayId &&
+                            now - lastRelocationAttemptMs > RELOCATION_COOLDOWN_MS
+                        ) {
+                            lastRelocationAttemptMs = now
                             // Companion FIRST (built-in screen), then move
                             // this singleTask instance to the addon so the
                             // shell ends up focused.

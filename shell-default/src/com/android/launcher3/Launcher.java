@@ -1747,6 +1747,31 @@ public class Launcher extends StatefulActivity<LauncherState>
         TraceHelper.INSTANCE.beginSection(ON_NEW_INTENT_EVT);
         super.onNewIntent(intent);
 
+        // droidtop: a HOME press while the last-used shell is Desktop/
+        // Handheld forwards straight back to that shell (same lastMode
+        // redirect as onCreate/onStart's cold-start path, but for the
+        // warm case where this Launcher instance already exists), with a
+        // display-reinit flag: MainActivity re-runs its dual-screen role
+        // orchestration on it, restoring shell/widgets ownership of both
+        // displays -- Android silently falls back to MIRRORING a second
+        // display nothing presents on (confirmed live on the Dual-Screen
+        // Add-On), and a home press is the user's natural "fix my
+        // screens" gesture. The reinit deliberately leaves any app the
+        // user launched onto a display alone (see MainActivity's parked-
+        // display handling).
+        if (Intent.ACTION_MAIN.equals(intent.getAction())) {
+            String droidtopLastMode = dev.droidtop.shell.standard.ModePrefs.lastMode(this);
+            if (!dev.droidtop.shell.standard.BackButtonMenu.MODE_STANDARD.equals(droidtopLastMode)) {
+                Intent redirect = new Intent(Intent.ACTION_MAIN);
+                redirect.setClassName(getPackageName(), "dev.droidtop.app.MainActivity");
+                redirect.putExtra(dev.droidtop.shell.standard.BackButtonMenu.EXTRA_MODE, droidtopLastMode);
+                redirect.putExtra(dev.droidtop.shell.standard.BackButtonMenu.EXTRA_DISPLAY_REINIT, true);
+                redirect.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(redirect);
+                return;
+            }
+        }
+
         boolean alreadyOnHome = hasWindowFocus() && ((intent.getFlags() &
                 Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT)
                 != Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT);

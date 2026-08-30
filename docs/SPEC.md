@@ -568,6 +568,30 @@ not settled designs):
   1080×1920 native per DRM) but can come up in a 480×640 fallback mode
   until power-cycled — detect and surface that state rather than
   silently running at fallback resolution.
+- **Display reinit + parked displays (directed 2026-08-30)**: Android
+  silently MIRRORS a second display nothing presents on (confirmed live
+  on the addon) — droidtop's answer is that some droidtop surface owns
+  every display whenever Handheld runs, and a HOME press is the user's
+  "fix my screens" gesture: Launcher forwards a warm HOME press back to
+  the last-used shell with a display-reinit flag, and MainActivity
+  re-runs its role orchestration. A display an app was LAUNCHED onto is
+  *parked* (`LaunchDisplay.parkedDisplayId`): reinit never relocates the
+  shell onto it or presents the widgets panel over it (a Presentation
+  layers above activities), so a running game is never covered; an
+  explicit shell entry from the BackButtonMenu reclaims it. Shell
+  relocation attempts are cooldown-guarded — the recreated instance can
+  read its display as DEFAULT before window attach, and an unguarded
+  mismatch check relaunch-looped forever (confirmed live).
+- **Recents is NOT droidtop's today — quickstep backlog**: the Recents
+  UI belongs to the app holding the Quickstep role; shell-default's
+  Launcher3 fork deliberately excludes the quickstep module (SystemUI
+  shared-lib + per-Android-version plumbing), so recents comes from the
+  system's own component and droidtop cannot reshape it. A
+  display-aware recents (grouping tasks by which screen they run on —
+  quickstep's task model carries per-task displayId) is genuinely
+  buildable but only by compiling the quickstep flavor and holding the
+  default-home role: a large, separate work package, recorded here
+  rather than attempted as a patch.
 - **General framing**: droidtop's display/shell/settings model takes KDE
   Plasma as its broader reference point, not just for KScreen specifically
   — the goal (§1) is a real general-purpose compute device, and KDE is the
