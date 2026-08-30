@@ -60,6 +60,7 @@ import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.consoles.ES_DE_CONSOLE_SYSTEMS
+import dev.droidtop.library.displayName
 import dev.droidtop.library.displayName as launchStrategyDisplayName
 import dev.droidtop.library.theme.SystemThemeColors
 import dev.droidtop.library.theme.ThemeAssets
@@ -1743,22 +1744,8 @@ internal fun buildAppSections(entries: List<LibraryEntry>): List<HomeSection> {
     }
 }
 
-private fun LibraryEntryKind.displayName(): String = when (this) {
-    LibraryEntryKind.NATIVE_ANDROID_APP -> "Apps"
-    LibraryEntryKind.WINE_PROFILE -> "Windows"
-    LibraryEntryKind.LINUX_CONTAINER_APP -> "Linux"
-    LibraryEntryKind.REMOTE_STREAM -> "Remote PC"
-    LibraryEntryKind.RENPY, LibraryEntryKind.KIRIKIRI,
-    LibraryEntryKind.AUGUST, LibraryEntryKind.BURIKO, LibraryEntryKind.CATSYSTEM2,
-    LibraryEntryKind.CMVS, LibraryEntryKind.FLASH_AIR, LibraryEntryKind.TWINE,
-    -> "Visual Novels"
-    LibraryEntryKind.RPG_MAKER_MV, LibraryEntryKind.RPG_MAKER_MZ, LibraryEntryKind.RPG_MAKER_VX_ACE -> "RPG Maker"
-    LibraryEntryKind.CONSOLE_ROM -> "Consoles"
-    // Not visual-novel-shaped -- general game engines, kept as their own
-    // section rather than folded into "Visual Novels" where they'd be a
-    // real mismatch.
-    LibraryEntryKind.GODOT, LibraryEntryKind.UNREAL, LibraryEntryKind.UNITY -> "PC Games"
-}
+// LibraryEntryKind.displayName() moved to library-core (shared with the
+// second-screen companion panel) -- see its doc comment there.
 
 @Composable
 private fun HomeSectionRow(

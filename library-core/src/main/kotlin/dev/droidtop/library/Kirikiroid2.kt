@@ -48,6 +48,6 @@ object Kirikiroid2 {
         val intent = context.packageManager.getLaunchIntentForPackage(PACKAGE_NAME)
             ?: error("$PACKAGE_NAME has no launch intent")
         intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(intent)
+        LaunchDisplay.start(context, intent)
     }
 }

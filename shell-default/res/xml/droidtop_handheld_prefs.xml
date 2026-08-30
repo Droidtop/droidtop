@@ -51,6 +51,28 @@
          same way Console systems/Game folders above are: launch :app's
          MainActivity by explicit component name with a real Intent extra
          it reads on create. See SettingsHandheldFragment.kt. -->
+    <!-- Dual-screen role mapping (docs/SPEC.md section 4, handheld
+         dual-screen roles): where the shell itself renders when a second
+         display is present, and which display game launches target.
+         Values are DisplayRolePrefs enum names, read by :app. -->
+    <ListPreference
+        android:key="pref_display_shell_target"
+        android:title="@string/pref_display_shell_target_title"
+        android:summary="%s"
+        android:entries="@array/pref_display_shell_target_entries"
+        android:entryValues="@array/pref_display_shell_target_values"
+        android:defaultValue="SECOND_WHEN_PRESENT"
+        android:persistent="true" />
+
+    <ListPreference
+        android:key="pref_display_game_launch_target"
+        android:title="@string/pref_display_game_launch_target_title"
+        android:summary="%s"
+        android:entries="@array/pref_display_game_launch_target_entries"
+        android:entryValues="@array/pref_display_game_launch_target_values"
+        android:defaultValue="FOLLOW_SHELL"
+        android:persistent="true" />
+
     <Preference
         android:key="pref_handheld_rescan_library"
         android:title="@string/pref_handheld_rescan_library_title"
