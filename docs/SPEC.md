@@ -1240,13 +1240,15 @@ building this: `system.name`/`system.fullName` variables were never
 populated at all (only `system.theme` was), and theme-defined
 `<variables>` blocks never resolved their own embedded `${...}`
 placeholders (Art Book Next's own bundled per-system-metadata fragment
-uses exactly this real pattern for `systemDescription`). Real, still
+uses exactly this real pattern for `systemDescription`). Badge
+`collection` slot (8th of 9 real slots) now wired too — a reverse
+"which games are in ANY collection" query
+(`RomDao.getGameIdsInAnyCollection`) feeds `LibraryEntry.inCollection`
+at library-merge time in `ConsoleRomProvider.withMetadata`. Real, still
 deferred: `gamelistinfo`'s folder-entered case specifically (folders
-are a different, still-unmodeled concept from collections); per-game
-badge `collection`/`folder` slots (need a "which collection(s) is this
-game in, from the game's own side" query droidtop hasn't wired up
-yet, even though the reverse — which games are in a collection — now
-works). `sound`/`video`/`animation` playback (currently static-image
+are a different, still-unmodeled concept from collections); the badge
+`folder` slot (droidtop's ROM scan is flat, no gamelist-subfolder
+concept to detect membership in). `sound`/`video`/`animation` playback (currently static-image
 fallback only — genuine media-engine work, ExoPlayer/MediaCodec,
 bigger scope than the per-element passes above) is still open.
 Generalizing the

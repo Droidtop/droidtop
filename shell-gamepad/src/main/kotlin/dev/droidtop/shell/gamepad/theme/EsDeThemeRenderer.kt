@@ -615,6 +615,7 @@ private val BADGE_GLYPHS = mapOf(
     "controller" to "🎮",
     "altemulator" to "⚙",
     "manual" to "📖",
+    "collection" to "🗂",
 )
 
 /**
@@ -642,9 +643,11 @@ private val BADGE_GLYPHS = mapOf(
  *   OVERLAY icon (`setBadges`' own real runtime texture swap) has no
  *   droidtop asset to render -- shows the generic controller glyph only,
  *   same honest gap as the rest of this function's glyph fallbacks.
- * - `collection`/`folder` slots are never active -- see
+ * - `folder` (the last of the 9 real slots) is never active -- see
  *   [dev.droidtop.library.theme.BADGE_SLOTS]'s own doc comment for why
- *   (no collections/folder-entry concept in droidtop's data model yet).
+ *   (real ES-DE gamelist subfolders have no droidtop equivalent --
+ *   droidtop's ROM scan is flat -- unlike `collection`, which IS wired,
+ *   see [dev.droidtop.library.LibraryEntry.inCollection]).
  */
 @Composable
 private fun EsDeThemedBadges(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp, gameSelection: List<LibraryEntry>) {
@@ -670,7 +673,8 @@ private fun EsDeThemedBadges(element: EsDeThemeElement, viewWidth: Dp, viewHeigh
         "controller" -> entry.controllerShortName != null
         "altemulator" -> entry.altEmulator != null
         "manual" -> entry.manualUri != null
-        else -> false // collection/folder -- see this function's own doc comment
+        "collection" -> entry.inCollection
+        else -> false // folder -- see this function's own doc comment
     }
 
     val activeSlots = requestedSlots.filter { isActive(it) }

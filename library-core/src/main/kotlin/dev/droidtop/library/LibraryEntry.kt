@@ -115,10 +115,21 @@ data class LibraryEntry(
     // meaning "no override, use the real current default."
     val launchScreen: Int? = null,
     val sortName: String? = null,
-    // Real ES-DE MD_STRING field, stored but not yet consumed -- see
-    // GameMetadataEntity's own doc comment for why (no custom-collections
-    // concept in droidtop's data model yet, same tracked gap).
+    // Real ES-DE MD_STRING field, stored but not yet consumed -- real
+    // custom collections now exist (CollectionEntity/
+    // CollectionMemberEntity), this specifically needs a real per-
+    // collection sort-order UI/consumer, a smaller, separate follow-up.
     val collectionSortName: String? = null,
+    // Real ES-DE badge "collection" slot data (confirmed against
+    // BadgeComponent.cpp's own real SLOT_COLLECTION) -- true when this
+    // game is a member of at least one real custom collection
+    // (CollectionMemberEntity), computed at library-merge time
+    // (ConsoleRomProvider.withMetadata's own reverse-membership query),
+    // not stored directly. Real ES-DE's own "folder" slot -- whether
+    // this game sits inside a real gamelist SUBFOLDER -- stays
+    // unmodeled: droidtop's ROM scan has no folder/subdirectory concept
+    // at all, a genuinely separate, bigger gap than collections was.
+    val inCollection: Boolean = false,
 )
 
 enum class LibraryEntryKind {
