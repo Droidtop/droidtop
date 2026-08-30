@@ -1278,6 +1278,41 @@ section, not reproduced here — that file is the working log; this
 section is the durable, periodically-refreshed summary per this
 project's own convention of writing real decisions into SPEC.md itself.
 
+**Refactor decision (2026-08-30)**: a full code audit against real ES-DE
+source (`/root/es-de-reference`) and side-by-side device-vs-reference
+screenshots found the incremental patch approach had converged on a
+architecture that CANNOT reach real parity — not individual bugs, but
+three hand-synced layers (a hand-picked property whitelist, a parser
+that drops anything not whitelisted, ~15 per-element Compose renderers
+each re-implementing geometry/color/font/text independently) where every
+fix corrected one wrong constant while the bug *class* survived.
+Confirmed critical defects: the schema silently dropped real,
+theme-declared properties (`staticImage`/`imageColor`/`maxItemCount`
+were missing from carousel entirely — real system logos and item counts
+never worked); `text` metadata-key mapping is backwards vs. real
+`GamelistView::getMetadataValue` (theme key `"description"` must map to
+file key `"desc"`, not itself — real game descriptions have never
+rendered, ever); image `<color>` used Compose `ColorFilter.tint`
+(replace) instead of real ES-DE's color-shift *modulate* semantics
+(`ImageComponent::setColorShift`) — flattens any tinted background art
+into a silhouette; `fontPath` was read by the parser but never applied
+by any renderer — every themed screen renders in the system default
+font regardless of what a theme bundles; real ES-DE collections resolve
+their own theme presentation via `${system.theme}` = their own
+collection-folder name (`auto-allgames` etc.) — droidtop invented an
+unrelated "subfolder theme.xml" mechanism that matches no real bundled
+theme, so collections lose their themed presentation entirely.
+Decision: a scoped refactor (R1–R5, tracked in
+`coordination/HANDOFF.md`), not further incremental patches — R1 (full,
+verbatim `ThemeData::sElementMap` schema transcription, landed this
+commit, including the real XML-attribute-keyed `customBadgeIcon`/
+`customControllerIcon` parsing droidtop's parser never implemented at
+all) through R5 (primary-component full fidelity). Parser core (include
+resolution, variant axes, multi-name matching, element-merge semantics)
+and theme infrastructure (discovery, JGit downloader, prefs) were
+confirmed sound in the same audit and are NOT being rewritten — this is
+a renderer + schema correction, not a rewrite.
+
 ## 8. Licensing
 
 `vendor/gamenative` and `vendor/droidspaces` are GPL-3.0.
