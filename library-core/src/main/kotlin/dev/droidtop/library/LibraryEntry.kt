@@ -29,6 +29,12 @@ data class LibraryEntry(
     val title: String,
     val kind: LibraryEntryKind,
     val artworkUri: String? = null,
+    // Real ES-DE `manuals` media presence -- see
+    // dev.droidtop.library.EsDeArtwork.resolveManual's own doc comment
+    // for why this is filesystem-derived (same as [artworkUri]) rather
+    // than a GameMetadataEntity field; badge-consumed by EsDeThemedBadges'
+    // own "manual" slot.
+    val manualUri: String? = null,
     val playtimeSeconds: Long = 0,
     val lastPlayedEpochMs: Long? = null,
     // Real, persisted count of how many times this entry has actually been
@@ -79,6 +85,40 @@ data class LibraryEntry(
     // scraper sources themselves report it.
     val players: String? = null,
     val favorite: Boolean = false,
+    // The rest of real ES-DE's own per-GAME metadata field set (see
+    // dev.droidtop.library.consoles.GameMetadataEntity's own doc comment
+    // for the full real MetaData.cpp cross-reference and which fields
+    // are deliberately NOT modeled here, and why) -- user-editable via
+    // dev.droidtop.shell.gamepad's GameMetadataEditor, badge-consumed by
+    // EsDeThemedBadges.
+    val completed: Boolean = false,
+    val kidGame: Boolean = false,
+    val hidden: Boolean = false,
+    val broken: Boolean = false,
+    val noGameCount: Boolean = false,
+    val noMultiScrape: Boolean = false,
+    val hideMetadata: Boolean = false,
+    // Real ES-DE MD_CONTROLLER convention: one of BadgeComponent.cpp's
+    // own real controller shortNames (e.g. "gamepad_generic",
+    // "joystick_arcade_4_buttons") -- see EsDeControllers.kt for the
+    // full real, ported list.
+    val controllerShortName: String? = null,
+    // Which registered LibraryProvider/launch mechanism this specific
+    // game should use instead of its system's real default -- droidtop's
+    // own real equivalent of ES-DE's MD_ALT_EMULATOR, since droidtop has
+    // no RetroArch-core concept, only distinct LibraryProviders per
+    // launch mechanism.
+    val altEmulator: String? = null,
+    // Real ES-DE MD_SCREEN field, applied to droidtop's own actual
+    // multi-display work -- an index into whichever real display outputs
+    // dev.droidtop.app.DisplayOutputRepository currently reports, null
+    // meaning "no override, use the real current default."
+    val launchScreen: Int? = null,
+    val sortName: String? = null,
+    // Real ES-DE MD_STRING field, stored but not yet consumed -- see
+    // GameMetadataEntity's own doc comment for why (no custom-collections
+    // concept in droidtop's data model yet, same tracked gap).
+    val collectionSortName: String? = null,
 )
 
 enum class LibraryEntryKind {
@@ -340,6 +380,37 @@ class Library(
             .filterIsInstance<dev.droidtop.library.consoles.ConsoleRomProvider>()
             .firstOrNull { entry.kind in it.kinds } ?: return@withContext null
         romProvider.toggleFavorite(entry.id)
+    }
+
+    /**
+     * Real load-for-editing step behind [dev.droidtop.shell.gamepad]
+     * `GameMetadataEditor` -- same "not applicable to a non-ROM entry"
+     * `null` convention as [toggleFavorite].
+     */
+    suspend fun getMetadataForEditing(
+        entry: LibraryEntry,
+    ): dev.droidtop.library.consoles.GameMetadataEntity? = withContext(Dispatchers.IO) {
+        val romProvider = providers
+            .filterIsInstance<dev.droidtop.library.consoles.ConsoleRomProvider>()
+            .firstOrNull { entry.kind in it.kinds } ?: return@withContext null
+        romProvider.getMetadataForEditing(entry.id)
+    }
+
+    /**
+     * Real save path behind [dev.droidtop.shell.gamepad]
+     * `GameMetadataEditor` -- returns whether a matching provider was
+     * actually found to save against (same honest-`null`-vs-throw
+     * convention as [toggleFavorite]/[getMetadataForEditing]).
+     */
+    suspend fun saveMetadata(
+        entry: LibraryEntry,
+        metadata: dev.droidtop.library.consoles.GameMetadataEntity,
+    ): Boolean = withContext(Dispatchers.IO) {
+        val romProvider = providers
+            .filterIsInstance<dev.droidtop.library.consoles.ConsoleRomProvider>()
+            .firstOrNull { entry.kind in it.kinds } ?: return@withContext false
+        romProvider.saveMetadata(metadata)
+        true
     }
 
     private suspend fun withPlayHistory(entries: List<LibraryEntry>): List<LibraryEntry> {
