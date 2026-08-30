@@ -1,8 +1,6 @@
 package dev.droidtop.runtime.linux.root
 
 import android.content.Context
-import android.os.Build
-import java.io.File
 
 /**
  * Extracts the bundled `crane` binary (vendor/go-containerregistry's CLI,
@@ -13,32 +11,24 @@ import java.io.File
  * rationale.
  *
  * Unlike droidspaces (a static musl binary needing nothing else), crane is
- * a normal Go binary: arm64 links statically without cgo, but Android's
- * x86_64 target needs external (cgo) linking, so that ABI is built against
- * the Android NDK's clang — see build-scripts/build-vendor-deps.sh's crane
- * section for exactly how. Both are still self-contained executables once
- * built; no runtime shared-library dependency this class needs to worry
- * about.
+ * a normal Go binary built with cgo enabled on EVERY ABI — required on
+ * x86_64 for linking at all, and on arm64 for a working DNS resolver
+ * (Android has no /etc/resolv.conf; only the cgo resolver reaches
+ * bionic/netd — see build-scripts/build-vendor-deps.sh's crane section
+ * for the full confirmed-on-device story). Both are still self-contained
+ * executables once built; no runtime shared-library dependency this
+ * class needs to worry about.
+ *
+ * Extraction is keyed on the APK's own `lastUpdateTime` (same real
+ * pattern, for the same confirmed-live reason, as ThemeAssets'
+ * bundled-theme extraction): a bare `dest.exists()` check kept serving a
+ * binary extracted by an OLD install forever — the real case: the cgo
+ * DNS fix shipped in a new APK while the device kept executing the
+ * three-day-old no-cgo binary, reproducing the exact failure the new
+ * build had fixed. versionCode is pinned at 1 in this project, so it
+ * can't be the key.
  */
 object CraneBinary {
-    fun ensureExtracted(context: Context): String {
-        val dest = File(context.filesDir, "crane/bin/crane")
-        if (!dest.exists()) {
-            dest.parentFile?.mkdirs()
-            context.assets.open("bin/crane-${resolveAssetAbi()}").use { input ->
-                dest.outputStream().use { output -> input.copyTo(output) }
-            }
-            dest.setExecutable(true, /* ownerOnly = */ true)
-        }
-        return dest.absolutePath
-    }
-
-    private fun resolveAssetAbi(): String {
-        val supported = setOf("arm64-v8a", "x86_64")
-        return Build.SUPPORTED_ABIS.firstOrNull { it in supported }
-            ?: error(
-                "No crane asset for this device's ABIs (${Build.SUPPORTED_ABIS.joinToString()}) " +
-                    "— only arm64-v8a and x86_64 are cross-compiled."
-            )
-    }
+    fun ensureExtracted(context: Context): String =
+        BundledBinary.ensureExtracted(context, dirName = "crane", binaryName = "crane", assetBaseName = "crane")
 }
