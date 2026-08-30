@@ -1155,13 +1155,31 @@ summary):
   no automatic multi-source fallback chain).
 - Real element rendering: `image`/`text`/`carousel`/`grid`/`textlist`/
   `video`+`animation` (static-fallback only, no real playback yet)/
-  `clock`/`datetime`/`rating`/`helpsystem`/`badges` (favorite slot
-  only)/`systemstatus` (wifi/cellular/battery, real live device status
-  — droidtop genuinely IS the host; bluetooth deliberately excluded,
-  needs a dangerous runtime permission)/`gamelistinfo` (game+favorites
-  count, no filter/folder cases). Real input-mapping abstraction
-  (`GamepadAction` + `GamepadKeyMap`) feeds both real input handling and
-  the theme's own real `<helpsystem>` labels.
+  `clock`/`datetime`/`rating`/`helpsystem`/`badges` (a real, full
+  `FlexboxComponent`-ported layout — grid/direction/alignment/itemMargin/
+  lines/itemsPerLine math, not an approximation — rendering 7 of real
+  ES-DE's 9 real slots: favorite/completed/kidgame/broken/controller/
+  altemulator/manual; `collection`/`folder` stay honestly unrendered,
+  blocked on the separate collections gap below)/`systemstatus`
+  (wifi/cellular/battery, real live device status — droidtop genuinely IS
+  the host; bluetooth deliberately excluded, needs a dangerous runtime
+  permission)/`gamelistinfo` (game+favorites count, no filter/folder
+  cases). Real input-mapping abstraction (`GamepadAction` +
+  `GamepadKeyMap`) feeds both real input handling and the theme's own
+  real `<helpsystem>` labels.
+- Real per-game metadata editor (`GameMetadataEditor`, droidtop's own
+  equivalent of real ES-DE's `GuiMetaDataEd`) — reachable via an "Edit
+  metadata" action on the game detail screen, covers the full real
+  `MetaData.cpp` field set (completed/kidGame/hidden/broken/
+  noGameCount/noMultiScrape/hideMetadata/controller/altEmulator/
+  launchScreen/sortName/collectionSortName, plus editing the existing
+  scraped description/developer/publisher/genre/players/releaseDate/
+  rating fields directly). `GameMetadataEntity`/`RomEntity` schema
+  bumped (v3→v4) with a real, handwritten migration preserving existing
+  rows — a destructive wipe would have silently discarded real favorite
+  toggles. `EsDeControllers` (runtime-common) ports real ES-DE's own
+  37-entry controller list unchanged, for the controller-badge/metadata
+  picker.
 - A real `droidtop-theme-patches` companion repo
   (`github.com/bi0shacker001/droidtop-theme-patches`) — a deliberately
   empty scaffold (real system-id list + real ES-DE metadata field
