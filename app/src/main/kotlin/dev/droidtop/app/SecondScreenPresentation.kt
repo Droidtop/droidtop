@@ -83,7 +83,10 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
             setViewTreeSavedStateRegistryOwner(savedStateOwner)
             setContent {
                 val entry by _focusedEntry.collectAsState()
-                CompanionInfoPanel(entry)
+                // darkTheme = true: an ambient always-dark companion
+                // surface (black ground is the design, like an idle
+                // screen) -- see DroidtopTheme's own doc comment.
+                dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) { CompanionInfoPanel(entry) }
             }
         }
         setContentView(composeView)
