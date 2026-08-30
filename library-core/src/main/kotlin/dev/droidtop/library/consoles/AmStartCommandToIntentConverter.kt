@@ -83,7 +83,19 @@ object AmStartCommandToIntentConverter {
                 "--ei" -> intent.putExtra(tokens.removeFirst(), Integer.decode(tokens.removeFirst()))
                 "--el" -> intent.putExtra(tokens.removeFirst(), tokens.removeFirst().toLong())
                 "--ef" -> intent.putExtra(tokens.removeFirst(), tokens.removeFirst().toFloat())
-                "--ez" -> intent.putExtra(tokens.removeFirst(), tokens.removeFirst().toBooleanStrict())
+                // Lenient boolean, NOT toBooleanStrict(): real presets from
+                // Daijishō's wiki write boolean extras as 0/1 as well as
+                // true/false, and toBooleanStrict("0") threw -- confirmed
+                // live: the very first real game launch on-device crashed
+                // the whole shell on a preset carrying `--ez key 0`.
+                "--ez" -> intent.putExtra(
+                    tokens.removeFirst(),
+                    when (val raw = tokens.removeFirst().lowercase()) {
+                        "true", "1" -> true
+                        "false", "0" -> false
+                        else -> throw IllegalArgumentException("Bad boolean extra value: $raw")
+                    },
+                )
                 "--esn" -> intent.putExtra(tokens.removeFirst(), null as String?)
                 // Real, documented `am start` boolean flags (no following
                 // value) -- several real emulator presets (DuckStation,

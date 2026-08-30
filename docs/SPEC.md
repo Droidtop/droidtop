@@ -446,6 +446,40 @@ bridges packets to/from the container's VPN:
   and kill-switch semantics are open. The product decision — containers
   can be the device's VPN — is settled.
 
+## 4b. PC-parity requirements: printing, USB peripherals, "open with droidtop"
+
+Standing test, per direction (2026-08-30): **if the user ever has to
+think "I'll need to pull out my computer for that," it's a failing.**
+The three highest-frequency laptop moments with no droidtop story at
+all, now required scope (mechanisms below are the grounded candidates,
+not settled designs):
+
+- **Printing.** Two real, complementary mechanisms: Android's own print
+  framework already handles "print from an Android app" device-wide;
+  for Linux/Wine software, CUPS runs as an ordinary package inside a
+  container (primary or a sibling), which is exactly how printing works
+  on any Linux desktop — droidtop's job is at most a settings pointer
+  and making the container's CUPS socket shareable like the other
+  sockets in §2. Open: whether a container's CUPS printers should also
+  be exposed back to Android as an Android `PrintService`.
+- **USB peripherals** (flash drives, serial adapters, scanners, audio
+  interfaces). Root path: bind the real `/dev` nodes into containers
+  (droidspaces `--hw-access`-style device sharing — its own existing
+  mechanism, deliberately narrowed per-device rather than wholesale).
+  Noroot path: Android's `UsbManager` APIs only, which don't produce
+  device nodes a container can use — an honest capability gap to state
+  in UI, not paper over. Open: per-device grant UX (a container-manager
+  detail view is the natural surface).
+- **"Open with droidtop" file associations.** Downloading an `.exe`,
+  `.msi`, `.AppImage`, or `.deb` and tapping it should offer droidtop:
+  an intent-filter Activity for those MIME/extensions that routes to
+  the right runtime — `.exe`/`.msi` into a Wine prefix (§5), `.deb`
+  into a chosen container's package manager, `.AppImage` into a chosen
+  container — with a real "which container/prefix?" chooser. The
+  runtime plumbing exists; the association surface and chooser are the
+  missing pieces. This is the moment-of-friction fix: execution already
+  works, the tap on the download is what currently dead-ends.
+
 ## 4. Display
 
 - One `DisplayOutput` per Android `Display` the device currently has: the
@@ -1186,6 +1220,34 @@ Spotify's plain REST client) — real next step: pull the SDK's own public
 integration docs from Discord and scope a `library-core/.../presence/
 DiscordPresenceClient` wrapper, same shape as the Spotify client, feeding
 the same `PresencePanel`.
+
+## 7e2. Data-driven player/platform database (directed 2026-08-30)
+
+Standalone-emulator launch definitions (the non-RetroArch emulators) are
+DATA, not code: `players-database.json` — a bundled seed asset in
+library-core plus a separately-updatable copy refreshed, user-driven,
+from the droidtop platform-db repository on GitHub
+(`bi0shacker001/droidtop-platform-db`). `KnownPlayers` loads
+filesDir-copy-if-valid, else the seed; `PlayersDatabaseUpdater` fetches
+with parse-validation before replacing anything. The previous state —
+117 presets as generated Kotlin — required an app release to add an
+emulator; now the database grows independently.
+
+**Generation, not hand-maintenance**: the platform-db repo's generator
+builds the console entries programmatically from other frontends' own
+real, maintained databases — ES-DE mobile's `es_systems.xml` +
+`es_find_rules.xml` (MIT; the richest source: per-system standalone
+commands with real intent details), Daijishō's public Start-Arguments
+wiki (the current seed's origin), and iiSU's database (a third Android
+game frontend — source format/license not yet researched). Windows,
+Linux, and engine-game entries are droidtop's own to author — no
+upstream frontend maintains those.
+
+**JoiPlay is permanently out of the launch loop** (per direction,
+re-confirmed after repeated rediscovery): it exposes no consumable
+launch surface. Engine games launch via enginehost, Kirikiroid2, Wine,
+or a Linux-container build — never JoiPlay, regardless of it being
+installed.
 
 ## 7f. Handheld mode: real, generic ES-DE theme engine
 

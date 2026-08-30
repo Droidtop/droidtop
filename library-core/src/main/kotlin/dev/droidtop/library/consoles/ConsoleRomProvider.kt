@@ -45,7 +45,7 @@ internal fun isPackageInstalled(context: Context, packageName: String): Boolean 
  */
 fun availablePlayers(context: Context, system: ConsoleSystemDef): List<Player.AmStart> {
     val custom = CustomPlayerPrefs.getForSystem(context, system.id)
-    val known = KnownPlayers.forSystem(system.id).map { it.player }
+    val known = KnownPlayers.forSystem(context, system.id).map { it.player }
     val retroArch = DefaultPlayers.retroArch(context, system)
     return (custom + known + listOfNotNull(retroArch)).filter { isPackageInstalled(context, it.packageName) }
 }
