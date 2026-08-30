@@ -127,6 +127,30 @@ object EsDeArtwork {
         }
         return null
     }
+
+    private val VIDEO_EXTENSIONS = listOf("mp4", "avi", "mkv")
+
+    /**
+     * Real ES-DE `videos` media type (USERGUIDE.md's own documented
+     * `downloaded_media` layout: `<system>/videos/<romname>.<ext>`) --
+     * same two-candidate-root search as [resolve]/[resolveManual]. Real
+     * ES-DE scrapers store MP4 almost exclusively; AVI/MKV are checked too
+     * since nothing stops a user from hand-placing a differently-encoded
+     * file here the same way [resolve]'s own PNG/JPG fallback list works.
+     */
+    fun resolveVideo(gamesRoot: File, system: String, romBaseName: String): String? {
+        val candidateMediaRoots = listOf(
+            File(gamesRoot.parentFile ?: gamesRoot, "ES-DE/downloaded_media"),
+            File(gamesRoot, "downloaded_media"),
+        )
+        for (mediaRoot in candidateMediaRoots) {
+            for (ext in VIDEO_EXTENSIONS) {
+                val candidate = File(mediaRoot, "$system/videos/$romBaseName.$ext")
+                if (candidate.isFile) return candidate.absolutePath
+            }
+        }
+        return null
+    }
 }
 
 /** Folder-name convention used both to scan under [File] roots and to key into [EsDeArtwork]'s media lookup. */
