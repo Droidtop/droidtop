@@ -11,90 +11,14 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-import java.nio.file.Files
-
-// AndroidSourceDirectorySet.srcDir() requires every entry to be a real,
-// existing directory -- confirmed via two real CI failures: it doesn't
-// implement PatternFilterable (no include()/exclude()), and a
-// PatternFilterable-filtered fileTree() passed to srcDir() is rejected
-// outright ("Source directory '.../Marker.kt' is not a directory" --
-// AGP validates each resolved path individually, it won't accept a
-// FileCollection of loose files as a source root). Several
-// app/gamenative/* subdirectories mix files this module needs
-// unmodified with sibling files that carry real, deliberate droidtop
-// divergence (see the sourceSets comment below) -- directory-level
-// inclusion alone can't separate those two without pulling in the
-// divergent siblings too and causing a duplicate-class error against
-// this module's own local copies of them.
-//
-// Real fix, not a workaround: this task symlinks exactly the needed
-// files/directories into a build-local staging directory, which IS a
-// real directory AGP will accept. Still a live reference, not a copy --
-// each symlink always resolves to the real file in vendor/gamenative;
-// there is nothing here to fall out of sync. Recreated on every build
-// (cheap: it's just relinking, no I/O on the actual file contents) so a
-// submodule update is picked up automatically without a stale staging
-// dir surviving from an earlier commit.
-val vendorGamenativeJavaRoot = file("../vendor/gamenative/app/src/main/java")
-val vendoredSourcesStagingDir = layout.buildDirectory.dir("vendoredSources/java")
-
-val syncVendorGamenativeSources by tasks.registering {
-    val outputDir = vendoredSourcesStagingDir
-    val javaRoot = vendorGamenativeJavaRoot
-    // The curated app.gamenative.* subset -- see the sourceSets comment
-    // below for what stays local instead and why.
-    val curatedAppGamenativeFiles = listOf(
-        "app/gamenative/enums/Marker.kt",
-        "app/gamenative/powercontrol/autotuning/AdaptiveFpsCap.kt",
-        "app/gamenative/powercontrol/autotuning/DeviceGate.kt",
-        "app/gamenative/powercontrol/autotuning/PidController.kt",
-        "app/gamenative/powercontrol/autotuning/ClusterTuner.kt",
-        "app/gamenative/powercontrol/autotuning/TunerDecisionEngine.kt",
-        "app/gamenative/powercontrol/drivers/NoOpPerformanceDriver.kt",
-        "app/gamenative/powercontrol/metrics/MetricsSnapshot.kt",
-        "app/gamenative/powercontrol/metrics/FrameTimeRing.kt",
-        "app/gamenative/powercontrol/metrics/JsonlSessionLog.kt",
-        "app/gamenative/powercontrol/metrics/PerformanceMetricsCollector.kt",
-        "app/gamenative/powercontrol/profiles/CpuGovernor.kt",
-        "app/gamenative/powercontrol/profiles/PerformancePreset.kt",
-        "app/gamenative/powercontrol/fan/FanTempController.kt",
-        "app/gamenative/powercontrol/AdaptiveFpsCapController.kt",
-        "app/gamenative/powercontrol/PowerBaseline.kt",
-        "app/gamenative/data/ShooterModeConfig.kt",
-        "app/gamenative/data/TouchGestureConfig.kt",
-        "app/gamenative/utils/MarkerUtils.kt",
-        "app/gamenative/SteamBootstrap.kt",
-    )
-    inputs.dir(javaRoot.resolve("com/winlator"))
-    curatedAppGamenativeFiles.forEach { inputs.file(javaRoot.resolve(it)) }
-    outputs.dir(outputDir)
-    doLast {
-        val stagingRoot = outputDir.get().asFile
-        stagingRoot.deleteRecursively()
-        // com.winlator.* wholesale -- one directory-level symlink, no
-        // per-file granularity needed since nothing else lives under
-        // vendor/gamenative's own java/com/ (confirmed) and nothing in
-        // it is droidtop-modified (confirmed via diff, see the
-        // sourceSets comment below).
-        val comLink = stagingRoot.resolve("com")
-        comLink.parentFile.mkdirs()
-        Files.createSymbolicLink(comLink.toPath(), javaRoot.resolve("com").toPath())
-        // The curated app.gamenative.* subset, file by file.
-        curatedAppGamenativeFiles.forEach { relativePath ->
-            val link = stagingRoot.resolve(relativePath)
-            link.parentFile.mkdirs()
-            Files.createSymbolicLink(link.toPath(), javaRoot.resolve(relativePath).toPath())
-        }
-    }
-}
-
 android {
     // Real, deliberate choice, not droidtop's usual dev.droidtop.* --
     // this module compiles vendor/gamenative's real com.winlator.* tree
-    // (via the sourceSets block below — a live reference into the
-    // submodule, not a copy, see that block's own comment) plus the
-    // minimal app.gamenative.* surface it touches (BuildConfig/PluviaApp
-    // compat shims -- see those files' own doc comments). Real
+    // (via real, plain, git-tracked symlinks under src/main/java -- a
+    // live reference into the submodule, not a copy, see the comment a
+    // few lines below) plus the minimal app.gamenative.* surface it
+    // touches (BuildConfig/PluviaApp compat shims -- see those files'
+    // own doc comments). Real
     // com.winlator source references `app.gamenative.R` directly, so this
     // module's own namespace has to BE app.gamenative for AGP's generated
     // R class to resolve those references without editing the forked
@@ -108,61 +32,55 @@ android {
         minSdk = 26
     }
 
-    // Real, live reference into vendor/gamenative -- NOT a copy. An
-    // earlier version of this module held a static, wholesale copy of
-    // gamenative's com.winlator.* tree + res/; confirmed via diff against
-    // the actual submodule that copy had already drifted from upstream
-    // (missing real feature additions like ContainerData's own
-    // xrRefreshRate field) purely from staleness, not any deliberate
-    // droidtop-side patch to those files. Per explicit direction ("we can
-    // just USE it... All of our submodules need to be INTEGRATED, not
-    // copied or replaced"), pointing srcDirs directly at the submodule
-    // means gamenative-tux's own daily upstream-sync keeps this module
-    // current automatically, with zero duplication or manual re-copying.
+    // Real, live reference into vendor/gamenative -- NOT a copy, and NOT
+    // via any Gradle-side staging/copy mechanism either. This module's
+    // own src/main/java/com/winlator is a real, plain git-tracked
+    // symlink to ../../../../vendor/gamenative/app/src/main/java/com/
+    // winlator (git tracks symlinks natively; nothing Gradle-specific
+    // needed -- AGP just sees a normal directory at the conventional
+    // srcDir location, the OS resolves the symlink transparently). An
+    // earlier version of this module held a static, wholesale COPY of
+    // that same tree; confirmed via diff it had already drifted from
+    // real upstream additions (e.g. ContainerData's own xrRefreshRate
+    // field) purely from staleness. The symlink means gamenative-tux's
+    // own daily upstream-sync keeps this module current automatically,
+    // with zero duplication and no rebuild-time indirection.
     //
-    // syncVendorGamenativeSources (top of this file) symlinks exactly the
-    // files this module needs from vendor/gamenative that are genuinely
-    // byte-identical to upstream --
-    // confirmed file-by-file via `diff`, not assumed (line-count diffs
-    // alone are misleading here: a droidtop file that's merely SMALLER
-    // than its real upstream counterpart isn't necessarily "heavily
-    // modified" -- see below). com.winlator.* is included wholesale
-    // (nothing in it is droidtop-modified). app.gamenative.* is NOT
-    // included wholesale -- most of what stays local there isn't a fork
-    // at all: BuildConfig.kt, PluviaApp.kt, MainActivity.kt, PrefManager.kt,
-    // service/SteamService.kt, utils/ContainerUtils.kt, and
-    // utils/LsfgVkManager.kt are all real, minimal compat shims (13-36
-    // lines each, vs. upstream's 650-4800-line real files) -- the same
-    // "empty marker so a dead/unused import resolves" pattern
-    // AndroidEvent.kt's own doc comment explains, confirmed the same way
-    // for each: grepped every live-referenced com.winlator.* caller and
-    // verified none of them actually invoke the parts these shims omit.
-    // The one file here with genuine, structural, load-bearing
-    // divergence is powercontrol/PowerManager.kt -- see its own doc
-    // comment for the real reasoning (different bootstrap order, no
-    // gamenative Application/DI graph) and the real, confirmed-live
-    // surface (`Win32AppWorkarounds.java`, live-referenced) it has to
-    // keep matching. A handful of smaller powercontrol/* files
+    // Individual files under src/main/java/app/gamenative/ are real,
+    // plain symlinks the same way, for whichever ones are genuinely
+    // byte-identical to upstream (confirmed file-by-file via `diff`, not
+    // assumed -- line-count diffs alone are misleading here: a droidtop
+    // file that's merely SMALLER than its real upstream counterpart
+    // isn't necessarily "heavily modified"). Most of what stays a real,
+    // local, non-symlinked file there isn't a fork at all: BuildConfig.kt,
+    // PluviaApp.kt, MainActivity.kt, PrefManager.kt, service/
+    // SteamService.kt, utils/ContainerUtils.kt, and utils/LsfgVkManager.kt
+    // are real, minimal compat shims (13-36 lines each, vs. upstream's
+    // 650-4800-line real files) -- the same "empty marker so a dead/
+    // unused import resolves" pattern AndroidEvent.kt's own doc comment
+    // explains, confirmed the same way for each: grepped every live
+    // (symlinked) com.winlator.* caller and verified none of them
+    // actually invoke the parts these shims omit. The one file here with
+    // genuine, structural, load-bearing divergence is powercontrol/
+    // PowerManager.kt -- see its own doc comment for the real reasoning
+    // (different bootstrap order, no gamenative Application/DI graph)
+    // and the real, confirmed-live surface (`Win32AppWorkarounds.java`)
+    // it has to keep matching. A handful of smaller powercontrol/* files
     // (PowerProfile.kt, PerformanceDriver.kt, SamsungPerformanceDriver.kt,
     // FanController.kt, SystemMetricsReader.kt, PerformanceAutoTuner.kt,
     // PowerControlUiState.kt) also carry real, smaller, confirmed
     // divergences (added methods PowerManager.kt calls, PrefManager-
-    // dependency removal, an initialization-order fix) and stay local for
-    // the same reason -- not yet individually doc-commented the way
-    // PowerManager.kt now is; a real follow-up, not an oversight being
-    // hidden. Also NOT referenced live: gamenative's own Hilt/Room/
-    // Compose-Navigation/JavaSteam-dependent code elsewhere in
-    // app.gamenative.* that this
-    // module was never wired to use at all.
-    sourceSets {
-        getByName("main") {
-            // Real, live reference (via the symlink-staging task above,
-            // see its own comment for why a plain filtered srcDir isn't
-            // accepted by AGP) into vendor/gamenative -- not a copy.
-            java.srcDir(vendoredSourcesStagingDir)
-            res.srcDir("../vendor/gamenative/app/src/main/res")
-        }
-    }
+    // dependency removal, an initialization-order fix) and stay real,
+    // local files for the same reason -- not yet individually
+    // doc-commented the way PowerManager.kt now is; a real follow-up,
+    // not an oversight being hidden. Also NOT symlinked at all:
+    // gamenative's own Hilt/Room/Compose-Navigation/JavaSteam-dependent
+    // code elsewhere in app.gamenative.* that this module was never
+    // wired to use.
+    //
+    // res/ is also a real, plain symlink to vendor/gamenative's own
+    // res/ wholesale (confirmed via diff it was already a lossless,
+    // unfiltered copy, so nothing is lost going live).
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -196,13 +114,6 @@ android {
     // (LinuxContainerBackend/DefaultProotContainerBackend/
     // LinuxProgramLauncherComponent) is included the same way -- this is
     // ProotRuntime's real port source, see runtime-linux-noroot.
-}
-
-// Real ordering requirement: the symlinks have to exist before AGP scans
-// java.srcDir(vendoredSourcesStagingDir) above, and preBuild is AGP's own
-// real, guaranteed-earliest per-variant hook for exactly this.
-tasks.named("preBuild") {
-    dependsOn(syncVendorGamenativeSources)
 }
 
 dependencies {
@@ -242,8 +153,8 @@ dependencies {
     // from vendor/gamenative's own src/main/lib/ (live reference, not a
     // copy — same real file app.gamenative.powercontrol.drivers.
     // SamsungPerformanceDriver.kt (this module's own local, lightly-
-    // modified copy — see the sourceSets comment above) needs it to
-    // compile. A real, optional device-specific driver: on any
+    // modified file — see the android{} block's own comment above) needs
+    // it to compile. A real, optional device-specific driver: on any
     // non-Samsung device this SDK's own runtime checks make it a no-op,
     // not something droidtop's build assumes will always be present.
     implementation(files("../vendor/gamenative/app/src/main/lib/perfsdk-v1.0.0.jar"))

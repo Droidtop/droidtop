@@ -1,0 +1,1 @@
+../../../../../../../../vendor/gamenative/app/src/main/java/app/gamenative/powercontrol/fan/FanTempController.kt
