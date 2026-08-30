@@ -15,7 +15,6 @@ import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.DisplayOutput
 import dev.droidtop.runtime.DisplayOutputKind
 import dev.droidtop.runtime.ImageCatalogResolver
-import dev.droidtop.runtime.ImageCatalogRole
 import dev.droidtop.runtime.ResolvedImage
 import dev.droidtop.runtime.linux.noroot.ProotRuntime
 import dev.droidtop.runtime.linux.root.CraneImageCatalogResolver
@@ -56,12 +55,13 @@ sealed interface DesktopSessionState {
  * this can't get past regardless of code correctness: [ProotRuntime] (the
  * non-root path) is still `TODO()` throughout.
  *
- * [selectPrimaryImage] resolves the bundled seed list's PRIMARY entry
+ * [selectPrimaryImage] resolves the USER-CHOSEN repository (Desktop
+ * setup; droidtop never auto-picks — see that method's own comment)
  * against the real registry via [ImageCatalogResolver] (docs/SPEC.md §3a's
- * "populate at runtime, don't prepopulate" model) — every PRIMARY entry
- * (runtime-common's `known-image-repositories.json`) now names a real,
- * already-published stock distro image (the same ones the SIBLING entries
- * use, e.g. `library/debian`), not a droidtop-maintained custom build:
+ * "populate at runtime, don't prepopulate" model) — every catalog entry
+ * (runtime-common's `known-image-repositories.json`) names a real,
+ * already-published stock distro image (e.g. `library/debian`), not a
+ * droidtop-maintained custom build:
  * [CompositorProvisioning] supplies the chosen distro's own package-manager
  * command, which [ContainerRuntime.createPrimary] runs once on first boot
  * to actually install a compositor into it. This is what makes §3a's "any
@@ -166,27 +166,50 @@ class DesktopSessionService : Service() {
     }
 
     /**
-     * Picks a PRIMARY-role repository — the user's own choice from
-     * onboarding's `DESKTOP_SETUP` step (or its Settings re-entry point),
-     * via [DesktopSetupPrefs], when one was actually made; first
-     * PRIMARY/BOTH match otherwise (unset, or a stale id a catalog edit
-     * removed — never a hard failure over a preference that no longer
-     * resolves) — and resolves it against the real registry via [resolver]
-     * — the catalog is populated live, not prepopulated with pinned
-     * versions (docs/SPEC.md §3a). Picks whatever tag the registry lists
-     * first; no "latest stable" ordering logic yet. Returns the full
-     * [ResolvedImage] (not just a [dev.droidtop.runtime.RootfsImage]) so
-     * [connect] can still see which distro/desktopEnvironment was picked —
-     * needed to look up the right [CompositorProvisioning] command.
+     * Resolves the USER-chosen primary repository (onboarding's
+     * `DESKTOP_SETUP` step, or its Settings re-entry point, via
+     * [DesktopSetupPrefs]) against the real registry via [resolver] — the
+     * catalog is populated live, not prepopulated with pinned versions
+     * (docs/SPEC.md §3a). There is deliberately NO fallback pick: droidtop
+     * never chooses an image the user didn't (per direction — an earlier
+     * "first PRIMARY-role entry" fallback here silently selected alpine
+     * on the first live run). Within the chosen repository the registry's
+     * own `latest` tag is preferred (first-listed picked `alpine:2.6`, a
+     * 2015 image); a real per-tag picker is Desktop setup UI work, not
+     * this method's. Returns the full [ResolvedImage] (not just a
+     * [dev.droidtop.runtime.RootfsImage]) so [connect] can still see which
+     * distro/desktopEnvironment was picked — needed to look up the right
+     * [CompositorProvisioning] command.
      */
     private suspend fun selectPrimaryImage(resolver: ImageCatalogResolver): ResolvedImage {
         val repositories = BundledImageRepositories.load(applicationContext).repositories
         val preferredId = DesktopSetupPrefs.preferredPrimaryImageId(applicationContext)
+        // The USER chooses the primary image (onboarding's Desktop setup
+        // step, re-enterable from Settings) -- droidtop NEVER auto-picks
+        // one. The previous "first PRIMARY-role entry in the seed list"
+        // fallback was a real spec violation (per direction, and §3a's
+        // whole point): it silently selected an image the user never
+        // chose (alpine, on the first live run). No choice, or a stale
+        // choice a catalog edit removed, now fails with guidance instead.
         val repo = repositories.firstOrNull { it.id == preferredId }
-            ?: repositories.firstOrNull { it.role == ImageCatalogRole.PRIMARY || it.role == ImageCatalogRole.BOTH }
-            ?: error("No PRIMARY-role repository in the bundled seed list")
+            ?: error(
+                if (preferredId == null) {
+                    "No desktop image chosen yet — pick one in Desktop setup (Onboarding, or Settings → Desktop)"
+                } else {
+                    "The chosen desktop image ('$preferredId') is no longer in the catalog — pick one in Desktop setup"
+                }
+            )
         val tags = resolver.listTags(repo)
-        val tag = tags.firstOrNull() ?: error("No tags published under ${repo.registry}/${repo.repository}")
+        // Prefer the registry's own real "latest" convention -- taking
+        // whatever tag the listing starts with picked alpine:2.6 (a 2015
+        // image with long-dead package repos) on the first live run,
+        // because `crane ls` returns tags in ascending registry order.
+        // Every stock distro repository in the bundled seed list
+        // publishes a real `latest` tag; anything without one falls back
+        // to the first listed tag as before.
+        val tag = tags.firstOrNull { it.equals("latest", ignoreCase = true) }
+            ?: tags.firstOrNull()
+            ?: error("No tags published under ${repo.registry}/${repo.repository}")
         return resolver.resolve(repo, tag)
     }
 

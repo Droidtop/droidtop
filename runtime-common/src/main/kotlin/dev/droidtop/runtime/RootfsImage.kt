@@ -34,10 +34,15 @@ data class ImageCachePolicy(
 
 interface ImageCache {
     suspend fun get(digest: String): String? // cached blob/layer path, if present
-    suspend fun put(digest: String, blobPath: String)
+    /** [label] is the human-readable `reference:tag` the digest was pulled as — kept alongside the blob so a cache-management UI can show "debian:bookworm", not an opaque digest. */
+    suspend fun put(digest: String, blobPath: String, label: String? = null)
+    /** Every cached entry: digest, size on disk, and the [put]-time label when one was recorded. */
+    suspend fun entries(): List<ImageCacheEntry>
     suspend fun evictToFit(policy: ImageCachePolicy)
     suspend fun clear()
 }
+
+data class ImageCacheEntry(val digest: String, val sizeBytes: Long, val label: String?)
 
 interface RootfsPuller {
     suspend fun resolve(reference: String): RootfsImage
