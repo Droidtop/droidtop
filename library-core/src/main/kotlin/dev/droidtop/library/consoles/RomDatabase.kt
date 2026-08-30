@@ -175,6 +175,40 @@ data class ScannedFolderKey(
     @ColumnInfo(name = "system_folder_id") val systemFolderId: String,
 )
 
+/**
+ * Real custom collection -- droidtop's own equivalent of real ES-DE's
+ * `CollectionSystemType.CUSTOM_COLLECTION` (confirmed against
+ * `CollectionSystemsManager.h`/`.cpp`, a real local clone kept at
+ * /root/es-de-reference for ongoing reference). Only custom collections
+ * are stored -- the three real AUTO collections (all games/favorites/
+ * last played) are computed on the fly from [LibraryEntry]/
+ * [GameMetadataEntity] directly (see `GameGroup.Collection`'s own doc
+ * comment in shell-gamepad), matching real ES-DE's own "no gamelist.xml,
+ * exists only in memory" auto-collection behavior. [id] is a stable,
+ * user-invisible key (a UUID); [name] is the real, user-editable display
+ * name -- kept separate so renaming a collection doesn't need to migrate
+ * every [CollectionMemberEntity] row's own foreign key.
+ */
+@Entity(tableName = "collections")
+data class CollectionEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+)
+
+/**
+ * Real many-to-many membership -- a game can be in any number of custom
+ * collections at once (real ES-DE's own actual model, confirmed via
+ * `CollectionSystemsManager::toggleGameInCollection`'s per-collection
+ * config-file membership, not a single collection-per-game field).
+ * [gameId] matches [RomEntity.id]/[LibraryEntry.id] (the ROM file's own
+ * absolute path).
+ */
+@Entity(tableName = "collection_members", primaryKeys = ["collection_id", "game_id"])
+data class CollectionMemberEntity(
+    @ColumnInfo(name = "collection_id") val collectionId: String,
+    @ColumnInfo(name = "game_id") val gameId: String,
+)
+
 @Dao
 interface RomDao {
     @Query("SELECT * FROM rom_entries WHERE roms_root IN (:romsRoots)")
@@ -246,6 +280,53 @@ interface RomDao {
      */
     @Query("SELECT * FROM game_metadata WHERE id = :id")
     suspend fun getGameMetadataSingle(id: String): GameMetadataEntity?
+
+    @Query("SELECT * FROM collections ORDER BY name")
+    suspend fun getCollections(): List<CollectionEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertCollection(collection: CollectionEntity)
+
+    @Query("DELETE FROM collections WHERE id = :id")
+    suspend fun deleteCollection(id: String)
+
+    @Query("DELETE FROM collection_members WHERE collection_id = :id")
+    suspend fun deleteCollectionMembers(id: String)
+
+    @Query("SELECT game_id FROM collection_members WHERE collection_id = :collectionId")
+    suspend fun getCollectionMemberIds(collectionId: String): List<String>
+
+    // Real collectionId -> gameIds map in one query, for the games-list
+    // read path (every custom collection's membership needed at once,
+    // not one query per collection) -- see GameGroup.Collection's own
+    // doc comment for how this feeds the system carousel.
+    @Query("SELECT collection_id, game_id FROM collection_members")
+    suspend fun getAllCollectionMembers(): List<CollectionMemberEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun addCollectionMember(member: CollectionMemberEntity)
+
+    @Query("DELETE FROM collection_members WHERE collection_id = :collectionId AND game_id = :gameId")
+    suspend fun removeCollectionMember(collectionId: String, gameId: String)
+
+    @Query("SELECT EXISTS(SELECT 1 FROM collection_members WHERE collection_id = :collectionId AND game_id = :gameId)")
+    suspend fun isCollectionMember(collectionId: String, gameId: String): Boolean
+
+    /**
+     * Real add/remove toggle -- droidtop's own equivalent of real ES-DE's
+     * `CollectionSystemsManager::toggleGameInCollection`. Returns the
+     * real new membership state.
+     */
+    @androidx.room.Transaction
+    suspend fun toggleCollectionMember(collectionId: String, gameId: String): Boolean {
+        return if (isCollectionMember(collectionId, gameId)) {
+            removeCollectionMember(collectionId, gameId)
+            false
+        } else {
+            addCollectionMember(CollectionMemberEntity(collectionId, gameId))
+            true
+        }
+    }
 }
 
 /**
@@ -283,7 +364,26 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
-@Database(entities = [RomEntity::class, ScanMetadataEntity::class, GameMetadataEntity::class], version = 4, exportSchema = false)
+/** Real, handwritten migration -- two brand-new tables for real custom collections (see [CollectionEntity]/[CollectionMemberEntity]'s own doc comments), nothing existing touched. */
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `collections` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `collection_members` (`collection_id` TEXT NOT NULL, `game_id` TEXT NOT NULL, PRIMARY KEY(`collection_id`, `game_id`))",
+        )
+    }
+}
+
+@Database(
+    entities = [
+        RomEntity::class, ScanMetadataEntity::class, GameMetadataEntity::class,
+        CollectionEntity::class, CollectionMemberEntity::class,
+    ],
+    version = 5,
+    exportSchema = false,
+)
 abstract class RomDatabase : RoomDatabase() {
     abstract fun romDao(): RomDao
 
@@ -306,7 +406,7 @@ abstract class RomDatabase : RoomDatabase() {
                     // because game_metadata holds real user data that
                     // must survive it -- see that migration's own doc
                     // comment.
-                    .addMigrations(MIGRATION_3_4)
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build().also { instance = it }
             }

@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -318,6 +319,7 @@ fun GamepadShell(
                 else -> when (section) {
                     HandheldSection.GAMES -> GamesSection(
                         entries = gameEntries.orEmpty(),
+                        library = library,
                         onLaunch = onLaunch,
                         onShowDetail = { detailEntry = it },
                         onDrillDownChanged = { canGoBack = it },
@@ -747,6 +749,39 @@ private sealed interface GameGroup {
         override val key get() = "system:$systemId"
         override val label get() = ES_DE_CONSOLE_SYSTEMS.firstOrNull { it.id == systemId }?.displayName ?: systemId
     }
+
+    /**
+     * Real ES-DE collection -- droidtop's own equivalent of real
+     * `CollectionSystemType` (confirmed against
+     * `CollectionSystemsManager.h`/`.cpp`'s own real declaration table,
+     * a real local clone kept at /root/es-de-reference). Unlike
+     * [Engine]/[System], membership here is cross-cutting, not a strict
+     * partition of [LibraryEntry.gameGroup] -- a game can be in "All
+     * games" AND "Favorites" AND its own real system group at once, so
+     * collection membership is computed separately (see
+     * `collectionGroupMembers` in [GamesSection]) rather than through
+     * [LibraryEntry.gameGroup]. [themeFolder] is real ES-DE's own
+     * documented per-collection-type theme subfolder name
+     * (`auto-allgames`/`auto-lastplayed`/`auto-favorites`/
+     * `custom-collections` -- every custom collection shares the one
+     * generic `custom-collections` folder, same as real ES-DE) -- when
+     * the active theme declares that subfolder, its own `theme.xml`
+     * loads instead of the theme's root one (see `ThemeAssets.
+     * loadActiveTheme`'s own `collectionThemeFolder` parameter).
+     */
+    data class Collection(val id: String, override val label: String, val themeFolder: String) : GameGroup {
+        override val key get() = "collection:$id"
+    }
+}
+
+/** Real ES-DE auto-collection ids/theme-folder names, confirmed against `CollectionSystemsManager.cpp`'s own real declaration table -- not guessed. */
+private object AutoCollections {
+    const val ALL_GAMES_ID = "all"
+    const val FAVORITES_ID = "favorites"
+    const val LAST_PLAYED_ID = "recent"
+    const val CUSTOM_THEME_FOLDER = "custom-collections"
+    // Real ES-DE LAST_PLAYED_MAX.
+    const val LAST_PLAYED_LIMIT = 50
 }
 
 // systemId-based grouping isn't CONSOLE_ROM-specific: PcGameProvider tags
@@ -774,6 +809,7 @@ private fun LibraryEntry.gameGroup(): GameGroup {
 @Composable
 private fun GamesSection(
     entries: List<LibraryEntry>,
+    library: Library,
     onLaunch: (LibraryEntry) -> Unit,
     onShowDetail: (LibraryEntry) -> Unit,
     onDrillDownChanged: (Boolean) -> Unit,
@@ -785,6 +821,51 @@ private fun GamesSection(
     var recentOnly by remember { mutableStateOf(false) }
     val firstFocus = remember { FocusRequester() }
     val context = LocalContext.current
+
+    // Real custom collections + membership, loaded once and refreshed
+    // whenever collectionsVersion bumps (mirrors ThemePrefs.version's own
+    // "force a real refresh, not just recomposition-by-luck" pattern) --
+    // CollectionManagerScreen bumps this after any real create/delete/
+    // rename/membership edit.
+    var collectionsVersion by remember { mutableIntStateOf(0) }
+    var customCollections by remember { mutableStateOf<List<dev.droidtop.library.consoles.CollectionEntity>>(emptyList()) }
+    var customCollectionMembership by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
+    LaunchedEffect(collectionsVersion) {
+        customCollections = library.getCollections()
+        customCollectionMembership = library.getCollectionMembership()
+    }
+    val entriesById = remember(entries) { entries.associateBy { it.id } }
+    // Real ES-DE auto-collections -- computed on the fly, never stored
+    // (see GameGroup.Collection's own doc comment). Only shown when
+    // non-empty, same "present-and-non-empty groups" convention the
+    // real system/engine groups below already use.
+    val autoCollectionGroups = remember(entries) {
+        buildList {
+            if (entries.isNotEmpty()) add(GameGroup.Collection(AutoCollections.ALL_GAMES_ID, "All games", "auto-allgames"))
+            if (entries.any { it.favorite }) add(GameGroup.Collection(AutoCollections.FAVORITES_ID, "Favorites", "auto-favorites"))
+            if (entries.any { it.lastPlayedEpochMs != null }) add(GameGroup.Collection(AutoCollections.LAST_PLAYED_ID, "Last played", "auto-lastplayed"))
+        }
+    }
+    val customCollectionGroups = remember(customCollections) {
+        customCollections.map { GameGroup.Collection(it.id, it.name, AutoCollections.CUSTOM_THEME_FOLDER) }
+    }
+    val collectionGroups = autoCollectionGroups + customCollectionGroups
+    // Real cross-cutting membership -- a game can be in several
+    // collections at once, unlike the strict system/engine partition
+    // below (see GameGroup.Collection's own doc comment).
+    val collectionGroupMembers = remember(collectionGroups, entries, customCollectionMembership) {
+        collectionGroups.associateWith { group ->
+            when (group.id) {
+                AutoCollections.ALL_GAMES_ID -> entries
+                AutoCollections.FAVORITES_ID -> entries.filter { it.favorite }
+                AutoCollections.LAST_PLAYED_ID -> entries
+                    .filter { it.lastPlayedEpochMs != null }
+                    .sortedByDescending { it.lastPlayedEpochMs }
+                    .take(AutoCollections.LAST_PLAYED_LIMIT)
+                else -> customCollectionMembership[group.id].orEmpty().mapNotNull { entriesById[it] }
+            }
+        }
+    }
     // Real per-game navigation index for the drilled-into-a-system
     // "gamelist" screen, ONLY used when the active theme's own real
     // gamelist view has no <carousel>/<grid>/<textlist> of its own to
@@ -795,16 +876,30 @@ private fun GamesSection(
     // convention.
     var focusedGameIndex by remember(selectedGroup) { mutableStateOf(0) }
     val selectedGroupSystemId = (selectedGroup as? GameGroup.System)?.systemId
-    val gamelistTheme = remember(selectedGroup, selectedGroupSystemId, ThemePrefs.version) {
-        if (selectedGroup != null) ThemeAssets.loadActiveTheme(context, selectedGroupSystemId) else null
+    val selectedGroupThemeFolder = (selectedGroup as? GameGroup.Collection)?.themeFolder
+    val gamelistTheme = remember(selectedGroup, selectedGroupSystemId, selectedGroupThemeFolder, ThemePrefs.version) {
+        if (selectedGroup != null) ThemeAssets.loadActiveTheme(context, selectedGroupSystemId, selectedGroupThemeFolder) else null
     }
     val gamelistView = gamelistTheme?.views?.get("gamelist")
     val gamelistHasListWidget = remember(gamelistView) { gamelistView?.primaryListElement() != null }
     // Alphabetical -- real ES-DE's own default gamelist sort order, and a
     // real, stable Up/Down order for the headless (no list widget) case
     // below, unlike allGames' own natural Library order.
-    val systemGamesForGroup = remember(selectedGroup, entries) {
-        selectedGroup?.let { g -> entries.filter { it.gameGroup() == g } }?.sortedBy { it.title.lowercase() } ?: emptyList()
+    val systemGamesForGroup = remember(selectedGroup, entries, collectionGroupMembers) {
+        when (selectedGroup) {
+            null -> emptyList()
+            // Real ES-DE Last Played stays in real recency order -- the
+            // one real collection where alphabetizing would defeat its
+            // own purpose. Every other group (including the other two
+            // real auto-collections) keeps the same alphabetical order
+            // real ES-DE gamelists default to.
+            is GameGroup.Collection -> if (selectedGroup.id == AutoCollections.LAST_PLAYED_ID) {
+                collectionGroupMembers[selectedGroup].orEmpty()
+            } else {
+                collectionGroupMembers[selectedGroup].orEmpty().sortedBy { it.title.lowercase() }
+            }
+            else -> entries.filter { it.gameGroup() == selectedGroup }.sortedBy { it.title.lowercase() }
+        }
     }
     // Real, unified themed-gamelist condition -- ONE real render path
     // below handles ANY theme with a real "gamelist" view, whether or not
@@ -860,7 +955,19 @@ private fun GamesSection(
     val orderedSystemGroups = byGroup.keys
         .filterIsInstance<GameGroup.System>()
         .sortedBy { it.label.lowercase() }
-    val orderedGroups: List<GameGroup> = orderedEngineGroups + orderedSystemGroups
+    // Real collections (auto + custom) lead the carousel -- quick access
+    // to Favorites/Last played/etc. without scrolling past every real
+    // console system, same real spirit as real ES-DE's own collections
+    // (a droidtop-side ordering choice; real ES-DE's own default
+    // placement isn't itself part of the theme-engine spec this follows).
+    val orderedGroups: List<GameGroup> = collectionGroups + orderedEngineGroups + orderedSystemGroups
+    // Real per-group item counts -- byGroup covers the strict
+    // system/engine partition, collectionGroupMembers covers the
+    // cross-cutting collections (see GameGroup.Collection's own doc
+    // comment for why these can't share one plain groupBy).
+    val groupItemCounts: Map<GameGroup, Int> = remember(byGroup, collectionGroupMembers) {
+        byGroup.mapValues { it.value.size } + collectionGroupMembers.mapValues { it.value.size }
+    }
 
     LaunchedEffect(selectedGroup, hasThemedGamelist, focusedGameIndex) {
         // Real regardless of whether the theme's gamelist has its own
@@ -978,19 +1085,23 @@ private fun GamesSection(
                     // onFocusedIndexChanged, driven by whichever carousel
                     // item actually has focus right now.
                     var focusedSystemIndex by remember { mutableStateOf(0) }
-                    val focusedSystemId = (orderedGroups.getOrNull(focusedSystemIndex) as? GameGroup.System)?.systemId
+                    val focusedGroup = orderedGroups.getOrNull(focusedSystemIndex)
+                    val focusedSystemId = (focusedGroup as? GameGroup.System)?.systemId
+                    val focusedThemeFolder = (focusedGroup as? GameGroup.Collection)?.themeFolder
                     // Keyed by ThemePrefs.version too, not just
                     // focusedSystemId -- otherwise switching the active
                     // theme from Settings has no effect until some
                     // unrelated recomposition happens to also fire (see
                     // ThemePrefs.version's own doc comment).
-                    val theme = remember(focusedSystemId, ThemePrefs.version) { ThemeAssets.loadActiveTheme(context, focusedSystemId) }
+                    val theme = remember(focusedSystemId, focusedThemeFolder, ThemePrefs.version) {
+                        ThemeAssets.loadActiveTheme(context, focusedSystemId, focusedThemeFolder)
+                    }
                     val listElement = remember(theme) { theme?.views?.get("system")?.primaryListElement() }
                     val items = orderedGroups.map { entryGroup ->
                         EsDeListItem(
                             key = entryGroup.key,
                             label = entryGroup.label,
-                            count = byGroup.getValue(entryGroup).size,
+                            count = groupItemCounts[entryGroup] ?: 0,
                             logoPath = (entryGroup as? GameGroup.System)?.let { ThemeAssets.systemLogoPath(context, it.systemId) },
                             accentColor = (entryGroup as? GameGroup.System)
                                 ?.let { SystemThemeColors.forSystem(context, it.systemId) }
