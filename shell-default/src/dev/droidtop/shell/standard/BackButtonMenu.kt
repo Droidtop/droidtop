@@ -44,6 +44,16 @@ object BackButtonMenu {
     const val EXTRA_HANDHELD_RESCAN = "dev.droidtop.app.EXTRA_HANDHELD_RESCAN"
 
     /**
+     * Set by Launcher's HOME-press forwarding (Launcher.onNewIntent):
+     * MainActivity re-runs its dual-screen role orchestration ("fix my
+     * screens" -- Android mirrors a second display nothing presents on)
+     * WITHOUT reclaiming a display the user launched an app onto. An
+     * explicit shell entry (this menu's own Handheld item) omits it, which
+     * is what clears that parked state -- see MainActivity.
+     */
+    const val EXTRA_DISPLAY_REINIT = "dev.droidtop.app.EXTRA_DISPLAY_REINIT"
+
+    /**
      * "Android" is only offered when droidtop actually holds a HOME role
      * (see [HomeRolePrefs]) — a user who chose "neither" during onboarding
      * has nothing for this entry to point to, so it's hidden rather than
@@ -63,7 +73,11 @@ object BackButtonMenu {
             if (ModePrefs.isModeEnabled(activity, MODE_HANDHELD)) add("Handheld")
             add("Settings")
         }
-        AlertDialog.Builder(activity)
+        // DroidtopDialog: the same dark chrome palette as DroidtopTheme
+        // (docs/SPEC.md section 2a chrome theming). This menu used to
+        // render in the stock AlertDialog look, visually unrelated to
+        // every other droidtop surface.
+        AlertDialog.Builder(activity, com.android.launcher3.R.style.DroidtopDialog)
             .setItems(items.toTypedArray()) { _, which ->
                 when (items[which]) {
                     "Android" -> launchHomeImplementation(activity, homeImplementation)

@@ -655,4 +655,19 @@
         <item name="widgetsTheme">@style/WidgetContainerTheme</item>
         <item name="pageIndicatorDotColor">@color/page_indicator_dot_color_light</item>
     </style>
+    <!-- The BackButtonMenu shell-switcher dialog, matching droidtop's
+         own chrome palette (DroidtopTheme, docs/SPEC.md section 2a):
+         dark surface, light text, the chrome's blue as the accent. The
+         stock AlertDialog look was visually unrelated to every other
+         droidtop surface. -->
+    <style name="DroidtopDialog" parent="@android:style/Theme.DeviceDefault.Dialog.Alert">
+        <item name="android:colorBackground">#FF1A1A1A</item>
+        <item name="android:textColorPrimary">#FFEDEDED</item>
+        <item name="android:textColor">#FFEDEDED</item>
+        <item name="android:colorAccent">#FF8AB4FF</item>
+        <item name="android:windowTitleStyle">@style/DroidtopDialogTitle</item>
+    </style>
+    <style name="DroidtopDialogTitle" parent="@android:style/TextAppearance.DeviceDefault.DialogWindowTitle">
+        <item name="android:textColor">#FFEDEDED</item>
+    </style>
 </resources>
