@@ -886,19 +886,20 @@ private fun GamesSection(
     // real, stable Up/Down order for the headless (no list widget) case
     // below, unlike allGames' own natural Library order.
     val systemGamesForGroup = remember(selectedGroup, entries, collectionGroupMembers) {
-        when (selectedGroup) {
+        val group = selectedGroup
+        when (group) {
             null -> emptyList()
             // Real ES-DE Last Played stays in real recency order -- the
             // one real collection where alphabetizing would defeat its
             // own purpose. Every other group (including the other two
             // real auto-collections) keeps the same alphabetical order
             // real ES-DE gamelists default to.
-            is GameGroup.Collection -> if (selectedGroup.id == AutoCollections.LAST_PLAYED_ID) {
-                collectionGroupMembers[selectedGroup].orEmpty()
+            is GameGroup.Collection -> if (group.id == AutoCollections.LAST_PLAYED_ID) {
+                collectionGroupMembers[group].orEmpty()
             } else {
-                collectionGroupMembers[selectedGroup].orEmpty().sortedBy { it.title.lowercase() }
+                collectionGroupMembers[group].orEmpty().sortedBy { it.title.lowercase() }
             }
-            else -> entries.filter { it.gameGroup() == selectedGroup }.sortedBy { it.title.lowercase() }
+            else -> entries.filter { it.gameGroup() == group }.sortedBy { it.title.lowercase() }
         }
     }
     // Real, unified themed-gamelist condition -- ONE real render path
