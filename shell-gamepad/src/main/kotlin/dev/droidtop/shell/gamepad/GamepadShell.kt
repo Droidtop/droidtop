@@ -35,6 +35,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
@@ -746,6 +747,34 @@ private fun HandheldSection.displayName(): String = when (this) {
  * emulation frontend) uses, which was the whole point of adopting that
  * model in the first place.
  */
+/**
+ * Requests focus once the [androidx.compose.ui.focus.FocusRequester]'s
+ * node actually exists. A themed view composes its list widget through
+ * several nested layout passes, so the focusable node attaches a LATER
+ * frame than a LaunchedEffect's first dispatch -- a single requestFocus
+ * reliably threw "FocusRequester is not initialized" (caught, so no
+ * crash, but the screen then had NO focus at all and every D-pad key
+ * went nowhere -- confirmed live on-device via logcat). Retries across
+ * frames until the node exists; gives up quietly after ~1s of frames
+ * rather than looping forever on a theme whose view genuinely never
+ * attaches one (ES-DWEE's widgetless system view is the real case).
+ */
+private suspend fun requestFocusWhenAttached(
+    focusRequester: androidx.compose.ui.focus.FocusRequester,
+    tag: String,
+) {
+    var attached = false
+    repeat(60) {
+        if (!attached) {
+            attached = runCatching { focusRequester.requestFocus() }.isSuccess
+            if (!attached) withFrameNanos {}
+        }
+    }
+    if (!attached) {
+        android.util.Log.w("droidtop.GamepadShell", "$tag focus never attached after 60 frames")
+    }
+}
+
 private sealed interface GameGroup {
     val key: String
     val label: String
@@ -1237,8 +1266,7 @@ private fun GamesSection(
                         (systemView == null || systemView.primaryListElement() != null)
                     LaunchedEffect(willAttachFocus, systemView) {
                         if (willAttachFocus) {
-                            runCatching { firstFocus.requestFocus() }
-                                .onFailure { android.util.Log.w("droidtop.GamepadShell", "System-list focus request failed", it) }
+                            requestFocusWhenAttached(firstFocus, "System list")
                         }
                     }
                     if (systemView != null) {
@@ -1311,12 +1339,11 @@ private fun GamesSection(
             // every other element (metadata/rating/datetime/video) always
             // binds to whichever game is actually current.
             LaunchedEffect(group, gamelistHasListWidget, gamelistWidgetItems) {
-                // Same never-crash boundary as the system-list screen's own
-                // focus request above -- a theme's structure must never be
-                // able to kill the app via an unattached FocusRequester.
+                // Same never-crash boundary AND same frame-retry as the
+                // system-list screen's own focus request above (see
+                // requestFocusWhenAttached).
                 if (gamelistHasListWidget && gamelistWidgetItems.isNotEmpty()) {
-                    runCatching { firstFocus.requestFocus() }
-                        .onFailure { android.util.Log.w("droidtop.GamepadShell", "Gamelist focus request failed", it) }
+                    requestFocusWhenAttached(firstFocus, "Gamelist")
                 }
             }
             EsDeThemedView(
@@ -1348,7 +1375,7 @@ private fun GamesSection(
             // Same "don't request focus on an unattached FocusRequester" fix
             // as the system-list view above -- games can be empty here too
             // (the "recent" filter selected with zero recently-played entries).
-            LaunchedEffect(group, recentOnly) { if (games.isNotEmpty()) firstFocus.requestFocus() }
+            LaunchedEffect(group, recentOnly) { if (games.isNotEmpty()) requestFocusWhenAttached(firstFocus, "Game grid") }
             // Same real per-system accent as GroupCard's own border, applied
             // as a subtle top-down vignette behind the whole grid -- carries
             // the "dynamic per-system," not just per-card, through into the
@@ -1473,7 +1500,7 @@ private fun AppsSection(
     // Same "don't request focus on an unattached FocusRequester" fix as
     // GamesSection -- firstFocus is only attached to a card once sections
     // is confirmed non-empty (see the early return right below).
-    LaunchedEffect(entries) { if (sections.isNotEmpty()) firstFocus.requestFocus() }
+    LaunchedEffect(entries) { if (sections.isNotEmpty()) requestFocusWhenAttached(firstFocus, "Sections") }
 
     if (sections.isEmpty()) {
         Text("No apps detected yet.", color = Color.White)
