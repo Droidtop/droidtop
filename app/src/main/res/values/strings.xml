@@ -4,7 +4,7 @@
          its own UI text, not just its manifest label. Since it has
          per-locale translations of that name and we don't, non-English
          locales fell back to its value ("Launcher:3") instead of ours for
-         the app's display label — confirmed on a real published APK via
+         the app's display label - confirmed on a real published APK via
          `aapt dump badging`. A distinct name avoids the resource-name
          collision entirely rather than fighting it. -->
     <string name="droidtop_app_name">droidtop</string>

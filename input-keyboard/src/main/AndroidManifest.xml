@@ -10,17 +10,17 @@
 
     <!--
       droidtop patch (not upstream Hacker's Keyboard): dropped
-      android:allowBackup (was "true" — :app's own android:allowBackup=
+      android:allowBackup (was "true" - :app's own android:allowBackup=
       "false" is the single source of truth, not a per-module opinion),
       android:backupAgent (real manifest-merge conflict against
-      shell-default's own LauncherBackupAgent — Android allows exactly
+      shell-default's own LauncherBackupAgent - Android allows exactly
       one per app; LatinIMEBackupAgent just isn't wired to anything yet,
       so dropping it costs nothing right now), android:hardwareAccelerated
-      (was "false", conflicting with shell-default's "true" — no known
+      (was "false", conflicting with shell-default's "true" - no known
       reason this module specifically needs software rendering), and the
       Main activity's LAUNCHER intent-filter (droidtop has one app-drawer
       identity; this would have added a stray second "Hacker's Keyboard"
-      icon). Main itself is kept — still reachable by explicit Intent —
+      icon). Main itself is kept - still reachable by explicit Intent -
       just not a launcher entry point.
     -->
     <application android:label="@string/english_ime_name"
@@ -30,11 +30,11 @@
 
         <!--
           android:exported now explicit on every component below (droidtop
-          patch — targetSdk 31+ requires it whenever an intent-filter is
+          patch - targetSdk 31+ requires it whenever an intent-filter is
           present, a real build error otherwise, not assumed). LatinIME
           itself must stay exported=true: the system's IME framework has
           to be able to bind to it for it to be selectable at all. Every
-          settings/preference screen below is exported=false — reachable
+          settings/preference screen below is exported=false - reachable
           only by droidtop's own explicit intents, not meant for other
           apps to launch.
         -->

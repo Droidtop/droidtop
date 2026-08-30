@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- DroidTop's own icon (not Murine/Launcher3's default): a laptop with the
-     Android robot on its screen — "turns an Android device into a laptop-
+     Android robot on its screen - "turns an Android device into a laptop-
      class desktop." Kept inside the ~66dp adaptive-icon safe zone (centered
      in the 108x108 viewport) so it survives circle/squircle/rounded-square
      masking alike. Android green (#3DDC84, the real brand color) for the

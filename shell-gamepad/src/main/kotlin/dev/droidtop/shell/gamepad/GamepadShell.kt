@@ -278,6 +278,19 @@ fun GamepadShell(
     // loads, same as before.
     LaunchedEffect(Unit) { tabBarFocus.requestFocus() }
 
+    // Outermost back swallow: droidtop is the HOME surface -- system back
+    // (which this hardware's B button doubles as) at the shell's top level
+    // must never finish the Activity and drop the user into whatever app
+    // happened to be behind the launcher (confirmed live, per report).
+    // Composed FIRST, so every deeper BackHandler (detail close, drill-up)
+    // registers later on the dispatcher and takes precedence while active.
+    androidx.activity.compose.BackHandler(enabled = true) {
+        // Deliberate no-op: top-of-shell back goes nowhere, same as any
+        // Android home screen.
+    }
+    // Real dispatcher-route for closing the detail screen with B/back --
+    // same reason as the drill-up BackHandler in GamesSection.
+    androidx.activity.compose.BackHandler(enabled = detailEntry != null) { detailEntry = null }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1107,6 +1120,17 @@ private fun GamesSection(
         }
     }
 
+    // Real system-back route for the drill-up: on this hardware B doubles
+    // as KEYCODE_BACK, which Android delivers through the back DISPATCHER
+    // (Activity back), not as a key event any composable sees -- so the
+    // onKeyEvent branch below never fired for it and the Activity finished
+    // instead, kicking the user out of droidtop entirely (confirmed live,
+    // per report). BackHandler registers on the real dispatcher; composed
+    // deeper than GamepadShell's own root swallow, so it wins while a
+    // group is open.
+    androidx.activity.compose.BackHandler(enabled = selectedGroup != null) {
+        selectedGroup = null
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
