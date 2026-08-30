@@ -197,6 +197,14 @@ class DroidSpacesRuntime(
     }
 
     override suspend fun start(container: Container) {
+        // Best-effort stop of a stale same-name instance first. Real,
+        // confirmed on-device leak this recovers from: droidspaces child
+        // processes survive an app force-stop (force-stop skips every
+        // Android lifecycle hook, so DesktopSessionService.onDestroy's own
+        // reap never runs) -- container names are deterministic
+        // (PRIMARY_NAME etc.), so the next session start is the reliable
+        // place to reap the previous one instead of double-starting.
+        RootProcess.run(binaryPath, "--name=${container.id}", "stop")
         val configPath = File(configsDir, "${container.id}.config").absolutePath
         val result = RootProcess.run(binaryPath, "--conf=$configPath", "start")
         check(result.succeeded) { "droidspaces start failed for ${container.id}: ${result.stderr}" }

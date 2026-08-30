@@ -1,8 +1,6 @@
 package dev.droidtop.runtime.linux.root
 
 import android.content.Context
-import android.os.Build
-import java.io.File
 
 /**
  * Extracts the bundled `droidspaces` binary (a static musl-libc executable,
@@ -20,31 +18,6 @@ import java.io.File
  */
 object DroidSpacesBinary {
     /** Absolute path to the extracted, executable `droidspaces` binary. */
-    fun ensureExtracted(context: Context): String {
-        val dest = File(context.filesDir, "droidspaces/bin/droidspaces")
-        if (!dest.exists()) {
-            dest.parentFile?.mkdirs()
-            context.assets.open("bin/droidspaces-${resolveAssetAbi()}").use { input ->
-                dest.outputStream().use { output -> input.copyTo(output) }
-            }
-            dest.setExecutable(true, /* ownerOnly = */ true)
-        }
-        return dest.absolutePath
-    }
-
-    /**
-     * [Build.SUPPORTED_ABIS] is ordered by preference — the first entry is
-     * the device's actual primary ABI. Only `arm64-v8a`/`x86_64` have
-     * cross-compiled assets (see build-scripts/build-vendor-deps.sh); any
-     * other primary ABI (e.g. a 32-bit-only device) has nothing to extract
-     * and fails loudly here rather than silently picking the wrong binary.
-     */
-    private fun resolveAssetAbi(): String {
-        val supported = setOf("arm64-v8a", "x86_64")
-        return Build.SUPPORTED_ABIS.firstOrNull { it in supported }
-            ?: error(
-                "No droidspaces asset for this device's ABIs (${Build.SUPPORTED_ABIS.joinToString()}) " +
-                    "— only arm64-v8a and x86_64 are cross-compiled."
-            )
-    }
+    fun ensureExtracted(context: Context): String =
+        BundledBinary.ensureExtracted(context, dirName = "droidspaces", binaryName = "droidspaces", assetBaseName = "droidspaces")
 }

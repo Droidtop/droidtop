@@ -1556,11 +1556,23 @@ Every module now builds and links for real:
   build-vendor-deps.sh now builds crane `CGO_ENABLED=1` against the NDK
   clang on EVERY ABI (arm64 included — x86_64 already required it), and
   the workflow's deps-cache key is bumped (v7) so the cached no-cgo
-  binary can't keep being served; on-device DNS re-verification still
-  pending the next installed build. Also found: `droidspaces` child
-  processes leak past app force-stop (nothing reaps them), and the
-  whole pipeline has no logging (failures render only in the Desktop
-  shell's own UI).
+  binary can't keep being served. **VERIFIED on-device**: the rebuilt
+  binary, run directly from the installed APK on the RP5, selects the
+  cgo resolver (`GODEBUG=netdns=2`: `hostLookupOrder(index.docker.io) =
+  cgo`) and `crane ls docker.io/library/alpine` returns real tags.
+  Verifying it surfaced a second, independent bug in the same class as
+  the theme staleness: `CraneBinary`/`DroidSpacesBinary` extraction was
+  gated on bare `dest.exists()`, so the device kept EXECUTING a
+  three-day-old no-cgo extraction while the fixed binary sat unread in
+  the newly installed APK — both now share one `BundledBinary` helper
+  whose marker is keyed on the APK's `lastUpdateTime` (versionCode is
+  pinned at 1, so it can't be the key). Also found and since fixed (same
+  day): `droidspaces` child processes leaked past app force-stop
+  (force-stop skips onDestroy, so no lifecycle hook can reap; fixed by
+  a best-effort stale-instance stop at the next `start()` — container
+  names are deterministic — plus a real `onDestroy` reap for normal
+  teardown), and the pipeline had no logging (every stage and every
+  failure now logs under `droidtop.DesktopSession`, with stack traces).
 
 The APK is a single fat build covering both `arm64-v8a` (real hardware —
 Retroid Pocket 5 and similar) and `x86_64` (emulators/x86 devices), rather
