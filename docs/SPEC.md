@@ -582,16 +582,28 @@ not settled designs):
   relocation attempts are cooldown-guarded — the recreated instance can
   read its display as DEFAULT before window attach, and an unguarded
   mismatch check relaunch-looped forever (confirmed live).
-- **Recents is NOT droidtop's today — quickstep backlog**: the Recents
-  UI belongs to the app holding the Quickstep role; shell-default's
-  Launcher3 fork deliberately excludes the quickstep module (SystemUI
-  shared-lib + per-Android-version plumbing), so recents comes from the
-  system's own component and droidtop cannot reshape it. A
-  display-aware recents (grouping tasks by which screen they run on —
-  quickstep's task model carries per-task displayId) is genuinely
-  buildable but only by compiling the quickstep flavor and holding the
-  default-home role: a large, separate work package, recorded here
-  rather than attempted as a patch.
+- **Recents (decided 2026-08-30): droidtop builds its OWN in-shell
+  recents; system quickstep recents is out.** Holding the system
+  recents role is impossible without root/system privileges
+  (`config_recentsComponentName` is ROM configuration; every launcher
+  with working quickstep recents is a system/ROM install), and root is
+  desktop-mode-only by standing rule — so replacing the system Recents
+  UI would make droidtop device- and Android-version-specific and is
+  rejected. Instead: a droidtop recents surface inside the shells,
+  unprivileged — droidtop-launched entries first (play history +
+  `LaunchDisplay`'s own per-launch display knowledge → screen-aware
+  grouping and "pull this game to the other screen" actions the system
+  recents could never offer), optionally enriched to all apps via
+  `UsageStatsManager` with the user-grantable usage-access permission.
+  **Backlog (directed)**: the same in-shell recents should also expose
+  every WINDOW running in the Desktop-mode session (the primary
+  compositor's window list, via the same wlroots protocols host-bridge
+  already speaks — e.g. `wlr-foreign-toplevel-management`) as
+  first-class recents entries, so desktop apps can be made fullscreen
+  and switched between naturally from the same surface as Android
+  tasks. The quickstep sources stay parked in
+  `upstream-unused-reference/` for a hypothetical future ROM/system
+  build only.
 - **General framing**: droidtop's display/shell/settings model takes KDE
   Plasma as its broader reference point, not just for KScreen specifically
   — the goal (§1) is a real general-purpose compute device, and KDE is the
