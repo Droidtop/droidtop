@@ -141,7 +141,7 @@ object ThemeAssets {
     /** Public read of [resolveActiveTheme]'s own name -- the real, resolved active theme, for UI display/cycling, not just the raw (possibly unset) [ThemePrefs] value. */
     fun activeThemeName(context: Context): String? = resolveActiveTheme(context)?.name
 
-    private val systemThemeCache = mutableMapOf<Triple<String, String?, String?>, EsDeTheme?>()
+    private val systemThemeCache = mutableMapOf<Triple<String, String?, Pair<String?, String?>>, EsDeTheme?>()
 
     /**
      * Loads the currently active theme (real, discovered + selected per
@@ -168,9 +168,14 @@ object ThemeAssets {
      * compatible), a deliberate droidtop simplification: droidtop always
      * shows collections, just without a themed override when none exists.
      */
-    fun loadActiveTheme(context: Context, systemId: String? = null, collectionThemeFolder: String? = null): EsDeTheme? {
+    fun loadActiveTheme(
+        context: Context,
+        systemId: String? = null,
+        collectionThemeFolder: String? = null,
+        systemFullName: String? = null,
+    ): EsDeTheme? {
         val active = resolveActiveTheme(context) ?: return null
-        val cacheKey = Triple(active.name, systemId, collectionThemeFolder)
+        val cacheKey = Triple(active.name, systemId, collectionThemeFolder to systemFullName)
         systemThemeCache[cacheKey]?.let { return it }
 
         val themeDir = when {
@@ -204,6 +209,7 @@ object ThemeAssets {
                 systemTheme = systemId,
                 screenAspectRatio = screenAspectRatio,
                 deviceLocale = deviceLocale,
+                systemFullName = systemFullName,
             )
         } catch (t: Exception) {
             Log.e("droidtop.ThemeAssets", "Failed to parse theme '${active.name}'", t)

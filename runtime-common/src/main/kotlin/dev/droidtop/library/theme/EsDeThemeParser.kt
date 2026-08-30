@@ -223,6 +223,7 @@ object EsDeThemeParser {
         systemTheme: String? = null,
         screenAspectRatio: Float? = null,
         deviceLocale: String? = null,
+        systemFullName: String? = null,
     ): EsDeTheme {
         val capabilities = parseCapabilities(File(themeFile.parentFile, "capabilities.xml"))
         val rawAspectRatio = capabilities.aspectRatios.firstOrNull() ?: "16:9"
@@ -244,6 +245,7 @@ object EsDeThemeParser {
             variant = capabilities.variants.firstOrNull(),
             systemTheme = systemTheme,
             language = resolvedLanguage,
+            systemFullName = systemFullName,
         )
     }
 
@@ -296,6 +298,22 @@ object EsDeThemeParser {
         // <language> capabilities at all (most themes/views -- language-
         // scoped blocks simply don't exist to match against either way).
         language: String? = null,
+        // Real ES-DE `system.name`/`system.fullName` variables (confirmed
+        // against `SystemData.cpp`'s own real `sysData.insert(...)`
+        // calls, a real local clone kept at /root/es-de-reference) --
+        // previously entirely unpopulated (only `system.theme` was),
+        // a real, confirmed-live gap (any theme text using
+        // `${system.fullName}` rendered the raw placeholder literally,
+        // caught on-device). Both variables resolve to the same real
+        // display string here -- droidtop has no separate "short
+        // internal name" vs. "display name" distinction real ES-DE's
+        // own `name`/`fullName` split serves, so inventing one wouldn't
+        // be real. Not populated: the real
+        // `.autoCollections`/`.customCollections`/`.noCollections`
+        // variant suffixes (a real, further ES-DE feature for
+        // conditional collection-vs-regular-system text -- a genuinely
+        // separate, smaller follow-up, not attempted here).
+        systemFullName: String? = null,
     ): EsDeTheme {
         val axes = listOf(
             VariantAxis("variant", variant),
@@ -306,6 +324,10 @@ object EsDeThemeParser {
         )
         val variables = mutableMapOf<String, String>()
         if (systemTheme != null) variables["system.theme"] = systemTheme
+        if (systemFullName != null) {
+            variables["system.name"] = systemFullName
+            variables["system.fullName"] = systemFullName
+        }
         val views = mutableMapOf<String, MutableMap<String, EsDeThemeElement>>()
         parseDocument(themeFile, axes, variables, views, depth = 0)
         return EsDeTheme(variables, views.mapValues { EsDeThemeView(it.value) })

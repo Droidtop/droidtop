@@ -877,8 +877,13 @@ private fun GamesSection(
     var focusedGameIndex by remember(selectedGroup) { mutableStateOf(0) }
     val selectedGroupSystemId = (selectedGroup as? GameGroup.System)?.systemId
     val selectedGroupThemeFolder = (selectedGroup as? GameGroup.Collection)?.themeFolder
+    val selectedGroupLabel = selectedGroup?.label
     val gamelistTheme = remember(selectedGroup, selectedGroupSystemId, selectedGroupThemeFolder, ThemePrefs.version) {
-        if (selectedGroup != null) ThemeAssets.loadActiveTheme(context, selectedGroupSystemId, selectedGroupThemeFolder) else null
+        if (selectedGroup != null) {
+            ThemeAssets.loadActiveTheme(context, selectedGroupSystemId, selectedGroupThemeFolder, systemFullName = selectedGroupLabel)
+        } else {
+            null
+        }
     }
     val gamelistView = gamelistTheme?.views?.get("gamelist")
     val gamelistHasListWidget = remember(gamelistView) { gamelistView?.primaryListElement() != null }
@@ -1094,8 +1099,9 @@ private fun GamesSection(
                     // theme from Settings has no effect until some
                     // unrelated recomposition happens to also fire (see
                     // ThemePrefs.version's own doc comment).
+                    val focusedGroupLabel = focusedGroup?.label
                     val theme = remember(focusedSystemId, focusedThemeFolder, ThemePrefs.version) {
-                        ThemeAssets.loadActiveTheme(context, focusedSystemId, focusedThemeFolder)
+                        ThemeAssets.loadActiveTheme(context, focusedSystemId, focusedThemeFolder, systemFullName = focusedGroupLabel)
                     }
                     val listElement = remember(theme) { theme?.views?.get("system")?.primaryListElement() }
                     val items = orderedGroups.map { entryGroup ->
