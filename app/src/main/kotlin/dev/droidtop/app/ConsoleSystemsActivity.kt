@@ -103,7 +103,10 @@ import java.io.File
 class ConsoleSystemsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { ConsoleSystemsScreen() }
+        // darkTheme = true: this screen opens from inside the Handheld
+        // shell (Settings tab -> Console systems), whose surface is
+        // always dark -- see DroidtopTheme's own doc comment.
+        setContent { dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) { ConsoleSystemsScreen() } }
     }
 }
 
@@ -135,7 +138,7 @@ private fun Modifier.gamepadFocusable(onClick: () -> Unit): Modifier = composed 
                 false
             }
         }
-        .background(if (focused) Color.White.copy(alpha = 0.10f) else Color.Transparent, RoundedCornerShape(6.dp))
+        .background(if (focused) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f) else Color.Transparent, RoundedCornerShape(6.dp))
 }
 
 /**
@@ -269,12 +272,12 @@ private fun ConsoleSystemsScreen() {
                 onDismiss = { romFoldersOpen = false; version++ },
             )
             else -> Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-                Text("Console systems", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+                Text("Console systems", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
                 Text(
                     "Each folder's system is guessed from its name. Tap the system to " +
                         "assign a different one by hand, or tap the player to choose which " +
                         "installed emulator (or a custom one you add) actually runs it.",
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
                 )
@@ -282,13 +285,13 @@ private fun ConsoleSystemsScreen() {
                 LaunchedEffect(Unit) { topFocus.requestFocus() }
                 Text(
                     "Manage platforms (add, edit, delete)",
-                    color = Color(0xFF8AB4FF),
+                    color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.fillMaxWidth().focusRequester(topFocus).gamepadFocusable { platformsOpen = true }.padding(vertical = 8.dp),
                 )
                 Text(
                     "ROM folders (add or remove)",
-                    color = Color(0xFF8AB4FF),
+                    color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.fillMaxWidth().gamepadFocusable { romFoldersOpen = true }.padding(vertical = 8.dp),
                 )
@@ -308,16 +311,16 @@ private fun ConsoleSystemsScreen() {
                     val needsSetup = ScraperSourcePrefs.get(context) == ScraperSource.THEGAMESDB && !TheGamesDbPrefs.isConfigured(context)
                     Text(
                         if (needsSetup) "Set up ROM scraper credentials" else "ROM scraper credentials -- edit",
-                        color = Color(0xFF8AB4FF),
+                        color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.fillMaxWidth().gamepadFocusable { scraperSettingsOpen = true }.padding(vertical = 8.dp),
                     )
                 }
                 scrapeStatus?.let {
-                    Text(it, color = Color(0xFF8AB4FF), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
+                    Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
                 }
                 if (folders.isEmpty()) {
-                    Text("No game folders configured yet.", color = Color.Gray)
+                    Text("No game folders configured yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(folders) { folder ->
@@ -513,28 +516,28 @@ private fun FolderRow(
     // saturation would be visually loud rather than a subtle system cue.
     val accent = resolvedSystem?.let { SystemThemeColors.forSystem(context, it.id) }?.let { Color(it) }
 
-    Row(modifier = modifier.fillMaxWidth().height(IntrinsicSize.Min).background(Color(0xFF161616))) {
+    Row(modifier = modifier.fillMaxWidth().height(IntrinsicSize.Min).background(MaterialTheme.colorScheme.background)) {
         if (accent != null) {
             Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(accent))
         }
         Column(
             modifier = Modifier
                 .weight(1f)
-                .background(if (accent != null) accent.copy(alpha = 0.14f) else Color(0xFF1A1A1A))
+                .background(if (accent != null) accent.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surface)
                 .padding(16.dp),
         ) {
             Column(modifier = Modifier.fillMaxWidth().gamepadFocusable(onClickSystem)) {
-                Text(folderName, color = Color.White, style = MaterialTheme.typography.titleMedium)
+                Text(folderName, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
                 Text(
                     resolvedSystem?.displayName ?: "Unrecognized -- tap to assign a system",
-                    color = if (resolvedSystem != null) Color.LightGray else Color(0xFFCC8800),
+                    color = if (resolvedSystem != null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.tertiary,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
             if (resolvedSystem != null) {
                 Text(
                     resolvedPlayer?.let { "Player: ${it.name}" } ?: "No installed player for this system -- tap to add one",
-                    color = if (resolvedPlayer != null) (accent ?: Color(0xFF8AB4FF)) else Color(0xFFCC8800),
+                    color = if (resolvedPlayer != null) (accent ?: MaterialTheme.colorScheme.primary) else MaterialTheme.colorScheme.tertiary,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.fillMaxWidth().gamepadFocusable(onClickPlayer).padding(top = 6.dp),
                 )
@@ -542,7 +545,7 @@ private fun FolderRow(
             if (onScrape != null) {
                 Text(
                     if (isScraping) "Scraping artwork..." else "Scrape missing artwork (Lutris + IGDB)",
-                    color = if (isScraping) Color.Gray else (accent ?: Color(0xFF8AB4FF)),
+                    color = if (isScraping) Color.Gray else (accent ?: MaterialTheme.colorScheme.primary),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -578,7 +581,7 @@ private fun ScraperSettingsScreen(onDismiss: () -> Unit) {
     var gamesDbApiKey by remember { mutableStateOf(TheGamesDbPrefs.apiKey(context)) }
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState())) {
-        Text("ROM artwork/metadata scraper", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+        Text("ROM artwork/metadata scraper", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
         Text(
             "Real ES-DE only ever uses ONE scraper source at a time, not an automatic " +
                 "fallback chain -- pick one below, matching ES-DE's own real behavior exactly. " +
@@ -586,52 +589,52 @@ private fun ScraperSettingsScreen(onDismiss: () -> Unit) {
                 "anonymous mode) -- fill in your own account (ssid/sspassword, a free " +
                 "screenscraper.fr account) for a higher personal limit. TheGamesDB needs its own " +
                 "free API key (thegamesdb.net -> sign up -> API key) before it can be used at all.",
-            color = Color.Gray,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
         )
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
             Checkbox(checked = source == ScraperSource.SCREENSCRAPER, onCheckedChange = { source = ScraperSource.SCREENSCRAPER })
-            Text("ScreenScraper (ES-DE's own real default)", color = Color.White, style = MaterialTheme.typography.bodyMedium)
+            Text("ScreenScraper (ES-DE's own real default)", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
         }
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.padding(bottom = 16.dp)) {
             Checkbox(checked = source == ScraperSource.THEGAMESDB, onCheckedChange = { source = ScraperSource.THEGAMESDB })
-            Text("TheGamesDB", color = Color.White, style = MaterialTheme.typography.bodyMedium)
+            Text("TheGamesDB", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
         }
-        Text("ScreenScraper dev ID (optional)", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+        Text("ScreenScraper dev ID (optional)", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         BasicTextField(
             value = devId,
             onValueChange = { devId = it },
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 16.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 16.dp).background(MaterialTheme.colorScheme.surface).padding(12.dp),
         )
-        Text("ScreenScraper dev password (optional)", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+        Text("ScreenScraper dev password (optional)", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         BasicTextField(
             value = devPassword,
             onValueChange = { devPassword = it },
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 16.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 16.dp).background(MaterialTheme.colorScheme.surface).padding(12.dp),
         )
-        Text("ScreenScraper account ssid (optional)", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+        Text("ScreenScraper account ssid (optional)", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         BasicTextField(
             value = userId,
             onValueChange = { userId = it },
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 16.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 16.dp).background(MaterialTheme.colorScheme.surface).padding(12.dp),
         )
-        Text("ScreenScraper account sspassword (optional)", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+        Text("ScreenScraper account sspassword (optional)", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         BasicTextField(
             value = userPassword,
             onValueChange = { userPassword = it },
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 24.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 24.dp).background(MaterialTheme.colorScheme.surface).padding(12.dp),
         )
-        Text("TheGamesDB API key", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+        Text("TheGamesDB API key", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         BasicTextField(
             value = gamesDbApiKey,
             onValueChange = { gamesDbApiKey = it },
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(MaterialTheme.colorScheme.surface).padding(12.dp),
         )
         Row(modifier = Modifier.fillMaxWidth().padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             TextButton(onClick = onDismiss) { Text("Cancel") }
@@ -661,15 +664,15 @@ private fun SystemPicker(systems: List<ConsoleSystemDef>, onPick: (ConsoleSystem
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-        Text("Assign a system", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+        Text("Assign a system", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
         BasicTextField(
             value = query,
             onValueChange = { query = it },
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 12.dp)
-                .background(Color(0xFF1A1A1A))
+                .background(MaterialTheme.colorScheme.surface)
                 .padding(12.dp),
         )
         val firstItemFocus = remember { FocusRequester() }
@@ -681,7 +684,7 @@ private fun SystemPicker(systems: List<ConsoleSystemDef>, onPick: (ConsoleSystem
             items(filtered) { system ->
                 Text(
                     "${system.displayName} (${system.id})",
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier
                         .fillMaxWidth()
                         .gamepadFocusable { onPick(system) }
@@ -707,15 +710,15 @@ private fun PlayerPicker(system: ConsoleSystemDef, onPick: (Player.AmStart?) -> 
     val players = remember(system) { availablePlayers(context, system) }
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-        Text("Player for ${system.displayName}", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+        Text("Player for ${system.displayName}", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
         Text(
             "Only installed emulators are listed. Pick one to launch this system with it every time.",
-            color = Color.Gray,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
         )
         if (players.isEmpty()) {
-            Text("No installed emulator can run ${system.displayName} yet.", color = Color(0xFFCC8800))
+            Text("No installed emulator can run ${system.displayName} yet.", color = MaterialTheme.colorScheme.tertiary)
         } else {
             val firstItemFocus = remember { FocusRequester() }
             LaunchedEffect(Unit) { firstItemFocus.requestFocus() }
@@ -726,7 +729,7 @@ private fun PlayerPicker(system: ConsoleSystemDef, onPick: (Player.AmStart?) -> 
                 items(players) { player ->
                     Text(
                         player.name,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier
                             .fillMaxWidth()
                             .gamepadFocusable { onPick(player) }
@@ -763,36 +766,36 @@ private fun AddCustomPlayerScreen(
     var kill by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-        Text("Add a player for ${system.displayName}", color = Color.White, style = MaterialTheme.typography.headlineSmall)
-        Text("Player name", color = Color.Gray, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 16.dp))
+        Text("Add a player for ${system.displayName}", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
+        Text("Player name", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 16.dp))
         BasicTextField(
             value = name,
             onValueChange = { name = it },
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(MaterialTheme.colorScheme.surface).padding(12.dp),
         )
-        Text("Package name (e.g. org.example.app)", color = Color.Gray, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 16.dp))
+        Text("Package name (e.g. org.example.app)", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 16.dp))
         BasicTextField(
             value = pkg,
             onValueChange = { pkg = it },
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(MaterialTheme.colorScheme.surface).padding(12.dp),
         )
         Text(
             "Player am start arguments -- use \"{file.path}\" and \"{file.uri}\" to specify the file to be played.",
-            color = Color.Gray,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(top = 16.dp),
         )
         BasicTextField(
             value = args,
             onValueChange = { args = it },
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(MaterialTheme.colorScheme.surface).padding(12.dp),
         )
         Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Checkbox(checked = kill, onCheckedChange = { kill = it })
-            Text("Kill package processes before am start", color = Color.White, modifier = Modifier.padding(top = 12.dp))
+            Text("Kill package processes before am start", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = 12.dp))
         }
         Row(modifier = Modifier.fillMaxWidth().padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             TextButton(onClick = onCancel) { Text("Cancel") }
@@ -855,13 +858,13 @@ private fun PlatformsScreen(onDismiss: () -> Unit) {
             onCancel = { addingNew = false; editing = null },
         )
         else -> Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-            Text("Manage platforms", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+            Text("Manage platforms", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
             Text(
                 "Every platform droidtop recognizes -- add a new one, edit any field " +
                     "(built-in platforms included), or delete one. \"Restore defaults\" " +
                     "resets every built-in platform back to its original values without " +
                     "touching any platform you added yourself.",
-                color = Color.Gray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
             )
@@ -870,13 +873,13 @@ private fun PlatformsScreen(onDismiss: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(bottom = 12.dp)) {
                 Text(
                     "+ Add platform",
-                    color = Color(0xFF8AB4FF),
+                    color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.focusRequester(firstFocus).gamepadFocusable { addingNew = true }.padding(8.dp),
                 )
                 Text(
                     "Restore defaults",
-                    color = Color(0xFFCC8800),
+                    color = MaterialTheme.colorScheme.tertiary,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.gamepadFocusable {
                         scope.launch {
@@ -894,14 +897,14 @@ private fun PlatformsScreen(onDismiss: () -> Unit) {
                             .gamepadFocusable { editing = system }
                             .padding(vertical = 10.dp),
                     ) {
-                        Text("${system.displayName} (${system.id})", color = Color.White, style = MaterialTheme.typography.bodyLarge)
+                        Text("${system.displayName} (${system.id})", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
                         Text(
                             listOfNotNull(
                                 system.extensionsCsv.ifBlank { null }?.let { "extensions: $it" },
                                 system.retroArchCore?.let { "core: $it" },
                                 if (system.isBuiltIn) "built-in" else "custom",
                             ).joinToString("  ·  "),
-                            color = Color.Gray,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -926,39 +929,39 @@ private fun PlatformEditScreen(
     var confirmingDelete by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-        Text(if (entity != null) "Edit platform" else "Add platform", color = Color.White, style = MaterialTheme.typography.headlineSmall)
-        Text("Id (used as the ROMs subfolder name, e.g. \"psx\")", color = Color.Gray, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 16.dp))
+        Text(if (entity != null) "Edit platform" else "Add platform", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
+        Text("Id (used as the ROMs subfolder name, e.g. \"psx\")", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 16.dp))
         BasicTextField(
             value = id,
             onValueChange = { if (entity == null) id = it }, // real id is the primary key -- editable only when adding new, never after (would silently orphan every SystemOverridePrefs entry pointing at the old id)
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = if (entity == null) Color.White else Color.Gray),
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = if (entity == null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(MaterialTheme.colorScheme.surface).padding(12.dp),
         )
-        Text("Display name", color = Color.Gray, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 16.dp))
+        Text("Display name", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 16.dp))
         BasicTextField(
             value = displayName,
             onValueChange = { displayName = it },
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(MaterialTheme.colorScheme.surface).padding(12.dp),
         )
-        Text("File extensions (comma-separated, e.g. \"nes,unf\")", color = Color.Gray, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 16.dp))
+        Text("File extensions (comma-separated, e.g. \"nes,unf\")", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 16.dp))
         BasicTextField(
             value = extensionsCsv,
             onValueChange = { extensionsCsv = it },
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(MaterialTheme.colorScheme.surface).padding(12.dp),
         )
-        Text("RetroArch core (optional, e.g. \"nestopia\")", color = Color.Gray, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 16.dp))
+        Text("RetroArch core (optional, e.g. \"nestopia\")", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 16.dp))
         BasicTextField(
             value = retroArchCore,
             onValueChange = { retroArchCore = it },
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(Color(0xFF1A1A1A)).padding(12.dp),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).background(MaterialTheme.colorScheme.surface).padding(12.dp),
         )
         if (entity?.isBuiltIn == true && !confirmingDelete) {
             Text(
                 "This is a built-in platform -- deleting it can be undone with \"Restore defaults\".",
-                color = Color(0xFFCC8800),
+                color = MaterialTheme.colorScheme.tertiary,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(top = 16.dp),
             )
@@ -1013,19 +1016,19 @@ private fun RomFoldersScreen(onDismiss: () -> Unit) {
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-        Text("ROM folders", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+        Text("ROM folders", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
         Text(
             "droidtop scans <folder>/<system>/<romFile> under each of these. Add another " +
                 "folder (an SD card, a second internal folder, ...), or remove one you no " +
                 "longer want scanned. Changes take effect next time the library rescans.",
-            color = Color.Gray,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
         )
         if (unresolvedWarning) {
             Text(
                 "Couldn't resolve that folder to a real path on this device -- not added.",
-                color = Color(0xFFCC8800),
+                color = MaterialTheme.colorScheme.tertiary,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
@@ -1034,12 +1037,12 @@ private fun RomFoldersScreen(onDismiss: () -> Unit) {
         LaunchedEffect(Unit) { firstFocus.requestFocus() }
         Text(
             "+ Add a folder",
-            color = Color(0xFF8AB4FF),
+            color = MaterialTheme.colorScheme.primary,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.fillMaxWidth().focusRequester(firstFocus).gamepadFocusable { pickFolder.launch(null) }.padding(vertical = 8.dp),
         )
         if (roots.isEmpty()) {
-            Text("No ROM folders configured.", color = Color.Gray, modifier = Modifier.padding(top = 8.dp))
+            Text("No ROM folders configured.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
         }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             items(roots) { path ->
@@ -1047,10 +1050,10 @@ private fun RomFoldersScreen(onDismiss: () -> Unit) {
                     modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text(path, color = Color.White, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Text(path, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                     Text(
                         "Remove",
-                        color = Color(0xFFCC8800),
+                        color = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.gamepadFocusable {
                             GamesRootPrefs.removeGamesRoot(context, path)
                             roots = GamesRootPrefs.gamesRootPaths(context).sorted()

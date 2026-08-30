@@ -159,6 +159,19 @@ Nothing in this section is implemented yet — the in-container launcher
 doesn't exist as software, the injection channel isn't designed in detail,
 and the helper process is a concept, not code.
 
+**Chrome theming (decided 2026-08-30)**: droidtop's own Compose chrome
+(Onboarding, Desktop shell panels, Console systems, etc.) follows the
+system dark/light setting through one shared Material theme
+(`app/.../ui/DroidtopTheme.kt`) — screens take colors from
+`MaterialTheme.colorScheme` tokens, never literals (the previous state:
+every screen hardcoded its palette, and no light mode existed at all).
+Two deliberate exceptions stay always-dark regardless of the system
+setting: surfaces living inside the Handheld shell's world (Console
+systems opens from Handheld's Settings tab and matches its plain-black
+ground) and ambient second-screen companion surfaces; ES-DE-themed
+Handheld views take every color from the active ES-DE theme (§7f) and
+are outside Material theming entirely.
+
 ## 3. Containers
 
 One `ContainerRuntime` interface (`runtime-common`), two interchangeable

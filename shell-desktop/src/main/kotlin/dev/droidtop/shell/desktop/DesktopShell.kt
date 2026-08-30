@@ -32,7 +32,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -83,7 +82,7 @@ fun DesktopShell(
 ) {
     var startMenuOpen by remember { mutableStateOf(false) }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0B1220))) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         DesktopViewport(hostBridge, primaryOutput, sessionMessage)
 
         Taskbar(
@@ -142,10 +141,10 @@ private fun BoxScope.DesktopViewport(
 
         if (presentFailed) {
             Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Couldn't present the desktop output.", color = Color.White)
+                Text("Couldn't present the desktop output.", color = MaterialTheme.colorScheme.onSurface)
                 Text(
                     "Check that the primary container's compositor is running.",
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -157,32 +156,32 @@ private fun BoxScope.DesktopViewport(
         ) {
             when (sessionMessage) {
                 is DesktopSessionMessage.Connecting -> {
-                    Text("Starting the desktop session…", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                    Text("Starting the desktop session…", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
                     Text(
                         "If a permission prompt appears (root access is required to run " +
                             "the container), grant it to continue.",
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
                 is DesktopSessionMessage.Failed -> {
-                    Text("Desktop session failed to start", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                    Text("Desktop session failed to start", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
                     Text(
                         sessionMessage.reason,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
                 is DesktopSessionMessage.Idle -> {
-                    Text("Desktop session not started", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                    Text("Desktop session not started", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
                     Text(
                         "The primary container (Wine/Linux desktop) isn't running yet — " +
                             "start it to see your desktop here.",
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(top = 8.dp),
@@ -209,18 +208,18 @@ private fun BoxScope.Taskbar(startMenuOpen: Boolean, onToggleStartMenu: () -> Un
             .align(if (DesktopPrefs.taskbarAtTop(context)) Alignment.TopStart else Alignment.BottomStart)
             .fillMaxWidth()
             .height(48.dp)
-            .background(Color(0xFF11182B)),
+            .background(MaterialTheme.colorScheme.surface),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Button(onClick = onToggleStartMenu, modifier = Modifier.padding(horizontal = 8.dp)) {
             Text(if (startMenuOpen) "Close" else "Start")
         }
-        Spacer(modifier = Modifier.width(1.dp).height(32.dp).background(Color(0xFF2A3454)))
+        Spacer(modifier = Modifier.width(1.dp).height(32.dp).background(MaterialTheme.colorScheme.outline))
         Spacer(modifier = Modifier.weight(1f))
         Button(onClick = { openSettings(context) }, modifier = Modifier.padding(horizontal = 8.dp)) {
             Text("Settings")
         }
-        Text(clockText, color = Color.White, modifier = Modifier.padding(horizontal = 16.dp))
+        Text(clockText, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(horizontal = 16.dp))
     }
 }
 
@@ -268,14 +267,14 @@ private fun BoxScope.StartMenu(library: Library, onDismiss: () -> Unit) {
             .align(if (taskbarAtTop) Alignment.TopStart else Alignment.BottomStart)
             .padding(top = if (taskbarAtTop) 48.dp else 0.dp, bottom = if (taskbarAtTop) 0.dp else 48.dp)
             .width(320.dp)
-            .background(Color(0xFF161F38)),
+            .background(MaterialTheme.colorScheme.surfaceVariant),
     ) {
         val currentEntries = entries
         when {
-            currentEntries == null -> Text("Loading…", color = Color.White, modifier = Modifier.padding(16.dp))
+            currentEntries == null -> Text("Loading…", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(16.dp))
             currentEntries.isEmpty() -> Text(
                 "Nothing in the library yet.",
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(16.dp),
             )
 
@@ -283,7 +282,7 @@ private fun BoxScope.StartMenu(library: Library, onDismiss: () -> Unit) {
                 items(currentEntries, key = { it.id }) { entry ->
                     Text(
                         entry.title,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp, horizontal = 8.dp)

@@ -35,7 +35,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.droidtop.runtime.BundledImageRepositories
@@ -81,11 +80,13 @@ class OnboardingActivity : AppCompatActivity() {
         val startStep = intent.getStringExtra(EXTRA_START_STEP)
             ?.let { name -> OnboardingStep.entries.firstOrNull { it.name == name } }
         setContent {
-            OnboardingScreen(
-                startStep = startStep,
-                isReEntry = startStep != null,
-                onDone = { finish() },
-            )
+            dev.droidtop.app.ui.DroidtopTheme {
+                OnboardingScreen(
+                    startStep = startStep,
+                    isReEntry = startStep != null,
+                    onDone = { finish() },
+                )
+            }
         }
     }
 
@@ -178,7 +179,7 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
         onDone()
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0B1220)), contentAlignment = Alignment.Center) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
         Column(
             modifier = Modifier.padding(48.dp).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -257,12 +258,12 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
 
 @Composable
 private fun WelcomeStep(onContinue: () -> Unit) {
-    Text("Welcome to droidtop", color = Color.White, style = MaterialTheme.typography.headlineMedium)
+    Text("Welcome to droidtop", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineMedium)
     Text(
         "droidtop turns this device into a real desktop, a gamepad-driven " +
             "library, or your normal Android home screen -- you choose what " +
             "to set up, and you can change any of it later in Settings.",
-        color = Color.Gray,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodyLarge,
     )
     Button(onClick = onContinue) { Text("Get started") }
@@ -270,10 +271,10 @@ private fun WelcomeStep(onContinue: () -> Unit) {
 
 @Composable
 private fun HomeChoiceStep(onStandard: () -> Unit, onAlternative: () -> Unit, onNeither: () -> Unit) {
-    Text("Your Android home screen", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+    Text("Your Android home screen", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineSmall)
     Text(
         "How should the home screen work when you press Home?",
-        color = Color.Gray,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodyMedium,
     )
     Button(onClick = onStandard) { Text("Use droidtop's own launcher") }
@@ -284,12 +285,12 @@ private fun HomeChoiceStep(onStandard: () -> Unit, onAlternative: () -> Unit, on
 @Composable
 private fun StandardSetupStep(onContinue: () -> Unit) {
     val context = LocalContext.current
-    Text("droidtop's launcher", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+    Text("droidtop's launcher", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineSmall)
     Text(
         "It's a full-featured launcher -- icon packs, grid density, app " +
             "drawer folders, backup/restore, and more all live in Settings " +
             "under Home Screen, App Drawer, and Icons.",
-        color = Color.Gray,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodyMedium,
     )
     Button(onClick = {
@@ -319,25 +320,25 @@ private fun AlternativeSetupStep(onPicked: (ComponentName) -> Unit, onBack: () -
         }
     }
 
-    Text("Pick a launcher", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+    Text("Pick a launcher", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineSmall)
     Text(
         "droidtop will still handle switching between Desktop and Handheld " +
             "mode -- pressing Home will open whichever launcher you pick here.",
-        color = Color.Gray,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodyMedium,
     )
     val current = launchers
     if (current == null) {
-        Text("Looking for installed launchers…", color = Color.Gray)
+        Text("Looking for installed launchers…", color = MaterialTheme.colorScheme.onSurfaceVariant)
     } else if (current.isEmpty()) {
-        Text("No other launcher is installed on this device.", color = Color.Gray)
+        Text("No other launcher is installed on this device.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton(onClick = onBack) { Text("Back") }
     } else {
         LazyColumn(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
             items(current) { (component, label) ->
                 Text(
                     label,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable { onPicked(component) },
                 )
             }
@@ -354,12 +355,12 @@ private fun ConfigureMoreStep(
     onHandheldChanged: (Boolean) -> Unit,
     onContinue: () -> Unit,
 ) {
-    Text("Anything else to set up?", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+    Text("Anything else to set up?", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineSmall)
     Text(
         "Desktop (Wine/Linux containers) and Handheld (a gamepad-driven " +
             "library) both stay reachable from droidtop's mode switcher " +
             "regardless of what you picked for your home screen.",
-        color = Color.Gray,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodyMedium,
     )
     LabeledCheckbox("Desktop", desktopChecked, onDesktopChanged)
@@ -374,7 +375,7 @@ private fun LabeledCheckbox(label: String, checked: Boolean, onCheckedChange: (B
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Checkbox(checked = checked, onCheckedChange = onCheckedChange)
-        Text(label, color = Color.White)
+        Text(label, color = MaterialTheme.colorScheme.onBackground)
     }
 }
 
@@ -405,22 +406,22 @@ private fun DesktopSetupStep(onContinue: () -> Unit) {
         checkMessage = if (result.succeeded) "Root access looks good." else result.stderr.ifBlank { result.stdout }
     }
 
-    Text("Desktop setup", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+    Text("Desktop setup", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineSmall)
     when (checkResult) {
-        null -> Text("Checking root access…", color = Color.Gray)
-        true -> Text(checkMessage, color = Color(0xFF8AB4FF))
+        null -> Text("Checking root access…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        true -> Text(checkMessage, color = MaterialTheme.colorScheme.primary)
         false -> Text(
             "Desktop mode needs root (Magisk/KernelSU/APatch): $checkMessage",
-            color = Color(0xFFCC8800),
+            color = MaterialTheme.colorScheme.tertiary,
         )
     }
-    Text("Which distro + compositor should droidtop use?", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
+    Text("Which distro + compositor should droidtop use?", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
     LazyColumn(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         items(repositories) { repo ->
             Box(modifier = Modifier.fillMaxWidth().clickable { selectedId = repo.id }) {
                 androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = repo.id == selectedId, onClick = { selectedId = repo.id })
-                    Text("${repo.os} + ${repo.desktopEnvironment}", color = Color.White)
+                    Text("${repo.os} + ${repo.desktopEnvironment}", color = MaterialTheme.colorScheme.onBackground)
                 }
             }
         }
@@ -434,12 +435,12 @@ private fun DesktopSetupStep(onContinue: () -> Unit) {
 
 @Composable
 private fun StoragePermissionStep(onGrant: () -> Unit, onSkip: () -> Unit) {
-    Text("One permission needed", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+    Text("One permission needed", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineSmall)
     Text(
         "droidtop needs full storage access to read game files directly " +
             "(including from an SD card) -- a folder picker alone isn't " +
             "enough for that.",
-        color = Color.Gray,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodyMedium,
     )
     Button(onClick = onGrant) { Text("Grant access") }
@@ -453,18 +454,18 @@ private fun GamesFoldersStep(
     onAddFolder: () -> Unit,
     onDone: () -> Unit,
 ) {
-    Text("Game folders", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+    Text("Game folders", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineSmall)
     Text(
         "Add every folder where your Ren'Py, RPG Maker, or Kirikiri games " +
             "live -- an SD card and internal storage both work. You can add " +
             "more, or change these, later in Settings.",
-        color = Color.Gray,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodyMedium,
     )
     if (roots.isNotEmpty()) {
         LazyColumn(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
             items(roots.toList()) { path ->
-                Text(path, color = Color.LightGray, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 4.dp))
+                Text(path, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 4.dp))
             }
         }
     }
@@ -473,7 +474,7 @@ private fun GamesFoldersStep(
             "That folder couldn't be used directly (this device's storage " +
                 "or SD card layout doesn't match what droidtop expects yet, " +
                 "or it's a cloud-backed folder).",
-            color = Color.Gray,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
         )
     }
@@ -483,11 +484,11 @@ private fun GamesFoldersStep(
 
 @Composable
 private fun DefaultModeChoiceStep(homeImplementation: HomeRolePrefs.HomeImplementation, onPicked: (String) -> Unit) {
-    Text("Which should droidtop open into?", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+    Text("Which should droidtop open into?", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineSmall)
     Text(
         "This is what happens when you launch droidtop -- everything else " +
             "you set up stays reachable from the mode switcher (long-press Back).",
-        color = Color.Gray,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodyMedium,
     )
     if (homeImplementation != HomeRolePrefs.HomeImplementation.NONE) {

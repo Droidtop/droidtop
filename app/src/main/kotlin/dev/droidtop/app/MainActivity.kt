@@ -137,6 +137,11 @@ class MainActivity : AppCompatActivity() {
         observeSecondScreen()
 
         setContent {
+            // DroidtopTheme provides Material tokens for droidtop's own
+            // chrome (DesktopShell panels etc.); the Handheld shell's
+            // ES-DE-themed surfaces take their colors from the active
+            // ES-DE theme instead and simply don't read these tokens.
+            dev.droidtop.app.ui.DroidtopTheme {
             when (mode) {
                 BackButtonMenu.MODE_HANDHELD -> GamepadShell(
                     library = library,
@@ -160,6 +165,7 @@ class MainActivity : AppCompatActivity() {
                         },
                     )
                 }
+            }
             }
         }
     }
