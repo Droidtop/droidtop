@@ -91,18 +91,29 @@ fun EsDeSystemListView(
     modifier: Modifier = Modifier,
     onFocusedIndexChanged: (Int) -> Unit = {},
 ) {
+    // Real ES-DE `fontSize`/`itemSize`/`itemSpacing` etc. are fractions of
+    // the THEMED area (see LocalEsDeThemedAreaSize's own doc comment for
+    // why that's not the same as the physical device screen). Null only
+    // at the real "no active theme" fallback call site (GamepadShell.kt),
+    // which has no themed area to be faithful to at all -- falls back to
+    // the raw device screen via LocalConfiguration there, same as before
+    // this composition local existed.
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val themedArea = LocalEsDeThemedAreaSize.current
+    val resolvedWidth = themedArea?.width ?: configuration.screenWidthDp.dp
+    val resolvedHeight = themedArea?.height ?: configuration.screenHeightDp.dp
     when (element?.type) {
         // Grid/textlist don't get onFocusedIndexChanged wired through --
         // real per-system theme reloading (what that callback drives) only
         // matters for the "system" view's own primary list; a per-game
         // grid/textlist browsing one already-selected system's games has
         // no equivalent "which system's metadata" question to answer.
-        "grid" -> EsDeGrid(element, items, firstItemFocus, modifier)
-        "textlist" -> EsDeTextList(element, items, firstItemFocus, modifier)
+        "grid" -> EsDeGrid(element, items, firstItemFocus, modifier, resolvedWidth, resolvedHeight)
+        "textlist" -> EsDeTextList(element, items, firstItemFocus, modifier, resolvedHeight)
         // "carousel", or no theme-declared element at all -- carousel is
         // ES-DE's own real default shape and the one droidtop already
         // shipped, so it's the honest fallback rather than an arbitrary one.
-        else -> EsDeCarousel(element, items, firstItemFocus, modifier, onFocusedIndexChanged)
+        else -> EsDeCarousel(element, items, firstItemFocus, modifier, onFocusedIndexChanged, resolvedWidth, resolvedHeight)
     }
 }
 
@@ -146,6 +157,8 @@ private fun EsDeCarousel(
     firstItemFocus: FocusRequester?,
     modifier: Modifier,
     onFocusedIndexChanged: (Int) -> Unit = {},
+    screenWidth: Dp,
+    screenHeight: Dp,
 ) {
     // Real default text color/background (CarouselComponent's own real
     // constructor defaults, distinct from a generic "text" element's own
@@ -177,24 +190,22 @@ private fun EsDeCarousel(
     // for a theme that genuinely omits it, matching the same default
     // already used by EsDeThemedText/EsDeTextList elsewhere in this file.
     val fontSizeFraction = element?.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
-    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * 1080).dp.toSp() }
-    // itemSize is a fraction of the *screen*, ES-DE's own real convention
-    // for carousel/grid geometry. Real, confirmed bug this fixes, found
-    // via actual on-device testing: this used to multiply the fraction
-    // against a fixed 1920/1080 reference and treat the result as `.dp`
-    // -- since `.dp` values get multiplied by the device's own density
-    // again when later converted `.toPx()` (see itemWidthPx below), this
-    // silently inflated the real on-screen item width by the device's
-    // density factor (e.g. 3x on a real xxhdpi handheld panel) relative
-    // to the carousel's own actual measured width in px, making
-    // itemSpacingPx collapse toward zero -- two adjacent real carousel
-    // items (a real device's "3ds" and "n64" systems) rendered nearly
-    // fully overlapping instead of properly spaced. Real fix: the
-    // fraction is of the *actual measured carousel size*, not a fixed
-    // reference resolution -- itemSizeFraction is kept here (still needed
-    // for the maxSize-less default below), but the real width/height are
-    // computed from live `maxWidth`/`maxHeight` inside BoxWithConstraints,
-    // in px, never re-multiplied by density.
+    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * screenHeight.value).dp.toSp() }
+    // itemSize is a fraction of the real ES-DE "screen" -- confirmed
+    // directly against CarouselComponent.h's own theme-property parsing:
+    // `mItemSize = itemSize * vec2(getScreenWidth(), getScreenHeight())`
+    // -- i.e. the THEMED AREA (screenWidth/screenHeight, see
+    // LocalEsDeThemedAreaSize's own doc comment), NOT the carousel's own
+    // box (a real, confirmed bug an earlier pass introduced: using this
+    // carousel's own measured maxWidth/maxHeight instead made a carousel
+    // that's only e.g. 13% of the screen tall compute item HEIGHT at 13%
+    // of its correct real size -- items rendered squished/tiny, the same
+    // failure mode as the missing-fontSize bug this same pass also fixed,
+    // just for size instead of text). `itemSpacingPx`/`xOffBasePx` below
+    // correctly keep using the carousel's OWN measured width -- that part
+    // matches real ES-DE too (`mSize.x`, the carousel's own real size, in
+    // the exact same real spacing formula: `((mSize.x - (mItemSize.x *
+    // mMaxItemCount)) / mMaxItemCount) + mItemSize.x`).
     val itemSizeFraction = element?.valueOrNull<EsDeThemeValue.Pair>("itemSize")
     // Real ES-DE defaults (CarouselComponent's own constructor): 3.0 and 1.2.
     val maxItemCount = (element?.valueOrNull<EsDeThemeValue.FloatValue>("maxItemCount")?.value ?: 3f).coerceIn(0.5f, 30f)
@@ -235,11 +246,13 @@ private fun EsDeCarousel(
     ) {
         val carouselWidthPx = with(density) { maxWidth.toPx() }
         val carouselHeightPx = with(density) { maxHeight.toPx() }
-        // Real px, straight from the fraction against the actual measured
-        // carousel size -- no `.dp` round-trip, no fixed reference
-        // resolution (see this function's own itemSizeFraction comment).
-        val itemWidthPx = itemSizeFraction?.let { it.x * carouselWidthPx } ?: with(density) { 200.dp.toPx() }
-        val itemHeightPx = itemSizeFraction?.let { it.y * carouselHeightPx } ?: with(density) { 140.dp.toPx() }
+        val screenWidthPx = with(density) { screenWidth.toPx() }
+        val screenHeightPx = with(density) { screenHeight.toPx() }
+        // Real px, against the themed area's own real size (see this
+        // function's own itemSizeFraction comment for why that's
+        // `screenWidthPx`/`screenHeightPx`, not this carousel's own box).
+        val itemWidthPx = itemSizeFraction?.let { it.x * screenWidthPx } ?: with(density) { 200.dp.toPx() }
+        val itemHeightPx = itemSizeFraction?.let { it.y * screenHeightPx } ?: with(density) { 140.dp.toPx() }
         val itemWidth = with(density) { itemWidthPx.toDp() }
         val itemHeight = with(density) { itemHeightPx.toDp() }
         val itemSpacingPx = ((carouselWidthPx - itemWidthPx * maxItemCount) / maxItemCount) + itemWidthPx
@@ -391,16 +404,28 @@ private fun EsDeCarouselItem(
  * constructor default).
  */
 @Composable
-private fun EsDeGrid(element: EsDeThemeElement, items: List<EsDeListItem>, firstItemFocus: FocusRequester?, modifier: Modifier) {
+private fun EsDeGrid(
+    element: EsDeThemeElement,
+    items: List<EsDeListItem>,
+    firstItemFocus: FocusRequester?,
+    modifier: Modifier,
+    screenWidth: Dp,
+    screenHeight: Dp,
+) {
     val textColor = element.valueOrNull<EsDeThemeValue.Color>("textColor")?.let { colorOf(it) } ?: Color.White
     val uppercase = element.valueOrNull<EsDeThemeValue.Str>("letterCase")?.value == "uppercase"
     val unfocusedOpacity = element.valueOrNull<EsDeThemeValue.FloatValue>("unfocusedItemOpacity")?.value ?: 1f
     val unfocusedSaturation = element.valueOrNull<EsDeThemeValue.FloatValue>("unfocusedItemSaturation")?.value ?: 1f
+    // Real ES-DE convention: itemSize/itemSpacing fractions are of the
+    // THEMED area (see EsDeSystemListView's own screenWidth/screenHeight
+    // doc comment), not a fixed 1920x1080 reference resolution.
+    val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
+    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * screenHeight.value).dp.toSp() }
     val itemSizeFraction = element.valueOrNull<EsDeThemeValue.Pair>("itemSize")
-    val itemWidth = itemSizeFraction?.let { (it.x * 1920).dp } ?: 160.dp
+    val itemWidth = itemSizeFraction?.let { (it.x * screenWidth.value).dp } ?: 160.dp
     val itemSpacingFraction = element.valueOrNull<EsDeThemeValue.Pair>("itemSpacing")
-    val itemSpacingX = itemSpacingFraction?.let { (it.x * 1920).dp } ?: 16.dp
-    val itemSpacingY = itemSpacingFraction?.let { (it.y * 1080).dp } ?: 16.dp
+    val itemSpacingX = itemSpacingFraction?.let { (it.x * screenWidth.value).dp } ?: 16.dp
+    val itemSpacingY = itemSpacingFraction?.let { (it.y * screenHeight.value).dp } ?: 16.dp
     val itemScale = (element.valueOrNull<EsDeThemeValue.FloatValue>("itemScale")?.value ?: 1.05f).coerceIn(0.5f, 3f)
     // Real formula (calculateLayout, scaleInwards not modeled/read here so
     // treated as false, ES-DE's own default): margin only reserved when
@@ -441,6 +466,7 @@ private fun EsDeGrid(element: EsDeThemeElement, items: List<EsDeListItem>, first
                     height = itemWidth * 0.75f,
                     textColor = textColor,
                     uppercase = uppercase,
+                    fontSize = fontSizeSp,
                     unfocusedOpacity = unfocusedOpacity,
                     unfocusedSaturation = unfocusedSaturation,
                     modifier = (if (index == 0 && firstItemFocus != null) Modifier.focusRequester(firstItemFocus) else Modifier)
@@ -468,7 +494,7 @@ private fun EsDeGrid(element: EsDeThemeElement, items: List<EsDeListItem>, first
  * size and a flat 4.dp gap.
  */
 @Composable
-private fun EsDeTextList(element: EsDeThemeElement, items: List<EsDeListItem>, firstItemFocus: FocusRequester?, modifier: Modifier) {
+private fun EsDeTextList(element: EsDeThemeElement, items: List<EsDeListItem>, firstItemFocus: FocusRequester?, modifier: Modifier, screenHeight: Dp) {
     val primaryColor = element.valueOrNull<EsDeThemeValue.Color>("primaryColor")?.let { colorOf(it) } ?: Color.White
     val selectedColor = element.valueOrNull<EsDeThemeValue.Color>("selectedColor")?.let { colorOf(it) } ?: primaryColor
     val uppercase = element.valueOrNull<EsDeThemeValue.Str>("letterCase")?.value == "uppercase"
@@ -480,9 +506,11 @@ private fun EsDeTextList(element: EsDeThemeElement, items: List<EsDeListItem>, f
     val selectorColor = element.valueOrNull<EsDeThemeValue.Color>("selectorColor")?.let { colorOf(it) }
         ?: Color(0x33, 0x33, 0x33, 0xFF)
     // Real ES-DE default font size for a textlist (its own theme docs).
+    // Fraction of the THEMED area (see EsDeSystemListView's own
+    // screenWidth/screenHeight doc comment), not a fixed 1080 reference.
     val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
     val lineSpacing = (element.valueOrNull<EsDeThemeValue.FloatValue>("lineSpacing")?.value ?: 1.5f).coerceIn(0.5f, 3f)
-    val fontSizeDp = (fontSizeFraction * 1080).dp
+    val fontSizeDp = (fontSizeFraction * screenHeight.value).dp
     val fontSizeSp = with(LocalDensity.current) { fontSizeDp.toSp() }
     // Real formula (TextListComponent::render): entrySize = fontSize * lineSpacing.
     val rowHeight = fontSizeDp * lineSpacing
@@ -550,6 +578,7 @@ private fun EsDeListTile(
     height: androidx.compose.ui.unit.Dp,
     textColor: Color,
     uppercase: Boolean,
+    fontSize: androidx.compose.ui.unit.TextUnit,
     unfocusedOpacity: Float,
     unfocusedSaturation: Float,
     modifier: Modifier,
@@ -606,7 +635,7 @@ private fun EsDeListTile(
         Text(
             if (uppercase) item.label.uppercase() else item.label,
             color = textColor,
-            style = MaterialTheme.typography.titleMedium,
+            fontSize = fontSize,
             maxLines = 1,
         )
         item.count?.let {
