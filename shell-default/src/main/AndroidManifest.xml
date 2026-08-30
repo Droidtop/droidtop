@@ -2,7 +2,7 @@
 <!--
 /*
 ** Copyright 2016, The Android Open Source Project
-** Copyright 2026 Alex Sim (alesimula) — Murine Launcher
+** Copyright 2026 Alex Sim (alesimula) - Murine Launcher
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 -->
 <!--
   Hand-merged from upstream Murine Launcher's AndroidManifest-common.xml +
-  AndroidManifest.xml (aospWithoutQuickstep flavor) — upstream relies on
+  AndroidManifest.xml (aospWithoutQuickstep flavor) - upstream relies on
   Gradle's flavor-based manifest merger to combine those two files; since
   shell-default/build.gradle collapses the flavor matrix down to a single
   variant (see its own header comment for why), that merge has to happen
@@ -28,7 +28,7 @@
 
   com.android.launcher3.secondarydisplay.SecondaryDisplayLauncher (below)
   is the interesting one for droidtop's multi-display goals: Launcher3
-  already ships a SECONDARY_HOME-category Activity — Android's own
+  already ships a SECONDARY_HOME-category Activity - Android's own
   mechanism for a launcher to provide a home screen on a secondary
   Display (see docs/SPEC.md §4's DisplayManager/Presentation model). The
   droidtop-specific multi-display patch work is extending/wiring this
@@ -50,7 +50,7 @@
     <uses-permission android:name="android.permission.LOCK_APPS" />
     <uses-permission android:name="android.permission.VIBRATE"/>
     <!-- Signature-level; declared for parity with upstream, won't be
-         granted to a non-privileged install — code paths using these must
+         granted to a non-privileged install - code paths using these must
          already tolerate that (Murine ships successfully as a normal app). -->
     <uses-permission android:name="android.permission.ROTATE_SURFACE_FLINGER" />
     <uses-permission android:name="android.permission.WAKEUP_SURFACE_FLINGER" />
@@ -190,7 +190,7 @@
         </activity>
 
         <!--
-        Launcher activity for secondary display — the SECONDARY_HOME
+        Launcher activity for secondary display - the SECONDARY_HOME
         category is Android's own mechanism for a launcher to provide a
         home screen on a secondary Display. This is the real starting
         point for droidtop's multi-display patch work; see this file's

@@ -1245,8 +1245,8 @@ the same `PresencePanel`.
 Standalone-emulator launch definitions (the non-RetroArch emulators) are
 DATA, not code: `players-database.json` — a bundled seed asset in
 library-core plus a separately-updatable copy refreshed, user-driven,
-from the droidtop platform-db repository on GitHub
-(`bi0shacker001/droidtop-platform-db`). `KnownPlayers` loads
+from the droidtop-platforms repository on GitHub
+(`bi0shacker001/droidtop-platforms`). `KnownPlayers` loads
 filesDir-copy-if-valid, else the seed; `PlayersDatabaseUpdater` fetches
 with parse-validation before replacing anything. The previous state —
 117 presets as generated Kotlin — required an app release to add an

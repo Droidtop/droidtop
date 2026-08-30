@@ -21,7 +21,7 @@ import java.net.URL
 object PlayersDatabaseUpdater {
     private const val DB_FILE_NAME = "players-database.json"
     const val DEFAULT_URL =
-        "https://raw.githubusercontent.com/bi0shacker001/droidtop-platform-db/main/players-database.json"
+        "https://raw.githubusercontent.com/bi0shacker001/droidtop-platforms/main/players-database.json"
 
     /** Returns the number of players in the refreshed database. */
     fun update(context: Context, url: String = DEFAULT_URL): Int {

@@ -42,6 +42,12 @@ jobs:
           # we only ever need their current tip, not history.
           fetch-depth: 1
 
+      - name: XML comment dash check
+        # "-" sequences (and em/en dashes one edit away from them) inside
+        # XML comments break ManifestMerger2; this has failed CI multiple
+        # times, so it fails fast here instead (see the script's doc).
+        run: python3 build-scripts/check_xml_comments.py
+
       - name: Set up JDK 17 + 21
         # 21 is needed for shell-default's forked-in sub-modules (Murine
         # Launcher/Launcher3) — several of them request a Gradle toolchain

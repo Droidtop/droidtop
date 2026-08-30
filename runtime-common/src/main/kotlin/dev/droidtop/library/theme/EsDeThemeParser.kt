@@ -224,8 +224,19 @@ object EsDeThemeParser {
         screenAspectRatio: Float? = null,
         deviceLocale: String? = null,
         systemFullName: String? = null,
+        // The THEME ROOT directory -- where capabilities.xml really lives.
+        // Real, confirmed-live bug this parameter fixes: a collection's
+        // subfolder theme.xml (Art Book Next's custom-collections/
+        // theme.xml) was parsed with capabilities looked up NEXT TO THAT
+        // FILE, where no capabilities.xml exists -- so colorScheme fell
+        // back to "1", no colorScheme block matched, and every variable
+        // those blocks define (systemViewLogoPos/artworkSource/background
+        // colors) went unresolved: the collection's logo rendered at the
+        // default 0,0 position with a 0.5,0.5 origin (giant, clipped into
+        // the top-left corner, over the tab bar) on a black background.
+        themeRootDir: File? = null,
     ): EsDeTheme {
-        val capabilities = parseCapabilities(File(themeFile.parentFile, "capabilities.xml"))
+        val capabilities = parseCapabilities(File(themeRootDir ?: themeFile.parentFile, "capabilities.xml"))
         val rawAspectRatio = capabilities.aspectRatios.firstOrNull() ?: "16:9"
         val resolvedAspectRatio = if (rawAspectRatio == "automatic") {
             resolveAutomaticAspectRatio(capabilities.aspectRatios, screenAspectRatio)

@@ -56,6 +56,10 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.foundation)
+    // BackHandler (system-back dispatcher) -- see GamepadShell's back
+    // handling: B doubles as KEYCODE_BACK on this hardware and arrives via
+    // the dispatcher, not as a key event.
+    implementation(libs.androidx.activity.compose)
     implementation(libs.coil.compose)
     implementation(libs.coil.android)
     // Real system logos (see theme/ThemeAssets.kt) are the bundled DEcaffe

@@ -14,7 +14,7 @@ import java.io.File
  *
  * Two sources, checked in order:
  *  1. `filesDir/players-database.json` — a database updated from the
- *     droidtop platform-db repository on GitHub (user-driven refresh; see
+ *     droidtop-platforms repository on GitHub (user-driven refresh; see
  *     [PlayersDatabaseUpdater]). A copy that fails to parse is ignored
  *     (never lets a bad download brick player resolution).
  *  2. The bundled asset seed — the same 117 real presets the hardcoded
