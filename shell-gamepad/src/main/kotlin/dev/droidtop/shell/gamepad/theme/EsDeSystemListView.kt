@@ -191,6 +191,7 @@ private fun EsDeCarousel(
     // already used by EsDeThemedText/EsDeTextList elsewhere in this file.
     val fontSizeFraction = element?.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
     val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * screenHeight.value).dp.toSp() }
+    val itemFontFamily = element?.let { themeFontFamily(it) }
     // itemSize is a fraction of the real ES-DE "screen" -- confirmed
     // directly against CarouselComponent.h's own theme-property parsing:
     // `mItemSize = itemSize * vec2(getScreenWidth(), getScreenHeight())`
@@ -288,6 +289,7 @@ private fun EsDeCarousel(
                 textSelectedBackgroundColor = textSelectedBackgroundColor,
                 uppercase = uppercase,
                 fontSize = fontSizeSp,
+                fontFamily = itemFontFamily,
                 unfocusedOpacity = unfocusedOpacity,
                 unfocusedSaturation = unfocusedSaturation,
                 modifier = (if (index == 0 && firstItemFocus != null) Modifier.focusRequester(firstItemFocus) else Modifier)
@@ -326,6 +328,7 @@ private fun EsDeCarouselItem(
     textSelectedBackgroundColor: Color,
     uppercase: Boolean,
     fontSize: androidx.compose.ui.unit.TextUnit,
+    fontFamily: androidx.compose.ui.text.font.FontFamily?,
     unfocusedOpacity: Float,
     unfocusedSaturation: Float,
     modifier: Modifier,
@@ -377,6 +380,7 @@ private fun EsDeCarouselItem(
             if (uppercase) item.label.uppercase() else item.label,
             color = if (isFocused) textSelectedColor else textColor,
             fontSize = fontSize,
+            fontFamily = fontFamily,
             textAlign = TextAlign.Center,
             modifier = baseModifier
                 .background(if (isFocused) textSelectedBackgroundColor else textBackgroundColor)
@@ -421,6 +425,7 @@ private fun EsDeGrid(
     // doc comment), not a fixed 1920x1080 reference resolution.
     val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
     val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * screenHeight.value).dp.toSp() }
+    val tileFontFamily = themeFontFamily(element)
     val itemSizeFraction = element.valueOrNull<EsDeThemeValue.Pair>("itemSize")
     val itemWidth = itemSizeFraction?.let { (it.x * screenWidth.value).dp } ?: 160.dp
     val itemSpacingFraction = element.valueOrNull<EsDeThemeValue.Pair>("itemSpacing")
@@ -467,6 +472,7 @@ private fun EsDeGrid(
                     textColor = textColor,
                     uppercase = uppercase,
                     fontSize = fontSizeSp,
+                    fontFamily = tileFontFamily,
                     unfocusedOpacity = unfocusedOpacity,
                     unfocusedSaturation = unfocusedSaturation,
                     modifier = (if (index == 0 && firstItemFocus != null) Modifier.focusRequester(firstItemFocus) else Modifier)
@@ -514,6 +520,7 @@ private fun EsDeTextList(element: EsDeThemeElement, items: List<EsDeListItem>, f
     val fontSizeSp = with(LocalDensity.current) { fontSizeDp.toSp() }
     // Real formula (TextListComponent::render): entrySize = fontSize * lineSpacing.
     val rowHeight = fontSizeDp * lineSpacing
+    val rowFontFamily = themeFontFamily(element)
 
     LazyColumn(modifier = modifier) {
         itemsIndexed(items, key = { _, item -> item.key }) { index, item ->
@@ -524,6 +531,7 @@ private fun EsDeTextList(element: EsDeThemeElement, items: List<EsDeListItem>, f
                 selectorColor = selectorColor,
                 uppercase = uppercase,
                 fontSize = fontSizeSp,
+                fontFamily = rowFontFamily,
                 rowHeight = rowHeight,
                 modifier = if (index == 0 && firstItemFocus != null) Modifier.focusRequester(firstItemFocus) else Modifier,
             )
@@ -539,6 +547,7 @@ private fun EsDeTextListRow(
     selectorColor: Color,
     uppercase: Boolean,
     fontSize: androidx.compose.ui.unit.TextUnit,
+    fontFamily: androidx.compose.ui.text.font.FontFamily?,
     rowHeight: androidx.compose.ui.unit.Dp,
     modifier: Modifier,
 ) {
@@ -547,6 +556,7 @@ private fun EsDeTextListRow(
         if (uppercase) item.label.uppercase() else item.label,
         color = if (focused) selectedColor else primaryColor,
         fontSize = fontSize,
+        fontFamily = fontFamily,
         modifier = modifier
             .fillMaxWidth()
             .height(rowHeight)
@@ -579,6 +589,7 @@ private fun EsDeListTile(
     textColor: Color,
     uppercase: Boolean,
     fontSize: androidx.compose.ui.unit.TextUnit,
+    fontFamily: androidx.compose.ui.text.font.FontFamily?,
     unfocusedOpacity: Float,
     unfocusedSaturation: Float,
     modifier: Modifier,
@@ -636,6 +647,7 @@ private fun EsDeListTile(
             if (uppercase) item.label.uppercase() else item.label,
             color = textColor,
             fontSize = fontSize,
+            fontFamily = fontFamily,
             maxLines = 1,
         )
         item.count?.let {
