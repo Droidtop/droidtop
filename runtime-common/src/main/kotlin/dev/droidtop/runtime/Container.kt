@@ -43,9 +43,25 @@ data class ContainerExecResult(val exitCode: Int, val stdout: String, val stderr
     val succeeded: Boolean get() = exitCode == 0
 }
 
+/**
+ * One row of [ContainerRuntime.listContainers] — a known container (running
+ * or not) plus the live state a management surface needs to render it
+ * (docs/SPEC.md §3d's container manager is the real consumer).
+ */
+data class ContainerInfo(val container: Container, val running: Boolean)
+
 /** Common lifecycle surface both container backends implement. */
 interface ContainerRuntime {
     val backend: ContainerBackend
+
+    /**
+     * Every container this backend knows about on this device — running or
+     * stopped — with live running state. "Knows about" means created by
+     * droidtop through this runtime (each backend persists its own
+     * per-container config; that persisted set IS the list), not a scan of
+     * arbitrary processes.
+     */
+    suspend fun listContainers(): List<ContainerInfo>
 
     /**
      * [image] is caller-chosen — from the live-resolved catalog

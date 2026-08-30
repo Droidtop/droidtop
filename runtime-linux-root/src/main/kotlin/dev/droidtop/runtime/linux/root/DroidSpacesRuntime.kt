@@ -216,6 +216,36 @@ class DroidSpacesRuntime(
     }
 
     /**
+     * The persisted per-container configs under [configsDir] ARE the set of
+     * known containers (every create writes one, destroy deletes it);
+     * running state comes from droidspaces' own real `show` command (a
+     * name+PID table of currently-running containers — simple substring
+     * match on the name column is deliberate: names are droidtop-generated
+     * and never whitespace-bearing).
+     */
+    override suspend fun listContainers(): List<dev.droidtop.runtime.ContainerInfo> {
+        val configs = configsDir.listFiles { f -> f.isFile && f.name.endsWith(".config") }.orEmpty()
+        if (configs.isEmpty()) return emptyList()
+        val showOutput = RootProcess.run(binaryPath, "show").stdout
+        return configs.map { configFile ->
+            val name = configFile.name.removeSuffix(".config")
+            val rootfsPath = configFile.readLines()
+                .firstOrNull { it.startsWith("rootfs_path=") }
+                ?.substringAfter("rootfs_path=")
+                ?: File(rootfsDir, name).absolutePath
+            dev.droidtop.runtime.ContainerInfo(
+                container = Container(
+                    id = name,
+                    role = if (name == PRIMARY_NAME) ContainerRole.PRIMARY else ContainerRole.SIBLING,
+                    backend = backend,
+                    rootfsPath = rootfsPath,
+                ),
+                running = showOutput.lineSequence().any { it.contains(name) },
+            )
+        }
+    }
+
+    /**
      * `droidspaces --name=<id> run <cmd...>` — droidspaces' own documented
      * exec-into-running-container primitive (Documentation/Linux-CLI.md's
      * `run` subcommand). Per-invocation env vars aren't a `run` flag

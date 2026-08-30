@@ -217,6 +217,20 @@ private fun EsDeCarousel(
     val imageColor = element?.valueOrNull<EsDeThemeValue.Color>("imageColor")?.let { colorOf(it) }
     val imageSelectedColor = element?.valueOrNull<EsDeThemeValue.Color>("imageSelectedColor")?.let { colorOf(it) } ?: imageColor
     val imageSaturation = (element?.valueOrNull<EsDeThemeValue.FloatValue>("imageSaturation")?.value ?: 1f).coerceIn(0f, 1f)
+    // Real `imageFit` (CarouselComponent.h:1515-1534): contain (default) /
+    // fill / cover map onto exactly Compose's Fit / FillBounds / Crop.
+    val imageFit = when (element?.valueOrNull<EsDeThemeValue.Str>("imageFit")?.value) {
+        "fill" -> ContentScale.FillBounds
+        "cover" -> ContentScale.Crop
+        else -> ContentScale.Fit
+    }
+    // Real `selectedItemMargins` (CarouselComponent.h:1458-1465 parse:
+    // NORMALIZED_PAIR clamped to +-1, scaled by screen WIDTH for a
+    // horizontal carousel; :945-963 render: items left of the cursor shift
+    // by -x, items right of it by +y, ramped by |distance| inside one
+    // item's travel) -- extra breathing room around the selected item.
+    val selectedItemMargins = element?.valueOrNull<EsDeThemeValue.Pair>("selectedItemMargins")
+        ?.let { EsDeThemeValue.Pair(it.x.coerceIn(-1f, 1f), it.y.coerceIn(-1f, 1f)) }
     val itemSizeFraction = element?.valueOrNull<EsDeThemeValue.Pair>("itemSize")
     // Real ES-DE defaults (CarouselComponent's own constructor): 3.0 and 1.2.
     val maxItemCount = (element?.valueOrNull<EsDeThemeValue.FloatValue>("maxItemCount")?.value ?: 3f).coerceIn(0.5f, 30f)
@@ -328,7 +342,17 @@ private fun EsDeCarousel(
                 absDistance >= 1f -> unfocusedOpacity
                 else -> unfocusedOpacity + ((1f - unfocusedOpacity) - (1f - unfocusedOpacity) * absDistance)
             }
-            val xDp = with(density) { (index * itemSpacingPx + xOffBasePx).toDp() }
+            // Real selectedItemMargins application (see the parse comment
+            // above): full margin beyond one item of distance, ramped
+            // linearly by |distance| within it.
+            val marginFactor = if (absDistance < 1f) absDistance else 1f
+            val selectedMarginPx = when {
+                selectedItemMargins == null -> 0f
+                distance < 0f -> -selectedItemMargins.x * screenWidthPx * marginFactor
+                distance > 0f -> selectedItemMargins.y * screenWidthPx * marginFactor
+                else -> 0f
+            }
+            val xDp = with(density) { (index * itemSpacingPx + xOffBasePx + selectedMarginPx).toDp() }
             val yDp = with(density) { yOffPx.toDp() }
 
             EsDeCarouselItem(
@@ -348,6 +372,7 @@ private fun EsDeCarousel(
                 imageColorShift = imageColor,
                 imageSelectedColorShift = imageSelectedColor,
                 imageSaturation = imageSaturation,
+                imageContentScale = imageFit,
                 modifier = Modifier
                     .absoluteOffset(x = xDp, y = yDp)
                     .graphicsLayer { scaleX = rawScale; scaleY = rawScale; alpha = opacity },
@@ -384,6 +409,7 @@ private fun EsDeCarouselItem(
     imageColorShift: Color?,
     imageSelectedColorShift: Color?,
     imageSaturation: Float,
+    imageContentScale: ContentScale,
     modifier: Modifier,
 ) {
     // No focusable()/onKeyEvent here: the carousel CONTAINER owns focus
@@ -428,7 +454,7 @@ private fun EsDeCarouselItem(
         AsyncImage(
             model = item.logoPath,
             contentDescription = null,
-            contentScale = ContentScale.Fit,
+            contentScale = imageContentScale,
             colorFilter = colorFilter,
             modifier = baseModifier,
         )

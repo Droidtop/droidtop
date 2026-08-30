@@ -30,6 +30,12 @@ class ProotRuntime : ContainerRuntime {
         TODO("proot rootfs bootstrap from $image; share primary's WAYLAND_DISPLAY + PulseAudio socket via bind mount")
     }
 
+    // Empty, not TODO(): a management surface listing containers on a
+    // device where the proot backend has never created any should see
+    // "none yet," not crash -- the create/start/stop members above stay
+    // TODO() because CALLING them means real work was requested.
+    override suspend fun listContainers(): List<dev.droidtop.runtime.ContainerInfo> = emptyList()
+
     override suspend fun start(container: Container): Unit = TODO()
     override suspend fun stop(container: Container): Unit = TODO()
     override suspend fun destroy(container: Container): Unit = TODO()
