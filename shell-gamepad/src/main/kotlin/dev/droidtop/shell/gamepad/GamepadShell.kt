@@ -1086,12 +1086,15 @@ private fun GamesSection(
         val group = selectedGroup
         if (group == null) {
             val continuePlaying = entries.filter { it.lastPlayedEpochMs != null }.sortedByDescending { it.lastPlayedEpochMs }
-            val hasAnyGroupCard = orderedGroups.isNotEmpty()
-            // firstFocus is only ever attached to a Modifier below when there's
-            // at least one GroupCard to attach it to -- requesting focus
-            // otherwise throws (FocusRequester not initialized), which is
-            // exactly what happened with an empty/fresh games folder.
-            LaunchedEffect(entries) { if (hasAnyGroupCard) firstFocus.requestFocus() }
+            // NOTE: the focus request for this screen now lives INSIDE the
+            // render branch below, where whether firstFocus will actually
+            // ATTACH to anything is knowable -- see its own doc comment.
+            // Requesting up here (the old shape) crashed the whole app
+            // ("FocusRequester is not initialized") for any real theme
+            // whose system view declares no carousel/grid/textlist for the
+            // requester to attach to -- confirmed live with a real
+            // downloaded community theme (ES-DWEE), and the same crash
+            // signature was already in the device's older crash logs.
             if (entries.isEmpty()) {
                 Column(modifier = Modifier.fillMaxSize().padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(32.dp)) {
                     Text("No games detected yet.", color = Color.White, modifier = Modifier.padding(horizontal = 48.dp))
@@ -1185,7 +1188,29 @@ private fun GamesSection(
                         theme?.views?.get("system")?.elements?.values?.any { it.type == "helpsystem" } == true
                     }
                     LaunchedEffect(hasThemeHelpSystem) { onThemeHandlesHints(hasThemeHelpSystem) }
-                    theme?.views?.get("system")?.let { systemView ->
+                    val systemView = theme?.views?.get("system")
+                    // Real crash boundary (confirmed live with a real
+                    // downloaded community theme, ES-DWEE): firstFocus only
+                    // ATTACHES when a real list widget composes with at
+                    // least one item -- the themed path only does that when
+                    // the theme's own system view actually declares a
+                    // carousel/grid/textlist; the fallback path always
+                    // does. Requesting focus on an unattached
+                    // FocusRequester is a hard IllegalStateException that
+                    // killed the whole app. Belt AND braces: gate on the
+                    // real attachment condition, and never let a focus
+                    // request crash droidtop over a theme's own structure
+                    // regardless -- a theme must never be able to kill the
+                    // app.
+                    val willAttachFocus = items.isNotEmpty() &&
+                        (systemView == null || systemView.primaryListElement() != null)
+                    LaunchedEffect(willAttachFocus, systemView) {
+                        if (willAttachFocus) {
+                            runCatching { firstFocus.requestFocus() }
+                                .onFailure { android.util.Log.w("droidtop.GamepadShell", "System-list focus request failed", it) }
+                        }
+                    }
+                    if (systemView != null) {
                         EsDeThemedView(
                             view = systemView,
                             items = items,
@@ -1194,23 +1219,45 @@ private fun GamesSection(
                             onFocusedIndexChanged = { focusedSystemIndex = it },
                             focusedSystemEntries = focusedSystemEntries,
                             hints = systemListHints,
+                            systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
+                                name = focusedGroupLabel,
+                                gameCount = focusedSystemEntries.size,
+                                favoriteCount = focusedSystemEntries.count { it.favorite },
+                                // Real ES-DE special case (SystemView.cpp's own
+                                // favoriteSystem/recentSystem flags): those two
+                                // auto-collections show a bare game count.
+                                countsOnly = (focusedGroup as? GameGroup.Collection)?.id
+                                    ?.let { it == AutoCollections.FAVORITES_ID || it == AutoCollections.LAST_PLAYED_ID } == true,
+                            ),
                         )
-                    } ?: EsDeSystemListView(
-                        element = listElement,
-                        items = items,
-                        firstItemFocus = firstFocus,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp),
-                    )
-                    if (continuePlaying.isNotEmpty()) {
-                        HomeSectionRow(
-                            HomeSection("Continue Playing", continuePlaying),
-                            firstCardFocus = null,
-                            onLaunch = onLaunch,
-                            onShowDetail = onShowDetail,
-                            onFocusedEntryChanged = onFocusedEntryChanged,
-                            modifier = Modifier.align(Alignment.TopStart).padding(top = 16.dp),
-                            onToggleFavorite = onToggleFavorite,
+                        // NO droidtop chrome over a themed screen: the
+                        // "Continue Playing" overlay sat directly on top of
+                        // decaffe's own real metadata sidebar (and collided
+                        // on every other real theme tested) -- a themed view
+                        // owns its whole surface, same as real ES-DE. The
+                        // row stays on the unthemed fallback below, which IS
+                        // droidtop's own surface. (docs/SPEC.md §7f's
+                        // "needs real per-theme-aware safe-zone placement"
+                        // note is resolved by this simpler decision:
+                        // themed screens get no overlay at all.)
+                    } else {
+                        EsDeSystemListView(
+                            element = listElement,
+                            items = items,
+                            firstItemFocus = firstFocus,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp),
                         )
+                        if (continuePlaying.isNotEmpty()) {
+                            HomeSectionRow(
+                                HomeSection("Continue Playing", continuePlaying),
+                                firstCardFocus = null,
+                                onLaunch = onLaunch,
+                                onShowDetail = onShowDetail,
+                                onFocusedEntryChanged = onFocusedEntryChanged,
+                                modifier = Modifier.align(Alignment.TopStart).padding(top = 16.dp),
+                                onToggleFavorite = onToggleFavorite,
+                            )
+                        }
                     }
                 }
             }
@@ -1233,7 +1280,13 @@ private fun GamesSection(
             // every other element (metadata/rating/datetime/video) always
             // binds to whichever game is actually current.
             LaunchedEffect(group, gamelistHasListWidget, gamelistWidgetItems) {
-                if (gamelistHasListWidget && gamelistWidgetItems.isNotEmpty()) firstFocus.requestFocus()
+                // Same never-crash boundary as the system-list screen's own
+                // focus request above -- a theme's structure must never be
+                // able to kill the app via an unattached FocusRequester.
+                if (gamelistHasListWidget && gamelistWidgetItems.isNotEmpty()) {
+                    runCatching { firstFocus.requestFocus() }
+                        .onFailure { android.util.Log.w("droidtop.GamepadShell", "Gamelist focus request failed", it) }
+                }
             }
             EsDeThemedView(
                 view = gamelistView,
@@ -1248,6 +1301,13 @@ private fun GamesSection(
                     GamepadAction.Y to "Info",
                     GamepadAction.X to "Favorite",
                     GamepadAction.B to "Back",
+                ),
+                systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
+                    name = selectedGroupLabel,
+                    gameCount = systemGamesForGroup.size,
+                    favoriteCount = systemGamesForGroup.count { it.favorite },
+                    countsOnly = (group as? GameGroup.Collection)?.id
+                        ?.let { it == AutoCollections.FAVORITES_ID || it == AutoCollections.LAST_PLAYED_ID } == true,
                 ),
             )
         } else {

@@ -161,6 +161,15 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
                                         ThemeDownloader.ThemeSyncStatus.DIVERGED -> "Has local changes -- skipped"
                                         ThemeDownloader.ThemeSyncStatus.FAILED -> "Failed: ${result.error?.message ?: "unknown error"}"
                                     })
+                                    // A theme UPDATED in place keeps its name -- the
+                                    // name-keyed parse cache would silently keep
+                                    // serving the old version without this (see
+                                    // ThemeAssets' own change-listener doc comment).
+                                    if (result.status == ThemeDownloader.ThemeSyncStatus.CLONED ||
+                                        result.status == ThemeDownloader.ThemeSyncStatus.UPDATED
+                                    ) {
+                                        dev.droidtop.library.theme.ThemePrefs.notifyThemesChanged()
+                                    }
                                     refresh()
                                 }
                             },

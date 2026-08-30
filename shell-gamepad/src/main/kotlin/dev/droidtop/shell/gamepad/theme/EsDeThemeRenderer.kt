@@ -90,6 +90,23 @@ import java.util.TimeZone
 val LocalEsDeThemedAreaSize = compositionLocalOf<androidx.compose.ui.unit.DpSize?> { null }
 
 /**
+ * System-level bindings for `systemdata`-bound `text` elements --
+ * transcribed from real `SystemView::updateGameCount`
+ * (SystemView.cpp:966-1030, the actual source of every real format
+ * below). [countsOnly] is that function's own favorites/recent special
+ * case (`favoriteSystem`/`recentSystem`): those two auto-collections
+ * show a bare "N games" with no favorites suffix, and their
+ * gamecountGames/gamecountFavorites sub-bindings behave differently
+ * (see [EsDeThemedText]'s systemdata branch).
+ */
+data class EsDeSystemContext(
+    val name: String?,
+    val gameCount: Int,
+    val favoriteCount: Int,
+    val countsOnly: Boolean,
+)
+
+/**
  * Renders a parsed [EsDeThemeView] as ONE coherent screen -- every
  * positioned element (background/video/info text/carousel/help/...)
  * composited together by real z-index, the theme itself driving the
@@ -150,6 +167,9 @@ fun EsDeThemedView(
     // its own -- never overrides a real, theme-declared one (e.g. the
     // "system" view's random game-preview collage).
     focusedGameIndex: Int? = null,
+    // System-level bindings for `systemdata` text elements (see
+    // [EsDeSystemContext]) -- null for callers with no system concept.
+    systemContext: EsDeSystemContext? = null,
 ) {
     BoxWithConstraints(modifier = modifier) {
         val viewWidth = maxWidth
@@ -181,7 +201,7 @@ fun EsDeThemedView(
             .sortedBy { zIndexOf(it) }.forEach { element ->
             when (element.type) {
                 "image" -> EsDeThemedImage(element, viewWidth, viewHeight, gameSelection)
-                "text" -> EsDeThemedText(element, viewWidth, viewHeight, gameSelection)
+                "text" -> EsDeThemedText(element, viewWidth, viewHeight, gameSelection, systemContext)
                 // Real video playback (see EsDeThemedVideo's own doc
                 // comment) when the selected game has a real, scraped
                 // video file; the same static-poster fallback
@@ -216,16 +236,18 @@ fun EsDeThemedView(
                 "carousel", "grid", "textlist" -> EsDeThemedListElement(
                     element, items, firstItemFocus, viewWidth, viewHeight, onFocusedIndexChanged,
                 )
-                // Real, previously-dead theme data (see this file's own
-                // history): EsDeTheme.kt's schema already parses a real
-                // <helpsystem> block (pos/origin/textColor/iconColor/
-                // fontPath/fontSize/entrySpacing/backgroundColor/opacity),
-                // but nothing here ever rendered it -- droidtop's actual
-                // button-hint bar was a fully hardcoded, unthemed
-                // ButtonHintFooter instead. [hints] (see this composable's
-                // own doc comment) is the only piece this renderer can't
-                // get from the theme alone.
-                "helpsystem" -> EsDeThemedHelpSystem(element, viewWidth, viewHeight, hints)
+                // helpsystem is deliberately NOT dispatched per element --
+                // see the singleton merge/render after this loop. Real,
+                // confirmed-live bug the per-element dispatch caused: Art
+                // Book Next declares MANY named <helpsystem> blocks
+                // (help-system-view/help-gamelist-view/help-menu-view,
+                // scope-gated), and real ES-DE's HelpComponent is a
+                // SINGLETON the theme merely styles -- every declaration
+                // configures the one component, with `scope` choosing
+                // which config applies where. Rendering one bar per
+                // element drew the help bar three times at once on a real
+                // device.
+                "helpsystem" -> Unit
                 // Real, honestly PARTIAL -- see EsDeThemedBadges' own doc
                 // comment for exactly which of real ES-DE's nine real
                 // badge slot types this actually covers (one: favorite).
@@ -241,6 +263,32 @@ fun EsDeThemedView(
                 // in the currently browsed system, not just the one/few
                 // gameSelector picked.
                 "gamelistinfo" -> EsDeThemedGamelistInfo(element, viewWidth, viewHeight, focusedSystemEntries)
+            }
+        }
+        // Real ES-DE HelpComponent semantics: ONE help bar per view,
+        // configured by merging every declared <helpsystem> element (a
+        // theme commonly declares several, multi-named/scope-gated -- Art
+        // Book Next does) rather than drawn once per declaration.
+        // `scope=menu` styles real ES-DE's own menu overlays, which
+        // droidtop doesn't render at all -- those declarations are
+        // skipped, not merged in (their pos/colors are for a different
+        // surface entirely). Remaining declarations merge in document
+        // order (LinkedHashMap preserves parse order; later wins per
+        // property), matching real ES-DE's own last-applied-wins theme
+        // application. Rendered after the element loop -- help draws on
+        // top, real ES-DE's own draw order for it.
+        val helpElements = view.elements.values.filter {
+            it.type == "helpsystem" &&
+                it.valueOrNull<EsDeThemeValue.Str>("scope")?.value != "menu"
+        }
+        if (helpElements.isNotEmpty() && hints.isNotEmpty()) {
+            val merged = EsDeThemeElement(
+                type = "helpsystem",
+                key = "helpsystem_merged",
+                properties = helpElements.fold(emptyMap()) { acc, element -> acc + element.properties },
+            )
+            if (merged.valueOrNull<EsDeThemeValue.Bool>("visible")?.value != false) {
+                EsDeThemedHelpSystem(merged, viewWidth, viewHeight, hints)
             }
         }
         }
@@ -406,7 +454,13 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
  * align within.
  */
 @Composable
-private fun EsDeThemedText(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp, gameSelection: List<LibraryEntry>) {
+private fun EsDeThemedText(
+    element: EsDeThemeElement,
+    viewWidth: Dp,
+    viewHeight: Dp,
+    gameSelection: List<LibraryEntry>,
+    systemContext: EsDeSystemContext? = null,
+) {
     // Real gameselector-bound title text (DEcaffe's own `text name="game"`,
     // `metadata=name`): previously fell through the plain `?: return`
     // below every single time, since a metadata-bound element has no
@@ -462,7 +516,40 @@ private fun EsDeThemedText(element: EsDeThemeElement, viewWidth: Dp, viewHeight:
         }
         else -> null
     }
-    val resolvedText = if (metadata != null) {
+    // Real `systemdata` binding, transcribed from SystemView.cpp:913-947
+    // (name/fullname) and :966-1030 (the gamecount family, exact real
+    // format strings including singular forms and the favorites/recent
+    // collections' bare-count special case). An unrecognized systemdata
+    // value renders as its own literal string -- that IS real ES-DE's own
+    // behavior (SystemView.cpp:926/:1028 both setValue the raw string),
+    // not a droidtop fallback invention. decaffe's own bottom info strip
+    // ("10 GAMES (2 FAVORITES)" in its reference render) is
+    // systemdata=gamecount -- unrendered entirely before this.
+    val systemdata = element.valueOrNull<EsDeThemeValue.Str>("systemdata")?.value
+    fun plural(count: Int, singular: String, pluralForm: String) = if (count == 1) singular else pluralForm
+    val systemdataText: String? = if (systemdata == null || systemContext == null) {
+        null
+    } else {
+        val games = systemContext.gameCount
+        val favorites = systemContext.favoriteCount
+        val gamesText = "$games " + plural(games, "game", "games")
+        when (systemdata) {
+            "name", "fullname" -> systemContext.name
+            "gamecount" ->
+                if (systemContext.countsOnly) gamesText
+                else "$gamesText ($favorites " + plural(favorites, "favorite", "favorites") + ")"
+            "gamecountGames" -> gamesText
+            "gamecountGamesNoText" -> games.toString()
+            "gamecountFavorites" ->
+                if (systemContext.countsOnly) "" else "$favorites " + plural(favorites, "favorite", "favorites")
+            "gamecountFavoritesNoText" ->
+                if (systemContext.countsOnly) "" else favorites.toString()
+            else -> systemdata
+        }
+    }
+    val resolvedText = if (systemdataText != null) {
+        systemdataText
+    } else if (metadata != null) {
         metadataText ?: element.valueOrNull<EsDeThemeValue.Str>("defaultValue")?.value
     } else {
         element.valueOrNull<EsDeThemeValue.Str>("text")?.value

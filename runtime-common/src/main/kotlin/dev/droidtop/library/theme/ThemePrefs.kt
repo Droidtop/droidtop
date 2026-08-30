@@ -32,6 +32,30 @@ object ThemePrefs {
     private const val PREFS_NAME = "com.android.launcher3.prefs"
     private const val KEY_ACTIVE_THEME = "droidtop_active_theme"
 
+    // Real, confirmed-live bug this fixes: `:shell-default`'s Theme
+    // ListPreference writes through THIS object directly (it has no
+    // Compose), but the only change signal was shell-gamepad's own
+    // wrapper's `version` counter -- which that wrapper only bumped for
+    // its OWN set() calls. A theme switched from Settings never reached a
+    // running GamepadShell composition at all (confirmed on-device: every
+    // switch required a full process restart to take effect). Listeners
+    // registered here fire for EVERY real write regardless of which
+    // module performed it -- the wrapper registers one that bumps its
+    // Compose counter, and ThemeAssets registers one that drops its own
+    // parse cache (a stale parse of the previous theme name is harmless,
+    // but a re-downloaded/updated theme under the SAME name must not keep
+    // serving its old parse).
+    private val changeListeners = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
+
+    fun addOnChangeListener(listener: () -> Unit) {
+        changeListeners += listener
+    }
+
+    /** For non-selection changes that still invalidate theme state (e.g. a theme re-downloaded in place) -- fires the same listeners a real selection change does. */
+    fun notifyThemesChanged() {
+        changeListeners.forEach { it() }
+    }
+
     /** Null means "no explicit selection" -- caller falls back per real ES-DE's own rule. */
     fun get(context: Context): String? =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_ACTIVE_THEME, null)
@@ -39,5 +63,6 @@ object ThemePrefs {
     fun set(context: Context, themeName: String) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit().putString(KEY_ACTIVE_THEME, themeName).apply()
+        changeListeners.forEach { it() }
     }
 }
