@@ -557,6 +557,42 @@ class ConsoleRomProvider(
         dao.upsertGameMetadata(metadata)
     }
 
+    /** Real custom collections list, alphabetical -- droidtop's own equivalent of real ES-DE's `getCustomCollectionSystems`. */
+    suspend fun getCollections(): List<CollectionEntity> = dao.getCollections()
+
+    /**
+     * Real collection creation -- droidtop's own equivalent of real
+     * ES-DE's `addNewCustomCollection`. [id] is a fresh UUID, not the
+     * user-facing [name] -- see [CollectionEntity]'s own doc comment for
+     * why.
+     */
+    suspend fun createCollection(name: String): CollectionEntity {
+        val collection = CollectionEntity(id = java.util.UUID.randomUUID().toString(), name = name)
+        dao.upsertCollection(collection)
+        return collection
+    }
+
+    suspend fun renameCollection(id: String, newName: String) {
+        dao.upsertCollection(CollectionEntity(id = id, name = newName))
+    }
+
+    /** Real deletion -- droidtop's own equivalent of real ES-DE's `deleteCustomCollection`, including its own membership rows. */
+    suspend fun deleteCollection(id: String) {
+        dao.deleteCollectionMembers(id)
+        dao.deleteCollection(id)
+    }
+
+    /** Real add/remove membership toggle -- droidtop's own equivalent of real ES-DE's `toggleGameInCollection`. Returns the real new membership state. */
+    suspend fun toggleCollectionMembership(collectionId: String, gameId: String): Boolean =
+        dao.toggleCollectionMember(collectionId, gameId)
+
+    suspend fun isCollectionMember(collectionId: String, gameId: String): Boolean =
+        dao.isCollectionMember(collectionId, gameId)
+
+    /** Real collectionId -> member gameIds map, for the games-list read path -- see [dev.droidtop.shell.gamepad]'s own `GameGroup.Collection` doc comment. */
+    suspend fun getCollectionMembership(): Map<String, List<String>> =
+        dao.getAllCollectionMembers().groupBy({ it.collectionId }, { it.gameId })
+
     // `ActivityManager.forceStopPackage()` needs the signature-level
     // FORCE_STOP_PACKAGES permission -- not grantable to a normal app, so
     // this real Daijishō-preset flag (several of KnownPlayers' real

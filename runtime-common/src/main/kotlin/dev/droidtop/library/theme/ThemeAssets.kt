@@ -141,18 +141,36 @@ object ThemeAssets {
     /** Public read of [resolveActiveTheme]'s own name -- the real, resolved active theme, for UI display/cycling, not just the raw (possibly unset) [ThemePrefs] value. */
     fun activeThemeName(context: Context): String? = resolveActiveTheme(context)?.name
 
-    private val systemThemeCache = mutableMapOf<Pair<String, String?>, EsDeTheme?>()
+    private val systemThemeCache = mutableMapOf<Triple<String, String?, String?>, EsDeTheme?>()
 
     /**
      * Loads the currently active theme (real, discovered + selected per
      * [resolveActiveTheme]), parsed for [systemId] specifically -- real
      * ES-DE parses a theme once PER SYSTEM (its own `${system.theme}`
      * substitution differs per system), so this is cached per (theme
-     * name, systemId) pair rather than parsed fresh every call.
+     * name, systemId, collectionThemeFolder) rather than parsed fresh
+     * every call.
+     *
+     * [collectionThemeFolder] is real ES-DE's own per-collection theme
+     * override (confirmed against `CollectionSystemsManager::
+     * themeFolderExists` -- a real local clone kept at
+     * /root/es-de-reference): when set and the active theme actually
+     * declares that subfolder (`auto-allgames`/`auto-favorites`/
+     * `auto-lastplayed`/`custom-collections`, see `GamepadShell.kt`'s
+     * own `AutoCollections`/`GameGroup.Collection`), that subfolder's
+     * own `theme.xml` loads INSTEAD of the theme's root one -- real
+     * themes commonly `<include>` the parent unchanged (Art Book Next's
+     * own bundle does this for several collection folders) or override
+     * specific elements. Falls back to the root `theme.xml` when the
+     * theme doesn't declare that subfolder at all -- more forgiving than
+     * real ES-DE's own behavior (which hides the collection from the
+     * system carousel entirely if the active theme isn't collection-
+     * compatible), a deliberate droidtop simplification: droidtop always
+     * shows collections, just without a themed override when none exists.
      */
-    fun loadActiveTheme(context: Context, systemId: String? = null): EsDeTheme? {
+    fun loadActiveTheme(context: Context, systemId: String? = null, collectionThemeFolder: String? = null): EsDeTheme? {
         val active = resolveActiveTheme(context) ?: return null
-        val cacheKey = active.name to systemId
+        val cacheKey = Triple(active.name, systemId, collectionThemeFolder)
         systemThemeCache[cacheKey]?.let { return it }
 
         val themeDir = when {
@@ -161,7 +179,8 @@ object ThemeAssets {
             else -> null
         } ?: return null
 
-        val themeFile = File(themeDir, "theme.xml")
+        val collectionThemeFile = collectionThemeFolder?.let { File(themeDir, "$it/theme.xml") }?.takeIf { it.isFile }
+        val themeFile = collectionThemeFile ?: File(themeDir, "theme.xml")
         val theme = try {
             // Real device screen ratio (landscape width/height, matching
             // ES_DE_ASPECT_RATIO_MAP's own convention) -- resolves a real

@@ -413,6 +413,41 @@ class Library(
         true
     }
 
+    // Real, library-wide collections -- unlike favorite/metadata, not
+    // scoped to one entry's own kind (a collection can list any mix of
+    // real console ROMs, engine games, etc.), so these grab the one real
+    // ConsoleRomProvider directly rather than filtering by an entry's
+    // kind. Returns real, honest empty/false defaults when no such
+    // provider exists at all (same "not applicable" convention as
+    // toggleFavorite), not a crash.
+    private val romProvider: dev.droidtop.library.consoles.ConsoleRomProvider?
+        get() = providers.filterIsInstance<dev.droidtop.library.consoles.ConsoleRomProvider>().firstOrNull()
+
+    suspend fun getCollections(): List<dev.droidtop.library.consoles.CollectionEntity> =
+        withContext(Dispatchers.IO) { romProvider?.getCollections() ?: emptyList() }
+
+    suspend fun createCollection(name: String): dev.droidtop.library.consoles.CollectionEntity? =
+        withContext(Dispatchers.IO) { romProvider?.createCollection(name) }
+
+    suspend fun renameCollection(id: String, newName: String) {
+        withContext(Dispatchers.IO) { romProvider?.renameCollection(id, newName) }
+    }
+
+    suspend fun deleteCollection(id: String) {
+        withContext(Dispatchers.IO) { romProvider?.deleteCollection(id) }
+    }
+
+    /** Real add/remove toggle -- returns the real new membership state, `null` if no provider exists to toggle against. */
+    suspend fun toggleCollectionMembership(collectionId: String, entry: LibraryEntry): Boolean? =
+        withContext(Dispatchers.IO) { romProvider?.toggleCollectionMembership(collectionId, entry.id) }
+
+    suspend fun isCollectionMember(collectionId: String, entry: LibraryEntry): Boolean =
+        withContext(Dispatchers.IO) { romProvider?.isCollectionMember(collectionId, entry.id) ?: false }
+
+    /** Real collectionId -> member gameIds map -- see [dev.droidtop.shell.gamepad]'s own `GameGroup.Collection` doc comment for how this feeds the system carousel. */
+    suspend fun getCollectionMembership(): Map<String, List<String>> =
+        withContext(Dispatchers.IO) { romProvider?.getCollectionMembership() ?: emptyMap() }
+
     private suspend fun withPlayHistory(entries: List<LibraryEntry>): List<LibraryEntry> {
         if (entries.isEmpty()) return entries
         val history = playHistory.getAll(entries.map { it.id })
