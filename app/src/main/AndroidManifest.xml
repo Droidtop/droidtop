@@ -113,6 +113,23 @@
             android:exported="true" />
 
         <!--
+          docs/SPEC.md section 3d's container/distro manager. The
+          intent-filter action lets shells in other modules
+          (:shell-desktop's taskbar) open it without a compile-time
+          dependency on :app, same decoupling reason the SettingsActivity
+          launches use component/action names elsewhere. Not exported:
+          droidtop-internal surface.
+        -->
+        <activity
+            android:name="dev.droidtop.app.ContainersActivity"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="dev.droidtop.app.action.CONTAINERS" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!--
           Runs the primary container's host-bridge session (connect + present
           outputs) as a foreground service so the desktop survives the
           launcher Activity being backgrounded — see docs/SPEC.md.

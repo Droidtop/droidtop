@@ -216,6 +216,9 @@ private fun BoxScope.Taskbar(startMenuOpen: Boolean, onToggleStartMenu: () -> Un
         }
         Spacer(modifier = Modifier.width(1.dp).height(32.dp).background(MaterialTheme.colorScheme.outline))
         Spacer(modifier = Modifier.weight(1f))
+        Button(onClick = { openContainers(context) }, modifier = Modifier.padding(horizontal = 8.dp)) {
+            Text("Containers")
+        }
         Button(onClick = { openSettings(context) }, modifier = Modifier.padding(horizontal = 8.dp)) {
             Text("Settings")
         }
@@ -237,6 +240,17 @@ private object DesktopPrefs {
 
     fun taskbarAtTop(context: Context): Boolean =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_TASKBAR_TOP, false)
+}
+
+// Action string, not a component class: :shell-desktop has no compile-time
+// dependency on :app (where ContainersActivity lives) -- same decoupling as
+// openSettings' component-name launch below. setPackage keeps it internal.
+private fun openContainers(context: Context) {
+    val intent = Intent("dev.droidtop.app.action.CONTAINERS").apply {
+        setPackage(context.packageName)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    context.startActivity(intent)
 }
 
 private fun openSettings(context: Context) {

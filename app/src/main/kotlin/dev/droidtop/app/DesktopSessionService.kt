@@ -16,14 +16,10 @@ import dev.droidtop.runtime.DisplayOutput
 import dev.droidtop.runtime.DisplayOutputKind
 import dev.droidtop.runtime.ImageCatalogResolver
 import dev.droidtop.runtime.ImageCatalogRole
-import dev.droidtop.runtime.ImageCachePolicy
 import dev.droidtop.runtime.ResolvedImage
 import dev.droidtop.runtime.linux.noroot.ProotRuntime
 import dev.droidtop.runtime.linux.root.CraneImageCatalogResolver
-import dev.droidtop.runtime.linux.root.CraneRootfsPuller
 import dev.droidtop.runtime.linux.root.DroidSpacesRuntime
-import dev.droidtop.runtime.linux.root.FileImageCache
-import dev.droidtop.runtime.linux.root.RootProcess
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -194,25 +190,9 @@ class DesktopSessionService : Service() {
         return resolver.resolve(repo, tag)
     }
 
-    /**
-     * Root gives access to [DroidSpacesRuntime]'s real namespace/cgroup
-     * isolation; falls back to [ProotRuntime] (still entirely `TODO()`)
-     * otherwise. Checked by actually running a root shell command rather
-     * than inferring from e.g. build tags — the only real signal.
-     */
-    private suspend fun selectRuntime(): ContainerRuntime {
-        val rootAvailable = RootProcess.run("id").succeeded
-        return if (rootAvailable) {
-            DroidSpacesRuntime(
-                context = applicationContext,
-                rootfsPuller = CraneRootfsPuller(applicationContext),
-                imageCache = FileImageCache(applicationContext),
-                cachePolicy = ImageCachePolicy(enabled = true),
-            )
-        } else {
-            ProotRuntime()
-        }
-    }
+    // Backend selection lives in ContainerRuntimeFactory (shared with the
+    // container manager screen) -- see its doc comment.
+    private suspend fun selectRuntime(): ContainerRuntime = ContainerRuntimeFactory.select(applicationContext)
 
     private fun primaryDisplayOutput(): DisplayOutput {
         @Suppress("DEPRECATION") // minSdk 26; WindowMetrics needs API 30+
