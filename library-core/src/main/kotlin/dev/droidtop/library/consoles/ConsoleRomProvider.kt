@@ -412,6 +412,7 @@ class ConsoleRomProvider(
                     systemId = effectiveSystemId,
                     artworkUri = EsDeArtwork.resolve(gamesRoot, effectiveSystemId, romFile.nameWithoutExtension),
                     manualUri = EsDeArtwork.resolveManual(gamesRoot, effectiveSystemId, romFile.nameWithoutExtension),
+                    videoUri = EsDeArtwork.resolveVideo(gamesRoot, effectiveSystemId, romFile.nameWithoutExtension),
                 )
             }
         }.awaitAll().withMetadata()
@@ -623,6 +624,7 @@ private fun LibraryEntry.toRomEntity(romsRoot: String, systemFolderId: String): 
     systemId = systemId ?: "",
     artworkUri = artworkUri,
     manualUri = manualUri,
+    videoUri = videoUri,
     romsRoot = romsRoot,
     systemFolderId = systemFolderId,
 )
@@ -634,4 +636,5 @@ private fun RomEntity.toLibraryEntry(): LibraryEntry = LibraryEntry(
     systemId = systemId,
     artworkUri = artworkUri,
     manualUri = manualUri,
+    videoUri = videoUri,
 )

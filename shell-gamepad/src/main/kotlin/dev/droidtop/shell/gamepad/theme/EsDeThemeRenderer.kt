@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,8 +38,14 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.shape.CircleShape
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
 import coil3.compose.AsyncImage
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.theme.BADGE_SLOTS
@@ -143,13 +150,16 @@ fun EsDeThemedView(
             when (element.type) {
                 "image" -> EsDeThemedImage(element, viewWidth, viewHeight, gameSelection)
                 "text" -> EsDeThemedText(element, viewWidth, viewHeight, gameSelection)
-                // Real, honest fallback: no video/GIF playback engine
-                // wired up (real, separate work) -- shows the element's
-                // own real default/poster PATH property, or the
-                // gameselector-resolved artwork for its selected game when
-                // gameselectorEntry is set, as a static image instead of
-                // silently rendering nothing.
-                "video", "animation" -> EsDeThemedFallbackImage(element, viewWidth, viewHeight, gameSelection)
+                // Real video playback (see EsDeThemedVideo's own doc
+                // comment) when the selected game has a real, scraped
+                // video file; the same static-poster fallback
+                // EsDeThemedFallbackImage always used otherwise (no video
+                // present, or a gameselector slot with no video concept at
+                // all, e.g. a mosaic tile). "animation" (GIF/APNG) stays on
+                // the plain fallback -- a genuinely separate, smaller decode
+                // engine this pass doesn't build.
+                "video" -> EsDeThemedVideo(element, viewWidth, viewHeight, gameSelection)
+                "animation" -> EsDeThemedFallbackImage(element, viewWidth, viewHeight, gameSelection)
                 // Real, live-rendered -- ES-DE's own "clock" type has no
                 // "metadata" property at all (confirmed against its real
                 // schema), unlike "datetime".
@@ -440,6 +450,67 @@ private fun EsDeThemedText(element: EsDeThemeElement, viewWidth: Dp, viewHeight:
 }
 
 /**
+ * Real `video` element playback -- a real ExoPlayer/media3 instance
+ * (`androidx.media3:media3-exoplayer`, `:media3-ui`), not a static poster,
+ * when the selected game has a real, scraped [LibraryEntry.videoUri] (see
+ * [dev.droidtop.library.EsDeArtwork.resolveVideo]'s own doc comment for
+ * the real ES-DE `videos` media-type convention this reads). Loops
+ * (`repeatMode = Player.REPEAT_MODE_ONE`, matching real ES-DE's own
+ * gamelist-preview behavior of looping a short clip while a game stays
+ * selected) and plays MUTED -- real ES-DE's own default is audible
+ * preview audio, but droidtop has no per-view "is this screen actually
+ * focused/visible" signal this composable can see (unlike real ES-DE's
+ * own view-lifecycle hook that stops playback on navigating away), so
+ * muted is the honest, safe default rather than risking audio from an
+ * off-screen or backgrounded preview; a future volume/mute setting is a
+ * real, separate, smaller follow-up once that signal exists. Falls back
+ * to [EsDeThemedFallbackImage]'s exact same static-poster path (its own
+ * `default`/`defaultImage`/`path`/gameselector-artwork chain) when no
+ * video is present -- e.g. this specific game was never scraped for
+ * video, or this is a gameselector mosaic-tile slot with no video concept
+ * at all.
+ */
+@Composable
+private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp, gameSelection: List<LibraryEntry>) {
+    val gameselectorEntry = element.valueOrNull<EsDeThemeValue.UInt>("gameselectorEntry")?.value?.toInt()
+    val videoUri = gameSelection.getOrNull(gameselectorEntry ?: 0)?.videoUri
+    if (videoUri == null) {
+        EsDeThemedFallbackImage(element, viewWidth, viewHeight, gameSelection)
+        return
+    }
+    val (width, height) = sizeOf(element, viewWidth, viewHeight)
+    val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
+    val cornerRadiusFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("imageCornerRadius")?.value ?: 0f
+    val cornerRadius = (cornerRadiusFraction * viewWidth.value).dp
+    val context = LocalContext.current
+    val player = remember(videoUri) {
+        ExoPlayer.Builder(context).build().apply {
+            setMediaItem(MediaItem.fromUri(videoUri))
+            repeatMode = Player.REPEAT_MODE_ONE
+            volume = 0f
+            prepare()
+            playWhenReady = true
+        }
+    }
+    DisposableEffect(player) {
+        onDispose { player.release() }
+    }
+    AndroidView(
+        factory = { ctx ->
+            PlayerView(ctx).apply {
+                useController = false
+                this.player = player
+                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+            }
+        },
+        modifier = Modifier
+            .absoluteOffset(x = offsetX, y = offsetY)
+            .size(width = width, height = height)
+            .let { if (cornerRadius > 0.dp) it.clip(RoundedCornerShape(cornerRadius)) else it },
+    )
+}
+
+/**
  * Real fallback for `video`/`animation` elements: their own `default`/
  * `defaultImage`/`path` PATH property when present, shown as a plain
  * static image -- or, for a gameselector-driven element (DEcaffe's own
@@ -448,9 +519,11 @@ private fun EsDeThemedText(element: EsDeThemeElement, viewWidth: Dp, viewHeight:
  * artwork, same real per-game-image approach as [EsDeThemedImage]'s own
  * gameselectorEntry handling (see that function's doc comment for the
  * same "default priority order, not this element's own imageType"
- * simplification). Real ES-DE plays these as actual video/GIF content;
- * this pass doesn't build a media-playback engine, so a static poster is
- * the honest alternative to rendering nothing at all.
+ * simplification). Real ES-DE plays `animation` elements as actual GIF/
+ * APNG content -- this pass doesn't build that decode engine (a real,
+ * separate, smaller follow-up), so a static poster is the honest
+ * alternative to rendering nothing at all. Also [EsDeThemedVideo]'s own
+ * fallback when a `video` element's selected game has no scraped video.
  */
 @Composable
 private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp, gameSelection: List<LibraryEntry>) {

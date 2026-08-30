@@ -53,6 +53,10 @@ data class RomEntity(
     // field) -- resolved and cached at scan time exactly like [artworkUri]
     // already is, not part of GameMetadataEntity.
     @ColumnInfo(name = "manual_uri") val manualUri: String? = null,
+    // Real ES-DE `videos` media presence -- same filesystem-derived,
+    // scan-time-resolved convention as [manualUri] (see
+    // EsDeArtwork.resolveVideo's own doc comment).
+    @ColumnInfo(name = "video_uri") val videoUri: String? = null,
     @ColumnInfo(name = "roms_root") val romsRoot: String,
     // The folder actually scanned to produce this row -- deliberately
     // separate from [systemId], which may have been corrected by
@@ -380,12 +384,19 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+/** Real, handwritten migration -- rom_entries is pure cache (see RomEntity's own doc comment), same treatment as manual_uri in MIGRATION_3_4. */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE rom_entries ADD COLUMN video_uri TEXT")
+    }
+}
+
 @Database(
     entities = [
         RomEntity::class, ScanMetadataEntity::class, GameMetadataEntity::class,
         CollectionEntity::class, CollectionMemberEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class RomDatabase : RoomDatabase() {
@@ -410,7 +421,7 @@ abstract class RomDatabase : RoomDatabase() {
                     // because game_metadata holds real user data that
                     // must survive it -- see that migration's own doc
                     // comment.
-                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build().also { instance = it }
             }

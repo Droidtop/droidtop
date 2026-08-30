@@ -276,8 +276,9 @@ internal val ES_DE_ELEMENT_SCHEMA: Map<String, Map<String, EsDePropertyType>> = 
         "lineSpacing" to EsDePropertyType.FLOAT,
         "zIndex" to EsDePropertyType.FLOAT,
     ),
-    // Real fallback-image-only rendering (see EsDeThemedView) -- actual
-    // video playback is real, separate work, not attempted this pass.
+    // Real ExoPlayer/media3 playback when the selected game has a scraped
+    // video (see EsDeThemedVideo), falling back to the same static-image
+    // rendering "animation" always uses when it doesn't.
     "video" to mapOf(
         "pos" to EsDePropertyType.NORMALIZED_PAIR,
         "size" to EsDePropertyType.NORMALIZED_PAIR,

@@ -35,6 +35,12 @@ data class LibraryEntry(
     // than a GameMetadataEntity field; badge-consumed by EsDeThemedBadges'
     // own "manual" slot.
     val manualUri: String? = null,
+    // Real ES-DE `videos` media presence -- same filesystem-derived
+    // convention as [manualUri] (see EsDeArtwork.resolveVideo's own doc
+    // comment); consumed by the theme renderer's "video" element to play
+    // a real gameplay-preview clip instead of falling back to a static
+    // image when one exists.
+    val videoUri: String? = null,
     val playtimeSeconds: Long = 0,
     val lastPlayedEpochMs: Long? = null,
     // Real, persisted count of how many times this entry has actually been
