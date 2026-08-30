@@ -164,6 +164,20 @@ private fun EsDeCarousel(
     val carouselColor = element?.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color(0xFF, 0xFF, 0xFF, 0xD8)
     val carouselColorEnd = element?.valueOrNull<EsDeThemeValue.Color>("colorEnd")?.let { colorOf(it) } ?: carouselColor
     val colorGradientHorizontal = element?.valueOrNull<EsDeThemeValue.Bool>("colorGradientHorizontal")?.value ?: true
+    // Real, confirmed bug this fixes: the text-fallback item renderer
+    // never read this element's own real `fontSize` at all, silently
+    // defaulting to Compose's ~14sp Text() default -- on a real device
+    // this rendered carousel item labels ("NINTENDO 3DS" etc.) as
+    // "practically invisible" tiny text, confirmed via a direct on-device
+    // screenshot diffed against the bundled theme's own reference
+    // sys.png. Real ES-DE's own default (`Font::getFromTheme`'s fallback,
+    // `FONT_SIZE_LARGE_FIXED`) is a fixed absolute size, not a screen-
+    // height fraction -- but every real theme (decaffe included) declares
+    // its own real `fontSize`, so the 0.045f fallback here only matters
+    // for a theme that genuinely omits it, matching the same default
+    // already used by EsDeThemedText/EsDeTextList elsewhere in this file.
+    val fontSizeFraction = element?.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
+    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * 1080).dp.toSp() }
     // itemSize is a fraction of the *screen*, ES-DE's own real convention
     // for carousel/grid geometry. Real, confirmed bug this fixes, found
     // via actual on-device testing: this used to multiply the fraction
@@ -260,6 +274,7 @@ private fun EsDeCarousel(
                 textSelectedColor = textSelectedColor,
                 textSelectedBackgroundColor = textSelectedBackgroundColor,
                 uppercase = uppercase,
+                fontSize = fontSizeSp,
                 unfocusedOpacity = unfocusedOpacity,
                 unfocusedSaturation = unfocusedSaturation,
                 modifier = (if (index == 0 && firstItemFocus != null) Modifier.focusRequester(firstItemFocus) else Modifier)
@@ -297,6 +312,7 @@ private fun EsDeCarouselItem(
     textSelectedColor: Color,
     textSelectedBackgroundColor: Color,
     uppercase: Boolean,
+    fontSize: androidx.compose.ui.unit.TextUnit,
     unfocusedOpacity: Float,
     unfocusedSaturation: Float,
     modifier: Modifier,
@@ -347,6 +363,7 @@ private fun EsDeCarouselItem(
         Text(
             if (uppercase) item.label.uppercase() else item.label,
             color = if (isFocused) textSelectedColor else textColor,
+            fontSize = fontSize,
             textAlign = TextAlign.Center,
             modifier = baseModifier
                 .background(if (isFocused) textSelectedBackgroundColor else textBackgroundColor)
