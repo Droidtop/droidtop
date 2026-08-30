@@ -31,13 +31,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -207,6 +208,15 @@ private fun EsDeCarousel(
     // matches real ES-DE too (`mSize.x`, the carousel's own real size, in
     // the exact same real spacing formula: `((mSize.x - (mItemSize.x *
     // mMaxItemCount)) / mMaxItemCount) + mItemSize.x`).
+    // Real CarouselComponent item-image properties (its own mImageColorShift/
+    // mImageSaturation, applied per item in addEntry -- see that real
+    // source): `imageColor` is a color SHIFT (multiply, same real modulate
+    // semantics as ImageComponent::setColorShift), `imageSelectedColor`
+    // replaces it for the focused item, `imageSaturation` is a real
+    // desaturation. Art Book Next's hero carousel declares all three.
+    val imageColor = element?.valueOrNull<EsDeThemeValue.Color>("imageColor")?.let { colorOf(it) }
+    val imageSelectedColor = element?.valueOrNull<EsDeThemeValue.Color>("imageSelectedColor")?.let { colorOf(it) } ?: imageColor
+    val imageSaturation = (element?.valueOrNull<EsDeThemeValue.FloatValue>("imageSaturation")?.value ?: 1f).coerceIn(0f, 1f)
     val itemSizeFraction = element?.valueOrNull<EsDeThemeValue.Pair>("itemSize")
     // Real ES-DE defaults (CarouselComponent's own constructor): 3.0 and 1.2.
     val maxItemCount = (element?.valueOrNull<EsDeThemeValue.FloatValue>("maxItemCount")?.value ?: 3f).coerceIn(0.5f, 30f)
@@ -236,14 +246,50 @@ private fun EsDeCarousel(
         )
     }
 
+    // Real ES-DE input architecture: the CAROUSEL is the focus/input
+    // target (`CarouselComponent::input` -> `List::listInput`), items are
+    // render entries with no input identity of their own. The previous
+    // per-item `focusable()` + `FocusManager.moveFocus` approach never
+    // actually traversed between absolutely-positioned siblings on-device
+    // (confirmed live: focus landed on item 0 and every D-pad key was
+    // swallowed by a failed moveFocus -- the carousel LOOKED fine but
+    // never moved). Container-level state stepping is the real model, and
+    // wraparound (`% size`) is real CarouselComponent behavior too -- its
+    // list is circular.
     BoxWithConstraints(
-        modifier = modifier.background(
-            if (colorGradientHorizontal) {
-                Brush.horizontalGradient(listOf(carouselColor, carouselColorEnd))
-            } else {
-                Brush.verticalGradient(listOf(carouselColor, carouselColorEnd))
-            },
-        ),
+        modifier = (if (firstItemFocus != null) modifier.focusRequester(firstItemFocus) else modifier)
+            .focusable()
+            .onKeyEvent { event ->
+                if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
+                when (GamepadKeyMap.actionFor(event.key)) {
+                    GamepadAction.A -> {
+                        items.getOrNull(focusedIndex)?.onSelect?.invoke()
+                        true
+                    }
+                    GamepadAction.LEFT -> {
+                        if (items.isNotEmpty()) {
+                            focusedIndex = (focusedIndex - 1 + items.size) % items.size
+                            onFocusedIndexChanged(focusedIndex)
+                        }
+                        true
+                    }
+                    GamepadAction.RIGHT -> {
+                        if (items.isNotEmpty()) {
+                            focusedIndex = (focusedIndex + 1) % items.size
+                            onFocusedIndexChanged(focusedIndex)
+                        }
+                        true
+                    }
+                    else -> false
+                }
+            }
+            .background(
+                if (colorGradientHorizontal) {
+                    Brush.horizontalGradient(listOf(carouselColor, carouselColorEnd))
+                } else {
+                    Brush.verticalGradient(listOf(carouselColor, carouselColorEnd))
+                },
+            ),
     ) {
         val carouselWidthPx = with(density) { maxWidth.toPx() }
         val carouselHeightPx = with(density) { maxHeight.toPx() }
@@ -292,15 +338,12 @@ private fun EsDeCarousel(
                 fontFamily = itemFontFamily,
                 unfocusedOpacity = unfocusedOpacity,
                 unfocusedSaturation = unfocusedSaturation,
-                modifier = (if (index == 0 && firstItemFocus != null) Modifier.focusRequester(firstItemFocus) else Modifier)
+                imageColorShift = imageColor,
+                imageSelectedColorShift = imageSelectedColor,
+                imageSaturation = imageSaturation,
+                modifier = Modifier
                     .absoluteOffset(x = xDp, y = yDp)
-                    .graphicsLayer { scaleX = rawScale; scaleY = rawScale; alpha = opacity }
-                    .onFocusChanged {
-                        if (it.isFocused) {
-                            focusedIndex = index
-                            onFocusedIndexChanged(index)
-                        }
-                    },
+                    .graphicsLayer { scaleX = rawScale; scaleY = rawScale; alpha = opacity },
             )
         }
     }
@@ -331,49 +374,56 @@ private fun EsDeCarouselItem(
     fontFamily: androidx.compose.ui.text.font.FontFamily?,
     unfocusedOpacity: Float,
     unfocusedSaturation: Float,
+    imageColorShift: Color?,
+    imageSelectedColorShift: Color?,
+    imageSaturation: Float,
     modifier: Modifier,
 ) {
-    val focusManager = LocalFocusManager.current
+    // No focusable()/onKeyEvent here: the carousel CONTAINER owns focus
+    // and key handling (real CarouselComponent::input architecture -- see
+    // EsDeCarousel's own comment; the per-item moveFocus approach this
+    // replaces never actually traversed on-device). clickable stays: touch
+    // taps a specific item directly, same as before.
     val baseModifier = modifier
         .size(width = width, height = height)
-        .focusable()
-        // Same real touch-input fix as EsDeTextListRow/EsDeListTile.
         .clickable(onClick = item.onSelect)
-        .onKeyEvent { event ->
-            if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
-            // Real, confirmed-live bug this fixes: absolutely-positioned
-            // focusable() carousel items (this carousel's own real
-            // pos/scale math, not a LazyRow) don't get Compose's built-in
-            // spatial arrow-key focus traversal for free the way a plain
-            // Row/LazyRow's children would -- confirmed on-device, D-pad
-            // left/right simply never moved focus off the first item.
-            // Explicit FocusManager.moveFocus is the standard real fix for
-            // exactly this gap, not a guess.
-            when (GamepadKeyMap.actionFor(event.key)) {
-                GamepadAction.A -> {
-                    item.onSelect()
-                    true
-                }
-                GamepadAction.LEFT -> {
-                    focusManager.moveFocus(FocusDirection.Left)
-                    true
-                }
-                GamepadAction.RIGHT -> {
-                    focusManager.moveFocus(FocusDirection.Right)
-                    true
-                }
-                else -> false
-            }
-        }
 
     if (item.logoPath != null) {
+        // Real ES-DE image treatment, replacing an earlier fake "dim
+        // slightly when desaturated" alpha hack: the carousel-declared
+        // `imageSaturation` (times the real `unfocusedItemSaturation` for
+        // an unfocused item) as an actual saturation ColorMatrix, with the
+        // `imageColor`/`imageSelectedColor` color SHIFT (multiply --
+        // ImageComponent::setColorShift's real modulate semantics) folded
+        // into the same matrix as a per-channel scale.
+        val shift = if (isFocused) imageSelectedColorShift else imageColorShift
+        val effectiveSaturation = if (isFocused) imageSaturation else imageSaturation * unfocusedSaturation
+        val colorFilter = when {
+            effectiveSaturation < 1f -> {
+                val matrix = ColorMatrix().apply { setToSaturation(effectiveSaturation) }
+                if (shift != null && shift != Color.White) {
+                    matrix.timesAssign(
+                        ColorMatrix(
+                            floatArrayOf(
+                                shift.red, 0f, 0f, 0f, 0f,
+                                0f, shift.green, 0f, 0f, 0f,
+                                0f, 0f, shift.blue, 0f, 0f,
+                                0f, 0f, 0f, shift.alpha, 0f,
+                            ),
+                        ),
+                    )
+                }
+                ColorFilter.colorMatrix(matrix)
+            }
+            shift != null && shift != Color.White -> ColorFilter.tint(shift, BlendMode.Modulate)
+            else -> null
+        }
         AsyncImage(
             model = item.logoPath,
             contentDescription = null,
             contentScale = ContentScale.Fit,
-            modifier = baseModifier.let {
-                if (!isFocused && unfocusedSaturation < 1f) it.graphicsLayer { alpha = 0.85f } else it
-            },
+            colorFilter = colorFilter,
+            modifier = baseModifier,
         )
     } else {
         Text(
