@@ -91,6 +91,23 @@
         android:title="@string/pref_handheld_theme_title"
         android:summary="%s" />
 
+    <!-- Real ES-DE parity: the active theme's own declared color
+         schemes and variants, user-selectable (entries populated
+         dynamically from the theme's capabilities.xml in
+         SettingsHandheldFragment; hidden when the theme declares one or
+         none). -->
+    <ListPreference
+        android:key="pref_handheld_theme_colorscheme"
+        android:title="@string/pref_handheld_theme_colorscheme_title"
+        android:summary="%s"
+        android:persistent="false" />
+
+    <ListPreference
+        android:key="pref_handheld_theme_variant"
+        android:title="@string/pref_handheld_theme_variant_title"
+        android:summary="%s"
+        android:persistent="false" />
+
     <Preference
         android:key="pref_handheld_sync_theme_index"
         android:title="@string/pref_handheld_sync_theme_index_title"

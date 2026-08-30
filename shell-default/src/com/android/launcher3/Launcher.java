@@ -447,6 +447,9 @@ public class Launcher extends StatefulActivity<LauncherState>
     // consumed in onStart -- see onStart's own comment for why the actual
     // redirect can't happen from inside onCreate itself.
     private String mDroidtopPendingModeRedirect;
+    // Double-tap-home window tracking for the hard display reinit (see
+    // onNewIntent). Static: home presses span onNewIntent calls.
+    private static long sDroidtopLastHomePressMs = 0L;
 
     @Override
     @TargetApi(Build.VERSION_CODES.S)
@@ -1760,12 +1763,23 @@ public class Launcher extends StatefulActivity<LauncherState>
         // user launched onto a display alone (see MainActivity's parked-
         // display handling).
         if (Intent.ACTION_MAIN.equals(intent.getAction())) {
+            // Double-tap detection: two HOME presses within the window is
+            // the HARD display reinit (re-assert droidtop on BOTH
+            // displays regardless of what runs on them -- per direction);
+            // a single press stays the soft reinit that never covers a
+            // launched app.
+            long nowMs = android.os.SystemClock.elapsedRealtime();
+            boolean doubleTap = nowMs - sDroidtopLastHomePressMs < 600;
+            sDroidtopLastHomePressMs = nowMs;
             String droidtopLastMode = dev.droidtop.shell.standard.ModePrefs.lastMode(this);
             if (!dev.droidtop.shell.standard.BackButtonMenu.MODE_STANDARD.equals(droidtopLastMode)) {
                 Intent redirect = new Intent(Intent.ACTION_MAIN);
                 redirect.setClassName(getPackageName(), "dev.droidtop.app.MainActivity");
                 redirect.putExtra(dev.droidtop.shell.standard.BackButtonMenu.EXTRA_MODE, droidtopLastMode);
                 redirect.putExtra(dev.droidtop.shell.standard.BackButtonMenu.EXTRA_DISPLAY_REINIT, true);
+                if (doubleTap) {
+                    redirect.putExtra(dev.droidtop.shell.standard.BackButtonMenu.EXTRA_DISPLAY_REINIT_FORCE, true);
+                }
                 redirect.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(redirect);
                 return;

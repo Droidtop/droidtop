@@ -92,6 +92,9 @@ data class EsDeThemeCapabilities(
     val fontSizes: List<String>,
     val variants: List<String>,
     val languages: List<String> = emptyList(),
+    /** Human-readable `<label>` per colorScheme/variant name, when capabilities.xml declares one — what a real selection UI shows (real ES-DE's own theme menus use these labels). */
+    val colorSchemeLabels: Map<String, String> = emptyMap(),
+    val variantLabels: Map<String, String> = emptyMap(),
 )
 
 object EsDeThemeParser {
@@ -112,6 +115,11 @@ object EsDeThemeParser {
         val fontSizes = mutableListOf<String>()
         val variants = mutableListOf<String>()
         val languages = mutableListOf<String>()
+        val colorSchemeLabels = mutableMapOf<String, String>()
+        val variantLabels = mutableMapOf<String, String>()
+        // Tracks which axis entry a following <label> belongs to (labels
+        // are children of their colorScheme/variant block).
+        var pendingLabelTarget: Pair<MutableMap<String, String>, String>? = null
         val parser = Xml.newPullParser().apply {
             setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
             setInput(StringReader(capabilitiesFile.readText()))
@@ -122,14 +130,24 @@ object EsDeThemeParser {
                 when (parser.name) {
                     "aspectRatio" -> aspectRatios += readText(parser)
                     "fontSize" -> fontSizes += readText(parser)
-                    "colorScheme" -> parser.getAttributeValue(null, "name")?.let { colorSchemes += it }
-                    "variant" -> parser.getAttributeValue(null, "name")?.let { variants += it }
+                    "colorScheme" -> parser.getAttributeValue(null, "name")?.let {
+                        colorSchemes += it
+                        pendingLabelTarget = colorSchemeLabels to it
+                    }
+                    "variant" -> parser.getAttributeValue(null, "name")?.let {
+                        variants += it
+                        pendingLabelTarget = variantLabels to it
+                    }
+                    "label" -> pendingLabelTarget?.let { (map, name) -> map[name] = readText(parser) }
                     "language" -> languages += readText(parser)
                 }
             }
             event = parser.next()
         }
-        return EsDeThemeCapabilities(aspectRatios, colorSchemes, fontSizes, variants, languages)
+        return EsDeThemeCapabilities(
+            aspectRatios, colorSchemes, fontSizes, variants, languages,
+            colorSchemeLabels, variantLabels,
+        )
     }
 
     /**
@@ -235,6 +253,12 @@ object EsDeThemeParser {
         // default 0,0 position with a 0.5,0.5 origin (giant, clipped into
         // the top-left corner, over the tab bar) on a black background.
         themeRootDir: File? = null,
+        // Real ES-DE parity (Settings "ThemeColorScheme"/"ThemeVariant"):
+        // the user's selection, validated against what capabilities.xml
+        // actually declares -- an unknown/stale value falls back to the
+        // first-declared default rather than selecting nothing.
+        colorSchemeOverride: String? = null,
+        variantOverride: String? = null,
     ): EsDeTheme {
         val capabilities = parseCapabilities(File(themeRootDir ?: themeFile.parentFile, "capabilities.xml"))
         val rawAspectRatio = capabilities.aspectRatios.firstOrNull() ?: "16:9"
@@ -251,9 +275,11 @@ object EsDeThemeParser {
         return parse(
             themeFile = themeFile,
             aspectRatio = resolvedAspectRatio,
-            colorScheme = capabilities.colorSchemes.firstOrNull() ?: "1",
+            colorScheme = colorSchemeOverride?.takeIf { it in capabilities.colorSchemes }
+                ?: capabilities.colorSchemes.firstOrNull() ?: "1",
             fontSize = capabilities.fontSizes.firstOrNull() ?: "medium",
-            variant = capabilities.variants.firstOrNull(),
+            variant = variantOverride?.takeIf { it in capabilities.variants }
+                ?: capabilities.variants.firstOrNull(),
             systemTheme = systemTheme,
             language = resolvedLanguage,
             systemFullName = systemFullName,

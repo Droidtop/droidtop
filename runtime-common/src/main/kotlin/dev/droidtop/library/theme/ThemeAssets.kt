@@ -242,6 +242,15 @@ object ThemeAssets {
                 // see parseWithCapabilities' own parameter comment for
                 // the confirmed-live collection-logo bug this fixes.
                 themeRootDir = themeDir,
+                // Real ES-DE parity: colorScheme/variant are user
+                // selections (per theme), validated in the parser against
+                // capabilities; unset/stale falls back to first-declared.
+                // Cache safety: ThemePrefs.set*() fires the same change
+                // listeners a theme switch does, which clears
+                // systemThemeCache -- so stale-scheme parses can't be
+                // served after a selection change.
+                colorSchemeOverride = ThemePrefs.colorScheme(context, active.name),
+                variantOverride = ThemePrefs.variant(context, active.name),
             )
         } catch (t: Exception) {
             Log.e("droidtop.ThemeAssets", "Failed to parse theme '${active.name}'", t)
@@ -373,6 +382,21 @@ object ThemeAssets {
      * `${system.theme}` substitution -- this just reads that value back
      * out instead of maintaining a second, separate lookup.
      */
+    /**
+     * The ACTIVE theme's declared capabilities (colorSchemes/variants with
+     * their labels) — what the Settings colorScheme/variant pickers list.
+     * Null when no theme resolves.
+     */
+    fun activeThemeCapabilities(context: Context): EsDeThemeCapabilities? {
+        val active = resolveActiveTheme(context) ?: return null
+        val themeDir = when {
+            active.userDir != null -> active.userDir
+            active.bundledAssetFolder != null -> extractedBundledThemeDir(context, active.bundledAssetFolder)
+            else -> null
+        } ?: return null
+        return EsDeThemeParser.parseCapabilities(File(themeDir, "capabilities.xml"))
+    }
+
     fun systemLogoPath(context: Context, systemId: String): String? {
         val theme = loadActiveTheme(context, systemId) ?: return null
         val listElement = theme.views["system"]?.primaryListElement() ?: return null

@@ -54,6 +54,15 @@ object BackButtonMenu {
     const val EXTRA_DISPLAY_REINIT = "dev.droidtop.app.EXTRA_DISPLAY_REINIT"
 
     /**
+     * Set on a DOUBLE-tap of home (Launcher.onNewIntent's press timing):
+     * the HARD display reinit — re-asserts droidtop's surfaces on BOTH
+     * displays regardless of what's running on them, clearing any parked
+     * display. The single-press soft reinit above never covers a launched
+     * app; this one deliberately does, per direction.
+     */
+    const val EXTRA_DISPLAY_REINIT_FORCE = "dev.droidtop.app.EXTRA_DISPLAY_REINIT_FORCE"
+
+    /**
      * "Android" is only offered when droidtop actually holds a HOME role
      * (see [HomeRolePrefs]) — a user who chose "neither" during onboarding
      * has nothing for this entry to point to, so it's hidden rather than
