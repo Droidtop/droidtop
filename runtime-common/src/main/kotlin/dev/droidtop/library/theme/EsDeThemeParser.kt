@@ -462,6 +462,23 @@ object EsDeThemeParser {
         return file.takeIf { it.isFile }
     }
 
+    /**
+     * Real bug, confirmed live on-device: a theme-defined `<variables>`
+     * block (real ES-DE's own generic custom-variable mechanism -- Art
+     * Book Next's bundled `_metadata-global/_default.xml` defines
+     * `systemDescription`/`systemHardwareType`/`systemColor`/... this
+     * way) commonly references an already-known variable inside its own
+     * definition, e.g. `<systemDescription>Play ${system.fullName}
+     * </systemDescription>`. This used to store that raw, unresolved
+     * text verbatim -- any theme using this real, common pattern showed
+     * the literal `${system.fullName}` placeholder on screen instead of
+     * a real value. `resolvePlaceholders` against the variables map
+     * accumulated SO FAR (real ES-DE's own actual behavior: variables
+     * resolve in document order, a later `<variables>` block can
+     * reference an earlier one's real value, not the other way around)
+     * fixes it -- matching how every other raw-text property already
+     * gets resolved (`parseElementProperties`'s own `rawText`).
+     */
     private fun parseVariables(parser: XmlPullParser, variables: MutableMap<String, String>) {
         val depth = parser.depth
         var event = parser.next()
@@ -469,7 +486,7 @@ object EsDeThemeParser {
             if (event == XmlPullParser.START_TAG) {
                 val name = parser.name
                 val text = readText(parser)
-                variables[name] = text
+                variables[name] = resolvePlaceholders(text, variables)
             }
             event = parser.next()
         }
