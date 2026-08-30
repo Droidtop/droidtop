@@ -1221,17 +1221,35 @@ fixed, not guessed — see git history for the individual commits):
   entirely blank next to `sys.png`'s own reference screenshot. Confirmed
   fixed live: the metadata sidebar and description text both render now.
 
-**Real, honestly deferred gaps** (not fabricated, not started): real
-`sound`/`video`/`animation` playback (currently static-image fallback
-only — genuine media-engine work, ExoPlayer/MediaCodec, bigger scope
-than the per-element passes above); `gamelistinfo`'s real filtered and
-folder-entered cases (no filter UI, no folder concept in droidtop's own
-data model yet); real per-COLLECTION theme overrides (confirmed real
-ES-DE themes can provide these — Art Book Next's own bundle has
-`now-playing/`/`completed/`/`custom-collections/` subfolders — droidtop
-has no "collections" concept — favorites/recently-played/custom
-collections as real pseudo-systems — in its data model at all yet, a
-bigger blocker than the theme-loading piece itself); generalizing the
+**Done (2026-08-30)**: real ES-DE collections — droidtop's own
+`CollectionEntity`/`CollectionMemberEntity` (`RomDatabase` v5) for
+custom collections, plus real, computed-on-the-fly auto collections
+(all games/favorites/last played, `LAST_PLAYED_MAX`=50 confirmed
+against `CollectionSystemsManager.cpp`). Both appear as real
+`GameGroup.Collection` pseudo-systems leading the Handheld system
+carousel, with real per-collection theme overrides (`auto-allgames`/
+`auto-favorites`/`auto-lastplayed`/`custom-collections` theme
+subfolders, confirmed against the same real source) — falls back to
+the theme's root `theme.xml` when a theme doesn't declare that
+subfolder, a deliberate droidtop simplification (real ES-DE hides an
+incompatible collection from the carousel entirely instead). Real UI:
+`CollectionMembershipEditor` (create + toggle per-game membership,
+reachable via a "Collections" action on the game detail screen).
+Two real, confirmed-live theme-engine bugs found and fixed while
+building this: `system.name`/`system.fullName` variables were never
+populated at all (only `system.theme` was), and theme-defined
+`<variables>` blocks never resolved their own embedded `${...}`
+placeholders (Art Book Next's own bundled per-system-metadata fragment
+uses exactly this real pattern for `systemDescription`). Real, still
+deferred: `gamelistinfo`'s folder-entered case specifically (folders
+are a different, still-unmodeled concept from collections); per-game
+badge `collection`/`folder` slots (need a "which collection(s) is this
+game in, from the game's own side" query droidtop hasn't wired up
+yet, even though the reverse — which games are in a collection — now
+works). `sound`/`video`/`animation` playback (currently static-image
+fallback only — genuine media-engine work, ExoPlayer/MediaCodec,
+bigger scope than the per-element passes above) is still open.
+Generalizing the
 real gamelist list-widget path (`EsDeListItem`) to badge/rating overlays
 the way a real theme's own game GRID entries sometimes show them inline;
 droidtop's own "Continue Playing" row (a real bolt-on with no equivalent
