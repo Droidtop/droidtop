@@ -280,6 +280,13 @@ private fun EsDeCarousel(
                         }
                         true
                     }
+                    // Consumed as no-ops for a horizontal carousel: real
+                    // ES-DE's system view has no other focus surface, so
+                    // stray UP/DOWN must not bubble out and land Compose
+                    // focus on droidtop's own header chrome (after which
+                    // every arrow key moves the wrong surface). Section
+                    // switching stays on its real dedicated action (L).
+                    GamepadAction.UP, GamepadAction.DOWN -> true
                     else -> false
                 }
             }
