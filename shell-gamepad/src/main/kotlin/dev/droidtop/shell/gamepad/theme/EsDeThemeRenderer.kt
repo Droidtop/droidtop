@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -42,7 +43,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.shape.CircleShape
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -56,7 +56,10 @@ import dev.droidtop.library.theme.EsDeThemeValue
 import dev.droidtop.library.theme.EsDeThemeView
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import kotlinx.coroutines.delay
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -350,7 +353,19 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     AsyncImage(
         model = path,
         contentDescription = null,
-        colorFilter = tint?.let { ColorFilter.tint(it) },
+        // Real ES-DE `<color>` on an image is a colorSHIFT -- a real
+        // multiply of the color into the texture's own existing pixels
+        // (ImageComponent::setColorShift, real default 0xFFFFFFFF = a
+        // true no-op multiply), not a full replace. Compose's default
+        // ColorFilter.tint blend mode is SrcIn, which REPLACES every
+        // opaque source pixel with a flat, uniform color -- any real,
+        // detailed background/decorative art tinted this way rendered as
+        // a flat, featureless silhouette instead of its own real
+        // shape/gradient/texture tinted through, a real, confirmed-live
+        // bug found by diffing an on-device screenshot against the
+        // theme's own bundled reference render. BlendMode.Modulate is
+        // Compose's real multiply-blend equivalent.
+        colorFilter = tint?.let { ColorFilter.tint(it, BlendMode.Modulate) },
         alpha = opacity,
         contentScale = if (hasCropSize) ContentScale.Crop else ContentScale.Fit,
         modifier = Modifier
@@ -410,13 +425,40 @@ private fun EsDeThemedText(element: EsDeThemeElement, viewWidth: Dp, viewHeight:
     val metadata = element.valueOrNull<EsDeThemeValue.Str>("metadata")?.value
     val gameselectorEntry = element.valueOrNull<EsDeThemeValue.UInt>("gameselectorEntry")?.value?.toInt() ?: 0
     val selectedGame = gameSelection.getOrNull(gameselectorEntry)
+    // Real, confirmed-live bug this fixes: `metadata="description"` is the
+    // real THEME key (confirmed against GamelistView::getMetadataValue,
+    // GamelistView.cpp:1007-1008 -- `if (metadata == "description") return
+    // file->metadata.get("desc")`, i.e. the theme key "description" maps
+    // to the FILE's own internal "desc" field, they are NOT the same
+    // string). droidtop matched on "desc" instead of "description" --
+    // decaffe's own theme.xml declares `<metadata>description</metadata>`
+    // (its own real per-game description panel), which never matched
+    // either branch, silently falling through to defaultValue every
+    // single time regardless of real scraped data. Real per-game text
+    // metadata keys ES-DE themes actually use, transcribed from the same
+    // function (GamelistView.cpp:1005-1040): description/developer/
+    // publisher/genre/players/favorite/completed/kidgame/broken/manual/
+    // playtime/altemulator.
     val metadataText = when (metadata) {
         "name" -> selectedGame?.title
-        "desc" -> selectedGame?.description
+        "description" -> selectedGame?.description
         "developer" -> selectedGame?.developer
         "publisher" -> selectedGame?.publisher
         "genre" -> selectedGame?.genre
         "players" -> selectedGame?.players
+        "favorite" -> selectedGame?.favorite?.let { if (it) "yes" else "no" }
+        "completed" -> selectedGame?.completed?.let { if (it) "yes" else "no" }
+        "kidgame" -> selectedGame?.kidGame?.let { if (it) "yes" else "no" }
+        "broken" -> selectedGame?.broken?.let { if (it) "yes" else "no" }
+        "manual" -> selectedGame?.let { if (it.manualUri != null) "yes" else "no" }
+        "altemulator" -> selectedGame?.altEmulator
+        // Real ES-DE format (File::getPlayTimeString): "Xh Ym", or "Never
+        // played" for zero -- same real convention droidtop's own
+        // EntryDetailScreen already uses ("Played N min"), transcribed
+        // here to match the theme-bound case too.
+        "playtime" -> selectedGame?.playtimeSeconds?.let { seconds ->
+            if (seconds <= 0) "Never played" else "${seconds / 3600}h ${(seconds % 3600) / 60}m"
+        }
         else -> null
     }
     val resolvedText = if (metadata != null) {
@@ -471,6 +513,7 @@ private fun EsDeThemedText(element: EsDeThemeElement, viewWidth: Dp, viewHeight:
             text = text,
             color = color.copy(alpha = color.alpha * opacity),
             fontSize = fontSizeSp,
+            fontFamily = themeFontFamily(element),
             lineHeight = fontSizeSp * lineSpacing,
             textAlign = textAlign,
             modifier = if (hasSize) Modifier.fillMaxWidth() else Modifier,
@@ -582,7 +625,19 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
     AsyncImage(
         model = path,
         contentDescription = null,
-        colorFilter = tint?.let { ColorFilter.tint(it) },
+        // Real ES-DE `<color>` on an image is a colorSHIFT -- a real
+        // multiply of the color into the texture's own existing pixels
+        // (ImageComponent::setColorShift, real default 0xFFFFFFFF = a
+        // true no-op multiply), not a full replace. Compose's default
+        // ColorFilter.tint blend mode is SrcIn, which REPLACES every
+        // opaque source pixel with a flat, uniform color -- any real,
+        // detailed background/decorative art tinted this way rendered as
+        // a flat, featureless silhouette instead of its own real
+        // shape/gradient/texture tinted through, a real, confirmed-live
+        // bug found by diffing an on-device screenshot against the
+        // theme's own bundled reference render. BlendMode.Modulate is
+        // Compose's real multiply-blend equivalent.
+        colorFilter = tint?.let { ColorFilter.tint(it, BlendMode.Modulate) },
         alpha = opacity,
         contentScale = if (hasCropSize) ContentScale.Crop else ContentScale.Fit,
         modifier = Modifier
@@ -629,6 +684,7 @@ private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         text = formatted,
         color = color.copy(alpha = color.alpha * opacity),
         fontSize = fontSizeSp,
+        fontFamily = themeFontFamily(element),
         modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY),
     )
 }
@@ -681,6 +737,7 @@ private fun EsDeThemedDateTime(element: EsDeThemeElement, viewWidth: Dp, viewHei
         text = formatted,
         color = color.copy(alpha = color.alpha * opacity),
         fontSize = fontSizeSp,
+        fontFamily = themeFontFamily(element),
         modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY),
     )
 }
@@ -931,6 +988,7 @@ private fun EsDeThemedSystemStatus(element: EsDeThemeElement, viewWidth: Dp, vie
             text = parts.joinToString("  "),
             color = color.copy(alpha = color.alpha * opacity),
             fontSize = with(LocalDensity.current) { heightDp.toSp() },
+            fontFamily = themeFontFamily(element),
         )
     }
 }
@@ -967,6 +1025,7 @@ private fun EsDeThemedGamelistInfo(element: EsDeThemeElement, viewWidth: Dp, vie
         text = text,
         color = color.copy(alpha = color.alpha * opacity),
         fontSize = with(LocalDensity.current) { fontSizeDp.toSp() },
+        fontFamily = themeFontFamily(element),
         modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY),
     )
 }
@@ -1061,16 +1120,19 @@ private fun EsDeThemedHelpSystem(
         horizontalArrangement = Arrangement.spacedBy(entrySpacing.dp),
     ) {
         hints.forEach { (action, label) ->
+            // Real ES-DE HelpComponent draws an icon glyph in `iconColor`
+            // beside a text label in `textColor` -- no pill/background
+            // behind the glyph at all. Real, confirmed-live bug this
+            // fixes: droidtop drew the glyph IN iconColor ON a pill
+            // filled with textColor -- decaffe keys both colors to the
+            // same real palette family (see colors.xml's own
+            // mainFontColor-driven scheme), so the glyph text and its own
+            // background were the same color, rendering as a blank,
+            // illegible circle on every real device screenshot.
+            val fontFamily = themeFontFamily(element)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    GamepadKeyMap.labelFor(action),
-                    color = iconColor,
-                    fontSize = fontSizeSp,
-                    modifier = Modifier
-                        .background(textColor, CircleShape)
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
-                )
-                Text(label, color = textColor, fontSize = fontSizeSp)
+                Text(GamepadKeyMap.labelFor(action), color = iconColor, fontSize = fontSizeSp, fontFamily = fontFamily)
+                Text(label, color = textColor, fontSize = fontSizeSp, fontFamily = fontFamily)
             }
         }
     }
@@ -1168,4 +1230,25 @@ private fun colorOf(value: EsDeThemeValue.Color): Color {
     val b = (rgba shr 8) and 0xFF
     val a = rgba and 0xFF
     return Color(red = r.toInt(), green = g.toInt(), blue = b.toInt(), alpha = a.toInt())
+}
+
+// Real, confirmed-live gap this fixes: `fontPath` is a real, correctly-
+// parsed property (every text-bearing element type declares it -- see
+// EsDeTheme.kt's own real schema) that no renderer here ever actually
+// LOADED and applied -- every themed screen rendered in Compose's plain
+// system default font regardless of what real font file a theme bundles
+// and points `fontPath` at (decaffe alone ships 8 real .otf/.ttf files,
+// referenced by ~40 separate `fontPath` declarations across its own
+// theme.xml). Cached by resolved file path -- `Font(File)` decodes the
+// real font file from disk, not free to redo on every recomposition.
+// Not `@Composable`: a plain memoization map is enough here, no Compose
+// state/recomposition scoping needed for a value keyed purely off the
+// element's own already-resolved path.
+private val themeFontFamilyCache = mutableMapOf<String, FontFamily>()
+
+internal fun themeFontFamily(element: EsDeThemeElement): FontFamily? {
+    val path = element.valueOrNull<EsDeThemeValue.Path>("fontPath")?.resolved ?: return null
+    return themeFontFamilyCache.getOrPut(path) {
+        FontFamily(Font(File(path)))
+    }
 }
