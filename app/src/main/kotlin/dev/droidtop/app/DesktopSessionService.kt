@@ -88,12 +88,26 @@ class DesktopSessionService : Service() {
     }
 
     override fun onDestroy() {
+        // Real fix for a confirmed on-device leak: droidspaces child
+        // processes survived past app force-stop because nothing ever
+        // stopped the container -- runBlocking here is deliberate:
+        // onDestroy is the last chance to reap, and scope.cancel() below
+        // would kill an async attempt mid-flight.
+        (_stateHolder.value as? DesktopSessionState.Connected)?.let { session ->
+            kotlinx.coroutines.runBlocking {
+                runCatching { session.runtime.stop(session.container) }
+                    .onFailure { android.util.Log.w(TAG, "Stopping primary container on destroy failed", it) }
+            }
+        }
+        _stateHolder.value = DesktopSessionState.Idle
         scope.cancel()
         super.onDestroy()
     }
 
     private suspend fun connect() {
+        android.util.Log.i(TAG, "Desktop session connecting")
         val runtime: ContainerRuntime = selectRuntime()
+        android.util.Log.i(TAG, "Runtime selected: ${runtime.javaClass.simpleName}")
 
         if (runtime is DroidSpacesRuntime) {
             val check = runtime.checkSystemRequirements()
@@ -101,14 +115,16 @@ class DesktopSessionService : Service() {
                 fail("droidspaces check failed: ${check.stderr.ifBlank { check.stdout }}")
                 return
             }
+            android.util.Log.i(TAG, "droidspaces check passed")
         }
 
         val primaryImage = try {
             selectPrimaryImage(CraneImageCatalogResolver(applicationContext))
         } catch (t: Throwable) {
-            fail("Couldn't resolve a primary image from the catalog: ${t.message}")
+            fail("Couldn't resolve a primary image from the catalog: ${t.message}", t)
             return
         }
+        android.util.Log.i(TAG, "Primary image resolved: ${primaryImage.repository.registry}/${primaryImage.repository.repository} @ ${primaryImage.tag}")
 
         val provisionCommand = try {
             val repo = primaryImage.repository
@@ -117,10 +133,11 @@ class DesktopSessionService : Service() {
             CompositorProvisioning.installCommand(repo.os, desktopEnvironment)
                 ?: error("No known compositor-install command for ${repo.os}/$desktopEnvironment")
         } catch (t: Throwable) {
-            fail("Couldn't determine how to provision a compositor: ${t.message}")
+            fail("Couldn't determine how to provision a compositor: ${t.message}", t)
             return
         }
 
+        android.util.Log.i(TAG, "Creating primary container (pull + unpack can take a while on first run)")
         val primary = try {
             runtime.createPrimary(primaryImage.toRootfsImage(), provisionCommand)
         } catch (t: Throwable) {
@@ -128,16 +145,18 @@ class DesktopSessionService : Service() {
             // live droidspaces container (see this class's own doc
             // comment) — a clear, attributable failure beats a silent
             // no-op.
-            fail("Couldn't create the primary container: ${t.message}")
+            fail("Couldn't create the primary container: ${t.message}", t)
             return
         }
+        android.util.Log.i(TAG, "Primary container created: ${primary.id}")
 
         try {
             runtime.start(primary)
         } catch (t: Throwable) {
-            fail("Couldn't start the primary container: ${t.message}")
+            fail("Couldn't start the primary container: ${t.message}", t)
             return
         }
+        android.util.Log.i(TAG, "Primary container started")
 
         val hostBridge = HostBridge()
         val socketPath = runtime.primaryWaylandSocketPath()
@@ -145,6 +164,7 @@ class DesktopSessionService : Service() {
             fail("HostBridge couldn't connect to $socketPath")
             return
         }
+        android.util.Log.i(TAG, "HostBridge connected to $socketPath — desktop session up")
 
         _stateHolder.value = DesktopSessionState.Connected(hostBridge, primaryDisplayOutput(), runtime, primary)
     }
@@ -206,7 +226,12 @@ class DesktopSessionService : Service() {
         )
     }
 
-    private fun fail(message: String) {
+    // Failures used to render ONLY in the Desktop shell's own UI text --
+    // debugging the first real on-device pipeline run meant screenshotting
+    // the shell to read error strings. Every failure now also lands in
+    // logcat with its stack trace.
+    private fun fail(message: String, cause: Throwable? = null) {
+        android.util.Log.e(TAG, "Desktop session failed: $message", cause)
         _stateHolder.value = DesktopSessionState.Failed(message)
     }
 
@@ -226,6 +251,7 @@ class DesktopSessionService : Service() {
     }
 
     companion object {
+        private const val TAG = "droidtop.DesktopSession"
         private const val NOTIFICATION_ID = 1
         private val _stateHolder = MutableStateFlow<DesktopSessionState>(DesktopSessionState.Idle)
 
