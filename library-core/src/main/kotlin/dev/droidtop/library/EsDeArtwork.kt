@@ -105,6 +105,28 @@ object EsDeArtwork {
         }
         return null
     }
+
+    /**
+     * Real ES-DE `manuals` media type (confirmed via USERGUIDE.md's own
+     * documented `downloaded_media` layout: `<system>/manuals/<romname>.pdf`)
+     * -- deliberately NOT a per-game metadata field (confirmed against
+     * `MetaData.cpp`'s real `gameDecls` table, which has no "manual" key
+     * at all); `BadgeComponent`'s own real "manual" badge slot is driven
+     * by whether this file exists, same as [resolve]'s own artwork-
+     * presence check, not a stored flag. Same two-candidate-root search
+     * as [resolve].
+     */
+    fun resolveManual(gamesRoot: File, system: String, romBaseName: String): String? {
+        val candidateMediaRoots = listOf(
+            File(gamesRoot.parentFile ?: gamesRoot, "ES-DE/downloaded_media"),
+            File(gamesRoot, "downloaded_media"),
+        )
+        for (mediaRoot in candidateMediaRoots) {
+            val candidate = File(mediaRoot, "$system/manuals/$romBaseName.pdf")
+            if (candidate.isFile) return candidate.absolutePath
+        }
+        return null
+    }
 }
 
 /** Folder-name convention used both to scan under [File] roots and to key into [EsDeArtwork]'s media lookup. */

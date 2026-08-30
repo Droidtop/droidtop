@@ -411,6 +411,7 @@ class ConsoleRomProvider(
                     kind = LibraryEntryKind.CONSOLE_ROM,
                     systemId = effectiveSystemId,
                     artworkUri = EsDeArtwork.resolve(gamesRoot, effectiveSystemId, romFile.nameWithoutExtension),
+                    manualUri = EsDeArtwork.resolveManual(gamesRoot, effectiveSystemId, romFile.nameWithoutExtension),
                 )
             }
         }.awaitAll().withMetadata()
@@ -439,6 +440,18 @@ class ConsoleRomProvider(
                 rating = meta.rating,
                 players = meta.players,
                 favorite = meta.favorite,
+                completed = meta.completed,
+                kidGame = meta.kidGame,
+                hidden = meta.hidden,
+                broken = meta.broken,
+                noGameCount = meta.noGameCount,
+                noMultiScrape = meta.noMultiScrape,
+                hideMetadata = meta.hideMetadata,
+                controllerShortName = meta.controllerShortName,
+                altEmulator = meta.altEmulator,
+                launchScreen = meta.launchScreen,
+                sortName = meta.sortName,
+                collectionSortName = meta.collectionSortName,
             )
         }
     }
@@ -521,6 +534,29 @@ class ConsoleRomProvider(
         return next
     }
 
+    /**
+     * Real load-for-editing step -- [dev.droidtop.shell.gamepad]
+     * `GameMetadataEditor`'s own "show current values" state. Returns a
+     * real, default-valued [GameMetadataEntity] (matching real ES-DE's
+     * own `MetaDataList`'s constructor behavior -- every field starts at
+     * its documented default, not null/missing, when a game has no row
+     * yet) rather than null, so the editor never has to special-case
+     * "never edited before."
+     */
+    suspend fun getMetadataForEditing(entryId: String): GameMetadataEntity =
+        dao.getGameMetadataSingle(entryId) ?: GameMetadataEntity(id = entryId)
+
+    /**
+     * Real save path for [dev.droidtop.shell.gamepad] `GameMetadataEditor`
+     * -- a plain full upsert (unlike [toggleFavorite]'s single-column
+     * `UPDATE`) since the editor legitimately holds and can change every
+     * real field at once, same as real ES-DE's own `GuiMetaDataEd` saving
+     * its whole in-memory `MetaDataList` back on exit.
+     */
+    suspend fun saveMetadata(metadata: GameMetadataEntity) {
+        dao.upsertGameMetadata(metadata)
+    }
+
     // `ActivityManager.forceStopPackage()` needs the signature-level
     // FORCE_STOP_PACKAGES permission -- not grantable to a normal app, so
     // this real Daijishō-preset flag (several of KnownPlayers' real
@@ -543,6 +579,7 @@ private fun LibraryEntry.toRomEntity(romsRoot: String, systemFolderId: String): 
     title = title,
     systemId = systemId ?: "",
     artworkUri = artworkUri,
+    manualUri = manualUri,
     romsRoot = romsRoot,
     systemFolderId = systemFolderId,
 )
@@ -553,4 +590,5 @@ private fun RomEntity.toLibraryEntry(): LibraryEntry = LibraryEntry(
     kind = LibraryEntryKind.CONSOLE_ROM,
     systemId = systemId,
     artworkUri = artworkUri,
+    manualUri = manualUri,
 )

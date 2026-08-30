@@ -300,6 +300,7 @@ fun GamepadShell(
                 // it stays checked before the loading gate too.
                 entry != null -> EntryDetailScreen(
                     entry = entry,
+                    library = library,
                     onLaunch = { onLaunch(entry); detailEntry = null },
                     onClose = { detailEntry = null },
                 )
@@ -417,10 +418,22 @@ private object HandheldPrefs {
  * only behavior. Reached via a card's Y/Info action, closed via B/Back.
  */
 @Composable
-private fun EntryDetailScreen(entry: LibraryEntry, onLaunch: () -> Unit, onClose: () -> Unit) {
+private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: () -> Unit, onClose: () -> Unit) {
     val context = LocalContext.current
     val launchFocus = remember { FocusRequester() }
     LaunchedEffect(entry) { launchFocus.requestFocus() }
+
+    var editingMetadata by remember { mutableStateOf(false) }
+    val isRomEntry = entry.kind == LibraryEntryKind.CONSOLE_ROM
+
+    if (editingMetadata) {
+        GameMetadataEditor(
+            entry = entry,
+            library = library,
+            onDismiss = { editingMetadata = false },
+        )
+        return
+    }
 
     // Real choice, not a silent default -- enginehost/Kirikiroid2/Wine/a
     // Linux container are all genuinely available strategies for an
@@ -506,6 +519,12 @@ private fun EntryDetailScreen(entry: LibraryEntry, onLaunch: () -> Unit, onClose
         }
         Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             ActionChip("Launch", highlighted = true, modifier = Modifier.focusRequester(launchFocus), onClick = onLaunch)
+            // Real ConsoleRomProvider-specific concept -- same honest
+            // "not applicable" gating Library.toggleFavorite/
+            // saveMetadata already use for a non-ROM entry.
+            if (isRomEntry) {
+                ActionChip("Edit metadata", highlighted = false, onClick = { editingMetadata = true })
+            }
             ActionChip("Back", highlighted = false, onClick = onClose)
         }
         // Only shown when there's an actual choice to make -- a single
@@ -571,7 +590,7 @@ private fun LaunchStrategyPicker(
 }
 
 @Composable
-private fun ActionChip(label: String, highlighted: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+internal fun ActionChip(label: String, highlighted: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     Text(
         label,
