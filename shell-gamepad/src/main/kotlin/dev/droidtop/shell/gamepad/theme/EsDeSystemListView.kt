@@ -749,12 +749,3 @@ private fun EsDeListTile(
     }
 }
 
-/** [EsDeThemeValue.Color.argbLikeRgba] is packed RRGGBBAA -- Compose's Color wants ARGB, so channels need reordering. Same real logic as EsDeThemeRenderer.kt's own colorOf. */
-private fun colorOf(value: EsDeThemeValue.Color): Color {
-    val rgba = value.argbLikeRgba
-    val r = (rgba shr 24) and 0xFF
-    val g = (rgba shr 16) and 0xFF
-    val b = (rgba shr 8) and 0xFF
-    val a = rgba and 0xFF
-    return Color(red = r.toInt(), green = g.toInt(), blue = b.toInt(), alpha = a.toInt())
-}

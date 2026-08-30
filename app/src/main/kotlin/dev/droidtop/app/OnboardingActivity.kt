@@ -38,12 +38,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.droidtop.runtime.BundledImageRepositories
-import dev.droidtop.runtime.ImageCachePolicy
 import dev.droidtop.runtime.ImageCatalogRole
 import dev.droidtop.runtime.KnownImageRepository
-import dev.droidtop.runtime.linux.root.CraneRootfsPuller
 import dev.droidtop.runtime.linux.root.DroidSpacesRuntime
-import dev.droidtop.runtime.linux.root.FileImageCache
 import dev.droidtop.shell.standard.BackButtonMenu
 import dev.droidtop.shell.standard.HomeRolePrefs
 import dev.droidtop.shell.standard.ModePrefs
@@ -390,20 +387,31 @@ private fun DesktopSetupStep(onContinue: () -> Unit) {
     LaunchedEffect(Unit) {
         repositories = withContext(Dispatchers.IO) {
             BundledImageRepositories.load(context).repositories
+                // arm64 is the hard filter -- droidtop only targets ARM64
+                // hardware; an amd64-only entry (e.g. official Arch) can't
+                // run here regardless of anything else (docs/SPEC.md §3a).
+                .filter { it.arm64Available }
                 .filter { it.role == ImageCatalogRole.PRIMARY || it.role == ImageCatalogRole.BOTH }
         }
-        selectedId = DesktopSetupPrefs.preferredPrimaryImageId(context) ?: repositories.firstOrNull()?.id
+        // ONLY a previously-made real choice pre-selects -- droidtop never
+        // picks an image the user didn't (docs/SPEC.md §3a; the old
+        // `?: repositories.firstOrNull()?.id` here was the UI half of the
+        // same auto-pick spec violation the session service had).
+        selectedId = DesktopSetupPrefs.preferredPrimaryImageId(context)
         val result = withContext(Dispatchers.IO) {
-            val runtime = DroidSpacesRuntime(
-                context = context,
-                rootfsPuller = CraneRootfsPuller(context),
-                imageCache = FileImageCache(context),
-                cachePolicy = ImageCachePolicy(enabled = true),
-            )
-            runtime.checkSystemRequirements()
+            // Same backend selection as the real session, not a second
+            // hand-built runtime (see ContainerRuntimeFactory).
+            when (val runtime = ContainerRuntimeFactory.select(context)) {
+                is DroidSpacesRuntime -> runtime.checkSystemRequirements()
+                else -> null
+            }
         }
-        checkResult = result.succeeded
-        checkMessage = if (result.succeeded) "Root access looks good." else result.stderr.ifBlank { result.stdout }
+        checkResult = result?.succeeded ?: false
+        checkMessage = when {
+            result == null -> "no root access detected (the no-root desktop backend isn't ready yet)"
+            result.succeeded -> "Root access looks good."
+            else -> result.stderr.ifBlank { result.stdout }
+        }
     }
 
     Text("Desktop setup", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineSmall)
@@ -426,10 +434,17 @@ private fun DesktopSetupStep(onContinue: () -> Unit) {
             }
         }
     }
-    Button(onClick = {
-        DesktopSetupPrefs.setPreferredPrimaryImageId(context, selectedId)
-        onContinue()
-    }) { Text("Continue") }
+    // Continue stays disabled until the user actually chose an image --
+    // saving a selection they never made would be the auto-pick violation
+    // again, just via UI default. Skip is the honest "no choice yet" path
+    // (the desktop session fails with guidance until one is made).
+    Button(
+        enabled = selectedId != null,
+        onClick = {
+            DesktopSetupPrefs.setPreferredPrimaryImageId(context, selectedId)
+            onContinue()
+        },
+    ) { Text("Continue") }
     TextButton(onClick = onContinue) { Text("Skip for now") }
 }
 
@@ -456,9 +471,10 @@ private fun GamesFoldersStep(
 ) {
     Text("Game folders", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineSmall)
     Text(
-        "Add every folder where your Ren'Py, RPG Maker, or Kirikiri games " +
-            "live -- an SD card and internal storage both work. You can add " +
-            "more, or change these, later in Settings.",
+        "Add every folder where your games live -- console ROMs (sorted " +
+            "into per-system folders) and Ren'Py/RPG Maker/Kirikiri-style " +
+            "engine games alike. An SD card and internal storage both " +
+            "work, and you can add more, or change these, later in Settings.",
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodyMedium,
     )

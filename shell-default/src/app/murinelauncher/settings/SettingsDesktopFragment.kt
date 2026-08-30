@@ -19,6 +19,7 @@ public final class SettingsDesktopFragment : AbstractSettingsFragment() {
 
     companion object {
         const val PREF_ROOT_COMPOSITOR_SETUP: String = "pref_desktop_root_compositor_setup"
+        const val PREF_CONTAINERS: String = "pref_desktop_containers"
     }
 
     override fun getPreferenceScreenResId() = R.xml.droidtop_desktop_prefs
@@ -38,6 +39,20 @@ public final class SettingsDesktopFragment : AbstractSettingsFragment() {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 startActivity(intent)
+                true
+            }
+        }
+        if (preference.key == PREF_CONTAINERS) {
+            // The container/distro manager (docs/SPEC.md section 3d) --
+            // action-string launch, same no-compile-dependency reasoning
+            // as above and as DesktopShell's own taskbar button.
+            preference.setOnPreferenceClickListener {
+                startActivity(
+                    Intent("dev.droidtop.app.action.CONTAINERS").apply {
+                        setPackage(requireContext().packageName)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    },
+                )
                 true
             }
         }
