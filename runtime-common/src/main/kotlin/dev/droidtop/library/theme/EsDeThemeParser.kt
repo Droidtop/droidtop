@@ -548,10 +548,32 @@ object EsDeThemeParser {
         while (!(event == XmlPullParser.END_TAG && parser.depth == depth)) {
             if (event == XmlPullParser.START_TAG) {
                 val propName = parser.name
+                // Real ES-DE attribute-keyed property (confirmed against
+                // sPropertyAttributeMap, ThemeData.cpp:144-154) -- the
+                // attribute value MUST be read here, before readText()
+                // advances the parser past this tag's own START_TAG
+                // position, or getAttributeValue has nothing to read. A
+                // real, confirmed-live bug this fixes: this read never
+                // happened at all before, so a real theme's own
+                // `<customBadgeIcon badge="kidgame">` declarations were
+                // silently unparseable regardless of what the schema
+                // declared -- confirmed via the bundled decaffe theme's
+                // own six real customBadgeIcon/customControllerIcon
+                // declarations, none of which ever reached
+                // EsDeThemedBadges' own `badge_$slot` lookup.
+                val attributeMapping = ES_DE_PROPERTY_ATTRIBUTE_MAP[propName]
+                val attrValue = attributeMapping?.let { (attrName, _) -> parser.getAttributeValue(null, attrName) }
                 val rawText = resolvePlaceholders(readText(parser), variables)
                 val propType = schema[propName]
                 if (propType != null && rawText.isNotBlank()) {
-                    coerce(propType, rawText, baseDir)?.let { properties[propName] = it }
+                    coerce(propType, rawText, baseDir)?.let { value ->
+                        val key = if (attributeMapping != null && attrValue != null) {
+                            "${attributeMapping.second}_$attrValue"
+                        } else {
+                            propName
+                        }
+                        properties[key] = value
+                    }
                 }
             }
             event = parser.next()

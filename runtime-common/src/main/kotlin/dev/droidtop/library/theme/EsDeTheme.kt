@@ -114,78 +114,411 @@ sealed interface EsDeThemeValue {
 internal enum class EsDePropertyType { NORMALIZED_PAIR, PATH, STRING, COLOR, UNSIGNED_INTEGER, FLOAT, BOOLEAN }
 
 /**
- * Real element/property schema, transcribed from ES-DE's own
- * `ThemeData::sElementMap` (verified against the actual source, not
- * guessed) -- all 16 real element types, within each restricted to the
- * properties this parser actually implements (see [EsDeTheme]'s own doc
- * comment for the real parsing-vs-rendering coverage distinction).
+ * Real element/property schema -- a VERBATIM transcription of ES-DE's own
+ * `ThemeData::sElementMap` (`es-core/src/ThemeData.cpp:156-645`, a real
+ * local clone kept at /root/es-de-reference, read directly line-by-line
+ * for this transcription, not guessed or partially covered). All 16 real
+ * element types, every real property each one declares, with its real
+ * type. This replaces an earlier, real, confirmed bug: a hand-picked
+ * SUBSET of each element's real properties (e.g. carousel was missing
+ * `staticImage`/`imageColor`/`selectedItemMargins`/`itemVerticalAlignment`
+ * entirely) -- a renderer reading one of those missing keys via
+ * `valueOrNull` got a silent `null` indistinguishable from "theme didn't
+ * set this," not a parse failure, so the gap was invisible without
+ * diffing against real ES-DE source directly. Rendering coverage for a
+ * newly-added property is still real, separate, incremental work (see
+ * [EsDeTheme]'s own doc comment) -- this schema's job is only to make
+ * sure the DATA survives parsing, so a renderer pass can actually reach
+ * it instead of finding null where the theme set a real value.
  */
 internal val ES_DE_ELEMENT_SCHEMA: Map<String, Map<String, EsDePropertyType>> = mapOf(
+    // ThemeData.cpp:158-231
+    "carousel" to mapOf(
+        "pos" to EsDePropertyType.NORMALIZED_PAIR,
+        "size" to EsDePropertyType.NORMALIZED_PAIR,
+        "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "type" to EsDePropertyType.STRING,
+        "staticImage" to EsDePropertyType.PATH,
+        "imageType" to EsDePropertyType.STRING,
+        "defaultImage" to EsDePropertyType.PATH,
+        "defaultFolderImage" to EsDePropertyType.PATH,
+        "maxItemCount" to EsDePropertyType.FLOAT,
+        "itemsBeforeCenter" to EsDePropertyType.UNSIGNED_INTEGER,
+        "itemsAfterCenter" to EsDePropertyType.UNSIGNED_INTEGER,
+        "itemStacking" to EsDePropertyType.STRING,
+        "selectedItemMargins" to EsDePropertyType.NORMALIZED_PAIR,
+        "selectedItemOffset" to EsDePropertyType.NORMALIZED_PAIR,
+        "itemSize" to EsDePropertyType.NORMALIZED_PAIR,
+        "itemScale" to EsDePropertyType.FLOAT,
+        "itemLinearScale" to EsDePropertyType.NORMALIZED_PAIR,
+        "itemLinearSpacing" to EsDePropertyType.NORMALIZED_PAIR,
+        "itemRotation" to EsDePropertyType.FLOAT,
+        "itemRotationOrigin" to EsDePropertyType.NORMALIZED_PAIR,
+        "itemAxisHorizontal" to EsDePropertyType.BOOLEAN,
+        "itemAxisRotation" to EsDePropertyType.FLOAT,
+        "imageFit" to EsDePropertyType.STRING,
+        "imageCropPos" to EsDePropertyType.NORMALIZED_PAIR,
+        "imageInterpolation" to EsDePropertyType.STRING,
+        "imageCornerRadius" to EsDePropertyType.FLOAT,
+        "imageColor" to EsDePropertyType.COLOR,
+        "imageColorEnd" to EsDePropertyType.COLOR,
+        "imageGradientType" to EsDePropertyType.STRING,
+        "imageSelectedColor" to EsDePropertyType.COLOR,
+        "imageSelectedColorEnd" to EsDePropertyType.COLOR,
+        "imageSelectedGradientType" to EsDePropertyType.STRING,
+        "imageBrightness" to EsDePropertyType.FLOAT,
+        "imageSaturation" to EsDePropertyType.FLOAT,
+        "itemTransitions" to EsDePropertyType.STRING,
+        "itemDiagonalOffset" to EsDePropertyType.FLOAT,
+        "itemHorizontalAlignment" to EsDePropertyType.STRING,
+        "itemVerticalAlignment" to EsDePropertyType.STRING,
+        "wheelHorizontalAlignment" to EsDePropertyType.STRING,
+        "wheelVerticalAlignment" to EsDePropertyType.STRING,
+        "horizontalOffset" to EsDePropertyType.FLOAT,
+        "verticalOffset" to EsDePropertyType.FLOAT,
+        "reflections" to EsDePropertyType.BOOLEAN,
+        "reflectionsOpacity" to EsDePropertyType.FLOAT,
+        "reflectionsFalloff" to EsDePropertyType.FLOAT,
+        "unfocusedItemOpacity" to EsDePropertyType.FLOAT,
+        "unfocusedItemSaturation" to EsDePropertyType.FLOAT,
+        "unfocusedItemDimming" to EsDePropertyType.FLOAT,
+        "fastScrolling" to EsDePropertyType.BOOLEAN,
+        "color" to EsDePropertyType.COLOR,
+        "colorEnd" to EsDePropertyType.COLOR,
+        "gradientType" to EsDePropertyType.STRING,
+        "text" to EsDePropertyType.STRING,
+        "textRelativeScale" to EsDePropertyType.FLOAT,
+        "textBackgroundCornerRadius" to EsDePropertyType.FLOAT,
+        "textColor" to EsDePropertyType.COLOR,
+        "textBackgroundColor" to EsDePropertyType.COLOR,
+        "textSelectedColor" to EsDePropertyType.COLOR,
+        "textSelectedBackgroundColor" to EsDePropertyType.COLOR,
+        "textHorizontalScrolling" to EsDePropertyType.BOOLEAN,
+        "textHorizontalScrollSpeed" to EsDePropertyType.FLOAT,
+        "textHorizontalScrollDelay" to EsDePropertyType.FLOAT,
+        "textHorizontalScrollGap" to EsDePropertyType.FLOAT,
+        "fontPath" to EsDePropertyType.PATH,
+        "fontSize" to EsDePropertyType.FLOAT,
+        "letterCase" to EsDePropertyType.STRING,
+        "letterCaseAutoCollections" to EsDePropertyType.STRING,
+        "letterCaseCustomCollections" to EsDePropertyType.STRING,
+        "lineSpacing" to EsDePropertyType.FLOAT,
+        "systemNameSuffix" to EsDePropertyType.BOOLEAN,
+        "letterCaseSystemNameSuffix" to EsDePropertyType.STRING,
+        "fadeAbovePrimary" to EsDePropertyType.BOOLEAN,
+        "zIndex" to EsDePropertyType.FLOAT,
+    ),
+    // ThemeData.cpp:232-296
+    "grid" to mapOf(
+        "pos" to EsDePropertyType.NORMALIZED_PAIR,
+        "size" to EsDePropertyType.NORMALIZED_PAIR,
+        "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "staticImage" to EsDePropertyType.PATH,
+        "imageType" to EsDePropertyType.STRING,
+        "defaultImage" to EsDePropertyType.PATH,
+        "defaultFolderImage" to EsDePropertyType.PATH,
+        "itemSize" to EsDePropertyType.NORMALIZED_PAIR,
+        "itemScale" to EsDePropertyType.FLOAT,
+        "itemSpacing" to EsDePropertyType.NORMALIZED_PAIR,
+        "scaleInwards" to EsDePropertyType.BOOLEAN,
+        "fractionalRows" to EsDePropertyType.BOOLEAN,
+        "itemTransitions" to EsDePropertyType.STRING,
+        "rowTransitions" to EsDePropertyType.STRING,
+        "unfocusedItemOpacity" to EsDePropertyType.FLOAT,
+        "unfocusedItemSaturation" to EsDePropertyType.FLOAT,
+        "unfocusedItemDimming" to EsDePropertyType.FLOAT,
+        "imageFit" to EsDePropertyType.STRING,
+        "imageCropPos" to EsDePropertyType.NORMALIZED_PAIR,
+        "imageInterpolation" to EsDePropertyType.STRING,
+        "imageRelativeScale" to EsDePropertyType.FLOAT,
+        "imageCornerRadius" to EsDePropertyType.FLOAT,
+        "imageColor" to EsDePropertyType.COLOR,
+        "imageColorEnd" to EsDePropertyType.COLOR,
+        "imageGradientType" to EsDePropertyType.STRING,
+        "imageSelectedColor" to EsDePropertyType.COLOR,
+        "imageSelectedColorEnd" to EsDePropertyType.COLOR,
+        "imageSelectedGradientType" to EsDePropertyType.STRING,
+        "imageBrightness" to EsDePropertyType.FLOAT,
+        "imageSaturation" to EsDePropertyType.FLOAT,
+        "backgroundImage" to EsDePropertyType.PATH,
+        "backgroundRelativeScale" to EsDePropertyType.FLOAT,
+        "backgroundCornerRadius" to EsDePropertyType.FLOAT,
+        "backgroundColor" to EsDePropertyType.COLOR,
+        "backgroundColorEnd" to EsDePropertyType.COLOR,
+        "backgroundGradientType" to EsDePropertyType.STRING,
+        "selectorImage" to EsDePropertyType.PATH,
+        "selectorRelativeScale" to EsDePropertyType.FLOAT,
+        "selectorCornerRadius" to EsDePropertyType.FLOAT,
+        "selectorLayer" to EsDePropertyType.STRING,
+        "selectorColor" to EsDePropertyType.COLOR,
+        "selectorColorEnd" to EsDePropertyType.COLOR,
+        "selectorGradientType" to EsDePropertyType.STRING,
+        "text" to EsDePropertyType.STRING,
+        "textRelativeScale" to EsDePropertyType.FLOAT,
+        "textBackgroundCornerRadius" to EsDePropertyType.FLOAT,
+        "textColor" to EsDePropertyType.COLOR,
+        "textBackgroundColor" to EsDePropertyType.COLOR,
+        "textSelectedColor" to EsDePropertyType.COLOR,
+        "textSelectedBackgroundColor" to EsDePropertyType.COLOR,
+        "textHorizontalScrolling" to EsDePropertyType.BOOLEAN,
+        "textHorizontalScrollSpeed" to EsDePropertyType.FLOAT,
+        "textHorizontalScrollDelay" to EsDePropertyType.FLOAT,
+        "textHorizontalScrollGap" to EsDePropertyType.FLOAT,
+        "fontPath" to EsDePropertyType.PATH,
+        "fontSize" to EsDePropertyType.FLOAT,
+        "letterCase" to EsDePropertyType.STRING,
+        "letterCaseAutoCollections" to EsDePropertyType.STRING,
+        "letterCaseCustomCollections" to EsDePropertyType.STRING,
+        "lineSpacing" to EsDePropertyType.FLOAT,
+        "systemNameSuffix" to EsDePropertyType.BOOLEAN,
+        "letterCaseSystemNameSuffix" to EsDePropertyType.STRING,
+        "fadeAbovePrimary" to EsDePropertyType.BOOLEAN,
+        "zIndex" to EsDePropertyType.FLOAT,
+    ),
+    // ThemeData.cpp:297-335
+    "textlist" to mapOf(
+        "pos" to EsDePropertyType.NORMALIZED_PAIR,
+        "size" to EsDePropertyType.NORMALIZED_PAIR,
+        "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "selectorWidth" to EsDePropertyType.FLOAT,
+        "selectorHeight" to EsDePropertyType.FLOAT,
+        "selectorHorizontalOffset" to EsDePropertyType.FLOAT,
+        "selectorVerticalOffset" to EsDePropertyType.FLOAT,
+        "selectorColor" to EsDePropertyType.COLOR,
+        "selectorColorEnd" to EsDePropertyType.COLOR,
+        "selectorGradientType" to EsDePropertyType.STRING,
+        "selectorImagePath" to EsDePropertyType.PATH,
+        "selectorImageTile" to EsDePropertyType.BOOLEAN,
+        "primaryColor" to EsDePropertyType.COLOR,
+        "secondaryColor" to EsDePropertyType.COLOR,
+        "selectedColor" to EsDePropertyType.COLOR,
+        "selectedSecondaryColor" to EsDePropertyType.COLOR,
+        "selectedBackgroundColor" to EsDePropertyType.COLOR,
+        "selectedSecondaryBackgroundColor" to EsDePropertyType.COLOR,
+        "selectedBackgroundMargins" to EsDePropertyType.NORMALIZED_PAIR,
+        "selectedBackgroundCornerRadius" to EsDePropertyType.FLOAT,
+        "textHorizontalScrolling" to EsDePropertyType.BOOLEAN,
+        "textHorizontalScrollSpeed" to EsDePropertyType.FLOAT,
+        "textHorizontalScrollDelay" to EsDePropertyType.FLOAT,
+        "textHorizontalScrollGap" to EsDePropertyType.FLOAT,
+        "fontPath" to EsDePropertyType.PATH,
+        "fontSize" to EsDePropertyType.FLOAT,
+        "horizontalAlignment" to EsDePropertyType.STRING,
+        "horizontalMargin" to EsDePropertyType.FLOAT,
+        "letterCase" to EsDePropertyType.STRING,
+        "letterCaseAutoCollections" to EsDePropertyType.STRING,
+        "letterCaseCustomCollections" to EsDePropertyType.STRING,
+        "lineSpacing" to EsDePropertyType.FLOAT,
+        "indicators" to EsDePropertyType.STRING,
+        "collectionIndicators" to EsDePropertyType.STRING,
+        "systemNameSuffix" to EsDePropertyType.BOOLEAN,
+        "letterCaseSystemNameSuffix" to EsDePropertyType.STRING,
+        "fadeAbovePrimary" to EsDePropertyType.BOOLEAN,
+        "zIndex" to EsDePropertyType.FLOAT,
+    ),
+    // ThemeData.cpp:336-372
     "image" to mapOf(
         "pos" to EsDePropertyType.NORMALIZED_PAIR,
         "size" to EsDePropertyType.NORMALIZED_PAIR,
-        // Real, distinct ES-DE property from "size" (confirmed against
-        // ImageComponent.cpp's own setResize/setMaxSize): "size" stretches
-        // to an exact size, "maxSize" scales down to fit WITHIN bounds
-        // while preserving aspect ratio -- a real theme can use either
-        // (Art Book Next's own system-logo element uses ONLY maxSize, no
-        // size at all), and this was missing from the schema entirely,
-        // meaning such an element fell through to the renderer's generic
-        // default-size fallback instead of its own real bounds.
         "maxSize" to EsDePropertyType.NORMALIZED_PAIR,
+        "cropSize" to EsDePropertyType.NORMALIZED_PAIR,
+        "cropPos" to EsDePropertyType.NORMALIZED_PAIR,
         "origin" to EsDePropertyType.NORMALIZED_PAIR,
         "rotation" to EsDePropertyType.FLOAT,
-        // Real, previously-missing properties -- DEcaffe's own carousel
-        // outline/fade decorative art (systemcar fade/fadebot,
-        // caroutlinetop/caroutline) mirrors ONE real source image around
-        // the carousel using exactly these two, one flipped, one flipped
-        // AND rotated 180 -- without them both instances render in the
-        // same orientation, a real, visually-confirmed misalignment bug
-        // (found by comparing a real on-device screenshot against
-        // theme.xml directly), not a missing-asset problem.
+        "rotationOrigin" to EsDePropertyType.NORMALIZED_PAIR,
+        "scaleFactor" to EsDePropertyType.FLOAT,
+        "stationary" to EsDePropertyType.STRING,
+        "renderDuringTransitions" to EsDePropertyType.BOOLEAN,
         "flipHorizontal" to EsDePropertyType.BOOLEAN,
         "flipVertical" to EsDePropertyType.BOOLEAN,
         "path" to EsDePropertyType.PATH,
+        "gameOverridePath" to EsDePropertyType.PATH,
         "default" to EsDePropertyType.PATH,
-        "color" to EsDePropertyType.COLOR,
-        // Real gameselector-driven properties (ThemeData.cpp's own
-        // ImageComponent entries for the system view's game-preview
-        // grid/collage) -- previously missing entirely, meaning an
-        // element like DEcaffe's own `game1`..`game9`/`screen2` (real
-        // per-game preview art, not static background) fell through to
-        // the plain static-`path` renderer and rendered nothing, since
-        // those elements have no `path` of their own at all. `colorEnd`/
-        // `gradientType` cover the OTHER real use of "image" for a
-        // gradient-filled decorative band (DEcaffe's own leftband/
-        // rightband elements), a second, unrelated real use of the same
-        // element type -- both fell through the same gap for different
-        // reasons.
-        "gameselectorEntry" to EsDePropertyType.UNSIGNED_INTEGER,
         "imageType" to EsDePropertyType.STRING,
-        "cropSize" to EsDePropertyType.NORMALIZED_PAIR,
-        "gradientType" to EsDePropertyType.STRING,
-        "colorEnd" to EsDePropertyType.COLOR,
+        "metadataElement" to EsDePropertyType.BOOLEAN,
+        "gameselector" to EsDePropertyType.STRING,
+        "gameselectorEntry" to EsDePropertyType.UNSIGNED_INTEGER,
+        "tile" to EsDePropertyType.BOOLEAN,
+        "tileSize" to EsDePropertyType.NORMALIZED_PAIR,
+        "tileHorizontalAlignment" to EsDePropertyType.STRING,
+        "tileVerticalAlignment" to EsDePropertyType.STRING,
+        "interpolation" to EsDePropertyType.STRING,
+        "mipmap" to EsDePropertyType.BOOLEAN,
         "cornerRadius" to EsDePropertyType.FLOAT,
+        "color" to EsDePropertyType.COLOR,
+        "colorEnd" to EsDePropertyType.COLOR,
+        "gradientType" to EsDePropertyType.STRING,
+        "scrollFadeIn" to EsDePropertyType.BOOLEAN,
         "brightness" to EsDePropertyType.FLOAT,
         "opacity" to EsDePropertyType.FLOAT,
         "saturation" to EsDePropertyType.FLOAT,
         "visible" to EsDePropertyType.BOOLEAN,
         "zIndex" to EsDePropertyType.FLOAT,
     ),
-    // Real property set expanded beyond the original pass to include
-    // ES-DE's own metadata-binding properties (metadata/systemdata/
-    // gameselector/defaultValue) -- what a real gamelist theme uses to
-    // bind a text element to a specific per-game field (developer, genre,
-    // release date, ...) rather than static text. See [EsDeTheme]'s own
-    // doc comment for why rendering these still needs real per-game
-    // metadata droidtop doesn't model yet.
+    // ThemeData.cpp:373-414
+    "video" to mapOf(
+        "pos" to EsDePropertyType.NORMALIZED_PAIR,
+        "size" to EsDePropertyType.NORMALIZED_PAIR,
+        "maxSize" to EsDePropertyType.NORMALIZED_PAIR,
+        "cropSize" to EsDePropertyType.NORMALIZED_PAIR,
+        "cropPos" to EsDePropertyType.NORMALIZED_PAIR,
+        "imageSize" to EsDePropertyType.NORMALIZED_PAIR,
+        "imageMaxSize" to EsDePropertyType.NORMALIZED_PAIR,
+        "imageCropSize" to EsDePropertyType.NORMALIZED_PAIR,
+        "imageCropPos" to EsDePropertyType.NORMALIZED_PAIR,
+        "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "rotation" to EsDePropertyType.FLOAT,
+        "rotationOrigin" to EsDePropertyType.NORMALIZED_PAIR,
+        "stationary" to EsDePropertyType.STRING,
+        "path" to EsDePropertyType.PATH,
+        "default" to EsDePropertyType.PATH,
+        "defaultImage" to EsDePropertyType.PATH,
+        "imageType" to EsDePropertyType.STRING,
+        "metadataElement" to EsDePropertyType.BOOLEAN,
+        "gameselector" to EsDePropertyType.STRING,
+        "gameselectorEntry" to EsDePropertyType.UNSIGNED_INTEGER,
+        "iterationCount" to EsDePropertyType.UNSIGNED_INTEGER,
+        "onIterationsDone" to EsDePropertyType.STRING,
+        "audio" to EsDePropertyType.BOOLEAN,
+        "interpolation" to EsDePropertyType.STRING,
+        "imageCornerRadius" to EsDePropertyType.FLOAT,
+        "videoCornerRadius" to EsDePropertyType.FLOAT,
+        "color" to EsDePropertyType.COLOR,
+        "colorEnd" to EsDePropertyType.COLOR,
+        "gradientType" to EsDePropertyType.STRING,
+        "pillarboxes" to EsDePropertyType.BOOLEAN,
+        "pillarboxThreshold" to EsDePropertyType.NORMALIZED_PAIR,
+        "scanlines" to EsDePropertyType.BOOLEAN,
+        "delay" to EsDePropertyType.FLOAT,
+        "fadeInType" to EsDePropertyType.STRING,
+        "fadeInTime" to EsDePropertyType.FLOAT,
+        "scrollFadeIn" to EsDePropertyType.BOOLEAN,
+        "brightness" to EsDePropertyType.FLOAT,
+        "opacity" to EsDePropertyType.FLOAT,
+        "saturation" to EsDePropertyType.FLOAT,
+        "visible" to EsDePropertyType.BOOLEAN,
+        "zIndex" to EsDePropertyType.FLOAT,
+    ),
+    // ThemeData.cpp:415-438
+    "animation" to mapOf(
+        "pos" to EsDePropertyType.NORMALIZED_PAIR,
+        "size" to EsDePropertyType.NORMALIZED_PAIR,
+        "maxSize" to EsDePropertyType.NORMALIZED_PAIR,
+        "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "rotation" to EsDePropertyType.FLOAT,
+        "rotationOrigin" to EsDePropertyType.NORMALIZED_PAIR,
+        "scaleFactor" to EsDePropertyType.FLOAT,
+        "stationary" to EsDePropertyType.STRING,
+        "metadataElement" to EsDePropertyType.BOOLEAN,
+        "path" to EsDePropertyType.PATH,
+        "speed" to EsDePropertyType.FLOAT,
+        "direction" to EsDePropertyType.STRING,
+        "iterationCount" to EsDePropertyType.UNSIGNED_INTEGER,
+        "interpolation" to EsDePropertyType.STRING,
+        "cornerRadius" to EsDePropertyType.FLOAT,
+        "color" to EsDePropertyType.COLOR,
+        "colorEnd" to EsDePropertyType.COLOR,
+        "gradientType" to EsDePropertyType.STRING,
+        "brightness" to EsDePropertyType.FLOAT,
+        "opacity" to EsDePropertyType.FLOAT,
+        "saturation" to EsDePropertyType.FLOAT,
+        "visible" to EsDePropertyType.BOOLEAN,
+        "zIndex" to EsDePropertyType.FLOAT,
+    ),
+    // ThemeData.cpp:439-471. Real ES-DE keys a slot-specific custom icon
+    // by an XML ATTRIBUTE on the property tag itself (e.g. `<customBadgeIcon
+    // badge="kidgame">`), not by a distinct property name per slot --
+    // confirmed against sPropertyAttributeMap (ThemeData.cpp:144-154) and
+    // sElementMap itself, which declares only ONE `customBadgeIcon`/
+    // `customControllerIcon` property here, real type PATH. The schema
+    // below matches that exactly; [EsDeThemeParser.parseElementProperties]
+    // is what expands the attribute into the real per-slot/per-controller
+    // storage key (`badge_$slot`/`controller_$shortName`) this renderer
+    // reads -- see that function's own doc comment for the real,
+    // previously-confirmed parsing bug this fixes (the parser never read
+    // ANY property tag's attributes at all, so a real theme's own
+    // `<customBadgeIcon badge="...">` declarations were silently
+    // unparseable regardless of what this schema declared).
+    "badges" to mapOf(
+        "pos" to EsDePropertyType.NORMALIZED_PAIR,
+        "size" to EsDePropertyType.NORMALIZED_PAIR,
+        "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "rotation" to EsDePropertyType.FLOAT,
+        "rotationOrigin" to EsDePropertyType.NORMALIZED_PAIR,
+        "stationary" to EsDePropertyType.STRING,
+        "horizontalAlignment" to EsDePropertyType.STRING,
+        "direction" to EsDePropertyType.STRING,
+        "lines" to EsDePropertyType.UNSIGNED_INTEGER,
+        "itemsPerLine" to EsDePropertyType.UNSIGNED_INTEGER,
+        "itemMargin" to EsDePropertyType.NORMALIZED_PAIR,
+        "slots" to EsDePropertyType.STRING,
+        "controllerPos" to EsDePropertyType.NORMALIZED_PAIR,
+        "controllerSize" to EsDePropertyType.FLOAT,
+        "customBadgeIcon" to EsDePropertyType.PATH,
+        "customControllerIcon" to EsDePropertyType.PATH,
+        "folderLinkPos" to EsDePropertyType.NORMALIZED_PAIR,
+        "folderLinkSize" to EsDePropertyType.FLOAT,
+        "customFolderLinkIcon" to EsDePropertyType.PATH,
+        "badgeIconColor" to EsDePropertyType.COLOR,
+        "badgeIconColorEnd" to EsDePropertyType.COLOR,
+        "badgeIconGradientType" to EsDePropertyType.STRING,
+        "controllerIconColor" to EsDePropertyType.COLOR,
+        "controllerIconColorEnd" to EsDePropertyType.COLOR,
+        "controllerIconGradientType" to EsDePropertyType.STRING,
+        "folderLinkIconColor" to EsDePropertyType.COLOR,
+        "folderLinkIconColorEnd" to EsDePropertyType.COLOR,
+        "folderLinkIconGradientType" to EsDePropertyType.STRING,
+        "interpolation" to EsDePropertyType.STRING,
+        "opacity" to EsDePropertyType.FLOAT,
+        "visible" to EsDePropertyType.BOOLEAN,
+        "zIndex" to EsDePropertyType.FLOAT,
+    ),
+    // ThemeData.cpp:472-507
     "text" to mapOf(
         "pos" to EsDePropertyType.NORMALIZED_PAIR,
         "size" to EsDePropertyType.NORMALIZED_PAIR,
         "origin" to EsDePropertyType.NORMALIZED_PAIR,
         "rotation" to EsDePropertyType.FLOAT,
+        "rotationOrigin" to EsDePropertyType.NORMALIZED_PAIR,
+        "stationary" to EsDePropertyType.STRING,
         "text" to EsDePropertyType.STRING,
         "systemdata" to EsDePropertyType.STRING,
+        "metadata" to EsDePropertyType.STRING,
+        "defaultValue" to EsDePropertyType.STRING,
+        "systemNameSuffix" to EsDePropertyType.BOOLEAN,
+        "letterCaseSystemNameSuffix" to EsDePropertyType.STRING,
+        "metadataElement" to EsDePropertyType.BOOLEAN,
+        "gameselector" to EsDePropertyType.STRING,
+        "gameselectorEntry" to EsDePropertyType.UNSIGNED_INTEGER,
+        "container" to EsDePropertyType.BOOLEAN,
+        "containerType" to EsDePropertyType.STRING,
+        "containerVerticalSnap" to EsDePropertyType.BOOLEAN,
+        "containerScrollSpeed" to EsDePropertyType.FLOAT,
+        "containerStartDelay" to EsDePropertyType.FLOAT,
+        "containerResetDelay" to EsDePropertyType.FLOAT,
+        "containerScrollGap" to EsDePropertyType.FLOAT,
+        "fontPath" to EsDePropertyType.PATH,
+        "fontSize" to EsDePropertyType.FLOAT,
+        "horizontalAlignment" to EsDePropertyType.STRING,
+        "verticalAlignment" to EsDePropertyType.STRING,
+        "color" to EsDePropertyType.COLOR,
+        "backgroundColor" to EsDePropertyType.COLOR,
+        "backgroundMargins" to EsDePropertyType.NORMALIZED_PAIR,
+        "backgroundCornerRadius" to EsDePropertyType.FLOAT,
+        "letterCase" to EsDePropertyType.STRING,
+        "lineSpacing" to EsDePropertyType.FLOAT,
+        "opacity" to EsDePropertyType.FLOAT,
+        "visible" to EsDePropertyType.BOOLEAN,
+        "zIndex" to EsDePropertyType.FLOAT,
+    ),
+    // ThemeData.cpp:508-533
+    "datetime" to mapOf(
+        "pos" to EsDePropertyType.NORMALIZED_PAIR,
+        "size" to EsDePropertyType.NORMALIZED_PAIR,
+        "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "rotation" to EsDePropertyType.FLOAT,
+        "rotationOrigin" to EsDePropertyType.NORMALIZED_PAIR,
+        "stationary" to EsDePropertyType.STRING,
         "metadata" to EsDePropertyType.STRING,
         "defaultValue" to EsDePropertyType.STRING,
         "gameselector" to EsDePropertyType.STRING,
@@ -196,204 +529,24 @@ internal val ES_DE_ELEMENT_SCHEMA: Map<String, Map<String, EsDePropertyType>> = 
         "verticalAlignment" to EsDePropertyType.STRING,
         "color" to EsDePropertyType.COLOR,
         "backgroundColor" to EsDePropertyType.COLOR,
+        "backgroundMargins" to EsDePropertyType.NORMALIZED_PAIR,
+        "backgroundCornerRadius" to EsDePropertyType.FLOAT,
         "letterCase" to EsDePropertyType.STRING,
         "lineSpacing" to EsDePropertyType.FLOAT,
-        "opacity" to EsDePropertyType.FLOAT,
-        "visible" to EsDePropertyType.BOOLEAN,
-        "zIndex" to EsDePropertyType.FLOAT,
-    ),
-    "carousel" to mapOf(
-        "pos" to EsDePropertyType.NORMALIZED_PAIR,
-        "size" to EsDePropertyType.NORMALIZED_PAIR,
-        "origin" to EsDePropertyType.NORMALIZED_PAIR,
-        "type" to EsDePropertyType.STRING,
-        "itemSize" to EsDePropertyType.NORMALIZED_PAIR,
-        "itemScale" to EsDePropertyType.FLOAT,
-        // Real carousel-wide background bar drawn ONCE behind every item
-        // (CarouselComponent::render's own single drawRect call) -- NOT a
-        // per-item box. Real default 0xFFFFFFD8 (translucent white),
-        // confirmed against the real constructor default, not guessed.
-        "color" to EsDePropertyType.COLOR,
-        "colorEnd" to EsDePropertyType.COLOR,
-        "colorGradientHorizontal" to EsDePropertyType.BOOLEAN,
-        "text" to EsDePropertyType.STRING,
-        "textColor" to EsDePropertyType.COLOR,
-        // Real, previously-missing carousel text properties -- an item's
-        // OWN text fallback (shown only when it has no image, see
-        // CarouselComponent::onDemandTextureLoad/addEntry) has real
-        // default colors distinct from a themed "text" element's own
-        // defaults (0x000000FF text, transparent background).
-        "textBackgroundColor" to EsDePropertyType.COLOR,
-        "textSelectedColor" to EsDePropertyType.COLOR,
-        "textSelectedBackgroundColor" to EsDePropertyType.COLOR,
-        "fontPath" to EsDePropertyType.PATH,
-        "fontSize" to EsDePropertyType.FLOAT,
-        "letterCase" to EsDePropertyType.STRING,
-        "unfocusedItemOpacity" to EsDePropertyType.FLOAT,
-        "unfocusedItemSaturation" to EsDePropertyType.FLOAT,
-        "zIndex" to EsDePropertyType.FLOAT,
-    ),
-    // Real property set transcribed from ES-DE's own ThemeData.cpp
-    // sElementMap (fetched and read directly this session, not guessed --
-    // ~60 real properties exist; scoped here to the ones that materially
-    // change layout/appearance for a real Compose grid renderer).
-    "grid" to mapOf(
-        "pos" to EsDePropertyType.NORMALIZED_PAIR,
-        "size" to EsDePropertyType.NORMALIZED_PAIR,
-        "origin" to EsDePropertyType.NORMALIZED_PAIR,
-        "itemSize" to EsDePropertyType.NORMALIZED_PAIR,
-        "itemScale" to EsDePropertyType.FLOAT,
-        "itemSpacing" to EsDePropertyType.NORMALIZED_PAIR,
-        "unfocusedItemOpacity" to EsDePropertyType.FLOAT,
-        "unfocusedItemSaturation" to EsDePropertyType.FLOAT,
-        "imageColor" to EsDePropertyType.COLOR,
-        "imageSelectedColor" to EsDePropertyType.COLOR,
-        "backgroundColor" to EsDePropertyType.COLOR,
-        "selectorColor" to EsDePropertyType.COLOR,
-        "text" to EsDePropertyType.STRING,
-        "textColor" to EsDePropertyType.COLOR,
-        "textSelectedColor" to EsDePropertyType.COLOR,
-        "fontPath" to EsDePropertyType.PATH,
-        "fontSize" to EsDePropertyType.FLOAT,
-        "letterCase" to EsDePropertyType.STRING,
-        "zIndex" to EsDePropertyType.FLOAT,
-    ),
-    // Same real source as "grid" above.
-    "textlist" to mapOf(
-        "pos" to EsDePropertyType.NORMALIZED_PAIR,
-        "size" to EsDePropertyType.NORMALIZED_PAIR,
-        "origin" to EsDePropertyType.NORMALIZED_PAIR,
-        "selectorColor" to EsDePropertyType.COLOR,
-        "primaryColor" to EsDePropertyType.COLOR,
-        "secondaryColor" to EsDePropertyType.COLOR,
-        "selectedColor" to EsDePropertyType.COLOR,
-        "selectedBackgroundColor" to EsDePropertyType.COLOR,
-        "fontPath" to EsDePropertyType.PATH,
-        "fontSize" to EsDePropertyType.FLOAT,
-        "horizontalAlignment" to EsDePropertyType.STRING,
-        "horizontalMargin" to EsDePropertyType.FLOAT,
-        "letterCase" to EsDePropertyType.STRING,
-        "lineSpacing" to EsDePropertyType.FLOAT,
-        "zIndex" to EsDePropertyType.FLOAT,
-    ),
-    // Real ExoPlayer/media3 playback when the selected game has a scraped
-    // video (see EsDeThemedVideo), falling back to the same static-image
-    // rendering "animation" always uses when it doesn't.
-    "video" to mapOf(
-        "pos" to EsDePropertyType.NORMALIZED_PAIR,
-        "size" to EsDePropertyType.NORMALIZED_PAIR,
-        "origin" to EsDePropertyType.NORMALIZED_PAIR,
-        "path" to EsDePropertyType.PATH,
-        "default" to EsDePropertyType.PATH,
-        "defaultImage" to EsDePropertyType.PATH,
-        "color" to EsDePropertyType.COLOR,
-        // Same real gameselector-driven properties as "image" -- DEcaffe's
-        // own `screen2` element (the large game-preview poster) is a
-        // "video", not an "image", and was missing these for the same
-        // reason.
-        "gameselectorEntry" to EsDePropertyType.UNSIGNED_INTEGER,
-        "imageType" to EsDePropertyType.STRING,
-        "cropSize" to EsDePropertyType.NORMALIZED_PAIR,
-        "imageCornerRadius" to EsDePropertyType.FLOAT,
-        "opacity" to EsDePropertyType.FLOAT,
-        "visible" to EsDePropertyType.BOOLEAN,
-        "zIndex" to EsDePropertyType.FLOAT,
-    ),
-    // Same real fallback-image-only rendering as "video" -- real GIF/frame
-    // animation playback is separate work, not attempted this pass.
-    "animation" to mapOf(
-        "pos" to EsDePropertyType.NORMALIZED_PAIR,
-        "size" to EsDePropertyType.NORMALIZED_PAIR,
-        "origin" to EsDePropertyType.NORMALIZED_PAIR,
-        "path" to EsDePropertyType.PATH,
-        "color" to EsDePropertyType.COLOR,
-        "cornerRadius" to EsDePropertyType.FLOAT,
-        "opacity" to EsDePropertyType.FLOAT,
-        "visible" to EsDePropertyType.BOOLEAN,
-        "zIndex" to EsDePropertyType.FLOAT,
-    ),
-    // Full real schema, confirmed field-by-field against BadgeComponent.cpp
-    // /FlexboxComponent.cpp's own real applyTheme (a real local clone kept
-    // at /root/es-de-reference for ongoing reference) -- not the earlier
-    // partial version. Real slot-specific custom-icon keys use ES-DE's
-    // own `"badge_" + slot` / `"controller_" + shortName` naming
-    // convention exactly (see BADGE_SLOTS/EsDeControllers.all below for
-    // the full real key lists this generates).
-    "badges" to (
-        mapOf(
-            "pos" to EsDePropertyType.NORMALIZED_PAIR,
-            "size" to EsDePropertyType.NORMALIZED_PAIR,
-            "origin" to EsDePropertyType.NORMALIZED_PAIR,
-            "rotation" to EsDePropertyType.FLOAT,
-            "stationary" to EsDePropertyType.STRING,
-            "direction" to EsDePropertyType.STRING,
-            "horizontalAlignment" to EsDePropertyType.STRING,
-            "lines" to EsDePropertyType.UNSIGNED_INTEGER,
-            "itemsPerLine" to EsDePropertyType.UNSIGNED_INTEGER,
-            "itemMargin" to EsDePropertyType.NORMALIZED_PAIR,
-            "interpolation" to EsDePropertyType.STRING,
-            // Real ES-DE default (BadgeComponent's own constructor, when a
-            // theme declares no <slots> at all): every real badge type --
-            // collection/folder/favorite/completed/kidgame/broken/
-            // controller/altemulator/manual.
-            "slots" to EsDePropertyType.STRING,
-            "badgeIconColor" to EsDePropertyType.COLOR,
-            "badgeIconColorEnd" to EsDePropertyType.COLOR,
-            "badgeIconGradientType" to EsDePropertyType.STRING,
-            "controllerIconColor" to EsDePropertyType.COLOR,
-            "controllerIconColorEnd" to EsDePropertyType.COLOR,
-            "controllerIconGradientType" to EsDePropertyType.STRING,
-            "controllerPos" to EsDePropertyType.NORMALIZED_PAIR,
-            "controllerSize" to EsDePropertyType.FLOAT,
-            "folderLinkIconColor" to EsDePropertyType.COLOR,
-            "folderLinkIconColorEnd" to EsDePropertyType.COLOR,
-            "folderLinkIconGradientType" to EsDePropertyType.STRING,
-            "customFolderLinkIcon" to EsDePropertyType.PATH,
-            "folderLinkPos" to EsDePropertyType.NORMALIZED_PAIR,
-            "folderLinkSize" to EsDePropertyType.FLOAT,
-            "opacity" to EsDePropertyType.FLOAT,
-            "visible" to EsDePropertyType.BOOLEAN,
-            "zIndex" to EsDePropertyType.FLOAT,
-        ) +
-            // "badge_" + slot -- one real custom-icon-path key per real
-            // badge slot type.
-            BADGE_SLOTS.associate { "badge_$it" to EsDePropertyType.PATH } +
-            // "controller_" + shortName -- one real custom-icon-path key
-            // per real controller definition (BadgeComponent's own
-            // sControllerDefinitions, ported unchanged as
-            // EsDeControllers.all).
-            EsDeControllers.all.associate {
-                "controller_${it.shortName}" to EsDePropertyType.PATH
-            }
-        ),
-    // Real, live-rendered (current date/time) -- doesn't need per-game
-    // metadata, unlike badges/rating/gamelistinfo.
-    "datetime" to mapOf(
-        "pos" to EsDePropertyType.NORMALIZED_PAIR,
-        "size" to EsDePropertyType.NORMALIZED_PAIR,
-        "origin" to EsDePropertyType.NORMALIZED_PAIR,
-        "metadata" to EsDePropertyType.STRING,
-        "defaultValue" to EsDePropertyType.STRING,
-        "fontPath" to EsDePropertyType.PATH,
-        "fontSize" to EsDePropertyType.FLOAT,
-        "horizontalAlignment" to EsDePropertyType.STRING,
-        "verticalAlignment" to EsDePropertyType.STRING,
-        "color" to EsDePropertyType.COLOR,
-        "backgroundColor" to EsDePropertyType.COLOR,
-        "letterCase" to EsDePropertyType.STRING,
         "format" to EsDePropertyType.STRING,
+        "displayRelative" to EsDePropertyType.BOOLEAN,
         "opacity" to EsDePropertyType.FLOAT,
         "visible" to EsDePropertyType.BOOLEAN,
         "zIndex" to EsDePropertyType.FLOAT,
     ),
-    // Real, honestly PARTIAL (2026-08-28 session) -- see
-    // EsDeThemedGamelistInfo's own doc comment for exactly which real
-    // ES-DE case this covers (a plain "N games" + favorites count) vs.
-    // which two it doesn't (filtered, folder-entered).
+    // ThemeData.cpp:534-549
     "gamelistinfo" to mapOf(
         "pos" to EsDePropertyType.NORMALIZED_PAIR,
         "size" to EsDePropertyType.NORMALIZED_PAIR,
         "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "rotation" to EsDePropertyType.FLOAT,
+        "rotationOrigin" to EsDePropertyType.NORMALIZED_PAIR,
+        "stationary" to EsDePropertyType.STRING,
         "fontPath" to EsDePropertyType.PATH,
         "fontSize" to EsDePropertyType.FLOAT,
         "horizontalAlignment" to EsDePropertyType.STRING,
@@ -404,13 +557,18 @@ internal val ES_DE_ELEMENT_SCHEMA: Map<String, Map<String, EsDePropertyType>> = 
         "visible" to EsDePropertyType.BOOLEAN,
         "zIndex" to EsDePropertyType.FLOAT,
     ),
-    // Parses real; rendering deferred -- needs a real per-game star-rating
-    // value droidtop's LibraryEntry doesn't model yet.
+    // ThemeData.cpp:550-567
     "rating" to mapOf(
         "pos" to EsDePropertyType.NORMALIZED_PAIR,
         "size" to EsDePropertyType.NORMALIZED_PAIR,
         "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "rotation" to EsDePropertyType.FLOAT,
+        "rotationOrigin" to EsDePropertyType.NORMALIZED_PAIR,
+        "stationary" to EsDePropertyType.STRING,
         "hideIfZero" to EsDePropertyType.BOOLEAN,
+        "gameselector" to EsDePropertyType.STRING,
+        "gameselectorEntry" to EsDePropertyType.UNSIGNED_INTEGER,
+        "interpolation" to EsDePropertyType.STRING,
         "color" to EsDePropertyType.COLOR,
         "filledPath" to EsDePropertyType.PATH,
         "unfilledPath" to EsDePropertyType.PATH,
@@ -419,69 +577,121 @@ internal val ES_DE_ELEMENT_SCHEMA: Map<String, Map<String, EsDePropertyType>> = 
         "visible" to EsDePropertyType.BOOLEAN,
         "zIndex" to EsDePropertyType.FLOAT,
     ),
-    // Not a positioned visual element in real ES-DE either -- selects
-    // which game(s) other elements' gameselector/gameselectorEntry
-    // properties reference. Parsed for completeness; no rendering (there's
-    // nothing to draw).
+    // ThemeData.cpp:568-571. Not a positioned visual element in real
+    // ES-DE either -- selects which game(s) other elements' gameselector/
+    // gameselectorEntry properties reference. Parsed for completeness; no
+    // rendering (there's nothing to draw).
     "gameselector" to mapOf(
         "selection" to EsDePropertyType.STRING,
         "gameCount" to EsDePropertyType.UNSIGNED_INTEGER,
         "allowDuplicates" to EsDePropertyType.BOOLEAN,
     ),
-    // Parses real; no rendering here -- droidtop already has its own
-    // hand-built persistent button-hint footer (docs/SPEC.md §7), a real,
-    // working equivalent, not a gap.
+    // ThemeData.cpp:572-603
     "helpsystem" to mapOf(
         "pos" to EsDePropertyType.NORMALIZED_PAIR,
+        "posDimmed" to EsDePropertyType.NORMALIZED_PAIR,
         "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "originDimmed" to EsDePropertyType.NORMALIZED_PAIR,
+        "rotation" to EsDePropertyType.FLOAT,
+        "rotationOrigin" to EsDePropertyType.NORMALIZED_PAIR,
         "textColor" to EsDePropertyType.COLOR,
+        "textColorDimmed" to EsDePropertyType.COLOR,
         "iconColor" to EsDePropertyType.COLOR,
+        "iconColorDimmed" to EsDePropertyType.COLOR,
         "fontPath" to EsDePropertyType.PATH,
         "fontSize" to EsDePropertyType.FLOAT,
+        "fontSizeDimmed" to EsDePropertyType.FLOAT,
+        "scope" to EsDePropertyType.STRING,
+        "entries" to EsDePropertyType.STRING,
+        "entryLayout" to EsDePropertyType.STRING,
+        "entryRelativeScale" to EsDePropertyType.FLOAT,
         "entrySpacing" to EsDePropertyType.FLOAT,
+        "entrySpacingDimmed" to EsDePropertyType.FLOAT,
+        "iconTextSpacing" to EsDePropertyType.FLOAT,
+        "iconTextSpacingDimmed" to EsDePropertyType.FLOAT,
+        "letterCase" to EsDePropertyType.STRING,
         "backgroundColor" to EsDePropertyType.COLOR,
+        "backgroundColorEnd" to EsDePropertyType.COLOR,
+        "backgroundGradientType" to EsDePropertyType.STRING,
+        "backgroundHorizontalPadding" to EsDePropertyType.NORMALIZED_PAIR,
+        "backgroundVerticalPadding" to EsDePropertyType.NORMALIZED_PAIR,
+        "backgroundCornerRadius" to EsDePropertyType.FLOAT,
         "opacity" to EsDePropertyType.FLOAT,
+        "opacityDimmed" to EsDePropertyType.FLOAT,
         "customButtonIcon" to EsDePropertyType.PATH,
     ),
-    // Real, honestly PARTIAL -- droidtop genuinely runs as the real host
-    // device (unlike a desktop ES-DE build's own OS-status queries, no
-    // fabrication involved), so wifi/cellular/battery are real device
-    // status. Bluetooth is a real, deliberate gap: reading adapter state
-    // needs BLUETOOTH_CONNECT on Android 12+, a dangerous runtime
-    // permission not worth requesting for one decorative status icon
-    // without checking with the user first -- see EsDeThemedSystemStatus'
-    // own doc comment.
+    // ThemeData.cpp:604-623
     "systemstatus" to mapOf(
         "pos" to EsDePropertyType.NORMALIZED_PAIR,
         "height" to EsDePropertyType.FLOAT,
         "origin" to EsDePropertyType.NORMALIZED_PAIR,
-        "entries" to EsDePropertyType.STRING,
+        "rotation" to EsDePropertyType.FLOAT,
+        "rotationOrigin" to EsDePropertyType.NORMALIZED_PAIR,
+        "scope" to EsDePropertyType.STRING,
         "fontPath" to EsDePropertyType.PATH,
+        "textRelativeScale" to EsDePropertyType.FLOAT,
         "color" to EsDePropertyType.COLOR,
         "backgroundColor" to EsDePropertyType.COLOR,
+        "backgroundColorEnd" to EsDePropertyType.COLOR,
+        "backgroundGradientType" to EsDePropertyType.STRING,
+        "backgroundHorizontalPadding" to EsDePropertyType.NORMALIZED_PAIR,
+        "backgroundVerticalPadding" to EsDePropertyType.NORMALIZED_PAIR,
+        "backgroundCornerRadius" to EsDePropertyType.FLOAT,
+        "entries" to EsDePropertyType.STRING,
+        "entrySpacing" to EsDePropertyType.FLOAT,
         "customIcon" to EsDePropertyType.PATH,
         "opacity" to EsDePropertyType.FLOAT,
     ),
-    // Real, live-rendered (current time) -- same real category as datetime.
+    // ThemeData.cpp:624-643
     "clock" to mapOf(
         "pos" to EsDePropertyType.NORMALIZED_PAIR,
         "size" to EsDePropertyType.NORMALIZED_PAIR,
         "origin" to EsDePropertyType.NORMALIZED_PAIR,
+        "rotation" to EsDePropertyType.FLOAT,
+        "rotationOrigin" to EsDePropertyType.NORMALIZED_PAIR,
+        "scope" to EsDePropertyType.STRING,
         "fontPath" to EsDePropertyType.PATH,
         "fontSize" to EsDePropertyType.FLOAT,
         "horizontalAlignment" to EsDePropertyType.STRING,
         "verticalAlignment" to EsDePropertyType.STRING,
         "color" to EsDePropertyType.COLOR,
         "backgroundColor" to EsDePropertyType.COLOR,
+        "backgroundColorEnd" to EsDePropertyType.COLOR,
+        "backgroundGradientType" to EsDePropertyType.STRING,
+        "backgroundHorizontalPadding" to EsDePropertyType.NORMALIZED_PAIR,
+        "backgroundVerticalPadding" to EsDePropertyType.NORMALIZED_PAIR,
+        "backgroundCornerRadius" to EsDePropertyType.FLOAT,
         "format" to EsDePropertyType.STRING,
         "opacity" to EsDePropertyType.FLOAT,
     ),
-    // Not a visual element at all in real ES-DE (plays on navigation/
-    // selection) -- parsed for completeness; no rendering, real audio
-    // playback wiring is separate work.
+    // ThemeData.cpp:644-645. Not a visual element at all in real ES-DE
+    // (plays on navigation/selection) -- parsed for completeness; no
+    // rendering, real audio playback wiring is separate work.
     "sound" to mapOf(
         "path" to EsDePropertyType.PATH,
     ),
+)
+
+/**
+ * Real ES-DE `sPropertyAttributeMap` (ThemeData.cpp:144-154) -- a handful
+ * of properties are keyed not just by tag name but by an XML ATTRIBUTE on
+ * that same tag (`<customBadgeIcon badge="kidgame">./icon.svg
+ * </customBadgeIcon>`), letting one property name repeat with a different
+ * attribute value per real declaration. Maps the property's real tag name
+ * to (real attribute name, storage-key prefix this parser generates --
+ * `badge_$attrValue`/`controller_$attrValue`, matching what
+ * [EsDeThemedBadges]/[dev.droidtop.library.theme.EsDeControllers] already
+ * read). `customButtonIcon` (helpsystem) and `customIcon` (systemstatus)
+ * are real sPropertyAttributeMap entries too, but droidtop renders no
+ * per-entry icon for either yet -- included for parsing completeness, not
+ * silently dropped, but with no renderer consumer to wire a storage-key
+ * convention against yet.
+ */
+internal val ES_DE_PROPERTY_ATTRIBUTE_MAP: Map<String, kotlin.Pair<String, String>> = mapOf(
+    "customBadgeIcon" to ("badge" to "badge"),
+    "customControllerIcon" to ("controller" to "controller"),
+    "customButtonIcon" to ("button" to "customButtonIcon"),
+    "customIcon" to ("icon" to "customIcon"),
 )
 
 internal val ES_DE_SUPPORTED_VIEWS = setOf("all", "system", "gamelist")
