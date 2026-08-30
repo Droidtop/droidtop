@@ -50,6 +50,8 @@
     <string name="pref_desktop_root_compositor_setup_desc">Re-check root access and choose which distro + compositor to use</string>
     <string name="pref_desktop_containers_title">Containers</string>
     <string name="pref_desktop_containers_desc">Manage Linux containers and distros: create, start, stop, delete</string>
+    <string name="pref_display_shell_target_title">Handheld shell display</string>
+    <string name="pref_display_game_launch_target_title">Games launch on</string>
 
     <string name="pref_handheld_default_section_title">Default section</string>
     <string name="pref_handheld_show_hints_title">Show button hints</string>
@@ -67,6 +69,24 @@
     <string name="pref_handheld_sync_theme_index_desc">Update the real ES-DE theme list; run this before Browse themes if that list is empty</string>
     <string name="pref_handheld_browse_themes_title">Browse themes</string>
     <string name="pref_handheld_browse_themes_desc">Download or update an individual theme from the real ES-DE community index</string>
+    <string-array name="pref_display_shell_target_entries">
+        <item>Second display when connected</item>
+        <item>Always the built-in screen</item>
+    </string-array>
+    <string-array name="pref_display_shell_target_values">
+        <item>SECOND_WHEN_PRESENT</item>
+        <item>BUILT_IN</item>
+    </string-array>
+    <string-array name="pref_display_game_launch_target_entries">
+        <item>Same display as the shell</item>
+        <item>Built-in screen</item>
+        <item>Second display</item>
+    </string-array>
+    <string-array name="pref_display_game_launch_target_values">
+        <item>FOLLOW_SHELL</item>
+        <item>BUILT_IN</item>
+        <item>SECOND</item>
+    </string-array>
     <string-array name="pref_handheld_default_section_entries">
         <item>Games</item>
         <item>Apps</item>

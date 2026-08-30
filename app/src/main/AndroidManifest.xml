@@ -113,6 +113,17 @@
             android:exported="true" />
 
         <!--
+          The widgets/ambient-info surface for whichever display the
+          Handheld shell is NOT on (docs/SPEC.md section 4, handheld
+          dual-screen roles) -- started by MainActivity's role
+          orchestration, never launched directly by the user.
+        -->
+        <activity
+            android:name="dev.droidtop.app.CompanionActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|navigation" />
+
+        <!--
           docs/SPEC.md section 3d's container/distro manager. The
           intent-filter action lets shells in other modules
           (:shell-desktop's taskbar) open it without a compile-time

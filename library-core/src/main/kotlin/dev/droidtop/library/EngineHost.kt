@@ -72,7 +72,7 @@ object EngineHost {
             }
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        context.startActivity(intent)
+        LaunchDisplay.start(context, intent)
     }
 }
 
