@@ -1,6 +1,7 @@
 package dev.droidtop.library.consoles
 
 import android.content.Context
+import dev.droidtop.library.LaunchDisplay
 import dev.droidtop.library.EsDeArtwork
 import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.LibraryEntry
@@ -524,7 +525,7 @@ class ConsoleRomProvider(
             ?: error("No installed Player available for system ${system.id}")
         if (player.killPackageProcesses) killPackageProcessesBestEffort(player.packageName)
         val intent = AmStartCommandToIntentConverter.toIntent(context, player.argumentsTemplate, romFile.absolutePath)
-        context.startActivity(intent)
+        LaunchDisplay.start(context, intent)
     }
 
     /**

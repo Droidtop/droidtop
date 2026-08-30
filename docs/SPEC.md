@@ -549,6 +549,25 @@ not settled designs):
     rather use the lower screen as an independent output (mirrored, or
     its own `SecondaryDisplayLauncher`) turns this off, per the per-output
     role model above.
+- **Handheld dual-screen roles (directed 2026-08-30, first live addon
+  session)**: when the Dual-Screen Add-On (or any second display) is
+  present, the HANDHELD SHELL ITSELF moves to it — the addon is the
+  upper/main screen — and the built-in screen becomes the
+  widgets/ambient-info surface (FocusCompanion/PresencePanel tenants,
+  §7e), the inverse of a phone-style "companion on the accessory"
+  model. Desktop mode is exempt: it deliberately keeps the lower screen
+  as its input surface (keyboard/trackpad, above). Additionally,
+  **launch-display targeting is a launcher-wide capability**: every
+  launch (console ROM players via `ActivityOptions.setLaunchDisplayId`,
+  engine/native/Wine launches alike) targets a configured display,
+  defaulting to wherever the shell is. All of it is user-configurable —
+  the §4 per-output role/mapping UI is now required, not deferred:
+  which display hosts the shell, which hosts widgets, and where games
+  launch. Hardware findings from the first session: the addon
+  enumerates as a presentation-category EXTERNAL display ("DP Screen",
+  1080×1920 native per DRM) but can come up in a 480×640 fallback mode
+  until power-cycled — detect and surface that state rather than
+  silently running at fallback resolution.
 - **General framing**: droidtop's display/shell/settings model takes KDE
   Plasma as its broader reference point, not just for KScreen specifically
   — the goal (§1) is a real general-purpose compute device, and KDE is the

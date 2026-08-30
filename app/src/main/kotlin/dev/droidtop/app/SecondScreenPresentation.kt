@@ -27,9 +27,12 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.text.style.TextOverflow
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.consoles.ES_DE_CONSOLE_SYSTEMS
+import dev.droidtop.library.displayName
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Rich companion display for the second/lower screen — per direction:
@@ -64,15 +67,6 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
         override val savedStateRegistry: SavedStateRegistry get() = controller.savedStateRegistry
     }
 
-    private val _focusedEntry = MutableStateFlow<LibraryEntry?>(null)
-
-    /** Set by whatever's driving the primary screen (currently [dev.droidtop.shell.gamepad.GamepadShell]'s focus callback) — the companion panel just reflects it live. */
-    var focusedEntry: LibraryEntry?
-        get() = _focusedEntry.value
-        set(value) {
-            _focusedEntry.value = value
-        }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         savedStateOwner.controller.performRestore(null)
@@ -82,11 +76,11 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(savedStateOwner)
             setContent {
-                val entry by _focusedEntry.collectAsState()
+                val entry by CompanionState.focusedEntry.collectAsState()
                 // darkTheme = true: an ambient always-dark companion
                 // surface (black ground is the design, like an idle
                 // screen) -- see DroidtopTheme's own doc comment.
-                dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) { CompanionInfoPanel(entry) }
+                dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) { CompanionContent(entry) }
             }
         }
         setContentView(composeView)
@@ -104,24 +98,72 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
 }
 
 /**
- * The actual "rich informational display" content — currently: whatever
- * [LibraryEntry] is focused on the primary screen, live. Room to grow
- * (artwork, achievements, system status) without touching the
- * `Presentation` plumbing above — this composable is the only thing that
- * needs to change to make the panel richer.
+ * The one place the focused-entry feed lives — written by whatever drives
+ * the shell ([dev.droidtop.shell.gamepad.GamepadShell]'s focus callback,
+ * via MainActivity), read by BOTH companion hosts ([CompanionActivity] on
+ * the built-in screen when the shell is on the addon, and
+ * [SecondScreenPresentation] on the addon when the shell stays built-in).
+ * A process-wide flow rather than a field on either host, since which
+ * host exists changes with [DisplayRolePrefs] + live display attach.
  */
+object CompanionState {
+    val focusedEntry = MutableStateFlow<LibraryEntry?>(null)
+}
+
 @Composable
-private fun CompanionInfoPanel(entry: LibraryEntry?) {
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+internal fun CompanionContent(entry: LibraryEntry?) {
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         if (entry == null) {
-            Text("droidtop", color = Color.DarkGray, style = MaterialTheme.typography.headlineMedium)
-        } else {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("droidtop", color = Color.DarkGray, style = MaterialTheme.typography.headlineMedium)
+            }
+            return@Box
+        }
+        // No artwork here by design (per direction): this panel is the
+        // ambient WIDGETS/INFO surface (§4's dual-screen roles -- the
+        // shell itself lives on the other display when both exist), so
+        // it carries focused-game information, not a second copy of the
+        // shell's art.
+        Row(
+            modifier = Modifier.fillMaxSize().padding(48.dp),
+            horizontalArrangement = Arrangement.spacedBy(40.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Column(
-                modifier = Modifier.padding(32.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(entry.title, color = Color.White, style = MaterialTheme.typography.headlineLarge)
-                Text(entry.kind.name, color = Color.Gray, style = MaterialTheme.typography.titleMedium)
+                // Real system name (Nintendo 64, PlayStation 2) when this
+                // is a console ROM; the shared kind grouping name otherwise.
+                val systemName = entry.systemId
+                    ?.let { id -> ES_DE_CONSOLE_SYSTEMS.firstOrNull { it.id == id }?.displayName }
+                    ?: entry.kind.displayName()
+                Text(systemName, color = Color(0xFF9BB4D0), style = MaterialTheme.typography.titleMedium)
+                val detailLine = listOfNotNull(
+                    entry.developer,
+                    entry.releaseDate?.take(4),
+                    entry.genre,
+                ).joinToString("  ·  ")
+                if (detailLine.isNotEmpty()) {
+                    Text(detailLine, color = Color.LightGray, style = MaterialTheme.typography.bodyLarge)
+                }
+                entry.rating?.let { rating ->
+                    Text(
+                        "★".repeat((rating * 5).toInt().coerceIn(0, 5)) + "☆".repeat(5 - (rating * 5).toInt().coerceIn(0, 5)),
+                        color = Color(0xFFE0C060),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+                entry.description?.let { description ->
+                    Text(
+                        description,
+                        color = Color.Gray,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 6,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                }
                 if (entry.playtimeSeconds > 0) {
                     Text("Played ${entry.playtimeSeconds / 60} min", color = Color.Gray, style = MaterialTheme.typography.bodyLarge)
                 }

@@ -97,6 +97,6 @@ class NativeAppProvider(private val context: Context) : LibraryProvider {
         val pm = context.packageManager
         val intent = pm.getLaunchIntentForPackage(entry.id) ?: return
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(intent)
+        LaunchDisplay.start(context, intent)
     }
 }

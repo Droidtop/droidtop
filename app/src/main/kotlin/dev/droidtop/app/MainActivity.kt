@@ -1,6 +1,7 @@
 package dev.droidtop.app
 
 import android.content.Intent
+import android.os.Build
 import android.hardware.display.DisplayManager
 import android.os.Bundle
 import android.view.KeyEvent
@@ -18,9 +19,6 @@ import dev.droidtop.library.RoomPlayHistoryStore
 import dev.droidtop.library.consoles.ConsoleRomProvider
 import dev.droidtop.runtime.DisplayOutputKind
 import dev.droidtop.runtime.DisplayOutputRepository
-import dev.droidtop.runtime.DualScreenCoordinator
-import dev.droidtop.runtime.DualScreenRole
-import dev.droidtop.runtime.PrefsDualScreenAssignmentStore
 import dev.droidtop.runtime.PrimaryContainerSession
 import dev.droidtop.runtime.windows.PcGameProvider
 import dev.droidtop.shell.desktop.DesktopSessionMessage
@@ -145,7 +143,7 @@ class MainActivity : AppCompatActivity() {
             when (mode) {
                 BackButtonMenu.MODE_HANDHELD -> GamepadShell(
                     library = library,
-                    onFocusedEntryChanged = { secondScreenPresentation?.focusedEntry = it },
+                    onFocusedEntryChanged = { CompanionState.focusedEntry.value = it },
                     deepLinkToken = handheldDeepLinkToken,
                     startSectionName = handheldStartSection,
                     triggerRescan = handheldTriggerRescan,
@@ -240,44 +238,87 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Live display detection + role resolution + [SecondScreenPresentation]
-     * lifecycle management — "primary/lower display detection" and "multi-
-     * display fixing" (per direction), not a one-shot check at launch.
-     * [DisplayOutputRepository] reacts to a second screen/external lapdock
-     * monitor being connected or removed at runtime; [DualScreenCoordinator]
-     * resolves which one currently plays [DualScreenRole.LOWER_INPUT] (§4 —
-     * a starting guess, user-overridable, persisted). Whenever that
-     * resolution names a display, this shows/keeps a [SecondScreenPresentation]
-     * on it; when it doesn't (no second screen right now), any existing
-     * presentation is dismissed.
-     *
-     * UNVERIFIED against a real dual-screen device — no hardware with a
-     * real secondary `Display` was available while writing this.
+     * Dual-screen role orchestration (docs/SPEC.md §4, handheld
+     * dual-screen roles — directed after the first live addon session):
+     * when a second display is present and [DisplayRolePrefs.shellTarget]
+     * says so (the default), the HANDHELD SHELL ITSELF moves to it (the
+     * addon is the upper/main screen) and the built-in screen gets the
+     * widgets panel ([CompanionActivity] — a real Activity, since
+     * `Presentation` can only target non-default displays). The
+     * [SecondScreenPresentation] path stays as the real implementation of
+     * the other choice (shell on built-in, widgets on the addon). Launch
+     * ordering under SECOND_WHEN_PRESENT: companion first, then the shell
+     * task moves (singleTask + setLaunchDisplayId relocates this same
+     * instance) — so window focus, and every gamepad event with it, ends
+     * on the shell. Also maintains [LaunchDisplay.targetDisplayId] — the
+     * launcher-wide "games launch on which display" setting. Desktop mode
+     * deliberately opts out of all of this (§4: its lower screen is an
+     * input surface).
      */
     private fun observeSecondScreen() {
         val displayOutputs = DisplayOutputRepository(applicationContext)
-        val coordinator = DualScreenCoordinator(PrefsDualScreenAssignmentStore(applicationContext))
         val displayManager = getSystemService(DisplayManager::class.java)
 
         lifecycleScope.launch {
             displayOutputs.observe().collectLatest { outputs ->
-                val roles = coordinator.resolve(outputs)
-                val lowerOutput = roles.entries.firstOrNull { it.value == DualScreenRole.LOWER_INPUT }?.key
+                val second = outputs.firstOrNull { it.kind == DisplayOutputKind.SECOND_SCREEN }
+                val handheld = mode == BackButtonMenu.MODE_HANDHELD
+                val shellOnSecond = handheld && second != null &&
+                    DisplayRolePrefs.shellTarget(this@MainActivity) == DisplayRolePrefs.ShellTarget.SECOND_WHEN_PRESENT
 
-                if (lowerOutput == null) {
-                    secondScreenPresentation?.dismiss()
-                    secondScreenPresentation = null
-                    return@collectLatest
+                dev.droidtop.library.LaunchDisplay.targetDisplayId = when {
+                    !handheld || second == null -> null
+                    else -> when (DisplayRolePrefs.gameLaunchTarget(this@MainActivity)) {
+                        DisplayRolePrefs.GameLaunchTarget.FOLLOW_SHELL ->
+                            if (shellOnSecond) second.androidDisplayId else null
+                        DisplayRolePrefs.GameLaunchTarget.BUILT_IN -> null
+                        DisplayRolePrefs.GameLaunchTarget.SECOND -> second.androidDisplayId
+                    }
                 }
 
-                // Already showing on this exact display -- nothing to do (avoids
-                // tearing down and recreating the Presentation, and losing
-                // focusedEntry state, on every unrelated DisplayListener callback).
-                if (secondScreenPresentation?.display?.displayId == lowerOutput.androidDisplayId) return@collectLatest
-
-                secondScreenPresentation?.dismiss()
-                val display = displayManager.getDisplay(lowerOutput.androidDisplayId) ?: return@collectLatest
-                secondScreenPresentation = SecondScreenPresentation(applicationContext, display).also { it.show() }
+                when {
+                    second == null -> {
+                        secondScreenPresentation?.dismiss()
+                        secondScreenPresentation = null
+                    }
+                    shellOnSecond -> {
+                        secondScreenPresentation?.dismiss()
+                        secondScreenPresentation = null
+                        val currentDisplayId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            display?.displayId ?: android.view.Display.DEFAULT_DISPLAY
+                        } else {
+                            @Suppress("DEPRECATION")
+                            windowManager.defaultDisplay.displayId
+                        }
+                        if (currentDisplayId != second.androidDisplayId) {
+                            // Companion FIRST (built-in screen), then move
+                            // this singleTask instance to the addon so the
+                            // shell ends up focused.
+                            startActivity(
+                                Intent(this@MainActivity, CompanionActivity::class.java)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                            startActivity(
+                                Intent(intent).setClass(this@MainActivity, MainActivity::class.java)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                android.app.ActivityOptions.makeBasic()
+                                    .setLaunchDisplayId(second.androidDisplayId)
+                                    .toBundle(),
+                            )
+                        }
+                    }
+                    else -> {
+                        // Shell stays on the built-in screen; the addon gets
+                        // the widgets panel via Presentation. Skip if already
+                        // presenting on this exact display (avoids teardown on
+                        // every unrelated DisplayListener callback).
+                        if (secondScreenPresentation?.display?.displayId != second.androidDisplayId) {
+                            secondScreenPresentation?.dismiss()
+                            val display = displayManager.getDisplay(second.androidDisplayId) ?: return@collectLatest
+                            secondScreenPresentation = SecondScreenPresentation(applicationContext, display).also { it.show() }
+                        }
+                    }
+                }
             }
         }
     }
