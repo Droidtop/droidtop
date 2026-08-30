@@ -1,0 +1,941 @@
+{
+ "version": 1,
+ "players": [
+  {
+   "id": "arcadia-com-amigan-droidarcadia-droidarcadia",
+   "systemId": "arcadia",
+   "label": "DroidArcadia",
+   "pkg": "com.amigan.droidarcadia",
+   "argumentsTemplate": "-n com.amigan.droidarcadia/.MainActivity -a android.intent.action.VIEW -d {file.uri} -t application/zip --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": true
+  },
+  {
+   "id": "atari2600-com-explusalpha-a2600emu-com-explusalpha-a2600emu",
+   "systemId": "atari2600",
+   "label": "com.explusalpha.A2600Emu",
+   "pkg": "com.explusalpha.A2600Emu",
+   "argumentsTemplate": "-n com.explusalpha.A2600Emu/com.imagine.BaseActivity -a android.intent.action.VIEW -d {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "atari2600-com-androidemu-atari-com-androidemu-atari",
+   "systemId": "atari2600",
+   "label": "com.androidemu.atari",
+   "pkg": "com.androidemu.atari",
+   "argumentsTemplate": "-n com.androidemu.atari/.EmulatorActivity -a android.intent.action.VIEW -d {file.path} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "atomiswave-io-recompiled-redream-io-recompiled-redream",
+   "systemId": "atomiswave",
+   "label": "io.recompiled.redream",
+   "pkg": "io.recompiled.redream",
+   "argumentsTemplate": "-n io.recompiled.redream/.MainActivity -a android.intent.action.VIEW -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "atomiswave-com-reicast-emulator-com-reicast-emulator",
+   "systemId": "atomiswave",
+   "label": "com.reicast.emulator",
+   "pkg": "com.reicast.emulator",
+   "argumentsTemplate": "-n com.reicast.emulator/.MainActivity -a android.intent.action.VIEW -d {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "atomiswave-com-flycast-emulator-com-flycast-emulator",
+   "systemId": "atomiswave",
+   "label": "com.flycast.emulator",
+   "pkg": "com.flycast.emulator",
+   "argumentsTemplate": "-n com.flycast.emulator/com.flycast.emulator.MainActivity -a android.intent.action.VIEW -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "atomiswave-com-flycast-emulator-com-flycast-emulator-dev-build",
+   "systemId": "atomiswave",
+   "label": "com.flycast.emulator (dev build)",
+   "pkg": "com.flycast.emulator",
+   "argumentsTemplate": "-n com.flycast.emulator/com.flycast.emulator.MainActivity -a android.intent.action.VIEW -d {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "c64-com-explusalpha-c64emu-com-explusalpha-c64emu",
+   "systemId": "c64",
+   "label": "com.explusalpha.C64Emu",
+   "pkg": "com.explusalpha.C64Emu",
+   "argumentsTemplate": "-n com.explusalpha.C64Emu/com.imagine.BaseActivity -a android.intent.action.VIEW -d {file.path} -t application/zip",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "cps1-com-explusalpha-neoemu-neo-emu",
+   "systemId": "cps1",
+   "label": "NEO.EMU",
+   "pkg": "com.explusalpha.neoemu",
+   "argumentsTemplate": "-n com.explusalpha.neoemu/com.imagine.BaseActivity -d {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "cps2-com-explusalpha-neoemu-neo-emu",
+   "systemId": "cps2",
+   "label": "NEO.EMU",
+   "pkg": "com.explusalpha.neoemu",
+   "argumentsTemplate": "-n com.explusalpha.neoemu/com.imagine.BaseActivity -d {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "cps3-com-explusalpha-neoemu-neo-emu",
+   "systemId": "cps3",
+   "label": "NEO.EMU",
+   "pkg": "com.explusalpha.neoemu",
+   "argumentsTemplate": "-n com.explusalpha.neoemu/com.imagine.BaseActivity -d {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "dreamcast-io-recompiled-redream-io-recompiled-redream",
+   "systemId": "dreamcast",
+   "label": "io.recompiled.redream",
+   "pkg": "io.recompiled.redream",
+   "argumentsTemplate": "-n io.recompiled.redream/.MainActivity -a android.intent.action.VIEW -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "dreamcast-com-reicast-emulator-com-reicast-emulator",
+   "systemId": "dreamcast",
+   "label": "com.reicast.emulator",
+   "pkg": "com.reicast.emulator",
+   "argumentsTemplate": "-n com.reicast.emulator/.MainActivity -a android.intent.action.VIEW -d {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "dreamcast-com-flycast-emulator-com-flycast-emulator",
+   "systemId": "dreamcast",
+   "label": "com.flycast.emulator",
+   "pkg": "com.flycast.emulator",
+   "argumentsTemplate": "-n com.flycast.emulator/com.flycast.emulator.MainActivity -a android.intent.action.VIEW -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "dreamcast-com-flycast-emulator-com-flycast-emulator-dev-build",
+   "systemId": "dreamcast",
+   "label": "com.flycast.emulator (dev build)",
+   "pkg": "com.flycast.emulator",
+   "argumentsTemplate": "-n com.flycast.emulator/com.flycast.emulator.MainActivity -a android.intent.action.VIEW -d {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "fds-com-explusalpha-nesemu-com-explusalpha-nesemu",
+   "systemId": "fds",
+   "label": "com.explusalpha.NesEmu",
+   "pkg": "com.explusalpha.NesEmu",
+   "argumentsTemplate": "-n com.explusalpha.NesEmu/com.imagine.BaseActivity -a android.intent.action.VIEW -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "fds-com-androidemu-nes-com-androidemu-nes",
+   "systemId": "fds",
+   "label": "com.androidemu.nes",
+   "pkg": "com.androidemu.nes",
+   "argumentsTemplate": "-n com.androidemu.nes/.EmulatorActivity -a android.intent.action.VIEW -d {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gamegear-com-androidemu-gg-com-androidemu-gg",
+   "systemId": "gamegear",
+   "label": "com.androidemu.gg",
+   "pkg": "com.androidemu.gg",
+   "argumentsTemplate": "-n com.androidemu.gg/.EmulatorActivity -a android.intent.action.VIEW -d {file.path} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gamegear-com-fms-mg-mastergear",
+   "systemId": "gamegear",
+   "label": "MasterGear",
+   "pkg": "com.fms.mg",
+   "argumentsTemplate": "-n com.fms.mg/com.fms.emulib.MainActivity -a android.intent.action.VIEW -d {file.uri} --activity-clear-task --activity-clear-top --activity-no-history",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gb-it-dbtecno-pizzaboy-pizza-boy-basic",
+   "systemId": "gb",
+   "label": "Pizza Boy Basic",
+   "pkg": "it.dbtecno.pizzaboy",
+   "argumentsTemplate": "-n it.dbtecno.pizzaboy/it.dbtecno.pizzaboy.MainActivity -e rom_uri {file.path} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gb-it-dbtecno-pizzaboypro-pizza-boy-pro",
+   "systemId": "gb",
+   "label": "Pizza Boy Pro",
+   "pkg": "it.dbtecno.pizzaboypro",
+   "argumentsTemplate": "-n it.dbtecno.pizzaboypro/it.dbtecno.pizzaboypro.MainActivity -e rom_uri {file.path} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gb-com-sky-skyemu-skyemu",
+   "systemId": "gb",
+   "label": "SkyEmu",
+   "pkg": "com.sky.SkyEmu",
+   "argumentsTemplate": "-n com.sky.SkyEmu/.EnhancedNativeActivity -a android.intent.action.VIEW -d {file.uri} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gb-com-explusalpha-gbcemu-com-explusalpha-gbcemu",
+   "systemId": "gb",
+   "label": "com.explusalpha.GbcEmu",
+   "pkg": "com.explusalpha.GbcEmu",
+   "argumentsTemplate": "-n com.explusalpha.GbcEmu/com.imagine.BaseActivity -a android.intent.action.VIEW -d {file.uri} -t application/zip",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gb-com-fastemulator-gbcfree-com-fastemulator-gbcfree",
+   "systemId": "gb",
+   "label": "com.fastemulator.gbcfree",
+   "pkg": "com.fastemulator.gbcfree",
+   "argumentsTemplate": "-n com.fastemulator.gbcfree/.EmulatorActivity -a android.intent.action.VIEW -d {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gb-com-fastemulator-gbc-com-fastemulator-gbc",
+   "systemId": "gb",
+   "label": "com.fastemulator.gbc",
+   "pkg": "com.fastemulator.gbc",
+   "argumentsTemplate": "-n com.fastemulator.gbc/.EmulatorActivity -a android.intent.action.VIEW -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gba-it-dbtecno-pizzaboygba-pizza-boy-gba-basic",
+   "systemId": "gba",
+   "label": "Pizza Boy GBA Basic",
+   "pkg": "it.dbtecno.pizzaboygba",
+   "argumentsTemplate": "-n it.dbtecno.pizzaboygba/it.dbtecno.pizzaboygba.MainActivity -e rom_uri {file.path} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gba-it-dbtecno-pizzaboygbapro-pizza-boy-gba-pro",
+   "systemId": "gba",
+   "label": "Pizza Boy GBA Pro",
+   "pkg": "it.dbtecno.pizzaboygbapro",
+   "argumentsTemplate": "-n it.dbtecno.pizzaboygbapro/it.dbtecno.pizzaboygbapro.MainActivity -e rom_uri {file.path} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gba-com-sky-skyemu-skyemu",
+   "systemId": "gba",
+   "label": "SkyEmu",
+   "pkg": "com.sky.SkyEmu",
+   "argumentsTemplate": "-n com.sky.SkyEmu/.EnhancedNativeActivity -a android.intent.action.VIEW -d {file.uri} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gba-com-explusalpha-gbaemu-com-explusalpha-gbaemu",
+   "systemId": "gba",
+   "label": "com.explusalpha.GbaEmu",
+   "pkg": "com.explusalpha.GbaEmu",
+   "argumentsTemplate": "-n com.explusalpha.GbaEmu/com.imagine.BaseActivity -a android.intent.action.VIEW -d {file.uri} -t application/zip",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gba-com-fastemulator-gbafree-com-fastemulator-gbafree",
+   "systemId": "gba",
+   "label": "com.fastemulator.gbafree",
+   "pkg": "com.fastemulator.gbafree",
+   "argumentsTemplate": "-n com.fastemulator.gbafree/com.fastemulator.gba.EmulatorActivity -a android.intent.action.VIEW -d {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gba-com-fastemulator-gba-com-fastemulator-gba",
+   "systemId": "gba",
+   "label": "com.fastemulator.gba",
+   "pkg": "com.fastemulator.gba",
+   "argumentsTemplate": "-n com.fastemulator.gba/.EmulatorActivity -a android.intent.action.VIEW -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gbc-it-dbtecno-pizzaboy-pizza-boy-basic",
+   "systemId": "gbc",
+   "label": "Pizza Boy Basic",
+   "pkg": "it.dbtecno.pizzaboy",
+   "argumentsTemplate": "-n it.dbtecno.pizzaboy/it.dbtecno.pizzaboy.MainActivity -e rom_uri {file.path} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gbc-it-dbtecno-pizzaboypro-pizza-boy-pro",
+   "systemId": "gbc",
+   "label": "Pizza Boy Pro",
+   "pkg": "it.dbtecno.pizzaboypro",
+   "argumentsTemplate": "-n it.dbtecno.pizzaboypro/it.dbtecno.pizzaboypro.MainActivity -e rom_uri {file.path} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gbc-com-sky-skyemu-skyemu",
+   "systemId": "gbc",
+   "label": "SkyEmu",
+   "pkg": "com.sky.SkyEmu",
+   "argumentsTemplate": "-n com.sky.SkyEmu/.EnhancedNativeActivity -a android.intent.action.VIEW -d {file.uri} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gbc-com-explusalpha-gbcemu-com-explusalpha-gbcemu",
+   "systemId": "gbc",
+   "label": "com.explusalpha.GbcEmu",
+   "pkg": "com.explusalpha.GbcEmu",
+   "argumentsTemplate": "-n com.explusalpha.GbcEmu/com.imagine.BaseActivity -a android.intent.action.VIEW -d {file.uri} -t application/zip",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gc-org-dolphinemu-handheld-dolphin-handheld",
+   "systemId": "gc",
+   "label": "Dolphin handheld",
+   "pkg": "org.dolphinemu.handheld",
+   "argumentsTemplate": "-n org.dolphinemu.handheld/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -e AutoStartFile {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gc-org-mm-jr-dolphin-org-mm-jr-fork",
+   "systemId": "gc",
+   "label": "Dolphin org.mm.jr fork",
+   "pkg": "org.mm.jr",
+   "argumentsTemplate": "-n org.mm.jr/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -e AutoStartFile {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gc-org-mm-j-dolphin-org-mm-j-fork",
+   "systemId": "gc",
+   "label": "Dolphin org.mm.j fork",
+   "pkg": "org.mm.j",
+   "argumentsTemplate": "-n org.mm.j/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -e AutoStartFile {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gc-org-dolphinemu-mmjr-dolphin-mmjr",
+   "systemId": "gc",
+   "label": "Dolphin mmjr",
+   "pkg": "org.dolphinemu.mmjr",
+   "argumentsTemplate": "-n org.dolphinemu.mmjr/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -e AutoStartFile {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gc-org-dolphinemu-dolphinemu-org-dolphinemu-dolphinemu",
+   "systemId": "gc",
+   "label": "org.dolphinemu.dolphinemu",
+   "pkg": "org.dolphinemu.dolphinemu",
+   "argumentsTemplate": "-n org.dolphinemu.dolphinemu/.ui.main.MainActivity -a android.intent.action.MAIN -e AutoStartFile {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gc-org-dolphinemu-mmjr3-dolphin-mmjr3",
+   "systemId": "gc",
+   "label": "Dolphin mmjr3",
+   "pkg": "org.dolphinemu.mmjr3",
+   "argumentsTemplate": "-n org.dolphinemu.mmjr3/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -e AutoStartFile {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "gc-org-dolphin-ishiirukadark-dolphin-ishiiruka",
+   "systemId": "gc",
+   "label": "Dolphin Ishiiruka",
+   "pkg": "org.dolphin.ishiirukadark",
+   "argumentsTemplate": "-n org.dolphin.ishiirukadark/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -e AutoStartFile {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "genesis-com-explusalpha-mdemu-com-explusalpha-mdemu",
+   "systemId": "genesis",
+   "label": "com.explusalpha.MdEmu",
+   "pkg": "com.explusalpha.MdEmu",
+   "argumentsTemplate": "-n com.explusalpha.MdEmu/com.imagine.BaseActivity -a android.intent.action.VIEW -d {file.uri} -t application/zip",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "genesis-com-androidemu-gens-com-androidemu-gens",
+   "systemId": "genesis",
+   "label": "com.androidemu.gens",
+   "pkg": "com.androidemu.gens",
+   "argumentsTemplate": "-n com.androidemu.gens/.EmulatorActivity -a android.intent.action.VIEW -d {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "j2me-ru-playsoftware-j2meloader-ru-playsoftware-j2meloader",
+   "systemId": "j2me",
+   "label": "ru.playsoftware.j2meloader",
+   "pkg": "ru.playsoftware.j2meloader",
+   "argumentsTemplate": "-n ru.playsoftware.j2meloader/ru.playsoftware.j2meloader.MainActivity -a android.intent.action.VIEW -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "j2me-ru-woesss-j2meloader-jl-mod",
+   "systemId": "j2me",
+   "label": "jl-mod",
+   "pkg": "ru.woesss.j2meloader",
+   "argumentsTemplate": "-n ru.woesss.j2meloader/ru.playsoftware.j2meloader.MainActivity -a android.intent.action.VIEW -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "mame-com-seleuco-mame4droid-com-seleuco-mame4droid",
+   "systemId": "mame",
+   "label": "com.seleuco.mame4droid",
+   "pkg": "com.seleuco.mame4droid",
+   "argumentsTemplate": "-n com.seleuco.mame4droid/.MAME4droid -a android.intent.action.VIEW -d {file.uri} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "mame-com-seleuco-mame4d2024-com-seleuco-mame4droid-2024",
+   "systemId": "mame",
+   "label": "com.seleuco.mame4droid 2024",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -d {file.uri} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "msx-com-explusalpha-msxemu-com-explusalpha-msxemu",
+   "systemId": "msx",
+   "label": "com.explusalpha.MsxEmu",
+   "pkg": "com.explusalpha.MsxEmu",
+   "argumentsTemplate": "-n com.explusalpha.MsxEmu/com.imagine.BaseActivity -a android.intent.action.VIEW -d {file.path} -t application/zip",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "n64-org-mupen64plusae-v3-fzurita-org-mupen64plusae-v3-fzurita",
+   "systemId": "n64",
+   "label": "org.mupen64plusae.v3.fzurita",
+   "pkg": "org.mupen64plusae.v3.fzurita",
+   "argumentsTemplate": "-n org.mupen64plusae.v3.fzurita/paulscode.android.mupen64plusae.SplashActivity -a android.intent.action.VIEW -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "n64-org-mupen64plusae-v3-alpha-org-mupen64plusae-v3-alpha",
+   "systemId": "n64",
+   "label": "org.mupen64plusae.v3.alpha",
+   "pkg": "org.mupen64plusae.v3.alpha",
+   "argumentsTemplate": "-n org.mupen64plusae.v3.alpha/paulscode.android.mupen64plusae.SplashActivity -a android.intent.action.VIEW -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "n64-org-mupen64plusae-v3-fzurita-pro-org-mupen64plusae-v3-fzurita-pro",
+   "systemId": "n64",
+   "label": "org.mupen64plusae.v3.fzurita.pro",
+   "pkg": "org.mupen64plusae.v3.fzurita.pro",
+   "argumentsTemplate": "-n org.mupen64plusae.v3.fzurita.pro/paulscode.android.mupen64plusae.SplashActivity -a android.intent.action.VIEW -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "n64-paulscode-android-mupen64plusae-paulscode-android-mupen64plusae",
+   "systemId": "n64",
+   "label": "paulscode.android.mupen64plusae",
+   "pkg": "paulscode.android.mupen64plusae",
+   "argumentsTemplate": "-n paulscode.android.mupen64plusae/.MainActivity -a android.intent.action.VIEW -d {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "naomi-com-flycast-emulator-com-flycast-emulator",
+   "systemId": "naomi",
+   "label": "com.flycast.emulator",
+   "pkg": "com.flycast.emulator",
+   "argumentsTemplate": "-n com.flycast.emulator/com.flycast.emulator.MainActivity -a android.intent.action.VIEW -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "naomi-com-flycast-emulator-com-flycast-emulator-dev-build",
+   "systemId": "naomi",
+   "label": "com.flycast.emulator (dev build)",
+   "pkg": "com.flycast.emulator",
+   "argumentsTemplate": "-n com.flycast.emulator/com.flycast.emulator.MainActivity -a android.intent.action.VIEW -d {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "nds-com-dsemu-drastic-drastic",
+   "systemId": "nds",
+   "label": "Drastic",
+   "pkg": "com.dsemu.drastic",
+   "argumentsTemplate": "-n com.dsemu.drastic/.DraSticActivity -d {file.uri} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "nds-me-magnum-melonds-melonds",
+   "systemId": "nds",
+   "label": "MelonDS",
+   "pkg": "me.magnum.melonds",
+   "argumentsTemplate": "-a me.magnum.melonds.LAUNCH_ROM -n me.magnum.melonds/.ui.emulator.EmulatorActivity -e uri {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "nds-me-magnum-melonds-nightly-melonds-nightly",
+   "systemId": "nds",
+   "label": "MelonDS Nightly",
+   "pkg": "me.magnum.melonds.nightly",
+   "argumentsTemplate": "-a me.magnum.melonds.nightly.LAUNCH_ROM -n me.magnum.melonds.nightly/me.magnum.melonds.ui.emulator.EmulatorActivity -e uri {file.uri}",
+   "killPackageProcesses": true
+  },
+  {
+   "id": "nds-me-magnum-melonds-dev-melonds-dev-dual-screen-fork",
+   "systemId": "nds",
+   "label": "MelonDS Dev (Dual Screen Fork)",
+   "pkg": "me.magnum.melonds.dev",
+   "argumentsTemplate": "-a me.magnum.melonds.dev.LAUNCH_ROM -n me.magnum.melonds.dev/me.magnum.melonds.ui.emulator.EmulatorActivity -e uri {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "nds-com-hydra-noods-noods",
+   "systemId": "nds",
+   "label": "NooDS",
+   "pkg": "com.hydra.noods",
+   "argumentsTemplate": "-n com.hydra.noods/.FileBrowser -e LaunchPath {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "neogeo-com-explusalpha-neoemu-neo-emu",
+   "systemId": "neogeo",
+   "label": "NEO.EMU",
+   "pkg": "com.explusalpha.NeoEmu",
+   "argumentsTemplate": "-n com.explusalpha.NeoEmu/com.imagine.BaseActivity -d {file.path} -t application/zip",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "nes-com-explusalpha-nesemu-com-explusalpha-nesemu",
+   "systemId": "nes",
+   "label": "com.explusalpha.NesEmu",
+   "pkg": "com.explusalpha.NesEmu",
+   "argumentsTemplate": "-n com.explusalpha.NesEmu/com.imagine.BaseActivity -a android.intent.action.VIEW -d {file.uri} -t application/zip",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "nes-com-androidemu-nes-com-androidemu-nes",
+   "systemId": "nes",
+   "label": "com.androidemu.nes",
+   "pkg": "com.androidemu.nes",
+   "argumentsTemplate": "-n com.androidemu.nes/.EmulatorActivity -a android.intent.action.VIEW -d {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "ngage-com-github-eka2l1-eka2l1",
+   "systemId": "ngage",
+   "label": "eka2l1",
+   "pkg": "com.github.eka2l1",
+   "argumentsTemplate": "-n com.github.eka2l1/.emu.EmulatorActivity -a android.intent.action.VIEW --activity-clear-task --activity-clear-top -d {file.uri}",
+   "killPackageProcesses": true
+  },
+  {
+   "id": "ngp-com-explusalpha-ngpemu-ngp-emu",
+   "systemId": "ngp",
+   "label": "NGP.EMU",
+   "pkg": "com.explusalpha.NgpEmu",
+   "argumentsTemplate": "-n com.explusalpha.NgpEmu/com.imagine.BaseActivity -d {file.path} -t application/zip",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "ngpc-com-explusalpha-ngpemu-ngp-emu",
+   "systemId": "ngpc",
+   "label": "NGP.EMU",
+   "pkg": "com.explusalpha.NgpEmu",
+   "argumentsTemplate": "-n com.explusalpha.NgpEmu/com.imagine.BaseActivity -d {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "pico8-me-dt2dev-infinity-infinity-p8-player",
+   "systemId": "pico8",
+   "label": "Infinity P8 Player",
+   "pkg": "me.dt2dev.infinity",
+   "argumentsTemplate": "-n me.dt2dev.infinity/me.dt2dev.infinity.SchemeActivity -a android.intent.action.VIEW -d {file.uri}",
+   "killPackageProcesses": true
+  },
+  {
+   "id": "ps2-xyz-aethersx2-android-aethersx2",
+   "systemId": "ps2",
+   "label": "Aethersx2",
+   "pkg": "xyz.aethersx2.android",
+   "argumentsTemplate": "-n xyz.aethersx2.android/.EmulationActivity -a android.intent.action.MAIN -e bootPath {file.uri} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": true
+  },
+  {
+   "id": "ps2-xyz-aethersx2-custom-aethersx2-turnip",
+   "systemId": "ps2",
+   "label": "Aethersx2 Turnip",
+   "pkg": "xyz.aethersx2.custom",
+   "argumentsTemplate": "-n xyz.aethersx2.custom/.EmulationActivity -a android.intent.action.MAIN -e bootPath {file.uri} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": true
+  },
+  {
+   "id": "ps2-xyz-aethersx2-tturnip-nethersx2-turnip",
+   "systemId": "ps2",
+   "label": "NetherSX2 Turnip",
+   "pkg": "xyz.aethersx2.tturnip",
+   "argumentsTemplate": "-n xyz.aethersx2.tturnip/xyz.aethersx2.android.EmulationActivity -a android.intent.action.MAIN -e bootPath {file.uri} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": true
+  },
+  {
+   "id": "ps2-xyz-aethersx2-cturnip-nethersx2-turnip-classic",
+   "systemId": "ps2",
+   "label": "NetherSX2 Turnip (Classic)",
+   "pkg": "xyz.aethersx2.cturnip",
+   "argumentsTemplate": "-n xyz.aethersx2.cturnip/xyz.aethersx2.android.EmulationActivity -a android.intent.action.MAIN -e bootPath {file.uri} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": true
+  },
+  {
+   "id": "ps2-come-nanodata-armsx2-armsx2",
+   "systemId": "ps2",
+   "label": "ARMSX2",
+   "pkg": "come.nanodata.armsx2",
+   "argumentsTemplate": "-n come.nanodata.armsx2/kr.co.iefriends.pcsx2.MainActivity -a android.intent.action.VIEW -d {file.uri} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": true
+  },
+  {
+   "id": "ps2-come-nanodata-armsx2-debug-armsx2-nightly",
+   "systemId": "ps2",
+   "label": "ARMSX2 (Nightly)",
+   "pkg": "come.nanodata.armsx2.debug",
+   "argumentsTemplate": "-n come.nanodata.armsx2.debug/kr.co.iefriends.pcsx2.activities.MainActivity -a android.intent.action.VIEW -d {file.uri} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": true
+  },
+  {
+   "id": "ps2-com-sbro-emucorex-emucorex",
+   "systemId": "ps2",
+   "label": "EmuCoreX",
+   "pkg": "com.sbro.emucorex",
+   "argumentsTemplate": "-n com.sbro.emucorex/.MainActivity -a com.sbro.emucorex.action.LAUNCH_GAME --es com.sbro.emucorex.extra.GAME_PATH {file.uri} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": true
+  },
+  {
+   "id": "psp-org-ppsspp-ppsspp-ppsspp",
+   "systemId": "psp",
+   "label": "PPSSPP",
+   "pkg": "org.ppsspp.ppsspp",
+   "argumentsTemplate": "-n org.ppsspp.ppsspp/.PpssppActivity -a android.intent.action.VIEW -c android.intent.category.DEFAULT -d {file.uri} -t application/octet-stream --activity-clear-task --activity-clear-top --activity-no-history",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "psp-org-ppsspp-ppssppgold-ppsspp-gold",
+   "systemId": "psp",
+   "label": "PPSSPP Gold",
+   "pkg": "org.ppsspp.ppssppgold",
+   "argumentsTemplate": "-n org.ppsspp.ppssppgold/org.ppsspp.ppsspp.PpssppActivity -a android.intent.action.VIEW -c android.intent.category.DEFAULT -d {file.uri} -t application/octet-stream --activity-clear-task --activity-clear-top --activity-no-history",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "psp-org-ppsspp-ppsspplegacy-ppsspp-legacy",
+   "systemId": "psp",
+   "label": "PPSSPP Legacy",
+   "pkg": "org.ppsspp.ppsspplegacy",
+   "argumentsTemplate": "-n org.ppsspp.ppsspplegacy/org.ppsspp.ppsspp.PpssppActivity -a android.intent.action.VIEW -c android.intent.category.DEFAULT -d {file.uri} -t application/octet-stream --activity-clear-task --activity-clear-top --activity-no-history",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "psx-com-github-stenzek-duckstation-duckstation",
+   "systemId": "psx",
+   "label": "Duckstation",
+   "pkg": "com.github.stenzek.duckstation",
+   "argumentsTemplate": "-n com.github.stenzek.duckstation/.EmulationActivity -e bootPath {file.uri} --ez resumeState 0 --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "psx-com-github-stenzek-duckstation-duckstation-legacy",
+   "systemId": "psx",
+   "label": "Duckstation (Legacy)",
+   "pkg": "com.github.stenzek.duckstation",
+   "argumentsTemplate": "-n com.github.stenzek.duckstation/.EmulationActivity -e bootPath {file.path} --ez resumeState 0 --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "psx-com-emulator-fpse-fpse",
+   "systemId": "psx",
+   "label": "FPse",
+   "pkg": "com.emulator.fpse",
+   "argumentsTemplate": "-n com.emulator.fpse/.Main -a android.intent.action.VIEW -d {file.path} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "psx-com-emulator-fpse64-fpse64",
+   "systemId": "psx",
+   "label": "FPse64",
+   "pkg": "com.emulator.fpse64",
+   "argumentsTemplate": "-n com.emulator.fpse64/.Main -a android.intent.action.VIEW -d {file.path} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "psx-com-epsxe-epsxe-epsxe",
+   "systemId": "psx",
+   "label": "ePSXe",
+   "pkg": "com.epsxe.ePSXe",
+   "argumentsTemplate": "-n com.epsxe.ePSXe/.ePSXe -a android.intent.action.MAIN -e com.epsxe.ePSXe.isoName {file.path} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "psx-com-retroarch-aarch64-retroarch-64-beetle-psx-hw",
+   "systemId": "psx",
+   "label": "Retroarch 64 - beetle psx hw",
+   "pkg": "com.retroarch.aarch64",
+   "argumentsTemplate": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture -e ROM {file.path} -e LIBRETRO /data/data/com.retroarch.aarch64/cores/mednafen_psx_hw_libretro_android.so -e CONFIGFILE /storage/emulated/0/Android/data/com.retroarch.aarch64/files/retroarch.cfg -e QUITFOCUS --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": true
+  },
+  {
+   "id": "psx-com-retroarch-aarch64-retroarch-64-beetle-psx",
+   "systemId": "psx",
+   "label": "Retroarch 64 - beetle psx",
+   "pkg": "com.retroarch.aarch64",
+   "argumentsTemplate": "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture -e ROM {file.path} -e LIBRETRO /data/data/com.retroarch.aarch64/cores/mednafen_psx_libretro_android.so -e CONFIGFILE /storage/emulated/0/Android/data/com.retroarch.aarch64/files/retroarch.cfg -e QUITFOCUS --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": true
+  },
+  {
+   "id": "psx-com-retroarch-ra32-retroarch-32-beetle-psx-hw",
+   "systemId": "psx",
+   "label": "Retroarch 32 - beetle psx hw",
+   "pkg": "com.retroarch.ra32",
+   "argumentsTemplate": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture -e ROM {file.path} -e LIBRETRO /data/data/com.retroarch.ra32/cores/mednafen_psx_hw_libretro_android.so -e CONFIGFILE /storage/emulated/0/Android/data/com.retroarch.ra32/files/retroarch.cfg -e QUITFOCUS --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": true
+  },
+  {
+   "id": "psx-com-retroarch-ra32-retroarch-32-beetle-psx",
+   "systemId": "psx",
+   "label": "Retroarch 32 - beetle psx",
+   "pkg": "com.retroarch.ra32",
+   "argumentsTemplate": "-n com.retroarch.ra32/com.retroarch.browser.retroactivity.RetroActivityFuture -e ROM {file.path} -e LIBRETRO /data/data/com.retroarch.ra32/cores/mednafen_psx_libretro_android.so -e CONFIGFILE /storage/emulated/0/Android/data/com.retroarch.ra32/files/retroarch.cfg -e QUITFOCUS --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": true
+  },
+  {
+   "id": "psx-com-retroarch-retroarch-beetle-psx-hw",
+   "systemId": "psx",
+   "label": "Retroarch - beetle psx hw",
+   "pkg": "com.retroarch",
+   "argumentsTemplate": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture -e ROM {file.path} -e LIBRETRO /data/data/com.retroarch/cores/mednafen_psx_hw_libretro_android.so -e CONFIGFILE /storage/emulated/0/Android/data/com.retroarch/files/retroarch.cfg -e QUITFOCUS --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": true
+  },
+  {
+   "id": "psx-com-retroarch-retroarch-beetle-psx",
+   "systemId": "psx",
+   "label": "Retroarch - beetle psx",
+   "pkg": "com.retroarch",
+   "argumentsTemplate": "-n com.retroarch/com.retroarch.browser.retroactivity.RetroActivityFuture -e ROM {file.path} -e LIBRETRO /data/data/com.retroarch/cores/mednafen_psx_libretro_android.so -e CONFIGFILE /storage/emulated/0/Android/data/com.retroarch/files/retroarch.cfg -e QUITFOCUS --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": true
+  },
+  {
+   "id": "satellaview-com-explusalpha-snes9xplus-com-explusalpha-snes9xplus",
+   "systemId": "satellaview",
+   "label": "com.explusalpha.Snes9xPlus",
+   "pkg": "com.explusalpha.Snes9xPlus",
+   "argumentsTemplate": "-n com.explusalpha.Snes9xPlus/com.imagine.BaseActivity -a android.intent.action.VIEW -d {file.uri} -t application/zip",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "saturn-org-devmiyax-yabasanshioro2-pro-yabasanshiro-2-pro",
+   "systemId": "saturn",
+   "label": "YabaSanshiro 2 Pro",
+   "pkg": "org.devmiyax.yabasanshioro2.pro",
+   "argumentsTemplate": "-n org.devmiyax.yabasanshioro2.pro/org.uoyabause.android.Yabause -a android.intent.action.MAIN -e org.uoyabause.android.FileNameUri {file.uri} --activity-clear-task --activity-clear-top --activity-no-history",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "saturn-org-devmiyax-yabasanshioro2-yabasanshiro-2",
+   "systemId": "saturn",
+   "label": "YabaSanshiro 2",
+   "pkg": "org.devmiyax.yabasanshioro2",
+   "argumentsTemplate": "-n org.devmiyax.yabasanshioro2/org.uoyabause.android.Yabause -a android.intent.action.MAIN -e org.uoyabause.android.FileNameUri {file.uri} --activity-clear-task --activity-clear-top --activity-no-history",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "saturn-org-uoyabause-android-pro-yabasanshiro-pro",
+   "systemId": "saturn",
+   "label": "YabaSanshiro Pro",
+   "pkg": "org.uoyabause.android.pro",
+   "argumentsTemplate": "-n org.uoyabause.android.pro/org.uoyabause.android.Yabause -a android.intent.action.VIEW -e org.uoyabause.android.FileNameEx {file.path} --activity-clear-task --activity-clear-top --activity-no-history",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "saturn-org-uoyabause-android-yabasanshiro",
+   "systemId": "saturn",
+   "label": "YabaSanshiro",
+   "pkg": "org.uoyabause.android",
+   "argumentsTemplate": "-n org.uoyabause.android/org.uoyabause.android.Yabause -a android.intent.action.VIEW -e org.uoyabause.android.FileNameEx {file.path} --activity-clear-task --activity-clear-top --activity-no-history",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "saturn-com-explusalpha-saturnemu-saturn-emu",
+   "systemId": "saturn",
+   "label": "Saturn.EMU",
+   "pkg": "com.explusalpha.SaturnEmu",
+   "argumentsTemplate": "-n com.explusalpha.SaturnEmu/com.imagine.BaseActivity -d {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "segacd-com-explusalpha-mdemu-com-explusalpha-mdemu",
+   "systemId": "segacd",
+   "label": "com.explusalpha.MdEmu",
+   "pkg": "com.explusalpha.MdEmu",
+   "argumentsTemplate": "-n com.explusalpha.MdEmu/com.imagine.BaseActivity -a android.intent.action.VIEW -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "snes-com-explusalpha-snes9xplus-com-explusalpha-snes9xplus",
+   "systemId": "snes",
+   "label": "com.explusalpha.Snes9xPlus",
+   "pkg": "com.explusalpha.Snes9xPlus",
+   "argumentsTemplate": "-n com.explusalpha.Snes9xPlus/com.imagine.BaseActivity -a android.intent.action.VIEW -d {file.uri} -t application/zip",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "supergrafx-com-pceemu-com-pceemu",
+   "systemId": "supergrafx",
+   "label": "com.PceEmu",
+   "pkg": "com.PceEmu",
+   "argumentsTemplate": "-n com.PceEmu/com.imagine.BaseActivity -a android.intent.action.VIEW -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "switch-dev-eden-eden-emulator-eden",
+   "systemId": "switch",
+   "label": "eden",
+   "pkg": "dev.eden.eden_emulator",
+   "argumentsTemplate": "-n dev.eden.eden_emulator/org.yuzu.yuzu_emu.activities.EmulationActivity -a android.nfc.action.TECH_DISCOVERED -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "switch-skyline-emu-skyline",
+   "systemId": "switch",
+   "label": "Skyline",
+   "pkg": "skyline.emu",
+   "argumentsTemplate": "-n skyline.emu/emu.skyline.EmulationActivity -a android.intent.action.VIEW -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "switch-org-stratoemu-strato-strato-official",
+   "systemId": "switch",
+   "label": "Strato (Official)",
+   "pkg": "org.stratoemu.strato",
+   "argumentsTemplate": "-n org.stratoemu.strato/org.stratoemu.strato.EmulationActivity -a android.intent.action.VIEW -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "switch-org-yuzu-yuzu-emu-yuzu",
+   "systemId": "switch",
+   "label": "Yuzu",
+   "pkg": "org.yuzu.yuzu_emu",
+   "argumentsTemplate": "-n org.yuzu.yuzu_emu/org.yuzu.yuzu_emu.activities.EmulationActivity -a android.nfc.action.TECH_DISCOVERED -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "switch-org-yuzu-yuzu-emu-ea-yuzu-early-access",
+   "systemId": "switch",
+   "label": "Yuzu (early access)",
+   "pkg": "org.yuzu.yuzu_emu.ea",
+   "argumentsTemplate": "-n org.yuzu.yuzu_emu.ea/org.yuzu.yuzu_emu.activities.EmulationActivity -a android.nfc.action.TECH_DISCOVERED -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "switch-dev-suyu-suyu-emu-relwithdebinfo-suyu",
+   "systemId": "switch",
+   "label": "Suyu",
+   "pkg": "dev.suyu.suyu_emu.relWithDebInfo",
+   "argumentsTemplate": "-n dev.suyu.suyu_emu.relWithDebInfo/dev.suyu.suyu_emu.activities.EmulationActivity -a android.intent.action.VIEW -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "switch-org-sudachi-sudachi-emu-ea-sudachi",
+   "systemId": "switch",
+   "label": "Sudachi",
+   "pkg": "org.sudachi.sudachi_emu.ea",
+   "argumentsTemplate": "-n org.sudachi.sudachi_emu.ea/org.sudachi.sudachi_emu.activities.EmulationActivity -a android.nfc.action.TECH_DISCOVERED -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "tg16-com-pceemu-com-pceemu",
+   "systemId": "tg16",
+   "label": "com.PceEmu",
+   "pkg": "com.PceEmu",
+   "argumentsTemplate": "-n com.PceEmu/com.imagine.BaseActivity -a android.intent.action.VIEW -d {file.uri} -t application/zip",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "triforce-org-dolphinemu-dolphinemu-dolphin",
+   "systemId": "triforce",
+   "label": "Dolphin",
+   "pkg": "org.dolphinemu.dolphinemu",
+   "argumentsTemplate": "-n org.dolphinemu.dolphinemu/.ui.main.MainActivity -a android.intent.action.MAIN -e AutoStartFile {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "virtualboy-com-simongellis-vvb-vvs",
+   "systemId": "virtualboy",
+   "label": "vvs",
+   "pkg": "com.simongellis.vvb",
+   "argumentsTemplate": "-n com.simongellis.vvb/com.simongellis.vvb.MainActivity -a android.intent.action.VIEW -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "wii-org-mm-jr-dolphin-org-mm-jr-fork",
+   "systemId": "wii",
+   "label": "Dolphin org.mm.jr fork",
+   "pkg": "org.mm.jr",
+   "argumentsTemplate": "-n org.mm.jr/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -e AutoStartFile {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "wii-org-mm-j-dolphin-org-mm-j-fork",
+   "systemId": "wii",
+   "label": "Dolphin org.mm.j fork",
+   "pkg": "org.mm.j",
+   "argumentsTemplate": "-n org.mm.j/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -e AutoStartFile {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "wii-org-dolphinemu-mmjr-dolphin-mmjr",
+   "systemId": "wii",
+   "label": "Dolphin mmjr",
+   "pkg": "org.dolphinemu.mmjr",
+   "argumentsTemplate": "-n org.dolphinemu.mmjr/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -e AutoStartFile {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "wii-org-dolphinemu-dolphinemu-org-dolphinemu-dolphinemu",
+   "systemId": "wii",
+   "label": "org.dolphinemu.dolphinemu",
+   "pkg": "org.dolphinemu.dolphinemu",
+   "argumentsTemplate": "-n org.dolphinemu.dolphinemu/.ui.main.MainActivity -a android.intent.action.MAIN -e AutoStartFile {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "wii-org-dolphinemu-mmjr3-dolphin-mmjr3",
+   "systemId": "wii",
+   "label": "Dolphin mmjr3",
+   "pkg": "org.dolphinemu.mmjr3",
+   "argumentsTemplate": "-n org.dolphinemu.mmjr3/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -e AutoStartFile {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "wii-org-dolphin-ishiirukadark-dolphin-ishiiruka",
+   "systemId": "wii",
+   "label": "Dolphin Ishiiruka",
+   "pkg": "org.dolphin.ishiirukadark",
+   "argumentsTemplate": "-n org.dolphin.ishiirukadark/org.dolphinemu.dolphinemu.ui.main.MainActivity -a android.intent.action.VIEW -e AutoStartFile {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "wiiu-info-cemu-cemu-cemu",
+   "systemId": "wiiu",
+   "label": "cemu",
+   "pkg": "info.cemu.cemu",
+   "argumentsTemplate": "-n info.cemu.cemu/.emulation.EmulationActivity -d {file.uri} --activity-clear-task --activity-clear-top",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "windows-com-winlator-winlator-cmod",
+   "systemId": "windows",
+   "label": "Winlator CMod",
+   "pkg": "com.winlator",
+   "argumentsTemplate": "-n com.winlator/.XServerDisplayActivity -e shortcut_path {file.path} --activity-clear-task --activity-clear-top --activity-no-history",
+   "killPackageProcesses": true
+  },
+  {
+   "id": "windows-com-cmodded-winlator-winlator-cmod-proot",
+   "systemId": "windows",
+   "label": "Winlator CMod Proot",
+   "pkg": "com.cmodded.winlator",
+   "argumentsTemplate": "-n com.cmodded.winlator/com.winlator.XServerDisplayActivity -e shortcut_path {file.path} --activity-clear-task --activity-clear-top --activity-no-history",
+   "killPackageProcesses": true
+  },
+  {
+   "id": "windows-com-micewine-emu-micewin",
+   "systemId": "windows",
+   "label": "MiceWin",
+   "pkg": "com.micewine.emu",
+   "argumentsTemplate": "-n com.micewine.emu/com.micewine.emu.activities.MainActivity -e exePath {file.path} --activity-clear-task --activity-clear-top --activity-no-history",
+   "killPackageProcesses": true
+  }
+ ]
+}

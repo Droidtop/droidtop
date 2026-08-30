@@ -295,6 +295,24 @@ private fun ConsoleSystemsScreen() {
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.fillMaxWidth().gamepadFocusable { romFoldersOpen = true }.padding(vertical = 8.dp),
                 )
+                // Real refresh of the data-driven player database (docs/
+                // SPEC.md section 7e2) -- user-driven, same as scraping.
+                var playerDbStatus by remember { mutableStateOf<String?>(null) }
+                val playerDbScope = rememberCoroutineScope()
+                Text(
+                    playerDbStatus ?: "Update player database (emulator launch presets)",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.fillMaxWidth().gamepadFocusable {
+                        playerDbStatus = "Updating player database…"
+                        playerDbScope.launch(Dispatchers.IO) {
+                            playerDbStatus = runCatching {
+                                val count = dev.droidtop.library.consoles.PlayersDatabaseUpdater.update(context)
+                                "Player database updated ($count players)"
+                            }.getOrElse { "Player database update failed: ${it.message}" }
+                        }
+                    }.padding(vertical = 8.dp),
+                )
                 // Real, matching this screen's other two rows -- this used
                 // to be a plain TextButton (Material's touch-ripple
                 // widget), the only row on this whole screen with no
