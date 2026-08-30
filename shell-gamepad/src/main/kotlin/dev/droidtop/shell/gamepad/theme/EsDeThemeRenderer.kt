@@ -17,8 +17,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,6 +61,29 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+
+/**
+ * Real ES-DE `pos`/`size`/`fontSize`/etc. fractions are of the "screen"
+ * (`Renderer::getScreenWidth/Height()`, confirmed directly against real
+ * ES-DE source, e.g. `CarouselComponent.h`'s own `itemSize` parsing:
+ * `mItemSize = itemSize * vec2(getScreenWidth(), getScreenHeight())`) --
+ * but droidtop draws its own top tab bar (Games/Apps/Settings) above the
+ * themed area, which has no real ES-DE equivalent and isn't part of any
+ * theme's own coordinate space. [EsDeThemedView]'s own `BoxWithConstraints`
+ * (its real, measured, actual-device size, already positioned below that
+ * header by its caller) IS the one true "screen" every themed element's
+ * fractions must resolve against -- provided here ONCE via
+ * [CompositionLocalProvider] rather than threaded as an explicit
+ * parameter through every nested composable (carousel/grid/textlist and
+ * their own per-item renderers included), so nothing downstream can
+ * silently fall back to a wrong reference (a hardcoded 1920x1080, or the
+ * physical device screen including the header) the way a hand-threaded
+ * optional parameter easily could. Null only outside any themed area at
+ * all (the real "no active theme" fallback call sites) -- readers fall
+ * back to the raw device screen via `LocalConfiguration` there, see
+ * [dev.droidtop.shell.gamepad.theme.themedAreaSize].
+ */
+val LocalEsDeThemedAreaSize = compositionLocalOf<androidx.compose.ui.unit.DpSize?> { null }
 
 /**
  * Renders a parsed [EsDeThemeView] as ONE coherent screen -- every
@@ -125,6 +150,9 @@ fun EsDeThemedView(
     BoxWithConstraints(modifier = modifier) {
         val viewWidth = maxWidth
         val viewHeight = maxHeight
+        CompositionLocalProvider(
+            LocalEsDeThemedAreaSize provides androidx.compose.ui.unit.DpSize(viewWidth, viewHeight),
+        ) {
         // Selected ONCE per focused-system change (remember's key is the
         // entries list itself -- structurally stable across recompositions
         // for the same system, changes when focus moves to a different
@@ -210,6 +238,7 @@ fun EsDeThemedView(
                 // gameSelector picked.
                 "gamelistinfo" -> EsDeThemedGamelistInfo(element, viewWidth, viewHeight, focusedSystemEntries)
             }
+        }
         }
     }
 }
