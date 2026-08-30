@@ -141,7 +141,7 @@ object ThemeAssets {
     /** Public read of [resolveActiveTheme]'s own name -- the real, resolved active theme, for UI display/cycling, not just the raw (possibly unset) [ThemePrefs] value. */
     fun activeThemeName(context: Context): String? = resolveActiveTheme(context)?.name
 
-    private val systemThemeCache = mutableMapOf<Triple<String, String?, Pair<String?, String?>>, EsDeTheme?>()
+    private val systemThemeCache = mutableMapOf<Triple<String, String?, Pair<String?, String?>>, EsDeTheme>()
 
     init {
         // A theme selection change -- or a theme re-downloaded/updated in
@@ -242,7 +242,11 @@ object ThemeAssets {
             Log.e("droidtop.ThemeAssets", "Failed to parse theme '${active.name}'", t)
             null
         }?.let { applyThemePatchesOverlay(context, it, systemId) }
-        systemThemeCache[cacheKey] = theme
+        // NEVER cache a failed parse -- a transient failure (mid-
+        // extraction race on first launch was the real, confirmed case)
+        // would otherwise poison this name-keyed cache for the whole
+        // process lifetime, long after the underlying files became fine.
+        if (theme != null) systemThemeCache[cacheKey] = theme
         return theme
     }
 
@@ -273,36 +277,56 @@ object ThemeAssets {
         return theme.copy(variables = overlay + theme.variables)
     }
 
+    private val extractionLock = Any()
+
     private fun extractedBundledThemeDir(context: Context, assetFolder: String): File {
         val themeDir = File(context.cacheDir, "theme_$assetFolder")
         val marker = File(themeDir, EXTRACTED_MARKER)
-        // Real, confirmed-live bug this fixes: the marker was a bare
-        // existence check, never invalidated by an APK update -- a device
-        // kept serving a STALE extraction of an old build's bundled theme
-        // forever (the real test device was carrying extractions from two
-        // dead legacy asset layouts, confirmed by listing its cache dir).
-        // The marker now stores the APK's own lastUpdateTime -- NOT
+        // The marker stores the APK's own lastUpdateTime -- NOT
         // versionCode, which this project pins at a constant 1 (see
         // app/build.gradle.kts; only versionName varies per CI run), and
         // NOT versionName either, since a dev reinstall of the same build
         // number with different assets is a real, common case here --
         // lastUpdateTime changes on every real (re)install, which is
         // exactly the "did the bundled assets possibly change" signal.
+        // (The original marker was a bare existence check, never
+        // invalidated by any update -- the real test device was carrying
+        // extractions of two long-dead legacy asset layouts.)
         val currentVersion = try {
             context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime.toString()
         } catch (t: Exception) {
             "unknown"
         }
-        val markerVersion = try {
-            if (marker.isFile) marker.readText().trim() else null
+        fun markerCurrent(): Boolean = try {
+            marker.isFile && marker.readText().trim() == currentVersion
         } catch (t: Exception) {
-            null
+            false
         }
-        if (markerVersion != currentVersion) {
+        if (markerCurrent()) return themeDir
+        // Real, confirmed-live regression this synchronized/atomic shape
+        // fixes: post-install, the first Handheld composition parses the
+        // theme WHILE extraction is still running (systemLogoPath alone
+        // calls loadActiveTheme once per carousel item, concurrently) --
+        // unsynchronized callers each saw a stale marker and wiped/
+        // re-extracted over each other, and a parse that ran against the
+        // half-extracted tree lost real content (decaffe's per-system
+        // carousel logos went missing on a real device). One lock so
+        // exactly one caller extracts while the rest wait; extraction
+        // goes into a sibling temp dir with the marker written LAST, then
+        // swaps into place with a same-filesystem rename -- a reader
+        // never sees a partial tree, only the old-complete or
+        // new-complete one.
+        synchronized(extractionLock) {
+            if (markerCurrent()) return themeDir
             try {
+                val tempDir = File(context.cacheDir, "theme_$assetFolder.extracting")
+                tempDir.deleteRecursively()
+                extractAssetDir(context, "$BUNDLED_THEMES_ASSET_ROOT/$assetFolder", tempDir)
+                File(tempDir, EXTRACTED_MARKER).writeText(currentVersion)
                 themeDir.deleteRecursively()
-                extractAssetDir(context, "$BUNDLED_THEMES_ASSET_ROOT/$assetFolder", themeDir)
-                marker.writeText(currentVersion)
+                if (!tempDir.renameTo(themeDir)) {
+                    Log.e("droidtop.ThemeAssets", "Atomic swap failed for bundled theme '$assetFolder'")
+                }
             } catch (t: Exception) {
                 Log.e("droidtop.ThemeAssets", "Failed to extract bundled theme '$assetFolder'", t)
             }
