@@ -426,6 +426,7 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
     LaunchedEffect(entry) { launchFocus.requestFocus() }
 
     var editingMetadata by remember { mutableStateOf(false) }
+    var editingCollections by remember { mutableStateOf(false) }
     val isRomEntry = entry.kind == LibraryEntryKind.CONSOLE_ROM
 
     if (editingMetadata) {
@@ -433,6 +434,14 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
             entry = entry,
             library = library,
             onDismiss = { editingMetadata = false },
+        )
+        return
+    }
+    if (editingCollections) {
+        CollectionMembershipEditor(
+            entry = entry,
+            library = library,
+            onDismiss = { editingCollections = false },
         )
         return
     }
@@ -526,6 +535,7 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
             // saveMetadata already use for a non-ROM entry.
             if (isRomEntry) {
                 ActionChip("Edit metadata", highlighted = false, onClick = { editingMetadata = true })
+                ActionChip("Collections", highlighted = false, onClick = { editingCollections = true })
             }
             ActionChip("Back", highlighted = false, onClick = onClose)
         }
@@ -784,6 +794,24 @@ private object AutoCollections {
     const val LAST_PLAYED_LIMIT = 50
 }
 
+/**
+ * Real cross-composable-tree refresh signal -- same real shape
+ * [dev.droidtop.library.theme.ThemePrefs]'s own `version` property
+ * already uses. Needed because [CollectionMembershipEditor] (create/
+ * toggle a collection) lives outside [GamesSection]'s own composable
+ * subtree (it's rendered from a sibling `detailEntry` branch in
+ * `GamepadShell` itself), so a plain `remember` inside `GamesSection`
+ * has no way to know a collection changed elsewhere.
+ */
+internal object CollectionsRefresh {
+    var version by mutableIntStateOf(0)
+        private set
+
+    fun bump() {
+        version++
+    }
+}
+
 // systemId-based grouping isn't CONSOLE_ROM-specific: PcGameProvider tags
 // its real WINE_PROFILE entries with systemId = "pc" (ES-DE's own system
 // id) specifically so they render through this same System -> Game
@@ -825,12 +853,11 @@ private fun GamesSection(
     // Real custom collections + membership, loaded once and refreshed
     // whenever collectionsVersion bumps (mirrors ThemePrefs.version's own
     // "force a real refresh, not just recomposition-by-luck" pattern) --
-    // CollectionManagerScreen bumps this after any real create/delete/
-    // rename/membership edit.
-    var collectionsVersion by remember { mutableIntStateOf(0) }
+    // CollectionMembershipEditor calls CollectionsRefresh.bump() after
+    // any real create/toggle.
     var customCollections by remember { mutableStateOf<List<dev.droidtop.library.consoles.CollectionEntity>>(emptyList()) }
     var customCollectionMembership by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
-    LaunchedEffect(collectionsVersion) {
+    LaunchedEffect(CollectionsRefresh.version) {
         customCollections = library.getCollections()
         customCollectionMembership = library.getCollectionMembership()
     }
