@@ -196,7 +196,24 @@ fun GamepadShell(
     var themeHandlesHints by remember { mutableStateOf(false) }
     var detailEntry by remember { mutableStateOf<LibraryEntry?>(null) }
     val scope = rememberCoroutineScope()
-    val onLaunch: (LibraryEntry) -> Unit = { entry -> scope.launch { library.launch(entry) } }
+    // Real user-visible launch-failure state -- see launchError's render
+    // site. A failed launch must inform, never kill.
+    var launchError by remember { mutableStateOf<String?>(null) }
+    // Never-crash boundary: a launch failure (bad emulator preset, missing
+    // app, malformed template) must NEVER kill the shell -- confirmed
+    // live: the first real on-device game launch threw from a preset's
+    // bad boolean extra and took the whole app down to its crash-recovery
+    // screen. The error surfaces to the user instead.
+    val onLaunch: (LibraryEntry) -> Unit = { entry ->
+        scope.launch {
+            launchError = null
+            runCatching { library.launch(entry) }
+                .onFailure {
+                    android.util.Log.e("droidtop.GamepadShell", "Launching ${entry.title} failed", it)
+                    launchError = "Couldn't launch ${entry.title}: ${it.message}"
+                }
+        }
+    }
     val tabBarFocus = remember { FocusRequester() }
 
     // The extra .filter is real, not redundant: Library.scanKinds(Progressive)
@@ -290,6 +307,23 @@ fun GamepadShell(
             },
     ) {
         SectionTabBar(current = section, onSelect = selectSection, currentTabFocus = tabBarFocus)
+        // Launch-failure banner (see onLaunch's crash boundary): visible,
+        // dismisses itself after a few seconds, never blocks input.
+        launchError?.let { message ->
+            LaunchedEffect(message) {
+                kotlinx.coroutines.delay(6000)
+                if (launchError == message) launchError = null
+            }
+            Text(
+                message,
+                color = Color(0xFFFFB4AB),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xCC330E0B))
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
         Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
             val entry = detailEntry
             when {

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -243,6 +244,8 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
 
                 OnboardingStep.DEFAULT_MODE_CHOICE -> DefaultModeChoiceStep(
                     homeImplementation = HomeRolePrefs.activeHomeImplementation(context),
+                    desktopConfigured = configureDesktop,
+                    handheldConfigured = configureHandheld,
                     onPicked = { mode ->
                         ModePrefs.setLastMode(context, mode)
                         finishOnboarding()
@@ -424,7 +427,12 @@ private fun DesktopSetupStep(onContinue: () -> Unit) {
         )
     }
     Text("Which distro + compositor should droidtop use?", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-    LazyColumn(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+    // heightIn cap: an unconstrained LazyColumn inside the step Column
+    // consumed ALL remaining height, pushing Continue/Skip off-screen
+    // with no way to scroll to them -- confirmed live on-device (the
+    // step was un-completable). Capped, a short list wraps tight and a
+    // long one scrolls internally; the buttons always stay on screen.
+    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp).padding(vertical = 8.dp)) {
         items(repositories) { repo ->
             Box(modifier = Modifier.fillMaxWidth().clickable { selectedId = repo.id }) {
                 androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
@@ -496,10 +504,29 @@ private fun GamesFoldersStep(
     }
     Button(onClick = onAddFolder) { Text(if (roots.isEmpty()) "Add a folder" else "Add another folder") }
     TextButton(onClick = onDone) { Text(if (roots.isEmpty()) "Skip for now" else "Done") }
+    Text(
+        "Handheld's whole look is themeable (real ES-DE themes, bundled " +
+            "and downloadable) -- pick one any time in Settings > Handheld.",
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.bodySmall,
+    )
 }
 
+/**
+ * Only modes the user actually configured this run are offered — picking
+ * an unconfigured Desktop/Handheld as the default landed straight in that
+ * mode's failure/empty screen after onboarding (a real dead end the
+ * coherence review flagged). When nothing was configured at all, the one
+ * honest option is Handheld (it works unconfigured, showing its own
+ * empty-library guidance), labeled as such.
+ */
 @Composable
-private fun DefaultModeChoiceStep(homeImplementation: HomeRolePrefs.HomeImplementation, onPicked: (String) -> Unit) {
+private fun DefaultModeChoiceStep(
+    homeImplementation: HomeRolePrefs.HomeImplementation,
+    desktopConfigured: Boolean,
+    handheldConfigured: Boolean,
+    onPicked: (String) -> Unit,
+) {
     Text("Which should droidtop open into?", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineSmall)
     Text(
         "This is what happens when you launch droidtop -- everything else " +
@@ -507,9 +534,16 @@ private fun DefaultModeChoiceStep(homeImplementation: HomeRolePrefs.HomeImplemen
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodyMedium,
     )
+    val anyConfigured = homeImplementation != HomeRolePrefs.HomeImplementation.NONE || desktopConfigured || handheldConfigured
     if (homeImplementation != HomeRolePrefs.HomeImplementation.NONE) {
         Button(onClick = { onPicked(BackButtonMenu.MODE_STANDARD) }) { Text("My home screen") }
     }
-    Button(onClick = { onPicked(BackButtonMenu.MODE_DESKTOP) }) { Text("Desktop") }
-    Button(onClick = { onPicked(BackButtonMenu.MODE_HANDHELD) }) { Text("Handheld") }
+    if (desktopConfigured) {
+        Button(onClick = { onPicked(BackButtonMenu.MODE_DESKTOP) }) { Text("Desktop") }
+    }
+    if (handheldConfigured || !anyConfigured) {
+        Button(onClick = { onPicked(BackButtonMenu.MODE_HANDHELD) }) {
+            Text(if (handheldConfigured) "Handheld" else "Handheld (set up later in Settings)")
+        }
+    }
 }
