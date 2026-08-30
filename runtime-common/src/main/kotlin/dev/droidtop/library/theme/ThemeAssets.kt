@@ -371,8 +371,22 @@ object ThemeAssets {
     fun systemLogoPath(context: Context, systemId: String): String? {
         val theme = loadActiveTheme(context, systemId) ?: return null
         val listElement = theme.views["system"]?.primaryListElement() ?: return null
-        val path = listElement.valueOrNull<EsDeThemeValue.Path>("staticImage")
-            ?: listElement.valueOrNull<EsDeThemeValue.Path>("path")
-        return path?.resolved
+        // Real CarouselComponent::addEntry fallback chain, transcribed:
+        // the per-system item image IF its file exists, else the
+        // carousel's own declared `defaultImage` IF its file exists (Art
+        // Book Next really ships `_default.png` exactly for systems it
+        // has no art for), else null -- which the item renderer turns
+        // into real ES-DE's own text-label fallback. The existence checks
+        // are load-bearing: real ES-DE's parser keeps a PATH property
+        // even when the file is missing (ThemeData.cpp:2323-2377 only
+        // logs), so a theme's `staticImage` template resolves to a real
+        // path for EVERY system -- systems the theme has no art for got a
+        // dead path here and rendered as a blank carousel item instead of
+        // falling through (confirmed live: Art Book Next's black items).
+        return listOfNotNull(
+            listElement.valueOrNull<EsDeThemeValue.Path>("staticImage")?.resolved,
+            listElement.valueOrNull<EsDeThemeValue.Path>("path")?.resolved,
+            listElement.valueOrNull<EsDeThemeValue.Path>("defaultImage")?.resolved,
+        ).firstOrNull { File(it).exists() }
     }
 }
