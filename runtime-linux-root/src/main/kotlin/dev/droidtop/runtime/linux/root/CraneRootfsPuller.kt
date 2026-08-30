@@ -63,12 +63,25 @@ class CraneRootfsPuller(private val context: Context) : RootfsPuller {
                 "crane export failed for ${image.reference}@$digest: ${pullResult.stderr}"
             }
             if (policy.enabled) {
-                cache.put(digest, scratchPath)
+                cache.put(digest, scratchPath, label = image.reference)
                 cache.get(digest) ?: error("ImageCache.put($digest, ...) didn't make it available via get()")
             } else {
                 scratchPath
             }
         }
+
+        // Idempotence + no image mixing: a destination already extracted
+        // from THIS digest is left alone (fast session restarts); one
+        // holding anything else — a different image, or a partial/failed
+        // earlier attempt (the real first-run case: an alpine:2.6 rootfs
+        // left behind by a failed create) — is wiped first, since tar
+        // over an existing tree silently merges two images into one
+        // broken rootfs. The marker is written LAST, so a wipe-then-fail
+        // never leaves a tree claiming to be complete.
+        val digestMarker = "$destinationPath/.droidtop-image-digest"
+        val existing = RootProcess.run("cat", digestMarker)
+        if (existing.succeeded && existing.stdout.trim() == digest) return
+        RootProcess.run("rm", "-rf", destinationPath)
 
         val mkdirResult = RootProcess.run("mkdir", "-p", destinationPath)
         check(mkdirResult.succeeded) { "mkdir -p $destinationPath failed: ${mkdirResult.stderr}" }
@@ -77,6 +90,8 @@ class CraneRootfsPuller(private val context: Context) : RootfsPuller {
         check(extractResult.succeeded) {
             "Extracting $tarPath into $destinationPath failed: ${extractResult.stderr}"
         }
+        val markResult = RootProcess.run("sh", "-c", "printf %s '$digest' > '$digestMarker'")
+        check(markResult.succeeded) { "Writing $digestMarker failed: ${markResult.stderr}" }
 
         if (!policy.enabled) {
             File(tarPath).delete()
