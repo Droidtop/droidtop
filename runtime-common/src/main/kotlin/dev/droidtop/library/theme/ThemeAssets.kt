@@ -237,6 +237,11 @@ object ThemeAssets {
                 screenAspectRatio = screenAspectRatio,
                 deviceLocale = deviceLocale,
                 systemFullName = systemFullName,
+                // capabilities.xml lives at the THEME ROOT even when the
+                // parsed file is a collection's subfolder theme.xml --
+                // see parseWithCapabilities' own parameter comment for
+                // the confirmed-live collection-logo bug this fixes.
+                themeRootDir = themeDir,
             )
         } catch (t: Exception) {
             Log.e("droidtop.ThemeAssets", "Failed to parse theme '${active.name}'", t)
