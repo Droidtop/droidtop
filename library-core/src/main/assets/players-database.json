@@ -2618,14 +2618,6 @@
    "killPackageProcesses": false
   },
   {
-   "id": "daijishou-switch-com-mihoyo-yuanshen",
-   "systemId": "switch",
-   "label": "switch - eden (Legacy/Optimized)",
-   "pkg": "com.miHoYo.Yuanshen",
-   "argumentsTemplate": "-n com.miHoYo.Yuanshen/org.yuzu.yuzu_emu.activities.EmulationActivity -a android.nfc.action.TECH_DISCOVERED -d {file.uri}",
-   "killPackageProcesses": false
-  },
-  {
    "id": "daijishou-switch-org-sudachi-sudachi-emu",
    "systemId": "switch",
    "label": "switch - Sudachi (Mainline)",
@@ -3703,6 +3695,14 @@
    "label": "GameHub Lite Local (Standalone)",
    "pkg": "emuready.gamehub.lite",
    "argumentsTemplate": "-n emuready.gamehub.lite/com.xj.landscape.launcher.ui.gamedetail.GameDetailActivity -a gamehub.lite.LAUNCH_GAME --ez autoStartGame true -e localGameId {file.inject:{file.path}}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "switch-dev-legacy-eden-emulator",
+   "systemId": "switch",
+   "label": "eden (Legacy/Optimized)",
+   "pkg": "dev.legacy.eden_emulator",
+   "argumentsTemplate": "-n dev.legacy.eden_emulator/org.yuzu.yuzu_emu.activities.EmulationActivity -a android.nfc.action.TECH_DISCOVERED -d {file.uri}",
    "killPackageProcesses": false
   }
  ]

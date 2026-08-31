@@ -28,6 +28,13 @@ data class ScreenScraperGameMetadata(
     val releaseDate: String?,
     val rating: Float?,
     val players: String?,
+    /**
+     * ScreenScraper's own digest for the matched ROM (`<rom><rommd5>`).
+     * Comparing it against the local file's digest is real ES-DE's
+     * entire automatic-mode confidence check: identical means what its
+     * own log calls a "perfect match".
+     */
+    val romMd5: String?,
 )
 
 /**
@@ -106,6 +113,7 @@ object ScreenScraperClient {
         userPassword: String = "",
         region: String = "wor",
         language: String = "en",
+        md5: String = "",
     ): ScreenScraperGameMetadata? {
         val url = URL(
             "https://www.screenscraper.fr/api2/jeuInfos.php?" +
@@ -117,7 +125,12 @@ object ScreenScraperClient {
                 "&output=xml" +
                 "&systemeid=$systemeId" +
                 "&romnom=${URLEncoder.encode(romName, "UTF-8")}" +
-                "&romtaille=$romSizeBytes",
+                // Fidelity fix from re-reading ES-DE's real URL builder:
+                // it sends romtaille ONLY together with md5 (the pair is
+                // what the server verifies against its dump database).
+                // Sending size alone risked mismatch rejections whenever
+                // a local file's size drifts from the reference dump.
+                (if (md5.isNotBlank()) "&md5=$md5&romtaille=$romSizeBytes" else ""),
         )
         val connection = (url.openConnection() as HttpURLConnection).apply { requestMethod = "GET" }
         if (connection.responseCode != 200) return null
@@ -154,6 +167,7 @@ object ScreenScraperClient {
         var players: String? = null
         var noteRaw: String? = null
         var coverUrl: String? = null
+        var romMd5: String? = null
         var foundJeu = false
 
         var event = parser.eventType
@@ -187,6 +201,9 @@ object ScreenScraperClient {
                     "editeur" -> if (foundJeu) publisher = readElementText(parser).ifBlank { null }
                     "joueurs" -> if (foundJeu) players = readElementText(parser).ifBlank { null }
                     "note" -> if (foundJeu) noteRaw = readElementText(parser).ifBlank { null }
+                    "rommd5" -> if (foundJeu) {
+                        romMd5 = readElementText(parser).lowercase().ifBlank { null }
+                    }
                     "media" -> if (foundJeu && parser.getAttributeValue(null, "type") == "box-2D") {
                         coverUrl = readElementText(parser).ifBlank { null }
                     }
@@ -228,6 +245,7 @@ object ScreenScraperClient {
             releaseDate = releaseDateRaw?.let { parseReleaseDate(it) },
             rating = rating,
             players = players,
+            romMd5 = romMd5,
         )
     }
 
