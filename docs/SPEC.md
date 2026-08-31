@@ -568,6 +568,30 @@ not settled designs):
   1080×1920 native per DRM) but can come up in a 480×640 fallback mode
   until power-cycled — detect and surface that state rather than
   silently running at fallback resolution.
+- **On-screen controller (directed 2026-08-30)**: when no physical
+  gamepad is detected (`InputDevice` scan for SOURCE_GAMEPAD/JOYSTICK —
+  dual-screen phones and foldables running droidtop's surfaces on both
+  halves are real targets, not just the Retroid + addon), the companion
+  display offers a VIRTUAL controller as one of its roles, feeding the
+  same GamepadKeyMap/GamepadAction layer physical pads use. Not built
+  from scratch AND not ported: vendor/gamenative's
+  `com.winlator.inputcontrols` (a complete, real touch-controls/
+  virtual-gamepad implementation) is already vendored and compiled into
+  droidtop's build — hook those classes directly in-process (per
+  direction), extending what runtime-windows compiles only if a needed
+  class isn't in the set yet. User-toggleable; auto-offered only when
+  no controller is present.
+- **Companion surface is user-populatable (directed 2026-08-30, second
+  live addon session)**: the widgets/info screen (CompanionActivity on
+  whichever display the shell is not on) is not just droidtop's ambient
+  readout — the user populates it: real Android app WIDGETS (an
+  `AppWidgetHost`, the same mechanism every launcher uses — music
+  controls, calendars, whatever's installed) laid over droidtop's own
+  focused-game/info backdrop, plus resizable/floating apps (launched to
+  that display via the same launch-display targeting; freeform
+  windowing per §2a's native-apps plan). Widget layout persists
+  per-display-role. droidtop's info stays the BACKGROUND layer; user
+  content composites above it.
 - **Display reinit + parked displays (directed 2026-08-30)**: Android
   silently MIRRORS a second display nothing presents on (confirmed live
   on the addon) — droidtop's answer is that some droidtop surface owns

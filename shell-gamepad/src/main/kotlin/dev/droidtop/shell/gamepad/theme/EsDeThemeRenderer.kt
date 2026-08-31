@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -340,13 +341,36 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         } else {
             Brush.verticalGradient(listOf(startColor, endColor))
         }
-        Box(
-            modifier = Modifier
-                .absoluteOffset(x = offsetX, y = offsetY)
-                .size(width = width, height = height)
-                .graphicsLayer { alpha = opacity }
-                .background(brush),
-        )
+        // Real ES-DE semantics (ImageComponent setColorShift/-End): the
+        // gradient is a color SHIFT ACROSS THE ELEMENT'S OWN IMAGE — a
+        // per-vertex multiply of the gradient into the texture — not a
+        // replacement for it. The previous approximation dropped the
+        // image entirely and drew a flat gradient box, which erased
+        // DEcaffe's decorative side-band art (background.png tinted by
+        // the scheme's bgColor gradient): the bands rendered as plain
+        // dark boxes instead of art. Compose equivalent: draw the image,
+        // then modulate the gradient over the drawn content. Elements
+        // with a gradient but NO existing image file keep the flat
+        // gradient box (that is what they really are).
+        val gradientImagePath = element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved
+            ?.takeIf { File(it).exists() }
+        val gradientModifier = Modifier
+            .absoluteOffset(x = offsetX, y = offsetY)
+            .size(width = width, height = height)
+            .graphicsLayer { alpha = opacity }
+        if (gradientImagePath != null) {
+            AsyncImage(
+                model = gradientImagePath,
+                contentDescription = null,
+                contentScale = ContentScale.FillBounds,
+                modifier = gradientModifier.drawWithContent {
+                    drawContent()
+                    drawRect(brush = brush, blendMode = BlendMode.Modulate)
+                },
+            )
+        } else {
+            Box(modifier = gradientModifier.background(brush))
+        }
         return
     }
 
