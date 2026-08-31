@@ -917,7 +917,9 @@ object AppSettingsCatalogs {
     private fun scraperScreen() = CatalogScreen(
         id = SCREEN_SCRAPER,
         title = "Artwork & metadata scraper",
-        subtitle = "One source at a time, exactly like real ES-DE. ScreenScraper works anonymously with everything blank; an account (free at screenscraper.fr) raises your rate limit. TheGamesDB needs its own free API key",
+        subtitle = "One source at a time, exactly like real ES-DE. ScreenScraper needs at least a dev ID " +
+            "(or the debug credentials file); TheGamesDB needs its own free API key. Without either, " +
+            "only the keyless libretro boxart fallback fills anything",
         groups = { context ->
             listOf(
                 CatalogGroup(
@@ -933,6 +935,40 @@ object AppSettingsCatalogs {
                             ),
                             current = ScraperSourcePrefs.get(context).name,
                             onSelect = { ctx, value -> ScraperSourcePrefs.set(ctx, ScraperSource.valueOf(value)) },
+                        ),
+                    ),
+                ),
+                CatalogGroup(
+                    id = "scraper_options",
+                    title = "Scrape options",
+                    items = listOf(
+                        ChoiceItem(
+                            id = "scrape_filter",
+                            title = "Scrape these games",
+                            options = dev.droidtop.library.scraper.ScrapeFilter.entries.map {
+                                ChoiceOption(it.name, it.label)
+                            },
+                            current = dev.droidtop.library.scraper.ScrapeOptionsPrefs.filter(context).name,
+                            onSelect = { ctx, value ->
+                                dev.droidtop.library.scraper.ScrapeOptionsPrefs.setFilter(
+                                    ctx,
+                                    dev.droidtop.library.scraper.ScrapeFilter.valueOf(value),
+                                )
+                            },
+                        ),
+                        ToggleItem(
+                            id = "scrape_content_metadata",
+                            title = "Fetch game details",
+                            subtitle = "Descriptions, developer, publisher, genre, release date, rating, players",
+                            current = dev.droidtop.library.scraper.ScrapeOptionsPrefs.scrapeMetadata(context),
+                            onToggle = { ctx, value -> dev.droidtop.library.scraper.ScrapeOptionsPrefs.setScrapeMetadata(ctx, value) },
+                        ),
+                        ToggleItem(
+                            id = "scrape_content_artwork",
+                            title = "Fetch box art",
+                            subtitle = "Cover images, including the keyless libretro fallback",
+                            current = dev.droidtop.library.scraper.ScrapeOptionsPrefs.scrapeArtwork(context),
+                            onToggle = { ctx, value -> dev.droidtop.library.scraper.ScrapeOptionsPrefs.setScrapeArtwork(ctx, value) },
                         ),
                     ),
                 ),
