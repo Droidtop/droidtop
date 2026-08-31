@@ -19,7 +19,9 @@ import java.net.URLEncoder
  * consults this when the selected source returned no cover).
  *
  * Naming rules are libretro's own, applied by RetroArch when saving
- * playlists: the characters `&*/:`<>?\|"` in a display name become `_`,
+ * playlists: the characters ampersand, asterisk, slash, colon, backtick,
+ * angle brackets, question mark, backslash, pipe, and double quote in a
+ * display name each become an underscore (see FORBIDDEN below),
  * and the file is `<name>.png` under the system's playlist-name
  * directory. The system map below covers droidtop's common systems with
  * their real playlist names; a system not listed simply returns null
