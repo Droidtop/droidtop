@@ -28,6 +28,7 @@ object HandheldSettingsCatalog {
     const val ID_DEFAULT_SECTION = "pref_handheld_default_section"
     const val ID_SHOW_HINTS = "pref_handheld_show_hints"
     const val ID_CONSOLE_SYSTEMS = "pref_handheld_console_systems"
+    const val ID_WINDOWS_GAMES = "pref_handheld_windows_games"
     const val ID_GAME_FOLDERS = "pref_handheld_game_folders"
     const val ID_DISPLAY_SHELL_TARGET = "pref_display_shell_target"
     const val ID_DISPLAY_GAME_LAUNCH_TARGET = "pref_display_game_launch_target"
@@ -87,6 +88,17 @@ object HandheldSettingsCatalog {
                         title = "Game folders",
                         subtitle = "Add or remove the folders droidtop scans for games",
                         registryId = "rom_folders",
+                    ),
+                )
+                add(
+                    NestedScreenItem(
+                        id = ID_WINDOWS_GAMES,
+                        title = "Windows games",
+                        // This is the destination launchWindows's own
+                        // "isn't set up yet" error names, so the title
+                        // there and here must stay in step.
+                        subtitle = "Set up the Wine environment Windows games run inside",
+                        registryId = "windows_games",
                     ),
                 )
                 add(displayShellTargetItem(context))
