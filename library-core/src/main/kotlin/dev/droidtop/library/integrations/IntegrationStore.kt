@@ -92,12 +92,14 @@ object IntegrationStore {
             systemFolder = systemFolder,
             query = query,
         )
-        // The destination folder doubles as the {file.path} the converter
-        // needs for its own URI handling: for ACQUIRE_CONTENT that is
-        // exactly the right file to grant the other app access to, since
-        // it is where the result is meant to land.
-        val anchor = systemFolder?.absolutePath ?: context.filesDir.absolutePath
-        LaunchDisplay.start(context, AmStartCommandToIntentConverter.toIntent(context, expanded, anchor))
+        // Passed as the converter's file anchor only when there genuinely
+        // is one, so a template that references {file.uri} for the
+        // destination folder still works, and one that doesn't is never
+        // made to invent a file it has no use for.
+        LaunchDisplay.start(
+            context,
+            AmStartCommandToIntentConverter.toIntent(context, expanded, systemFolder?.absolutePath),
+        )
     }
 
     /**

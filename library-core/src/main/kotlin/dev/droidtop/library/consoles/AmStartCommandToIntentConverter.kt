@@ -27,7 +27,7 @@ import java.io.File
 object AmStartCommandToIntentConverter {
     class UnsupportedArgumentException(argument: String) : IllegalArgumentException("Unsupported am start argument: $argument")
 
-    fun toIntent(context: Context, argumentsTemplate: String, filePath: String): Intent {
+    fun toIntent(context: Context, argumentsTemplate: String, filePath: String?): Intent {
         // Real, second placeholder alongside {file.path} -- roughly half of
         // the real presets pulled from Daijishō's own wiki (KnownPlayers.kt)
         // specifically need a file:// URI, not a bare path string (several
@@ -44,16 +44,26 @@ object AmStartCommandToIntentConverter {
         // targeting a real Android version already understands via
         // ACTION_VIEW, plus FLAG_GRANT_READ_URI_PERMISSION on the resulting
         // Intent so the receiving app can actually read it.
-        val fileUri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            File(filePath),
-        )
         val usesFileUri = argumentsTemplate.contains("{file.uri}")
+        val usesFilePath = argumentsTemplate.contains("{file.path}")
+        if ((usesFileUri || usesFilePath) && filePath == null) {
+            throw IllegalArgumentException(
+                "This command references {file.uri}/{file.path} but no file was supplied.",
+            )
+        }
+        // Computed only when the template actually asks for it. Not just
+        // an efficiency point: callers that have no file at all (an app
+        // integration handed a destination folder, say) must not be made
+        // to invent one purely to satisfy a URI nobody referenced.
+        val fileUri = if (usesFileUri) {
+            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(filePath!!))
+        } else {
+            null
+        }
         val tokens = ArrayDeque(
             argumentsTemplate
-                .replace("{file.path}", filePath)
-                .replace("{file.uri}", fileUri.toString())
+                .let { if (filePath != null) it.replace("{file.path}", filePath) else it }
+                .let { if (fileUri != null) it.replace("{file.uri}", fileUri.toString()) else it }
                 .split(Regex("[\\n\\s]+"))
                 .filter { it.isNotEmpty() },
         )
@@ -133,7 +143,7 @@ object AmStartCommandToIntentConverter {
         // and open it later from a context the Intent grant no longer
         // reaches. The grant is read-only and Android revokes it when the
         // receiving task dies.
-        if (usesFileUri) {
+        if (fileUri != null) {
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             intent.clipData = android.content.ClipData.newRawUri(null, fileUri)
             val targetPackage = intent.component?.packageName ?: intent.getPackage()
