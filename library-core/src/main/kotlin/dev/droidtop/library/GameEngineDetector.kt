@@ -388,12 +388,19 @@ private fun GameEngine.toLibraryEntryKind(): LibraryEntryKind = when (this) {
  */
 class EngineGameProvider(
     private val context: Context,
+    // Extra scan roots beyond the user's own games folders: the app
+    // layer passes store install directories (Steam's steamapps/common
+    // dirs) so a store-installed engine game flows through the SAME
+    // detection, grouping, and launch-strategy resolution as any other
+    // engine game, enginehost included. A supplier because the set is
+    // live: the install location can change between scans.
+    private val extraRoots: () -> List<File> = { emptyList() },
 ) : LibraryProvider {
     override val kinds: Set<LibraryEntryKind> = GameEngine.entries.map { it.toLibraryEntryKind() }.toSet()
 
     override suspend fun scan(): List<LibraryEntry> {
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
-        return GamesRoots.current(context).flatMap { root ->
+        return (GamesRoots.current(context) + extraRoots()).distinct().flatMap { root ->
             GameEngineDetector.scan(root, systemsById).map { detected ->
                 LibraryEntry(
                     id = detected.displayFolder.absolutePath,
