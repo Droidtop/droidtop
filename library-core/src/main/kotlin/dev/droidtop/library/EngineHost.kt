@@ -29,6 +29,23 @@ import java.io.File
  */
 object EngineHost {
     const val PACKAGE_NAME = "dev.enginehost"
+
+    /**
+     * The contract's config-creator action (Codex response 2026-08-31,
+     * accepted+implemented): enginehost scans the supplied directory,
+     * lets the user repair or complete detection IN ITS OWN UI, and
+     * writes `<path>/enginehost.json` after validation. This is the
+     * contract's designed flow for a version droidtop cannot determine
+     * -- their own guidance for RPG Maker 2000/2003 and KiriKiri2 is
+     * "leave unknown and open CONFIGURE", never fabricate.
+     */
+    const val ACTION_CONFIGURE = "dev.enginehost.CONFIGURE"
+
+    /** Global enginehost settings (2026-08-31 10:55 response) -- the emulator's own settings screen, surfaced like any player's. */
+    const val ACTION_CONFIGURE_SETTINGS = "dev.enginehost.CONFIGURE_SETTINGS"
+
+    /** Narrower saves-only alias of [ACTION_CONFIGURE_SETTINGS]; kept for surfaces that want to deep-link saves directly. */
+    const val ACTION_CONFIGURE_SAVES = "dev.enginehost.CONFIGURE_SAVES"
     private const val ACTION_LAUNCH = "dev.enginehost.LAUNCH"
 
     /**
@@ -89,6 +106,28 @@ object EngineHost {
         context.packageManager.resolveActivity(launchIntent(), PackageManager.MATCH_DEFAULT_ONLY) != null
 
     /**
+     * The config-creator intent for [gameFolder], with what droidtop DID
+     * determine prefilled -- the contract says caller facts fill absent
+     * fields and never override the folder's own document, so a partial
+     * prefill (family without version, say) is exactly what the action
+     * is for.
+     */
+    fun configureIntent(gameFolder: File, target: EnginehostTarget?): Intent =
+        Intent(ACTION_CONFIGURE).setPackage(PACKAGE_NAME).apply {
+            putExtra("path", gameFolder.absolutePath)
+            if (target != null) {
+                putExtra("config", target.toConfigJson(engineVersion = null).toString())
+            }
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+    fun settingsIntent(): Intent =
+        Intent(ACTION_CONFIGURE_SETTINGS).setPackage(PACKAGE_NAME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    fun savesSettingsIntent(): Intent =
+        Intent(ACTION_CONFIGURE_SAVES).setPackage(PACKAGE_NAME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /**
      * Fires the real `dev.enginehost.LAUNCH` contract for [gameFolder].
      *
      * [target] carries only enginehost's own family/context vocabulary
@@ -121,11 +160,19 @@ object EngineHost {
             // that the caller does not grant its UID by passing a URI.
             putExtra("path", gameFolder.absolutePath)
             if (!hasOwnConfig) {
-                checkNotNull(engineVersion) {
-                    "No engineVersion known for ${gameFolder.absolutePath} -- add an " +
-                        "enginehost.json to that folder, or set a per-folder override " +
-                        "(EngineVersionOverridePrefs.set). Guessing one is a contract " +
-                        "violation: enginehost matches versions exactly, never by closeness."
+                if (engineVersion == null) {
+                    // The contract's own flow for an undetectable
+                    // version: open enginehost's CONFIGURE screen (with
+                    // what droidtop DID determine prefilled) so the user
+                    // completes detection in the emulator's own UI and
+                    // it writes the folder's authoritative
+                    // enginehost.json -- after which every future launch
+                    // is a plain LAUNCH. This replaced a hard error:
+                    // "add an enginehost.json by hand" was droidtop
+                    // refusing to use the mechanism built for exactly
+                    // this case.
+                    LaunchDisplay.start(context, configureIntent(gameFolder, target))
+                    return
                 }
                 putExtra("config", target.toConfigJson(engineVersion).toString())
                 // Confident = we know the exact compatibility line AND the
@@ -163,9 +210,16 @@ data class EnginehostTarget(
      */
     val runtimeRequirements: Map<String, String> = emptyMap(),
 ) {
-    fun toConfigJson(engineVersion: String): JSONObject = JSONObject().apply {
+    /**
+     * [engineVersion] nullable for the CONFIGURE prefill case: the
+     * contract's config creator accepts partial caller facts (family
+     * without version) and fills the rest through its own scan+UI.
+     * LAUNCH-path callers still always pass a real version -- the
+     * null-version launch path routes to CONFIGURE instead of here.
+     */
+    fun toConfigJson(engineVersion: String?): JSONObject = JSONObject().apply {
         put("engine", engine)
-        put("engineVersion", engineVersion)
+        engineVersion?.let { put("engineVersion", it) }
         engineContext?.let { put("engineContext", it) }
         if (runtimeRequirements.isNotEmpty()) {
             put("runtimeRequirements", JSONObject(runtimeRequirements.toMap()))
