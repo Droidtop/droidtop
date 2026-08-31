@@ -23,7 +23,7 @@ import android.content.Context
  */
 object PlatformDatabaseSource {
     const val DEFAULT_BASE_URL =
-        "https://raw.githubusercontent.com/bi0shacker001/droidtop-platforms/main"
+        "https://raw.githubusercontent.com/droidtop/droidtop-platforms/main"
 
     private const val PREFS_NAME = "com.android.launcher3.prefs"
     const val KEY_BASE_URL = "pref_platform_database_base_url"
