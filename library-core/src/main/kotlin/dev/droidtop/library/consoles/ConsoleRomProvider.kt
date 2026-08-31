@@ -8,8 +8,8 @@ import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
 import dev.droidtop.library.romdetect.LibretroDatabase
-import dev.droidtop.library.romdetect.SerialScanner
 import dev.droidtop.library.romdetect.PlayStationDiscType
+import dev.droidtop.library.romdetect.SerialScanner
 import dev.droidtop.library.romdetect.SystemID
 import dev.droidtop.library.romdetect.toConsoleSystemId
 import kotlinx.coroutines.async
