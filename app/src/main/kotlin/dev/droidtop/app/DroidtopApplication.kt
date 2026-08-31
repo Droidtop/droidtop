@@ -31,6 +31,15 @@ import com.android.launcher3.LauncherApplication
  * (see AndroidManifest.xml) so this subclass wins over the plain
  * `LauncherApplication` declaration merged in from that module.
  */
+// Also the app's Hilt application: the vendored gamenative tree's
+// activities are @AndroidEntryPoint and need the object graph rooted
+// here. Hilt's bytecode transform works over any base class, so
+// extending LauncherApplication is not a conflict. gamenative's own
+// PluviaApp bootstrap (Steam service, power manager, event dispatcher)
+// is deliberately NOT invoked yet -- that wiring is increment 2 of the
+// full-gamenative work, done deliberately rather than by inheriting an
+// onCreate written for a different app's lifecycle.
+@dagger.hilt.android.HiltAndroidApp
 class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory {
     override fun newImageLoader(context: PlatformContext): ImageLoader {
         return ImageLoader.Builder(context)
