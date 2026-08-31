@@ -38,6 +38,16 @@ data class SystemStatusSnapshot(
     val network: NetworkKind,
     /** 0..4 when on Wi-Fi and readable; null otherwise. */
     val wifiLevel: Int?,
+    /**
+     * Whether the connection actually reaches the internet
+     * (NET_CAPABILITY_VALIDATED) -- "connected to Wi-Fi" and "has
+     * internet" are different facts, and the gap between them is the
+     * captive portal every travelling handheld meets. False while
+     * connected means exactly "signed-in Wi-Fi without internet".
+     */
+    val validated: Boolean,
+    /** A VPN is active on the current network (TRANSPORT_VPN). */
+    val vpnActive: Boolean,
 )
 
 enum class NetworkKind { WIFI, ETHERNET, CELLULAR, NONE }
@@ -55,6 +65,8 @@ object SystemStatus {
 
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
         val caps = cm?.getNetworkCapabilities(cm.activeNetwork)
+        val validated = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
+        val vpnActive = caps?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
         val kind = when {
             caps == null -> NetworkKind.NONE
             caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> NetworkKind.WIFI
@@ -75,7 +87,7 @@ object SystemStatus {
             }.getOrNull()
         } else null
 
-        return SystemStatusSnapshot(percent, charging, kind, wifiLevel)
+        return SystemStatusSnapshot(percent, charging, kind, wifiLevel, validated, vpnActive)
     }
 
     /**

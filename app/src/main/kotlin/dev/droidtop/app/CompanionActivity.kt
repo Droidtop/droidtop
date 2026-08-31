@@ -262,8 +262,15 @@ internal fun statusLine(status: dev.droidtop.runtime.systemstatus.SystemStatusSn
         dev.droidtop.runtime.systemstatus.NetworkKind.CELLULAR -> "Mobile data"
         dev.droidtop.runtime.systemstatus.NetworkKind.NONE -> "Offline"
     }
+    // Validation is the first-class fact: connected-without-internet is
+    // the captive-portal state a handheld must SAY, not hide behind a
+    // healthy-looking Wi-Fi glyph.
+    val noInternet = if (status.network != dev.droidtop.runtime.systemstatus.NetworkKind.NONE && !status.validated) {
+        "(no internet)"
+    } else ""
+    val vpn = if (status.vpnActive) "VPN" else ""
     val battery = status.batteryPercent?.let { "$it%" + if (status.charging) " \u26A1" else "" } ?: ""
-    return listOf(network, battery).filter { it.isNotEmpty() }.joinToString("   ")
+    return listOf(network, noInternet, vpn, battery).filter { it.isNotEmpty() }.joinToString("   ")
 }
 
 @androidx.compose.runtime.Composable
