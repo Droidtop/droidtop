@@ -86,7 +86,39 @@ android {
         getByName("main") {
             java.srcDir("../vendor/gamenative/app/src/main/java/com/winlator")
             res.srcDir("../vendor/gamenative/app/src/main/res")
+            // The forked com.winlator tree reads real assets by name --
+            // common_dlls.json the moment a container is created, then
+            // gpu_cards.json, wincomponents/wincomponents.json,
+            // wine_startmenu.json, redirect.tzst and the box86_64/
+            // fexcore/wowbox64 translator payloads. None of them shipped
+            // before this, which is the actual reason no Wine container
+            // could ever be created: extractContainerPatternFile fails on
+            // the first missing file.
+            assets.srcDir("../vendor/gamenative/app/src/main/assets")
         }
+    }
+
+    androidResources {
+        // Excluding, not including, on purpose: if upstream adds a file
+        // this bundles it (wasteful, harmless), whereas an include list
+        // would silently drop something needed and fail at runtime.
+        //
+        //   dxwrapper       29 MB, and every entry in
+        //                   dxwrapper_download.json resolves to
+        //                   downloads.gamenative.app -- it is fetched on
+        //                   demand, so bundling it buys nothing.
+        //   steampipe /     Steam-only (steam_api.dll, region lists).
+        //   steaminput /    droidtop is not a Steam client.
+        //   steam_regions
+        //
+        // box86_64, fexcore and wowbox64 deliberately stay (~56 MB): they
+        // are read straight off getAssets() with no download manifest
+        // anywhere, so a missing version is an unrecoverable failure, not
+        // a slow first launch. Trimming them to the default versions
+        // alone would save most of that and break any other choice in the
+        // container config UI -- worth doing later behind a real test,
+        // not guessed at now.
+        ignoreAssetsPatterns += listOf("dxwrapper", "steampipe", "steaminput", "steam_regions.json")
     }
 
     compileOptions {
