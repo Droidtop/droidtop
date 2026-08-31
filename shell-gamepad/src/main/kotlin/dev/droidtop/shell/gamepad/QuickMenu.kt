@@ -1,6 +1,7 @@
 package dev.droidtop.shell.gamepad
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,7 +29,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusable
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -192,8 +192,11 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                     action == GamepadAction.A && !granted -> {
                         context.startActivity(NotificationsStore.grantIntent()); onDismiss(); true
                     }
-                    action == GamepadAction.A && current?.contentIntent != null -> {
-                        runCatching { current.contentIntent.send() }
+                    action == GamepadAction.A && current != null -> {
+                        // Captured locally: contentIntent is a property
+                        // from another module, so no smart cast.
+                        val pending = current.contentIntent
+                        if (pending != null) runCatching { pending.send() }
                         onDismiss(); true
                     }
                     action == GamepadAction.X && current?.clearable == true -> {
