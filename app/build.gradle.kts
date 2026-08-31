@@ -94,6 +94,20 @@ android {
     }
 }
 
+// Two protobuf runtimes meet in this app: shell-default's Launcher3
+// protos are generated LITE and pull protobuf-javalite, while the
+// vendored gamenative tree (JavaSteam's Steam protos) needs full
+// protobuf-java. Both jars ship the same com.google.protobuf classes,
+// which is exactly the duplicate-class failure this resolves. The full
+// runtime is the documented superset -- lite-generated code runs on it
+// unchanged -- so one copy of the full artifact stands in for both.
+configurations.all {
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("com.google.protobuf:protobuf-javalite"))
+            .using(module("com.google.protobuf:protobuf-java:4.33.2"))
+    }
+}
+
 dependencies {
     implementation(project(":runtime-common"))
     implementation(project(":host-bridge"))
