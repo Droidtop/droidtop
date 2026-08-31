@@ -42,6 +42,13 @@ android {
 }
 
 dependencies {
+    // APNG4Android's FrameAnimationDrawable publicly extends
+    // vectordrawable-animated's Animatable2Compat, and Kotlin requires
+    // supertypes on the compile classpath to touch the subtype at all
+    // ("Cannot access 'Animatable2Compat'", real CI failure). The apng
+    // artifact declares it only transitively-invisibly, so it is named
+    // here directly.
+    implementation("androidx.vectordrawable:vectordrawable-animated:1.2.0")
     implementation(project(":library-core"))
     // Real, direct dependency: the ES-DE theme engine (dev.droidtop.library.theme
     // -- EsDeThemeParser/EsDeTheme/ThemeAssets/ThemePrefs/ThemeDownloader/

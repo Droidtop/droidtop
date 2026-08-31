@@ -81,7 +81,7 @@ fun navigationSoundPaths(theme: EsDeTheme?): Map<String, String> {
  * The bundled decaffe theme is a real, known no-op case, on the theme's
  * own terms: its navigationsounds.xml exists (declaring the real seven
  * sounds) but is never `<include>`d from theme.xml, AND its declared
- * `./core/sounds/*.wav` paths don't match where its .wav files actually
+ * `.wav` paths under `./core/sounds/` don't match where its .wav files actually
  * live (`./assets/sounds/`) -- both verified directly in the vendored
  * copy. Real ES-DE would silently use its bundled fallbacks there, which
  * masks the theme bug; droidtop plays nothing. A downloaded theme that
