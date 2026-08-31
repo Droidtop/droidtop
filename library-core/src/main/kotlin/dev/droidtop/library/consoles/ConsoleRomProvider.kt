@@ -543,13 +543,35 @@ class ConsoleRomProvider(
         if (extension == "iso" || extension == "bin") {
             PlayStationDiscType.detect(romFile)?.toConsoleSystemId()?.let { return it }
         }
-        return try {
+        val scanned = try {
             FileInputStream(romFile).use { stream ->
-                SerialScanner.extractInfo(romFile.name, stream).systemID?.toConsoleSystemId()
+                SerialScanner.extractInfo(romFile.name, stream).systemID
             }
         } catch (t: Throwable) {
             null
         }
+        // A disc image the scanner calls PSX is not evidence of PS1. The
+        // scanner reaches that answer from the "PLAYSTATION" volume
+        // identifier, which PS2 discs carry too, and it defaults to PSX
+        // even when it learned nothing else -- so for a disc image that
+        // verdict means "a PlayStation disc of some generation", not
+        // "PS1". Reaching here means the SYSTEM.CNF read above failed to
+        // say which, so droidtop reports unknown and lets the folder name
+        // decide, rather than overriding a correct /Roms/ps2/ with a
+        // guess. Confirmed necessary on-device: two PS2 discs that had
+        // been identified correctly flipped back to psx after a
+        // transient read failure, purely because of this default.
+        //
+        // The serial does not help: PS2 serials use the same prefixes
+        // (SLUS, SCUS, ...) the PS1 list already matches.
+        if (scanned == SystemID.PSX && (extension == "iso" || extension == "bin")) {
+            android.util.Log.w(
+                "droidtop.RomScan",
+                "Could not read SYSTEM.CNF from ${romFile.name}; leaving the system to the folder name",
+            )
+            return null
+        }
+        return scanned?.toConsoleSystemId()
     }
 
     /**
