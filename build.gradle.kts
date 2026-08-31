@@ -11,24 +11,13 @@ buildscript {
     }
 }
 
-// Round 9 of the same ladder: with javapoet fixed, Hilt's processor
-// itself fails reading our classes -- "Metadata instance has version
-// 2.2.0, while maximum supported version is 2.1.0". Dagger 2.55 (the
-// fork's pinned version, consumed via the gn catalog) bundles the
-// kotlin-metadata-jvm for Kotlin 2.1 while droidtop compiles with
-// 2.2.21. Forcing the metadata library to match our compiler is the
-// standard fix that keeps the fork's Hilt version tracked instead of
-// diverging it.
-subprojects {
-    configurations.all {
-        resolutionStrategy.eachDependency {
-            if (requested.group == "org.jetbrains.kotlin" && requested.name == "kotlin-metadata-jvm") {
-                useVersion("2.2.21")
-                because("Hilt/Dagger must read Kotlin 2.2 metadata; see the comment above")
-            }
-        }
-    }
-}
+// Rounds 9/13 of the same ladder: Hilt's processor failing with
+// "Metadata instance has version 2.2.0, while maximum supported version
+// is 2.1.0" is NOT fixable by forcing kotlin-metadata-jvm -- dagger-
+// compiler SHADES its metadata reader (dagger.spi.internal.shaded.
+// kotlin.metadata), so dependency resolution never touches the copy
+// that actually runs. The real fix is the Dagger 2.57.2 version
+// override on the gn catalog in settings.gradle.kts.
 
 // Root build file — no build logic here, plugins are applied per-module.
 plugins {
