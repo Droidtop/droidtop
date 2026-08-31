@@ -41,8 +41,10 @@ class EngineVersionDetectorTest {
         )
 
         val detected = EngineVersionDetector.detect(GameEngine.RENPY, tmp.root)
-        // The trailing build serial is not part of the engine version line.
-        assertEquals("8.3.2", detected?.version)
+        // Verbatim, all four components -- enginehost's own config
+        // creator emits the same full form (observed on-device against
+        // a real Ren'Py game: 8.2.1.24030407).
+        assertEquals("8.3.2.24090902", detected?.version)
         assertEquals("renpy/vc_version.py", detected?.source)
     }
 
@@ -59,7 +61,7 @@ class EngineVersionDetectorTest {
         )
 
         val detected = EngineVersionDetector.detect(GameEngine.RENPY, tmp.root)
-        assertEquals("8.3.2", detected?.version)
+        assertEquals("8.3.2.24090902", detected?.version)
         assertEquals("log.txt", detected?.source)
     }
 
@@ -92,7 +94,7 @@ class EngineVersionDetectorTest {
         mkdirs("lib", "py3-linux-x86_64")
 
         val detected = EngineVersionDetector.detect(GameEngine.RENPY, tmp.root)
-        assertEquals("8.3.2", detected?.version)
+        assertEquals("8.3.2.24090902", detected?.version)
         assertEquals("8", detected?.family)
     }
 

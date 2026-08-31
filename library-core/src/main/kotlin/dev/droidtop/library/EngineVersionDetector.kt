@@ -39,6 +39,7 @@ object EngineVersionDetector {
 
     fun detect(engine: GameEngine, gameRoot: File): DetectedVersion? = when (engine) {
         GameEngine.RENPY -> detectRenPy(gameRoot)
+        GameEngine.RPG_MAKER_VX_ACE -> detectRgss(gameRoot)
         // Deliberately absent: every other engine's version signature is
         // unverified against a real game so far. Adding a guessed one
         // would produce exactly the confidently-wrong engineVersion this
@@ -46,6 +47,46 @@ object EngineVersionDetector {
         // per-folder override / enginehost.json paths until a real sample
         // is available to verify a signature against.
         else -> null
+    }
+
+    // ---- RPG Maker (RGSS family: XP, VX, VX Ace) -------------------------
+    //
+    // Verified against MGQ Paradox 3.06 on the user's own device, which is
+    // the exact game enginehost's own notes call out for its RGSS301
+    // metadata. Its Game.ini reads:
+    //
+    //     [Game]
+    //     Library=System\RGSS301.dll
+    //     Scripts=Data\Scripts.rvdata2
+    //
+    // Game.ini is RPG Maker's own runtime configuration file and the
+    // Library line names the exact RGSS build the game was made for, so
+    // this is the engine declaring its own version rather than droidtop
+    // inferring one. The DLL name encodes it as RGSS<major><minor,2
+    // digits>[locale letter]: RGSS301 -> 3.01 (which is precisely the
+    // engineVersion enginehost's own contract uses in its vxace example),
+    // RGSS202E -> 2.02, RGSS104E -> 1.04.
+
+    private val RGSS_LIBRARY_LINE = Regex("""Library\s*=\s*.*?RGSS(\d)(\d{2})""", RegexOption.IGNORE_CASE)
+
+    /** RGSS major version -> enginehost's own RPG Maker generation context. */
+    fun rgssGenerationContext(majorRgss: Int): String? = when (majorRgss) {
+        1 -> "xp"
+        2 -> "vx"
+        3 -> "vxace"
+        else -> null
+    }
+
+    private fun detectRgss(gameRoot: File): DetectedVersion? {
+        val text = readHead(File(gameRoot, "Game.ini")) ?: return null
+        val match = RGSS_LIBRARY_LINE.find(text) ?: return null
+        val major = match.groupValues[1]
+        val minor = match.groupValues[2]
+        return DetectedVersion(
+            version = "$major.$minor",
+            family = major,
+            source = "Game.ini (Library=RGSS$major$minor)",
+        )
     }
 
     // ---- Ren'Py ----------------------------------------------------------
@@ -57,18 +98,24 @@ object EngineVersionDetector {
     //   30YearOldVirgin-0.37...  renpy/ stripped to audio+uguu, ONLY lib/python3.12 survives
 
     private val VC_VERSION_LINE = Regex("""^\s*version\s*=\s*['"]([0-9][0-9.]*)['"]""", RegexOption.MULTILINE)
-    private val LOG_BANNER = Regex("""Ren'Py\s+([0-9]+\.[0-9]+(?:\.[0-9]+)?)""")
+    private val LOG_BANNER = Regex("""Ren'Py\s+([0-9][0-9.]*)""")
 
     private fun detectRenPy(gameRoot: File): DetectedVersion? {
         val family = renPyFamily(gameRoot)
 
         // 1. renpy/vc_version.py -- Ren'Py's own canonical version file,
-        //    e.g. `version = '8.3.2.24090902'`. The trailing component is
-        //    a build serial, not part of the engine version line, so only
-        //    the first three components are kept.
+        //    e.g. `version = '8.3.2.24090902'`. Reported VERBATIM, all four
+        //    components. An earlier draft trimmed to three on the strength
+        //    of the contract's "e.g. 8.3.2" wording, which was wrong:
+        //    enginehost's own config creator, observed running on this
+        //    device against a real Ren'Py game, fills engineVersion with
+        //    the full `8.2.1.24030407`. Since resolution matches versions
+        //    exactly (and only trailing ZERO components compare equal, so
+        //    a build serial is not droppable), sending a trimmed version
+        //    would silently fail to resolve a bundle the full one matches.
         readHead(File(gameRoot, "renpy/vc_version.py"))?.let { text ->
             VC_VERSION_LINE.find(text)?.groupValues?.get(1)?.let { raw ->
-                return DetectedVersion(trimToEngineVersion(raw), family, "renpy/vc_version.py")
+                return DetectedVersion(raw, family, "renpy/vc_version.py")
             }
         }
 
@@ -78,7 +125,7 @@ object EngineVersionDetector {
         //    was stripped out of the distribution.
         readHead(File(gameRoot, "log.txt"))?.let { text ->
             LOG_BANNER.find(text)?.groupValues?.get(1)?.let { raw ->
-                return DetectedVersion(trimToEngineVersion(raw), family, "log.txt")
+                return DetectedVersion(raw, family, "log.txt")
             }
         }
 
@@ -103,10 +150,6 @@ object EngineVersionDetector {
             else -> null
         }
     }
-
-    /** `8.3.2.24090902` -> `8.3.2`; `8.3` stays `8.3`. */
-    private fun trimToEngineVersion(raw: String): String =
-        raw.split('.').filter { it.isNotEmpty() }.take(3).joinToString(".")
 
     /**
      * First 8KB only: every file read here identifies itself in its first
