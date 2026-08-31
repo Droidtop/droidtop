@@ -1193,13 +1193,16 @@ distrobox-style) both need real UI, not just the underlying runtime logic.
 Two concrete references to build from rather than design blind:
 
 - **Wine prefix management**: [vendor/gamenative](../vendor/gamenative)
-  (already `:runtime-windows`'s fork source) has its own real, working UI
-  for exactly this — `ContainerConfigDialog.kt`/`ContainerConfigState.kt`
-  (Windows version selection, DXVK/VKD3D configuration, installed-
-  component tracking) and `ContainerStorageManagerDialog.kt` (per-
-  container storage). Worth porting/adapting the same way
-  `:runtime-windows` itself is forked from gamenative's runtime, not
-  designed from nothing.
+  has its own real, working UI for exactly this — `ContainerConfigDialog.
+  kt`/`ContainerConfigState.kt` (Windows version selection, DXVK/VKD3D
+  configuration, installed-component tracking) and
+  `ContainerStorageManagerDialog.kt` (per-container storage).
+  **Decision (2026-08-31): these arrive by COMPILING, not porting** —
+  `:runtime-windows` now compiles the entire vendored gamenative tree
+  (see §9), so this UI is already built into droidtop's APK; what
+  remains is increment 2 of that work (Hilt bootstrap in `:app`,
+  manifest components, an entry point from droidtop's own settings), not
+  a file-by-file port.
 - **Linux container management**: distrobox itself is CLI-only (no
   official GUI), but [BoxBuddy](https://github.com/Dvlv/BoxBuddy) is a
   real, actively-maintained GTK4 GUI for it — confirmed feature set:
@@ -1846,6 +1849,33 @@ pc-helper/               → separate Go program, runs on the remote gaming PC, 
                             Android module — Sunshine REST API client + (limited) Steam
                             install trigger; see §7a
 ```
+
+### `:runtime-windows` consumes ALL of gamenative (decided 2026-08-31)
+
+Previously the module compiled only the vendored `com.winlator.*` subtree
+plus hand-written shims for the `app.gamenative.*` symbols it touched.
+Reviewing all 40 local files against the vendor tree showed every one was
+either a shim or a stale snapshot of a file the fork had since evolved --
+and each shim was a place droidtop re-learned something gamenative
+already does (an always-null downloader stub was the direct reason Wine
+container creation could never work). Direction: **compile the entire
+vendored tree.**
+
+Mechanics worth keeping straight: gamenative's own version catalog is
+registered as a second Gradle catalog (`gn`) so dependency versions track
+the fork through vendor sync; BuildConfig is AGP-generated with
+`MODERN_ANDROID=true` and the W^X bionic preload (droidtop targets SDK
+34, where the legacy exec() path has been blocked since 28 -- the old
+shim's `false` could never work); Play Integrity's client library is
+deliberately not declared, making the fork's ripout structural; PostHog
+compiles with an empty key (inert) pending a proper strip in the fork.
+
+Increment 2, still open: Hilt bootstrap in `:app` (gamenative's
+`PluviaApp` is a Hilt application; its `@AndroidEntryPoint` activities
+need droidtop's Application to carry the Hilt graph), curating the
+vendor manifest's components into the module manifest, and real entry
+points from droidtop settings into gamenative's container-config UI
+(§7c).
 
 ## 10. Suggested build order
 
