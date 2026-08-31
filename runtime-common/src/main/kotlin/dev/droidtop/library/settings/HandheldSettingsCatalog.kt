@@ -68,23 +68,25 @@ object HandheldSettingsCatalog {
             items = buildList {
                 add(defaultSectionItem(context))
                 add(showHintsItem(context))
+                // Nested catalog screens whose DATA lives in :app -- resolved
+                // through SettingsScreenRegistry (registered at process start
+                // by :app's SettingsCatalogInitProvider), so they render
+                // in-place in whichever surface is showing this catalog
+                // instead of bouncing to a differently-chromed activity.
                 add(
-                    ActionItem(
+                    NestedScreenItem(
                         id = ID_CONSOLE_SYSTEMS,
                         title = "Console systems",
-                        subtitle = "Assign game folders to a console system by hand",
-                        run = launchComponent("dev.droidtop.app.ConsoleSystemsActivity"),
+                        subtitle = "Folders, per-system emulators, artwork scraping, platforms",
+                        registryId = "console_systems",
                     ),
                 )
                 add(
-                    ActionItem(
+                    NestedScreenItem(
                         id = ID_GAME_FOLDERS,
                         title = "Game folders",
                         subtitle = "Add or remove the folders droidtop scans for games",
-                        run = launchComponent(
-                            "dev.droidtop.app.OnboardingActivity",
-                            "dev.droidtop.app.EXTRA_START_STEP" to "GAMES_FOLDERS",
-                        ),
+                        registryId = "rom_folders",
                     ),
                 )
                 add(displayShellTargetItem(context))

@@ -177,5 +177,14 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- Registers :app's settings-catalog screens (console systems,
+             platform CRUD, ROM folders, scraper credentials) into the
+             process-wide SettingsScreenRegistry before any Activity runs;
+             see SettingsCatalogInitProvider's own doc comment. -->
+        <provider
+            android:name="dev.droidtop.app.settings.SettingsCatalogInitProvider"
+            android:authorities="${applicationId}.settingscataloginit"
+            android:exported="false" />
+
     </application>
 </manifest>
