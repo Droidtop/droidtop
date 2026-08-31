@@ -815,10 +815,23 @@ app-drawer icon or a floating switcher button:
   "Rescan library" by bumping its own scan trigger and opens the theme
   browser inline); every catalog default must still be real and correct
   on its own so an id-unaware renderer gets working behavior for
-  everything. Desktop/Standard settings are still XML-declared
-  Preference screens — migrating them onto catalogs is the follow-up
-  that makes their settings renderable inside Desktop's own shell the
-  same way.
+  everything. Coverage is total, per direction:
+  EVERYTHING that is a droidtop setting lives in the catalog model —
+  flat lists and management surfaces alike. Management screens (console
+  systems, per-folder system/player assignment, artwork scraping,
+  platform CRUD, ROM folders, scraper credentials) are nested
+  `CatalogScreen`s whose data lives in `:app`
+  (`dev.droidtop.app.settings.AppSettingsCatalogs`), registered into the
+  process-wide `SettingsScreenRegistry` at process start by a
+  manifest-declared init provider so lower modules open them by id with
+  no dependency edge on `:app`; both renderers navigate them natively
+  (the in-shell `CatalogNavigator`'s real nav stack; the Preference
+  surface's in-place PreferenceScreen stack in
+  `CatalogPreferenceNavigator`). `ConsoleSystemsActivity` is now just a
+  host for `CatalogNavigator` — its former hand-rolled one-off UI is
+  gone. Desktop/Standard settings are still XML-declared Preference
+  screens — migrating them onto catalogs is the follow-up that makes
+  their settings renderable inside Desktop's own shell the same way.
   - **Known real gap, confirmed on-device**: the Standard shell as it
     ships from Murine Launcher upstream is functional but plain — first
     real-device testing surfaced this directly, not a guess. Backlog item,
