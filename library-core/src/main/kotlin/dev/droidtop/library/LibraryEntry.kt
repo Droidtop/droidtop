@@ -165,6 +165,16 @@ enum class LibraryEntryKind {
     RPG_MAKER_MV,
     RPG_MAKER_MZ,
     RPG_MAKER_VX_ACE,
+
+    /**
+     * RPG Maker 2000/2003 — real, distinct detection signature
+     * (`RPG_RT.exe`/`RPG_RT.ldb`, see [GameEngineDetector]'s own doc
+     * comment) from the MV/MZ/VX Ace family above; its primary real
+     * launch path is the EasyRPG Player entries in players-database.json
+     * (systemId "rpgmaker-2000-2003"), not a dedicated
+     * [GameLaunchStrategy] the way Kirikiroid2 is for [KIRIKIRI].
+     */
+    RPG_MAKER_2000_2003,
     KIRIKIRI,
 
     /**
@@ -211,7 +221,9 @@ fun LibraryEntryKind.displayName(): String = when (this) {
     LibraryEntryKind.AUGUST, LibraryEntryKind.BURIKO, LibraryEntryKind.CATSYSTEM2,
     LibraryEntryKind.CMVS, LibraryEntryKind.FLASH_AIR, LibraryEntryKind.TWINE,
     -> "Visual Novels"
-    LibraryEntryKind.RPG_MAKER_MV, LibraryEntryKind.RPG_MAKER_MZ, LibraryEntryKind.RPG_MAKER_VX_ACE -> "RPG Maker"
+    LibraryEntryKind.RPG_MAKER_MV, LibraryEntryKind.RPG_MAKER_MZ, LibraryEntryKind.RPG_MAKER_VX_ACE,
+    LibraryEntryKind.RPG_MAKER_2000_2003,
+    -> "RPG Maker"
     LibraryEntryKind.CONSOLE_ROM -> "Consoles"
     // Not visual-novel-shaped — general game engines, kept as their own
     // section rather than folded into "Visual Novels" where they'd be a

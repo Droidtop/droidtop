@@ -12,7 +12,7 @@ import java.io.File
  * droidtop-owned project (see `/root/coordination/HANDOFF.md` and
  * `ENGINEHOST_CODEX_BRIEF.md`). droidtop fires its real, documented
  * Intent contract rather than launching a third-party interpreter
- * directly for the engines it covers — see [ENGINEHOST_ENGINE_IDS].
+ * directly for the engines it covers — see [ENGINEHOST_TARGETS].
  * (A prior direct-JoiPlay integration was removed entirely: JoiPlay
  * doesn't expose an intent contract that lets an external caller launch
  * a specific game, so that integration never actually worked.)
@@ -31,44 +31,109 @@ object EngineHost {
     const val PACKAGE_NAME = "dev.enginehost"
     private const val ACTION_LAUNCH = "dev.enginehost.LAUNCH"
 
-    /** Needs `<queries><package android:name="dev.enginehost" /></queries>` in the caller's manifest on API 30+ (package visibility). */
-    fun isInstalled(context: Context): Boolean =
-        try {
-            context.packageManager.getPackageInfo(PACKAGE_NAME, 0)
-            true
-        } catch (e: PackageManager.NameNotFoundException) {
-            false
+    /**
+     * A package-scoped implicit intent, exactly as the contract
+     * prescribes: the action is exported, so scoping it to
+     * [PACKAGE_NAME] is what stops another installed app from claiming
+     * it and receiving a game path meant for enginehost.
+     */
+    private fun launchIntent(): Intent = Intent(ACTION_LAUNCH).setPackage(PACKAGE_NAME)
+
+    /**
+     * Whether enginehost can open [gameFolder] *as a filesystem path*,
+     * which is the only form its V1 contract accepts.
+     *
+     * The limit here is the contract's path-only shape, NOT an Android
+     * one: droidtop can and does share app-private files with other apps
+     * through FileProvider `content://` URIs plus an explicit
+     * `grantUriPermission` (exactly how it hands ROMs to emulators, see
+     * [dev.droidtop.library.consoles.AmStartCommandToIntentConverter]).
+     * What it cannot do is give another UID a raw path into
+     * `/data/data/dev.droidtop.app/...`. So a game sitting there is
+     * reachable in principle and unreachable in practice until enginehost
+     * accepts a URI -- which is what
+     * `/root/coordination/enginehost-claude-requests.md` item 1 asks for.
+     *
+     * Mostly this should not arise, because games are supposed to install
+     * to user-accessible storage (internal shared storage or an SD card)
+     * rather than app-private storage. It still can: gamenative keeps its
+     * Wine containers under `context.getFilesDir()/imagefs/home/xuser-<id>/`
+     * (checked in the vendored source), and a game installed into a
+     * prefix rather than to a real volume ends up there too. This gate
+     * keeps droidtop from offering a launch that would fail, without
+     * pretending the situation is unfixable.
+     */
+    fun canReachGameFolder(context: Context, gameFolder: File): Boolean {
+        val path = gameFolder.absolutePath
+        val privateRoots = buildList {
+            add(context.filesDir.absolutePath)
+            add(context.dataDir.absolutePath)
+            context.getExternalFilesDirs(null).filterNotNull().forEach { add(it.absolutePath) }
         }
+        return privateRoots.none { path == it || path.startsWith("$it/") }
+    }
+
+    /**
+     * Resolves the real launch Activity rather than merely checking the
+     * package exists -- the contract's own recommended check
+     * (`resolveActivity(launch, MATCH_DEFAULT_ONLY)`), which additionally
+     * proves this installed build actually serves the launch action
+     * rather than just sharing its package name.
+     *
+     * Package visibility (API 30+) is already covered by :app's own
+     * `QUERY_ALL_PACKAGES` declaration, held legitimately because
+     * droidtop ships a real HOME/LAUNCHER activity -- checked, not
+     * assumed, so no additional `<queries>` block is needed here.
+     */
+    fun isInstalled(context: Context): Boolean =
+        context.packageManager.resolveActivity(launchIntent(), PackageManager.MATCH_DEFAULT_ONLY) != null
 
     /**
      * Fires the real `dev.enginehost.LAUNCH` contract for [gameFolder].
-     * [engineId]/[engineVersion] are only actually used (and only
-     * required) when [gameFolder] has no `enginehost.json` of its own —
-     * enginehost reads that file directly and ignores the `config` extra
-     * entirely when it exists, so a caller with a folder that already has
-     * one can pass `engineVersion = null` and this still launches fine.
-     * [engineVersion] being null for a folder that does NOT have its own
-     * `enginehost.json` is a genuine caller error (nothing sensible to
-     * fall back to — enginehost itself rejects a missing `engineVersion`
-     * outright, see this object's own doc comment), and fails loudly
-     * here rather than silently guessing or omitting the field.
+     *
+     * [target] carries only enginehost's own family/context vocabulary
+     * (see [ENGINEHOST_TARGETS]); [engineVersion] is the game's real
+     * runtime version, never a label like "MV" or "latest". Both only
+     * matter when [gameFolder] has no `enginehost.json` of its own --
+     * that file is authoritative at every key, and the contract is
+     * explicit that a caller must never try to override it, so droidtop
+     * sends no `config` at all in that case rather than sending one that
+     * would be silently ignored.
+     *
+     * `autoinstallPlugin` is set only when droidtop's own detection was
+     * confident enough to name BOTH the context and the version, matching
+     * the contract's rule that the flag is for callers whose detection
+     * can pick code without asking the user. It never bypasses
+     * enginehost's signature verification or trust approval; it only
+     * skips the release-choice screen.
      */
-    fun launch(context: Context, gameFolder: File, engineId: String, engineVersion: String?) {
+    fun launch(
+        context: Context,
+        gameFolder: File,
+        target: EnginehostTarget,
+        engineVersion: String?,
+    ) {
         check(isInstalled(context)) { "enginehost ($PACKAGE_NAME) isn't installed" }
         val hasOwnConfig = File(gameFolder, "enginehost.json").isFile
-        val intent = Intent(ACTION_LAUNCH).apply {
+        val intent = launchIntent().apply {
+            // A filesystem path, not a content:// URI -- enginehost holds
+            // its own storage permission and the contract is explicit
+            // that the caller does not grant its UID by passing a URI.
             putExtra("path", gameFolder.absolutePath)
             if (!hasOwnConfig) {
                 checkNotNull(engineVersion) {
-                    "No engineVersion known for ${gameFolder.absolutePath} -- either add an " +
+                    "No engineVersion known for ${gameFolder.absolutePath} -- add an " +
                         "enginehost.json to that folder, or set a per-folder override " +
-                        "(EngineVersionOverridePrefs.set)."
+                        "(EngineVersionOverridePrefs.set). Guessing one is a contract " +
+                        "violation: enginehost matches versions exactly, never by closeness."
                 }
-                val config = JSONObject().apply {
-                    put("engine", engineId)
-                    put("engineVersion", engineVersion)
-                }
-                putExtra("config", config.toString())
+                putExtra("config", target.toConfigJson(engineVersion).toString())
+                // Confident = we know the exact compatibility line AND the
+                // exact version. A family whose context droidtop cannot
+                // yet determine (RPG Maker 2000 vs 2003, CMVS ps2 vs ps3)
+                // deliberately lands in enginehost's own choice UI rather
+                // than auto-installing against a guess.
+                if (target.engineContext != null) putExtra("autoinstallPlugin", true)
             }
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
@@ -77,42 +142,83 @@ object EngineHost {
 }
 
 /**
- * The 11 VN/interactive-fiction-shaped engines enginehost is meant to
- * host (see `ENGINEHOST_CODEX_BRIEF.md` for why GODOT/UNREAL/UNITY are
- * deliberately excluded — they ship their own runtime per game rather
- * than being hosted by a generic interpreter). Only `kirikiri2` is a
- * real, confirmed id, read directly from `enginehost-plugin-kirikiri`'s
- * own manifest `<meta-data>` (`engineVersion="2.32"`). The others have no
- * plugin yet, so these ids are this project's own convention, not a
- * confirmed contract — matching enginehost's own README example
- * (`"rpgmvxace"`) shape; update these if whoever writes each plugin picks
- * a different id.
+ * A detected engine expressed in enginehost's own real family/context
+ * vocabulary (`enginehost-contract.md`'s own table, transcribed -- not
+ * droidtop's internal [GameEngine] names). Two rules from that contract
+ * drive the shape: RPG Maker generations are a CONTEXT inside one
+ * `rpgmaker` family rather than separate families, and August is not a
+ * family at all -- it is `buriko` with the August context.
+ *
+ * [engineContext] is null only where droidtop genuinely cannot yet tell
+ * which line a game belongs to; that nullness is meaningful (see
+ * [EngineHost.launch], which refuses to auto-install on it).
  */
-val ENGINEHOST_ENGINE_IDS: Map<GameEngine, String> = mapOf(
-    GameEngine.KIRIKIRI to "kirikiri2",
-    GameEngine.RENPY to "renpy",
-    GameEngine.RPG_MAKER_MV to "rpgmv",
-    GameEngine.RPG_MAKER_MZ to "rpgmz",
-    GameEngine.RPG_MAKER_VX_ACE to "rpgmvxace",
-    GameEngine.AUGUST to "august",
-    GameEngine.BURIKO to "buriko",
-    GameEngine.CATSYSTEM2 to "catsystem2",
-    GameEngine.CMVS to "cmvs",
-    GameEngine.FLASH_AIR to "flash_air",
-    GameEngine.TWINE to "twine",
+data class EnginehostTarget(
+    val engine: String,
+    val engineContext: String?,
+    /**
+     * Exact component versions the runtime must provide, participating in
+     * enginehost's bundle resolution (an RGSS3 game pinned to Ruby 1.9.2
+     * must not resolve a Ruby 3.1 capability).
+     */
+    val runtimeRequirements: Map<String, String> = emptyMap(),
+) {
+    fun toConfigJson(engineVersion: String): JSONObject = JSONObject().apply {
+        put("engine", engine)
+        put("engineVersion", engineVersion)
+        engineContext?.let { put("engineContext", it) }
+        if (runtimeRequirements.isNotEmpty()) {
+            put("runtimeRequirements", JSONObject(runtimeRequirements.toMap()))
+        }
+    }
+}
+
+/**
+ * Every [GameEngine] droidtop can hand to enginehost, mapped onto that
+ * project's real engine family/context vocabulary. Transcribed directly
+ * from `enginehost-contract.md`'s own table -- these are no longer
+ * droidtop-invented ids (the previous map guessed "rpgmv"/"rpgmz"/
+ * "rpgmvxace"/"august" as engine FAMILIES, which the contract explicitly
+ * rejects: generations are contexts, and August is a buriko context).
+ *
+ * UNREAL and UNITY stay absent deliberately: they ship their own runtime
+ * per game rather than being hosted by a generic interpreter. GODOT is
+ * present now because the contract lists `godot` as a real family.
+ */
+val ENGINEHOST_TARGETS: Map<GameEngine, EnginehostTarget> = mapOf(
+    GameEngine.RENPY to EnginehostTarget("renpy", "standard"),
+    GameEngine.RPG_MAKER_MV to EnginehostTarget("rpgmaker", "mv"),
+    GameEngine.RPG_MAKER_MZ to EnginehostTarget("rpgmaker", "mz"),
+    // Ruby 1.9.2 is RGSS3's own real pairing -- enginehost's own config
+    // editor prefills exactly this for detected VX Ace, so it is their
+    // stated fact, not a droidtop guess.
+    GameEngine.RPG_MAKER_VX_ACE to EnginehostTarget("rpgmaker", "vxace", mapOf("ruby" to "1.9.2")),
+    // Context deliberately null: the RPG_RT.exe/.ldb signature droidtop
+    // detects proves the 2000/2003 FAMILY but not which of the two
+    // contexts -- see enginehost-claude-requests.md, which asks for a
+    // real disambiguating signal rather than picking one at random.
+    GameEngine.RPG_MAKER_2000_2003 to EnginehostTarget("rpgmaker", null),
+    GameEngine.KIRIKIRI to EnginehostTarget("kirikiri2", "default"),
+    GameEngine.BURIKO to EnginehostTarget("buriko", "compiled-script-v1"),
+    GameEngine.AUGUST to EnginehostTarget("buriko", "august-compiled-script-v1"),
+    GameEngine.CATSYSTEM2 to EnginehostTarget("catsystem2", "cst"),
+    // ps2 vs ps3 undetermined by the cmvs32/cmvs64/cmvs.cfg signature.
+    GameEngine.CMVS to EnginehostTarget("cmvs", null),
+    // droidtop's FLASH_AIR signature is specifically the AIR package
+    // shape (META-INF/ plus a mimetype file), so the AIR context is the
+    // real answer here, not a coin flip between swf and air.
+    GameEngine.FLASH_AIR to EnginehostTarget("flash_air", "air"),
+    GameEngine.TWINE to EnginehostTarget("twine", "compiled-html"),
+    GameEngine.GODOT to EnginehostTarget("godot", "standard"),
 )
 
-/** The one real, confirmed engineVersion — everything else has no known real version yet (no plugin exists to confirm one against). */
-private val ENGINEHOST_DEFAULT_ENGINE_VERSION: Map<GameEngine, String> = mapOf(
-    GameEngine.KIRIKIRI to "2.32",
-)
 
 /**
  * Per-folder `engineVersion` override for a game enginehost will launch
- * without its own `enginehost.json` — real, user-facing stopgap for the
- * gap `ENGINEHOST_CODEX_BRIEF.md` documents (droidtop's own detection
- * only ever determines *which* engine, never a specific version; real
- * version detection is deferred, not attempted here). Same
+ * without its own `enginehost.json` — the user's explicit last word,
+ * outranking even [EngineVersionDetector]'s real detection (a repacked
+ * game can genuinely carry a stale version file its actual runtime no
+ * longer matches, and the user is the one who can tell). Same
  * SharedPreferences-backed shape as
  * [dev.droidtop.library.consoles.SystemOverridePrefs]/
  * [dev.droidtop.library.consoles.PlayerOverridePrefs] — one string per
@@ -133,11 +239,28 @@ object EngineVersionOverridePrefs {
 }
 
 /**
- * The real `engineVersion` to launch [gameFolder] with: an explicit
- * per-folder override first, then the one real confirmed default for
- * engines with an actual installed plugin ([ENGINEHOST_DEFAULT_ENGINE_VERSION]),
- * else null -- meaning the caller must ask the user to set one (see
- * [EngineHost.launch]'s own doc comment on why this is never guessed at).
+ * The real `engineVersion` to launch [gameFolder] with, in descending
+ * order of authority: an explicit per-folder override, then the version
+ * the game actually declares about itself ([EngineVersionDetector] --
+ * read out of the game's own files, never guessed), then the one real
+ * else null.
+ *
+ * There is deliberately no hardcoded per-engine fallback version any
+ * more. The previous one claimed KiriKiri2 games were version "2.32",
+ * read off an old plugin's manifest rather than off any actual game --
+ * exactly what the contract names as a thing callers must not do
+ * ("invent an engine version, especially KiriKiri2 or RPG Maker JS
+ * versions"), and doubly wrong now that real KiriKiri2 versions are
+ * four-component FileVersions like 2.31.2009.825.
+ *
+ * Real bug this closes: with detection absent, this returned null for
+ * essentially every real game folder, [GameLaunchStrategyResolver]
+ * dropped [GameLaunchStrategy.ENGINEHOST] from the available list on
+ * that basis, and a Ren'Py game with a perfectly good native runtime
+ * available fell through to [GameLaunchStrategy.WINE_PREFIX] instead --
+ * "Ren'Py needs a full Wine implementation" was that gap, not a real
+ * property of the engine.
+ *
  * Skipped entirely when [gameFolder] already has its own
  * `enginehost.json`, since enginehost reads that directly regardless of
  * what droidtop would have resolved here.
@@ -145,5 +268,5 @@ object EngineVersionOverridePrefs {
 fun resolveEngineVersion(context: Context, gameFolder: File, engine: GameEngine): String? {
     if (File(gameFolder, "enginehost.json").isFile) return null
     return EngineVersionOverridePrefs.get(context, gameFolder.absolutePath)
-        ?: ENGINEHOST_DEFAULT_ENGINE_VERSION[engine]
+        ?: EngineVersionDetector.detect(engine, gameFolder)?.version
 }
