@@ -1268,6 +1268,23 @@ private fun GamesSection(
                     // Left/Right inside a gamelist jumps directly to the
                     // adjacent system's gamelist rather than requiring a
                     // Back-then-reselect round trip through the system list.
+                    // The SHOULDERS also quick-system-select while a
+                    // gamelist is open -- consuming them here is what
+                    // STOPS them from bubbling to the top-level section
+                    // switcher, which used to yank a browsing user out
+                    // to Apps/Settings mid-gamelist. Sections keep the
+                    // shoulders at the top level, where that is what
+                    // they mean; and a horizontal games carousel keeps
+                    // Left/Right for its items while the shoulders still
+                    // work, which is exactly the case the Left/Right
+                    // branch below cannot serve.
+                    (action == GamepadAction.L || action == GamepadAction.R) && group != null && orderedGroups.size > 1 -> {
+                        val index = orderedGroups.indexOf(group)
+                        val step = if (action == GamepadAction.L) -1 else 1
+                        EsDeNavigationSounds.play("quicksysselect")
+                        selectedGroup = orderedGroups[(index + step + orderedGroups.size) % orderedGroups.size]
+                        true
+                    }
                     action == GamepadAction.LEFT && group != null && orderedGroups.size > 1 -> {
                         // Real ES-DE quicksysselect sound -- this jump IS
                         // real ES-DE's quick system select (ViewController.
