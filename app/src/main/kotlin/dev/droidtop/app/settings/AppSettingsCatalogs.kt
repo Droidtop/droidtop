@@ -141,6 +141,30 @@ object AppSettingsCatalogs {
                         valueLabel = { ctx -> if (ScraperSourcePrefs.get(ctx) == ScraperSource.THEGAMESDB) "TheGamesDB" else "ScreenScraper" },
                     ),
                     AsyncActionItem(
+                        id = "console_systems_scrape_all",
+                        title = "Scrape all systems",
+                        subtitle = "Runs the artwork & metadata scrape for every game folder, one system at a time",
+                        run = { ctx, onStatus ->
+                            val systemsById = ConsoleSystemsRepository.allSystems(ctx).associateBy { it.id }
+                            val folders = scrapeTargets(ctx, systemsById)
+                            if (folders.isEmpty()) {
+                                "No game folders found to scrape."
+                            } else {
+                                val summaries = mutableListOf<String>()
+                                folders.forEachIndexed { index, (folder, system) ->
+                                    onStatus("[${index + 1}/${folders.size}] ${system.displayName}\u2026")
+                                    val summary = runCatching {
+                                        scrapeSystemArtwork(ctx, folder, system) { done, total ->
+                                            onStatus("[${index + 1}/${folders.size}] ${system.displayName}: $done/$total")
+                                        }
+                                    }.getOrElse { "${system.displayName}: failed (${it.message})" }
+                                    summaries += summary
+                                }
+                                summaries.joinToString("\n")
+                            }
+                        },
+                    ),
+                    AsyncActionItem(
                         id = "console_systems_update_players",
                         title = "Update platform databases",
                         subtitle = "Refresh players, platforms, engine routing, and BIOS registry from droidtop-platforms on GitHub",
@@ -207,6 +231,25 @@ object AppSettingsCatalogs {
             ),
         )
     }
+
+    /**
+     * Every game folder that resolves to a real system, paired with it --
+     * the same roots-then-subfolders walk the console-systems screen
+     * lists, narrowed to the resolvable ones because a scrape needs a
+     * system to scrape AS. Used by "Scrape all systems".
+     */
+    private fun scrapeTargets(
+        context: Context,
+        systemsById: Map<String, ConsoleSystemDef>,
+    ): List<Pair<File, ConsoleSystemDef>> =
+        GamesRootPrefs.gamesRootPaths(context)
+            .map(::File)
+            .flatMap { root -> (root.listFiles() ?: emptyArray()).filter { it.isDirectory }.toList() }
+            .mapNotNull { folder ->
+                SystemOverridePrefs.resolveForFolder(context, folder.absolutePath, folder.name, systemsById)
+                    ?.let { folder to it }
+            }
+            .sortedBy { it.first.name.lowercase() }
 
     private fun folderScreen(folder: File) = CatalogScreen(
         id = "console_folder_${folder.absolutePath}",
