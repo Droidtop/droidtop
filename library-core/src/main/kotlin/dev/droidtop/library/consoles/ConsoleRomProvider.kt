@@ -531,9 +531,16 @@ class ConsoleRomProvider(
         // scanned. PS1 and PS2 discs share the "PLAYSTATION" volume
         // identifier, so the magic numbers below cannot separate them and
         // used to call every PS2 disc a PS1 one -- which launched those
-        // games through a PS1 emulator. Falls through to the scanner when
-        // this is not a readable ISO9660 image, rather than guessing.
-        if (extension == "iso") {
+        // games through a PS1 emulator.
+        //
+        // This is the only PS2 signal droidtop has: the bundled libretro
+        // database carries no ps2 rows (24 systems, all Lemuroid's), so
+        // the filename lookup below can never identify one. Hence trying
+        // .bin too, not just .iso -- it costs nothing when it does not
+        // apply, since the reader self-checks for "CD001" and returns
+        // null on a raw-sector image, falling through to the scanner
+        // exactly as before.
+        if (extension == "iso" || extension == "bin") {
             PlayStationDiscType.detect(romFile)?.toConsoleSystemId()?.let { return it }
         }
         return try {
