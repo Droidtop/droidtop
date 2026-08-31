@@ -216,11 +216,15 @@ class CatalogPreferenceNavigator(
             isIconSpaceReserved = false
             setOnPreferenceClickListener { pref ->
                 pref.summary = "Working..."
-                fragment.viewLifecycleOwner.lifecycleScope.launch {
+                // this@... qualification: inside Preference.apply {},
+                // a bare `fragment` is the Preference's own String
+                // fragment-route property, not the hosting fragment.
+                val host = this@CatalogPreferenceNavigator.fragment
+                host.viewLifecycleOwner.lifecycleScope.launch {
                     val outcome = withContext(Dispatchers.IO) {
                         runCatching {
                             item.run(context) { status ->
-                                fragment.activity?.runOnUiThread { pref.summary = status }
+                                host.activity?.runOnUiThread { pref.summary = status }
                             }
                         }.getOrElse { "Failed: ${it.message}" }
                     }
