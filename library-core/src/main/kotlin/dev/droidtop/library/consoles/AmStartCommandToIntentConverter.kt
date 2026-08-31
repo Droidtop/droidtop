@@ -102,9 +102,44 @@ object AmStartCommandToIntentConverter {
             // value containing a space must not be split into separate
             // tokens. One place knows how a template becomes tokens.
             for ((key, value) in placeholders) t = t.replace(key, value)
-            t
+            expandInject(t, filePath)
         }
     }
+
+    /**
+     * `{file.inject:REL}` becomes the CONTENT of the file at REL,
+     * resolved against the game's own directory (absolute REL allowed --
+     * the GameNative presets read the launched file itself). This is
+     * ES-DE's own %INJECT% mechanism: Vita3K launches by a title id
+     * stored in `<basename>.psvita`, GameNative by an app id stored in
+     * the .steam stub -- the argument the emulator needs simply is not
+     * derivable from the path, only from the bytes.
+     *
+     * REL is expanded AFTER the ordinary placeholders, so
+     * `{file.inject:{file.basename}.psvita}` works. Content is trimmed
+     * (these are one-line id files, and a trailing newline would ride
+     * into the extra). A missing or unreadable file is an error by name
+     * -- launching with a half-substituted argument would fail somewhere
+     * far less explicable inside the emulator.
+     */
+    private fun expandInject(token: String, filePath: String?): String {
+        val start = token.indexOf(INJECT_PREFIX)
+        if (start < 0) return token
+        val end = token.indexOf('}', start + INJECT_PREFIX.length)
+        if (end < 0) throw IllegalArgumentException("Unterminated {file.inject:...} in am start command")
+        val rel = token.substring(start + INJECT_PREFIX.length, end)
+        val resolved = File(rel).let { raw ->
+            if (raw.isAbsolute) raw
+            else File(File(filePath ?: throw IllegalArgumentException("{file.inject} needs a game file")).parentFile, rel)
+        }
+        val content = runCatching { resolved.readText().trim() }.getOrElse {
+            throw IllegalArgumentException("Couldn't read ${resolved.absolutePath} for {file.inject}")
+        }
+        // Recurse: a token may hold several directives.
+        return expandInject(token.substring(0, start) + content + token.substring(end + 1), filePath)
+    }
+
+    private const val INJECT_PREFIX = "{file.inject:"
 
     fun toIntent(
         context: Context,
@@ -186,6 +221,10 @@ object AmStartCommandToIntentConverter {
                     },
                 )
                 "--esn" -> intent.putExtra(tokens.removeFirst(), null as String?)
+                // Real, documented am flag: a comma-separated string
+                // array. Vita3K's own ES-DE launch command passes its
+                // AppStartParameters this way.
+                "--esa" -> intent.putExtra(tokens.removeFirst(), tokens.removeFirst().split(',').toTypedArray())
                 // Real, documented `am start` boolean flags (no following
                 // value) -- several real emulator presets (DuckStation,
                 // AetherSX2, ePSXe, ...) depend on these actually being

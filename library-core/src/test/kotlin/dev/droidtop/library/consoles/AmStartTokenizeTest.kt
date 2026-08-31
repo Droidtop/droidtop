@@ -149,6 +149,47 @@ class AmStartTokenizeTest {
     }
 
     @Test
+    fun `file inject substitutes the content of a sibling file`() {
+        // ES-DE's %INJECT% mechanism: Vita3K launches by the title id
+        // STORED IN <basename>.psvita -- the argument is not derivable
+        // from any path, only from the bytes.
+        val dir = java.nio.file.Files.createTempDirectory("inject").toFile()
+        try {
+            val game = java.io.File(dir, "Persona 4 Golden.psvita")
+            game.writeText("PCSE00120\n")
+            val tokens = AmStartCommandToIntentConverter.tokenize(
+                "--esa AppStartParameters -r,{file.inject:{file.basename}.psvita}",
+                game.absolutePath,
+                null,
+                mapOf("{file.basename}" to game.nameWithoutExtension),
+            )
+            // Content trimmed -- the trailing newline must not ride into
+            // the extra -- and the surrounding literal kept.
+            assertEquals("-r,PCSE00120", tokens[2])
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `a missing inject file is an error by name, not a half-substituted launch`() {
+        val dir = java.nio.file.Files.createTempDirectory("inject").toFile()
+        try {
+            val game = java.io.File(dir, "Game.psvita").apply { writeText("x") }
+            AmStartCommandToIntentConverter.tokenize(
+                "-e id {file.inject:absent.txt}",
+                game.absolutePath,
+                null,
+            )
+            org.junit.Assert.fail("expected IllegalArgumentException")
+        } catch (expected: IllegalArgumentException) {
+            org.junit.Assert.assertTrue(expected.message!!.contains("absent.txt"))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `a template with no placeholders is untouched`() {
         val tokens = AmStartCommandToIntentConverter.tokenize(
             "-n com.example/.Main --activity-clear-task",
