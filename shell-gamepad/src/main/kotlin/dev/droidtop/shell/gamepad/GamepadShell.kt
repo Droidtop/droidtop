@@ -58,7 +58,7 @@ import dev.droidtop.library.LaunchStrategyOverridePrefs
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
-import dev.droidtop.library.consoles.ES_DE_CONSOLE_SYSTEMS
+import dev.droidtop.library.consoles.PlatformsDatabase
 import dev.droidtop.library.displayName
 import dev.droidtop.library.displayName as launchStrategyDisplayName
 import dev.droidtop.library.theme.SystemThemeColors
@@ -868,7 +868,7 @@ private sealed interface GameGroup {
 
     data class System(val systemId: String) : GameGroup {
         override val key get() = "system:$systemId"
-        override val label get() = ES_DE_CONSOLE_SYSTEMS.firstOrNull { it.id == systemId }?.displayName ?: systemId
+        override val label get() = PlatformsDatabase.displayNameOrNull(systemId) ?: systemId
         override val systemThemeFolder get() = systemId
     }
 

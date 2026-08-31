@@ -122,11 +122,18 @@ object AppSettingsCatalogs {
                     ),
                     AsyncActionItem(
                         id = "console_systems_update_players",
-                        title = "Update player database",
-                        subtitle = "Refresh the emulator launch presets from droidtop-platforms on GitHub",
-                        run = { ctx, _ ->
-                            val count = PlayersDatabaseUpdater.update(ctx)
-                            "Player database updated ($count players)"
+                        title = "Update platform databases",
+                        subtitle = "Refresh players, platforms, engine routing, and BIOS registry from droidtop-platforms on GitHub",
+                        run = { ctx, onStatus ->
+                            onStatus("Updating players...")
+                            val players = PlayersDatabaseUpdater.update(ctx)
+                            onStatus("Updating platforms...")
+                            val platforms = dev.droidtop.library.consoles.PlatformsDatabase.update(ctx)
+                            onStatus("Updating engine routing...")
+                            val engines = dev.droidtop.library.EnginesDatabase.update(ctx)
+                            onStatus("Updating BIOS registry...")
+                            val bios = BiosDatabase.update(ctx)
+                            "Updated: $players players, $platforms platforms, $engines engines, $bios BIOS systems"
                         },
                     ),
                 ),

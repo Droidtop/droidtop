@@ -1,0 +1,3162 @@
+{
+ "version": 1,
+ "source": "ES-DE es_systems.xml (linux), MIT -- regenerate with generator/from_esde_systems.py",
+ "platforms": [
+  {
+   "id": "3do",
+   "name": "3DO Interactive Multiplayer",
+   "extensions": [
+    "7z",
+    "bin",
+    "chd",
+    "cue",
+    "iso",
+    "zip"
+   ],
+   "retroArchCore": "opera",
+   "theme": "3do"
+  },
+  {
+   "id": "adam",
+   "name": "Coleco Adam",
+   "extensions": [
+    "1dd",
+    "7z",
+    "bin",
+    "col",
+    "cqi",
+    "cqm",
+    "d77",
+    "d88",
+    "ddp",
+    "dfi",
+    "dsk",
+    "hfe",
+    "imd",
+    "mfi",
+    "mfm",
+    "rom",
+    "td0",
+    "wav",
+    "zip"
+   ],
+   "retroArchCore": null,
+   "theme": "adam"
+  },
+  {
+   "id": "ags",
+   "name": "Adventure Game Studio Game Engine",
+   "extensions": [
+    "desktop",
+    "sh"
+   ],
+   "retroArchCore": null,
+   "theme": "ags"
+  },
+  {
+   "id": "amiga",
+   "name": "Commodore Amiga",
+   "extensions": [
+    "7z",
+    "adf",
+    "adz",
+    "ccd",
+    "chd",
+    "cue",
+    "dms",
+    "fdi",
+    "hdf",
+    "hdz",
+    "ipf",
+    "iso",
+    "lha",
+    "m3u",
+    "mds",
+    "nrg",
+    "rp9",
+    "uae",
+    "zip"
+   ],
+   "retroArchCore": "puae",
+   "theme": "amiga"
+  },
+  {
+   "id": "amiga1200",
+   "name": "Commodore Amiga 1200",
+   "extensions": [
+    "7z",
+    "adf",
+    "adz",
+    "ccd",
+    "chd",
+    "cue",
+    "dms",
+    "fdi",
+    "hdf",
+    "hdz",
+    "ipf",
+    "iso",
+    "lha",
+    "m3u",
+    "mds",
+    "nrg",
+    "rp9",
+    "uae",
+    "zip"
+   ],
+   "retroArchCore": "puae",
+   "theme": "amiga1200"
+  },
+  {
+   "id": "amiga600",
+   "name": "Commodore Amiga 600",
+   "extensions": [
+    "7z",
+    "adf",
+    "adz",
+    "ccd",
+    "chd",
+    "cue",
+    "dms",
+    "fdi",
+    "hdf",
+    "hdz",
+    "ipf",
+    "iso",
+    "lha",
+    "m3u",
+    "mds",
+    "nrg",
+    "rp9",
+    "uae",
+    "zip"
+   ],
+   "retroArchCore": "puae",
+   "theme": "amiga600"
+  },
+  {
+   "id": "amigacd32",
+   "name": "Commodore Amiga CD32",
+   "extensions": [
+    "7z",
+    "adf",
+    "adz",
+    "ccd",
+    "chd",
+    "cue",
+    "dms",
+    "fdi",
+    "hdf",
+    "hdz",
+    "ipf",
+    "iso",
+    "lha",
+    "m3u",
+    "mds",
+    "nrg",
+    "rp9",
+    "uae",
+    "zip"
+   ],
+   "retroArchCore": "puae",
+   "theme": "amigacd32"
+  },
+  {
+   "id": "amstradcpc",
+   "name": "Amstrad CPC",
+   "extensions": [
+    "7z",
+    "cdt",
+    "cpr",
+    "dsk",
+    "kcr",
+    "m3u",
+    "sna",
+    "tap",
+    "tar",
+    "voc",
+    "zip"
+   ],
+   "retroArchCore": "cap32",
+   "theme": "amstradcpc"
+  },
+  {
+   "id": "android",
+   "name": "Google Android",
+   "extensions": [
+    "7z",
+    "zip"
+   ],
+   "retroArchCore": null,
+   "theme": "android"
+  },
+  {
+   "id": "androidapps",
+   "name": "Android Apps",
+   "extensions": [
+    "7z",
+    "zip"
+   ],
+   "retroArchCore": null,
+   "theme": "androidapps"
+  },
+  {
+   "id": "androidgames",
+   "name": "Android Games",
+   "extensions": [
+    "7z",
+    "zip"
+   ],
+   "retroArchCore": null,
+   "theme": "androidgames"
+  },
+  {
+   "id": "apple2",
+   "name": "Apple II",
+   "extensions": [
+    "7z",
+    "do",
+    "dsk",
+    "nib",
+    "po",
+    "zip"
+   ],
+   "retroArchCore": "applewin",
+   "theme": "apple2"
+  },
+  {
+   "id": "apple2gs",
+   "name": "Apple IIGS",
+   "extensions": [
+    "2mg",
+    "7z",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "apple2gs"
+  },
+  {
+   "id": "arcade",
+   "name": "Arcade",
+   "extensions": [
+    "7z",
+    "acgame",
+    "arcadedef",
+    "cmd",
+    "desktop",
+    "gam",
+    "lindbergh",
+    "neo",
+    "sh",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "arcade"
+  },
+  {
+   "id": "arcadia",
+   "name": "Emerson Arcadia 2001",
+   "extensions": [
+    "7z",
+    "bin",
+    "tvc",
+    "zip"
+   ],
+   "retroArchCore": "amiarcadia",
+   "theme": "arcadia"
+  },
+  {
+   "id": "archimedes",
+   "name": "Acorn Archimedes",
+   "extensions": [
+    "1dd",
+    "360",
+    "7z",
+    "adf",
+    "adl",
+    "adm",
+    "ads",
+    "apd",
+    "bbc",
+    "chd",
+    "cqi",
+    "cqm",
+    "d77",
+    "d88",
+    "dfi",
+    "dsd",
+    "dsk",
+    "hfe",
+    "ima",
+    "imd",
+    "img",
+    "ipf",
+    "jfd",
+    "mfi",
+    "mfm",
+    "msa",
+    "ssd",
+    "st",
+    "td0",
+    "ufi",
+    "zip"
+   ],
+   "retroArchCore": null,
+   "theme": "archimedes"
+  },
+  {
+   "id": "arduboy",
+   "name": "Arduboy Miniature Game System",
+   "extensions": [
+    "7z",
+    "arduboy",
+    "hex",
+    "zip"
+   ],
+   "retroArchCore": "arduous",
+   "theme": "arduboy"
+  },
+  {
+   "id": "astrocde",
+   "name": "Bally Astrocade",
+   "extensions": [
+    "7z",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "astrocade"
+  },
+  {
+   "id": "atari2600",
+   "name": "Atari 2600",
+   "extensions": [
+    "7z",
+    "a26",
+    "bin",
+    "zip"
+   ],
+   "retroArchCore": "stella",
+   "theme": "atari2600"
+  },
+  {
+   "id": "atari5200",
+   "name": "Atari 5200",
+   "extensions": [
+    "7z",
+    "a52",
+    "atr",
+    "atx",
+    "bin",
+    "car",
+    "cas",
+    "cdm",
+    "com",
+    "rom",
+    "xex",
+    "xfd",
+    "zip"
+   ],
+   "retroArchCore": "a5200",
+   "theme": "atari5200"
+  },
+  {
+   "id": "atari7800",
+   "name": "Atari 7800 ProSystem",
+   "extensions": [
+    "7z",
+    "a78",
+    "bin",
+    "zip"
+   ],
+   "retroArchCore": "prosystem",
+   "theme": "atari7800"
+  },
+  {
+   "id": "atari800",
+   "name": "Atari 800",
+   "extensions": [
+    "7z",
+    "a52",
+    "atr",
+    "atx",
+    "bin",
+    "car",
+    "cas",
+    "cdm",
+    "com",
+    "rom",
+    "xex",
+    "xfd",
+    "zip"
+   ],
+   "retroArchCore": "atari800",
+   "theme": "atari800"
+  },
+  {
+   "id": "atarijaguar",
+   "name": "Atari Jaguar",
+   "extensions": [
+    "7z",
+    "abs",
+    "bigpimg",
+    "bin",
+    "cdi",
+    "cof",
+    "cue",
+    "j64",
+    "jag",
+    "prg",
+    "rom",
+    "zip"
+   ],
+   "retroArchCore": "virtualjaguar",
+   "theme": "atarijaguar"
+  },
+  {
+   "id": "atarijaguarcd",
+   "name": "Atari Jaguar CD",
+   "extensions": [
+    "abs",
+    "bigpimg",
+    "bin",
+    "cdi",
+    "cof",
+    "cue",
+    "j64",
+    "jag",
+    "prg",
+    "rom"
+   ],
+   "retroArchCore": "virtualjaguar",
+   "theme": "atarijaguarcd"
+  },
+  {
+   "id": "atarilynx",
+   "name": "Atari Lynx",
+   "extensions": [
+    "7z",
+    "lnx",
+    "lyx",
+    "o",
+    "zip"
+   ],
+   "retroArchCore": "handy",
+   "theme": "atarilynx"
+  },
+  {
+   "id": "atarist",
+   "name": "Atari ST",
+   "extensions": [
+    "7z",
+    "dim",
+    "ipf",
+    "m3u",
+    "msa",
+    "st",
+    "stx",
+    "zip"
+   ],
+   "retroArchCore": "hatari",
+   "theme": "atarist"
+  },
+  {
+   "id": "atarixe",
+   "name": "Atari XE",
+   "extensions": [
+    "7z",
+    "a52",
+    "atr",
+    "atx",
+    "bin",
+    "car",
+    "cas",
+    "cdm",
+    "com",
+    "rom",
+    "xex",
+    "xfd",
+    "zip"
+   ],
+   "retroArchCore": "atari800",
+   "theme": "atarixe"
+  },
+  {
+   "id": "atomiswave",
+   "name": "Sammy Corporation Atomiswave",
+   "extensions": [
+    "7z",
+    "bin",
+    "dat",
+    "elf",
+    "lst",
+    "zip"
+   ],
+   "retroArchCore": "flycast",
+   "theme": "atomiswave"
+  },
+  {
+   "id": "bbcmicro",
+   "name": "Acorn Computers BBC Micro",
+   "extensions": [
+    "7z",
+    "dsd",
+    "img",
+    "ssd",
+    "zip"
+   ],
+   "retroArchCore": "b2",
+   "theme": "bbcmicro"
+  },
+  {
+   "id": "c64",
+   "name": "Commodore 64",
+   "extensions": [
+    "7z",
+    "bin",
+    "cmd",
+    "crt",
+    "d2m",
+    "d4m",
+    "d64",
+    "d6z",
+    "d71",
+    "d7z",
+    "d80",
+    "d81",
+    "d82",
+    "d8z",
+    "g41",
+    "g4z",
+    "g64",
+    "g6z",
+    "gz",
+    "lnx",
+    "m3u",
+    "nbz",
+    "nib",
+    "p00",
+    "prg",
+    "t64",
+    "tap",
+    "vfl",
+    "vsf",
+    "x64",
+    "x6z",
+    "zip"
+   ],
+   "retroArchCore": "vice_x64sc",
+   "theme": "c64"
+  },
+  {
+   "id": "cdimono1",
+   "name": "Philips CD-i",
+   "extensions": [
+    "chd",
+    "cue",
+    "iso"
+   ],
+   "retroArchCore": "same_cdi",
+   "theme": "cdimono1"
+  },
+  {
+   "id": "cdtv",
+   "name": "Commodore CDTV",
+   "extensions": [
+    "7z",
+    "adf",
+    "adz",
+    "ccd",
+    "chd",
+    "cue",
+    "dms",
+    "fdi",
+    "hdf",
+    "hdz",
+    "ipf",
+    "iso",
+    "lha",
+    "m3u",
+    "mds",
+    "nrg",
+    "rp9",
+    "uae",
+    "zip"
+   ],
+   "retroArchCore": "puae",
+   "theme": "cdtv"
+  },
+  {
+   "id": "chailove",
+   "name": "ChaiLove Game Engine",
+   "extensions": [
+    "7z",
+    "chai",
+    "chailove",
+    "zip"
+   ],
+   "retroArchCore": "chailove",
+   "theme": "chailove"
+  },
+  {
+   "id": "channelf",
+   "name": "Fairchild Channel F",
+   "extensions": [
+    "7z",
+    "bin",
+    "chf",
+    "zip"
+   ],
+   "retroArchCore": "freechaf",
+   "theme": "channelf"
+  },
+  {
+   "id": "coco",
+   "name": "Tandy Color Computer",
+   "extensions": [
+    "cas",
+    "ccc",
+    "dsk",
+    "rom"
+   ],
+   "retroArchCore": null,
+   "theme": "coco"
+  },
+  {
+   "id": "colecovision",
+   "name": "Coleco ColecoVision",
+   "extensions": [
+    "7z",
+    "bin",
+    "cas",
+    "col",
+    "cv",
+    "dsk",
+    "m3u",
+    "mx1",
+    "mx2",
+    "myv",
+    "ri",
+    "rom",
+    "sc",
+    "sg",
+    "zip"
+   ],
+   "retroArchCore": "bluemsx",
+   "theme": "colecovision"
+  },
+  {
+   "id": "consolearcade",
+   "name": "Console Arcade Systems",
+   "extensions": [
+    "7z",
+    "acgame",
+    "arcadedef",
+    "desktop",
+    "iso",
+    "ps3",
+    "sh",
+    "xbe",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "consolearcade"
+  },
+  {
+   "id": "cps",
+   "name": "Capcom Play System",
+   "extensions": [
+    "7z",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "cps"
+  },
+  {
+   "id": "cps1",
+   "name": "Capcom Play System I",
+   "extensions": [
+    "7z",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "cps1"
+  },
+  {
+   "id": "cps2",
+   "name": "Capcom Play System II",
+   "extensions": [
+    "7z",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "cps2"
+  },
+  {
+   "id": "cps3",
+   "name": "Capcom Play System III",
+   "extensions": [
+    "7z",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "cps3"
+  },
+  {
+   "id": "crvision",
+   "name": "VTech CreatiVision",
+   "extensions": [
+    "7z",
+    "bin",
+    "rom",
+    "zip"
+   ],
+   "retroArchCore": "jollycv",
+   "theme": "crvision"
+  },
+  {
+   "id": "daphne",
+   "name": "Daphne Arcade LaserDisc Emulator",
+   "extensions": [
+    "7z",
+    "daphne",
+    "dirksimple",
+    "mmi",
+    "ogv",
+    "singe",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "daphne"
+  },
+  {
+   "id": "desktop",
+   "name": "Desktop Applications",
+   "extensions": [
+    "appimage",
+    "desktop",
+    "sh"
+   ],
+   "retroArchCore": null,
+   "theme": "desktop"
+  },
+  {
+   "id": "doom",
+   "name": "Doom",
+   "extensions": [
+    "desktop",
+    "ipk3",
+    "iwad",
+    "pk3",
+    "pk4",
+    "pwad",
+    "sh",
+    "wad"
+   ],
+   "retroArchCore": "prboom",
+   "theme": "doom"
+  },
+  {
+   "id": "dos",
+   "name": "DOS (PC)",
+   "extensions": [
+    "7z",
+    "bat",
+    "com",
+    "conf",
+    "cue",
+    "dosz",
+    "exe",
+    "img",
+    "iso",
+    "zip"
+   ],
+   "retroArchCore": "dosbox_pure",
+   "theme": "dos"
+  },
+  {
+   "id": "dragon32",
+   "name": "Dragon Data Dragon 32",
+   "extensions": [
+    "7z",
+    "cas",
+    "ccc",
+    "dsk",
+    "rom",
+    "zip"
+   ],
+   "retroArchCore": null,
+   "theme": "dragon32"
+  },
+  {
+   "id": "dreamcast",
+   "name": "Sega Dreamcast",
+   "extensions": [
+    "7z",
+    "cdi",
+    "chd",
+    "cue",
+    "dat",
+    "elf",
+    "gdi",
+    "iso",
+    "lst",
+    "m3u",
+    "zip"
+   ],
+   "retroArchCore": "flycast",
+   "theme": "dreamcast"
+  },
+  {
+   "id": "easyrpg",
+   "name": "EasyRPG Game Engine",
+   "extensions": [
+    "easyrpg",
+    "zip"
+   ],
+   "retroArchCore": "easyrpg",
+   "theme": "easyrpg"
+  },
+  {
+   "id": "electron",
+   "name": "Acorn Electron",
+   "extensions": [
+    "1dd",
+    "7z",
+    "adf",
+    "adl",
+    "adm",
+    "ads",
+    "bbc",
+    "bin",
+    "cqi",
+    "cqm",
+    "csw",
+    "d77",
+    "d88",
+    "dfi",
+    "dsd",
+    "dsk",
+    "hfe",
+    "imd",
+    "img",
+    "mfi",
+    "mfm",
+    "rom",
+    "ssd",
+    "td0",
+    "uef",
+    "wav",
+    "zip"
+   ],
+   "retroArchCore": null,
+   "theme": "electron"
+  },
+  {
+   "id": "emulators",
+   "name": "Emulators",
+   "extensions": [
+    "appimage",
+    "desktop",
+    "sh"
+   ],
+   "retroArchCore": null,
+   "theme": "emulators"
+  },
+  {
+   "id": "epic",
+   "name": "Epic Games Store",
+   "extensions": [
+    "desktop",
+    "sh"
+   ],
+   "retroArchCore": null,
+   "theme": "epic"
+  },
+  {
+   "id": "famicom",
+   "name": "Nintendo Family Computer",
+   "extensions": [
+    "3dsen",
+    "7z",
+    "fds",
+    "nes",
+    "unf",
+    "unif",
+    "zip"
+   ],
+   "retroArchCore": "mesen",
+   "theme": "famicom"
+  },
+  {
+   "id": "fba",
+   "name": "FinalBurn Alpha",
+   "extensions": [
+    "7z",
+    "iso",
+    "zip"
+   ],
+   "retroArchCore": "fbalpha2012",
+   "theme": "fba"
+  },
+  {
+   "id": "fbneo",
+   "name": "FinalBurn Neo",
+   "extensions": [
+    "7z",
+    "zip"
+   ],
+   "retroArchCore": "fbneo",
+   "theme": "fbneo"
+  },
+  {
+   "id": "fds",
+   "name": "Nintendo Famicom Disk System",
+   "extensions": [
+    "7z",
+    "fds",
+    "nes",
+    "unf",
+    "unif",
+    "zip"
+   ],
+   "retroArchCore": "mesen",
+   "theme": "fds"
+  },
+  {
+   "id": "flash",
+   "name": "Adobe Flash",
+   "extensions": [
+    "ruf",
+    "swf"
+   ],
+   "retroArchCore": null,
+   "theme": "flash"
+  },
+  {
+   "id": "fm7",
+   "name": "Fujitsu FM-7",
+   "extensions": [
+    "1dd",
+    "7z",
+    "cqi",
+    "cqm",
+    "d77",
+    "d88",
+    "dfi",
+    "dsk",
+    "hfe",
+    "imd",
+    "mfi",
+    "mfm",
+    "t77",
+    "td0",
+    "wav",
+    "zip"
+   ],
+   "retroArchCore": null,
+   "theme": "fm7"
+  },
+  {
+   "id": "fmtowns",
+   "name": "Fujitsu FM Towns",
+   "extensions": [
+    "cdr",
+    "chd",
+    "cue",
+    "gdi",
+    "iso"
+   ],
+   "retroArchCore": "mame",
+   "theme": "fmtowns"
+  },
+  {
+   "id": "fpinball",
+   "name": "Future Pinball",
+   "extensions": [
+    "fpt"
+   ],
+   "retroArchCore": null,
+   "theme": "fpinball"
+  },
+  {
+   "id": "gamate",
+   "name": "Bit Corporation Gamate",
+   "extensions": [
+    "7z",
+    "bin",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "gamate"
+  },
+  {
+   "id": "gameandwatch",
+   "name": "Nintendo Game and Watch",
+   "extensions": [
+    "7z",
+    "mgw",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "gameandwatch"
+  },
+  {
+   "id": "gamecom",
+   "name": "Tiger Electronics Game.com",
+   "extensions": [
+    "7z",
+    "tgc",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "gamecom"
+  },
+  {
+   "id": "gamegear",
+   "name": "Sega Game Gear",
+   "extensions": [
+    "68k",
+    "7z",
+    "bin",
+    "bms",
+    "chd",
+    "col",
+    "cue",
+    "gen",
+    "gg",
+    "iso",
+    "m3u",
+    "md",
+    "mdx",
+    "rom",
+    "sg",
+    "sgd",
+    "smd",
+    "sms",
+    "zip"
+   ],
+   "retroArchCore": "genesis_plus_gx",
+   "theme": "gamegear"
+  },
+  {
+   "id": "gb",
+   "name": "Nintendo Game Boy",
+   "extensions": [
+    "7z",
+    "bs",
+    "cgb",
+    "dmg",
+    "gb",
+    "gbc",
+    "gbx",
+    "sfc",
+    "sgb",
+    "smc",
+    "zip"
+   ],
+   "retroArchCore": "gambatte",
+   "theme": "gb"
+  },
+  {
+   "id": "gba",
+   "name": "Nintendo Game Boy Advance",
+   "extensions": [
+    "7z",
+    "agb",
+    "bin",
+    "cgb",
+    "dmg",
+    "gb",
+    "gba",
+    "gbc",
+    "gbx",
+    "sgb",
+    "zip"
+   ],
+   "retroArchCore": "mgba",
+   "theme": "gba"
+  },
+  {
+   "id": "gbc",
+   "name": "Nintendo Game Boy Color",
+   "extensions": [
+    "7z",
+    "bs",
+    "cgb",
+    "dmg",
+    "gb",
+    "gbc",
+    "gbx",
+    "sfc",
+    "sgb",
+    "smc",
+    "zip"
+   ],
+   "retroArchCore": "gambatte",
+   "theme": "gbc"
+  },
+  {
+   "id": "gc",
+   "name": "Nintendo GameCube",
+   "extensions": [
+    "7z",
+    "ciso",
+    "dff",
+    "dol",
+    "elf",
+    "gcm",
+    "gcz",
+    "iso",
+    "json",
+    "m3u",
+    "rvz",
+    "tgc",
+    "wad",
+    "wbfs",
+    "wia",
+    "zip"
+   ],
+   "retroArchCore": "dolphin",
+   "theme": "gc"
+  },
+  {
+   "id": "genesis",
+   "name": "Sega Genesis",
+   "extensions": [
+    "32x",
+    "68k",
+    "7z",
+    "bin",
+    "bms",
+    "chd",
+    "cue",
+    "gen",
+    "gg",
+    "iso",
+    "m3u",
+    "md",
+    "mdx",
+    "sg",
+    "sgd",
+    "smd",
+    "sms",
+    "zip"
+   ],
+   "retroArchCore": "genesis_plus_gx",
+   "theme": "genesis"
+  },
+  {
+   "id": "gmaster",
+   "name": "Hartung Game Master",
+   "extensions": [
+    "7z",
+    "bin",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "gmaster"
+  },
+  {
+   "id": "gx4000",
+   "name": "Amstrad GX4000",
+   "extensions": [
+    "7z",
+    "bin",
+    "cdt",
+    "cpr",
+    "dsk",
+    "kcr",
+    "m3u",
+    "sna",
+    "tap",
+    "tar",
+    "voc",
+    "zip"
+   ],
+   "retroArchCore": "cap32",
+   "theme": "gx4000"
+  },
+  {
+   "id": "intellivision",
+   "name": "Mattel Electronics Intellivision",
+   "extensions": [
+    "7z",
+    "bin",
+    "int",
+    "rom",
+    "zip"
+   ],
+   "retroArchCore": "freeintv",
+   "theme": "intellivision"
+  },
+  {
+   "id": "j2me",
+   "name": "Java 2 Micro Edition (J2ME)",
+   "extensions": [
+    "7z",
+    "jar",
+    "zip"
+   ],
+   "retroArchCore": "squirreljme",
+   "theme": "j2me"
+  },
+  {
+   "id": "kodi",
+   "name": "Kodi Home Theatre Software",
+   "extensions": [
+    "desktop",
+    "sh"
+   ],
+   "retroArchCore": null,
+   "theme": "kodi"
+  },
+  {
+   "id": "laserdisc",
+   "name": "LaserDisc Games",
+   "extensions": [
+    "7z",
+    "daphne",
+    "dirksimple",
+    "mmi",
+    "ogv",
+    "singe",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "laserdisc"
+  },
+  {
+   "id": "lcdgames",
+   "name": "LCD Handheld Games",
+   "extensions": [
+    "7z",
+    "mgw",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "lcdgames"
+  },
+  {
+   "id": "lowresnx",
+   "name": "LowRes NX Fantasy Console",
+   "extensions": [
+    "nx"
+   ],
+   "retroArchCore": "lowresnx",
+   "theme": "lowresnx"
+  },
+  {
+   "id": "lutris",
+   "name": "Lutris Open Gaming Platform",
+   "extensions": [
+    "desktop",
+    "sh"
+   ],
+   "retroArchCore": null,
+   "theme": "lutris"
+  },
+  {
+   "id": "lutro",
+   "name": "Lutro Game Engine",
+   "extensions": [
+    "7z",
+    "lua",
+    "lutro",
+    "zip"
+   ],
+   "retroArchCore": "lutro",
+   "theme": "lutro"
+  },
+  {
+   "id": "macintosh",
+   "name": "Apple Macintosh",
+   "extensions": [
+    "dsk",
+    "game",
+    "img"
+   ],
+   "retroArchCore": "minivmac",
+   "theme": "macintosh"
+  },
+  {
+   "id": "mame",
+   "name": "Multiple Arcade Machine Emulator",
+   "extensions": [
+    "7z",
+    "acgame",
+    "arcadedef",
+    "cmd",
+    "desktop",
+    "gam",
+    "lindbergh",
+    "neo",
+    "sh",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "mame"
+  },
+  {
+   "id": "mame-advmame",
+   "name": "AdvanceMAME",
+   "extensions": [
+    "7z",
+    "zip"
+   ],
+   "retroArchCore": null,
+   "theme": "mame-advmame"
+  },
+  {
+   "id": "mark3",
+   "name": "Sega Mark III",
+   "extensions": [
+    "68k",
+    "7z",
+    "bin",
+    "bms",
+    "chd",
+    "col",
+    "cue",
+    "gen",
+    "gg",
+    "iso",
+    "m3u",
+    "md",
+    "mdx",
+    "rom",
+    "sg",
+    "sgd",
+    "smd",
+    "sms",
+    "zip"
+   ],
+   "retroArchCore": "genesis_plus_gx",
+   "theme": "mark3"
+  },
+  {
+   "id": "mastersystem",
+   "name": "Sega Master System",
+   "extensions": [
+    "68k",
+    "7z",
+    "bin",
+    "bms",
+    "chd",
+    "col",
+    "cue",
+    "gen",
+    "gg",
+    "iso",
+    "m3u",
+    "md",
+    "mdx",
+    "rom",
+    "sg",
+    "sgd",
+    "smd",
+    "sms",
+    "zip"
+   ],
+   "retroArchCore": "genesis_plus_gx",
+   "theme": "mastersystem"
+  },
+  {
+   "id": "megacd",
+   "name": "Sega Mega-CD",
+   "extensions": [
+    "68k",
+    "7z",
+    "bin",
+    "bms",
+    "chd",
+    "cue",
+    "gen",
+    "gg",
+    "iso",
+    "m3u",
+    "md",
+    "mdx",
+    "sg",
+    "sgd",
+    "smd",
+    "sms",
+    "zip"
+   ],
+   "retroArchCore": "genesis_plus_gx",
+   "theme": "megacd"
+  },
+  {
+   "id": "megacdjp",
+   "name": "Sega Mega-CD",
+   "extensions": [
+    "68k",
+    "7z",
+    "bin",
+    "bms",
+    "chd",
+    "cue",
+    "gen",
+    "gg",
+    "iso",
+    "m3u",
+    "md",
+    "mdx",
+    "sg",
+    "sgd",
+    "smd",
+    "sms",
+    "zip"
+   ],
+   "retroArchCore": "genesis_plus_gx",
+   "theme": "megacdjp"
+  },
+  {
+   "id": "megadrive",
+   "name": "Sega Mega Drive",
+   "extensions": [
+    "32x",
+    "68k",
+    "7z",
+    "bin",
+    "bms",
+    "chd",
+    "cue",
+    "gen",
+    "gg",
+    "iso",
+    "m3u",
+    "md",
+    "mdx",
+    "sg",
+    "sgd",
+    "smd",
+    "sms",
+    "zip"
+   ],
+   "retroArchCore": "genesis_plus_gx",
+   "theme": "megadrive"
+  },
+  {
+   "id": "megadrivejp",
+   "name": "Sega Mega Drive",
+   "extensions": [
+    "32x",
+    "68k",
+    "7z",
+    "bin",
+    "bms",
+    "chd",
+    "cue",
+    "gen",
+    "gg",
+    "iso",
+    "m3u",
+    "md",
+    "mdx",
+    "sg",
+    "sgd",
+    "smd",
+    "sms",
+    "zip"
+   ],
+   "retroArchCore": "genesis_plus_gx",
+   "theme": "megadrivejp"
+  },
+  {
+   "id": "megaduck",
+   "name": "Creatronic Mega Duck",
+   "extensions": [
+    "7z",
+    "bin",
+    "zip"
+   ],
+   "retroArchCore": "sameduck",
+   "theme": "megaduck"
+  },
+  {
+   "id": "mess",
+   "name": "Multi Emulator Super System",
+   "extensions": [
+    "7z",
+    "chd",
+    "zip"
+   ],
+   "retroArchCore": "mess2015",
+   "theme": "mess"
+  },
+  {
+   "id": "model2",
+   "name": "Sega Model 2",
+   "extensions": [
+    "7z",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "model2"
+  },
+  {
+   "id": "model3",
+   "name": "Sega Model 3",
+   "extensions": [
+    "7z",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "model3"
+  },
+  {
+   "id": "moto",
+   "name": "Thomson MO/TO Series",
+   "extensions": [
+    "7z",
+    "fd",
+    "k7",
+    "m5",
+    "m7",
+    "rom",
+    "sap",
+    "zip"
+   ],
+   "retroArchCore": "theodore",
+   "theme": "moto"
+  },
+  {
+   "id": "msx",
+   "name": "MSX",
+   "extensions": [
+    "7z",
+    "cas",
+    "col",
+    "di1",
+    "di2",
+    "dmk",
+    "dsk",
+    "fd1",
+    "fd2",
+    "m3u",
+    "mx1",
+    "mx2",
+    "ogv",
+    "ri",
+    "rom",
+    "sc",
+    "sg",
+    "wav",
+    "xsa",
+    "zip"
+   ],
+   "retroArchCore": "bluemsx",
+   "theme": "msx"
+  },
+  {
+   "id": "msx1",
+   "name": "MSX1",
+   "extensions": [
+    "7z",
+    "cas",
+    "col",
+    "di1",
+    "di2",
+    "dmk",
+    "dsk",
+    "fd1",
+    "fd2",
+    "m3u",
+    "mx1",
+    "mx2",
+    "ogv",
+    "ri",
+    "rom",
+    "sc",
+    "sg",
+    "wav",
+    "xsa",
+    "zip"
+   ],
+   "retroArchCore": "bluemsx",
+   "theme": "msx1"
+  },
+  {
+   "id": "msx2",
+   "name": "MSX2",
+   "extensions": [
+    "7z",
+    "cas",
+    "col",
+    "di1",
+    "di2",
+    "dmk",
+    "dsk",
+    "fd1",
+    "fd2",
+    "m3u",
+    "mx1",
+    "mx2",
+    "ogv",
+    "ri",
+    "rom",
+    "sc",
+    "sg",
+    "wav",
+    "xsa",
+    "zip"
+   ],
+   "retroArchCore": "bluemsx",
+   "theme": "msx2"
+  },
+  {
+   "id": "msxturbor",
+   "name": "MSX Turbo R",
+   "extensions": [
+    "7z",
+    "cas",
+    "col",
+    "di1",
+    "di2",
+    "dmk",
+    "dsk",
+    "fd1",
+    "fd2",
+    "m3u",
+    "mx1",
+    "mx2",
+    "ogv",
+    "ri",
+    "rom",
+    "sc",
+    "sg",
+    "wav",
+    "xsa",
+    "zip"
+   ],
+   "retroArchCore": "bluemsx",
+   "theme": "msxturbor"
+  },
+  {
+   "id": "mugen",
+   "name": "M.U.G.E.N Game Engine",
+   "extensions": [
+    "mugen"
+   ],
+   "retroArchCore": null,
+   "theme": "mugen"
+  },
+  {
+   "id": "multivision",
+   "name": "Othello Multivision",
+   "extensions": [
+    "7z",
+    "bin",
+    "gg",
+    "rom",
+    "sg",
+    "sms",
+    "zip"
+   ],
+   "retroArchCore": "gearsystem",
+   "theme": "multivision"
+  },
+  {
+   "id": "n3ds",
+   "name": "Nintendo 3DS",
+   "extensions": [
+    "3ds",
+    "3dsx",
+    "7z",
+    "app",
+    "axf",
+    "cci",
+    "cxi",
+    "desktop",
+    "elf",
+    "z3dsx",
+    "zcci",
+    "zcxi",
+    "zip"
+   ],
+   "retroArchCore": "azahar",
+   "theme": "n3ds"
+  },
+  {
+   "id": "n64",
+   "name": "Nintendo 64",
+   "extensions": [
+    "7z",
+    "appimage",
+    "bin",
+    "d64",
+    "desktop",
+    "n64",
+    "ndd",
+    "sh",
+    "u1",
+    "v64",
+    "z64",
+    "zip"
+   ],
+   "retroArchCore": "mupen64plus_next",
+   "theme": "n64"
+  },
+  {
+   "id": "n64dd",
+   "name": "Nintendo 64DD",
+   "extensions": [
+    "7z",
+    "bin",
+    "d64",
+    "n64",
+    "ndd",
+    "u1",
+    "v64",
+    "z64",
+    "zip"
+   ],
+   "retroArchCore": "parallel_n64",
+   "theme": "n64dd"
+  },
+  {
+   "id": "naomi",
+   "name": "Sega NAOMI",
+   "extensions": [
+    "7z",
+    "bin",
+    "dat",
+    "elf",
+    "lst",
+    "zip"
+   ],
+   "retroArchCore": "flycast",
+   "theme": "naomi"
+  },
+  {
+   "id": "naomi2",
+   "name": "Sega NAOMI 2",
+   "extensions": [
+    "7z",
+    "bin",
+    "dat",
+    "elf",
+    "lst",
+    "zip"
+   ],
+   "retroArchCore": "flycast",
+   "theme": "naomi2"
+  },
+  {
+   "id": "naomigd",
+   "name": "Sega NAOMI GD-ROM",
+   "extensions": [
+    "7z",
+    "bin",
+    "dat",
+    "elf",
+    "lst",
+    "zip"
+   ],
+   "retroArchCore": "flycast",
+   "theme": "naomigd"
+  },
+  {
+   "id": "nds",
+   "name": "Nintendo DS",
+   "extensions": [
+    "7z",
+    "app",
+    "bin",
+    "dsi",
+    "ids",
+    "nds",
+    "zip"
+   ],
+   "retroArchCore": "melondsds",
+   "theme": "nds"
+  },
+  {
+   "id": "neogeo",
+   "name": "SNK Neo Geo",
+   "extensions": [
+    "7z",
+    "neo",
+    "zip"
+   ],
+   "retroArchCore": "fbneo",
+   "theme": "neogeo"
+  },
+  {
+   "id": "neogeocd",
+   "name": "SNK Neo Geo CD",
+   "extensions": [
+    "chd",
+    "cue"
+   ],
+   "retroArchCore": "neocd",
+   "theme": "neogeocd"
+  },
+  {
+   "id": "neogeocdjp",
+   "name": "SNK Neo Geo CD",
+   "extensions": [
+    "chd",
+    "cue"
+   ],
+   "retroArchCore": "neocd",
+   "theme": "neogeocdjp"
+  },
+  {
+   "id": "nes",
+   "name": "Nintendo Entertainment System",
+   "extensions": [
+    "3dsen",
+    "7z",
+    "fds",
+    "nes",
+    "unf",
+    "unif",
+    "zip"
+   ],
+   "retroArchCore": "mesen",
+   "theme": "nes"
+  },
+  {
+   "id": "ngage",
+   "name": "Nokia N-Gage",
+   "extensions": [
+    "ngage",
+    "zip"
+   ],
+   "retroArchCore": null,
+   "theme": "ngage"
+  },
+  {
+   "id": "ngp",
+   "name": "SNK Neo Geo Pocket",
+   "extensions": [
+    "7z",
+    "ngc",
+    "ngp",
+    "ngpc",
+    "npc",
+    "zip"
+   ],
+   "retroArchCore": "mednafen_ngp",
+   "theme": "ngp"
+  },
+  {
+   "id": "ngpc",
+   "name": "SNK Neo Geo Pocket Color",
+   "extensions": [
+    "7z",
+    "ngc",
+    "ngp",
+    "ngpc",
+    "npc",
+    "zip"
+   ],
+   "retroArchCore": "mednafen_ngp",
+   "theme": "ngpc"
+  },
+  {
+   "id": "odyssey2",
+   "name": "Magnavox Odyssey 2",
+   "extensions": [
+    "7z",
+    "bin",
+    "zip"
+   ],
+   "retroArchCore": "o2em",
+   "theme": "odyssey2"
+  },
+  {
+   "id": "openbor",
+   "name": "OpenBOR Game Engine",
+   "extensions": [
+    "appimage"
+   ],
+   "retroArchCore": null,
+   "theme": "openbor"
+  },
+  {
+   "id": "oric",
+   "name": "Tangerine Computer Systems Oric",
+   "extensions": [
+    "dsk",
+    "ort",
+    "tap",
+    "wav"
+   ],
+   "retroArchCore": null,
+   "theme": "oric"
+  },
+  {
+   "id": "palm",
+   "name": "Palm OS",
+   "extensions": [
+    "7z",
+    "img",
+    "pqa",
+    "prc",
+    "zip"
+   ],
+   "retroArchCore": "mu",
+   "theme": "palm"
+  },
+  {
+   "id": "pc",
+   "name": "IBM PC",
+   "extensions": [
+    "7z",
+    "bat",
+    "com",
+    "conf",
+    "cue",
+    "dosz",
+    "exe",
+    "img",
+    "iso",
+    "zip"
+   ],
+   "retroArchCore": "dosbox_pure",
+   "theme": "pc"
+  },
+  {
+   "id": "pc88",
+   "name": "NEC PC-8800 Series",
+   "extensions": [
+    "88d",
+    "cmt",
+    "d88",
+    "m3u",
+    "t88",
+    "u88"
+   ],
+   "retroArchCore": "quasi88",
+   "theme": "pc88"
+  },
+  {
+   "id": "pc98",
+   "name": "NEC PC-9800 Series",
+   "extensions": [
+    "2hd",
+    "7z",
+    "88d",
+    "98d",
+    "cmd",
+    "d88",
+    "d98",
+    "dup",
+    "fdd",
+    "fdi",
+    "hdd",
+    "hdi",
+    "hdm",
+    "hdn",
+    "m3u",
+    "nhd",
+    "tfd",
+    "thd",
+    "xdf",
+    "zip"
+   ],
+   "retroArchCore": "np2kai",
+   "theme": "pc98"
+  },
+  {
+   "id": "pcarcade",
+   "name": "PC Arcade Systems",
+   "extensions": [
+    "appimage",
+    "desktop",
+    "exe",
+    "lindbergh",
+    "sh"
+   ],
+   "retroArchCore": null,
+   "theme": "pcarcade"
+  },
+  {
+   "id": "pcengine",
+   "name": "NEC PC Engine",
+   "extensions": [
+    "7z",
+    "ccd",
+    "chd",
+    "cue",
+    "img",
+    "iso",
+    "m3u",
+    "pce",
+    "rom",
+    "sgx",
+    "toc",
+    "zip"
+   ],
+   "retroArchCore": "mednafen_pce",
+   "theme": "pcengine"
+  },
+  {
+   "id": "pcenginecd",
+   "name": "NEC PC Engine CD",
+   "extensions": [
+    "7z",
+    "ccd",
+    "chd",
+    "cue",
+    "img",
+    "iso",
+    "m3u",
+    "pce",
+    "sgx",
+    "toc",
+    "zip"
+   ],
+   "retroArchCore": "mednafen_pce",
+   "theme": "pcenginecd"
+  },
+  {
+   "id": "pcfx",
+   "name": "NEC PC-FX",
+   "extensions": [
+    "7z",
+    "ccd",
+    "chd",
+    "cue",
+    "m3u",
+    "toc",
+    "zip"
+   ],
+   "retroArchCore": "mednafen_pcfx",
+   "theme": "pcfx"
+  },
+  {
+   "id": "pico8",
+   "name": "PICO-8 Fantasy Console",
+   "extensions": [
+    "p8",
+    "png"
+   ],
+   "retroArchCore": "retro8",
+   "theme": "pico8"
+  },
+  {
+   "id": "plus4",
+   "name": "Commodore Plus/4",
+   "extensions": [
+    "7z",
+    "bin",
+    "cmd",
+    "crt",
+    "d2m",
+    "d4m",
+    "d64",
+    "d6z",
+    "d71",
+    "d7z",
+    "d80",
+    "d81",
+    "d82",
+    "d8z",
+    "g41",
+    "g4z",
+    "g64",
+    "g6z",
+    "gz",
+    "lnx",
+    "m3u",
+    "nbz",
+    "nib",
+    "p00",
+    "prg",
+    "t64",
+    "tap",
+    "vfl",
+    "vsf",
+    "x64",
+    "x6z",
+    "zip"
+   ],
+   "retroArchCore": "vice_xplus4",
+   "theme": "plus4"
+  },
+  {
+   "id": "pokemini",
+   "name": "Nintendo Pok\u00e9mon Mini",
+   "extensions": [
+    "7z",
+    "min",
+    "zip"
+   ],
+   "retroArchCore": "pokemini",
+   "theme": "pokemini"
+  },
+  {
+   "id": "ports",
+   "name": "Ports",
+   "extensions": [
+    "appimage",
+    "desktop",
+    "exe",
+    "game",
+    "phd",
+    "psx",
+    "sh"
+   ],
+   "retroArchCore": "ecwolf",
+   "theme": "ports"
+  },
+  {
+   "id": "ps2",
+   "name": "Sony PlayStation 2",
+   "extensions": [
+    "bin",
+    "chd",
+    "ciso",
+    "cso",
+    "desktop",
+    "dump",
+    "elf",
+    "gz",
+    "img",
+    "iso",
+    "isz",
+    "m3u",
+    "mdf",
+    "ngr",
+    "nrg",
+    "zso"
+   ],
+   "retroArchCore": "pcee2",
+   "theme": "ps2"
+  },
+  {
+   "id": "ps3",
+   "name": "Sony PlayStation 3",
+   "extensions": [
+    "desktop",
+    "iso",
+    "ps3",
+    "ps3dir"
+   ],
+   "retroArchCore": null,
+   "theme": "ps3"
+  },
+  {
+   "id": "ps4",
+   "name": "Sony PlayStation 4",
+   "extensions": [
+    "bin",
+    "desktop",
+    "ps4"
+   ],
+   "retroArchCore": null,
+   "theme": "ps4"
+  },
+  {
+   "id": "psp",
+   "name": "Sony PlayStation Portable",
+   "extensions": [
+    "7z",
+    "chd",
+    "cso",
+    "elf",
+    "iso",
+    "pbp",
+    "prx",
+    "zip"
+   ],
+   "retroArchCore": "ppsspp",
+   "theme": "psp"
+  },
+  {
+   "id": "psvita",
+   "name": "Sony PlayStation Vita",
+   "extensions": [
+    "psvita"
+   ],
+   "retroArchCore": null,
+   "theme": "psvita"
+  },
+  {
+   "id": "psx",
+   "name": "Sony PlayStation",
+   "extensions": [
+    "7z",
+    "bin",
+    "cbn",
+    "ccd",
+    "chd",
+    "cue",
+    "ecm",
+    "exe",
+    "img",
+    "iso",
+    "m3u",
+    "mdf",
+    "mds",
+    "minipsf",
+    "pbp",
+    "psexe",
+    "psf",
+    "toc",
+    "z",
+    "zip",
+    "znx"
+   ],
+   "retroArchCore": "mednafen_psx",
+   "theme": "psx"
+  },
+  {
+   "id": "pv1000",
+   "name": "Casio PV-1000",
+   "extensions": [
+    "7z",
+    "bin",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "pv1000"
+  },
+  {
+   "id": "quake",
+   "name": "Quake",
+   "extensions": [
+    "desktop",
+    "pak",
+    "pk3",
+    "sh"
+   ],
+   "retroArchCore": "tyrquake",
+   "theme": "quake"
+  },
+  {
+   "id": "samcoupe",
+   "name": "MGT SAM Coup\u00e9",
+   "extensions": [
+    "7z",
+    "dsk",
+    "mgt",
+    "sad",
+    "sbt",
+    "zip"
+   ],
+   "retroArchCore": null,
+   "theme": "samcoupe"
+  },
+  {
+   "id": "satellaview",
+   "name": "Nintendo Satellaview",
+   "extensions": [
+    "7z",
+    "bml",
+    "bs",
+    "fig",
+    "sfc",
+    "smc",
+    "st",
+    "swc",
+    "zip"
+   ],
+   "retroArchCore": "snes9x",
+   "theme": "satellaview"
+  },
+  {
+   "id": "saturn",
+   "name": "Sega Saturn",
+   "extensions": [
+    "7z",
+    "bin",
+    "ccd",
+    "chd",
+    "cue",
+    "iso",
+    "m3u",
+    "mds",
+    "toc",
+    "zip"
+   ],
+   "retroArchCore": "mednafen_saturn",
+   "theme": "saturn"
+  },
+  {
+   "id": "saturnjp",
+   "name": "Sega Saturn",
+   "extensions": [
+    "7z",
+    "bin",
+    "ccd",
+    "chd",
+    "cue",
+    "iso",
+    "m3u",
+    "mds",
+    "toc",
+    "zip"
+   ],
+   "retroArchCore": "mednafen_saturn",
+   "theme": "saturnjp"
+  },
+  {
+   "id": "scummvm",
+   "name": "ScummVM Game Engine",
+   "extensions": [
+    "scummvm",
+    "svm"
+   ],
+   "retroArchCore": "scummvm",
+   "theme": "scummvm"
+  },
+  {
+   "id": "scv",
+   "name": "Epoch Super Cassette Vision",
+   "extensions": [
+    "0",
+    "7z",
+    "bin",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "scv"
+  },
+  {
+   "id": "sega32x",
+   "name": "Sega Mega Drive 32X",
+   "extensions": [
+    "32x",
+    "68k",
+    "7z",
+    "bin",
+    "chd",
+    "cue",
+    "gen",
+    "iso",
+    "m3u",
+    "md",
+    "smd",
+    "sms",
+    "zip"
+   ],
+   "retroArchCore": "picodrive",
+   "theme": "sega32x"
+  },
+  {
+   "id": "sega32xjp",
+   "name": "Sega Super 32X",
+   "extensions": [
+    "32x",
+    "68k",
+    "7z",
+    "bin",
+    "chd",
+    "cue",
+    "gen",
+    "iso",
+    "m3u",
+    "md",
+    "smd",
+    "sms",
+    "zip"
+   ],
+   "retroArchCore": "picodrive",
+   "theme": "sega32xjp"
+  },
+  {
+   "id": "sega32xna",
+   "name": "Sega Genesis 32X",
+   "extensions": [
+    "32x",
+    "68k",
+    "7z",
+    "bin",
+    "chd",
+    "cue",
+    "gen",
+    "iso",
+    "m3u",
+    "md",
+    "smd",
+    "sms",
+    "zip"
+   ],
+   "retroArchCore": "picodrive",
+   "theme": "sega32xna"
+  },
+  {
+   "id": "segacd",
+   "name": "Sega CD",
+   "extensions": [
+    "68k",
+    "7z",
+    "bin",
+    "bms",
+    "chd",
+    "cue",
+    "gen",
+    "gg",
+    "iso",
+    "m3u",
+    "md",
+    "mdx",
+    "sg",
+    "sgd",
+    "smd",
+    "sms",
+    "zip"
+   ],
+   "retroArchCore": "genesis_plus_gx",
+   "theme": "segacd"
+  },
+  {
+   "id": "sfc",
+   "name": "Nintendo SFC (Super Famicom)",
+   "extensions": [
+    "7z",
+    "bin",
+    "bml",
+    "bs",
+    "bsx",
+    "dx2",
+    "fig",
+    "gd3",
+    "gd7",
+    "mgd",
+    "sfc",
+    "smc",
+    "st",
+    "swc",
+    "zip"
+   ],
+   "retroArchCore": "snes9x",
+   "theme": "sfc"
+  },
+  {
+   "id": "sg-1000",
+   "name": "Sega SG-1000",
+   "extensions": [
+    "68k",
+    "7z",
+    "bin",
+    "bms",
+    "chd",
+    "cue",
+    "gen",
+    "gg",
+    "iso",
+    "m3u",
+    "md",
+    "mdx",
+    "ri",
+    "rom",
+    "sg",
+    "sgd",
+    "smd",
+    "sms",
+    "zip"
+   ],
+   "retroArchCore": "genesis_plus_gx",
+   "theme": "sg-1000"
+  },
+  {
+   "id": "sgb",
+   "name": "Nintendo Super Game Boy",
+   "extensions": [
+    "7z",
+    "gb",
+    "gbc",
+    "sgb",
+    "zip"
+   ],
+   "retroArchCore": "sameboy",
+   "theme": "sgb"
+  },
+  {
+   "id": "snes",
+   "name": "Nintendo SNES (Super Nintendo)",
+   "extensions": [
+    "7z",
+    "bin",
+    "bml",
+    "bs",
+    "bsx",
+    "dx2",
+    "fig",
+    "gd3",
+    "gd7",
+    "mgd",
+    "sfc",
+    "smc",
+    "st",
+    "swc",
+    "zip"
+   ],
+   "retroArchCore": "snes9x",
+   "theme": "snes"
+  },
+  {
+   "id": "snesna",
+   "name": "Nintendo SNES (Super Nintendo)",
+   "extensions": [
+    "7z",
+    "bin",
+    "bml",
+    "bs",
+    "bsx",
+    "dx2",
+    "fig",
+    "gd3",
+    "gd7",
+    "mgd",
+    "sfc",
+    "smc",
+    "st",
+    "swc",
+    "zip"
+   ],
+   "retroArchCore": "snes9x",
+   "theme": "snesna"
+  },
+  {
+   "id": "solarus",
+   "name": "Solarus Game Engine",
+   "extensions": [
+    "solarus"
+   ],
+   "retroArchCore": null,
+   "theme": "solarus"
+  },
+  {
+   "id": "spectravideo",
+   "name": "Spectravideo",
+   "extensions": [
+    "7z",
+    "cas",
+    "col",
+    "dsk",
+    "m3u",
+    "mx1",
+    "mx2",
+    "ri",
+    "rom",
+    "sc",
+    "sg",
+    "zip"
+   ],
+   "retroArchCore": "bluemsx",
+   "theme": "spectravideo"
+  },
+  {
+   "id": "steam",
+   "name": "Valve Steam",
+   "extensions": [
+    "desktop",
+    "sh"
+   ],
+   "retroArchCore": null,
+   "theme": "steam"
+  },
+  {
+   "id": "stv",
+   "name": "Sega Titan Video Game System",
+   "extensions": [
+    "7z",
+    "zip"
+   ],
+   "retroArchCore": "kronos",
+   "theme": "stv"
+  },
+  {
+   "id": "sufami",
+   "name": "Bandai SuFami Turbo",
+   "extensions": [
+    "7z",
+    "bml",
+    "bs",
+    "fig",
+    "sfc",
+    "smc",
+    "st",
+    "zip"
+   ],
+   "retroArchCore": "snes9x",
+   "theme": "sufami"
+  },
+  {
+   "id": "supergrafx",
+   "name": "NEC SuperGrafx",
+   "extensions": [
+    "7z",
+    "ccd",
+    "chd",
+    "cue",
+    "pce",
+    "rom",
+    "sgx",
+    "zip"
+   ],
+   "retroArchCore": "mednafen_supergrafx",
+   "theme": "supergrafx"
+  },
+  {
+   "id": "supervision",
+   "name": "Watara Supervision",
+   "extensions": [
+    "7z",
+    "bin",
+    "sv",
+    "zip"
+   ],
+   "retroArchCore": "potator",
+   "theme": "supervision"
+  },
+  {
+   "id": "supracan",
+   "name": "Funtech Super A'Can",
+   "extensions": [
+    "7z",
+    "bin",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "supracan"
+  },
+  {
+   "id": "switch",
+   "name": "Nintendo Switch",
+   "extensions": [
+    "nca",
+    "nro",
+    "nso",
+    "nsp",
+    "xci"
+   ],
+   "retroArchCore": null,
+   "theme": "switch"
+  },
+  {
+   "id": "symbian",
+   "name": "Symbian",
+   "extensions": [
+    "sis",
+    "sisx",
+    "symbian"
+   ],
+   "retroArchCore": null,
+   "theme": "symbian"
+  },
+  {
+   "id": "tanodragon",
+   "name": "Tano Dragon",
+   "extensions": [
+    "7z",
+    "cas",
+    "ccc",
+    "dsk",
+    "rom",
+    "zip"
+   ],
+   "retroArchCore": null,
+   "theme": "tanodragon"
+  },
+  {
+   "id": "tg16",
+   "name": "NEC TurboGrafx-16",
+   "extensions": [
+    "7z",
+    "ccd",
+    "chd",
+    "cue",
+    "img",
+    "iso",
+    "m3u",
+    "pce",
+    "rom",
+    "sgx",
+    "toc",
+    "zip"
+   ],
+   "retroArchCore": "mednafen_pce",
+   "theme": "tg16"
+  },
+  {
+   "id": "tg-cd",
+   "name": "NEC TurboGrafx-CD",
+   "extensions": [
+    "7z",
+    "ccd",
+    "chd",
+    "cue",
+    "img",
+    "iso",
+    "m3u",
+    "pce",
+    "sgx",
+    "toc",
+    "zip"
+   ],
+   "retroArchCore": "mednafen_pce",
+   "theme": "tg-cd"
+  },
+  {
+   "id": "ti99",
+   "name": "Texas Instruments TI-99",
+   "extensions": [
+    "7z",
+    "rpk",
+    "zip"
+   ],
+   "retroArchCore": null,
+   "theme": "ti99"
+  },
+  {
+   "id": "tic80",
+   "name": "TIC-80 Fantasy Computer",
+   "extensions": [
+    "png",
+    "tic"
+   ],
+   "retroArchCore": "tic80",
+   "theme": "tic80"
+  },
+  {
+   "id": "to8",
+   "name": "Thomson TO8",
+   "extensions": [
+    "7z",
+    "fd",
+    "k7",
+    "m5",
+    "m7",
+    "rom",
+    "sap",
+    "zip"
+   ],
+   "retroArchCore": "theodore",
+   "theme": "to8"
+  },
+  {
+   "id": "triforce",
+   "name": "Namco-Sega-Nintendo Triforce",
+   "extensions": [
+    "7z",
+    "ciso",
+    "dff",
+    "dol",
+    "elf",
+    "gcm",
+    "gcz",
+    "iso",
+    "json",
+    "m3u",
+    "rvz",
+    "tgc",
+    "wad",
+    "wbfs",
+    "wia",
+    "zip"
+   ],
+   "retroArchCore": "dolphin",
+   "theme": "triforce"
+  },
+  {
+   "id": "trs-80",
+   "name": "Tandy TRS-80",
+   "extensions": [
+    "cmd",
+    "dsk"
+   ],
+   "retroArchCore": null,
+   "theme": "trs-80"
+  },
+  {
+   "id": "type-x",
+   "name": "Taito Type X",
+   "extensions": [
+    "appimage",
+    "desktop",
+    "exe",
+    "sh"
+   ],
+   "retroArchCore": null,
+   "theme": "type-x"
+  },
+  {
+   "id": "uzebox",
+   "name": "Uzebox Open Source Console",
+   "extensions": [
+    "7z",
+    "uze",
+    "zip"
+   ],
+   "retroArchCore": "uzem",
+   "theme": "uzebox"
+  },
+  {
+   "id": "vectrex",
+   "name": "GCE Vectrex",
+   "extensions": [
+    "7z",
+    "bin",
+    "gam",
+    "vc",
+    "vec",
+    "zip"
+   ],
+   "retroArchCore": "vecx",
+   "theme": "vectrex"
+  },
+  {
+   "id": "vic20",
+   "name": "Commodore VIC-20",
+   "extensions": [
+    "7z",
+    "a0",
+    "b0",
+    "bin",
+    "cmd",
+    "crt",
+    "d2m",
+    "d4m",
+    "d64",
+    "d6z",
+    "d71",
+    "d7z",
+    "d80",
+    "d81",
+    "d82",
+    "d8z",
+    "g41",
+    "g4z",
+    "g64",
+    "g6z",
+    "gz",
+    "lnx",
+    "m3u",
+    "nbz",
+    "nib",
+    "p00",
+    "prg",
+    "rom",
+    "t64",
+    "tap",
+    "vfl",
+    "vsf",
+    "x64",
+    "x6z",
+    "zip"
+   ],
+   "retroArchCore": "vice_xvic",
+   "theme": "vic20"
+  },
+  {
+   "id": "videopac",
+   "name": "Philips Videopac G7000",
+   "extensions": [
+    "7z",
+    "bin",
+    "zip"
+   ],
+   "retroArchCore": "o2em",
+   "theme": "videopac"
+  },
+  {
+   "id": "vircon32",
+   "name": "Vircon32 Virtual Console",
+   "extensions": [
+    "7z",
+    "v32",
+    "zip"
+   ],
+   "retroArchCore": "vircon32",
+   "theme": "vircon32"
+  },
+  {
+   "id": "virtualboy",
+   "name": "Nintendo Virtual Boy",
+   "extensions": [
+    "7z",
+    "bin",
+    "vb",
+    "vboy",
+    "zip"
+   ],
+   "retroArchCore": "mednafen_vb",
+   "theme": "virtualboy"
+  },
+  {
+   "id": "vpinball",
+   "name": "Visual Pinball",
+   "extensions": [
+    "vpt",
+    "vpx"
+   ],
+   "retroArchCore": null,
+   "theme": "vpinball"
+  },
+  {
+   "id": "vsmile",
+   "name": "VTech V.Smile",
+   "extensions": [
+    "7z",
+    "bin",
+    "zip"
+   ],
+   "retroArchCore": "mame",
+   "theme": "vsmile"
+  },
+  {
+   "id": "wasm4",
+   "name": "WASM-4 Fantasy Console",
+   "extensions": [
+    "7z",
+    "wasm",
+    "zip"
+   ],
+   "retroArchCore": "wasm4",
+   "theme": "wasm4"
+  },
+  {
+   "id": "wii",
+   "name": "Nintendo Wii",
+   "extensions": [
+    "7z",
+    "ciso",
+    "dff",
+    "dol",
+    "elf",
+    "gcm",
+    "gcz",
+    "iso",
+    "json",
+    "m3u",
+    "rvz",
+    "tgc",
+    "wad",
+    "wbfs",
+    "wia",
+    "zip"
+   ],
+   "retroArchCore": "dolphin",
+   "theme": "wii"
+  },
+  {
+   "id": "wiiu",
+   "name": "Nintendo Wii U",
+   "extensions": [
+    "elf",
+    "rpx",
+    "tmd",
+    "wua",
+    "wud",
+    "wuhb",
+    "wux"
+   ],
+   "retroArchCore": null,
+   "theme": "wiiu"
+  },
+  {
+   "id": "windows",
+   "name": "Microsoft Windows",
+   "extensions": [
+    "appimage",
+    "desktop",
+    "sh"
+   ],
+   "retroArchCore": null,
+   "theme": "windows"
+  },
+  {
+   "id": "windows3x",
+   "name": "Microsoft Windows 3.x",
+   "extensions": [
+    "7z",
+    "appimage",
+    "bat",
+    "desktop",
+    "dosz",
+    "sh",
+    "zip"
+   ],
+   "retroArchCore": "dosbox_pure",
+   "theme": "windows3x"
+  },
+  {
+   "id": "windows9x",
+   "name": "Microsoft Windows 9x",
+   "extensions": [
+    "7z",
+    "appimage",
+    "bat",
+    "desktop",
+    "dosz",
+    "sh",
+    "zip"
+   ],
+   "retroArchCore": "dosbox_pure",
+   "theme": "windows9x"
+  },
+  {
+   "id": "wonderswan",
+   "name": "Bandai WonderSwan",
+   "extensions": [
+    "7z",
+    "pc2",
+    "ws",
+    "zip"
+   ],
+   "retroArchCore": "mednafen_wswan",
+   "theme": "wonderswan"
+  },
+  {
+   "id": "wonderswancolor",
+   "name": "Bandai WonderSwan Color",
+   "extensions": [
+    "7z",
+    "pc2",
+    "ws",
+    "wsc",
+    "zip"
+   ],
+   "retroArchCore": "mednafen_wswan",
+   "theme": "wonderswancolor"
+  },
+  {
+   "id": "x1",
+   "name": "Sharp X1",
+   "extensions": [
+    "2d",
+    "2hd",
+    "7z",
+    "88d",
+    "cmd",
+    "d88",
+    "dup",
+    "dx1",
+    "hdm",
+    "tap",
+    "tfd",
+    "xdf",
+    "zip"
+   ],
+   "retroArchCore": "x1",
+   "theme": "x1"
+  },
+  {
+   "id": "x68000",
+   "name": "Sharp X68000",
+   "extensions": [
+    "2hd",
+    "7z",
+    "88d",
+    "cmd",
+    "d88",
+    "dim",
+    "dup",
+    "hdf",
+    "hdm",
+    "img",
+    "m3u",
+    "xdf",
+    "zip"
+   ],
+   "retroArchCore": "px68k",
+   "theme": "x68000"
+  },
+  {
+   "id": "xbox",
+   "name": "Microsoft Xbox",
+   "extensions": [
+    "iso",
+    "xiso"
+   ],
+   "retroArchCore": null,
+   "theme": "xbox"
+  },
+  {
+   "id": "xbox360",
+   "name": "Microsoft Xbox 360",
+   "extensions": [
+    "",
+    "desktop",
+    "iso",
+    "sh",
+    "xex",
+    "zar"
+   ],
+   "retroArchCore": null,
+   "theme": "xbox360"
+  },
+  {
+   "id": "xboxone",
+   "name": "Microsoft Xbox One",
+   "extensions": [
+    "7z",
+    "zip"
+   ],
+   "retroArchCore": null,
+   "theme": "xboxone"
+  },
+  {
+   "id": "zmachine",
+   "name": "Infocom Z-machine",
+   "extensions": [
+    "dat",
+    "z1",
+    "z2",
+    "z3",
+    "z4",
+    "z5",
+    "z6",
+    "z7",
+    "z8",
+    "zblorb",
+    "zlb"
+   ],
+   "retroArchCore": "mojozork",
+   "theme": "zmachine"
+  },
+  {
+   "id": "zx81",
+   "name": "Sinclair ZX81",
+   "extensions": [
+    "7z",
+    "p",
+    "tzx",
+    "zip"
+   ],
+   "retroArchCore": "81",
+   "theme": "zx81"
+  },
+  {
+   "id": "zxnext",
+   "name": "Sinclair ZX Spectrum Next",
+   "extensions": [
+    "nex",
+    "sna"
+   ],
+   "retroArchCore": null,
+   "theme": "zxnext"
+  },
+  {
+   "id": "zxspectrum",
+   "name": "Sinclair ZX Spectrum",
+   "extensions": [
+    "7z",
+    "dsk",
+    "gz",
+    "img",
+    "mgt",
+    "rzx",
+    "scl",
+    "sh",
+    "sna",
+    "szx",
+    "tap",
+    "trd",
+    "tzx",
+    "udi",
+    "z80",
+    "zip"
+   ],
+   "retroArchCore": "fuse",
+   "theme": "zxspectrum"
+  }
+ ]
+}

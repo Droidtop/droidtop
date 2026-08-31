@@ -5,8 +5,9 @@ import android.content.Context
 /**
  * The one real place every caller reads or writes console-platform
  * definitions through -- see [ConsoleSystemsDatabase]'s own doc comment
- * for why this replaced [ES_DE_CONSOLE_SYSTEMS] as the runtime source of
- * truth. [allSystems] seeds the database from [ES_DE_CONSOLE_SYSTEMS] the
+ * for why this replaced the compiled-in list as the runtime source of
+ * truth. [allSystems] seeds the database from [PlatformsDatabase] (the
+ * data-driven platforms-database.json, docs/SPEC.md §7e2) the
  * first time it's ever called on a fresh install (an empty table), so
  * every existing built-in system is present and editable from the very
  * first real read, not just after some separate manual "import" step.
@@ -14,7 +15,7 @@ import android.content.Context
 object ConsoleSystemsRepository {
     suspend fun allSystems(context: Context): List<ConsoleSystemDef> {
         val dao = ConsoleSystemsDatabase.get(context).consoleSystemDao()
-        seedIfEmpty(dao)
+        seedIfEmpty(context, dao)
         return dao.getAll().map { it.toConsoleSystemDef() }
     }
 
@@ -26,16 +27,16 @@ object ConsoleSystemsRepository {
         ConsoleSystemsDatabase.get(context).consoleSystemDao().delete(id)
     }
 
-    /** Real, explicit "undo my platform edits, start over" action -- clears every built-in row (leaving any real user-added custom platform untouched) and reseeds from [ES_DE_CONSOLE_SYSTEMS]. */
+    /** Real, explicit "undo my platform edits, start over" action -- clears every built-in row (leaving any real user-added custom platform untouched) and reseeds from [PlatformsDatabase]. */
     suspend fun restoreDefaults(context: Context) {
         val dao = ConsoleSystemsDatabase.get(context).consoleSystemDao()
         dao.clearBuiltIns()
-        dao.upsertAll(ES_DE_CONSOLE_SYSTEMS.map { it.toEntity(isBuiltIn = true) })
+        dao.upsertAll(PlatformsDatabase.builtIns(context).map { it.toEntity(isBuiltIn = true) })
     }
 
-    private suspend fun seedIfEmpty(dao: ConsoleSystemDao) {
+    private suspend fun seedIfEmpty(context: Context, dao: ConsoleSystemDao) {
         if (dao.count() == 0) {
-            dao.upsertAll(ES_DE_CONSOLE_SYSTEMS.map { it.toEntity(isBuiltIn = true) })
+            dao.upsertAll(PlatformsDatabase.builtIns(context).map { it.toEntity(isBuiltIn = true) })
         }
     }
 }
