@@ -1368,6 +1368,25 @@ launch surface. Engine games launch via enginehost, Kirikiroid2, Wine,
 or a Linux-container build — never JoiPlay, regardless of it being
 installed.
 
+## 7e4. Emulator setup helpers (directed 2026-08-31, EmuDeck-style)
+
+Guided per-system setup instead of dead ends, all data-driven like §7e2:
+`bios-database.json` in droidtop-platforms is GENERATED from Batocera's
+real, maintained BIOS registry (`batocera-systems`, GPL — the same
+md5/path data Batocera's own missing-bios checker uses; regenerate with
+`generator/from_batocera.py`, never hand-author hashes). droidtop's
+`BiosDatabase` (:library-core) mirrors `KnownPlayers`' bundled-seed +
+GitHub-refresh + validate-before-replace model, and checks a system's
+firmware under `<gamesRoot>/bios` by presence AND md5 (the classic
+"right name, wrong dump"). Surfaced as settings-catalog rows in each
+folder's screen: a BIOS status screen per system that needs firmware,
+and — when NO installed emulator can run a system — "Get an emulator"
+actions built from the player database's real packages (market:// with
+a web fallback). Follow-ups, not started: per-emulator install sources
+beyond Play (GitHub releases in the players DB), and applying
+recommended per-emulator settings where an emulator exposes a real
+configuration surface.
+
 ## 7e3. Lutris install-script integration (directed 2026-08-30, backlog)
 
 Beyond cover art (§7d's Lutris scraper client), lutris.net's real public

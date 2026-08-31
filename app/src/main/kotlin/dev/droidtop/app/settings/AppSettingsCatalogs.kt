@@ -12,6 +12,9 @@ import dev.droidtop.library.consoles.CustomPlayerPrefs
 import dev.droidtop.library.consoles.PlayerOverridePrefs
 import dev.droidtop.library.consoles.PlayersDatabaseUpdater
 import dev.droidtop.library.consoles.SystemOverridePrefs
+import dev.droidtop.library.consoles.BiosDatabase
+import dev.droidtop.library.consoles.KnownPlayers
+import dev.droidtop.library.consoles.SystemBiosSpec
 import dev.droidtop.library.consoles.availablePlayers
 import dev.droidtop.library.consoles.resolvePlayer
 import dev.droidtop.library.scraper.ScraperSource
@@ -200,14 +203,125 @@ object AppSettingsCatalogs {
                                             },
                                         ),
                                     )
+                                    // EmuDeck-style setup helper: firmware
+                                    // check against the real Batocera BIOS
+                                    // registry, when this system needs any.
+                                    val bios = BiosDatabase.forSystem(context, resolved.id)
+                                    if (bios != null) {
+                                        val gamesRoot = folder.parentFile ?: folder
+                                        add(
+                                            NestedScreenItem(
+                                                id = "folder_bios_${resolved.id}",
+                                                title = "BIOS files",
+                                                subtitle = "Firmware ${resolved.displayName} emulators may need, looked for in ${gamesRoot.name}/bios",
+                                                inline = biosScreen(gamesRoot, bios),
+                                                valueLabel = { _ ->
+                                                    // Presence only here -- md5 hashing happens
+                                                    // inside the screen, off the main thread.
+                                                    val present = bios.files.count { File(gamesRoot, it.file).isFile }
+                                                    "$present/${bios.files.size}"
+                                                },
+                                            ),
+                                        )
+                                    }
                                 }
                             },
                         ),
                     )
+                    // EmuDeck-style setup helper: when no installed emulator
+                    // can run this system, offer the real known presets'
+                    // packages for installation instead of a dead end.
+                    if (resolved != null) {
+                        val installedPkgs = availablePlayers(context, resolved).map { it.packageName }.toSet()
+                        val missing = KnownPlayers.forSystem(context, resolved.id)
+                            .filter { it.pkg !in installedPkgs }
+                            .distinctBy { it.pkg }
+                        if (installedPkgs.isEmpty() && missing.isNotEmpty()) {
+                            add(
+                                CatalogGroup(
+                                    id = "folder_get_emulator",
+                                    title = "Get an emulator",
+                                    items = missing.take(8).map { preset ->
+                                        ActionItem(
+                                            id = "install_${preset.pkg}",
+                                            title = "Get ${preset.label}",
+                                            subtitle = preset.pkg,
+                                            run = installPackageAction(preset.pkg),
+                                        )
+                                    },
+                                ),
+                            )
+                        }
+                    }
                 }
             }
         },
     )
+
+    // One screen per system's firmware set: every registry file with its
+    // real on-disk presence AND md5 verification (catches the classic
+    // "right name, wrong dump"), plus the database refresh action.
+    private fun biosScreen(gamesRoot: File, spec: SystemBiosSpec) = CatalogScreen(
+        id = "bios_${spec.systemId}",
+        title = "${spec.name} BIOS files",
+        subtitle = "Checked under ${gamesRoot.absolutePath}/bios -- md5-verified against Batocera's real registry",
+        groups = { context ->
+            withContext(Dispatchers.IO) {
+                val statuses = BiosDatabase.check(gamesRoot, spec)
+                listOf(
+                    CatalogGroup(
+                        id = "bios_files",
+                        title = null,
+                        items = statuses.map { status ->
+                            ActionItem(
+                                id = "bios_${spec.systemId}_${status.spec.file}",
+                                title = status.spec.file.removePrefix("bios/"),
+                                subtitle = when {
+                                    !status.present -> "Missing -- place it at ${File(gamesRoot, status.spec.file).absolutePath}"
+                                    status.md5Ok == false -> "Present, but the md5 matches no known-good dump"
+                                    status.md5Ok == true -> "Present, verified"
+                                    else -> "Present (no known hash to verify against)"
+                                },
+                                run = {},
+                            )
+                        },
+                    ),
+                    CatalogGroup(
+                        id = "bios_tools",
+                        title = null,
+                        items = listOf(
+                            AsyncActionItem(
+                                id = "bios_update_db",
+                                title = "Update BIOS database",
+                                subtitle = "Refresh the registry from droidtop-platforms on GitHub",
+                                run = { ctx, _ ->
+                                    val count = BiosDatabase.update(ctx)
+                                    "BIOS database updated ($count systems)"
+                                },
+                            ),
+                        ),
+                    ),
+                )
+            }
+        },
+    )
+
+    private fun installPackageAction(pkg: String): (Context) -> Unit = { ctx ->
+        val market = android.content.Intent(
+            android.content.Intent.ACTION_VIEW,
+            Uri.parse("market://details?id=$pkg"),
+        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            ctx.startActivity(market)
+        } catch (e: android.content.ActivityNotFoundException) {
+            ctx.startActivity(
+                android.content.Intent(
+                    android.content.Intent.ACTION_VIEW,
+                    Uri.parse("https://play.google.com/store/apps/details?id=$pkg"),
+                ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
+    }
 
     private fun systemChoiceItem(context: Context, folder: File, systems: List<ConsoleSystemDef>) = ChoiceItem(
         id = "folder_system_${folder.absolutePath}",
