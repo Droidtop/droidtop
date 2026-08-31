@@ -1723,10 +1723,34 @@ element playback via ExoPlayer/media3 (`EsDeThemedVideo`), reading a new
 (`EsDeArtwork.resolveVideo`, real ES-DE `videos` media-type convention),
 looped and muted (no per-view visibility signal exists yet to safely
 unmute), falling back to the existing static-image path when a game has
-no scraped video. Real, still open: `sound` and `animation` (GIF/APNG)
-playback (animation still falls back to a static image; sound elements
-are unparsed/unrendered entirely) — separate, smaller decode engines
-from real video, not attempted here.
+no scraped video. **Done (2026-08-31)**: the last two open element
+types. `sound` — real ES-DE navigation sounds (the seven real names
+from `NavigationSounds::loadThemeNavigationSounds`, Sound.cpp:213-219:
+systembrowse/quicksysselect/select/back/scroll/favorite/launch,
+declared under the special `all` view per THEMES.md), played through a
+SoundPool-backed `EsDeNavigationSounds` singleton bound wherever the
+active theme loads, with each trigger wired at the existing real
+key-handling site matching its real ES-DE call site (systembrowse:
+system-carousel move; scroll: gamelist move, headless or widget;
+select: entering a system; back: gamelist drill-up, both the key and
+back-dispatcher routes; quicksysselect: Left/Right sibling-system jump;
+favorite: actual favorite toggle; launch: the one launch handler). No
+bundled fallback sounds, deliberately — real ES-DE falls back per file
+to its own .wav resources, which aren't ours to redistribute, so an
+undeclared/missing sound plays nothing (the bundled decaffe theme is a
+real known no-op on its own terms: its navigationsounds.xml is never
+included from theme.xml and declares `./core/sounds/` paths while its
+wavs live in `./assets/sounds/`). `animation` — real GIF playback plus
+APNG (APNG4Android, the same library/version the vendored gamenative
+catalog pins), dispatched by extension exactly like real ES-DE
+(SystemView.cpp:648-676: .json→Lottie, .gif→GIF, else refused), with
+.png/.apng as droidtop's one deliberate widening of that set; Lottie
+(.json) is parsed but rendered as nothing with a logged warning — real
+ES-DE treats it as a separate component class (rlottie) and it stays
+out of scope. Animation properties speed/direction/interpolation/
+colorEnd-gradient/stationary/metadataElement are parsed but not
+applied (no decoder-level control for them) — honest gaps documented at
+`EsDeThemedAnimation`.
 Generalizing the
 real gamelist list-widget path (`EsDeListItem`) to badge/rating overlays
 the way a real theme's own game GRID entries sometimes show them inline;
@@ -1836,6 +1860,23 @@ collection folder name, which also lets themes' bundled collection
 carousel art like `auto-allgames.png` resolve). Groups keep their own
 display names (`fullname` still says "Ren'Py" etc.) — only the art/
 metadata lookup folder is shared.
+
+### Debug-credentials pathway (directed 2026-08-31)
+
+A plain properties file in app-PRIVATE storage
+(`filesDir/debug-credentials.properties`, `key=value` lines, namespaced
+keys like `screenscraper.ssid`) that credentialed features read as an
+OVERRIDE above their stored settings. The point is programmatic control
+without exposure: the device's owner places the file (adb push +
+run-as, root, a private-storage file manager) and wipes it from
+Settings, and no UI field, log line, or automation layer ever carries
+the values -- the settings surface shows key NAMES and a count only,
+and the visible text fields deliberately render the STORED prefs, never
+the override (both the display and the save-one-field-copies-the-rest
+paths were real leaks, caught in review before shipping). One generic
+mechanism (`DebugCredentials` in library-core) for every current and
+future credentialed integration; ScreenScraper and TheGamesDB consume
+it today.
 
 ## 8. Licensing
 
