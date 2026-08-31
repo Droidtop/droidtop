@@ -29,6 +29,12 @@ object HandheldSettingsCatalog {
     const val ID_SHOW_HINTS = "pref_handheld_show_hints"
     const val ID_CONSOLE_SYSTEMS = "pref_handheld_console_systems"
     const val ID_WINDOWS_GAMES = "pref_handheld_windows_games"
+    const val GROUP_SYSTEM = "handheld_system"
+    const val ID_SYSTEM_NETWORK = "pref_handheld_system_network"
+    const val ID_SYSTEM_VOLUME = "pref_handheld_system_volume"
+    const val ID_SYSTEM_BRIGHTNESS = "pref_handheld_system_brightness"
+    const val ID_SYSTEM_BRIGHTNESS_GRANT = "pref_handheld_system_brightness_grant"
+    const val ID_SYSTEM_BLUETOOTH = "pref_handheld_system_bluetooth"
     const val ID_GAME_FOLDERS = "pref_handheld_game_folders"
     const val ID_DISPLAY_SHELL_TARGET = "pref_display_shell_target"
     const val ID_DISPLAY_GAME_LAUNCH_TARGET = "pref_display_game_launch_target"
@@ -155,6 +161,76 @@ object HandheldSettingsCatalog {
                     ),
                 )
                 add(appsGridColumnsItem(context))
+            },
+        ),
+        CatalogGroup(
+            id = GROUP_SYSTEM,
+            title = "System",
+            items = buildList {
+                val status = dev.droidtop.runtime.systemstatus.SystemStatus.snapshot(context)
+                val controls = dev.droidtop.runtime.systemstatus.SystemControls
+                val network = when (status.network) {
+                    dev.droidtop.runtime.systemstatus.NetworkKind.WIFI ->
+                        "Wi-Fi" + (status.wifiLevel?.let { ", signal $it/4" } ?: "")
+                    dev.droidtop.runtime.systemstatus.NetworkKind.ETHERNET -> "Ethernet"
+                    dev.droidtop.runtime.systemstatus.NetworkKind.CELLULAR -> "Mobile data"
+                    dev.droidtop.runtime.systemstatus.NetworkKind.NONE -> "Offline"
+                }
+                val battery = status.batteryPercent
+                    ?.let { "$it%" + if (status.charging) ", charging" else "" }
+                    ?: "unknown"
+                add(
+                    ActionItem(
+                        id = ID_SYSTEM_NETWORK,
+                        title = "Network: $network",
+                        // The system's own internet panel -- apps lost
+                        // programmatic Wi-Fi toggling in API 29, and
+                        // opening the real control beats faking one.
+                        subtitle = "Battery $battery. Select to open Wi-Fi and data controls",
+                        run = { ctx ->
+                            ctx.startActivity(controls.internetPanelIntent())
+                        },
+                    ),
+                )
+                add(
+                    SliderItem(
+                        id = ID_SYSTEM_VOLUME,
+                        title = "Volume",
+                        min = 0,
+                        max = controls.volumeRange(context).last,
+                        current = controls.volume(context),
+                        onChange = { ctx, value -> controls.setVolume(ctx, value) },
+                    ),
+                )
+                if (controls.canWriteBrightness(context)) {
+                    add(
+                        SliderItem(
+                            id = ID_SYSTEM_BRIGHTNESS,
+                            title = "Brightness",
+                            min = 0,
+                            max = 255,
+                            current = controls.brightness(context) ?: 128,
+                            onChange = { ctx, value -> controls.setBrightness(ctx, value) },
+                        ),
+                    )
+                } else {
+                    add(
+                        ActionItem(
+                            id = ID_SYSTEM_BRIGHTNESS_GRANT,
+                            title = "Allow brightness control",
+                            subtitle = "Opens the system screen where droidtop can be granted Modify system settings",
+                            run = { ctx -> ctx.startActivity(controls.brightnessGrantIntent(ctx)) },
+                        ),
+                    )
+                }
+                add(
+                    ActionItem(
+                        id = ID_SYSTEM_BLUETOOTH,
+                        title = "Bluetooth",
+                        subtitle = "Pair controllers and audio in the system Bluetooth screen",
+                        run = { ctx -> ctx.startActivity(controls.bluetoothSettingsIntent()) },
+                    ),
+                )
             },
         ),
         CatalogGroup(
