@@ -7,6 +7,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -65,6 +66,13 @@ class CompanionActivity : AppCompatActivity() {
                         // glance (per direction: wifi status and system
                         // controls in every mode except Standard).
                         CompanionSystemBar()
+                        // The Quick Menu's device-management surface,
+                        // mirrored to the always-on screen (per
+                        // direction): live notifications with
+                        // tap-to-open and per-item dismiss, no
+                        // controller needed. The system controls
+                        // already sit in the bar above.
+                        CompanionNotifications()
                         widgetIds.forEach { widgetId ->
                             val info = widgetManager.getAppWidgetInfo(widgetId)
                             if (info != null) {
@@ -214,6 +222,49 @@ object CompanionWidgetPrefs {
  * left app reach in API 29, and opening the real control beats faking
  * one.
  */
+@androidx.compose.runtime.Composable
+private fun CompanionNotifications() {
+    val items by dev.droidtop.runtime.systemstatus.NotificationsStore.items.collectAsState()
+    if (items.isEmpty()) return
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        items.take(4).forEach { item ->
+            androidx.compose.foundation.layout.Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(enabled = item.contentIntent != null) {
+                            runCatching { item.contentIntent?.send() }
+                        },
+                ) {
+                    Text(
+                        listOfNotNull(item.appLabel, item.title).joinToString(": "),
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                    )
+                    // Local val, not the property: cross-module
+                    // properties don't smart-cast.
+                    val body = item.text
+                    if (!body.isNullOrBlank()) {
+                        Text(body, color = Color.Gray, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                    }
+                }
+                if (item.clearable) {
+                    TextButton(onClick = {
+                        dev.droidtop.runtime.systemstatus.NotificationsStore.controller?.dismiss(item.key)
+                    }) { Text("Dismiss", style = MaterialTheme.typography.labelSmall) }
+                }
+            }
+        }
+        if (items.size > 4) {
+            Text("+" + (items.size - 4) + " more in the Quick Menu", color = Color.DarkGray, style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
 @androidx.compose.runtime.Composable
 private fun CompanionSystemBar() {
     val context = androidx.compose.ui.platform.LocalContext.current

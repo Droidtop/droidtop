@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -347,10 +348,24 @@ fun GamepadShell(
             // etc. all take priority since they're closer to the focused
             // node in the bubbling chain).
             .onKeyEvent { event ->
-                // Quick Menu trigger: HOLD Select. repeatCount >= 1 is
-                // the system's own key-repeat threshold (~500ms) -- a
-                // timing-free long-press, and short-press Select keeps
-                // its existing meaning because only the repeat opens it.
+                // Quick Menu trigger: R2, the dedicated quick-device-
+                // management button (per direction), named on screen by
+                // the R2 pill in the top-right corner. KeyDown opens;
+                // the same press's KeyUp lands in the menu dialog, which
+                // swallows it, and a FRESH R2 press there toggles the
+                // menu closed.
+                if (GamepadKeyMap.actionFor(event.key) == GamepadAction.R2) {
+                    if (event.type == KeyEventType.KeyDown && !quickMenuOpen) {
+                        quickMenuOpen = true
+                    }
+                    return@onKeyEvent true
+                }
+                // HOLD Select stays as the fallback trigger for pads
+                // whose triggers are analog-only and never emit an R2
+                // KEY event at all -- a different failure domain, not a
+                // second mechanism for its own sake. repeatCount >= 2
+                // KeyDowns = the system's own key-repeat (~500ms), so
+                // short-press Select keeps its existing meaning.
                 if (GamepadKeyMap.actionFor(event.key) == GamepadAction.SELECT) {
                     if (event.type == KeyEventType.KeyDown) {
                         selectDownCount += 1
@@ -388,7 +403,12 @@ fun GamepadShell(
                 }
             },
     ) {
-        SectionTabBar(current = section, onSelect = selectSection, currentTabFocus = tabBarFocus)
+        SectionTabBar(
+            current = section,
+            onSelect = selectSection,
+            currentTabFocus = tabBarFocus,
+            onQuickMenu = { quickMenuOpen = true },
+        )
         // Launch-failure banner (see onLaunch's crash boundary): visible,
         // dismisses itself after a few seconds, never blocks input.
         launchError?.let { message ->
@@ -843,7 +863,12 @@ private val APP_KINDS = setOf(
 )
 
 @Composable
-private fun SectionTabBar(current: HandheldSection, onSelect: (HandheldSection) -> Unit, currentTabFocus: FocusRequester) {
+private fun SectionTabBar(
+    current: HandheldSection,
+    onSelect: (HandheldSection) -> Unit,
+    currentTabFocus: FocusRequester,
+    onQuickMenu: () -> Unit,
+) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(32.dp),
@@ -871,6 +896,26 @@ private fun SectionTabBar(current: HandheldSection, onSelect: (HandheldSection) 
                         }
                     },
             )
+        }
+        Spacer(Modifier.weight(1f))
+        // On-screen indicator for the Quick Menu button (per direction):
+        // the bordered pill names the physical button, the label names
+        // what it opens. Tapping it opens the menu too -- touch parity,
+        // the same rule as the section tabs beside it.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.clickable(onClick = onQuickMenu),
+        ) {
+            Text(
+                "R2",
+                color = Color.White,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier
+                    .border(1.dp, Color.Gray, RoundedCornerShape(6.dp))
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
+            )
+            Text("Quick Menu", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
         }
     }
 }
