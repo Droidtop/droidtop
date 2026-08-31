@@ -27,6 +27,40 @@ import java.io.File
 object AmStartCommandToIntentConverter {
     class UnsupportedArgumentException(argument: String) : IllegalArgumentException("Unsupported am start argument: $argument")
 
+    /**
+     * Splits a template into `am start` tokens, expanding the file
+     * placeholders.
+     *
+     * Split FIRST, substitute SECOND. The order is the whole point: a
+     * real ROM path routinely contains spaces, and substituting into the
+     * template before splitting on whitespace tore one path into several
+     * tokens.
+     *
+     * Confirmed on-device by the all-systems launch sweep, which is how
+     * this was found: N64, NDS, GBA and GBC all failed with "Unsupported
+     * am start argument: (USA).z64" launching "Glover (USA).z64" through
+     * RetroArch's `--es ROM {file.path}`. `ROM` received a truncated path
+     * and the remainder of the filename hit the unrecognized-flag branch.
+     * Every system that worked in that sweep happened to use
+     * `-d {file.uri}`, whose percent-encoded URI has no spaces to split
+     * on -- which is why this survived despite breaking any collection
+     * whose filenames contain spaces, which is most of them.
+     *
+     * Splitting the raw template is safe because the placeholders contain
+     * no whitespace themselves, so each always lands wholly inside one
+     * token.
+     */
+    internal fun tokenize(argumentsTemplate: String, filePath: String?, fileUri: String?): List<String> =
+        argumentsTemplate
+            .split(Regex("[\\n\\s]+"))
+            .filter { it.isNotEmpty() }
+            .map { token ->
+                var t = token
+                if (filePath != null) t = t.replace("{file.path}", filePath)
+                if (fileUri != null) t = t.replace("{file.uri}", fileUri)
+                t
+            }
+
     fun toIntent(context: Context, argumentsTemplate: String, filePath: String?): Intent {
         // Real, second placeholder alongside {file.path} -- roughly half of
         // the real presets pulled from Daijishō's own wiki (KnownPlayers.kt)
@@ -60,13 +94,7 @@ object AmStartCommandToIntentConverter {
         } else {
             null
         }
-        val tokens = ArrayDeque(
-            argumentsTemplate
-                .let { if (filePath != null) it.replace("{file.path}", filePath) else it }
-                .let { if (fileUri != null) it.replace("{file.uri}", fileUri.toString()) else it }
-                .split(Regex("[\\n\\s]+"))
-                .filter { it.isNotEmpty() },
-        )
+        val tokens = ArrayDeque(tokenize(argumentsTemplate, filePath, fileUri?.toString()))
 
         val intent = Intent()
         var dataUri: Uri? = null
