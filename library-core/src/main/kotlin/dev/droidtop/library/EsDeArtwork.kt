@@ -159,6 +159,12 @@ fun GameEngine.esDeSystemName(): String = when (this) {
     GameEngine.RPG_MAKER_MV -> "rpgmaker_mv"
     GameEngine.RPG_MAKER_MZ -> "rpgmaker_mz"
     GameEngine.RPG_MAKER_VX_ACE -> "rpgmaker_vxace"
+    // Matches players-database.json's real systemId for this engine
+    // ("rpgmaker-2000-2003", the EasyRPG Player entry) exactly, unlike
+    // the underscore convention every other engine bucket here uses --
+    // deliberate, so EsDeArtwork/scraper lookups key on the same string
+    // the player-resolution path already uses for this one engine.
+    GameEngine.RPG_MAKER_2000_2003 -> "rpgmaker-2000-2003"
     GameEngine.KIRIKIRI -> "kirikiri"
     GameEngine.AUGUST -> "august"
     GameEngine.BURIKO -> "buriko"
