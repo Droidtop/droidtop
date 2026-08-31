@@ -15,16 +15,19 @@ import org.junit.Test
  * reported every PS2 disc as PS1 -- launching those games through an
  * emulator that cannot run them.
  *
- * The images built here are synthetic but reproduce the parts the
- * detector actually depends on: a PVD at sector 16, a root directory
- * record pointing at a real directory, and SYSTEM.CNF content at its own
- * extent. The boot lines are copied verbatim from the user's real discs,
- * including the one that writes `BOOT2=` with no spaces at all.
+ * The images built here are synthetic but reproduce the structures the
+ * detector actually walks: a typed PVD at sector 16, a root directory
+ * record, and SYSTEM.CNF content at its own extent -- in plain 2048-byte
+ * sectors AND in raw 2352-byte layouts, because the first reader only
+ * understood 2048 and silently returned null for every raw `.bin`, the
+ * most common PS1 dump format. Boot lines are verbatim from real discs,
+ * including the one that writes `BOOT2=` with no spaces.
  *
- * SYSTEM.CNF is deliberately placed well past where the earlier scanning
- * approach could see. On the real discs it sat as far in as 3.9 GB,
- * which is what made scanning unfixable and reading the filesystem
- * necessary.
+ * SYSTEM.CNF is placed well past where the abandoned scanning approach
+ * could see (it sat at 3.9 GB on one real disc), and its content is
+ * sized to span a sector boundary so the sector-by-sector read is
+ * actually exercised -- in a raw image a single long read would
+ * interleave sync headers into the text.
  */
 class PlayStationDiscDetectionTest {
 
@@ -36,11 +39,10 @@ class PlayStationDiscDetectionTest {
     }
 
     private companion object {
-        const val SECTOR = 2048L
         const val PVD_SECTOR = 16L
         const val ROOT_DIRECTORY_SECTOR = 20L
 
-        /** Byte 4,096,000 -- past any window the scanning approach used. */
+        /** Sector 2000 -- far past any window the scanning approach used. */
         const val SYSTEM_CNF_SECTOR = 2000L
     }
 
@@ -65,40 +67,82 @@ class PlayStationDiscDetectionTest {
         target[at + 3] = ((value shr 24) and 0xFF).toByte()
     }
 
-    private fun disc(systemCnf: String?, volumeMagic: String = "CD001"): File {
+    /**
+     * Builds an image in the given sector layout. [sectorSize]/
+     * [dataOffset] pairs mirror the reader's own table: (2048, 0) for a
+     * plain .iso, (2352, 24) for raw Mode 2 (what PS1 discs are),
+     * (2352, 16) for raw Mode 1.
+     */
+    private fun disc(
+        systemCnf: String?,
+        sectorSize: Long = 2048,
+        dataOffset: Long = 0,
+        typeByte: Byte = 1,
+        volumeMagic: String = "CD001",
+    ): File {
         val file = File.createTempFile("disc", ".iso").also { temporaryFiles += it }
         RandomAccessFile(file, "rw").use { raf ->
-            raf.setLength((SYSTEM_CNF_SECTOR + 4) * SECTOR)
+            raf.setLength((SYSTEM_CNF_SECTOR + 4) * sectorSize)
+
+            fun writeSector(lba: Long, data: ByteArray) {
+                raf.seek(lba * sectorSize + dataOffset)
+                raf.write(data)
+            }
 
             // The PVD carries the same "PLAYSTATION" identifier a PS1
             // disc has -- the whole reason the two cannot be separated
             // without reading further into the image.
-            val pvd = ByteArray(SECTOR.toInt())
+            val pvd = ByteArray(2048)
+            pvd[0] = typeByte
             volumeMagic.toByteArray(Charsets.US_ASCII).copyInto(pvd, 1)
             "PLAYSTATION".toByteArray(Charsets.US_ASCII).copyInto(pvd, 8)
-            directoryRecord(" ", ROOT_DIRECTORY_SECTOR, SECTOR.toInt()).copyInto(pvd, 156)
-            raf.seek(PVD_SECTOR * SECTOR)
-            raf.write(pvd)
+            directoryRecord(" ", ROOT_DIRECTORY_SECTOR, 2048).copyInto(pvd, 156)
+            writeSector(PVD_SECTOR, pvd)
 
             if (systemCnf != null) {
                 val content = systemCnf.toByteArray(Charsets.US_ASCII)
-                val directory = ByteArray(SECTOR.toInt())
+                val directory = ByteArray(2048)
                 directoryRecord("SYSTEM.CNF;1", SYSTEM_CNF_SECTOR, content.size)
                     .copyInto(directory, 0)
-                raf.seek(ROOT_DIRECTORY_SECTOR * SECTOR)
-                raf.write(directory)
+                writeSector(ROOT_DIRECTORY_SECTOR, directory)
 
-                raf.seek(SYSTEM_CNF_SECTOR * SECTOR)
-                raf.write(content)
+                // Sector by sector, matching how a real raw image lays
+                // file content out -- a contiguous write here would let a
+                // broken contiguous READ pass the test.
+                var written = 0
+                var lba = SYSTEM_CNF_SECTOR
+                while (written < content.size) {
+                    val chunk = content.copyOfRange(written, minOf(written + 2048, content.size))
+                    writeSector(lba, chunk)
+                    written += chunk.size
+                    lba += 1
+                }
             }
         }
         return file
     }
 
+    /** Real Sly 3 boot line, padded past one sector so the read spans two. */
+    private fun ps2Cnf(): String =
+        "BOOT2 = cdrom0:\\SCUS_974.64;1\nVER = 1.00\nVMODE = NTSC\n" +
+            "# ".repeat(1100) + "\n"
+
     @Test
-    fun `a disc booting through BOOT2 is PS2`() {
-        // Verbatim from Sly 3 - Honor Among Thieves (USA).iso.
-        val file = disc("BOOT2 = cdrom0:\\SCUS_974.64;1\nVER = 1.00\nVMODE = NTSC\n")
+    fun `a plain iso booting through BOOT2 is PS2`() {
+        assertEquals(SystemID.PS2, PlayStationDiscType.detect(disc(ps2Cnf())))
+    }
+
+    @Test
+    fun `a raw Mode 2 bin is read too -- what PS1 dumps actually are`() {
+        // The first reader only understood 2048-byte sectors, so every
+        // raw .bin silently returned null and fell back to a guess.
+        val file = disc(ps2Cnf(), sectorSize = 2352, dataOffset = 24)
+        assertEquals(SystemID.PS2, PlayStationDiscType.detect(file))
+    }
+
+    @Test
+    fun `a raw Mode 1 bin is read as well`() {
+        val file = disc(ps2Cnf(), sectorSize = 2352, dataOffset = 16)
         assertEquals(SystemID.PS2, PlayStationDiscType.detect(file))
     }
 
@@ -118,7 +162,15 @@ class PlayStationDiscDetectionTest {
 
     @Test
     fun `a non-ISO9660 file yields null so the caller falls back`() {
-        val file = disc("BOOT2 = cdrom0:\\SCUS_974.64;1\n", volumeMagic = "XXXXX")
+        val file = disc(ps2Cnf(), volumeMagic = "XXXXX")
+        assertNull(PlayStationDiscType.detect(file))
+    }
+
+    @Test
+    fun `a wrong descriptor type is rejected, not just a wrong magic`() {
+        // The probe checks three offsets in arbitrary files; the type
+        // byte is the second lock on the door.
+        val file = disc(ps2Cnf(), typeByte = 0)
         assertNull(PlayStationDiscType.detect(file))
     }
 
