@@ -29,7 +29,7 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <!-- Do Not Disturb control. Like WRITE_SETTINGS this is a special
          access the user grants on a system screen droidtop opens
-         (SystemControls.dndGrantIntent) -- one of the few real controls
+         (SystemControls.dndGrantIntent) - one of the few real controls
          Android still lets an ordinary app own, so droidtop owns it. -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <!-- Brightness control. Special access the user grants on a system
