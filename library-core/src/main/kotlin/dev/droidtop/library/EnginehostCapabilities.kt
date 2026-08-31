@@ -27,7 +27,11 @@ import org.json.JSONArray
  */
 object EnginehostCapabilities {
 
-    val PROVIDER_URI: Uri = Uri.parse("content://dev.enginehost.capabilities/installed")
+    // Lazy on purpose: android.net.Uri is a stub on the JVM, and an
+    // eager parse at object-init turns every unit test that touches
+    // this object (the pure-logic seriesCovers ones included) into an
+    // ExceptionInInitializerError. Real round-13 CI failure.
+    val PROVIDER_URI: Uri by lazy { Uri.parse("content://dev.enginehost.capabilities/installed") }
 
     data class InstalledBundle(
         val bundleId: String,
