@@ -42,12 +42,17 @@ object EngineVersionDetector {
         GameEngine.RPG_MAKER_VX_ACE -> detectRgss(gameRoot)
         GameEngine.RPG_MAKER_MV -> detectRpgMakerJs(gameRoot, "rpg_core.js")
         GameEngine.RPG_MAKER_MZ -> detectRpgMakerJs(gameRoot, "rmmz_core.js")
-        // Deliberately absent: every other engine's version signature is
-        // unverified against a real game so far. Adding a guessed one
-        // would produce exactly the confidently-wrong engineVersion this
-        // class exists to avoid -- they resolve through the existing
-        // per-folder override / enginehost.json paths until a real sample
-        // is available to verify a signature against.
+        GameEngine.TWINE -> detectTwine(gameRoot)
+        GameEngine.FLASH_AIR -> detectSwf(gameRoot)
+        // Deliberately absent, each per enginehost's own guidance
+        // (coordination responses 2026-08-31): RPG Maker 2000/2003 needs
+        // EasyRPG's real RPG_RT.exe classification (the LDB/LMT pair
+        // alone is ambiguous), KiriKiri2 needs the executable's PE
+        // FileVersion, and CMVS/Buriko/CatSystem2 markers establish
+        // family, not a numeric runtime version. For all of them the
+        // launch path opens enginehost's CONFIGURE screen instead --
+        // "use CONFIGURE until an engine-specific parser is backed by
+        // source or verified game evidence", never a fabricated number.
         else -> null
     }
 
@@ -108,11 +113,18 @@ object EngineVersionDetector {
 
     private val RPG_MAKER_JS_VERSION = Regex("""^//\s*\S+\.js\s+v([0-9][0-9.]*)""", RegexOption.MULTILINE)
 
+    // The authoritative constant, per enginehost's own guidance
+    // ("Utils.RPGMAKER_VERSION in rpg_core.js or rmmz_core.js is the
+    // deployed runtime version") -- preferred over the banner comment,
+    // which some repacks strip while the code constant survives
+    // minification-free in every stock deploy.
+    private val RPG_MAKER_JS_CONSTANT = Regex("""Utils\.RPGMAKER_VERSION\s*=\s*['"]([0-9][0-9.]*)['"]""")
+
     private fun detectRpgMakerJs(gameRoot: File, scriptName: String): DetectedVersion? {
         val script = listOf(File(gameRoot, "js/$scriptName"), File(gameRoot, "www/js/$scriptName"))
             .firstOrNull { it.isFile } ?: return null
         val version = readHead(script)
-            ?.let { RPG_MAKER_JS_VERSION.find(it) }
+            ?.let { head -> RPG_MAKER_JS_CONSTANT.find(head) ?: RPG_MAKER_JS_VERSION.find(head) }
             ?.groupValues?.get(1)
             ?: return null
         return DetectedVersion(
@@ -188,6 +200,49 @@ object EngineVersionDetector {
      * First 8KB only: every file read here identifies itself in its first
      * handful of lines, and a real game's log.txt grows without bound.
      */
+    // ---- Twine -----------------------------------------------------------
+    //
+    // Enginehost's guidance: tw-storydata's creator-version attribute,
+    // "usable when numeric". The export is a single HTML file with the
+    // <tw-storydata ...> element near the top; format attribute noted
+    // for honesty but only the numeric creator-version is returned.
+    private val TWINE_CREATOR_VERSION = Regex("""<tw-storydata[^>]*\bcreator-version="([0-9][0-9.]*)"""")
+
+    private fun detectTwine(gameRoot: File): DetectedVersion? {
+        val html = gameRoot.listFiles()
+            ?.filter { it.isFile && it.extension.lowercase() in setOf("html", "htm") }
+            ?.sortedBy { it.name.lowercase() }
+            ?.firstOrNull { readHead(it)?.contains("<tw-storydata") == true }
+            ?: return null
+        val version = readHead(html)?.let { TWINE_CREATOR_VERSION.find(it) }?.groupValues?.get(1)
+            ?: return null
+        return DetectedVersion(version, "twine", "tw-storydata creator-version in ${html.name}")
+    }
+
+    // ---- Flash (SWF) -----------------------------------------------------
+    //
+    // Enginehost's guidance: "header byte 4 is the real SWF format
+    // version". Bytes 0-2 are the signature (FWS uncompressed, CWS
+    // zlib, ZWS lzma -- the version byte sits before the compressed
+    // region in all three), byte 3 the version.
+    private fun detectSwf(gameRoot: File): DetectedVersion? {
+        val swf = gameRoot.listFiles()
+            ?.filter { it.isFile && it.extension.equals("swf", ignoreCase = true) }
+            ?.sortedBy { it.name.lowercase() }
+            ?.firstOrNull()
+            ?: return null
+        return runCatching {
+            val header = ByteArray(4)
+            val read = swf.inputStream().use { it.read(header) }
+            if (read < 4) return null
+            val signature = String(header, 0, 3, Charsets.US_ASCII)
+            if (signature !in setOf("FWS", "CWS", "ZWS")) return null
+            val version = header[3].toInt() and 0xFF
+            if (version == 0 || version > 60) return null
+            DetectedVersion(version.toString(), "swf", "SWF header version byte in ${swf.name}")
+        }.getOrNull()
+    }
+
     private fun readHead(file: File): String? {
         if (!file.isFile) return null
         return try {

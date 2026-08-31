@@ -61,6 +61,7 @@ object AppSettingsCatalogs {
     const val SCREEN_INTEGRATIONS = "integrations"
     const val SCREEN_WINDOWS_GAMES = "windows_games"
     const val SCREEN_ANDROID_SETTINGS = "android_settings"
+    const val SCREEN_ENGINEHOST = "enginehost"
 
     // How deep folderLooksRomLike is willing to walk -- see the doc
     // comment at the original ConsoleSystemsActivity site this moved from.
@@ -78,6 +79,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(integrationsScreen())
         SettingsScreenRegistry.register(windowsGamesScreen())
         SettingsScreenRegistry.register(androidSettingsScreen())
+        SettingsScreenRegistry.register(enginehostScreen())
     }
 
     // ------------------------------------------------------------------
@@ -139,6 +141,12 @@ object AppSettingsCatalogs {
                         subtitle = "Source and credentials for ROM scraping",
                         registryId = SCREEN_SCRAPER,
                         valueLabel = { ctx -> if (ScraperSourcePrefs.get(ctx) == ScraperSource.THEGAMESDB) "TheGamesDB" else "ScreenScraper" },
+                    ),
+                    NestedScreenItem(
+                        id = "console_systems_enginehost",
+                        title = "Enginehost",
+                        subtitle = "Engine-game runtimes, like an emulator's core list; its own settings and save storage",
+                        registryId = SCREEN_ENGINEHOST,
                     ),
                     AsyncActionItem(
                         id = "console_systems_scrape_all",
@@ -556,6 +564,105 @@ object AppSettingsCatalogs {
      * filtered to what actually resolves on this device, so an OEM build
      * missing a screen never produces a dead row.
      */
+    // ------------------------------------------------------------------
+    // enginehost: an emulator to droidtop, driven through its contract.
+    // ------------------------------------------------------------------
+
+    /**
+     * enginehost's surface in droidtop, shaped exactly like an
+     * emulator's: an installed-runtimes list (the capabilities
+     * ContentProvider the contract exposes -- advisory by that
+     * contract, so it informs and never gates) and entry points into
+     * enginehost's own settings screens (its CONFIGURE_SETTINGS /
+     * CONFIGURE_SAVES actions), the same way any player's settings
+     * activity would be linked. droidtop never reaches inside; every
+     * row here is the published contract.
+     */
+    private fun enginehostScreen() = CatalogScreen(
+        id = SCREEN_ENGINEHOST,
+        title = "Enginehost",
+        subtitle = "The native VN/RPG engine runtime droidtop launches engine games through",
+        groups = { context ->
+            val installed = dev.droidtop.library.EngineHost.isInstalled(context)
+            val bundles = if (installed) {
+                dev.droidtop.library.EnginehostCapabilities.installedBundles(context)
+            } else emptyList()
+            listOf(
+                CatalogGroup(
+                    id = "enginehost_actions",
+                    title = null,
+                    items = buildList {
+                        if (!installed) {
+                            add(
+                                ActionItem(
+                                    id = "enginehost_missing",
+                                    title = "Enginehost isn't installed",
+                                    subtitle = "Engine games fall back to Wine/Linux strategies until it is",
+                                    run = {},
+                                ),
+                            )
+                            return@buildList
+                        }
+                        add(
+                            ActionItem(
+                                id = "enginehost_settings",
+                                title = "Enginehost settings",
+                                subtitle = "Opens enginehost's own global configuration",
+                                run = { ctx ->
+                                    ctx.startActivity(dev.droidtop.library.EngineHost.settingsIntent())
+                                },
+                            ),
+                        )
+                        add(
+                            ActionItem(
+                                id = "enginehost_saves",
+                                title = "Save storage",
+                                subtitle = "Shared save root and migration, in enginehost's own screen",
+                                run = { ctx ->
+                                    ctx.startActivity(dev.droidtop.library.EngineHost.savesSettingsIntent())
+                                },
+                            ),
+                        )
+                    },
+                ),
+                CatalogGroup(
+                    id = "enginehost_bundles",
+                    title = "Installed engine runtimes",
+                    items = if (!installed) {
+                        emptyList()
+                    } else if (bundles.isEmpty()) {
+                        listOf(
+                            ActionItem(
+                                id = "enginehost_no_bundles",
+                                title = "No runtime bundles installed yet",
+                                subtitle = "Launching an engine game offers the matching bundle; auto-install is used when droidtop's detection is confident",
+                                run = {},
+                            ),
+                        )
+                    } else {
+                        bundles.map { bundle ->
+                            ActionItem(
+                                id = "enginehost_bundle_${bundle.bundleId}",
+                                title = bundle.engine +
+                                    (bundle.engineContext?.let { " ($it)" } ?: "") +
+                                    (bundle.runtimeVersion?.let { "  $it" } ?: ""),
+                                subtitle = buildString {
+                                    append(bundle.bundleId)
+                                    if (bundle.supportedSeries.isNotEmpty()) {
+                                        append("  |  covers ")
+                                        append(bundle.supportedSeries.joinToString(", ") { "$it.*" })
+                                    }
+                                    bundle.origin?.let { append("  |  ").append(it) }
+                                },
+                                run = {},
+                            )
+                        }
+                    },
+                ),
+            )
+        },
+    )
+
     private fun androidSettingsScreen() = CatalogScreen(
         id = SCREEN_ANDROID_SETTINGS,
         title = "Android settings",
