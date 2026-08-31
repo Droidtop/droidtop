@@ -1355,6 +1355,21 @@ launch surface. Engine games launch via enginehost, Kirikiroid2, Wine,
 or a Linux-container build — never JoiPlay, regardless of it being
 installed.
 
+## 7e3. Lutris install-script integration (directed 2026-08-30, backlog)
+
+Beyond cover art (§7d's Lutris scraper client), lutris.net's real public
+install-script database is a fit for the PC side: per-game scripts that
+declare how a game from an arbitrary source (user-provided installers,
+GOG/itch builds, engine games) gets set up — files, Wine settings,
+required runtime pieces. Consuming those would let droidtop/gamenative-tux
+auto-configure games the user supplies themselves instead of only what
+GameNative's own community-config backend covers, diversifying away from
+a single config source. Standing note, not started: evaluate Lutris first
+but not exclusively (its coverage/format may not be the best fit); any
+runner-execution mapping goes through the existing strategy resolver
+(§7e2) and gamenative-tux's container backends, never a new parallel
+launch path.
+
 ## 7f. Handheld mode: real, generic ES-DE theme engine
 
 **Status as of 2026-08-29 — this is Handheld's actual, current, singular
