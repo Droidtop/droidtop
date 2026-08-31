@@ -127,7 +127,10 @@ class MainActivity : AppCompatActivity() {
         library = Library(
             listOf(
                 NativeAppProvider(applicationContext),
-                EngineGameProvider(applicationContext),
+                EngineGameProvider(
+                    applicationContext,
+                    extraRoots = { dev.droidtop.runtime.windows.SteamAccess.installRoots() },
+                ),
                 // Same roots as EngineGameProvider -- a folder can hold
                 // real console ROMs (<root>/<systemId>/<romFile>), engine
                 // games (<root>/<gameFolder>/...), or both; each provider

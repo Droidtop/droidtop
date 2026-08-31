@@ -1,1 +1,30 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Curated slice of the vendored gamenative manifest (per direction:
+     gamenative's UI stays out of the way, droidtop supplies its own UI
+     layer over the services). Only the backbone components droidtop
+     actually drives are declared: the Steam foreground service and the
+     notification Exit receiver. The vendor tree's activities, launcher
+     aliases, OAuth callbacks and FileProvider are deliberately absent;
+     droidtop's app module already owns a FileProvider under the same
+     authority pattern, and every user surface is droidtop's own. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
+    <application>
+        <service
+            android:name="app.gamenative.service.SteamService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <receiver
+            android:name="app.gamenative.service.NotificationActionReceiver"
+            android:exported="false" />
+    </application>
+</manifest>
