@@ -59,6 +59,7 @@ object AppSettingsCatalogs {
     const val SCREEN_SCRAPER = "rom_scraper"
     const val SCREEN_PLATFORMS = "manage_platforms"
     const val SCREEN_INTEGRATIONS = "integrations"
+    const val SCREEN_WINDOWS_GAMES = "windows_games"
 
     // How deep folderLooksRomLike is willing to walk -- see the doc
     // comment at the original ConsoleSystemsActivity site this moved from.
@@ -74,6 +75,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(scraperScreen())
         SettingsScreenRegistry.register(platformsScreen())
         SettingsScreenRegistry.register(integrationsScreen())
+        SettingsScreenRegistry.register(windowsGamesScreen())
     }
 
     // ------------------------------------------------------------------
@@ -482,6 +484,103 @@ object AppSettingsCatalogs {
     // ------------------------------------------------------------------
     // App integrations (docs/SPEC.md section 12).
     // ------------------------------------------------------------------
+
+    // ------------------------------------------------------------------
+    // Windows games: creating the Wine environment they run inside.
+    // ------------------------------------------------------------------
+
+    /**
+     * Sets up the Windows environment Wine games need.
+     *
+     * This is the screen `DroidtopPcGameRuntime.launchWindows` points at
+     * when it finds no container. Before it existed, that error named
+     * "Desktop mode > Containers", which had never been built -- so a
+     * Windows game could be detected, offered Wine, and then fail with
+     * instructions the user could not act on.
+     */
+    private fun windowsGamesScreen() = CatalogScreen(
+        id = SCREEN_WINDOWS_GAMES,
+        title = "Windows games",
+        subtitle = "The Wine environment Windows games run inside, and the folders it can reach",
+        groups = { context -> windowsGamesGroups(context) },
+    )
+
+    private suspend fun windowsGamesGroups(context: Context): List<CatalogGroup> {
+        val runtime = dev.droidtop.library.PcGameRuntimeRegistry.runtime
+        val roots = withContext(Dispatchers.IO) { GamesRootPrefs.gamesRootPaths(context).sorted() }
+        val provisioned = withContext(Dispatchers.IO) { runtime?.isProvisioned == true }
+
+        return listOf(
+            CatalogGroup(
+                id = "windows_setup",
+                title = null,
+                items = buildList {
+                    if (runtime == null) {
+                        add(
+                            ActionItem(
+                                id = "windows_unavailable",
+                                title = "Windows support isn't loaded",
+                                subtitle = "This build has no PC runtime registered, so there is nothing to set up",
+                                run = {},
+                            ),
+                        )
+                        return@buildList
+                    }
+                    add(
+                        AsyncActionItem(
+                            id = "windows_provision",
+                            title = if (provisioned) "Reinstall the Windows environment" else "Set up Windows games",
+                            subtitle = if (provisioned) {
+                                "Already set up. Running this again only reinstalls what is missing or out of date."
+                            } else {
+                                "Downloads and installs Wine's system files once, then maps your game folders into it. Several hundred megabytes."
+                            },
+                            run = { ctx, onStatus ->
+                                val gamesRoots = GamesRootPrefs.gamesRootPaths(ctx).map { File(it) }
+                                val result = dev.droidtop.library.PcGameRuntimeRegistry.runtime
+                                    ?.provision(gamesRoots, onStatus)
+                                when {
+                                    result == null -> "Windows support isn't loaded in this build"
+                                    result.succeeded -> result.detail
+                                    else -> "Setup failed: ${result.detail}"
+                                }
+                            },
+                        ),
+                    )
+                },
+            ),
+            CatalogGroup(
+                id = "windows_drives",
+                title = "Folders Wine can reach",
+                items = if (roots.isEmpty()) {
+                    listOf(
+                        ActionItem(
+                            id = "windows_no_roots",
+                            title = "No game folders added yet",
+                            subtitle = "Add one under Game folders first -- a Windows environment that cannot see your games is not much use",
+                            run = {},
+                        ),
+                    )
+                } else {
+                    // The SAME assignment provision writes -- one rule in
+                    // WineDriveMapping, so this preview cannot drift from
+                    // what a game actually sees.
+                    dev.droidtop.library.WineDriveMapping.assign(roots).map { (letter, path) ->
+                        ActionItem(
+                            id = "windows_drive_$letter",
+                            title = "$letter:  $path",
+                            subtitle = if (provisioned) {
+                                "Mapped when the environment was set up"
+                            } else {
+                                "Will be mapped when you set up the environment"
+                            },
+                            run = {},
+                        )
+                    }
+                },
+            ),
+        )
+    }
 
     private fun integrationsScreen() = CatalogScreen(
         id = SCREEN_INTEGRATIONS,

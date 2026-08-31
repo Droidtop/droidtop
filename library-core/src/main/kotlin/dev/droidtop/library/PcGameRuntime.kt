@@ -6,6 +6,15 @@ import java.io.File
 data class PcLaunchResult(val succeeded: Boolean, val detail: String)
 
 /**
+ * Outcome of setting up the Windows environment. Separate from
+ * [PcLaunchResult] despite the same shape because it answers a different
+ * question -- "is there something to launch into" rather than "did this
+ * game start" -- and a caller that conflates the two reports the wrong
+ * thing to the user.
+ */
+data class PcProvisionResult(val succeeded: Boolean, val detail: String)
+
+/**
  * The seam through which `library-core` reaches droidtop's real PC
  * runtimes: Wine/Box64 for Windows executables (`runtime-windows`'
  * `WineSession`) and the container runtime for native Linux builds
@@ -35,11 +44,62 @@ interface PcGameRuntime {
      */
     val isAvailable: Boolean
 
+    /**
+     * Whether a Windows environment has actually been set up yet.
+     *
+     * Distinct from [isAvailable], which asks whether a container
+     * session is live right now. Both have to be true to launch, and
+     * they fail for different reasons the user can act on differently:
+     * nothing installed yet versus installed but not running.
+     */
+    val isProvisioned: Boolean
+
+    /**
+     * Creates the Wine container and installs the Windows environment
+     * into it, reporting progress through [onStatus].
+     *
+     * [gamesRoots] are mapped as Wine drives at creation rather than
+     * afterwards. That is the whole point of doing this here: upstream's
+     * default drive list hardcodes its own package's private storage, so
+     * a container made from it cannot see a games folder on an SD card
+     * at all -- which is exactly the "arbitrary storage locations"
+     * problem, and matches what a Winlator investigation found (no SD
+     * drive mapping existed; adding one made the path resolve).
+     *
+     * Idempotent: an existing container is reported as already set up
+     * rather than duplicated. These environments are hundreds of
+     * megabytes and silently making a second one would be a real cost.
+     */
+    suspend fun provision(gamesRoots: List<File>, onStatus: (String) -> Unit): PcProvisionResult
+
     /** Runs a Windows executable under Wine/Box64, with [gameRoot] as its working directory. */
     suspend fun launchWindows(executable: File, gameRoot: File): PcLaunchResult
 
     /** Runs a native Linux executable directly inside the container. */
     suspend fun launchLinux(executable: File, gameRoot: File): PcLaunchResult
+}
+
+/**
+ * Which Wine drive letter each games root gets.
+ *
+ * One rule, used by both the runtime that creates the container and the
+ * settings screen that previews the mapping -- the screen promises to
+ * show what a game will actually see, and a second, slightly different
+ * implementation there is exactly how that promise would quietly break.
+ *
+ * D onwards: A/B are historically floppies and C: is the Windows drive
+ * inside the container itself. A path containing `:` is skipped rather
+ * than encoded, because the container's drive string finds each letter
+ * by the character before a `:` -- one such path would corrupt every
+ * mapping after it. exFAT already rejects `:` in names, so this is
+ * near-unreachable, but a silently malformed drive list is far harder to
+ * diagnose than a missing entry. Stops at Z.
+ */
+object WineDriveMapping {
+    fun assign(gamesRoots: List<String>): List<Pair<Char, String>> {
+        val usable = gamesRoots.filterNot { it.contains(':') }.distinct()
+        return usable.take('Z' - 'D' + 1).mapIndexed { index, path -> ('D' + index) to path }
+    }
 }
 
 /** Set once by `:app` at startup; read by every `library-core` launch path. */
