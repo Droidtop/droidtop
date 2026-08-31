@@ -5,85 +5,64 @@ import dev.droidtop.library.consoles.PlatformDatabaseSource
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
-import org.json.JSONObject
 
 /**
- * Engine-game launch STRATEGY routing, data-driven from the
- * droidtop-platforms repository's engines-database.json (docs/SPEC.md
- * §7e2, extended per direction 2026-08-31: launch resolution works FROM
- * the platforms database) -- the per-engine strategy priority that
- * [GameLaunchStrategyResolver.resolve] previously hardcoded in its
- * append order. Availability stays code (is enginehost installed, does
- * the folder have a Windows exe / Linux build) -- the database only
- * declares which available strategy WINS, so a garbage download can
- * never make an unlaunchable strategy launch. Same bundled-seed +
- * GitHub-refresh + validate-before-replace model as [dev.droidtop.library.consoles.KnownPlayers].
+ * The engine REGISTRY, data-driven from the droidtop-platforms
+ * repository's engines-database.json (docs/SPEC.md §7e2b; extended to
+ * v4 per direction 2026-08-31: detection rules, launch-strategy
+ * priority, and the enginehost family/context vocabulary ALL live in
+ * the database, so new engines and contexts ship as a data update, not
+ * an app rebuild). Availability stays code (is enginehost installed,
+ * does the folder hold a Windows exe) -- the database declares what
+ * exists and which available strategy WINS, so a garbage download can
+ * never make an unlaunchable strategy launch.
+ *
+ * Same bundled-seed + GitHub-refresh + validate-before-replace model as
+ * [dev.droidtop.library.consoles.KnownPlayers]. One extra validation
+ * for v4: a database that parses but carries no detection rules at all
+ * is a legacy v3 file, and loading it would silently turn engine
+ * scanning off -- rejected, both at [update] time and when reading a
+ * stale filesDir copy left by an older app version.
  */
 object EnginesDatabase {
     private const val DB_FILE_NAME = "engines-database.json"
 
-    // GameEngine enum -> the database's engine ids (droidtop's own engine
-    // vocabulary, shared with players-database.json's engine systemIds).
-    private val ENGINE_IDS = mapOf(
-        GameEngine.RENPY to "renpy",
-        GameEngine.RPG_MAKER_MV to "rpgmaker-mv",
-        GameEngine.RPG_MAKER_MZ to "rpgmaker-mz",
-        GameEngine.RPG_MAKER_VX_ACE to "rpgmaker-vxace",
-        GameEngine.KIRIKIRI to "kirikiri",
-        GameEngine.AUGUST to "august",
-        GameEngine.BURIKO to "buriko",
-        GameEngine.CATSYSTEM2 to "catsystem2",
-        GameEngine.CMVS to "cmvs",
-        GameEngine.FLASH_AIR to "flash-air",
-        GameEngine.GODOT to "godot",
-        GameEngine.TWINE to "twine",
-        GameEngine.UNREAL to "unreal",
-        GameEngine.UNITY to "unity",
-    )
-
     @Volatile
-    private var cached: Map<String, List<GameLaunchStrategy>>? = null
+    private var cached: List<EngineDef>? = null
 
-    /** The database's declared priority order for [engine], or null when it has no entry. */
-    fun priorityFor(context: Context, engine: GameEngine): List<GameLaunchStrategy>? =
-        ENGINE_IDS[engine]?.let { all(context)[it] }
-
-    fun all(context: Context): Map<String, List<GameLaunchStrategy>> {
+    /** Every registry row, database file order (which IS detection priority). */
+    fun defs(context: Context): List<EngineDef> {
         cached?.let { return it }
         synchronized(this) {
             cached?.let { return it }
             val updated = File(context.filesDir, DB_FILE_NAME)
                 .takeIf { it.isFile }
-                ?.let { runCatching { parse(it.readText()) }.getOrNull() }
+                ?.let { file -> runCatching { EngineRegistryParser.parse(file.readText()) }.getOrNull() }
+                ?.takeIf { defs -> defs.any { it.detect.isNotEmpty() } }
             val loaded = updated
-                ?: runCatching { parse(context.assets.open(DB_FILE_NAME).bufferedReader().use { it.readText() }) }
-                    .getOrElse { emptyMap() }
+                ?: runCatching {
+                    EngineRegistryParser.parse(
+                        context.assets.open(DB_FILE_NAME).bufferedReader().use { it.readText() },
+                    )
+                }.getOrElse { emptyList() }
             cached = loaded
             return loaded
         }
     }
 
+    fun defFor(context: Context, engine: GameEngine): EngineDef? =
+        defs(context).firstOrNull { it.engine == engine }
+
+    /** The database's declared strategy priority for [engine], or null when it has no entry. */
+    fun priorityFor(context: Context, engine: GameEngine): List<GameLaunchStrategy>? =
+        defFor(context, engine)?.strategies?.takeIf { it.isNotEmpty() }
+
+    /** The enginehost family/context mapping for [engine], or null when enginehost doesn't cover it. */
+    fun enginehostTargetFor(context: Context, engine: GameEngine): EnginehostTarget? =
+        defFor(context, engine)?.enginehost
+
     fun invalidate() {
         cached = null
-    }
-
-    private fun parse(text: String): Map<String, List<GameLaunchStrategy>> {
-        val engines = JSONObject(text).getJSONArray("engines")
-        val result = LinkedHashMap<String, List<GameLaunchStrategy>>()
-        for (i in 0 until engines.length()) {
-            val engine = engines.getJSONObject(i)
-            val strategies = engine.getJSONArray("strategies")
-            result[engine.getString("id")] = buildList {
-                for (j in 0 until strategies.length()) {
-                    // Unknown strategy names (a future database against an
-                    // older app) are skipped, never fatal.
-                    runCatching { GameLaunchStrategy.valueOf(strategies.getString(j)) }
-                        .getOrNull()?.let { add(it) }
-                }
-            }
-        }
-        check(result.isNotEmpty()) { "Engines database has no engines" }
-        return result
     }
 
     /** Same validate-before-replace atomic-write contract as [dev.droidtop.library.consoles.PlayersDatabaseUpdater]. Returns the engine count. */
@@ -97,7 +76,11 @@ object EnginesDatabase {
         } finally {
             connection.disconnect()
         }
-        val count = parse(text).size
+        val parsed = EngineRegistryParser.parse(text)
+        check(parsed.isNotEmpty()) { "Engines database has no engines" }
+        check(parsed.any { it.detect.isNotEmpty() }) {
+            "Engines database carries no detection rules (legacy v3 file?) -- refusing to replace the seed"
+        }
 
         val dest = File(context.filesDir, DB_FILE_NAME)
         val temp = File(context.filesDir, "$DB_FILE_NAME.downloading")
@@ -106,6 +89,6 @@ object EnginesDatabase {
             "Couldn't move the downloaded engines database into place"
         }
         invalidate()
-        return count
+        return parsed.size
     }
 }

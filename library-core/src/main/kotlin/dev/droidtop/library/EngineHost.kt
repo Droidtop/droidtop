@@ -12,7 +12,7 @@ import java.io.File
  * droidtop-owned project (see `/root/coordination/HANDOFF.md` and
  * `ENGINEHOST_CODEX_BRIEF.md`). droidtop fires its real, documented
  * Intent contract rather than launching a third-party interpreter
- * directly for the engines it covers — see [ENGINEHOST_TARGETS].
+ * directly for the engines it covers (the engines database declares the mapping).
  * (A prior direct-JoiPlay integration was removed entirely: JoiPlay
  * doesn't expose an intent contract that lets an external caller launch
  * a specific game, so that integration never actually worked.)
@@ -131,7 +131,7 @@ object EngineHost {
      * Fires the real `dev.enginehost.LAUNCH` contract for [gameFolder].
      *
      * [target] carries only enginehost's own family/context vocabulary
-     * (see [ENGINEHOST_TARGETS]); [engineVersion] is the game's real
+     * (from the engines database); [engineVersion] is the game's real
      * runtime version, never a label like "MV" or "latest". Both only
      * matter when [gameFolder] has no `enginehost.json` of its own --
      * that file is authoritative at every key, and the contract is
@@ -251,41 +251,10 @@ data class EnginehostTarget(
  * per game rather than being hosted by a generic interpreter. GODOT is
  * present now because the contract lists `godot` as a real family.
  */
-val ENGINEHOST_TARGETS: Map<GameEngine, EnginehostTarget> = mapOf(
-    GameEngine.RENPY to EnginehostTarget("renpy", "standard"),
-    GameEngine.RPG_MAKER_MV to EnginehostTarget("rpgmaker", "mv"),
-    GameEngine.RPG_MAKER_MZ to EnginehostTarget("rpgmaker", "mz"),
-    // Ruby 1.9.2 is RGSS3's own real pairing -- enginehost's own config
-    // editor prefills exactly this for detected VX Ace, so it is their
-    // stated fact, not a droidtop guess.
-    GameEngine.RPG_MAKER_VX_ACE to EnginehostTarget("rpgmaker", "vxace", mapOf("ruby" to "1.9.2")),
-    // Context deliberately null: the RPG_RT.exe/.ldb signature droidtop
-    // detects proves the 2000/2003 FAMILY but not which of the two
-    // contexts -- see enginehost-claude-requests.md, which asks for a
-    // real disambiguating signal rather than picking one at random.
-    GameEngine.RPG_MAKER_2000_2003 to EnginehostTarget("rpgmaker", null),
-    GameEngine.KIRIKIRI to EnginehostTarget(
-        "kirikiri2",
-        "default",
-        // Selector fall-through, not a version claim -- "0" maps to no
-        // implementation string, which by the engine's own semantics
-        // selects the sole default. Lets a confirmed-working engine
-        // (device-accepted 2026-08-31) launch without a CONFIGURE
-        // detour despite its version being honestly undetectable.
-        versionSelectorFallback = "0",
-    ),
-    GameEngine.BURIKO to EnginehostTarget("buriko", "compiled-script-v1"),
-    GameEngine.AUGUST to EnginehostTarget("buriko", "august-compiled-script-v1"),
-    GameEngine.CATSYSTEM2 to EnginehostTarget("catsystem2", "cst"),
-    // ps2 vs ps3 undetermined by the cmvs32/cmvs64/cmvs.cfg signature.
-    GameEngine.CMVS to EnginehostTarget("cmvs", null),
-    // droidtop's FLASH_AIR signature is specifically the AIR package
-    // shape (META-INF/ plus a mimetype file), so the AIR context is the
-    // real answer here, not a coin flip between swf and air.
-    GameEngine.FLASH_AIR to EnginehostTarget("flash_air", "air"),
-    GameEngine.TWINE to EnginehostTarget("twine", "compiled-html"),
-    GameEngine.GODOT to EnginehostTarget("godot", "standard"),
-)
+// The engine-to-enginehost mapping now lives in engines-database.json
+// (docs/SPEC.md §7e2b v4) -- EnginesDatabase.enginehostTargetFor is the
+// lookup. The map that used to sit here was the hardwired duplicate the
+// registry direction explicitly retired.
 
 
 /**
