@@ -108,9 +108,18 @@ internal suspend fun scrapeSystemArtwork(
 
     var found = 0
     var failed = 0
+    var hashMatched = 0
     missing.forEachIndexed { index, romFile ->
         onProgress(index, missing.size)
         try {
+            // Real ES-DE automatic mode: hash the file (up to its own
+            // 384 MiB default cap) and search WITH the digest — hash
+            // identity in the response is the confidence check, not any
+            // string similarity (ported from GuiScraperSearch.cpp /
+            // ScreenScraper.cpp, read before porting).
+            val localMd5 = if (screenScraperSystemId != null) {
+                dev.droidtop.library.scraper.RomHash.md5OrNull(romFile)
+            } else null
             val screenScraperResult = screenScraperSystemId?.let {
                 ScreenScraperClient.findMetadata(
                     systemeId = it.toString(),
@@ -120,7 +129,16 @@ internal suspend fun scrapeSystemArtwork(
                     devPassword = devPassword,
                     userId = userId,
                     userPassword = userPassword,
+                    md5 = localMd5.orEmpty(),
                 )
+            }
+            val confidence = when {
+                screenScraperResult == null -> null
+                localMd5 != null && screenScraperResult.romMd5 == localMd5 -> {
+                    hashMatched++
+                    "hash"
+                }
+                else -> "name"
             }
             val gamesDbResult = gamesDbSystemId?.let {
                 TheGamesDbClient.findMetadata(gamesDbApiKey, context.cacheDir, it, romFile.nameWithoutExtension)
@@ -154,6 +172,7 @@ internal suspend fun scrapeSystemArtwork(
                 val existing = dao.getGameMetadataSingle(romFile.absolutePath)
                 dao.upsertGameMetadata(
                     (existing ?: GameMetadataEntity(id = romFile.absolutePath)).copy(
+                        scrapeConfidence = confidence ?: existing?.scrapeConfidence,
                         description = description ?: existing?.description,
                         developer = developer ?: existing?.developer,
                         publisher = publisher ?: existing?.publisher,
@@ -170,7 +189,12 @@ internal suspend fun scrapeSystemArtwork(
             android.util.Log.e("droidtop.Scraper", "Failed to scrape ${romFile.name}", t)
         }
     }
-    "${system.displayName}: found $found, no match for ${missing.size - found - failed}, $failed failed (of ${missing.size} missing artwork/metadata)."
+    // hashMatched is the ES-DE "perfect match" count -- file digest
+    // identical to ScreenScraper's own dump digest. The remainder of
+    // $found matched by name search only, which is worth the user
+    // knowing: right most of the time, verified never.
+    "${system.displayName}: found $found ($hashMatched verified by file hash), " +
+        "no match for ${missing.size - found - failed}, $failed failed (of ${missing.size} missing artwork/metadata)."
 }
 
 /** Downloads [imageUrl] straight to [destination], creating parent directories as needed -- a plain generic helper, not tied to any one scraper source. */

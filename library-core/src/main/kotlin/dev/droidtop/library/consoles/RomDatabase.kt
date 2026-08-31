@@ -165,6 +165,14 @@ data class GameMetadataEntity(
     @ColumnInfo(name = "launch_screen") val launchScreen: Int? = null,
     @ColumnInfo(name = "sort_name") val sortName: String? = null,
     @ColumnInfo(name = "collection_sort_name") val collectionSortName: String? = null,
+    /**
+     * How the scraper matched this game, real ES-DE semantics: "hash"
+     * means the local file's MD5 was identical to ScreenScraper's own
+     * digest for the matched ROM (what ES-DE logs as a perfect match);
+     * "name" means a filename search's first result — correct most of
+     * the time, but not verified. Null means never scraped.
+     */
+    @ColumnInfo(name = "scrape_confidence") val scrapeConfidence: String? = null,
 )
 
 @Entity(tableName = "scan_metadata", primaryKeys = ["roms_root", "system_folder_id"])
@@ -413,12 +421,19 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
     }
 }
 
+/** Adds the scraper-confidence column ("hash"/"name", ES-DE's own match semantics). Plain additive column: user metadata survives untouched. */
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE game_metadata ADD COLUMN scrape_confidence TEXT")
+    }
+}
+
 @Database(
     entities = [
         RomEntity::class, ScanMetadataEntity::class, GameMetadataEntity::class,
         CollectionEntity::class, CollectionMemberEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = false,
 )
 abstract class RomDatabase : RoomDatabase() {
@@ -443,7 +458,7 @@ abstract class RomDatabase : RoomDatabase() {
                     // because game_metadata holds real user data that
                     // must survive it -- see that migration's own doc
                     // comment.
-                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build().also { instance = it }
             }
