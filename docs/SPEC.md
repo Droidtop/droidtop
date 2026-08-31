@@ -1498,6 +1498,20 @@ also cheaper -- two small seeks instead of megabytes of scanning.
 PS2 discrimination lives in `PlayStationDiscType`/`Iso9660`, so there is
 one discriminator rather than two.
 
+**An unreadable disc is unknown, never PS1.** The magic-number check
+reaches "PSX" from the volume identifier alone and defaults to it even
+when nothing else was learned. That was safe when only PS1 discs carried
+that string; with PS2 sharing it, "magic matched, nothing else known"
+means *unknown*. Since a scanned `systemId` outranks the folder name, a
+failed read that answered PS1 would override a correct `/Roms/ps2/` --
+which is exactly what happened on-device when a scan was interrupted
+mid-read. So for a disc image, if SYSTEM.CNF cannot be read droidtop
+reports unknown, logs it, and lets the folder name decide. The rule
+generalises: content detection may only override the folder when it
+actually determined something, never as a default. A serial does not
+count as determining it here, since PS2 serials use the same prefixes as
+PS1's.
+
 Because the scan result is cached in `rom_entries`, a detection fix ships
 with a `RomDatabase` migration clearing that cache and `scan_metadata`;
 otherwise it changes nothing for anyone who has already scanned.
