@@ -391,12 +391,34 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
     }
 }
 
+/**
+ * Clears the scan cache so PS2 discs get re-detected.
+ *
+ * Until this release every PS2 disc was stored as `psx`: the
+ * magic-number check keys on the ISO9660 volume identifier, which reads
+ * "PLAYSTATION" on PS1 and PS2 alike (see
+ * `SerialScanner.extractInfoForPlayStationDisc`). The scan result is
+ * cached, so fixing the detector alone would leave every existing
+ * install still launching PS2 games through a PS1 emulator.
+ *
+ * Only the cache is dropped. `game_metadata` and the collection tables
+ * are left untouched on purpose -- favorites, completed flags and
+ * collection membership are real user data, not something to discard to
+ * fix a detection bug.
+ */
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("DELETE FROM rom_entries")
+        db.execSQL("DELETE FROM scan_metadata")
+    }
+}
+
 @Database(
     entities = [
         RomEntity::class, ScanMetadataEntity::class, GameMetadataEntity::class,
         CollectionEntity::class, CollectionMemberEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class RomDatabase : RoomDatabase() {
@@ -421,7 +443,7 @@ abstract class RomDatabase : RoomDatabase() {
                     // because game_metadata holds real user data that
                     // must survive it -- see that migration's own doc
                     // comment.
-                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build().also { instance = it }
             }
