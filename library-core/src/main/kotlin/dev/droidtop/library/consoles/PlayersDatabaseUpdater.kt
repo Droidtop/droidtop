@@ -20,11 +20,9 @@ import java.net.URL
  */
 object PlayersDatabaseUpdater {
     private const val DB_FILE_NAME = "players-database.json"
-    const val DEFAULT_URL =
-        "https://raw.githubusercontent.com/bi0shacker001/droidtop-platforms/main/players-database.json"
 
     /** Returns the number of players in the refreshed database. */
-    fun update(context: Context, url: String = DEFAULT_URL): Int {
+    fun update(context: Context, url: String = PlatformDatabaseSource.urlFor(context, DB_FILE_NAME)): Int {
         val connection = URL(url).openConnection() as HttpURLConnection
         connection.connectTimeout = 15_000
         connection.readTimeout = 30_000

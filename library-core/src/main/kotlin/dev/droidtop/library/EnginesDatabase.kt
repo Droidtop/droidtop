@@ -1,6 +1,7 @@
 package dev.droidtop.library
 
 import android.content.Context
+import dev.droidtop.library.consoles.PlatformDatabaseSource
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -20,8 +21,6 @@ import org.json.JSONObject
  */
 object EnginesDatabase {
     private const val DB_FILE_NAME = "engines-database.json"
-    const val DEFAULT_URL =
-        "https://raw.githubusercontent.com/bi0shacker001/droidtop-platforms/main/engines-database.json"
 
     // GameEngine enum -> the database's engine ids (droidtop's own engine
     // vocabulary, shared with players-database.json's engine systemIds).
@@ -88,7 +87,7 @@ object EnginesDatabase {
     }
 
     /** Same validate-before-replace atomic-write contract as [dev.droidtop.library.consoles.PlayersDatabaseUpdater]. Returns the engine count. */
-    fun update(context: Context, url: String = DEFAULT_URL): Int {
+    fun update(context: Context, url: String = PlatformDatabaseSource.urlFor(context, DB_FILE_NAME)): Int {
         val connection = URL(url).openConnection() as HttpURLConnection
         connection.connectTimeout = 15_000
         connection.readTimeout = 30_000
