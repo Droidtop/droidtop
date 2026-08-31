@@ -665,8 +665,9 @@ internal val ES_DE_ELEMENT_SCHEMA: Map<String, Map<String, EsDePropertyType>> = 
         "opacity" to EsDePropertyType.FLOAT,
     ),
     // ThemeData.cpp:644-645. Not a visual element at all in real ES-DE
-    // (plays on navigation/selection) -- parsed for completeness; no
-    // rendering, real audio playback wiring is separate work.
+    // (navigation-sound declarations, read back by element lookup in
+    // Sound::getFromTheme) -- consumed by shell-gamepad's own
+    // EsDeNavigationSounds, never by a renderer.
     "sound" to mapOf(
         "path" to EsDePropertyType.PATH,
     ),

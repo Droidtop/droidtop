@@ -3,9 +3,12 @@ package dev.droidtop.shell.gamepad.theme
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.BatteryManager
+import android.widget.ImageView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -51,6 +54,10 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil3.compose.AsyncImage
+import com.github.penfeizhou.animation.FrameAnimationDrawable
+import com.github.penfeizhou.animation.apng.APNGDrawable
+import com.github.penfeizhou.animation.gif.GifDrawable
+import com.github.penfeizhou.animation.loader.FileLoader
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.theme.BADGE_SLOTS
 import dev.droidtop.library.theme.EsDeThemeElement
@@ -208,11 +215,18 @@ fun EsDeThemedView(
                 // video file; the same static-poster fallback
                 // EsDeThemedFallbackImage always used otherwise (no video
                 // present, or a gameselector slot with no video concept at
-                // all, e.g. a mosaic tile). "animation" (GIF/APNG) stays on
-                // the plain fallback -- a genuinely separate, smaller decode
-                // engine this pass doesn't build.
+                // all, e.g. a mosaic tile).
                 "video" -> EsDeThemedVideo(element, viewWidth, viewHeight, gameSelection)
-                "animation" -> EsDeThemedFallbackImage(element, viewWidth, viewHeight, gameSelection)
+                // Real GIF/APNG frame-animation playback (see
+                // EsDeThemedAnimation's own doc comment) -- no longer the
+                // static-image fallback this used to be.
+                "animation" -> EsDeThemedAnimation(element, viewWidth, viewHeight)
+                // Not a visual element at all in real ES-DE -- `<sound>`
+                // declarations feed NavigationSounds, not the render tree
+                // (Sound.cpp's getFromTheme reads them by element lookup).
+                // droidtop's equivalent consumer is EsDeNavigationSounds,
+                // loaded alongside the theme itself, never drawn here.
+                "sound" -> Unit
                 // Real, live-rendered -- ES-DE's own "clock" type has no
                 // "metadata" property at all (confirmed against its real
                 // schema), unlike "datetime".
@@ -797,7 +811,156 @@ private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight
 }
 
 /**
- * Real fallback for `video`/`animation` elements: their own `default`/
+ * Which decode engine an `animation` element's `path` really selects --
+ * transcribed from real ES-DE's own dispatch (SystemView.cpp:648-676 and
+ * the identical GamelistView.cpp block): strictly by file extension,
+ * ".json" -> LottieAnimComponent, ".gif" -> GIFAnimComponent, anything
+ * else logs a warning and creates NO component at all ("Only .gif and
+ * .json extensions are supported", THEMES.md's own `path` property doc).
+ * droidtop's one deliberate extension beyond that real set: ".png"/
+ * ".apng" -> APNG playback (docs/SPEC.md names "animation (GIF/APNG)" as
+ * the goal), which real ES-DE would refuse -- APNG4Android decodes both
+ * formats with one API, so supporting it costs nothing and loses no
+ * real-theme compatibility (a real theme written for ES-DE can't be
+ * using .apng paths anyway, so this only ever widens what renders).
+ * Pure and JVM-testable -- no Android/filesystem dependency.
+ */
+internal enum class EsDeAnimationKind { GIF, APNG, LOTTIE, UNSUPPORTED }
+
+internal fun esDeAnimationKind(path: String): EsDeAnimationKind {
+    // Extension of the FILENAME, not of the whole path -- a dot in a
+    // parent directory name must not read as an extension.
+    val extension = path.substringAfterLast('/').substringAfterLast('.', missingDelimiterValue = "").lowercase()
+    return when (extension) {
+        "gif" -> EsDeAnimationKind.GIF
+        "png", "apng" -> EsDeAnimationKind.APNG
+        "json" -> EsDeAnimationKind.LOTTIE
+        else -> EsDeAnimationKind.UNSUPPORTED
+    }
+}
+
+/**
+ * Real `animation` element playback -- actual GIF/APNG frame animation
+ * (APNG4Android's [GifDrawable]/[APNGDrawable], one shared
+ * FrameAnimationDrawable API for both formats), replacing the static
+ * first-frame-image fallback this element type rendered through before.
+ * Dispatch is real ES-DE's own extension-based one (see
+ * [esDeAnimationKind]); like real ES-DE, a component only exists when
+ * `path` is declared AND the file exists (SystemView.cpp:646 gates on
+ * `has("path")`; there is no `default` fallback property in the real
+ * animation schema, unlike image/video -- confirmed against
+ * ThemeData.cpp:415-438's property list).
+ *
+ * Lottie (".json") is parsed but deliberately NOT rendered: real ES-DE
+ * treats it as a genuinely separate component class
+ * (LottieAnimComponent, an rlottie integration) -- logged once per path
+ * so a theme author sees why, not silently dropped.
+ *
+ * Real properties applied: pos/size/maxSize/origin/rotation/opacity via
+ * the same [sizeOf]/[positionOf]/graphicsLayer helpers every other
+ * element uses; `color` as a real multiply color shift
+ * (PorterDuff.Mode.MULTIPLY -- the AndroidView equivalent of the
+ * BlendMode.Modulate rationale documented in [EsDeThemedImage]);
+ * `cornerRadius` against screen WIDTH (GIFAnimComponent.cpp:399-401,
+ * same axis exception as image); `iterationCount` via
+ * FrameAnimationDrawable.setLoopLimit (real range 0-10, 0 = infinite,
+ * GIFAnimComponent.cpp:370-371 / THEMES.md). Real, honest gaps -- all
+ * parsed, none rendered, because APNG4Android's decoder has no
+ * corresponding control: `speed` (real clamp 0.2-3.0), `direction`
+ * (normal/reverse/alternate/alternateReverse, including alternate's real
+ * iteration-doubling, GIFAnimComponent.cpp:343-373), `interpolation`,
+ * `colorEnd`/`gradientType` (a per-vertex gradient shift a flat
+ * ColorFilter can't express), `brightness`/`saturation` (not applied for
+ * plain images either), and `stationary`/`metadataElement` (droidtop has
+ * no slide-transition or fast-scroll-fade machinery for any element yet).
+ */
+@Composable
+private fun EsDeThemedAnimation(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp) {
+    // No gameSelection parameter, unlike image/video: the real animation
+    // schema has no gameselectorEntry property at all (ThemeData.cpp:
+    // 415-438) -- an animation is always its own declared file.
+    val path = element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved
+    if (path == null || !File(path).exists()) return
+    val kind = esDeAnimationKind(path)
+    if (kind == EsDeAnimationKind.LOTTIE || kind == EsDeAnimationKind.UNSUPPORTED) {
+        // Same real outcome as ES-DE's own "Invalid theme configuration"
+        // warning path (SystemView.cpp:667-675): no component.
+        android.util.Log.w(
+            "droidtop.EsDeTheme",
+            "animation element ${element.key}: ${if (kind == EsDeAnimationKind.LOTTIE) "Lottie (.json) animations are not implemented" else "unsupported animation extension"} ($path)",
+        )
+        return
+    }
+    val (width, height) = sizeOf(element, viewWidth, viewHeight)
+    val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
+    val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
+    val originFraction = element.valueOrNull<EsDeThemeValue.Pair>("origin") ?: EsDeThemeValue.Pair(0f, 0f)
+    val rotation = element.valueOrNull<EsDeThemeValue.FloatValue>("rotation")?.value ?: 0f
+    val tint = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) }
+    // Real GIFAnimComponent.cpp:399-401: cornerRadius scales against
+    // screen WIDTH (the same one-axis exception image documents).
+    val cornerRadiusFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("cornerRadius")?.value ?: 0f
+    val cornerRadius = (cornerRadiusFraction * viewWidth.value).dp
+    // Real clamp 0-10, 0 = infinite (GIFAnimComponent.cpp:370-371).
+    // setLoopLimit's own 0 also means unlimited, a direct match.
+    val iterationCount = (element.valueOrNull<EsDeThemeValue.UInt>("iterationCount")?.value?.toInt() ?: 0).coerceIn(0, 10)
+    // Real `size` vs `maxSize` semantics, same as sizeOf's own doc
+    // comment: an exact `size` stretches, `maxSize` fits within bounds
+    // preserving aspect -- ImageView scale types express exactly that.
+    val hasExactSize = element.valueOrNull<EsDeThemeValue.Pair>("size") != null
+    val drawable = remember(path, iterationCount) {
+        val loader = FileLoader(path)
+        val animation: FrameAnimationDrawable<*> = when (kind) {
+            EsDeAnimationKind.GIF -> GifDrawable(loader)
+            else -> APNGDrawable(loader)
+        }
+        animation.setLoopLimit(iterationCount)
+        animation
+    }
+    // FrameAnimationDrawable runs its own decode thread -- stop it when
+    // this element leaves composition (same lifecycle discipline as
+    // EsDeThemedVideo's player.release()).
+    DisposableEffect(drawable) {
+        onDispose { drawable.stop() }
+    }
+    AndroidView(
+        factory = { ctx ->
+            ImageView(ctx).apply {
+                scaleType = if (hasExactSize) ImageView.ScaleType.FIT_XY else ImageView.ScaleType.FIT_CENTER
+                if (tint != null) {
+                    // Real ES-DE `color` on an animation is the same
+                    // multiply color SHIFT as on images
+                    // (GIFAnimComponent's mColorShift, THEMES.md:
+                    // "multiplying each pixel's color by this color
+                    // value") -- MULTIPLY, never SRC_IN.
+                    colorFilter = PorterDuffColorFilter(
+                        android.graphics.Color.argb(
+                            (tint.alpha * 255).toInt(),
+                            (tint.red * 255).toInt(),
+                            (tint.green * 255).toInt(),
+                            (tint.blue * 255).toInt(),
+                        ),
+                        PorterDuff.Mode.MULTIPLY,
+                    )
+                }
+                setImageDrawable(drawable)
+            }
+        },
+        update = { view -> if (view.drawable !== drawable) view.setImageDrawable(drawable) },
+        modifier = Modifier
+            .absoluteOffset(x = offsetX, y = offsetY)
+            .size(width = width, height = height)
+            .graphicsLayer {
+                alpha = opacity
+                transformOrigin = TransformOrigin(originFraction.x, originFraction.y)
+                rotationZ = rotation
+            }
+            .let { if (cornerRadius > 0.dp) it.clip(RoundedCornerShape(cornerRadius)) else it },
+    )
+}
+
+/**
+ * Real fallback for `video` elements: their own `default`/
  * `defaultImage`/`path` PATH property when present, shown as a plain
  * static image -- or, for a gameselector-driven element (DEcaffe's own
  * `screen2`, the large game-preview poster, which has NO static path
@@ -805,11 +968,9 @@ private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight
  * artwork, same real per-game-image approach as [EsDeThemedImage]'s own
  * gameselectorEntry handling (see that function's doc comment for the
  * same "default priority order, not this element's own imageType"
- * simplification). Real ES-DE plays `animation` elements as actual GIF/
- * APNG content -- this pass doesn't build that decode engine (a real,
- * separate, smaller follow-up), so a static poster is the honest
- * alternative to rendering nothing at all. Also [EsDeThemedVideo]'s own
- * fallback when a `video` element's selected game has no scraped video.
+ * simplification). [EsDeThemedVideo]'s own fallback when a `video`
+ * element's selected game has no scraped video; `animation` elements now
+ * play for real instead -- see [EsDeThemedAnimation].
  */
 @Composable
 private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp, gameSelection: List<LibraryEntry>) {
@@ -828,9 +989,12 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
     val tint = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) }
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
-    // "video" real property is imageCornerRadius; "animation" real property is cornerRadius -- different keys, same real concept.
-    val cornerRadiusFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("imageCornerRadius")?.value
-        ?: element.valueOrNull<EsDeThemeValue.FloatValue>("cornerRadius")?.value ?: 0f
+    // "video"'s real property for its STATIC image is imageCornerRadius
+    // (videoCornerRadius is the playing surface's own, separate real
+    // property) -- and a static image is exactly what this fallback
+    // draws. Only video elements reach here now that animation plays for
+    // real (see EsDeThemedAnimation).
+    val cornerRadiusFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("imageCornerRadius")?.value ?: 0f
     // Real ImageComponent.cpp: cornerRadius scales against screen WIDTH,
     // not height -- confirmed against real ES-DE source (glm::clamp(...) *
     // mRenderer->getScreenWidth()), the one axis-exception also found for
