@@ -9,7 +9,8 @@ import java.io.RandomAccessFile
 
 /** Which engine a game folder was built with — decoupled from how it gets launched (see [GameLaunchStrategy]/[GameLaunchStrategyResolver]): several launch paths can exist for the same engine. */
 enum class GameEngine {
-    RENPY, RPG_MAKER_MV, RPG_MAKER_MZ, RPG_MAKER_VX_ACE, RPG_MAKER_2000_2003, KIRIKIRI,
+    RENPY, RPG_MAKER_MV, RPG_MAKER_MZ, RPG_MAKER_VX_ACE, RPG_MAKER_VX, RPG_MAKER_XP,
+    RPG_MAKER_2000_2003, KIRIKIRI,
     AUGUST, BURIKO, CATSYSTEM2, CMVS, FLASH_AIR, GODOT, TWINE, UNREAL, UNITY,
 }
 
@@ -72,56 +73,27 @@ enum class GameEngine {
  *   game at all.
  */
 object GameEngineDetector {
-    fun detect(folder: File): GameEngine? = when {
-        isRenPy(folder) -> GameEngine.RENPY
-        hasCoreScript(folder, "rpg_core.js") -> GameEngine.RPG_MAKER_MV
-        hasCoreScript(folder, "rmmz_core.js") -> GameEngine.RPG_MAKER_MZ
-        isRpgMakerVxAce(folder) -> GameEngine.RPG_MAKER_VX_ACE
-        isRpgMaker2000_2003(folder) -> GameEngine.RPG_MAKER_2000_2003
-        isKirikiri(folder) -> GameEngine.KIRIKIRI
-        isAugust(folder) -> GameEngine.AUGUST
-        isBuriko(folder) -> GameEngine.BURIKO
-        isCatSystem2(folder) -> GameEngine.CATSYSTEM2
-        isCmvs(folder) -> GameEngine.CMVS
-        isFlashAir(folder) -> GameEngine.FLASH_AIR
-        isGodot(folder) -> GameEngine.GODOT
-        isTwine(folder) -> GameEngine.TWINE
-        isUnreal(folder) -> GameEngine.UNREAL
-        isUnity(folder) -> GameEngine.UNITY
-        else -> null
+    /**
+     * Registry-driven classification (docs/SPEC.md §7e2b v4): the
+     * database's rules decide, in the database's own row order, and a
+     * row whose engine id this app doesn't know is skipped. Only the
+     * byte-magic probes below ([builtinProbe]) stay code; the database
+     * decides where they apply.
+     */
+    fun detect(folder: File, defs: List<EngineDef>): GameEngine? =
+        defs.firstOrNull { def ->
+            def.engine != null && EngineDetectRules.matches(def.detect, folder, ::builtinProbe)
+        }?.engine
+
+    private fun builtinProbe(name: String, folder: File): Boolean = when (name) {
+        "godot" -> isGodot(folder)
+        "twine" -> isTwine(folder)
+        "unity" -> isUnity(folder)
+        // An unknown builtin fails its rule rather than matching: a
+        // newer database referencing a probe this app doesn't ship must
+        // not misdetect.
+        else -> false
     }
-
-    private fun isRenPy(folder: File): Boolean =
-        File(folder, "renpy").isDirectory && File(folder, "game").isDirectory
-
-    private fun hasCoreScript(folder: File, filename: String): Boolean =
-        File(folder, "js/$filename").isFile || File(folder, "www/js/$filename").isFile
-
-    private fun isRpgMakerVxAce(folder: File): Boolean =
-        folder.listFiles()?.any { it.isFile && it.name.lowercase().contains(".rgss3a") } == true
-
-    private fun isRpgMaker2000_2003(folder: File): Boolean =
-        File(folder, "RPG_RT.exe").isFile || File(folder, "RPG_RT.ldb").isFile
-
-    private fun isKirikiri(folder: File): Boolean =
-        folder.listFiles()?.any { it.isFile && it.extension.lowercase() == "xp3" } == true
-
-    private fun isAugust(folder: File): Boolean =
-        (folder.listFiles()?.count { it.isDirectory && it.name.lowercase().startsWith("aug") } ?: 0) >= 2
-
-    private fun isBuriko(folder: File): Boolean =
-        File(folder, "BGI.gdb").isFile || File(folder, "BGI.hvl").isFile
-
-    private fun isCatSystem2(folder: File): Boolean =
-        File(folder, "cs2conf.dll").isFile
-
-    private val CMVS_MARKER_NAMES = setOf("cmvs32.exe", "cmvs64.exe", "cmvs.cfg")
-
-    private fun isCmvs(folder: File): Boolean =
-        folder.listFiles()?.any { it.isFile && it.name.lowercase() in CMVS_MARKER_NAMES } == true
-
-    private fun isFlashAir(folder: File): Boolean =
-        File(folder, "META-INF").isDirectory && File(folder, "mimetype").isFile
 
     private val GODOT_EXECUTABLE_SUFFIXES = setOf("exe", "x86_64", "x86", "")
     private val GODOT_EMBEDDED_PCK_MAGIC = byteArrayOf('G'.code.toByte(), 'D'.code.toByte(), 'P'.code.toByte(), 'C'.code.toByte())
@@ -182,9 +154,6 @@ object GameEngineDetector {
         return -1
     }
 
-    private fun isUnreal(folder: File): Boolean =
-        File(folder, "Engine/Binaries").isDirectory
-
     private val UNITY_PLAYER_FILENAMES = setOf("UnityPlayer.dll", "UnityPlayer.so", "UnityPlayer.dylib")
 
     private fun isUnity(folder: File): Boolean = hasUnityPlayerRuntime(folder, maxDepth = 3)
@@ -221,15 +190,25 @@ object GameEngineDetector {
      * stays the outer folder either way (the nicer name); only
      * [DetectedGame.gameRoot] moves to wherever the markers actually are.
      */
-    fun scan(root: File, systemsById: Map<String, ConsoleSystemDef>): List<DetectedGame> =
+    fun scan(
+        root: File,
+        systemsById: Map<String, ConsoleSystemDef>,
+        defs: List<EngineDef>,
+        // The user's explicit per-folder engine assignment (docs/SPEC.md
+        // §7e2b: "users should be able to specify if we don't know") --
+        // wins over every rule, exactly like SystemOverridePrefs wins
+        // over folder-name resolution for console folders.
+        override: (File) -> GameEngine? = { null },
+    ): List<DetectedGame> =
         (root.listFiles() ?: emptyArray())
             .filter { it.isDirectory && resolveSystem(it.name, systemsById) == null }
             .mapNotNull { top ->
-                detect(top)?.let { DetectedGame(top, top, it) }
+                override(top)?.let { return@mapNotNull DetectedGame(top, top, it) }
+                detect(top, defs)?.let { DetectedGame(top, top, it) }
                     ?: (top.listFiles() ?: emptyArray())
                         .asSequence()
                         .filter { it.isDirectory }
-                        .mapNotNull { nested -> detect(nested)?.let { DetectedGame(top, nested, it) } }
+                        .mapNotNull { nested -> detect(nested, defs)?.let { DetectedGame(top, nested, it) } }
                         .firstOrNull()
             }
 }
@@ -254,7 +233,7 @@ data class DetectedGame(val displayFolder: File, val gameRoot: File, val engine:
 enum class GameLaunchStrategy {
     /**
      * Hand off to `dev.enginehost` — see [EngineHost]. The real default
-     * for the engines it covers ([ENGINEHOST_TARGETS]).
+     * for the engines it covers (the engines database's enginehost mappings).
      */
     ENGINEHOST,
 
@@ -308,13 +287,18 @@ object GameLaunchStrategyResolver {
         // order only decides which available strategy wins. Null keeps the
         // historical append order (and the pure-JVM unit tests untouched).
         preferredOrder: List<GameLaunchStrategy>? = null,
+        // Whether the engines database declares an enginehost mapping
+        // for [engine]. Defaults true so the pure JVM tests, which model
+        // registry-covered engines, stay unchanged (same convention as
+        // engineHostCanReachFolder above).
+        enginehostSupported: Boolean = true,
     ): List<GameLaunchStrategy> {
         val strategies = mutableListOf<GameLaunchStrategy>()
         // Only offered when there's an actual engineVersion to launch
         // with -- a folder with no enginehost.json of its own and no
         // per-folder override set isn't a real available option yet, see
         // resolveEngineVersion's own doc comment.
-        if (engineHostInstalled && engineHostCanReachFolder && engine in ENGINEHOST_TARGETS &&
+        if (engineHostInstalled && engineHostCanReachFolder && enginehostSupported &&
             (File(folder, "enginehost.json").isFile || engineHostEngineVersion != null)
         ) {
             strategies += GameLaunchStrategy.ENGINEHOST
@@ -348,6 +332,8 @@ private fun GameEngine.toLibraryEntryKind(): LibraryEntryKind = when (this) {
     GameEngine.RPG_MAKER_MV -> LibraryEntryKind.RPG_MAKER_MV
     GameEngine.RPG_MAKER_MZ -> LibraryEntryKind.RPG_MAKER_MZ
     GameEngine.RPG_MAKER_VX_ACE -> LibraryEntryKind.RPG_MAKER_VX_ACE
+    GameEngine.RPG_MAKER_VX -> LibraryEntryKind.RPG_MAKER_VX
+    GameEngine.RPG_MAKER_XP -> LibraryEntryKind.RPG_MAKER_XP
     GameEngine.RPG_MAKER_2000_2003 -> LibraryEntryKind.RPG_MAKER_2000_2003
     GameEngine.KIRIKIRI -> LibraryEntryKind.KIRIKIRI
     GameEngine.AUGUST -> LibraryEntryKind.AUGUST
@@ -401,7 +387,12 @@ class EngineGameProvider(
     override suspend fun scan(): List<LibraryEntry> {
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         return (GamesRoots.current(context) + extraRoots()).distinct().flatMap { root ->
-            GameEngineDetector.scan(root, systemsById).map { detected ->
+            GameEngineDetector.scan(
+                root,
+                systemsById,
+                EnginesDatabase.defs(context),
+                override = { folder -> EngineOverridePrefs.engineFor(context, folder.absolutePath) },
+            ).map { detected ->
                 LibraryEntry(
                     id = detected.displayFolder.absolutePath,
                     title = detected.displayFolder.name,
@@ -421,11 +412,15 @@ class EngineGameProvider(
         // (a handful of listFiles() calls), and keeps LibraryEntry's shape
         // shared/uniform across every provider rather than growing an
         // engine-games-only field.
-        val gameRoot = GameEngineDetector.detect(displayFolder)?.let { displayFolder }
+        val defs = EnginesDatabase.defs(context)
+        EngineOverridePrefs.engineFor(context, displayFolder.absolutePath)?.let {
+            return ResolvedEntry(displayFolder, it)
+        }
+        val gameRoot = GameEngineDetector.detect(displayFolder, defs)?.let { displayFolder }
             ?: (displayFolder.listFiles() ?: emptyArray())
-                .firstOrNull { it.isDirectory && GameEngineDetector.detect(it) != null }
+                .firstOrNull { it.isDirectory && GameEngineDetector.detect(it, defs) != null }
             ?: displayFolder
-        val engine = GameEngineDetector.detect(gameRoot)
+        val engine = GameEngineDetector.detect(gameRoot, defs)
             ?: error("Couldn't re-detect an engine for ${gameRoot.absolutePath}")
         return ResolvedEntry(gameRoot, engine)
     }
@@ -449,6 +444,7 @@ class EngineGameProvider(
             engineHostEngineVersion = resolveEngineVersion(context, gameRoot, engine),
             engineHostCanReachFolder = EngineHost.canReachGameFolder(context, gameRoot),
             preferredOrder = EnginesDatabase.priorityFor(context, engine),
+            enginehostSupported = EnginesDatabase.enginehostTargetFor(context, engine) != null,
         )
     }
 
@@ -472,7 +468,8 @@ class EngineGameProvider(
                 EngineHost.launch(
                     context,
                     gameRoot,
-                    ENGINEHOST_TARGETS.getValue(engine),
+                    EnginesDatabase.enginehostTargetFor(context, engine)
+                        ?: error("engines-database has no enginehost mapping for $engine"),
                     resolveEngineVersion(context, gameRoot, engine),
                 )
             }

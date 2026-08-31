@@ -974,7 +974,12 @@ object AppSettingsCatalogs {
                 ),
                 CatalogGroup(
                     id = "scraper_screenscraper",
-                    title = "ScreenScraper account (all optional)",
+                    // Account fields ONLY: the dev ID/password pair is an
+                    // APPLICATION credential (real ES-DE embeds its own and
+                    // never surfaces it) -- it arrives via the debug
+                    // credentials file below, or a compiled-in registered
+                    // pair once droidtop has one, never a user-facing field.
+                    title = "ScreenScraper account (optional)",
                     items = listOf(
                         // stored*, not the effective getters: with the
                         // debug-credentials file active, the effective
@@ -987,12 +992,6 @@ object AppSettingsCatalogs {
                         },
                         screenScraperField(context, "ss_user_password", "Account sspassword", ScreenScraperPrefs.storedUserPassword(context), secret = true) { c, v ->
                             ScreenScraperPrefs.set(c, ScreenScraperPrefs.storedDevId(c), ScreenScraperPrefs.storedDevPassword(c), ScreenScraperPrefs.storedUserId(c), v)
-                        },
-                        screenScraperField(context, "ss_dev_id", "Dev ID", ScreenScraperPrefs.storedDevId(context)) { c, v ->
-                            ScreenScraperPrefs.set(c, v, ScreenScraperPrefs.storedDevPassword(c), ScreenScraperPrefs.storedUserId(c), ScreenScraperPrefs.storedUserPassword(c))
-                        },
-                        screenScraperField(context, "ss_dev_password", "Dev password", ScreenScraperPrefs.storedDevPassword(context), secret = true) { c, v ->
-                            ScreenScraperPrefs.set(c, ScreenScraperPrefs.storedDevId(c), v, ScreenScraperPrefs.storedUserId(c), ScreenScraperPrefs.storedUserPassword(c))
                         },
                     ),
                 ),

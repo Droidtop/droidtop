@@ -165,6 +165,8 @@ enum class LibraryEntryKind {
     RPG_MAKER_MV,
     RPG_MAKER_MZ,
     RPG_MAKER_VX_ACE,
+    RPG_MAKER_VX,
+    RPG_MAKER_XP,
 
     /**
      * RPG Maker 2000/2003 — real, distinct detection signature
@@ -222,6 +224,7 @@ fun LibraryEntryKind.displayName(): String = when (this) {
     LibraryEntryKind.CMVS, LibraryEntryKind.FLASH_AIR, LibraryEntryKind.TWINE,
     -> "Visual Novels"
     LibraryEntryKind.RPG_MAKER_MV, LibraryEntryKind.RPG_MAKER_MZ, LibraryEntryKind.RPG_MAKER_VX_ACE,
+    LibraryEntryKind.RPG_MAKER_VX, LibraryEntryKind.RPG_MAKER_XP,
     LibraryEntryKind.RPG_MAKER_2000_2003,
     -> "RPG Maker"
     LibraryEntryKind.CONSOLE_ROM -> "Consoles"

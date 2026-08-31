@@ -40,6 +40,8 @@ object EngineVersionDetector {
     fun detect(engine: GameEngine, gameRoot: File): DetectedVersion? = when (engine) {
         GameEngine.RENPY -> detectRenPy(gameRoot)
         GameEngine.RPG_MAKER_VX_ACE -> detectRgss(gameRoot)
+        GameEngine.RPG_MAKER_VX -> detectRgss(gameRoot)
+        GameEngine.RPG_MAKER_XP -> detectRgss(gameRoot)
         GameEngine.RPG_MAKER_MV -> detectRpgMakerJs(gameRoot, "rpg_core.js")
         GameEngine.RPG_MAKER_MZ -> detectRpgMakerJs(gameRoot, "rmmz_core.js")
         GameEngine.TWINE -> detectTwine(gameRoot)
