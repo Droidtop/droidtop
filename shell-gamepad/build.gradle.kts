@@ -70,6 +70,12 @@ dependencies {
     // theme/EsDeThemeRenderer.kt's own EsDeThemedVideo doc comment.
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
+    // Real "animation" theme element playback (GIF + APNG frame
+    // animation, APNG4Android -- the same library, at the same version,
+    // the vendored gamenative catalog already pins as `gn.apng`) -- see
+    // theme/EsDeThemeRenderer.kt's own EsDeThemedAnimation doc comment.
+    implementation(libs.apng)
+    implementation(libs.apng.gif)
 
     testImplementation(libs.junit)
 }
