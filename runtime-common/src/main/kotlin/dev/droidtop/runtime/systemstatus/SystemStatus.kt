@@ -189,4 +189,127 @@ object SystemControls {
 
     fun allSettingsIntent(): Intent =
         Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    // ------------------------------------------------------------------
+    // Do Not Disturb -- genuinely OWNABLE after a one-time grant
+    // (notification-policy access, given on a system screen droidtop
+    // opens). One of the few real controls Android still lets an
+    // ordinary app hold, so droidtop holds it.
+    // ------------------------------------------------------------------
+
+    fun hasDndAccess(context: Context): Boolean =
+        (context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager)
+            .isNotificationPolicyAccessGranted
+
+    fun dndEnabled(context: Context): Boolean =
+        (context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager)
+            .currentInterruptionFilter != android.app.NotificationManager.INTERRUPTION_FILTER_ALL
+
+    /** False when the policy-access grant is missing -- surface the grant action instead. */
+    fun setDnd(context: Context, enabled: Boolean): Boolean {
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        if (!nm.isNotificationPolicyAccessGranted) return false
+        return runCatching {
+            nm.setInterruptionFilter(
+                if (enabled) android.app.NotificationManager.INTERRUPTION_FILTER_PRIORITY
+                else android.app.NotificationManager.INTERRUPTION_FILTER_ALL,
+            )
+        }.isSuccess
+    }
+
+    fun dndGrantIntent(): Intent =
+        Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    // ------------------------------------------------------------------
+    // Settings.System-backed controls -- all behind the same
+    // WRITE_SETTINGS grant brightness already uses, so once the user has
+    // granted it for one of these they have granted it for all.
+    // ------------------------------------------------------------------
+
+    fun screenTimeoutMs(context: Context): Int? = runCatching {
+        Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_OFF_TIMEOUT)
+    }.getOrNull()
+
+    fun setScreenTimeoutMs(context: Context, ms: Int): Boolean {
+        if (!Settings.System.canWrite(context)) return false
+        return runCatching {
+            Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_OFF_TIMEOUT, ms.coerceAtLeast(5_000))
+        }.isSuccess
+    }
+
+    fun autoRotate(context: Context): Boolean = runCatching {
+        Settings.System.getInt(context.contentResolver, Settings.System.ACCELEROMETER_ROTATION) == 1
+    }.getOrDefault(false)
+
+    fun setAutoRotate(context: Context, enabled: Boolean): Boolean {
+        if (!Settings.System.canWrite(context)) return false
+        return runCatching {
+            Settings.System.putInt(
+                context.contentResolver,
+                Settings.System.ACCELEROMETER_ROTATION,
+                if (enabled) 1 else 0,
+            )
+        }.isSuccess
+    }
+
+    fun adaptiveBrightness(context: Context): Boolean = runCatching {
+        Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE) ==
+            Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC
+    }.getOrDefault(false)
+
+    fun setAdaptiveBrightness(context: Context, enabled: Boolean): Boolean {
+        if (!Settings.System.canWrite(context)) return false
+        return runCatching {
+            Settings.System.putInt(
+                context.contentResolver,
+                Settings.System.SCREEN_BRIGHTNESS_MODE,
+                if (enabled) Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC
+                else Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
+            )
+        }.isSuccess
+    }
+
+    // ------------------------------------------------------------------
+    // Direct links into the system screens the platform refuses to let
+    // an app own. Filtered to what actually RESOLVES on this device --
+    // an OEM build missing a screen must not produce a dead row.
+    // ------------------------------------------------------------------
+
+    data class SettingsLink(val id: String, val label: String, val intent: Intent)
+
+    fun appDetailsIntent(context: Context): Intent =
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+            .setData(android.net.Uri.parse("package:${context.packageName}"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    fun settingsLinks(context: Context): List<SettingsLink> {
+        val candidates = listOf(
+            SettingsLink("display", "Display", Intent(Settings.ACTION_DISPLAY_SETTINGS)),
+            SettingsLink("sound", "Sound & vibration", Intent(Settings.ACTION_SOUND_SETTINGS)),
+            SettingsLink("battery", "Battery saver", Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS)),
+            SettingsLink("storage", "Storage", Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)),
+            SettingsLink("apps", "Apps", Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS)),
+            SettingsLink("notifications", "Notifications", Intent(Settings.ACTION_ALL_APPS_NOTIFICATION_SETTINGS)),
+            SettingsLink("datetime", "Date & time", Intent(Settings.ACTION_DATE_SETTINGS)),
+            SettingsLink("locale", "Languages", Intent(Settings.ACTION_LOCALE_SETTINGS)),
+            SettingsLink("keyboard", "Keyboards & input", Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)),
+            SettingsLink("vpn", "VPN", Intent(Settings.ACTION_VPN_SETTINGS)),
+            SettingsLink("airplane", "Airplane mode", Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS)),
+            SettingsLink("cast", "Cast", Intent(Settings.ACTION_CAST_SETTINGS)),
+            SettingsLink("nfc", "NFC", Intent(Settings.ACTION_NFC_SETTINGS)),
+            // Printing is a PC-parity requirement (SPEC 4b) -- the system
+            // print-services screen is where CUPS-backed services land.
+            SettingsLink("print", "Printing", Intent(Settings.ACTION_PRINT_SETTINGS)),
+            SettingsLink("accessibility", "Accessibility", Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)),
+            SettingsLink("security", "Security", Intent(Settings.ACTION_SECURITY_SETTINGS)),
+            SettingsLink("privacy", "Privacy", Intent(Settings.ACTION_PRIVACY_SETTINGS)),
+            SettingsLink("location", "Location", Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)),
+            SettingsLink("developer", "Developer options", Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)),
+            SettingsLink("about", "About this device", Intent(Settings.ACTION_DEVICE_INFO_SETTINGS)),
+        )
+        val pm = context.packageManager
+        return candidates
+            .map { it.copy(intent = it.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            .filter { it.intent.resolveActivity(pm) != null }
+    }
 }
