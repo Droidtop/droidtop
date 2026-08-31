@@ -58,6 +58,20 @@ class GameEngineDetectorTest {
     }
 
     @Test
+    fun `detects RPG Maker 2000-2003 via RPG_RT-dot-exe`() {
+        touch("RPG_RT.exe")
+        assertEquals(GameEngine.RPG_MAKER_2000_2003, GameEngineDetector.detect(tmp.root))
+    }
+
+    @Test
+    fun `detects RPG Maker 2000-2003 via RPG_RT-dot-ldb alone`() {
+        // A real distribution can ship without the .exe (Linux/EasyRPG-only
+        // release) -- the .ldb database file alone is still a real signal.
+        touch("RPG_RT.ldb")
+        assertEquals(GameEngine.RPG_MAKER_2000_2003, GameEngineDetector.detect(tmp.root))
+    }
+
+    @Test
     fun `detects Kirikiri via any xp3 file`() {
         touch("data.xp3")
         assertEquals(GameEngine.KIRIKIRI, GameEngineDetector.detect(tmp.root))

@@ -9,7 +9,7 @@ import java.io.RandomAccessFile
 
 /** Which engine a game folder was built with — decoupled from how it gets launched (see [GameLaunchStrategy]/[GameLaunchStrategyResolver]): several launch paths can exist for the same engine. */
 enum class GameEngine {
-    RENPY, RPG_MAKER_MV, RPG_MAKER_MZ, RPG_MAKER_VX_ACE, KIRIKIRI,
+    RENPY, RPG_MAKER_MV, RPG_MAKER_MZ, RPG_MAKER_VX_ACE, RPG_MAKER_2000_2003, KIRIKIRI,
     AUGUST, BURIKO, CATSYSTEM2, CMVS, FLASH_AIR, GODOT, TWINE, UNREAL, UNITY,
 }
 
@@ -56,6 +56,20 @@ enum class GameEngine {
  * verify a signature against yet. Guessing one from a game's file
  * extensions rather than a confirmed install isn't a standard worth
  * dropping here just because this is a different project.
+ *
+ * - RPG Maker 2000/2003: `RPG_RT.exe` or `RPG_RT.ldb` (the engine's own
+ *   database file) directly in the game root — the real signature
+ *   EasyRPG Player's own project detection uses (confirmed against
+ *   EasyRPG's public docs, not guessed), closing the detection gap
+ *   `droidtop-platforms/engines-database.json` flagged: droidtop only
+ *   ever launched RM2k/2k3 via a manually-added Custom Player before
+ *   this, since the engine simply wasn't recognized. `RPG_RT.exe` is a
+ *   real Windows executable, so the existing `hasWindowsExecutable`
+ *   check already offers [GameLaunchStrategy.WINE_PREFIX] for it with
+ *   no resolver change — the primary real path stays the EasyRPG
+ *   Player entries in players-database.json (systemId
+ *   "rpgmaker-2000-2003"), reached once this folder is recognized as a
+ *   game at all.
  */
 object GameEngineDetector {
     fun detect(folder: File): GameEngine? = when {
@@ -63,6 +77,7 @@ object GameEngineDetector {
         hasCoreScript(folder, "rpg_core.js") -> GameEngine.RPG_MAKER_MV
         hasCoreScript(folder, "rmmz_core.js") -> GameEngine.RPG_MAKER_MZ
         isRpgMakerVxAce(folder) -> GameEngine.RPG_MAKER_VX_ACE
+        isRpgMaker2000_2003(folder) -> GameEngine.RPG_MAKER_2000_2003
         isKirikiri(folder) -> GameEngine.KIRIKIRI
         isAugust(folder) -> GameEngine.AUGUST
         isBuriko(folder) -> GameEngine.BURIKO
@@ -84,6 +99,9 @@ object GameEngineDetector {
 
     private fun isRpgMakerVxAce(folder: File): Boolean =
         folder.listFiles()?.any { it.isFile && it.name.lowercase().contains(".rgss3a") } == true
+
+    private fun isRpgMaker2000_2003(folder: File): Boolean =
+        File(folder, "RPG_RT.exe").isFile || File(folder, "RPG_RT.ldb").isFile
 
     private fun isKirikiri(folder: File): Boolean =
         folder.listFiles()?.any { it.isFile && it.extension.lowercase() == "xp3" } == true
@@ -236,7 +254,7 @@ data class DetectedGame(val displayFolder: File, val gameRoot: File, val engine:
 enum class GameLaunchStrategy {
     /**
      * Hand off to `dev.enginehost` — see [EngineHost]. The real default
-     * for the 11 VN-shaped engines it covers ([ENGINEHOST_ENGINE_IDS]).
+     * for the engines it covers ([ENGINEHOST_TARGETS]).
      */
     ENGINEHOST,
 
@@ -280,6 +298,11 @@ object GameLaunchStrategyResolver {
         kirikiroid2Installed: Boolean = false,
         engineHostInstalled: Boolean = false,
         engineHostEngineVersion: String? = null,
+        // Whether enginehost's own UID can actually read the game folder
+        // -- see EngineHost.canReachGameFolder. Defaults true so the pure
+        // JVM tests, which model real readable game folders, stay
+        // unchanged.
+        engineHostCanReachFolder: Boolean = true,
         // Database-declared priority (EnginesDatabase, docs/SPEC.md §7e2):
         // AVAILABILITY stays this function's own real checks below -- the
         // order only decides which available strategy wins. Null keeps the
@@ -291,7 +314,7 @@ object GameLaunchStrategyResolver {
         // with -- a folder with no enginehost.json of its own and no
         // per-folder override set isn't a real available option yet, see
         // resolveEngineVersion's own doc comment.
-        if (engineHostInstalled && engine in ENGINEHOST_ENGINE_IDS &&
+        if (engineHostInstalled && engineHostCanReachFolder && engine in ENGINEHOST_TARGETS &&
             (File(folder, "enginehost.json").isFile || engineHostEngineVersion != null)
         ) {
             strategies += GameLaunchStrategy.ENGINEHOST
@@ -325,6 +348,7 @@ private fun GameEngine.toLibraryEntryKind(): LibraryEntryKind = when (this) {
     GameEngine.RPG_MAKER_MV -> LibraryEntryKind.RPG_MAKER_MV
     GameEngine.RPG_MAKER_MZ -> LibraryEntryKind.RPG_MAKER_MZ
     GameEngine.RPG_MAKER_VX_ACE -> LibraryEntryKind.RPG_MAKER_VX_ACE
+    GameEngine.RPG_MAKER_2000_2003 -> LibraryEntryKind.RPG_MAKER_2000_2003
     GameEngine.KIRIKIRI -> LibraryEntryKind.KIRIKIRI
     GameEngine.AUGUST -> LibraryEntryKind.AUGUST
     GameEngine.BURIKO -> LibraryEntryKind.BURIKO
@@ -416,6 +440,7 @@ class EngineGameProvider(
             kirikiroid2Installed = Kirikiroid2.isInstalled(context),
             engineHostInstalled = EngineHost.isInstalled(context),
             engineHostEngineVersion = resolveEngineVersion(context, gameRoot, engine),
+            engineHostCanReachFolder = EngineHost.canReachGameFolder(context, gameRoot),
             preferredOrder = EnginesDatabase.priorityFor(context, engine),
         )
     }
@@ -437,8 +462,12 @@ class EngineGameProvider(
                 // enginehost.json doesn't need one) -- EngineHost.launch
                 // itself only requires it when actually building a config
                 // extra, and fails loudly then, not before.
-                val engineId = ENGINEHOST_ENGINE_IDS.getValue(engine)
-                EngineHost.launch(context, gameRoot, engineId, resolveEngineVersion(context, gameRoot, engine))
+                EngineHost.launch(
+                    context,
+                    gameRoot,
+                    ENGINEHOST_TARGETS.getValue(engine),
+                    resolveEngineVersion(context, gameRoot, engine),
+                )
             }
             GameLaunchStrategy.KIRIKIROID2 -> Kirikiroid2.open(context)
             GameLaunchStrategy.WINE_PREFIX -> error(
