@@ -85,6 +85,7 @@ class MainActivity : AppCompatActivity() {
     private var handheldDeepLinkToken by mutableStateOf(0)
     private var handheldStartSection by mutableStateOf<String?>(null)
     private var handheldTriggerRescan by mutableStateOf(false)
+    private var handheldTriggerBrowseThemes by mutableStateOf(false)
 
     // Re-runs the dual-screen role orchestration on demand (home-press
     // reinit, explicit shell re-entry, a game launch) -- display
@@ -103,6 +104,7 @@ class MainActivity : AppCompatActivity() {
     private fun applyHandheldDeepLink(intent: Intent) {
         handheldStartSection = intent.getStringExtra(BackButtonMenu.EXTRA_HANDHELD_START_SECTION)
         handheldTriggerRescan = intent.getBooleanExtra(BackButtonMenu.EXTRA_HANDHELD_RESCAN, false)
+        handheldTriggerBrowseThemes = intent.getBooleanExtra(BackButtonMenu.EXTRA_HANDHELD_BROWSE_THEMES, false)
         handheldDeepLinkToken++
     }
 
@@ -161,6 +163,7 @@ class MainActivity : AppCompatActivity() {
                     deepLinkToken = handheldDeepLinkToken,
                     startSectionName = handheldStartSection,
                     triggerRescan = handheldTriggerRescan,
+                    triggerBrowseThemes = handheldTriggerBrowseThemes,
                 )
                 else -> {
                     val sessionState by DesktopSessionService.state.collectAsState()

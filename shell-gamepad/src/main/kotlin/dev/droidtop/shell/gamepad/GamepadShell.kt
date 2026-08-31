@@ -1,8 +1,6 @@
 package dev.droidtop.shell.gamepad
 
-import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -53,6 +51,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import dev.droidtop.library.settings.HandheldSettingsCatalog
 import dev.droidtop.library.EngineGameProvider
 import dev.droidtop.library.GameLaunchStrategy
 import dev.droidtop.library.LaunchStrategyOverridePrefs
@@ -70,7 +69,6 @@ import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.theme.EsDeListItem
 import dev.droidtop.shell.gamepad.theme.EsDeSystemListView
 import dev.droidtop.shell.gamepad.theme.EsDeThemedView
-import dev.droidtop.shell.gamepad.theme.ThemeBrowserScreen
 import dev.droidtop.shell.gamepad.theme.ThemePrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -133,6 +131,7 @@ fun GamepadShell(
     deepLinkToken: Int = 0,
     startSectionName: String? = null,
     triggerRescan: Boolean = false,
+    triggerBrowseThemes: Boolean = false,
 ) {
     val context = LocalContext.current
     // Two independent states, not one -- see Library.scanKinds' own doc
@@ -152,6 +151,10 @@ fun GamepadShell(
     // adb; a real user has no such option.
     var rescanTrigger by remember { mutableStateOf(0) }
     var section by remember { mutableStateOf(HandheldPrefs.defaultSection(context)) }
+    // Bumps whenever a real "Browse themes" deep-link arrives (see
+    // deepLinkToken's own doc comment) -- SettingsCatalogView opens its
+    // inline ThemeBrowserScreen off this token.
+    var browseThemesRequest by remember { mutableStateOf(0) }
     // Reacts to every real deep-link (see deepLinkToken's own doc comment
     // above), not just the first composition -- a plain `remember` initial
     // value would only ever apply once per GamepadShell instance, silently
@@ -159,35 +162,25 @@ fun GamepadShell(
     // Activity's singleTask instance stays alive.
     LaunchedEffect(deepLinkToken) {
         if (triggerRescan) rescanTrigger++
+        if (triggerBrowseThemes) {
+            section = HandheldSection.SETTINGS
+            browseThemesRequest++
+        }
         startSectionName?.let { name ->
             HandheldSection.entries.firstOrNull { it.name == name }?.let { section = it }
         }
     }
-    // Real, deliberate distinction from plain `section = it`: a user
-    // actively PICKING Settings (tab click, L/R shoulder cycle) now opens
-    // the real, unified com.android.launcher3.settings.SettingsActivity
-    // (deep-linked straight to SettingsHandheldFragment) instead of this
-    // shell's own former in-house Settings tab -- see docs/SPEC.md's own
-    // settings-architecture note and SettingsHandheldFragment.kt, which
-    // now owns Library/Display, real Preference entries a user can find
-    // from ANY shell's settings, not just Handheld's. Never redirects the
-    // *initial* `section` value computed from `startSectionName` above --
-    // that's how the "Appearance" preference's own deep-link (which still
-    // needs this shell's own real Compose ThemeBrowserScreen, not
-    // reimplementable as flat XML) actually lands on real content instead
-    // of bouncing straight back out.
-    val selectSection: (HandheldSection) -> Unit = { target ->
-        if (target == HandheldSection.SETTINGS) {
-            val intent = Intent(Intent.ACTION_MAIN).apply {
-                component = ComponentName(context.packageName, "com.android.launcher3.settings.SettingsActivity")
-                putExtra(":settings:fragment", "app.murinelauncher.settings.SettingsHandheldFragment")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
-        } else {
-            section = target
-        }
-    }
+    // Settings is a real in-shell section again -- cycling to it with L/R
+    // or picking its tab NEVER leaves the handheld context (per direction:
+    // browsing sections must maintain context). It renders the SAME shared
+    // settings catalog the unified Preference surface renders
+    // (HandheldSettingsCatalog, :runtime-common -- see docs/SPEC.md's
+    // settings architecture), so nothing about the settings themselves is
+    // shell-specific; only the chrome is. Explicitly activating a
+    // navigation item inside it (Global settings, another shell's
+    // settings, Console systems) still opens those real surfaces -- that's
+    // a deliberate user choice, exactly the distinction this draws.
+    val selectSection: (HandheldSection) -> Unit = { target -> section = target }
     var canGoBack by remember { mutableStateOf(false) }
     // True only while GamesSection's own themed system-view render (the
     // real, loaded theme's <helpsystem> element, see EsDeThemedHelpSystem)
@@ -357,7 +350,11 @@ fun GamepadShell(
                 section == HandheldSection.SETTINGS -> {
                     canGoBack = false
                     themeHandlesHints = false
-                    SettingsSection(onBack = { section = HandheldPrefs.defaultSection(context) })
+                    SettingsCatalogView(
+                        onBack = { section = HandheldPrefs.defaultSection(context) },
+                        onRescan = { rescanTrigger++ },
+                        browseThemesToken = browseThemesRequest,
+                    )
                 }
                 // Each section now gates on its own scan only (see
                 // gameEntries/appEntries' own comment) -- Games' spinner no
@@ -419,12 +416,11 @@ private object HandheldPrefs {
     private const val KEY_SHOW_HINTS = "pref_handheld_show_hints"
     private const val KEY_APPS_GRID_COLUMNS = "pref_handheld_apps_grid_columns"
     private const val DEFAULT_APPS_GRID_COLUMNS = 5
-    // Same real range as CustomSeekBarPreference's android:min/android:max
-    // in droidtop_handheld_prefs.xml -- kept in sync by hand since the two
-    // screens read/write the same underlying pref but can't share a single
-    // XML-defined range across modules (see this object's own doc comment).
-    const val MIN_APPS_GRID_COLUMNS = 2
-    const val MAX_APPS_GRID_COLUMNS = 10
+    // One shared range definition -- the settings catalog
+    // (:runtime-common) is the single owner of this setting now, so the
+    // formerly hand-synced copy of the XML seekbar's range is gone.
+    const val MIN_APPS_GRID_COLUMNS = HandheldSettingsCatalog.MIN_APPS_GRID_COLUMNS
+    const val MAX_APPS_GRID_COLUMNS = HandheldSettingsCatalog.MAX_APPS_GRID_COLUMNS
 
     fun defaultSection(context: Context): HandheldSection {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -807,7 +803,7 @@ private fun HandheldSection.displayName(): String = when (this) {
  * rather than looping forever on a theme whose view genuinely never
  * attaches one (ES-DWEE's widgetless system view is the real case).
  */
-private suspend fun requestFocusWhenAttached(
+internal suspend fun requestFocusWhenAttached(
     focusRequester: androidx.compose.ui.focus.FocusRequester,
     tag: String,
 ) {
@@ -1729,24 +1725,6 @@ private fun AppIconTile(entry: LibraryEntry, modifier: Modifier = Modifier, onLa
  * the tab bar itself now goes straight to that real, unified Preference
  * screen instead (see GamepadShell's own selectSection).
  */
-@Composable
-private fun SettingsSection(onBack: () -> Unit) {
-    // Theme selection and syncing are now real, direct Android Preference
-    // entries (SettingsHandheldFragment.kt, reading/writing
-    // dev.droidtop.library.theme.ThemeAssets/ThemePrefs/ThemeDownloader
-    // directly, :runtime-common) -- no bounce through a differently-styled
-    // Compose screen for those two anymore. The one real, deliberate
-    // exception is browsing/downloading a NEW theme: it genuinely needs a
-    // rich, scrollable list of remote entries with screenshot previews, a
-    // different interaction shape than a flat preference list, and
-    // ThemeBrowserScreen is the only place that real UI exists. Reached
-    // ONLY via the "Browse themes" preference's own deep link (see
-    // GamepadShell's own selectSection/deepLinkToken handling) -- there is
-    // nothing else left in this section, so it opens directly, no
-    // intermediate list screen with a single item in it.
-    ThemeBrowserScreen(onDismiss = onBack)
-}
-
 internal data class HomeSection(val title: String, val entries: List<LibraryEntry>)
 
 /**

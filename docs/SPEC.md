@@ -792,6 +792,33 @@ app-drawer icon or a floating switcher button:
   preferences, and everything else configurable lives, matching KDE's
   "one coherent shell, modular settings" model rather than a
   bolted-on companion app.
+  **Settings architecture — shared catalogs, per-surface chrome**: the
+  settings DATA and LAYOUT live in renderer-agnostic catalogs
+  (`dev.droidtop.library.settings` in `:runtime-common` —
+  `SettingsCatalog.kt` model + one catalog object per mode, e.g.
+  `HandheldSettingsCatalog`): which settings exist, their grouping and
+  order, their live values, and their single write path each. Every UI
+  surface just chromes a catalog in its own visual context — the unified
+  Preference screen renders it via `CatalogPreferenceBuilder`
+  (`:shell-default`), and Handheld's own in-shell Settings section
+  renders the SAME catalog with pure gamepad input
+  (`SettingsCatalogView`, `:shell-gamepad`) so cycling sections with L/R
+  never leaves the handheld context (per direction: browsing sections
+  must maintain context; explicitly activating a navigation item is the
+  one thing that may switch surfaces). Catalog layout convention, every
+  mode: the droidtop-wide "global" group first (a surface whose chrome
+  already exposes global settings — SettingsActivity's persistent
+  action-bar item — skips it by group id), the current mode's own
+  settings next, shortcuts to the OTHER modes' settings last, so nobody
+  ever switches modes just to reach a setting. Renderers may substitute
+  a native fulfillment for an item by its stable id (Handheld performs
+  "Rescan library" by bumping its own scan trigger and opens the theme
+  browser inline); every catalog default must still be real and correct
+  on its own so an id-unaware renderer gets working behavior for
+  everything. Desktop/Standard settings are still XML-declared
+  Preference screens — migrating them onto catalogs is the follow-up
+  that makes their settings renderable inside Desktop's own shell the
+  same way.
   - **Known real gap, confirmed on-device**: the Standard shell as it
     ships from Murine Launcher upstream is functional but plain — first
     real-device testing surfaced this directly, not a guess. Backlog item,
