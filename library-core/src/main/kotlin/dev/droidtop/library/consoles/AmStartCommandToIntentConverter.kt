@@ -48,11 +48,12 @@ object AmStartCommandToIntentConverter {
             context,
             "${context.packageName}.fileprovider",
             File(filePath),
-        ).toString()
+        )
+        val usesFileUri = argumentsTemplate.contains("{file.uri}")
         val tokens = ArrayDeque(
             argumentsTemplate
                 .replace("{file.path}", filePath)
-                .replace("{file.uri}", fileUri)
+                .replace("{file.uri}", fileUri.toString())
                 .split(Regex("[\\n\\s]+"))
                 .filter { it.isNotEmpty() },
         )
@@ -119,6 +120,31 @@ object AmStartCommandToIntentConverter {
         // this specific Intent, and the receiver gets a SecurityException
         // instead of the earlier FileUriExposedException.
         if (dataUri?.scheme == "content") intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        // Real, confirmed on-device launch failure this fixes (PS2 via the
+        // all-systems launch sweep: "Failed to open CD image ... Failed to
+        // open 'content://dev.droidtop.app.fileprovider/...'"): Android's
+        // URI grant flags only apply to the Intent's DATA and ClipData --
+        // never to a URI riding inside a string extra, which is exactly
+        // where several real presets put {file.uri} (--es bootPath ...).
+        // The receiving emulator got the URI text but zero permission to
+        // open it. Attaching the same URI as ClipData extends the grant to
+        // it (the documented mechanism for exactly this), and the explicit
+        // per-package grant below covers receivers that stash the string
+        // and open it later from a context the Intent grant no longer
+        // reaches. The grant is read-only and Android revokes it when the
+        // receiving task dies.
+        if (usesFileUri) {
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            intent.clipData = android.content.ClipData.newRawUri(null, fileUri)
+            val targetPackage = intent.component?.packageName ?: intent.getPackage()
+            if (targetPackage != null) {
+                try {
+                    context.grantUriPermission(targetPackage, fileUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                } catch (e: SecurityException) {
+                    android.util.Log.w("droidtop.AmStart", "Could not pre-grant $fileUri to $targetPackage", e)
+                }
+            }
+        }
         return intent
     }
 }
