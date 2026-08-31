@@ -35,6 +35,7 @@ object HandheldSettingsCatalog {
     const val ID_SYSTEM_BRIGHTNESS = "pref_handheld_system_brightness"
     const val ID_SYSTEM_BRIGHTNESS_GRANT = "pref_handheld_system_brightness_grant"
     const val ID_SYSTEM_BLUETOOTH = "pref_handheld_system_bluetooth"
+    const val ID_SYSTEM_VPN = "pref_handheld_system_vpn"
     const val ID_SYSTEM_DND = "pref_handheld_system_dnd"
     const val ID_SYSTEM_DND_GRANT = "pref_handheld_system_dnd_grant"
     const val ID_SYSTEM_ADAPTIVE = "pref_handheld_system_adaptive"
@@ -196,14 +197,23 @@ object HandheldSettingsCatalog {
                 val battery = status.batteryPercent
                     ?.let { "$it%" + if (status.charging) ", charging" else "" }
                     ?: "unknown"
+                val validation = when {
+                    status.network == dev.droidtop.runtime.systemstatus.NetworkKind.NONE -> ""
+                    status.validated -> ""
+                    // The captive-portal state, said out loud: the row's
+                    // action opens the system sheet where signing in
+                    // actually happens.
+                    else -> " -- connected but NO INTERNET (captive portal?)"
+                }
+                val vpnLine = if (status.vpnActive) " VPN active." else ""
                 add(
                     ActionItem(
                         id = ID_SYSTEM_NETWORK,
-                        title = "Network: $network",
+                        title = "Network: $network$validation",
                         // The system's own internet panel -- apps lost
                         // programmatic Wi-Fi toggling in API 29, and
                         // opening the real control beats faking one.
-                        subtitle = "Battery $battery. Select to open Wi-Fi and data controls",
+                        subtitle = "Battery $battery.$vpnLine Select to open Wi-Fi and data controls",
                         run = { ctx ->
                             ctx.startActivity(controls.internetPanelIntent())
                         },
@@ -291,6 +301,19 @@ object HandheldSettingsCatalog {
                         ),
                     )
                 }
+                add(
+                    ActionItem(
+                        id = ID_SYSTEM_VPN,
+                        title = if (status.vpnActive) "VPN: active" else "VPN: off",
+                        subtitle = "Opens the system VPN screen to connect, disconnect, or configure",
+                        run = { ctx ->
+                            ctx.startActivity(
+                                android.content.Intent(android.provider.Settings.ACTION_VPN_SETTINGS)
+                                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                        },
+                    ),
+                )
                 add(
                     ActionItem(
                         id = ID_SYSTEM_BLUETOOTH,

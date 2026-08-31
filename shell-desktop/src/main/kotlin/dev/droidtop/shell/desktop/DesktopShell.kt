@@ -256,8 +256,15 @@ private fun SystemTray() {
                 dev.droidtop.runtime.systemstatus.NetworkKind.CELLULAR -> "LTE"
                 dev.droidtop.runtime.systemstatus.NetworkKind.NONE -> "\u2715"
             }
+            val noInternet = if (
+                status.network != dev.droidtop.runtime.systemstatus.NetworkKind.NONE && !status.validated
+            ) " !" else ""
+            val vpn = if (status.vpnActive) "  VPN" else ""
             val battery = status.batteryPercent?.let { "  $it%" + if (status.charging) "\u26A1" else "" } ?: ""
-            Text(network + battery, color = MaterialTheme.colorScheme.onSurface)
+            // "!" = connected without validated internet (captive
+            // portal); the popover's Network entry opens the system
+            // sheet where signing in happens.
+            Text(network + noInternet + vpn + battery, color = MaterialTheme.colorScheme.onSurface)
         }
         androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             var volume by remember { mutableStateOf(controls.volume(context).toFloat()) }
