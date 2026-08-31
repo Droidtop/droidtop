@@ -3584,6 +3584,126 @@
    "pkg": "com.seleuco.mame4d2024",
    "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -flop1 '{file.path}'\" -d x68000",
    "killPackageProcesses": false
+  },
+  {
+   "id": "esde-epic-gamenative",
+   "systemId": "epic",
+   "label": "GameNative (Standalone)",
+   "pkg": "app.gamenative",
+   "argumentsTemplate": "-n app.gamenative/app.gamenative.MainActivity -a app.gamenative.LAUNCH_GAME -e game_source EPIC --ei app_id {file.inject:{file.path}}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-ps4-bachatas4",
+   "systemId": "ps4",
+   "label": "BachataS4 (Standalone)",
+   "pkg": "com.bachatas4.android",
+   "argumentsTemplate": "-n com.bachatas4.android/com.bachatas4.android.DirectLaunchActivity -e game_id {file.inject:{file.basename}.ps4}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-psvita-vita3k",
+   "systemId": "psvita",
+   "label": "Vita3K (Standalone)",
+   "pkg": "org.vita3k.emulator",
+   "argumentsTemplate": "-n org.vita3k.emulator/org.vita3k.emulator.Emulator --esa AppStartParameters -r,{file.inject:{file.basename}.psvita}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-psvita-emucorev",
+   "systemId": "psvita",
+   "label": "EmuCoreV (Standalone)",
+   "pkg": "com.sbro.emucorev",
+   "argumentsTemplate": "-n com.sbro.emucorev/com.sbro.emucorev.core.vita.Emulator --esa AppStartParameters -r,{file.inject:{file.basename}.psvita}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-scummvm-scummvm",
+   "systemId": "scummvm",
+   "label": "ScummVM (Standalone)",
+   "pkg": "org.scummvm.scummvm.debug",
+   "argumentsTemplate": "-n org.scummvm.scummvm.debug/org.scummvm.scummvm.SplashActivity -a android.intent.action.MAIN -c android.intent.action.MAIN -d {file.inject:{file.path}}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-steam-gamenative",
+   "systemId": "steam",
+   "label": "GameNative (Standalone)",
+   "pkg": "app.gamenative",
+   "argumentsTemplate": "-n app.gamenative/app.gamenative.MainActivity -a app.gamenative.LAUNCH_GAME -e game_source STEAM --ei app_id {file.inject:{file.path}}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-steam-gamehub-lite",
+   "systemId": "steam",
+   "label": "GameHub Lite (Standalone)",
+   "pkg": "emuready.gamehub.lite",
+   "argumentsTemplate": "-n emuready.gamehub.lite/com.xj.landscape.launcher.ui.gamedetail.GameDetailActivity -a gamehub.lite.LAUNCH_GAME --ez autoStartGame true -e steamAppId {file.inject:{file.path}} -e localGameId {file.inject:{file.path}}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-steam-gamehub-lite",
+   "systemId": "steam",
+   "label": "GameHub Lite Local (Standalone)",
+   "pkg": "emuready.gamehub.lite",
+   "argumentsTemplate": "-n emuready.gamehub.lite/com.xj.landscape.launcher.ui.gamedetail.GameDetailActivity -a gamehub.lite.LAUNCH_GAME --ez autoStartGame true -e localGameId {file.inject:{file.path}}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-windows-gamenative",
+   "systemId": "windows",
+   "label": "GameNative Steam (Standalone)",
+   "pkg": "app.gamenative",
+   "argumentsTemplate": "-n app.gamenative/app.gamenative.MainActivity -a app.gamenative.LAUNCH_GAME -e game_source STEAM --ei app_id {file.inject:{file.path}}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-windows-gamenative",
+   "systemId": "windows",
+   "label": "GameNative Epic (Standalone)",
+   "pkg": "app.gamenative",
+   "argumentsTemplate": "-n app.gamenative/app.gamenative.MainActivity -a app.gamenative.LAUNCH_GAME -e game_source EPIC --ei app_id {file.inject:{file.path}}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-windows-gamenative",
+   "systemId": "windows",
+   "label": "GameNative GOG (Standalone)",
+   "pkg": "app.gamenative",
+   "argumentsTemplate": "-n app.gamenative/app.gamenative.MainActivity -a app.gamenative.LAUNCH_GAME -e game_source GOG --ei app_id {file.inject:{file.path}}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-windows-gamenative",
+   "systemId": "windows",
+   "label": "GameNative Amazon (Standalone)",
+   "pkg": "app.gamenative",
+   "argumentsTemplate": "-n app.gamenative/app.gamenative.MainActivity -a app.gamenative.LAUNCH_GAME -e game_source AMAZON --ei app_id {file.inject:{file.path}}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-windows-gamenative",
+   "systemId": "windows",
+   "label": "GameNative Custom Game (Standalone)",
+   "pkg": "app.gamenative",
+   "argumentsTemplate": "-n app.gamenative/app.gamenative.MainActivity -a app.gamenative.LAUNCH_GAME -e game_source CUSTOM_GAME --ei app_id {file.inject:{file.path}}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-windows-gamehub-lite",
+   "systemId": "windows",
+   "label": "GameHub Lite (Standalone)",
+   "pkg": "emuready.gamehub.lite",
+   "argumentsTemplate": "-n emuready.gamehub.lite/com.xj.landscape.launcher.ui.gamedetail.GameDetailActivity -a gamehub.lite.LAUNCH_GAME --ez autoStartGame true -e steamAppId {file.inject:{file.path}}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-windows-gamehub-lite",
+   "systemId": "windows",
+   "label": "GameHub Lite Local (Standalone)",
+   "pkg": "emuready.gamehub.lite",
+   "argumentsTemplate": "-n emuready.gamehub.lite/com.xj.landscape.launcher.ui.gamedetail.GameDetailActivity -a gamehub.lite.LAUNCH_GAME --ez autoStartGame true -e localGameId {file.inject:{file.path}}",
+   "killPackageProcesses": false
   }
  ]
 }
