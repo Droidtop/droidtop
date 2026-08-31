@@ -1492,11 +1492,31 @@ GitHub-refresh + validate-before-replace:
   source of truth because the user can edit platforms.
   `PlatformsDatabase.builtInsOrEmpty()` serves the synchronous label
   lookups (shell group labels, companion), warmed at process start.
-- `engines-database.json` — engine-game strategy PRIORITY
-  (`EnginesDatabase` → `GameLaunchStrategyResolver.resolve`'s
-  `preferredOrder`). Availability stays code (installed apps, folder
-  contents); the database only decides which available strategy wins,
-  so a bad download can never make an unlaunchable strategy launch.
+- `engines-database.json` — the full engine REGISTRY as of v4
+  (directed 2026-08-31: detection, launching, and enginehost vocabulary
+  all drive from the JSON bundles so coverage grows as a data update,
+  not an app rebuild). Per engine row: `detect` (ordered rules; rules
+  OR, conditions AND, first matching row in file order wins; condition
+  types dirExists/fileExists/anyFileNameContains/anyFileExtension/
+  anyFileNameIn/dirNamePrefixCount/fileHeadRegex, plus `builtin` naming
+  a code probe for byte-magic checks JSON can't express — Godot's GDPC
+  trailer, Unity's depth-limited player search, Twine's html scan),
+  `strategies` (launch priority, as before — availability stays code so
+  a bad download can never make an unlaunchable strategy launch), and
+  `enginehost` (the family/context/extras/versionSelectorFallback
+  vocabulary that used to be a hardwired Kotlin map). `EnginesDatabase`
+  parses it via `EngineRegistryParser`; `GameEngineDetector.detect`
+  evaluates the rules; a registry row whose id this app doesn't know is
+  skipped (future database, older app), an unknown condition type or
+  builtin fails its rule rather than matching, and an update whose file
+  carries no detection rules at all is rejected as a legacy v3
+  database. Users can pin a folder to an engine explicitly
+  (`EngineOverridePrefs`, the engine twin of `SystemOverridePrefs` —
+  stored by database id, wins over every rule). RPG Maker XP/VX joined
+  the engine set with the v4 registry (enginehost contract contexts
+  `xp`/`vx`, detected via their real archive/project/Game.ini RGSS
+  signatures). The unit tests parse the SHIPPED seed file, so registry
+  edits that break detection fail CI before they ship.
 - `bios-database.json` — §7e4's firmware registry.
 
 One user action refreshes all four ("Update platform databases" in the
