@@ -731,6 +731,23 @@ object AppSettingsCatalogs {
 
         return listOf(
             CatalogGroup(
+                id = "windows_steam",
+                title = "Steam",
+                items = listOf(
+                    ActionItem(
+                        id = "windows_steam_account",
+                        title = "Steam account and library",
+                        subtitle = "Sign in (QR or password), browse your games, and download them here",
+                        run = { ctx ->
+                            ctx.startActivity(
+                                android.content.Intent(ctx, dev.droidtop.app.SteamLoginActivity::class.java)
+                                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                        },
+                    ),
+                ),
+            ),
+            CatalogGroup(
                 id = "windows_setup",
                 title = null,
                 items = buildList {

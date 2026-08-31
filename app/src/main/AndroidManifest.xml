@@ -181,6 +181,13 @@
           scope rather than external-path's narrower primary-volume-only
           coverage.
         -->
+        <!-- droidtop's own Steam sign-in + library surface over the
+             vendored gamenative Steam service (its UI is deliberately
+             not wired; see runtime-windows/src/main/AndroidManifest.xml). -->
+        <activity
+            android:name=".SteamLoginActivity"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

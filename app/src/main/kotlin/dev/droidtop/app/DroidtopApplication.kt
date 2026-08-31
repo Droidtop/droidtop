@@ -35,12 +35,21 @@ import com.android.launcher3.LauncherApplication
 // activities are @AndroidEntryPoint and need the object graph rooted
 // here. Hilt's bytecode transform works over any base class, so
 // extending LauncherApplication is not a conflict. gamenative's own
-// PluviaApp bootstrap (Steam service, power manager, event dispatcher)
-// is deliberately NOT invoked yet -- that wiring is increment 2 of the
-// full-gamenative work, done deliberately rather than by inheriting an
-// onCreate written for a different app's lifecycle.
+// PluviaApp's process bootstrap runs from onCreate below through the
+// fork's own single static init path (PluviaApp.bootstrap), instead of
+// inheriting an onCreate written for a different app's lifecycle.
 @dagger.hilt.android.HiltAndroidApp
 class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory {
+    override fun onCreate() {
+        super.onCreate()
+        // The vendored gamenative backbone's own init (prefs, download
+        // service, Steam service prereqs, container-file preload) --
+        // the fork's single bootstrap path, invoked from droidtop's
+        // Application. Crash handling stays droidtop's own, hence the
+        // explicit false.
+        app.gamenative.PluviaApp.bootstrap(this, installCrashHandler = false)
+    }
+
     override fun newImageLoader(context: PlatformContext): ImageLoader {
         return ImageLoader.Builder(context)
             .components { add(SvgDecoder.Factory()) }
