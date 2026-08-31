@@ -59,6 +59,12 @@ class CompanionActivity : AppCompatActivity() {
                     CompanionContent(entry)
                     val density = androidx.compose.ui.platform.LocalDensity.current
                     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+                        // Status + controls bar, always the first row --
+                        // the companion is the glanceable screen, and
+                        // "is my Wi-Fi ok / how much battery" is the
+                        // glance (per direction: wifi status and system
+                        // controls in every mode except Standard).
+                        CompanionSystemBar()
                         widgetIds.forEach { widgetId ->
                             val info = widgetManager.getAppWidgetInfo(widgetId)
                             if (info != null) {
@@ -194,5 +200,115 @@ object CompanionWidgetPrefs {
     fun setWidgetIds(context: android.content.Context, ids: List<Int>) {
         context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
             .edit().putString(KEY_WIDGET_IDS, ids.joinToString(",")).apply()
+    }
+}
+
+
+/**
+ * The companion's own chrome over the shared [dev.droidtop.runtime.systemstatus.SystemStatus]
+ * core -- data shared, chrome per surface, same split the settings
+ * catalogs use. Clock + network + battery readout, with the honest
+ * controls: volume (directly controllable), brightness (behind the
+ * WRITE_SETTINGS grant, surfaced as a grant action until given), and
+ * the system's own internet panel for Wi-Fi -- programmatic toggling
+ * left app reach in API 29, and opening the real control beats faking
+ * one.
+ */
+@androidx.compose.runtime.Composable
+private fun CompanionSystemBar() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val status by androidx.compose.runtime.remember {
+        dev.droidtop.runtime.systemstatus.SystemStatus.flow(context)
+    }.collectAsState(initial = dev.droidtop.runtime.systemstatus.SystemStatus.snapshot(context))
+    var clock by androidx.compose.runtime.remember {
+        mutableStateOf(android.text.format.DateFormat.getTimeFormat(context).format(java.util.Date()))
+    }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        while (true) {
+            clock = android.text.format.DateFormat.getTimeFormat(context).format(java.util.Date())
+            kotlinx.coroutines.delay(30_000)
+        }
+    }
+    var controlsOpen by androidx.compose.runtime.remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(clock, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+            androidx.compose.foundation.layout.Spacer(Modifier.padding(horizontal = 8.dp))
+            Text(
+                statusLine(status),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+            TextButton(onClick = { controlsOpen = !controlsOpen }) {
+                Text(if (controlsOpen) "Hide controls" else "Controls")
+            }
+        }
+        if (controlsOpen) {
+            SystemControlsRow()
+        }
+    }
+}
+
+internal fun statusLine(status: dev.droidtop.runtime.systemstatus.SystemStatusSnapshot): String {
+    val network = when (status.network) {
+        dev.droidtop.runtime.systemstatus.NetworkKind.WIFI ->
+            "Wi-Fi" + (status.wifiLevel?.let { "  " + "\u2582\u2584\u2586\u2588".take(it.coerceIn(0, 4)) } ?: "")
+        dev.droidtop.runtime.systemstatus.NetworkKind.ETHERNET -> "Ethernet"
+        dev.droidtop.runtime.systemstatus.NetworkKind.CELLULAR -> "Mobile data"
+        dev.droidtop.runtime.systemstatus.NetworkKind.NONE -> "Offline"
+    }
+    val battery = status.batteryPercent?.let { "$it%" + if (status.charging) " \u26A1" else "" } ?: ""
+    return listOf(network, battery).filter { it.isNotEmpty() }.joinToString("   ")
+}
+
+@androidx.compose.runtime.Composable
+private fun SystemControlsRow() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val controls = dev.droidtop.runtime.systemstatus.SystemControls
+    var volume by androidx.compose.runtime.remember {
+        mutableStateOf(controls.volume(context).toFloat())
+    }
+    val volumeMax = androidx.compose.runtime.remember { controls.volumeRange(context).last.toFloat() }
+    var brightness by androidx.compose.runtime.remember {
+        mutableStateOf((controls.brightness(context) ?: 128).toFloat())
+    }
+    val canBrightness = androidx.compose.runtime.remember { controls.canWriteBrightness(context) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Volume", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            androidx.compose.material3.Slider(
+                value = volume,
+                onValueChange = { volume = it; controls.setVolume(context, it.toInt()) },
+                valueRange = 0f..volumeMax,
+                modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+            )
+        }
+        if (canBrightness) {
+            androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Brightness", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                androidx.compose.material3.Slider(
+                    value = brightness,
+                    onValueChange = { brightness = it; controls.setBrightness(context, it.toInt()) },
+                    valueRange = 0f..255f,
+                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+                )
+            }
+        }
+        androidx.compose.foundation.layout.Row {
+            TextButton(onClick = { context.startActivity(controls.internetPanelIntent()) }) { Text("Network") }
+            TextButton(onClick = { context.startActivity(controls.bluetoothSettingsIntent()) }) { Text("Bluetooth") }
+            if (!canBrightness) {
+                TextButton(onClick = { context.startActivity(controls.brightnessGrantIntent(context)) }) {
+                    Text("Allow brightness control")
+                }
+            }
+            TextButton(onClick = { context.startActivity(controls.allSettingsIntent()) }) { Text("All settings") }
+        }
     }
 }

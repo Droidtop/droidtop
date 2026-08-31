@@ -23,6 +23,15 @@
     <!-- Real wifi/cellular connectivity check for Handheld's own
          systemstatus theme element (EsDeThemeRenderer.kt). -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Wi-Fi signal level for the status surfaces (Companion bar,
+         Desktop tray, Handheld settings). SSID is deliberately never
+         read: it would drag in fine-location. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- Brightness control. Special access the user grants on a system
+         screen droidtop opens (SystemControls.brightnessGrantIntent);
+         every surface shows the grant action instead of failing silently
+         while it is missing. -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions" />
 
     <!--
       Requested during OnboardingActivity's flow, not implicitly. Real
