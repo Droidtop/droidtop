@@ -816,17 +816,23 @@ object AppSettingsCatalogs {
                     id = "scraper_screenscraper",
                     title = "ScreenScraper account (all optional)",
                     items = listOf(
-                        screenScraperField(context, "ss_user_id", "Account ssid", ScreenScraperPrefs.userId(context)) { c, v ->
-                            ScreenScraperPrefs.set(c, ScreenScraperPrefs.devId(c), ScreenScraperPrefs.devPassword(c), v, ScreenScraperPrefs.userPassword(c))
+                        // stored*, not the effective getters: with the
+                        // debug-credentials file active, the effective
+                        // values ARE the file's secrets -- displaying
+                        // them here, or copying them into prefs when one
+                        // sibling field is edited, would leak and then
+                        // PERSIST them past a wipe.
+                        screenScraperField(context, "ss_user_id", "Account ssid", ScreenScraperPrefs.storedUserId(context)) { c, v ->
+                            ScreenScraperPrefs.set(c, ScreenScraperPrefs.storedDevId(c), ScreenScraperPrefs.storedDevPassword(c), v, ScreenScraperPrefs.storedUserPassword(c))
                         },
-                        screenScraperField(context, "ss_user_password", "Account sspassword", ScreenScraperPrefs.userPassword(context), secret = true) { c, v ->
-                            ScreenScraperPrefs.set(c, ScreenScraperPrefs.devId(c), ScreenScraperPrefs.devPassword(c), ScreenScraperPrefs.userId(c), v)
+                        screenScraperField(context, "ss_user_password", "Account sspassword", ScreenScraperPrefs.storedUserPassword(context), secret = true) { c, v ->
+                            ScreenScraperPrefs.set(c, ScreenScraperPrefs.storedDevId(c), ScreenScraperPrefs.storedDevPassword(c), ScreenScraperPrefs.storedUserId(c), v)
                         },
-                        screenScraperField(context, "ss_dev_id", "Dev ID", ScreenScraperPrefs.devId(context)) { c, v ->
-                            ScreenScraperPrefs.set(c, v, ScreenScraperPrefs.devPassword(c), ScreenScraperPrefs.userId(c), ScreenScraperPrefs.userPassword(c))
+                        screenScraperField(context, "ss_dev_id", "Dev ID", ScreenScraperPrefs.storedDevId(context)) { c, v ->
+                            ScreenScraperPrefs.set(c, v, ScreenScraperPrefs.storedDevPassword(c), ScreenScraperPrefs.storedUserId(c), ScreenScraperPrefs.storedUserPassword(c))
                         },
-                        screenScraperField(context, "ss_dev_password", "Dev password", ScreenScraperPrefs.devPassword(context), secret = true) { c, v ->
-                            ScreenScraperPrefs.set(c, ScreenScraperPrefs.devId(c), v, ScreenScraperPrefs.userId(c), ScreenScraperPrefs.userPassword(c))
+                        screenScraperField(context, "ss_dev_password", "Dev password", ScreenScraperPrefs.storedDevPassword(context), secret = true) { c, v ->
+                            ScreenScraperPrefs.set(c, ScreenScraperPrefs.storedDevId(c), v, ScreenScraperPrefs.storedUserId(c), ScreenScraperPrefs.storedUserPassword(c))
                         },
                     ),
                 ),
@@ -838,10 +844,54 @@ object AppSettingsCatalogs {
                             id = "tgdb_api_key",
                             title = "API key",
                             subtitle = "Free at thegamesdb.net -- required before TheGamesDB can scrape at all",
-                            value = TheGamesDbPrefs.apiKey(context),
+                            value = TheGamesDbPrefs.storedApiKey(context),
                             onChange = { c, v -> TheGamesDbPrefs.set(c, v.trim()) },
                         ),
                     ),
+                ),
+                CatalogGroup(
+                    id = "scraper_debug_credentials",
+                    title = "Debug credentials file",
+                    items = buildList {
+                        val present = dev.droidtop.library.DebugCredentials.isPresent(context)
+                        val names = dev.droidtop.library.DebugCredentials.keyNames(context)
+                        add(
+                            ActionItem(
+                                id = "debug_creds_status",
+                                title = if (present) "File present (${names.size} keys)" else "No file",
+                                // Key NAMES only, never values -- the whole
+                                // point of this pathway is that secrets are
+                                // supplied and wiped without ever being
+                                // displayed or typed.
+                                subtitle = if (present) {
+                                    "Configures: ${names.joinToString(", ")}"
+                                } else {
+                                    "Place ${dev.droidtop.library.DebugCredentials.FILE_NAME} in this app's private files dir " +
+                                        "(key=value lines, e.g. screenscraper.ssid=...). Values override the fields above while enabled."
+                                },
+                                run = {},
+                            ),
+                        )
+                        add(
+                            ToggleItem(
+                                id = "debug_creds_enabled",
+                                title = "Use debug credentials file",
+                                current = dev.droidtop.library.DebugCredentials.isEnabled(context),
+                                onToggle = { ctx, on -> dev.droidtop.library.DebugCredentials.setEnabled(ctx, on) },
+                            ),
+                        )
+                        if (present) {
+                            add(
+                                ActionItem(
+                                    id = "debug_creds_wipe",
+                                    title = "Wipe debug credentials file",
+                                    subtitle = "Deletes the file permanently. Stored settings above are untouched.",
+                                    confirmTitle = "Delete the credentials file?",
+                                    run = { ctx -> dev.droidtop.library.DebugCredentials.wipe(ctx) },
+                                ),
+                            )
+                        }
+                    },
                 ),
             )
         },

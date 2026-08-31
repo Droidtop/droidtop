@@ -14,6 +14,13 @@ object TheGamesDbPrefs {
     private const val KEY_API_KEY = "droidtop_thegamesdb_apikey"
 
     fun apiKey(context: Context): String =
+        // Debug-credentials override -- see ScreenScraperPrefs' own note.
+        dev.droidtop.library.DebugCredentials.get(context, "thegamesdb.apikey")
+            ?: context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_API_KEY, "") ?: ""
+
+
+    /** Stored pref only, skipping the debug-file override -- for the settings field's display; see ScreenScraperPrefs. */
+    fun storedApiKey(context: Context): String =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_API_KEY, "") ?: ""
 
     fun set(context: Context, apiKey: String) {
