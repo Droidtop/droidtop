@@ -1907,7 +1907,7 @@ Verified: a real built APK contains distinct `lib/arm64-v8a/` and
   (primary + sibling) sharing a Wayland socket via bind mount cleanly, or
   whether that needs patching in DroidSpaces itself.
 
-## 12. Idea, not yet designed: a real third-party app integration system
+## 12. Third-party app integration system
 
 Raised directly by the user, not yet designed or scoped -- recorded here
 so it isn't lost, matching this project's own "real decisions land in
@@ -1944,7 +1944,50 @@ examples already given:
   cover -- richer data exchange, a real API client for a specific
   service, logic droidtop has no built-in equivalent for.
 
-Real open questions a genuine design pass still needs to answer (not
+**Built (2026-08-31), JSON half only.** An integration is a `.json` file
+declaring which installed app to drive and how:
+
+```json
+{ "id": "...", "label": "Get games", "package": "com.example.downloader",
+  "capability": "acquire_content",
+  "argumentsTemplate": "-a android.intent.action.VIEW -n com.example.downloader/.MainActivity --es system {system.id} --es dest {system.folder}" }
+```
+
+- **`argumentsTemplate` is the same `am start` syntax
+  `players-database.json` already uses, parsed by the same
+  `AmStartCommandToIntentConverter`.** That reuse is deliberate: droidtop
+  already had a real, tested mechanism for "describe how to launch
+  another app, in data", and an integration is that same problem. No
+  second mechanism and no new syntax, and integrations inherit the
+  FileProvider `content://` handling and read-permission grants that path
+  already had to get right.
+- Placeholders droidtop fills in: `{system.id}`, `{system.name}`,
+  `{system.folder}` (the real scanned directory), `{query}`.
+- `capability` is a closed set (`acquire_content`, `open_with`) because
+  the trust shape genuinely differs — handing over one file to a video
+  player is not the same as handing over a writable games folder.
+- Integrations live in `filesDir/integrations`, are **never bundled,
+  downloaded or synced**, and an integration whose package isn't
+  installed is hidden rather than offered-and-broken. Which apps someone
+  hooks into their own launcher is their business.
+- Surfaced per-system: an `acquire_content` integration appears as an
+  action inside that system's own settings screen, where the system id
+  and its destination folder are both already known.
+
+**The PLUGIN half (APK or Python module) is deliberately not built.**
+Nothing in the first real use case needs it, and a sandbox/trust model
+for running foreign code is a far larger design than a declarative Intent
+description.
+
+**Known limitation, confirmed against a real app:** an integration can
+only drive an app as far as that app's own exported surface allows. The
+first intended target, a ROM downloader, declares only
+`MAIN`/`LAUNCHER` — so droidtop can open it but cannot hand it a system
+or a destination, and extras are simply ignored. Making that case work
+needs an intent surface added to the *target* app, not more integration
+machinery here.
+
+Real open questions a full design pass still needs to answer (not
 resolved here): the exact shape of droidtop's internal API surface both
 integration types talk to, how a JSON integration's manifest is
 structured, how a PLUGIN integration (APK or Python module) is

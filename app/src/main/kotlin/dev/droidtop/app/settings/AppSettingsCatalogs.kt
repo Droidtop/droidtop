@@ -17,6 +17,9 @@ import dev.droidtop.library.consoles.BiosDatabase
 import dev.droidtop.library.consoles.KnownPlayers
 import dev.droidtop.library.consoles.SystemBiosSpec
 import dev.droidtop.library.consoles.availablePlayers
+import dev.droidtop.library.integrations.IntegrationCapability
+import dev.droidtop.library.integrations.IntegrationPlaceholders
+import dev.droidtop.library.integrations.IntegrationStore
 import dev.droidtop.library.consoles.resolvePlayer
 import dev.droidtop.library.scraper.ScraperSource
 import dev.droidtop.library.scraper.ScraperSourcePrefs
@@ -55,6 +58,7 @@ object AppSettingsCatalogs {
     const val SCREEN_ROM_FOLDERS = "rom_folders"
     const val SCREEN_SCRAPER = "rom_scraper"
     const val SCREEN_PLATFORMS = "manage_platforms"
+    const val SCREEN_INTEGRATIONS = "integrations"
 
     // How deep folderLooksRomLike is willing to walk -- see the doc
     // comment at the original ConsoleSystemsActivity site this moved from.
@@ -69,6 +73,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(romFoldersScreen())
         SettingsScreenRegistry.register(scraperScreen())
         SettingsScreenRegistry.register(platformsScreen())
+        SettingsScreenRegistry.register(integrationsScreen())
     }
 
     // ------------------------------------------------------------------
@@ -113,6 +118,16 @@ object AppSettingsCatalogs {
                         title = "ROM folders",
                         subtitle = "Add or remove the folders droidtop scans for ROMs",
                         registryId = SCREEN_ROM_FOLDERS,
+                    ),
+                    NestedScreenItem(
+                        id = "console_systems_integrations",
+                        title = "App integrations",
+                        subtitle = "Hook other installed apps into droidtop, e.g. a downloader for a system's games",
+                        registryId = SCREEN_INTEGRATIONS,
+                        valueLabel = { ctx ->
+                            val n = IntegrationStore.available(ctx).size
+                            if (n == 0) "none" else "$n active"
+                        },
                     ),
                     NestedScreenItem(
                         id = "console_systems_scraper",
@@ -226,6 +241,32 @@ object AppSettingsCatalogs {
                                             },
                                         ),
                                     )
+                                    // Third-party "get games for this system"
+                                    // hooks the user declared (docs/SPEC.md
+                                    // section 12). The system and its real
+                                    // destination folder are both known
+                                    // here, which is exactly what an
+                                    // acquire-content integration needs.
+                                    IntegrationStore.available(context, IntegrationCapability.ACQUIRE_CONTENT)
+                                        .forEach { integration ->
+                                            add(
+                                                ActionItem(
+                                                    id = "folder_integration_${integration.id}_${resolved.id}",
+                                                    title = integration.label,
+                                                    subtitle = integration.description
+                                                        ?: "Opens ${integration.packageName} for ${resolved.displayName}",
+                                                    run = { ctx ->
+                                                        IntegrationStore.run(
+                                                            context = ctx,
+                                                            integration = integration,
+                                                            systemId = resolved.id,
+                                                            systemName = resolved.displayName,
+                                                            systemFolder = folder,
+                                                        )
+                                                    },
+                                                ),
+                                            )
+                                        }
                                     // EmuDeck-style setup helper: firmware
                                     // check against the real Batocera BIOS
                                     // registry, when this system needs any.
@@ -437,6 +478,53 @@ object AppSettingsCatalogs {
             },
         )
     }
+
+    // ------------------------------------------------------------------
+    // App integrations (docs/SPEC.md section 12).
+    // ------------------------------------------------------------------
+
+    private fun integrationsScreen() = CatalogScreen(
+        id = SCREEN_INTEGRATIONS,
+        title = "App integrations",
+        subtitle = "Declared as .json files in droidtop's own storage, never bundled or synced -- which apps you hook in is yours alone",
+        groups = { context ->
+            withContext(Dispatchers.IO) { IntegrationStore.seedExampleIfEmpty(context) }
+            val declared = IntegrationStore.all(context)
+            listOf(
+                CatalogGroup(
+                    id = "integrations_list",
+                    title = null,
+                    items = if (declared.isEmpty()) {
+                        listOf(
+                            ActionItem(
+                                id = "integrations_none",
+                                title = "No integrations declared",
+                                subtitle = "Drop a .json file in ${IntegrationStore.userDir(context).absolutePath} -- example.json.txt there shows the format",
+                                run = {},
+                            ),
+                        )
+                    } else {
+                        declared.map { integration ->
+                            val installed = IntegrationStore.isInstalled(context, integration.packageName)
+                            ActionItem(
+                                id = "integration_${integration.id}",
+                                title = integration.label,
+                                subtitle = buildString {
+                                    append(integration.capability.display)
+                                    append(" - ")
+                                    append(if (installed) integration.packageName else "${integration.packageName} is NOT installed, so this is hidden elsewhere")
+                                    IntegrationPlaceholders.usedIn(integration.argumentsTemplate)
+                                        .takeIf { it.isNotEmpty() }
+                                        ?.let { append("  |  uses ").append(it.joinToString(" ")) }
+                                },
+                                run = {},
+                            )
+                        }
+                    },
+                ),
+            )
+        },
+    )
 
     // ------------------------------------------------------------------
     // ROM folders (games roots).
