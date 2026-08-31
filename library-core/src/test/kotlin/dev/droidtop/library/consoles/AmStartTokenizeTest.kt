@@ -71,6 +71,32 @@ class AmStartTokenizeTest {
     }
 
     @Test
+    fun `an integration's system folder keeps its spaces`() {
+        // Integrations hit the same bug: their placeholders used to be
+        // pasted into the template before the split, so a games folder
+        // with a space was torn apart exactly like the ROM path was.
+        val folder = "/storage/7EF7-E477/My Roms/psx"
+        val tokens = AmStartCommandToIntentConverter.tokenize(
+            "-a android.intent.action.VIEW -n com.example.dl/.MainActivity --es dest {system.folder}",
+            null,
+            null,
+            mapOf("{system.folder}" to folder),
+        )
+        assertEquals(folder, tokens[tokens.indexOf("dest") + 1])
+    }
+
+    @Test
+    fun `a multi-word search query stays one token`() {
+        val tokens = AmStartCommandToIntentConverter.tokenize(
+            "-n com.example.dl/.Search --es q {query}",
+            null,
+            null,
+            mapOf("{query}" to "final fantasy vii"),
+        )
+        assertEquals("final fantasy vii", tokens[tokens.indexOf("q") + 1])
+    }
+
+    @Test
     fun `a template with no placeholders is untouched`() {
         val tokens = AmStartCommandToIntentConverter.tokenize(
             "-n com.example/.Main --activity-clear-task",

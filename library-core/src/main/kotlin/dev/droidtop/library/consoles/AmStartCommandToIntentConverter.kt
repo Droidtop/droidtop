@@ -50,7 +50,12 @@ object AmStartCommandToIntentConverter {
      * no whitespace themselves, so each always lands wholly inside one
      * token.
      */
-    internal fun tokenize(argumentsTemplate: String, filePath: String?, fileUri: String?): List<String> =
+    internal fun tokenize(
+        argumentsTemplate: String,
+        filePath: String?,
+        fileUri: String?,
+        placeholders: Map<String, String> = emptyMap(),
+    ): List<String> =
         argumentsTemplate
             .split(Regex("[\\n\\s]+"))
             .filter { it.isNotEmpty() }
@@ -58,10 +63,22 @@ object AmStartCommandToIntentConverter {
                 var t = token
                 if (filePath != null) t = t.replace("{file.path}", filePath)
                 if (fileUri != null) t = t.replace("{file.uri}", fileUri)
+                // Integrations' own placeholders ({system.folder},
+                // {query}, ...) expand here for the same reason the file
+                // ones do: a games folder or a search query containing a
+                // space must not be split into separate tokens. Doing it
+                // here rather than in a second expansion routine keeps
+                // one place that knows how a template becomes tokens.
+                for ((key, value) in placeholders) t = t.replace(key, value)
                 t
             }
 
-    fun toIntent(context: Context, argumentsTemplate: String, filePath: String?): Intent {
+    fun toIntent(
+        context: Context,
+        argumentsTemplate: String,
+        filePath: String?,
+        placeholders: Map<String, String> = emptyMap(),
+    ): Intent {
         // Real, second placeholder alongside {file.path} -- roughly half of
         // the real presets pulled from Daijishō's own wiki (KnownPlayers.kt)
         // specifically need a file:// URI, not a bare path string (several
@@ -94,7 +111,7 @@ object AmStartCommandToIntentConverter {
         } else {
             null
         }
-        val tokens = ArrayDeque(tokenize(argumentsTemplate, filePath, fileUri?.toString()))
+        val tokens = ArrayDeque(tokenize(argumentsTemplate, filePath, fileUri?.toString(), placeholders))
 
         val intent = Intent()
         var dataUri: Uri? = null
