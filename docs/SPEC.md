@@ -1480,10 +1480,23 @@ went unused. The magic-number check keys on the ISO9660 volume descriptor
 system identifier, and that string is "PLAYSTATION" on PS1 and PS2 discs
 alike; `SystemID` had no PS2 constant at all.
 
-The discriminator is SYSTEM.CNF: PS1 boots `BOOT = cdrom:\`, PS2 boots
-`BOOT2 = cdrom0:\`. The search window is 2 MB, not the 64 KB the
-PS1-only path used, because SYSTEM.CNF sits well past 64 KB on a real
-disc (553 KB and 592 KB on the two verified against).
+The discriminator is SYSTEM.CNF: PS1 boots through a `BOOT` line, PS2
+through `BOOT2`. droidtop finds that file by **reading the image's
+ISO9660 filesystem** -- volume descriptor, root directory, file extent --
+rather than scanning for the string.
+
+That distinction was earned rather than assumed. Scanning was tried
+first and cannot be made to work: across seven real discs SYSTEM.CNF sat
+anywhere from byte 552,960 to byte **3,923,748,864**, so no sane window
+catches them all; two discs with the file at the identical offset gave
+different answers between runs, because fixed-size window reads off an
+SD card return short and lose a match that straddles the gap; and one
+disc writes `BOOT2=` with no spaces at all. Reading the filesystem is
+also cheaper -- two small seeks instead of megabytes of scanning.
+
+`SerialScanner` stays PS1-only by design and carries a note saying so;
+PS2 discrimination lives in `PlayStationDiscType`/`Iso9660`, so there is
+one discriminator rather than two.
 
 Because the scan result is cached in `rom_entries`, a detection fix ships
 with a `RomDatabase` migration clearing that cache and `scan_metadata`;
