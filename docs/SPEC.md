@@ -1387,6 +1387,33 @@ beyond Play (GitHub releases in the players DB), and applying
 recommended per-emulator settings where an emulator exposes a real
 configuration surface.
 
+## 7e2b. Launch resolution FROM the platforms database (directed 2026-08-31)
+
+Extends §7e2 to the whole launch pipeline: droidtop-platforms is the
+authority for launch data, four databases, each bundled-seed +
+GitHub-refresh + validate-before-replace:
+
+- `players-database.json` — per-system emulator launch presets
+  (`KnownPlayers`), as before.
+- `platforms-database.json` — platform definitions (id, name,
+  extensions, RetroArch core), GENERATED from ES-DE's real
+  es_systems.xml (`generator/from_esde_systems.py`; 195 platforms, 153
+  with cores). Replaces the formerly compiled-in
+  `ES_DE_CONSOLE_SYSTEMS` Kotlin list (deleted) as the seed for
+  `ConsoleSystemsRepository`'s Room store — Room stays the runtime
+  source of truth because the user can edit platforms.
+  `PlatformsDatabase.builtInsOrEmpty()` serves the synchronous label
+  lookups (shell group labels, companion), warmed at process start.
+- `engines-database.json` — engine-game strategy PRIORITY
+  (`EnginesDatabase` → `GameLaunchStrategyResolver.resolve`'s
+  `preferredOrder`). Availability stays code (installed apps, folder
+  contents); the database only decides which available strategy wins,
+  so a bad download can never make an unlaunchable strategy launch.
+- `bios-database.json` — §7e4's firmware registry.
+
+One user action refreshes all four ("Update platform databases" in the
+console-systems catalog screen).
+
 ## 7e3. Lutris install-script integration (directed 2026-08-30, backlog)
 
 Beyond cover art (§7d's Lutris scraper client), lutris.net's real public

@@ -280,6 +280,11 @@ object GameLaunchStrategyResolver {
         kirikiroid2Installed: Boolean = false,
         engineHostInstalled: Boolean = false,
         engineHostEngineVersion: String? = null,
+        // Database-declared priority (EnginesDatabase, docs/SPEC.md §7e2):
+        // AVAILABILITY stays this function's own real checks below -- the
+        // order only decides which available strategy wins. Null keeps the
+        // historical append order (and the pure-JVM unit tests untouched).
+        preferredOrder: List<GameLaunchStrategy>? = null,
     ): List<GameLaunchStrategy> {
         val strategies = mutableListOf<GameLaunchStrategy>()
         // Only offered when there's an actual engineVersion to launch
@@ -301,7 +306,10 @@ object GameLaunchStrategyResolver {
         // third-party interpreter rather than an official Linux build of
         // the engine.
         if (engine != GameEngine.KIRIKIRI && hasLinuxLibraryBuild(folder)) strategies += GameLaunchStrategy.LINUX_CONTAINER
-        return strategies
+        if (preferredOrder == null) return strategies
+        // Reorder by the database's declared priority; anything available
+        // but undeclared keeps its place after the declared ones.
+        return preferredOrder.filter { it in strategies } + strategies.filterNot { it in preferredOrder }
     }
 
     private fun hasWindowsExecutable(folder: File): Boolean =
@@ -408,6 +416,7 @@ class EngineGameProvider(
             kirikiroid2Installed = Kirikiroid2.isInstalled(context),
             engineHostInstalled = EngineHost.isInstalled(context),
             engineHostEngineVersion = resolveEngineVersion(context, gameRoot, engine),
+            preferredOrder = EnginesDatabase.priorityFor(context, engine),
         )
     }
 
