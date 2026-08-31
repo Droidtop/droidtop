@@ -43,15 +43,17 @@ import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 
 /**
- * The Quick Menu: hold SELECT anywhere in the Handheld shell (docs/
+ * The Quick Menu: press R2 anywhere in the Handheld shell (docs/
  * SPEC.md §4, quick-menu paradigm). A right-edge sheet in the Steam
  * Deck QAM family — the paradigm survey that picked it is in the SPEC:
  * the Deck's quick access menu (dedicated button, right sheet, vertical
  * tabs) is the strongest prior art for glanceable-while-playing, iiSU's
  * trigger menu is the same family on Android handhelds, and a
- * long-press stands in for the dedicated button this hardware doesn't
- * have (short-press SELECT keeps its existing meaning; chords were
- * rejected as undiscoverable).
+ * dedicated button here is R2, named by the R2 pill in the shell's
+ * top-right corner. Hold-SELECT remains only as the fallback for pads
+ * whose triggers are analog-only and never emit an R2 key event
+ * (short-press SELECT keeps its existing meaning; chords were rejected
+ * as undiscoverable).
  *
  * ENTIRELY controller-driven, per direction: L1/R1 switch tabs, D-pad
  * moves, A opens, X dismisses, Y clears all, B closes. The System tab
@@ -82,8 +84,19 @@ internal fun QuickMenu(onDismiss: () -> Unit) {
                     // parent's PREVIEW pass runs before the child sees
                     // the event at all.
                     .onPreviewKeyEvent { event ->
+                        val action = GamepadKeyMap.actionFor(event.key)
+                        // R2 toggles: a FRESH KeyDown closes. The
+                        // opening press's own key-up lands in this
+                        // window once it takes focus, so R2 KeyUp is
+                        // swallowed, never acted on -- the same
+                        // flash-open-shut hazard the SELECT note below
+                        // describes.
+                        if (action == GamepadAction.R2) {
+                            if (event.type == KeyEventType.KeyDown) onDismiss()
+                            return@onPreviewKeyEvent true
+                        }
                         if (event.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
-                        when (GamepadKeyMap.actionFor(event.key)) {
+                        when (action) {
                             GamepadAction.L -> {
                                 tab = tab.previous(); true
                             }
