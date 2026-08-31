@@ -133,9 +133,29 @@ object ScreenScraperClient {
                 (if (md5.isNotBlank()) "&md5=$md5&romtaille=$romSizeBytes" else ""),
         )
         val connection = (url.openConnection() as HttpURLConnection).apply { requestMethod = "GET" }
-        if (connection.responseCode != 200) return null
+        if (connection.responseCode != 200) {
+            // The API refuses outright (no/bad dev credentials, quota,
+            // maintenance). Without this line every refusal used to be
+            // indistinguishable from a genuine no-match -- a real
+            // on-device debugging trap (2026-08-31: an entire pass read
+            // "no match" when the server was rejecting every request).
+            android.util.Log.w(
+                "droidtop.Scraper",
+                "ScreenScraper HTTP ${connection.responseCode} for $romName " +
+                    "(dev credentials ${if (devId.isBlank()) "MISSING" else "present"})",
+            )
+            return null
+        }
         val xmlText = connection.inputStream.bufferedReader().readText()
-        return parseGameXml(xmlText, region.lowercase(), language.lowercase())
+        val parsed = parseGameXml(xmlText, region.lowercase(), language.lowercase())
+        if (parsed == null) {
+            android.util.Log.i(
+                "droidtop.Scraper",
+                "ScreenScraper: no game in response for $romName: " +
+                    xmlText.take(160).replace('\n', ' '),
+            )
+        }
+        return parsed
     }
 
     /**
