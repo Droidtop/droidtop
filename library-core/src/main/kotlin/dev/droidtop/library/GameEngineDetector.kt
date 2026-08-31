@@ -470,14 +470,49 @@ class EngineGameProvider(
                 )
             }
             GameLaunchStrategy.KIRIKIROID2 -> Kirikiroid2.open(context)
-            GameLaunchStrategy.WINE_PREFIX -> error(
-                "Wine/Box64 launching isn't wired to a running session yet (needs a real " +
-                    "WineSession instance, which library-core has no access to -- see SPEC.md §5a).",
-            )
-            GameLaunchStrategy.LINUX_CONTAINER -> error(
-                "Linux-container launching isn't wired to a running session yet (needs a real " +
-                    "ContainerRuntime instance, which library-core has no access to -- see SPEC.md §5a).",
-            )
+            // Both PC strategies go through the PcGameRuntime seam that
+            // :app fills in (see that interface's own doc comment). These
+            // used to be dead error() stubs, so a game could be offered
+            // Wine and then fail on activation with "not wired up yet";
+            // now it either really launches or says specifically why not.
+            GameLaunchStrategy.WINE_PREFIX -> launchOnPcRuntime(gameRoot, windows = true)
+            GameLaunchStrategy.LINUX_CONTAINER -> launchOnPcRuntime(gameRoot, windows = false)
         }
+    }
+
+    /**
+     * Runs [gameRoot]'s real executable through droidtop's own PC runtime.
+     * Every failure here names something the user can act on -- which
+     * runtime is missing, which container isn't running, which executable
+     * couldn't be identified -- rather than the old blanket "not
+     * implemented".
+     */
+    private suspend fun launchOnPcRuntime(gameRoot: File, windows: Boolean) {
+        val runtime = PcGameRuntimeRegistry.runtime
+            ?: error(
+                "droidtop's PC runtime isn't registered in this process. Launch from the main " +
+                    "droidtop app rather than a standalone surface.",
+            )
+        check(runtime.isAvailable) {
+            "Start Desktop mode first: droidtop runs Wine and native Linux games as processes " +
+                "inside a live container, and none is connected right now."
+        }
+
+        val executable = if (windows) {
+            GameExecutableResolver.windowsExecutable(gameRoot)
+        } else {
+            GameExecutableResolver.linuxExecutable(gameRoot)
+        } ?: error(
+            "Couldn't identify which file to run in ${gameRoot.name} -- it has no single obvious " +
+                (if (windows) "Windows executable" else "Linux launcher") +
+                ". Set one explicitly with a custom player.",
+        )
+
+        val result = if (windows) {
+            runtime.launchWindows(executable, gameRoot)
+        } else {
+            runtime.launchLinux(executable, gameRoot)
+        }
+        check(result.succeeded) { "Launching ${executable.name} failed: ${result.detail}" }
     }
 }
