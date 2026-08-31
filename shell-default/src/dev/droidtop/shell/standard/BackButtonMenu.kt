@@ -43,6 +43,13 @@ object BackButtonMenu {
     const val EXTRA_HANDHELD_START_SECTION = "dev.droidtop.app.EXTRA_HANDHELD_START_SECTION"
     const val EXTRA_HANDHELD_RESCAN = "dev.droidtop.app.EXTRA_HANDHELD_RESCAN"
 
+    // Jumps straight into the Handheld shell's inline theme browser
+    // (SettingsCatalogView -> ThemeBrowserScreen) -- the settings
+    // catalog's "Browse themes" default fulfillment, used when that item
+    // is activated from the unified Preference surface, which has no
+    // in-shell browser of its own to open.
+    const val EXTRA_HANDHELD_BROWSE_THEMES = "dev.droidtop.app.EXTRA_HANDHELD_BROWSE_THEMES"
+
     /**
      * Set by Launcher's HOME-press forwarding (Launcher.onNewIntent):
      * MainActivity re-runs its dual-screen role orchestration ("fix my
