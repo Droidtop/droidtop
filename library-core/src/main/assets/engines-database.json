@@ -1,0 +1,21 @@
+{
+ "version": 3,
+ "comment": "Engine-game launch STRATEGY routing - droidtop-authored (no upstream frontend maintains these). Names match droidtop's GameLaunchStrategy enum, in priority order: ENGINEHOST launches via the enginehost app's LAUNCH intent; WINE_PREFIX and LINUX_CONTAINER run through droidtop's internal gamenative-derived runtime (runtime-windows WineSession / NativeLinuxGameSession), never a separate app. Engine EMULATORS (EasyRPG, Kirikiroid2, Ruffle, ...) are NOT declared here: engines are systems, and apps that emulate engines live in players-database.json exactly like apps that emulate consoles (systemIds: easyrpg, kirikiri, flash, ...). JoiPlay is deliberately absent everywhere: it exposes no consumable launch surface.",
+ "engines": [
+  {"id": "renpy", "strategies": ["ENGINEHOST", "LINUX_CONTAINER", "WINE_PREFIX"], "notes": "Ren'Py ships py/sh/exe launchers together; Linux path preferred over Wine when both exist."},
+  {"id": "rpgmaker-mv", "strategies": ["ENGINEHOST", "WINE_PREFIX", "LINUX_CONTAINER"], "notes": "MV/MZ are nw.js exports; Linux only when the export includes it."},
+  {"id": "rpgmaker-mz", "strategies": ["ENGINEHOST", "WINE_PREFIX", "LINUX_CONTAINER"]},
+  {"id": "rpgmaker-vxace", "strategies": ["ENGINEHOST", "WINE_PREFIX"], "notes": "RGSS runtimes are Windows-only."},
+  {"id": "rpgmaker-2000-2003", "strategies": ["WINE_PREFIX"], "notes": "Primary path is the easyrpg PLAYER entries in players-database.json (engines are systems). DETECTION GAP: droidtop's GameEngineDetector does not classify RM2000/2003 folders yet (RPG_RT.exe/.ldb signature)."},
+  {"id": "kirikiri", "strategies": ["ENGINEHOST", "KIRIKIROID2", "WINE_PREFIX"], "notes": "KIRIKIROID2 strategy predates the unified player entry; both point at the same app."},
+  {"id": "august", "strategies": ["WINE_PREFIX"]},
+  {"id": "buriko", "strategies": ["WINE_PREFIX"]},
+  {"id": "catsystem2", "strategies": ["WINE_PREFIX"]},
+  {"id": "cmvs", "strategies": ["WINE_PREFIX"]},
+  {"id": "flash-air", "strategies": ["ENGINEHOST", "WINE_PREFIX"], "notes": "Plain .swf: the flash player entries in players-database.json (Ruffle etc.); AIR-packaged Windows builds fall back to Wine."},
+  {"id": "twine", "strategies": ["ENGINEHOST", "WINE_PREFIX"], "notes": "HTML export; enginehost's web runtime is the natural host."},
+  {"id": "godot", "strategies": ["ENGINEHOST", "LINUX_CONTAINER", "WINE_PREFIX"]},
+  {"id": "unity", "strategies": ["LINUX_CONTAINER", "WINE_PREFIX"], "notes": "Per-export: Linux build when shipped, else the Windows build under Wine."},
+  {"id": "unreal", "strategies": ["LINUX_CONTAINER", "WINE_PREFIX"]}
+ ]
+}

@@ -30,7 +30,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.text.style.TextOverflow
 import dev.droidtop.library.LibraryEntry
-import dev.droidtop.library.consoles.ES_DE_CONSOLE_SYSTEMS
+import dev.droidtop.library.consoles.PlatformsDatabase
 import dev.droidtop.library.displayName
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -137,7 +137,7 @@ internal fun CompanionContent(entry: LibraryEntry?) {
                 // Real system name (Nintendo 64, PlayStation 2) when this
                 // is a console ROM; the shared kind grouping name otherwise.
                 val systemName = entry.systemId
-                    ?.let { id -> ES_DE_CONSOLE_SYSTEMS.firstOrNull { it.id == id }?.displayName }
+                    ?.let { id -> PlatformsDatabase.displayNameOrNull(id) }
                     ?: entry.kind.displayName()
                 Text(systemName, color = Color(0xFF9BB4D0), style = MaterialTheme.typography.titleMedium)
                 val detailLine = listOfNotNull(

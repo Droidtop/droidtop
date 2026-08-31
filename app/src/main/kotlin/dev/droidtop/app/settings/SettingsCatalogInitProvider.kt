@@ -19,6 +19,16 @@ import android.net.Uri
 class SettingsCatalogInitProvider : ContentProvider() {
     override fun onCreate(): Boolean {
         AppSettingsCatalogs.ensureRegistered()
+        // Warm the platforms-database cache off the main thread: the few
+        // synchronous label lookups (GamepadShell group labels, the
+        // second-screen companion) read PlatformsDatabase.builtInsOrEmpty,
+        // which serves only what this load put in the cache.
+        val appContext = context?.applicationContext
+        if (appContext != null) {
+            Thread {
+                runCatching { dev.droidtop.library.consoles.PlatformsDatabase.builtIns(appContext) }
+            }.start()
+        }
         return true
     }
 
