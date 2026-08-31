@@ -55,23 +55,56 @@ object AmStartCommandToIntentConverter {
         filePath: String?,
         fileUri: String?,
         placeholders: Map<String, String> = emptyMap(),
-    ): List<String> =
-        argumentsTemplate
-            .split(Regex("[\\n\\s]+"))
-            .filter { it.isNotEmpty() }
-            .map { token ->
-                var t = token
-                if (filePath != null) t = t.replace("{file.path}", filePath)
-                if (fileUri != null) t = t.replace("{file.uri}", fileUri)
-                // Integrations' own placeholders ({system.folder},
-                // {query}, ...) expand here for the same reason the file
-                // ones do: a games folder or a search query containing a
-                // space must not be split into separate tokens. Doing it
-                // here rather than in a second expansion routine keeps
-                // one place that knows how a template becomes tokens.
-                for ((key, value) in placeholders) t = t.replace(key, value)
-                t
+    ): List<String> {
+        // Split honoring double quotes: a "..."-delimited span keeps its
+        // spaces and lands in one token, with the quotes themselves
+        // stripped and \" inside a span meaning a literal quote. This is
+        // not speculative shell emulation -- it is exactly the shape of
+        // the 78 real MAME4droid commands in ES-DE's own es_systems.xml
+        // (a multi-word `cli_params` string extra with escaped inner
+        // quotes), which the players-database generator used to SKIP
+        // because this function could not represent them.
+        val tokens = ArrayList<String>()
+        val current = StringBuilder()
+        var inQuotes = false
+        // Distinguishes `""` (a real, empty extra value) from "no token".
+        var sawQuote = false
+        var i = 0
+        while (i < argumentsTemplate.length) {
+            val c = argumentsTemplate[i]
+            when {
+                inQuotes && c == '\\' && i + 1 < argumentsTemplate.length && argumentsTemplate[i + 1] == '"' -> {
+                    current.append('"')
+                    i++
+                }
+                c == '"' -> {
+                    inQuotes = !inQuotes
+                    sawQuote = true
+                }
+                !inQuotes && c.isWhitespace() -> {
+                    if (current.isNotEmpty() || sawQuote) tokens.add(current.toString())
+                    current.setLength(0)
+                    sawQuote = false
+                }
+                else -> current.append(c)
             }
+            i++
+        }
+        if (inQuotes) throw IllegalArgumentException("Unterminated quote in am start command")
+        if (current.isNotEmpty() || sawQuote) tokens.add(current.toString())
+
+        return tokens.map { token ->
+            var t = token
+            if (filePath != null) t = t.replace("{file.path}", filePath)
+            if (fileUri != null) t = t.replace("{file.uri}", fileUri)
+            // Integrations' own placeholders ({system.folder}, {query},
+            // ...) expand here for the same reason the file ones do: a
+            // value containing a space must not be split into separate
+            // tokens. One place knows how a template becomes tokens.
+            for ((key, value) in placeholders) t = t.replace(key, value)
+            t
+        }
+    }
 
     fun toIntent(
         context: Context,
