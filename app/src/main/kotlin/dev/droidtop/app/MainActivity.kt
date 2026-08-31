@@ -358,9 +358,19 @@ class MainActivity : AppCompatActivity() {
                             // Companion FIRST (built-in screen), then move
                             // this singleTask instance to the addon so the
                             // shell ends up focused.
+                            // Companion explicitly on the BUILT-IN display:
+                            // startActivity without options launches on the
+                            // CALLER's display, which after relocation is
+                            // the addon -- confirmed live: the companion
+                            // landed behind the shell on the addon and the
+                            // built-in screen kept showing the Standard
+                            // launcher.
                             startActivity(
                                 Intent(this@MainActivity, CompanionActivity::class.java)
                                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                android.app.ActivityOptions.makeBasic()
+                                    .setLaunchDisplayId(android.view.Display.DEFAULT_DISPLAY)
+                                    .toBundle(),
                             )
                             startActivity(
                                 Intent(intent).setClass(this@MainActivity, MainActivity::class.java)
@@ -382,9 +392,15 @@ class MainActivity : AppCompatActivity() {
                             // the shell moved). Re-assert it, then
                             // re-front this shell so gamepad focus stays
                             // here, not on the companion.
+                            // Built-in display explicitly -- see the
+                            // relocation branch above for the confirmed
+                            // caller's-display default.
                             startActivity(
                                 Intent(this@MainActivity, CompanionActivity::class.java)
                                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                android.app.ActivityOptions.makeBasic()
+                                    .setLaunchDisplayId(android.view.Display.DEFAULT_DISPLAY)
+                                    .toBundle(),
                             )
                             startActivity(
                                 Intent(intent).setClass(this@MainActivity, MainActivity::class.java)
