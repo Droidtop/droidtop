@@ -4,7 +4,8 @@ import java.io.File
 import java.io.RandomAccessFile
 
 /**
- * Just enough ISO9660 to find a file in a disc image's root directory.
+ * Just enough ISO9660 to read one file out of a disc image's root
+ * directory.
  *
  * This exists because scanning a disc image for a marker string cannot
  * work, which was established the expensive way. droidtop reported every
@@ -23,17 +24,30 @@ import java.io.RandomAccessFile
  *
  * Reading the filesystem instead is both correct and cheaper: the volume
  * descriptor says where the root directory is, the root directory says
- * where the file is, and that is two small seeks rather than megabytes of
+ * where the file is -- a handful of small seeks rather than megabytes of
  * scanning.
  *
- * Deliberately minimal -- root directory only, no subdirectories, no
- * Joliet or Rock Ridge. Everything droidtop needs to identify a disc
- * (`SYSTEM.CNF`) lives in the root by the PlayStation's own boot
- * convention, and a fuller ISO9660 reader would be code with no caller.
+ * **Sector layouts.** A `.iso` stores bare 2048-byte data sectors, but a
+ * raw `.bin` -- the most common PS1 dump format -- stores full 2352-byte
+ * sectors with the data at an offset inside each: 16 for Mode 1, 24 for
+ * Mode 2 Form 1 (CD-XA, which PS1 discs actually are; the vendored
+ * scanner's own PSX magic offset 0x9320 is exactly sector 16 at
+ * 2352-byte pitch plus that 24-byte header plus the identifier field).
+ * The first version of this reader only understood 2048 and silently
+ * returned null for every raw image; [probeLayout] now tries all three.
+ * File content in a raw image is NOT contiguous, so reads go sector by
+ * sector -- which is also why [readRootFile] is the public API rather
+ * than a byte offset a caller would be tempted to read directly.
+ *
+ * Deliberately minimal beyond that -- root directory only, no
+ * subdirectories, no Joliet or Rock Ridge. Everything droidtop needs to
+ * identify a disc (`SYSTEM.CNF`) lives in the root by the PlayStation's
+ * own boot convention, and a fuller ISO9660 reader would be code with no
+ * caller.
  */
 object Iso9660 {
 
-    private const val SECTOR = 2048L
+    private const val DATA_SIZE = 2048
 
     /** The primary volume descriptor always sits at sector 16. */
     private const val PVD_SECTOR = 16L
@@ -47,43 +61,89 @@ object Iso9660 {
     /** Guards against a malformed image claiming an enormous root directory. */
     private const val MAX_ROOT_DIRECTORY_BYTES = 1 shl 20
 
-    data class Located(val offset: Long, val length: Int)
+    /** How the 2048 data bytes of each sector sit inside the image. */
+    private data class SectorLayout(val sectorSize: Long, val dataOffset: Long)
+
+    private val LAYOUTS = listOf(
+        SectorLayout(2048, 0), // plain .iso
+        SectorLayout(2352, 24), // raw Mode 2 Form 1 (CD-XA) -- what PS1 discs are
+        SectorLayout(2352, 16), // raw Mode 1
+    )
 
     /**
-     * Where [name] lives in the image's root directory, or null if this
-     * is not an ISO9660 image or the file is not there.
-     *
-     * [name] is matched case-insensitively and ignores the `;1` version
-     * suffix ISO9660 appends, since callers think in terms of
-     * "SYSTEM.CNF", not "SYSTEM.CNF;1".
+     * The first [maxBytes] of [name]'s content from the image's root
+     * directory, or null when this is not a readable ISO9660 image or the
+     * file is not there. [name] matches case-insensitively and ignores
+     * the `;1` version suffix ISO9660 appends.
      */
-    fun findInRootDirectory(file: File, name: String): Located? = runCatching {
+    fun readRootFile(file: File, name: String, maxBytes: Int): ByteArray? = runCatching {
         RandomAccessFile(file, "r").use { raf ->
-            val pvd = raf.readAt(PVD_SECTOR * SECTOR, SECTOR.toInt()) ?: return@runCatching null
-            // "CD001" at offset 1 is what makes this an ISO9660 volume
-            // descriptor at all; without it there is nothing to walk and
-            // the caller should fall back.
-            if (!pvd.matchesAscii(1, "CD001")) return@runCatching null
+            val layout = probeLayout(raf) ?: return@runCatching null
+            val pvd = readSectors(raf, layout, PVD_SECTOR, DATA_SIZE) ?: return@runCatching null
 
             val rootLba = pvd.leUInt(ROOT_RECORD_OFFSET + 2) ?: return@runCatching null
             val rootLength = pvd.leUInt(ROOT_RECORD_OFFSET + 10) ?: return@runCatching null
             if (rootLength <= 0L || rootLength > MAX_ROOT_DIRECTORY_BYTES) return@runCatching null
 
-            val root = raf.readAt(rootLba * SECTOR, rootLength.toInt()) ?: return@runCatching null
-            findRecord(root, name)
+            val root = readSectors(raf, layout, rootLba, rootLength.toInt()) ?: return@runCatching null
+            val record = findRecord(root, name) ?: return@runCatching null
+
+            val size = minOf(record.length, maxBytes.toLong()).toInt()
+            if (size <= 0) return@runCatching null
+            readSectors(raf, layout, record.lba, size)
         }
     }.getOrNull()
 
-    private fun findRecord(root: ByteArray, name: String): Located? {
+    private data class Record(val lba: Long, val length: Long)
+
+    /**
+     * Which sector layout this image uses, decided by where a valid
+     * primary volume descriptor (type byte 1, magic "CD001") actually
+     * is. Both checks, not just the magic: the probe looks at three
+     * different offsets in arbitrary files, and five magic bytes alone
+     * is a weaker accident-proofing than five plus the type.
+     */
+    private fun probeLayout(raf: RandomAccessFile): SectorLayout? =
+        LAYOUTS.firstOrNull { layout ->
+            val header = raf.readAt(PVD_SECTOR * layout.sectorSize + layout.dataOffset, 6)
+            header != null && header.size == 6 &&
+                header[0].toInt() == 1 && header.matchesAscii(1, "CD001")
+        }
+
+    /**
+     * [count] bytes of DATA starting at [startLba], read sector by
+     * sector -- in a raw image the data areas are not contiguous, so a
+     * single long read would interleave sync headers and EDC trailers
+     * into what the caller thinks is file content.
+     */
+    private fun readSectors(raf: RandomAccessFile, layout: SectorLayout, startLba: Long, count: Int): ByteArray? {
+        val out = ByteArray(count)
+        var produced = 0
+        var lba = startLba
+        while (produced < count) {
+            val want = minOf(DATA_SIZE, count - produced)
+            val chunk = raf.readAt(lba * layout.sectorSize + layout.dataOffset, want) ?: break
+            chunk.copyInto(out, produced)
+            produced += chunk.size
+            if (chunk.size < want) break
+            lba += 1
+        }
+        return when {
+            produced == 0 -> null
+            produced < count -> out.copyOf(produced)
+            else -> out
+        }
+    }
+
+    private fun findRecord(root: ByteArray, name: String): Record? {
         val wanted = name.uppercase()
-        val sector = SECTOR.toInt()
         var pos = 0
         while (pos < root.size) {
             val recordLength = root[pos].toInt() and 0xFF
             if (recordLength == 0) {
                 // Zero length means padding to the end of this sector;
                 // records never straddle a sector boundary.
-                pos = ((pos / sector) + 1) * sector
+                pos = ((pos / DATA_SIZE) + 1) * DATA_SIZE
                 continue
             }
             if (pos + recordLength > root.size || recordLength <= NAME_LENGTH_OFFSET) return null
@@ -98,7 +158,7 @@ object Iso9660 {
                 if (entry == wanted) {
                     val lba = root.leUInt(pos + 2) ?: return null
                     val length = root.leUInt(pos + 10) ?: return null
-                    return Located(lba * SECTOR, length.toInt())
+                    return Record(lba, length)
                 }
             }
             pos += recordLength
@@ -134,8 +194,8 @@ object Iso9660 {
     /**
      * ISO9660 stores these both-endian; droidtop reads the little-endian
      * half. Returned as a [Long] because the field is an unsigned 32-bit
-     * sector count -- a disc past 2 GB overflows a signed Int, and two of
-     * the real discs this was built against are 1.5 GB and 3.7 GB.
+     * value -- a disc past 2 GB overflows a signed Int, and two of the
+     * real discs this was built against are 1.5 GB and 3.7 GB.
      */
     private fun ByteArray.leUInt(at: Int): Long? {
         if (at < 0 || at + 4 > size) return null
@@ -170,27 +230,11 @@ object PlayStationDiscType {
     /**
      * [SystemID.PS2] or [SystemID.PSX] for a PlayStation disc image, or
      * null when the image is not one droidtop can read this way -- in
-     * which case the caller should fall back to [SerialScanner] rather
-     * than assume either.
+     * which case the caller should fall back rather than assume either.
      */
     fun detect(file: File): SystemID? {
-        val located = Iso9660.findInRootDirectory(file, SYSTEM_CNF) ?: return null
-        val text = runCatching {
-            RandomAccessFile(file, "r").use { raf ->
-                if (located.offset < 0 || located.offset >= raf.length()) return@runCatching null
-                val size = located.length.coerceIn(0, MAX_CNF_BYTES)
-                if (size == 0) return@runCatching null
-                raf.seek(located.offset)
-                val buffer = ByteArray(size)
-                var read = 0
-                while (read < size) {
-                    val n = raf.read(buffer, read, size - read)
-                    if (n <= 0) break
-                    read += n
-                }
-                if (read == 0) null else String(buffer, 0, read, Charsets.US_ASCII)
-            }
-        }.getOrNull() ?: return null
+        val bytes = Iso9660.readRootFile(file, SYSTEM_CNF, MAX_CNF_BYTES) ?: return null
+        val text = String(bytes, Charsets.US_ASCII)
 
         // Whitespace-insensitive: real discs write both "BOOT2 =" and
         // "BOOT2=", and matching one spelling would miss the other.
