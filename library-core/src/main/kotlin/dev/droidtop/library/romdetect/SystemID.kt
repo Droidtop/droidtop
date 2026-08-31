@@ -28,6 +28,7 @@ enum class SystemID(val dbname: String) {
     GG("gg"),
     ATARI2600("atari2600"),
     PSX("psx"),
+    PS2("ps2"),
     FBNEO("fbneo"),
     MAME2003PLUS("mame2003plus"),
     PC_ENGINE("pce"),
@@ -57,6 +58,7 @@ fun SystemID.toConsoleSystemId(): String? = when (this) {
     SystemID.GG -> "gamegear"
     SystemID.ATARI2600 -> "atari2600"
     SystemID.PSX -> "psx"
+    SystemID.PS2 -> "ps2"
     SystemID.FBNEO -> "fbneo"
     SystemID.MAME2003PLUS -> null
     SystemID.PC_ENGINE -> "tg16"
