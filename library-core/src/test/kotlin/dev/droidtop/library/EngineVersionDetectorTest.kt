@@ -99,8 +99,59 @@ class EngineVersionDetectorTest {
     }
 
     @Test
+    fun `reads the MV engine version from the core script header`() {
+        // Verbatim from "How to Raise a Happy NEET 1.0.5" and
+        // "luna_space_prison", both real MV exports using the www/ wrapper.
+        write(
+            """
+            //=============================================================================
+            // rpg_core.js v1.6.2
+            //=============================================================================
+            """.trimIndent(),
+            "www", "js", "rpg_core.js",
+        )
+
+        val detected = EngineVersionDetector.detect(GameEngine.RPG_MAKER_MV, tmp.root)
+        assertEquals("1.6.2", detected?.version)
+        assertEquals("rpg_core.js", detected?.source)
+    }
+
+    @Test
+    fun `reads the MZ engine version, unwrapped`() {
+        // "Magical Princess Lily" ships MZ without the www/ wrapper.
+        write("//=====\n// rmmz_core.js v1.8.0\n//=====\n", "js", "rmmz_core.js")
+
+        assertEquals("1.8.0", EngineVersionDetector.detect(GameEngine.RPG_MAKER_MZ, tmp.root)?.version)
+    }
+
+    @Test
+    fun `an MV export with no version header detects as null`() {
+        write("// some patched core with the header stripped\n", "www", "js", "rpg_core.js")
+        assertNull(EngineVersionDetector.detect(GameEngine.RPG_MAKER_MV, tmp.root))
+    }
+
+    @Test
+    fun `reads the RGSS version from Game-dot-ini`() {
+        // Verbatim from MGQ Paradox 3.06.
+        write(
+            """
+            [Game]
+            Library=System\RGSS301.dll
+            Scripts=Data\Scripts.rvdata2
+            Title=Monster Girl Quest! Paradox RPG
+            """.trimIndent(),
+            "Game.ini",
+        )
+
+        val detected = EngineVersionDetector.detect(GameEngine.RPG_MAKER_VX_ACE, tmp.root)
+        assertEquals("3.01", detected?.version)
+    }
+
+    @Test
     fun `engines with no verified signature yet detect as null rather than guessing`() {
-        write("anything", "Game.rgss3a")
-        assertNull(EngineVersionDetector.detect(GameEngine.RPG_MAKER_VX_ACE, tmp.root))
+        // Kirikiri has no verified version signature yet -- deliberately
+        // null rather than a plausible guess (see the class doc comment).
+        write("anything", "data.xp3")
+        assertNull(EngineVersionDetector.detect(GameEngine.KIRIKIRI, tmp.root))
     }
 }
