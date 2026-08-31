@@ -9,6 +9,7 @@ import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
 import dev.droidtop.library.romdetect.LibretroDatabase
 import dev.droidtop.library.romdetect.SerialScanner
+import dev.droidtop.library.romdetect.PlayStationDiscType
 import dev.droidtop.library.romdetect.SystemID
 import dev.droidtop.library.romdetect.toConsoleSystemId
 import kotlinx.coroutines.async
@@ -526,6 +527,15 @@ class ConsoleRomProvider(
     private fun detectSystemIdFromContent(romFile: File): String? {
         val extension = romFile.extension.lowercase()
         if (extension !in setOf("iso", "bin", "pbp", "3ds")) return null
+        // A PlayStation disc image is read as a filesystem first, not
+        // scanned. PS1 and PS2 discs share the "PLAYSTATION" volume
+        // identifier, so the magic numbers below cannot separate them and
+        // used to call every PS2 disc a PS1 one -- which launched those
+        // games through a PS1 emulator. Falls through to the scanner when
+        // this is not a readable ISO9660 image, rather than guessing.
+        if (extension == "iso") {
+            PlayStationDiscType.detect(romFile)?.toConsoleSystemId()?.let { return it }
+        }
         return try {
             FileInputStream(romFile).use { stream ->
                 SerialScanner.extractInfo(romFile.name, stream).systemID?.toConsoleSystemId()

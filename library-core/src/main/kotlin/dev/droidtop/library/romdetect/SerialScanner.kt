@@ -99,9 +99,6 @@ object SerialScanner {
 
     private const val PS_SERIAL_MAX_SIZE = 12
 
-    /** The SYSTEM.CNF key a PS2 disc boots through; a PS1 disc uses a bare `BOOT`. */
-    private const val PS2_BOOT_MARKER = "BOOT2"
-
     private val PSX_BASE_SERIALS =
         listOf(
             "CPCS",
@@ -191,7 +188,7 @@ object SerialScanner {
                     .getOrDefault(DiskInfo(null, SystemID.SEGACD))
 
             SystemID.PSX ->
-                runCatching { extractInfoForPlayStationDisc(openedStream) }
+                runCatching { extractInfoForPSX(openedStream) }
                     .getOrDefault(DiskInfo(null, SystemID.PSX))
 
             SystemID.PSP ->
@@ -257,50 +254,20 @@ object SerialScanner {
         return DiskInfo(finalSerial, SystemID.SEGACD)
     }
 
-    /**
-     * Distinguishes a PS1 disc from a PS2 one.
-     *
-     * Both carry the literal string "PLAYSTATION" as their ISO9660
-     * volume descriptor system identifier, so the magic-number check
-     * cannot tell them apart and reported every PS2 disc as PS1 --
-     * confirmed on-device, where all seven ISOs under /Roms/ps2/ were
-     * stored as systemId=psx and launched DuckStation, which cannot run
-     * them, while an installed PS2 emulator went unused.
-     *
-     * SYSTEM.CNF is the real discriminator: a PS1 disc boots via
-     * `BOOT = cdrom:\...` and a PS2 disc via `BOOT2 = cdrom0:\...`.
-     * Verified against real discs, which read
-     * `BOOT2 = cdrom0:\SCUS_974.64;1`.
-     *
-     * The window is 2 MB rather than the 64 KB the PS1-only path used,
-     * because SYSTEM.CNF sits well past 64 KB on a real disc (553 KB and
-     * 592 KB on the two verified against) -- a 64 KB window cannot see
-     * the BOOT2 line at all, which is why the old code always fell
-     * through to its PSX default. The same pass finds the serial, since
-     * the BOOT2 line contains it and SCUS is already a known prefix.
-     */
-    private fun extractInfoForPlayStationDisc(openedStream: InputStream): DiskInfo {
-        val headerSize = 2.megaBytes()
+    // PS1 only, by design. A PS2 disc carries the same "PLAYSTATION"
+    // volume identifier and cannot be told apart by scanning -- see
+    // [PlayStationDiscType], which reads SYSTEM.CNF out of the image's
+    // filesystem instead. Do not add PS2 scanning back in here.
+    private fun extractInfoForPSX(openedStream: InputStream): DiskInfo {
+        val headerSize = 64.kiloBytes()
         if (openedStream.available() < headerSize) {
             return DiskInfo(null, null)
         }
 
-        val hits = textSearch(
-            PSX_BASE_SERIALS + PS2_BOOT_MARKER,
-            openedStream,
-            PS_SERIAL_MAX_SIZE,
-            headerSize,
-        ).toList()
-
-        val systemID = if (hits.any { it.startsWith(PS2_BOOT_MARKER) }) SystemID.PS2 else SystemID.PSX
-        // The marker is excluded before serial parsing on purpose:
-        // parsePSXSerial happily reads "BOOT2 = cdro" as the serial
-        // "BOOT-2", and it can appear before the real serial.
-        val serial = hits.asSequence()
-            .filterNot { it.startsWith(PS2_BOOT_MARKER) }
-            .mapNotNull { parsePSXSerial(it) }
-            .firstOrNull()
-        return DiskInfo(serial, systemID)
+        return textSearch(PSX_BASE_SERIALS, openedStream, PS_SERIAL_MAX_SIZE, headerSize)
+            .mapNotNull { serial -> parsePSXSerial(serial) }
+            .mapNotNull { serial -> DiskInfo(serial, SystemID.PSX) }
+            .firstOrNull() ?: DiskInfo(null, SystemID.PSX)
     }
 
     private fun extractInfoForPSP(openedStream: InputStream): DiskInfo {
