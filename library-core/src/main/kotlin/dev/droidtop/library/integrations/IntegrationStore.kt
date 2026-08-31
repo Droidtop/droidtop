@@ -85,8 +85,7 @@ object IntegrationStore {
         check(isInstalled(context, integration.packageName)) {
             "${integration.label} needs ${integration.packageName}, which isn't installed."
         }
-        val expanded = IntegrationPlaceholders.expand(
-            template = integration.argumentsTemplate,
+        val placeholders = IntegrationPlaceholders.values(
             systemId = systemId,
             systemName = systemName,
             systemFolder = systemFolder,
@@ -98,7 +97,12 @@ object IntegrationStore {
         // made to invent a file it has no use for.
         LaunchDisplay.start(
             context,
-            AmStartCommandToIntentConverter.toIntent(context, expanded, systemFolder?.absolutePath),
+            AmStartCommandToIntentConverter.toIntent(
+                context,
+                integration.argumentsTemplate,
+                systemFolder?.absolutePath,
+                placeholders,
+            ),
         )
     }
 

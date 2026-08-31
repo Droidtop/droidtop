@@ -109,19 +109,27 @@ object IntegrationPlaceholders {
     /** A user-supplied search string, when the surface collected one. */
     const val QUERY = "{query}"
 
-    fun expand(
-        template: String,
+    /**
+     * The placeholder values to hand the converter, for the ones that
+     * actually have a value.
+     *
+     * Deliberately returns values rather than an expanded template.
+     * Expanding here would reintroduce the bug the ROM launch path just
+     * had to fix: a system folder or a query containing a space, pasted
+     * into the template before the converter splits it on whitespace,
+     * gets torn into separate tokens. The converter expands per token
+     * instead, so the value stays intact however many spaces it has.
+     */
+    fun values(
         systemId: String? = null,
         systemName: String? = null,
         systemFolder: File? = null,
         query: String? = null,
-    ): String {
-        var out = template
-        systemId?.let { out = out.replace(SYSTEM_ID, it) }
-        systemName?.let { out = out.replace(SYSTEM_NAME, it) }
-        systemFolder?.let { out = out.replace(SYSTEM_FOLDER, it.absolutePath) }
-        query?.let { out = out.replace(QUERY, it) }
-        return out
+    ): Map<String, String> = buildMap {
+        systemId?.let { put(SYSTEM_ID, it) }
+        systemName?.let { put(SYSTEM_NAME, it) }
+        systemFolder?.let { put(SYSTEM_FOLDER, it.absolutePath) }
+        query?.let { put(QUERY, it) }
     }
 
     /** Which placeholders [template] actually uses -- lets a surface skip prompting for a query nobody asked for. */
