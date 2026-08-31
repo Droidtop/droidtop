@@ -1881,7 +1881,19 @@ carousel art like `auto-allgames.png` resolve). Groups keep their own
 display names (`fullname` still says "Ren'Py" etc.) — only the art/
 metadata lookup folder is shared.
 
-### Debug-credentials pathway (directed 2026-08-31)
+### Credentials transfer (directed 2026-08-31, twice)
+
+Superseded same day: the app-private debug-credentials file below was
+built, then retired by direction once the existing whole-prefs settings
+backup/restore (Global settings, `BackupHelper` -- it archives the
+entire shared prefs file, so every `droidtop_*` credential key rides
+along) turned out to already cover the job with one mechanism. The
+scraper screen carries a pointer to it; the ScreenScraper fields say
+plain Username/Password; the dev ID/password pair is an APPLICATION
+credential (real ES-DE embeds its own) with no user-facing field at
+all.
+
+### Debug-credentials pathway (built and retired 2026-08-31)
 
 A plain properties file in app-PRIVATE storage
 (`filesDir/debug-credentials.properties`, `key=value` lines, namespaced
