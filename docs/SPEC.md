@@ -691,6 +691,50 @@ source already in [vendor/gamenative](../vendor/gamenative):
     layer needed at all) is an open problem, not assumed solved just
     because `osList` says "linux."
 
+### PC launch wiring: the `PcGameRuntime` seam (directed 2026-08-31)
+
+`WINE_PREFIX` and `LINUX_CONTAINER` were both dead `error()` stubs
+("isn't wired to a running session yet"), which meant the resolver could
+*offer* a detected engine game Wine and then fail the instant the user
+picked it. They are now real launches, through a seam:
+
+- `library-core` declares `PcGameRuntime` + `PcGameRuntimeRegistry` —
+  the same swappable-seam pattern `LaunchDisplay.chooser` and
+  gamenative-tux's own `LinuxContainerBackend` already use. It exists
+  because `library-core` cannot depend on the runtime modules, and both
+  runtimes need a live container session only the app layer can obtain.
+- The implementation lives in **`:runtime-windows`, not `:app`** — that
+  is the module compiling the vendored `com.winlator` tree, so
+  `ContainerManager` (the real owner of Wine-prefix state) is visible
+  only from there; `:app` depends on it with `implementation`, which does
+  not re-export those types, so the same code in `:app` would not
+  compile. `:app` constructs and registers it.
+- `GameExecutableResolver` picks what to actually run. Detection only
+  ever proved an engine was *present*; nothing had needed to name the
+  launchable file. It skips installers/uninstallers/redistributables and
+  returns null rather than choosing between equally plausible candidates,
+  so the user gets "pick one explicitly" instead of droidtop silently
+  starting a patcher.
+- droidtop reuses an existing Wine container rather than creating one per
+  game: an engine game should run in the environment the user already
+  configured, and spawning multi-hundred-megabyte prefixes per title
+  uninvited would be its own bug.
+- Per-game choice is exposed as a "Runs with: <backend>" chip in the game
+  detail screen, backed by the previously-unwired
+  `LaunchStrategyOverridePrefs`.
+
+**Known blocker, confirmed on-device:** droidtop has no flow to *create*
+a Wine container at all — `files/imagefs/home` does not exist on a real
+install, so `ContainerManager.containers` is empty and every Wine launch
+correctly reports "no Wine container exists yet". The gamenative
+machinery to build one (container-pattern download via
+`ContainerFilesDownloader`, `ImageFsInstaller` extraction,
+`ContainerManager.createContainer`) is all compiled in and unused. Until
+that is surfaced, the Wine path is wired but unreachable. This is the
+next real step for PC gaming, and it is also what blocks testing whether
+Wine can run a game from external storage through droidtop's own stack
+rather than through Winlator.
+
 **Implementation status (first slice, real but partial):**
 
 - `ContainerRuntime.exec(container, command, env)` — the actual missing
