@@ -127,9 +127,12 @@ class AmStartTokenizeTest {
             "/roms/dragon32/Game.cas",
             null,
         )
+        // tokens = ["--es", "cli_params", value] -- the value is index 2.
+        // (Index 1 here was this test's own first CI failure: the new
+        // test step caught the assertion pointing at the KEY.)
         assertEquals(
             """-autoboot_command 'cloadm""' -cass '/roms/dragon32/Game.cas'""",
-            tokens[1],
+            tokens[2],
         )
     }
 
