@@ -40,6 +40,8 @@ object EngineVersionDetector {
     fun detect(engine: GameEngine, gameRoot: File): DetectedVersion? = when (engine) {
         GameEngine.RENPY -> detectRenPy(gameRoot)
         GameEngine.RPG_MAKER_VX_ACE -> detectRgss(gameRoot)
+        GameEngine.RPG_MAKER_MV -> detectRpgMakerJs(gameRoot, "rpg_core.js")
+        GameEngine.RPG_MAKER_MZ -> detectRpgMakerJs(gameRoot, "rmmz_core.js")
         // Deliberately absent: every other engine's version signature is
         // unverified against a real game so far. Adding a guessed one
         // would produce exactly the confidently-wrong engineVersion this
@@ -86,6 +88,37 @@ object EngineVersionDetector {
             version = "$major.$minor",
             family = major,
             source = "Game.ini (Library=RGSS$major$minor)",
+        )
+    }
+
+    // ---- RPG Maker MV / MZ (the deployed JS engine) -----------------------
+    //
+    // The core script states its own version on its second line, which is
+    // what enginehost's contract means by the "deployed JS engine
+    // version" for these generations. Verified against three real games
+    // on the user's device:
+    //
+    //     //=============================================================================
+    //     // rpg_core.js v1.6.2
+    //
+    // "How to Raise a Happy NEET" and "luna_space_prison" both report MV
+    // v1.6.2; "Magical Princess Lily" reports rmmz_core.js v1.8.0. Read
+    // from the same two locations [GameEngineDetector] already probes, so
+    // the `www/` wrapper variant real MV exports use is covered.
+
+    private val RPG_MAKER_JS_VERSION = Regex("""^//\s*\S+\.js\s+v([0-9][0-9.]*)""", RegexOption.MULTILINE)
+
+    private fun detectRpgMakerJs(gameRoot: File, scriptName: String): DetectedVersion? {
+        val script = listOf(File(gameRoot, "js/$scriptName"), File(gameRoot, "www/js/$scriptName"))
+            .firstOrNull { it.isFile } ?: return null
+        val version = readHead(script)
+            ?.let { RPG_MAKER_JS_VERSION.find(it) }
+            ?.groupValues?.get(1)
+            ?: return null
+        return DetectedVersion(
+            version = version,
+            family = version.substringBefore('.'),
+            source = script.name,
         )
     }
 
