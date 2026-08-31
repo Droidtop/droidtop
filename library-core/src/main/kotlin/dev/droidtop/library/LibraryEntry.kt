@@ -418,6 +418,29 @@ class Library(
     }
 
     /**
+     * Every launch strategy genuinely available for [entry] right now, in
+     * the priority order [launch] would pick from -- so a UI can offer the
+     * real choice instead of the resolver silently taking the first one.
+     * Empty for any entry that isn't an engine game, the same honest "not
+     * applicable here" convention [toggleFavorite] uses rather than
+     * throwing.
+     *
+     * This became worth surfacing once WINE_PREFIX and LINUX_CONTAINER
+     * stopped being dead stubs (see [PcGameRuntime]): before that, a
+     * picker could only have offered one working option and two errors.
+     */
+    suspend fun availableLaunchStrategies(entry: LibraryEntry): List<GameLaunchStrategy> =
+        withContext(Dispatchers.IO) {
+            val engineProvider = providers
+                .filterIsInstance<EngineGameProvider>()
+                .firstOrNull { entry.kind in it.kinds } ?: return@withContext emptyList()
+            // Re-detection touches the filesystem and a game folder can
+            // vanish between a scan and this call; an unreadable folder
+            // means "no choices", never a crash in the detail screen.
+            runCatching { engineProvider.availableStrategies(entry) }.getOrDefault(emptyList())
+        }
+
+    /**
      * Real, user-driven favorite toggle -- see
      * [dev.droidtop.library.consoles.ConsoleRomProvider.toggleFavorite]'s
      * own doc comment. `favorite` is real ES-DE per-game metadata

@@ -496,6 +496,15 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
 
     var editingMetadata by remember { mutableStateOf(false) }
     var editingCollections by remember { mutableStateOf(false) }
+
+    // Which launch backends this particular game can actually use right
+    // now -- enginehost's native runtime, Wine, a Linux container. Loaded
+    // off the main thread because resolving them re-reads the game folder
+    // (see Library.availableLaunchStrategies). Empty for anything that
+    // isn't an engine game, which is what hides the chip below.
+    var strategies by remember(entry) { mutableStateOf<List<GameLaunchStrategy>>(emptyList()) }
+    var chosenStrategy by remember(entry) { mutableStateOf(LaunchStrategyOverridePrefs.get(context, entry.id)) }
+    LaunchedEffect(entry) { strategies = library.availableLaunchStrategies(entry) }
     val isRomEntry = entry.kind == LibraryEntryKind.CONSOLE_ROM
 
     if (editingMetadata) {
@@ -599,6 +608,22 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
         }
         Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             ActionChip("Launch", highlighted = true, modifier = Modifier.focusRequester(launchFocus), onClick = onLaunch)
+            // Only shown when there is a real choice to make. Cycles
+            // rather than opening a picker: there are at most a handful of
+            // backends, and cycling matches how every other choice in this
+            // shell is adjusted (see SettingsCatalogView's left/right).
+            if (strategies.size > 1) {
+                val active = strategies.firstOrNull { it.name == chosenStrategy } ?: strategies.first()
+                ActionChip(
+                    "Runs with: ${active.displayName()}",
+                    highlighted = false,
+                    onClick = {
+                        val next = strategies[(strategies.indexOf(active) + 1) % strategies.size]
+                        LaunchStrategyOverridePrefs.set(context, entry.id, next)
+                        chosenStrategy = next.name
+                    },
+                )
+            }
             // Real ConsoleRomProvider-specific concept -- same honest
             // "not applicable" gating Library.toggleFavorite/
             // saveMetadata already use for a non-ROM entry.
