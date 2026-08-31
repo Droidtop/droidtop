@@ -17,10 +17,36 @@ import android.content.Intent
  * display list) rather than each library-core call site re-reading
  * preferences it shouldn't know the shape of. Null = launch normally on
  * the default display.
+ *
+ * Per direction, the DEFAULT is to ASK per launch rather than silently
+ * assuming a display: when [askOptions] is set (MainActivity publishes
+ * the real candidate displays whenever the user's target preference is
+ * "ask" and more than one display is present) and a [chooser] is
+ * installed (the shell that owns launch UI), [start] defers to the
+ * chooser and launches on whatever the user picks — or not at all if
+ * they back out.
  */
+data class LaunchDisplayOption(val displayId: Int?, val label: String)
+
 object LaunchDisplay {
     @Volatile
     var targetDisplayId: Int? = null
+
+    /**
+     * Candidate displays to ask between, or null when no asking should
+     * happen (single display, or an explicit target preference).
+     */
+    @Volatile
+    var askOptions: List<LaunchDisplayOption>? = null
+
+    /**
+     * Installed by the shell owning launch UI: presents [askOptions] and
+     * invokes the continuation with the chosen display id (null =
+     * default display) — or never, if the user backs out (the launch is
+     * simply abandoned; nothing was started yet).
+     */
+    @Volatile
+    var chooser: ((options: List<LaunchDisplayOption>, onChosen: (Int?) -> Unit) -> Unit)? = null
 
     /**
      * The display the most recent launch was sent to, kept until the shell
@@ -39,7 +65,16 @@ object LaunchDisplay {
     var onLaunched: ((Int?) -> Unit)? = null
 
     fun start(context: Context, intent: Intent) {
-        val displayId = targetDisplayId
+        val options = askOptions
+        val ask = chooser
+        if (options != null && options.size > 1 && ask != null) {
+            ask(options) { chosen -> startOn(context, intent, chosen) }
+        } else {
+            startOn(context, intent, targetDisplayId)
+        }
+    }
+
+    private fun startOn(context: Context, intent: Intent, displayId: Int?) {
         if (displayId != null) {
             context.startActivity(intent, ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle())
         } else {

@@ -28,7 +28,13 @@ object DisplayRolePrefs {
 
     /** Which display game/app launches target. */
     enum class GameLaunchTarget {
-        /** Wherever the shell currently is (default). */
+        /**
+         * Ask per launch whenever more than one display is present (the
+         * default, per direction: never silently assume a screen).
+         */
+        ASK,
+
+        /** Wherever the shell currently is. */
         FOLLOW_SHELL,
         BUILT_IN,
         SECOND,
@@ -44,5 +50,5 @@ object DisplayRolePrefs {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(KEY_GAME_LAUNCH_DISPLAY, null)
             ?.let { runCatching { GameLaunchTarget.valueOf(it) }.getOrNull() }
-            ?: GameLaunchTarget.FOLLOW_SHELL
+            ?: GameLaunchTarget.ASK
 }
