@@ -1458,6 +1458,39 @@ GitHub-refresh + validate-before-replace:
 One user action refreshes all four ("Update platform databases" in the
 console-systems catalog screen).
 
+### Which system a ROM belongs to (2026-08-31)
+
+Three signals, in this order: the scanned `systemId` stored on the
+entry, then a `SystemOverridePrefs` folder override, then the folder
+name via `SYSTEM_ID_ALIASES`. The scan itself may correct the folder
+name from file content (`SerialScanner`), which is right when a disc
+image is misfiled and wrong when the detector is wrong -- so the
+detector has to actually be right.
+
+**droidtop's detection is not limited to what the vendored scanner
+covers.** `SerialScanner` is forked from Lemuroid, whose system coverage
+is its own emulator's, not droidtop's. Where droidtop supports a system
+Lemuroid does not, the detector gets extended rather than droidtop
+inheriting the gap.
+
+The first real case, found by an all-systems launch sweep: every PS2
+disc was being detected as PS1, so PS2 games launched through DuckStation
+-- a PS1 emulator that cannot run them -- while an installed PS2 emulator
+went unused. The magic-number check keys on the ISO9660 volume descriptor
+system identifier, and that string is "PLAYSTATION" on PS1 and PS2 discs
+alike; `SystemID` had no PS2 constant at all.
+
+The discriminator is SYSTEM.CNF: PS1 boots `BOOT = cdrom:\`, PS2 boots
+`BOOT2 = cdrom0:\`. The search window is 2 MB, not the 64 KB the
+PS1-only path used, because SYSTEM.CNF sits well past 64 KB on a real
+disc (553 KB and 592 KB on the two verified against).
+
+Because the scan result is cached in `rom_entries`, a detection fix ships
+with a `RomDatabase` migration clearing that cache and `scan_metadata`;
+otherwise it changes nothing for anyone who has already scanned.
+`game_metadata` and the collection tables are preserved -- favorites,
+completed flags and collection membership are real user data.
+
 ## 7e3. Lutris install-script integration (directed 2026-08-30, backlog)
 
 Beyond cover art (§7d's Lutris scraper client), lutris.net's real public
