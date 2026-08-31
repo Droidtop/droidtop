@@ -2,6 +2,13 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    // Hilt: the vendored gamenative tree (:runtime-windows) is Hilt-built
+    // -- its activities are @AndroidEntryPoint -- and Hilt requires the
+    // FINAL application module to carry the plugin and the annotated
+    // Application class (DroidtopApplication) for their object graph to
+    // exist at runtime.
+    alias(libs.plugins.google.ksp)
+    alias(gn.plugins.dagger.hilt)
 }
 
 android {
@@ -109,6 +116,12 @@ configurations.all {
 }
 
 dependencies {
+
+    // Hilt runtime + compiler for this, the application module -- see the
+    // plugins block comment. Versions from gamenative's own catalog so
+    // they track the fork exactly.
+    implementation(gn.bundles.hilt)
+    ksp(gn.hilt.android.compiler)
     implementation(project(":runtime-common"))
     implementation(project(":host-bridge"))
     implementation(project(":runtime-windows"))
