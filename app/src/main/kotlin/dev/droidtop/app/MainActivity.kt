@@ -146,6 +146,16 @@ class MainActivity : AppCompatActivity() {
             ),
             playHistory = RoomPlayHistoryStore(applicationContext),
         )
+
+        // Fills library-core's PcGameRuntime seam, which is what makes the
+        // WINE_PREFIX / LINUX_CONTAINER launch strategies real rather than
+        // error() stubs. Same live-session supplier PcGameProvider takes,
+        // for the same reason: the desktop session may still be connecting.
+        dev.droidtop.library.PcGameRuntimeRegistry.runtime =
+            dev.droidtop.runtime.windows.DroidtopPcGameRuntime(applicationContext) {
+            (DesktopSessionService.state.value as? DesktopSessionState.Connected)
+                ?.let { PrimaryContainerSession(it.runtime, it.container) }
+        }
         refreshModeIfUndecided()
 
         observeSecondScreen()
