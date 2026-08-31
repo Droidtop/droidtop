@@ -2888,6 +2888,702 @@
    "pkg": "com.explusalpha.SwanEmu",
    "argumentsTemplate": "-n com.explusalpha.SwanEmu/com.imagine.BaseActivity -a android.intent.action.VIEW -d {file.uri} -t application/zip",
    "killPackageProcesses": false
+  },
+  {
+   "id": "esde-adam-mame4droid-current",
+   "systemId": "adam",
+   "label": "MAME4droid Current [Diskette] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -flop1 '{file.path}'\" -d adam",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-adam-mame4droid-current",
+   "systemId": "adam",
+   "label": "MAME4droid Current [Tape] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cass1 '{file.path}'\" -d adam",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-adam-mame4droid-current",
+   "systemId": "adam",
+   "label": "MAME4droid Current [Cartridge] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart1 '{file.path}'\" -d adam",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-adam-mame4droid-current",
+   "systemId": "adam",
+   "label": "MAME4droid Current [Software list] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' {file.basename}\" -d adam",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-amstradcpc-mame4droid-current",
+   "systemId": "amstradcpc",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -flop1 '{file.path}'\" -d cpc6128",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-apple2-mame4droid-current",
+   "systemId": "apple2",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -gameio joy -flop1 '{file.path}'\" -d apple2e",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-apple2gs-mame4droid-current",
+   "systemId": "apple2gs",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -gameio joy -flop3 '{file.path}'\" -d apple2gs",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-apple2gs-mame4droid-current",
+   "systemId": "apple2gs",
+   "label": "MAME4droid Current [Software list] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -gameio joy {file.basename}\" -d apple2gs",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-arcade-mame4droid-current",
+   "systemId": "arcade",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}'\" -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-arcadia-mame4droid-current",
+   "systemId": "arcadia",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d arcadia",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-archimedes-mame4droid-current",
+   "systemId": "archimedes",
+   "label": "MAME4droid Current [Model A440/1] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -flop1 '{file.path}'\" -d aa4401",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-archimedes-mame4droid-current",
+   "systemId": "archimedes",
+   "label": "MAME4droid Current [Model A3000] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -flop1 '{file.path}'\" -d aa3000",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-archimedes-mame4droid-current",
+   "systemId": "archimedes",
+   "label": "MAME4droid Current [Model A310] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -flop1 '{file.path}'\" -d aa310",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-archimedes-mame4droid-current",
+   "systemId": "archimedes",
+   "label": "MAME4droid Current [Model A540] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -flop1 '{file.path}'\" -d aa540",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-astrocde-mame4droid-current",
+   "systemId": "astrocde",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d astrocde",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-atari7800-mame4droid-current",
+   "systemId": "atari7800",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d a7800",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-atarijaguar-mame4droid-current",
+   "systemId": "atarijaguar",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d jaguar",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-bbcmicro-mame4droid-current",
+   "systemId": "bbcmicro",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -autoboot_delay '2' -autoboot_command '*cat\\n\\n*exec !boot\\n' -analogue acornjoy -flop1 '{file.path}'\" -d bbcb",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-cdimono1-mame4droid-current",
+   "systemId": "cdimono1",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cdrom '{file.path}'\" -d cdimono1",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-channelf-mame4droid-current",
+   "systemId": "channelf",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d channelf",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-coco-mame4droid-current",
+   "systemId": "coco",
+   "label": "MAME4droid Current [Cartridge] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d coco",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-coco-mame4droid-current",
+   "systemId": "coco",
+   "label": "MAME4droid Current [Tape] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -autoboot_delay '2' -autoboot_command 'cloadm:exec\\n' -cass '{file.path}'\" -d coco",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-consolearcade-mame4droid-current",
+   "systemId": "consolearcade",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}'\" -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-consolearcade-dolphin",
+   "systemId": "consolearcade",
+   "label": "Dolphin (Standalone)",
+   "pkg": "org.dolphinemu.dolphinemu",
+   "argumentsTemplate": "-n org.dolphinemu.dolphinemu/org.dolphinemu.dolphinemu.ui.main.TvMainActivity -a android.intent.action.MAIN -c android.intent.category.LEANBACK_LAUNCHER -e AutoStartFile {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-cps-mame4droid-current",
+   "systemId": "cps",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}'\" -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-cps1-mame4droid-current",
+   "systemId": "cps1",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}'\" -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-cps2-mame4droid-current",
+   "systemId": "cps2",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}'\" -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-cps3-mame4droid-current",
+   "systemId": "cps3",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}'\" -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-crvision-mame4droid-current",
+   "systemId": "crvision",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d crvision",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-daphne-mame4droid-current",
+   "systemId": "daphne",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}'\" -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-dragon32-mame4droid-current",
+   "systemId": "dragon32",
+   "label": "MAME4droid Current Dragon 32 [Tape] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -autoboot_delay '4' -autoboot_command 'cloadm\\\"\\\"\\n' -cass '{file.path}'\" -d dragon32",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-dragon32-mame4droid-current",
+   "systemId": "dragon32",
+   "label": "MAME4droid Current Dragon 32 [Cartridge] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d dragon32",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-dragon32-mame4droid-current",
+   "systemId": "dragon32",
+   "label": "MAME4droid Current Dragon 64 [Tape] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -autoboot_delay '4' -autoboot_command 'cloadm\\\"\\\"\\n' -cass '{file.path}'\" -d dragon64",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-dragon32-mame4droid-current",
+   "systemId": "dragon32",
+   "label": "MAME4droid Current Dragon 64 [Cartridge] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d dragon64",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-electron-mame4droid-current",
+   "systemId": "electron",
+   "label": "MAME4droid Current [Tape] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -autoboot_delay '2' -autoboot_command '*T.\\nCH.\\\"\\\"\\n' -cass1 '{file.path}'\" -d electron64",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-electron-mame4droid-current",
+   "systemId": "electron",
+   "label": "MAME4droid Current [Diskette DFS] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -exp plus1 -cart1 seds -autoboot_delay '2' -autoboot_command '*CAT\\n\\n\\n\\n\\n\\n*EXEC !BOOT\\n' -flop1 '{file.path}'\" -d electron64",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-electron-mame4droid-current",
+   "systemId": "electron",
+   "label": "MAME4droid Current [Diskette ADFS] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -exp plus3 -exp:plus3:fdc:1 35dd -autoboot_delay '2' -autoboot_command '*CAT\\n\\n\\n\\n\\n\\n*RUN !BOOT\\n' -flop1 '{file.path}'\" -d electron64",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-epic-winnative",
+   "systemId": "epic",
+   "label": "WinNative (Standalone)",
+   "pkg": "com.winnative.cmod",
+   "argumentsTemplate": "-n com.winnative.cmod/com.winlator.cmod.runtime.display.XServerDisplayActivity --activity-clear-task --activity-clear-top -e shortcut_path {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-fm7-mame4droid-current",
+   "systemId": "fm7",
+   "label": "MAME4droid Current [FM-7 Diskette] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -flop1 '{file.path}'\" -d fm7",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-fm7-mame4droid-current",
+   "systemId": "fm7",
+   "label": "MAME4droid Current [FM-7 Tape] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -autoboot_delay '5' -autoboot_command 'load\\n\\n\\nrun\\n' -cass1 '{file.path}'\" -d fm7",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-fm7-mame4droid-current",
+   "systemId": "fm7",
+   "label": "MAME4droid Current [FM-7 Software list] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' {file.basename}\" -d fm7",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-fm7-mame4droid-current",
+   "systemId": "fm7",
+   "label": "MAME4droid Current [FM77AV Diskette] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -flop1 '{file.path}'\" -d fm77av",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-fm7-mame4droid-current",
+   "systemId": "fm7",
+   "label": "MAME4droid Current [FM77AV Tape] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -autoboot_delay '5' -autoboot_command 'load\\n\\n\\nrun\\n' -cass1 '{file.path}'\" -d fm77av",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-fm7-mame4droid-current",
+   "systemId": "fm7",
+   "label": "MAME4droid Current [FM77AV Software list] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' {file.basename}\" -d fm77av",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-fmtowns-mame4droid-current",
+   "systemId": "fmtowns",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cdrom '{file.path}'\" -d fmtownshr",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-gamate-mame4droid-current",
+   "systemId": "gamate",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d gamate",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-gamecom-mame4droid-current",
+   "systemId": "gamecom",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cartridge1 '{file.path}'\" -d gamecom",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-gc-dolphin",
+   "systemId": "gc",
+   "label": "Dolphin (Standalone)",
+   "pkg": "org.dolphinemu.dolphinemu",
+   "argumentsTemplate": "-n org.dolphinemu.dolphinemu/org.dolphinemu.dolphinemu.ui.main.TvMainActivity -a android.intent.action.MAIN -c android.intent.category.LEANBACK_LAUNCHER -e AutoStartFile {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-gmaster-mame4droid-current",
+   "systemId": "gmaster",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d gmaster",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-gx4000-mame4droid-current",
+   "systemId": "gx4000",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d gx4000",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-intellivision-mame4droid-current",
+   "systemId": "intellivision",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d intv",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-laserdisc-mame4droid-current",
+   "systemId": "laserdisc",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}'\" -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-macintosh-mame4droid-current",
+   "systemId": "macintosh",
+   "label": "MAME4droid Current Mac SE Bootable (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -flop1 '{file.path}'\" -d macse",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-macintosh-mame4droid-current",
+   "systemId": "macintosh",
+   "label": "MAME4droid Current Mac SE Boot Disk (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -flop1 {file.dir}/boot.dsk -flop2 '{file.path}'\" -d macse",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-macintosh-mame4droid-current",
+   "systemId": "macintosh",
+   "label": "MAME4droid Current Mac Plus Bootable (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -flop1 '{file.path}'\" -d macplus",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-macintosh-mame4droid-current",
+   "systemId": "macintosh",
+   "label": "MAME4droid Current Mac Plus Boot Disk (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -flop1 {file.dir}/boot.dsk -flop2 '{file.path}'\" -d macplus",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-mame-mame4droid-current",
+   "systemId": "mame",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}'\" -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-megaduck-mame4droid-current",
+   "systemId": "megaduck",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d megaduck",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-model2-mame4droid-current",
+   "systemId": "model2",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}'\" -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-model3-mame4droid-current",
+   "systemId": "model3",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}'\" -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-neogeo-mame4droid-current",
+   "systemId": "neogeo",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}'\" -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-neogeocd-mame4droid-current",
+   "systemId": "neogeocd",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cdrm '{file.path}'\" -d neocdz",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-neogeocdjp-mame4droid-current",
+   "systemId": "neogeocdjp",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cdrm '{file.path}'\" -d neocdz",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-odyssey2-mame4droid-current",
+   "systemId": "odyssey2",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d odyssey2",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-oric-mame4droid-current",
+   "systemId": "oric",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -autoboot_delay '4' -autoboot_command 'cload\\\"\\\"\\n' -cass '{file.path}'\" -d oric1",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-pcarcade-winnative",
+   "systemId": "pcarcade",
+   "label": "WinNative (Standalone)",
+   "pkg": "com.winnative.cmod",
+   "argumentsTemplate": "-n com.winnative.cmod/com.winlator.cmod.runtime.display.XServerDisplayActivity --activity-clear-task --activity-clear-top -e shortcut_path {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-psp-ppsspp",
+   "systemId": "psp",
+   "label": "PPSSPP (Standalone)",
+   "pkg": "org.ppsspp.ppssppgold",
+   "argumentsTemplate": "-n org.ppsspp.ppssppgold/org.ppsspp.ppsspp.PpssppActivity -a android.intent.action.VIEW -c android.intent.category.DEFAULT -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-psx-duckstation",
+   "systemId": "psx",
+   "label": "DuckStation (Standalone)",
+   "pkg": "com.github.stenzek.duckstation",
+   "argumentsTemplate": "-n com.github.stenzek.duckstation/com.github.stenzek.duckstation.EmulationActivity --activity-clear-task --activity-clear-top --ez resumeState false -e bootPath {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-pv1000-mame4droid-current",
+   "systemId": "pv1000",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d pv1000",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-scv-mame4droid-current",
+   "systemId": "scv",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d scv",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-steam-winnative",
+   "systemId": "steam",
+   "label": "WinNative (Standalone)",
+   "pkg": "com.winnative.cmod",
+   "argumentsTemplate": "-n com.winnative.cmod/com.winlator.cmod.runtime.display.XServerDisplayActivity --activity-clear-task --activity-clear-top -e shortcut_path {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-stv-mame4droid-current",
+   "systemId": "stv",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}'\" -d {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-supervision-mame4droid-current",
+   "systemId": "supervision",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d svision",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-supracan-mame4droid-current",
+   "systemId": "supracan",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d supracan",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-tanodragon-mame4droid-current",
+   "systemId": "tanodragon",
+   "label": "MAME4droid Current [Tape] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -autoboot_delay '4' -autoboot_command 'cloadm\\\"\\\"\\n' -cass '{file.path}'\" -d tanodr64",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-tanodragon-mame4droid-current",
+   "systemId": "tanodragon",
+   "label": "MAME4droid Current [Cartridge] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d tanodr64",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-ti99-mame4droid-current",
+   "systemId": "ti99",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -ioport peb -ioport:peb:slot3 speechadapter -cart '{file.path}'\" -d ti99_4a",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-triforce-dolphin",
+   "systemId": "triforce",
+   "label": "Dolphin (Standalone)",
+   "pkg": "org.dolphinemu.dolphinemu",
+   "argumentsTemplate": "-n org.dolphinemu.dolphinemu/org.dolphinemu.dolphinemu.ui.main.TvMainActivity -a android.intent.action.MAIN -c android.intent.category.LEANBACK_LAUNCHER -e AutoStartFile {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-type-x-winnative",
+   "systemId": "type-x",
+   "label": "WinNative (Standalone)",
+   "pkg": "com.winnative.cmod",
+   "argumentsTemplate": "-n com.winnative.cmod/com.winlator.cmod.runtime.display.XServerDisplayActivity --activity-clear-task --activity-clear-top -e shortcut_path {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-vectrex-mame4droid-current",
+   "systemId": "vectrex",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d vectrex",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-videopac-mame4droid-current",
+   "systemId": "videopac",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d videopac",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-vsmile-mame4droid-current",
+   "systemId": "vsmile",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cart '{file.path}'\" -d vsmile",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-wii-dolphin",
+   "systemId": "wii",
+   "label": "Dolphin (Standalone)",
+   "pkg": "org.dolphinemu.dolphinemu",
+   "argumentsTemplate": "-n org.dolphinemu.dolphinemu/org.dolphinemu.dolphinemu.ui.main.TvMainActivity -a android.intent.action.MAIN -c android.intent.category.LEANBACK_LAUNCHER -e AutoStartFile {file.uri}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-windows-winnative",
+   "systemId": "windows",
+   "label": "WinNative (Standalone)",
+   "pkg": "com.winnative.cmod",
+   "argumentsTemplate": "-n com.winnative.cmod/com.winlator.cmod.runtime.display.XServerDisplayActivity --activity-clear-task --activity-clear-top -e shortcut_path {file.path}",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-x1-mame4droid-current",
+   "systemId": "x1",
+   "label": "MAME4droid Current [Diskette] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -flop1 '{file.path}'\" -d x1",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-x1-mame4droid-current",
+   "systemId": "x1",
+   "label": "MAME4droid Current [Tape] (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -cass1 '{file.path}'\" -d x1",
+   "killPackageProcesses": false
+  },
+  {
+   "id": "esde-x68000-mame4droid-current",
+   "systemId": "x68000",
+   "label": "MAME4droid Current (Standalone)",
+   "pkg": "com.seleuco.mame4d2024",
+   "argumentsTemplate": "-n com.seleuco.mame4d2024/com.seleuco.mame4droid.MAME4droid -a android.intent.action.VIEW -e cli_params \"-rompath '{file.dir};{system.folder}' -flop1 '{file.path}'\" -d x68000",
+   "killPackageProcesses": false
   }
  ]
 }
