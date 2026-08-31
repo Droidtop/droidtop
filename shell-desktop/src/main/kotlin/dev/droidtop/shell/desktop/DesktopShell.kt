@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -222,7 +223,80 @@ private fun BoxScope.Taskbar(startMenuOpen: Boolean, onToggleStartMenu: () -> Un
         Button(onClick = { openSettings(context) }, modifier = Modifier.padding(horizontal = 8.dp)) {
             Text("Settings")
         }
+        SystemTray()
         Text(clockText, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(horizontal = 16.dp))
+    }
+}
+
+/**
+ * The desktop's system tray, over the shared
+ * [dev.droidtop.runtime.systemstatus.SystemStatus] core -- data shared,
+ * chrome per surface, the same split the settings catalogs use (per
+ * direction: wifi status and system controls in every mode except
+ * Standard, which has Android's own status bar). Readout in the bar;
+ * the honest controls in a popover: volume directly, brightness behind
+ * the WRITE_SETTINGS grant, and the system's own internet panel for
+ * Wi-Fi -- programmatic toggling left app reach in API 29, and opening
+ * the real control beats faking one.
+ */
+@Composable
+private fun SystemTray() {
+    val context = LocalContext.current
+    val status by remember { dev.droidtop.runtime.systemstatus.SystemStatus.flow(context) }
+        .collectAsState(initial = dev.droidtop.runtime.systemstatus.SystemStatus.snapshot(context))
+    var open by remember { mutableStateOf(false) }
+    val controls = dev.droidtop.runtime.systemstatus.SystemControls
+
+    Box {
+        androidx.compose.material3.TextButton(onClick = { open = !open }) {
+            val network = when (status.network) {
+                dev.droidtop.runtime.systemstatus.NetworkKind.WIFI ->
+                    "\u25E4" + (status.wifiLevel?.let { " $it/4" } ?: "")
+                dev.droidtop.runtime.systemstatus.NetworkKind.ETHERNET -> "ETH"
+                dev.droidtop.runtime.systemstatus.NetworkKind.CELLULAR -> "LTE"
+                dev.droidtop.runtime.systemstatus.NetworkKind.NONE -> "\u2715"
+            }
+            val battery = status.batteryPercent?.let { "  $it%" + if (status.charging) "\u26A1" else "" } ?: ""
+            Text(network + battery, color = MaterialTheme.colorScheme.onSurface)
+        }
+        androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            var volume by remember { mutableStateOf(controls.volume(context).toFloat()) }
+            val volumeMax = remember { controls.volumeRange(context).last.toFloat() }
+            Text("Volume", modifier = Modifier.padding(horizontal = 16.dp))
+            androidx.compose.material3.Slider(
+                value = volume,
+                onValueChange = { volume = it; controls.setVolume(context, it.toInt()) },
+                valueRange = 0f..volumeMax,
+                modifier = Modifier.padding(horizontal = 16.dp).width(220.dp),
+            )
+            if (controls.canWriteBrightness(context)) {
+                var brightness by remember { mutableStateOf((controls.brightness(context) ?: 128).toFloat()) }
+                Text("Brightness", modifier = Modifier.padding(horizontal = 16.dp))
+                androidx.compose.material3.Slider(
+                    value = brightness,
+                    onValueChange = { brightness = it; controls.setBrightness(context, it.toInt()) },
+                    valueRange = 0f..255f,
+                    modifier = Modifier.padding(horizontal = 16.dp).width(220.dp),
+                )
+            } else {
+                androidx.compose.material3.DropdownMenuItem(
+                    text = { Text("Allow brightness control\u2026") },
+                    onClick = { open = false; context.startActivity(controls.brightnessGrantIntent(context)) },
+                )
+            }
+            androidx.compose.material3.DropdownMenuItem(
+                text = { Text("Network\u2026") },
+                onClick = { open = false; context.startActivity(controls.internetPanelIntent()) },
+            )
+            androidx.compose.material3.DropdownMenuItem(
+                text = { Text("Bluetooth\u2026") },
+                onClick = { open = false; context.startActivity(controls.bluetoothSettingsIntent()) },
+            )
+            androidx.compose.material3.DropdownMenuItem(
+                text = { Text("All Android settings\u2026") },
+                onClick = { open = false; context.startActivity(controls.allSettingsIntent()) },
+            )
+        }
     }
 }
 
