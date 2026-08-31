@@ -7,6 +7,7 @@ import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
+import dev.droidtop.library.integrations.IntegrationPlaceholders
 import dev.droidtop.library.romdetect.LibretroDatabase
 import dev.droidtop.library.romdetect.PlayStationDiscType
 import dev.droidtop.library.romdetect.SerialScanner
@@ -609,7 +610,31 @@ class ConsoleRomProvider(
         val player = resolvePlayer(context, system)
             ?: error(noEmulatorInstalledMessage(context, system))
         if (player.killPackageProcesses) killPackageProcessesBestEffort(player.packageName)
-        val intent = AmStartCommandToIntentConverter.toIntent(context, player.argumentsTemplate, romFile.absolutePath)
+        // Beyond {file.path}/{file.uri}: the MAME4droid presets generated
+        // from ES-DE's own es_systems.xml build a -rompath out of the
+        // game's directory and the system folder, and software-list
+        // launches pass the extensionless basename. Same placeholder
+        // vocabulary the integrations already use for the system ones.
+        //
+        // {system.folder} is the ROM's parent directory: for the flat
+        // <root>/<system>/<rom> layout droidtop scans, that IS the system
+        // folder, and for a ROM in a subfolder it degrades to the game's
+        // own directory -- which for a MAME -rompath is still a correct
+        // search entry, just a narrower one.
+        val parentPath = parentFolder?.absolutePath
+        val placeholders = buildMap {
+            put("{file.dir}", parentPath ?: "")
+            put("{file.basename}", romFile.nameWithoutExtension)
+            put(IntegrationPlaceholders.SYSTEM_ID, system.id)
+            put(IntegrationPlaceholders.SYSTEM_NAME, system.displayName)
+            parentPath?.let { put(IntegrationPlaceholders.SYSTEM_FOLDER, it) }
+        }
+        val intent = AmStartCommandToIntentConverter.toIntent(
+            context,
+            player.argumentsTemplate,
+            romFile.absolutePath,
+            placeholders,
+        )
         LaunchDisplay.start(context, intent)
     }
 

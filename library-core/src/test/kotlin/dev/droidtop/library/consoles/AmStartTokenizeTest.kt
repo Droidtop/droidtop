@@ -97,6 +97,58 @@ class AmStartTokenizeTest {
     }
 
     @Test
+    fun `a double-quoted span keeps its spaces as one token`() {
+        // The real shape of ES-DE's 78 MAME4droid commands, translated:
+        // a multi-word cli_params string extra. The generator used to
+        // SKIP every one of these because the tokenizer split them.
+        val tokens = AmStartCommandToIntentConverter.tokenize(
+            "-n com.seleuco.mame4d2024/.MAME4droid -a android.intent.action.VIEW " +
+                "--es cli_params \"-rompath '{file.dir};{system.folder}' -cass1 '{file.path}'\"",
+            "/storage/7EF7-E477/Roms/adam/Buck Rogers.ddp",
+            null,
+            mapOf(
+                "{file.dir}" to "/storage/7EF7-E477/Roms/adam",
+                "{system.folder}" to "/storage/7EF7-E477/Roms/adam",
+            ),
+        )
+        assertEquals(
+            "-rompath '/storage/7EF7-E477/Roms/adam;/storage/7EF7-E477/Roms/adam' " +
+                "-cass1 '/storage/7EF7-E477/Roms/adam/Buck Rogers.ddp'",
+            tokens[tokens.indexOf("cli_params") + 1],
+        )
+    }
+
+    @Test
+    fun `an escaped quote inside a span is a literal quote`() {
+        // Verbatim from the dragon32 tape preset: MAME's autoboot
+        // command contains \" pairs the emulator itself must receive.
+        val tokens = AmStartCommandToIntentConverter.tokenize(
+            """--es cli_params "-autoboot_command 'cloadm\"\"' -cass '{file.path}'"""",
+            "/roms/dragon32/Game.cas",
+            null,
+        )
+        assertEquals(
+            """-autoboot_command 'cloadm""' -cass '/roms/dragon32/Game.cas'""",
+            tokens[1],
+        )
+    }
+
+    @Test
+    fun `an empty quoted value is an empty token, not a missing one`() {
+        val tokens = AmStartCommandToIntentConverter.tokenize("--es key \"\"", null, null)
+        assertEquals(listOf("--es", "key", ""), tokens)
+    }
+
+    @Test
+    fun `an unterminated quote is an error, not a silent guess`() {
+        try {
+            AmStartCommandToIntentConverter.tokenize("--es key \"unclosed", null, null)
+            org.junit.Assert.fail("expected IllegalArgumentException")
+        } catch (expected: IllegalArgumentException) {
+        }
+    }
+
+    @Test
     fun `a template with no placeholders is untouched`() {
         val tokens = AmStartCommandToIntentConverter.tokenize(
             "-n com.example/.Main --activity-clear-task",
