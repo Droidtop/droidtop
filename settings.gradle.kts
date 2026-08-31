@@ -34,6 +34,16 @@ dependencyResolutionManagement {
     versionCatalogs {
         create("gn") {
             from(files("vendor/gamenative/gradle/libs.versions.toml"))
+            // One deliberate divergence from the fork's toml: the fork
+            // pins Dagger 2.55, whose bundled (SHADED, under dagger.spi.
+            // internal.shaded) kotlin-metadata reader tops out at Kotlin
+            // 2.1 metadata and dies on droidtop's 2.2.21-compiled
+            // classes at :app:hiltJavaCompileDebug. No resolutionStrategy
+            // force can reach a shaded copy; the only real fix is a
+            // Dagger whose reader knows 2.2, and 2.57 is the first such
+            // release. Overridden here at the settings level so the
+            // vendored toml itself stays tracked, not hand-edited.
+            version("dagger-hilt", "2.57.2")
         }
     }
 }
