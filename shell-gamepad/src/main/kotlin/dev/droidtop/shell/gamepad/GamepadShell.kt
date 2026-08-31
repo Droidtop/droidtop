@@ -68,6 +68,7 @@ import dev.droidtop.library.theme.primaryListElement
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.theme.EsDeListItem
+import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import dev.droidtop.shell.gamepad.theme.EsDeSystemListView
 import dev.droidtop.shell.gamepad.theme.EsDeThemedView
 import dev.droidtop.shell.gamepad.theme.ThemePrefs
@@ -239,6 +240,11 @@ fun GamepadShell(
     }
 
     val onLaunch: (LibraryEntry) -> Unit = { entry ->
+        // Real ES-DE launch sound -- played unconditionally on any game
+        // launch (ViewController.cpp:1064-1066 plays LAUNCHSOUND whether
+        // or not a launch transition is configured), so it lives here in
+        // the ONE launch handler rather than per key-handling site.
+        EsDeNavigationSounds.play("launch")
         scope.launch {
             launchError = null
             runCatching { library.launch(entry) }
@@ -294,6 +300,10 @@ fun GamepadShell(
     val onToggleFavorite: (LibraryEntry) -> Unit = { entry ->
         scope.launch {
             val newFavorite = library.toggleFavorite(entry) ?: return@launch
+            // Real ES-DE favorite sound -- played on an actual toggle
+            // (GamelistBase.cpp:273-286), which is why it's after the
+            // null-check: a kind with no favorite concept makes no sound.
+            EsDeNavigationSounds.play("favorite")
             gameEntries = gameEntries?.map { if (it.id == entry.id) it.copy(favorite = newFavorite) else it }
         }
     }
@@ -1096,6 +1106,14 @@ private fun GamesSection(
             null
         }
     }
+    // Real navigation-sound (re)binding -- <sound> elements are parsed
+    // like any other themed element (declared under the special `all`
+    // view, expanded into system+gamelist by the parser), so whichever
+    // theme parse this screen just loaded carries the current sound set.
+    // Keyed on the theme object itself: reparses for a different focused
+    // system rebind to identical paths (cache hits, see
+    // EsDeNavigationSounds.load's own doc comment).
+    LaunchedEffect(gamelistTheme) { EsDeNavigationSounds.load(gamelistTheme) }
     val gamelistView = gamelistTheme?.views?.get("gamelist")
     val gamelistHasListWidget = remember(gamelistView) { gamelistView?.primaryListElement() != null }
     // Alphabetical -- real ES-DE's own default gamelist sort order, and a
@@ -1225,6 +1243,11 @@ private fun GamesSection(
     // deeper than GamepadShell's own root swallow, so it wins while a
     // group is open.
     androidx.activity.compose.BackHandler(enabled = selectedGroup != null) {
+        // Real ES-DE back sound (GamelistBase.cpp:144/156 -- leaving a
+        // gamelist for the system view plays BACKSOUND) -- this dispatcher
+        // route and the onKeyEvent branch below are the same real drill-up,
+        // just different hardware paths (see this handler's own comment).
+        EsDeNavigationSounds.play("back")
         selectedGroup = null
     }
     Box(
@@ -1236,6 +1259,8 @@ private fun GamesSection(
                 val action = GamepadKeyMap.actionFor(event.key)
                 when {
                     (action == GamepadAction.BACK || action == GamepadAction.B) && group != null -> {
+                        // Same real BACKSOUND as the BackHandler route above.
+                        EsDeNavigationSounds.play("back")
                         selectedGroup = null
                         true
                     }
@@ -1244,11 +1269,17 @@ private fun GamesSection(
                     // adjacent system's gamelist rather than requiring a
                     // Back-then-reselect round trip through the system list.
                     action == GamepadAction.LEFT && group != null && orderedGroups.size > 1 -> {
+                        // Real ES-DE quicksysselect sound -- this jump IS
+                        // real ES-DE's quick system select (ViewController.
+                        // cpp:718/728, the only two QUICKSYSSELECTSOUND
+                        // call sites, both in its Left/Right system jump).
+                        EsDeNavigationSounds.play("quicksysselect")
                         val index = orderedGroups.indexOf(group)
                         selectedGroup = orderedGroups[(index - 1 + orderedGroups.size) % orderedGroups.size]
                         true
                     }
                     action == GamepadAction.RIGHT && group != null && orderedGroups.size > 1 -> {
+                        EsDeNavigationSounds.play("quicksysselect")
                         val index = orderedGroups.indexOf(group)
                         selectedGroup = orderedGroups[(index + 1) % orderedGroups.size]
                         true
@@ -1263,10 +1294,16 @@ private fun GamesSection(
                     // Left/Right regardless, so there's no conflict either
                     // way.
                     action == GamepadAction.UP && group != null && hasThemedGamelist && !gamelistHasListWidget && systemGamesForGroup.isNotEmpty() -> {
+                        // Real ES-DE scroll sound -- per-game movement
+                        // inside a gamelist plays SCROLLSOUND (GamelistBase.
+                        // cpp:133/174/182 and every primary component when
+                        // hosted in a gamelist, CarouselComponent.h:105-108).
+                        EsDeNavigationSounds.play("scroll")
                         focusedGameIndex = (focusedGameIndex - 1 + systemGamesForGroup.size) % systemGamesForGroup.size
                         true
                     }
                     action == GamepadAction.DOWN && group != null && hasThemedGamelist && !gamelistHasListWidget && systemGamesForGroup.isNotEmpty() -> {
+                        EsDeNavigationSounds.play("scroll")
                         focusedGameIndex = (focusedGameIndex + 1) % systemGamesForGroup.size
                         true
                     }
@@ -1338,6 +1375,12 @@ private fun GamesSection(
                     val theme = remember(focusedSystemId, focusedThemeFolder, ThemePrefs.version) {
                         ThemeAssets.loadActiveTheme(context, focusedSystemId, focusedThemeFolder, systemFullName = focusedGroupLabel)
                     }
+                    // Same real navigation-sound rebinding as the gamelist
+                    // screen's own hook (see that LaunchedEffect's comment)
+                    // -- this is the site that runs FIRST after app start /
+                    // a live theme switch, so sounds bind before any
+                    // gamelist is ever entered.
+                    LaunchedEffect(theme) { EsDeNavigationSounds.load(theme) }
                     val listElement = remember(theme) { theme?.views?.get("system")?.primaryListElement() }
                     // remember(): building this list runs systemLogoPath/
                     // SystemThemeColors per group -- cache-hit lookups, but
@@ -1355,7 +1398,13 @@ private fun GamesSection(
                                 accentColor = entryGroup.systemThemeFolder
                                     ?.let { SystemThemeColors.forSystem(context, it) }
                                     ?.let { Color(it) },
-                                onSelect = { selectedGroup = entryGroup },
+                                // Real ES-DE select sound -- entering a
+                                // system from the system view plays
+                                // SELECTSOUND (SystemView.cpp:129).
+                                onSelect = {
+                                    EsDeNavigationSounds.play("select")
+                                    selectedGroup = entryGroup
+                                },
                             )
                         }
                     }
@@ -1438,7 +1487,18 @@ private fun GamesSection(
                             items = items,
                             firstItemFocus = firstFocus,
                             modifier = Modifier.fillMaxSize(),
-                            onFocusedIndexChanged = { focusedSystemIndex = it },
+                            // Real ES-DE systembrowse sound: moving the
+                            // system carousel plays SYSTEMBROWSESOUND
+                            // (CarouselComponent.h:108-110 -- the primary
+                            // component's own scroll plays systembrowse
+                            // when NOT hosted in a gamelist, scroll when it
+                            // is). Guarded on a real index CHANGE: this
+                            // callback also fires for the initial focus
+                            // attach, which is not a browse.
+                            onFocusedIndexChanged = {
+                                if (it != focusedSystemIndex) EsDeNavigationSounds.play("systembrowse")
+                                focusedSystemIndex = it
+                            },
                             focusedSystemEntries = focusedSystemEntries,
                             hints = systemListHints,
                             systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
@@ -1514,7 +1574,14 @@ private fun GamesSection(
                 items = gamelistWidgetItems,
                 firstItemFocus = if (gamelistHasListWidget) firstFocus else null,
                 modifier = Modifier.fillMaxSize(),
-                onFocusedIndexChanged = { focusedGameIndex = it },
+                // Same real SCROLLSOUND as the headless Up/Down branch
+                // above (a widget hosted in a gamelist scrolls with the
+                // scroll sound, CarouselComponent.h:105-108) -- guarded on
+                // a real index change, same reason as the system carousel.
+                onFocusedIndexChanged = {
+                    if (it != focusedGameIndex) EsDeNavigationSounds.play("scroll")
+                    focusedGameIndex = it
+                },
                 focusedSystemEntries = systemGamesForGroup,
                 focusedGameIndex = focusedGameIndex,
                 hints = listOf(

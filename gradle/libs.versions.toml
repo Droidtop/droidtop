@@ -38,6 +38,11 @@ navigation = "2.9.1"
 
 room = "2.7.2"
 coil = "3.3.0"
+# APNG4Android (GIF/APNG frame-animation drawables) -- the same library
+# family, at the same version, the vendored gamenative catalog already
+# pins as `gn.apng`; a droidtop-own alias because shell-gamepad follows
+# this catalog, not the vendored `gn` one.
+apng = "3.0.2"
 kotlinx-serialization = "1.9.0"
 kotlinx-datetime = "0.7.1"
 preference = "1.2.1"
@@ -141,6 +146,8 @@ coil = { module = "io.coil-kt.coil3:coil-compose-core", version.ref = "coil" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-android = { module = "io.coil-kt.coil3:coil-android", version.ref = "coil" }
 coil-svg = { module = "io.coil-kt.coil3:coil-svg", version.ref = "coil" }
+apng = { module = "com.github.penfeizhou.android.animation:apng", version.ref = "apng" }
+apng-gif = { module = "com.github.penfeizhou.android.animation:gif", version.ref = "apng" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 lottie = { module = "com.airbnb.android:lottie", version.ref = "lottie" }
