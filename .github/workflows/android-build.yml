@@ -258,3 +258,26 @@ jobs:
           gh release create latest droidtop-debug-latest.apk \
             --title "DroidTop — latest debug build" \
             --notes "Automatically built from commit ${{ github.sha }}. Debug build (signed with a persistent DroidTop dev key — see .signing/ / SIGNING_KEYSTORE_BASE64, so it installs over a previous \"latest\" without uninstalling first; arm64-v8a + x86_64 fat APK) — not for production use, and functionality is still early: see docs/SPEC.md for current status."
+
+      # Deliberately last. Until now the job's only Gradle invocation was
+      # :app:assembleDebug, so no test in this repo had ever actually run
+      # -- which is how a converter bug that broke every ROM whose
+      # filename contains a space survived in a covered code path.
+      #
+      # Running these after the APK is uploaded and the release is
+      # published means a failing test still turns the run red, but never
+      # costs anyone the installable build: this project's real workflow
+      # is installing the CI artifact on a device each morning, and
+      # blocking that on a unit test would trade something real for a
+      # convention. The signal is what matters here, not the gate.
+      - name: Run unit tests
+        if: always()
+        run: ./gradlew :library-core:testDebugUnitTest --stacktrace
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: library-core/build/reports/tests/
+          if-no-files-found: ignore
