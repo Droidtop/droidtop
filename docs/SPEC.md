@@ -1502,7 +1502,7 @@ summary):
   37-entry controller list unchanged, for the controller-badge/metadata
   picker.
 - A real `droidtop-theme-patches` companion repo
-  (`github.com/bi0shacker001/droidtop-theme-patches`) — a deliberately
+  (`github.com/droidtop/droidtop-theme-patches`) — a deliberately
   empty scaffold (real system-id list + real ES-DE metadata field
   template, no filled content — no AI-generated placeholder data) for
   community-contributed per-system metadata covering droidtop's own
