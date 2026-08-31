@@ -45,7 +45,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
@@ -208,6 +207,12 @@ fun GamepadShell(
     // Swallows the key-UP of the hold that opened the menu, so the
     // shell's ordinary short-press Select action doesn't ALSO fire.
     var swallowSelectUp by remember { mutableStateOf(false) }
+    // Counts SELECT KeyDowns between KeyUps: the system's own key-repeat
+    // redelivers KeyDown while held, so a second KeyDown IS the ~500ms
+    // hold threshold -- portable across Compose flavors, no
+    // nativeKeyEvent access (which the JetBrains artifacts droidtop
+    // builds against do not expose; a real CI failure, not a guess).
+    var selectDownCount by remember { mutableStateOf(0) }
     var displayChoice by remember {
         mutableStateOf<Pair<List<dev.droidtop.library.LaunchDisplayOption>, (Int?) -> Unit>?>(null)
     }
@@ -336,16 +341,24 @@ fun GamepadShell(
                 // timing-free long-press, and short-press Select keeps
                 // its existing meaning because only the repeat opens it.
                 if (GamepadKeyMap.actionFor(event.key) == GamepadAction.SELECT) {
-                    if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount >= 1) {
-                        if (!quickMenuOpen) {
-                            quickMenuOpen = true
-                            swallowSelectUp = true
+                    if (event.type == KeyEventType.KeyDown) {
+                        selectDownCount += 1
+                        if (selectDownCount >= 2) {
+                            // Second KeyDown = the system's key-repeat
+                            // fired = a real hold.
+                            if (!quickMenuOpen) {
+                                quickMenuOpen = true
+                                swallowSelectUp = true
+                            }
+                            return@onKeyEvent true
                         }
-                        return@onKeyEvent true
                     }
-                    if (event.type == KeyEventType.KeyUp && swallowSelectUp) {
-                        swallowSelectUp = false
-                        return@onKeyEvent true
+                    if (event.type == KeyEventType.KeyUp) {
+                        selectDownCount = 0
+                        if (swallowSelectUp) {
+                            swallowSelectUp = false
+                            return@onKeyEvent true
+                        }
                     }
                 }
                 if (event.type != KeyEventType.KeyUp || detailEntry != null) return@onKeyEvent false
