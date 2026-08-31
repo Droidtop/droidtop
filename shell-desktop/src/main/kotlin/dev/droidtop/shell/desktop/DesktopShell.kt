@@ -284,6 +284,21 @@ private fun SystemTray() {
                     onClick = { open = false; context.startActivity(controls.brightnessGrantIntent(context)) },
                 )
             }
+            run {
+                var dnd by remember { mutableStateOf(controls.dndEnabled(context)) }
+                androidx.compose.material3.DropdownMenuItem(
+                    text = { Text(if (dnd) "Do Not Disturb: on" else "Do Not Disturb: off") },
+                    onClick = {
+                        if (controls.hasDndAccess(context)) {
+                            dnd = !dnd
+                            controls.setDnd(context, dnd)
+                        } else {
+                            open = false
+                            context.startActivity(controls.dndGrantIntent())
+                        }
+                    },
+                )
+            }
             androidx.compose.material3.DropdownMenuItem(
                 text = { Text("Network\u2026") },
                 onClick = { open = false; context.startActivity(controls.internetPanelIntent()) },

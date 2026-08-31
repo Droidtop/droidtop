@@ -592,6 +592,31 @@ not settled designs):
   windowing per §2a's native-apps plan). Widget layout persists
   per-display-role. droidtop's info stays the BACKGROUND layer; user
   content composites above it.
+- **Handheld Quick Menu (directed 2026-08-31, iiSU-inspired)**: a
+  trigger-opened overlay with a Notifications tab and a System tab.
+  Paradigm survey behind the design (knowledge-based; no iiSU decompile
+  artifacts exist in the container): the Steam Deck QAM (dedicated
+  button → right-edge sheet, vertical tabs: notifications / quick
+  settings / performance) is the strongest prior art for
+  glanceable-while-playing; iiSU's trigger menu is the same family on
+  Android handhelds; PS5's control center (bottom pill bar) and the
+  Switch HOME-hold sheet are the alternatives considered and passed
+  over (bottom bars fight the theme's own helpsystem row; the Switch
+  sheet is single-purpose). Chosen: right-edge sheet, HOLD SELECT to
+  open (the system key-repeat threshold, ~500ms, detected via
+  repeatCount — no timers; short-press Select keeps its meaning; chords
+  rejected as undiscoverable; remappable later via the GamepadAction
+  layer). **Entirely controller-driven, per direction**: L1/R1 tabs,
+  D-pad focus, A open, X dismiss, Y clear-all, B close, with the hint
+  row stating exactly that. The System tab renders the settings
+  catalog's own System group through the same CatalogNavigator the
+  Settings section uses — a view, never a copy. Notifications need the
+  notification-access grant (NotificationListenerService in `:app`
+  feeding `runtime-common`'s NotificationsStore); until granted the tab
+  offers the grant, never a silently empty list. Honest limitation:
+  the menu overlays the SHELL only — games are separate activities, and
+  a Deck-style in-game overlay is future work tied to this section's
+  overlay plans, not claimed here.
 - **Display reinit + parked displays (directed 2026-08-30)**: Android
   silently MIRRORS a second display nothing presents on (confirmed live
   on the addon) — droidtop's answer is that some droidtop surface owns
@@ -836,6 +861,22 @@ app-drawer icon or a floating switcher button:
   preferences, and everything else configurable lives, matching KDE's
   "one coherent shell, modular settings" model rather than a
   bolted-on companion app.
+  **Own every control the platform allows; direct-link the rest
+  (directed 2026-08-31)**: droidtop consumes as much of the user's UI
+  needs as possible — the Android Settings app is something droidtop
+  LINKS INTO for the screens the platform refuses to let an app own,
+  never something the user has to go spelunking in. Concretely, the
+  ownable set on modern Android (all real, all implemented in
+  `runtime-common`'s `SystemControls`): volume (AudioManager);
+  brightness, adaptive brightness, screen timeout, auto-rotate (all one
+  WRITE_SETTINGS special grant); Do Not Disturb (its own
+  notification-policy grant). The non-ownable set gets curated direct
+  links filtered by `resolveActivity` so an OEM build missing a screen
+  never shows a dead row; Wi-Fi toggling specifically left app reach in
+  API 29, so surfaces open the system's own internet panel (the sheet
+  the quick-settings tile uses) rather than faking a toggle. Every
+  special grant is surfaced as an explicit "take me to the grant"
+  action until given — never a silent failure.
   **Settings architecture — shared catalogs, per-surface chrome**: the
   settings DATA and LAYOUT live in renderer-agnostic catalogs
   (`dev.droidtop.library.settings` in `:runtime-common` —

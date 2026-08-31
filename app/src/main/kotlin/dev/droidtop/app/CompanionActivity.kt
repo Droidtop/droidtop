@@ -301,6 +301,16 @@ private fun SystemControlsRow() {
             }
         }
         androidx.compose.foundation.layout.Row {
+            run {
+                var dnd by androidx.compose.runtime.remember { mutableStateOf(controls.dndEnabled(context)) }
+                TextButton(onClick = {
+                    if (controls.hasDndAccess(context)) {
+                        dnd = !dnd; controls.setDnd(context, dnd)
+                    } else {
+                        context.startActivity(controls.dndGrantIntent())
+                    }
+                }) { Text(if (dnd) "DND on" else "DND off") }
+            }
             TextButton(onClick = { context.startActivity(controls.internetPanelIntent()) }) { Text("Network") }
             TextButton(onClick = { context.startActivity(controls.bluetoothSettingsIntent()) }) { Text("Bluetooth") }
             if (!canBrightness) {
