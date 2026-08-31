@@ -38,6 +38,7 @@ object PlatformsDatabase {
             val loaded = updated
                 ?: parse(context.assets.open(DB_FILE_NAME).bufferedReader().use { it.readText() })
             cached = loaded
+            loadVersion.value += 1
             return loaded
         }
     }
@@ -45,11 +46,25 @@ object PlatformsDatabase {
     /** Cache-only, no-context variant for synchronous label lookups; empty until [builtIns] has run once this process. */
     fun builtInsOrEmpty(): List<ConsoleSystemDef> = cached ?: emptyList()
 
+    /**
+     * Bumped whenever the cache is (re)loaded or invalidated, so
+     * composition-time consumers of [builtInsOrEmpty] can re-run when
+     * the data actually arrives. Real, observed bug this fixes: the
+     * warm-up runs on a background thread (SettingsCatalogInitProvider),
+     * the Handheld shell's first composition sorted its system carousel
+     * against the still-empty cache, every label fell back to the raw
+     * system id, and the order froze that way -- "switch" sorted to the
+     * very end of the carousel where "Nintendo Switch" belongs among
+     * the Nintendos.
+     */
+    val loadVersion = kotlinx.coroutines.flow.MutableStateFlow(0)
+
     fun displayNameOrNull(systemId: String): String? =
         builtInsOrEmpty().firstOrNull { it.id == systemId }?.displayName
 
     fun invalidate() {
         cached = null
+        loadVersion.value += 1
     }
 
     private fun parse(text: String): List<ConsoleSystemDef> {
