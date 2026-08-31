@@ -10,6 +10,7 @@ import dev.droidtop.library.consoles.ConsoleSystemsDatabase
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.consoles.CustomPlayerPrefs
 import dev.droidtop.library.consoles.PlayerOverridePrefs
+import dev.droidtop.library.consoles.PlatformDatabaseSource
 import dev.droidtop.library.consoles.PlayersDatabaseUpdater
 import dev.droidtop.library.consoles.SystemOverridePrefs
 import dev.droidtop.library.consoles.BiosDatabase
@@ -135,6 +136,21 @@ object AppSettingsCatalogs {
                             val bios = BiosDatabase.update(ctx)
                             "Updated: $players players, $platforms platforms, $engines engines, $bios BIOS systems"
                         },
+                    ),
+                    // One source for all four databases (see
+                    // PlatformDatabaseSource). Editable because these URLs
+                    // ship compiled into the app and raw.githubusercontent
+                    // does not reliably redirect after a repository move --
+                    // without this, relocating the repo would silently
+                    // break updates on every already-installed build.
+                    TextInputItem(
+                        id = "console_systems_db_source",
+                        title = "Platform database source",
+                        subtitle = "Base URL the four databases are fetched from; blank restores the default",
+                        value = PlatformDatabaseSource.baseUrl(context)
+                            .takeIf { it != PlatformDatabaseSource.DEFAULT_BASE_URL }
+                            .orEmpty(),
+                        onChange = { ctx, value -> PlatformDatabaseSource.setBaseUrl(ctx, value) },
                     ),
                 ),
             ),

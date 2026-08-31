@@ -31,8 +31,6 @@ data class BiosFileStatus(val spec: BiosFileSpec, val present: Boolean, val md5O
 
 object BiosDatabase {
     private const val DB_FILE_NAME = "bios-database.json"
-    const val DEFAULT_URL =
-        "https://raw.githubusercontent.com/bi0shacker001/droidtop-platforms/main/bios-database.json"
 
     @Volatile
     private var cached: Map<String, SystemBiosSpec>? = null
@@ -111,7 +109,7 @@ object BiosDatabase {
      * validate-before-replace atomic-write contract
      * [PlayersDatabaseUpdater] established. Returns the system count.
      */
-    fun update(context: Context, url: String = DEFAULT_URL): Int {
+    fun update(context: Context, url: String = PlatformDatabaseSource.urlFor(context, DB_FILE_NAME)): Int {
         val connection = URL(url).openConnection() as HttpURLConnection
         connection.connectTimeout = 15_000
         connection.readTimeout = 30_000
