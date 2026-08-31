@@ -59,6 +59,52 @@ fun resolvePlayer(context: Context, system: ConsoleSystemDef): Player.AmStart? {
 }
 
 /**
+ * Real emulator names from the players database's own labels, in order,
+ * deduplicated.
+ *
+ * The labels are not uniform, which is why this needs to exist: some are
+ * real product names ("Drastic"), some carry a redundant system prefix
+ * ("gba - Linkboy"), and some are just the package id
+ * ("com.fastemulator.gba") where nobody ever filled a name in. Only a
+ * real name helps someone decide what to install, so the prefix is
+ * dropped and anything still shaped like a package id is discarded
+ * rather than shown -- telling a user to go install
+ * "com.fastemulator.gba" is barely better than telling them nothing.
+ *
+ * Separate from [noEmulatorInstalledMessage] purely so it can be tested:
+ * library-core's test source set is plain JUnit, so a function taking a
+ * Context could not be covered there.
+ */
+internal fun usableEmulatorNames(labels: List<String>): List<String> = labels
+    .map { it.substringAfter(" - ", it).trim() }
+    .filterNot { it.isEmpty() || '.' in it }
+    .distinct()
+
+/**
+ * What the user is told when [resolvePlayer] comes back empty.
+ *
+ * Real finding from the all-systems launch sweep: five systems (N64,
+ * NDS, GBA, GBC, Switch) failed to launch, and all five failed here --
+ * correctly, since nothing for them was installed. But the old wording,
+ * "No installed Player available for system n64", spent its one chance
+ * on internal vocabulary: "Player" is droidtop's own type name, and
+ * "n64" is a folder id, not what the system is called. Worse, it was a
+ * dead end -- droidtop knows every emulator it supports for the system
+ * and had just filtered that list down to the installed ones, so it
+ * could name them and simply didn't.
+ */
+internal fun noEmulatorInstalledMessage(context: Context, system: ConsoleSystemDef): String {
+    val suggestions = usableEmulatorNames(KnownPlayers.forSystem(context, system.id).map { it.label })
+    val base = "No emulator for ${system.displayName} is installed"
+    return if (suggestions.isEmpty()) {
+        base
+    } else {
+        "$base. droidtop can use ${suggestions.take(3).joinToString(", ")}" +
+            (if (suggestions.size > 3) ", among others." else ".")
+    }
+}
+
+/**
  * Folder-name mismatches between a real ROMs collection and ES-DE's own
  * canonical system ids. Generated (not hand-guessed) by cross-referencing
  * every real platform `shortname` in Daijishō's own public platform
@@ -522,7 +568,7 @@ class ConsoleRomProvider(
             ?: SystemOverridePrefs.resolveForFolder(context, parentFolder?.absolutePath ?: "", parentFolder?.name ?: "", systemsById)
             ?: error("Couldn't resolve a console system for ${entry.id}")
         val player = resolvePlayer(context, system)
-            ?: error("No installed Player available for system ${system.id}")
+            ?: error(noEmulatorInstalledMessage(context, system))
         if (player.killPackageProcesses) killPackageProcessesBestEffort(player.packageName)
         val intent = AmStartCommandToIntentConverter.toIntent(context, player.argumentsTemplate, romFile.absolutePath)
         LaunchDisplay.start(context, intent)
