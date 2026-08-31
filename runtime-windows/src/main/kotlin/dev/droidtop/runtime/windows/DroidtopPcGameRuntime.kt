@@ -1,7 +1,7 @@
 package dev.droidtop.runtime.windows
 
 import android.content.Context
-import app.gamenative.utils.downloader.ensureImageFsArchiveBlocking
+import app.gamenative.service.SteamService
 import com.winlator.container.Container
 import com.winlator.container.ContainerManager
 import com.winlator.xenvironment.ImageFs
@@ -96,14 +96,25 @@ class DroidtopPcGameRuntime(
                 "imagefs_bionic.txz"
             }
             onStatus("Downloading the Windows base system\u2026")
-            val archive = ensureImageFsArchiveBlocking(context, archiveName) { fraction ->
-                onStatus("Downloading the Windows base system\u2026 ${(fraction * 100).toInt()}%")
-            }
-            if (archive == null) {
-                return@withContext PcProvisionResult(
-                    false,
-                    "couldn't download the Windows base system -- check the network and retry",
-                )
+            // gamenative's own downloader, now that the whole tree is
+            // compiled in -- the same primary-plus-R2-mirror pair its
+            // pre-launch phase uses, writing to the same place
+            // ImageFsInstaller looks (ImageFs.getFilesDir() is the
+            // imagefs root's parent, i.e. the app files dir).
+            val dest = File(context.filesDir, archiveName)
+            if (!(dest.isFile && dest.length() > 0)) {
+                val downloaded = runCatching {
+                    SteamService.fetchFileWithFallback(archiveName, dest, context) { fraction ->
+                        onStatus("Downloading the Windows base system\u2026 ${(fraction * 100).toInt()}%")
+                    }
+                }
+                if (downloaded.isFailure) {
+                    return@withContext PcProvisionResult(
+                        false,
+                        downloaded.exceptionOrNull()?.message
+                            ?: "couldn't download the Windows base system -- check the network and retry",
+                    )
+                }
             }
         }
 

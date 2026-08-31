@@ -15,11 +15,27 @@ dependencyResolutionManagement {
         // see shell-default/README.md): chickenhook-restrictionbypass and
         // a couple of its other deps are only published there.
         maven { url = uri("https://jitpack.io") }
+        // Needed by :runtime-windows once it compiles the whole
+        // app.gamenative tree: gamenative pins a JavaSteam SNAPSHOT
+        // (io.github.joshuatam:javasteam), published only here — the
+        // same repository gamenative's own settings.gradle declares.
+        maven { url = uri("https://central.sonatype.com/repository/maven-snapshots/") }
     }
     // gradle/libs.versions.toml is picked up by convention — do not also
     // declare it via versionCatalogs { create("libs") { from(...) } },
     // that double-registers it and fails with "you can only call 'from' a
     // single time" (caught building against a real Gradle 8.9 install).
+    //
+    // gamenative's own catalog, registered as a SECOND catalog ("gn")
+    // rather than copied: :runtime-windows compiles the whole vendored
+    // app.gamenative tree, and its dependency versions should track the
+    // fork through the ordinary vendor sync, not a hand-maintained
+    // duplicate list that drifts.
+    versionCatalogs {
+        create("gn") {
+            from(files("vendor/gamenative/gradle/libs.versions.toml"))
+        }
+    }
 }
 
 rootProject.name = "droidtop"

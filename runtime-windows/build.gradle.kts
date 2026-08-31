@@ -1,99 +1,88 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
-    // Real, needed by the forked app.gamenative.powercontrol.* tree's own
-    // @Serializable data classes (PowerBaseline, PowerBaselineEntry, ...)
-    // -- the runtime library alone (kotlinx-serialization-json, already
-    // depended on below) isn't enough; @Serializable codegen needs this
-    // compiler plugin too, confirmed via a real CI failure this session
-    // ("Unresolved reference 'serializer'") once traced back to its root
-    // cause rather than guessed.
+    alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.google.ksp)
+    // Hilt and Room's own Gradle plugins come from gamenative's catalog
+    // (registered as "gn" in settings.gradle) so their versions track the
+    // fork, matching how the source itself is consumed.
+    alias(gn.plugins.dagger.hilt)
+    alias(gn.plugins.room)
+}
+
+// Room validates its schemas against gamenative's own real, versioned
+// schema history — the databases ARE gamenative's, so their migration
+// history is too.
+room {
+    schemaDirectory("$projectDir/../vendor/gamenative/app/schemas")
 }
 
 android {
-    // Real, deliberate choice, not droidtop's usual dev.droidtop.* --
-    // this module compiles vendor/gamenative's real com.winlator.* tree
-    // directly (a plain Gradle sourceSets reference, see below -- no
-    // copy, no symlink, no staging step of any kind) plus a curated
-    // subset of app.gamenative.* it touches (see below for which files
-    // and why). Real com.winlator source references `app.gamenative.R`
-    // directly, so this module's own namespace has to BE app.gamenative
-    // for AGP's generated R class to resolve those references without
-    // editing the forked files -- "our stuff should be UI only, or
-    // extensions" (direction this session) means the fork itself stays
-    // byte-for-byte, not renamed to fit droidtop's own package
-    // convention.
+    // Real, deliberate choice, not droidtop's usual dev.droidtop.*: this
+    // module compiles the ENTIRE vendored gamenative tree directly (see
+    // sourceSets below), and that tree references `app.gamenative.R` and
+    // its own generated BuildConfig throughout, so the namespace has to
+    // BE app.gamenative for both to resolve without editing forked files.
     namespace = "app.gamenative"
     compileSdk = 36
 
     defaultConfig {
         minSdk = 26
+
+        // The whole vendored tree compiles here, so all of gamenative's
+        // BuildConfig surface has to exist. Values mirror its "modern"
+        // product flavor: droidtop targets SDK 34, and Android blocks
+        // exec() of extracted binaries above targetSdk 28 — the legacy
+        // flavor's whole reason to exist — so MODERN_ANDROID=true and the
+        // W^X preload aren't a preference, they're the only values that
+        // can work. (This corrects the old hand-written shim, which chose
+        // false as "the conservative default" without noticing the
+        // targetSdk constraint that rules it out.)
+        buildConfigField("boolean", "MODERN_ANDROID", "true")
+        buildConfigField("String", "PRELOAD_BIONIC_SO", "\"libredirect-bionic-wx.so\"")
+        buildConfigField("boolean", "XR_BUILD", "false")
+        buildConfigField("boolean", "MODERN_XR", "false")
+        buildConfigField("boolean", "GOLD", "false")
+        // Empty on purpose, not missing secrets plumbing: PostHog is
+        // gamenative's telemetry, and an empty key keeps it inert — the
+        // same stance as ripping Play Integrity out of the fork. Wiring
+        // real keys here would be a decision, not a default.
+        buildConfigField("String", "POSTHOG_API_KEY", "\"\"")
+        buildConfigField("String", "POSTHOG_HOST", "\"\"")
+        buildConfigField("String", "STEAMGRIDDB_API_KEY", "\"\"")
+        buildConfigField("String", "CLOUD_PROJECT_NUMBER", "\"\"")
+        // Application-module-only fields AGP does not generate for a
+        // library, defined by hand because vendored code reads them:
+        // VERSION_* feed HTTP headers and gamenative's own self-update
+        // checker (dead in droidtop), APPLICATION_ID an intent-action
+        // string and its updater's fileprovider authority, FLAVOR a
+        // telemetry tag. All checked before choosing values — none is
+        // load-bearing for droidtop's own runtime paths.
+        buildConfigField("String", "VERSION_NAME", "\"1.2.0-droidtop\"")
+        buildConfigField("int", "VERSION_CODE", "21")
+        buildConfigField("String", "APPLICATION_ID", "\"app.gamenative\"")
+        buildConfigField("String", "FLAVOR", "\"droidtop\"")
     }
 
-    // Real, direct reference into vendor/gamenative -- not a copy, and
-    // not even a symlink: sourceSets below just points Gradle at the
-    // real path in the submodule. An earlier version of this module held
-    // a static, wholesale COPY of com.winlator.*/res/; confirmed via
-    // diff that copy had already drifted from real upstream additions
-    // (e.g. ContainerData's own xrRefreshRate field) purely from
-    // staleness. This direct reference means gamenative-tux's own daily
-    // upstream-sync keeps this module current automatically, with zero
-    // duplication.
-    //
-    // Only com.winlator.* and res/ get this direct, wholesale treatment
-    // -- both are safe because nothing in either is droidtop-modified
-    // (confirmed via diff) and neither has files this module needs to
-    // exclude. app.gamenative.* is NOT referenced this way: AGP's
-    // AndroidSourceDirectorySet.srcDir() only accepts real directories,
-    // not individual files or a filtered subset (confirmed via two real
-    // CI failures trying exactly that), and gamenative's own real
-    // app.gamenative.* tree elsewhere needs Hilt/Room/Compose-Navigation/
-    // JavaSteam this module doesn't declare -- so app.gamenative.*
-    // stays real, local, plain files under src/main/java/app/gamenative/
-    // (Gradle's own default sourceSet, no extra config needed). Most of
-    // what's there isn't a fork at all: BuildConfig.kt, PluviaApp.kt,
-    // MainActivity.kt, PrefManager.kt, service/SteamService.kt, utils/
-    // ContainerUtils.kt, and utils/LsfgVkManager.kt are real, minimal
-    // compat shims (13-36 lines each, vs. upstream's 650-4800-line real
-    // files) -- the same "empty marker so a dead/unused import resolves"
-    // pattern AndroidEvent.kt's own doc comment explains, confirmed the
-    // same way for each: grepped every real com.winlator.* caller and
-    // verified none of them actually invoke the parts these shims omit.
-    // The rest (enums/Marker.kt, powercontrol/autotuning/*,
-    // powercontrol/drivers/NoOpPerformanceDriver.kt, powercontrol/
-    // metrics/*, powercontrol/profiles/*, powercontrol/fan/
-    // FanTempController.kt, powercontrol/AdaptiveFpsCapController.kt,
-    // powercontrol/PowerBaseline.kt, data/*, utils/MarkerUtils.kt,
-    // SteamBootstrap.kt) are confirmed byte-identical to upstream via
-    // `diff` too, just kept local rather than symlinked given AGP's own
-    // real per-file limitation above -- a small, bounded, known set, not
-    // an open-ended copy. The one file here with genuine, structural,
-    // load-bearing divergence is powercontrol/PowerManager.kt -- see its
-    // own doc comment for the real reasoning (different bootstrap order,
-    // no gamenative Application/DI graph) and the real, confirmed-live
-    // surface (`Win32AppWorkarounds.java`) it has to keep matching. A
-    // handful of smaller powercontrol/* files (PowerProfile.kt,
-    // PerformanceDriver.kt, SamsungPerformanceDriver.kt, FanController.kt,
-    // SystemMetricsReader.kt, PerformanceAutoTuner.kt,
-    // PowerControlUiState.kt) also carry real, smaller, confirmed
-    // divergences (added methods PowerManager.kt calls, PrefManager-
-    // dependency removal, an initialization-order fix) and stay local
-    // for the same reason -- not yet individually doc-commented the way
-    // PowerManager.kt now is; a real follow-up, not an oversight being
-    // hidden.
+    // Real, direct reference into vendor/gamenative — not a copy, not a
+    // symlink. This used to point at java/com/winlator alone, with the
+    // app.gamenative.* files it touches recreated locally as shims and
+    // stale snapshots; reviewing those against the vendor tree showed
+    // every one traced to a single wholesale fork-in commit (stale, not
+    // droidtop-modified) while the fork had moved on — and each shim was
+    // a place droidtop re-learned something gamenative already does (a
+    // null downloader stub was the reason no Wine container could ever
+    // be created). Direction (2026-08-31): compile ALL of gamenative in.
     sourceSets {
         getByName("main") {
-            java.srcDir("../vendor/gamenative/app/src/main/java/com/winlator")
+            java.srcDir("../vendor/gamenative/app/src/main/java")
             res.srcDir("../vendor/gamenative/app/src/main/res")
-            // The forked com.winlator tree reads real assets by name --
-            // common_dlls.json the moment a container is created, then
-            // gpu_cards.json, wincomponents/wincomponents.json,
-            // wine_startmenu.json, redirect.tzst and the box86_64/
-            // fexcore/wowbox64 translator payloads. None of them shipped
-            // before this, which is the actual reason no Wine container
-            // could ever be created: extractContainerPatternFile fails on
-            // the first missing file.
+            // The tree reads real assets by name — common_dlls.json the
+            // moment a container is created, gpu_cards.json,
+            // wincomponents/wincomponents.json, wine_startmenu.json,
+            // redirect.tzst, and the box86_64/fexcore/wowbox64 translator
+            // payloads.
             assets.srcDir("../vendor/gamenative/app/src/main/assets")
         }
     }
@@ -105,7 +94,7 @@ android {
         //
         //   dxwrapper       29 MB, and every entry in
         //                   dxwrapper_download.json resolves to
-        //                   downloads.gamenative.app -- it is fetched on
+        //                   downloads.gamenative.app — it is fetched on
         //                   demand, so bundling it buys nothing.
         //   steampipe /     Steam-only (steam_api.dll, region lists).
         //   steaminput /    droidtop is not a Steam client.
@@ -114,10 +103,7 @@ android {
         // box86_64, fexcore and wowbox64 deliberately stay (~56 MB): they
         // are read straight off getAssets() with no download manifest
         // anywhere, so a missing version is an unrecoverable failure, not
-        // a slow first launch. Trimming them to the default versions
-        // alone would save most of that and break any other choice in the
-        // container config UI -- worth doing later behind a real test,
-        // not guessed at now.
+        // a slow first launch.
         ignoreAssetsPatterns += listOf("dxwrapper", "steampipe", "steaminput", "steam_regions.json")
     }
 
@@ -130,71 +116,91 @@ android {
     }
 
     buildFeatures {
-        // Real, needed by the forked com.winlator.* tree's own layout
-        // inflation (ContentDialog, NavigationDialog, InputControlsView,
-        // TouchpadView, FrameRating all inflate real XML layouts) --
-        // NOT Compose; the forked tree is plain View-based, same as
-        // upstream. buildConfig deliberately NOT enabled -- this module
-        // hand-writes its own tiny app.gamenative.BuildConfig shim
-        // instead (see that file's own doc comment), which would collide
-        // with AGP's auto-generated one under the same namespace.
-        viewBinding = false
+        // The full tree is Compose (gamenative's UI) plus the older
+        // View-based com.winlator dialogs; both compile here.
+        compose = true
+        buildConfig = true
     }
-
-    // Wine + Box64 binaries/ImageFS come from vendor/gamenative, packaged as
-    // prebuilt per-ABI assets — same as that project's own build, minus its
-    // Android SurfaceView XServer rendering path, which this module does
-    // not use (droidtop is a Wayland client instead, see docs/SPEC.md §2).
-    // XServer's own protocol/input-handling code (com.winlator.xserver) IS
-    // forked in wholesale regardless, per direction this session ("fork
-    // ALL the code in, and just not wire it up until we're ready... it's
-    // ok for stuff to not be there yet") -- real, unmodified, simply not
-    // called from droidtop's own WineSession yet. `com.winlator.linux`
-    // (LinuxContainerBackend/DefaultProotContainerBackend/
-    // LinuxProgramLauncherComponent) is included the same way -- this is
-    // ProotRuntime's real port source, see runtime-linux-noroot.
 }
 
 dependencies {
     implementation(project(":runtime-common"))
     // PcGameProvider.kt's own real LibraryProvider/LibraryEntry/
-    // LibraryEntryKind implementation -- this module supplying "pc"-system
-    // library entries to the same seam every other source (native apps,
-    // console ROMs, engine games) already goes through.
+    // LibraryEntryKind implementation — this module supplying "pc"-system
+    // library entries to the same seam every other source already goes
+    // through.
     implementation(project(":library-core"))
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.kotlinx.coroutines.android)
 
-    // Real, direct dependencies of the forked-in com.winlator.* +
-    // app.gamenative.powercontrol.* trees (confirmed by reading their
-    // actual imports this session, not guessed) -- Apache Commons
-    // Compress (tar/xz/zstd ImageFS archive handling), Timber (logging),
-    // kotlinx-serialization-json (ContainerData/power-profile
-    // (de)serialization), AndroidX AppCompat + Material (the forked
-    // View-based dialogs/widgets' own real resource dependencies,
-    // e.g. simple_list_item_multiple_choice/NavigationView).
-    implementation(libs.commons.compress)
-    implementation(libs.timber)
-    implementation(libs.kotlinx.serialization.json)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.material)
-    // com.winlator.PrefManager.kt's own real Preferences DataStore usage.
-    implementation(libs.androidx.datastore.preferences)
-    // com.winlator.container.ContainerData.kt's own real
-    // androidx.compose.runtime.saveable.mapSaver usage (Compose's state-
-    // saving API) -- ui transitively pulls in runtime + runtime-saveable,
-    // and this module has no @Composable functions of its own yet so the
-    // Compose compiler plugin itself isn't needed, only the library.
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.compose.ui)
+    // ------------------------------------------------------------------
+    // gamenative's own dependency list, expressed through its own
+    // catalog ("gn") so versions track the fork. Mirrors
+    // vendor/gamenative/app/build.gradle.kts with three deliberate
+    // deviations, each explained where it happens.
+    // ------------------------------------------------------------------
+    implementation(gn.material)
+    implementation("androidx.browser:browser:1.8.0")
+    implementation("androidx.documentfile:documentfile:1.0.1")
+
+    // JavaSteam (the SNAPSHOT repo is declared in settings.gradle).
+    implementation(gn.javasteam) { isChanging = true }
+    implementation(gn.javasteam.depotdownloader) { isChanging = true }
+    implementation(gn.spongycastle)
+    implementation(gn.okhttp.dnsoverhttps)
+
+    // Deviation 1: gamenative bundles feature-delivery WITH
+    // play-integrity ("libs.bundles.google"). droidtop takes
+    // feature-delivery alone — Play Integrity was deliberately ripped
+    // out of the fork's code, and keeping its client library out of the
+    // dependency tree makes that removal structural rather than
+    // accidental. If a stray reference survived the ripout, this is
+    // where the build will say so by name.
+    implementation(gn.feature.delivery)
+
+    // Winlator
+    implementation(gn.bundles.winlator)
+    implementation(gn.libarchive.android)
+    implementation(gn.zstd.jni) { artifact { type = "aar" } }
+    implementation(gn.xz)
+
+    // Compose — gamenative's own BOM, not droidtop's: the vendored UI
+    // uses material3-adaptive APIs that droidtop's older BOM predates.
+    implementation(platform(gn.androidx.compose.bom))
+    implementation(gn.bundles.compose)
+    implementation(gn.landscapist.coil)
+    implementation(gn.media3.exoplayer)
+    implementation(gn.media3.exoplayer.hls)
+    implementation(gn.media3.ui)
+    debugImplementation(gn.androidx.ui.tooling)
+
+    // Support
+    implementation(gn.androidx.core.ktx)
+    implementation(gn.androidx.lifecycle.runtime.ktx)
+    implementation(gn.apng)
+    implementation(gn.datastore.preferences)
+    implementation(gn.jetbrains.kotlinx.json)
+    implementation(gn.kotlin.coroutines)
+    implementation(gn.timber)
+    implementation(gn.zxing)
+    implementation(gn.protobuf.java)
+
+    // Hilt + Room (KSP for both)
+    implementation(gn.bundles.hilt)
+    ksp(gn.bundles.ksp)
+    implementation(gn.bundles.room)
+
+    // Deviation 2: PostHog stays a compile dependency (PluviaApp
+    // references it unconditionally) but the empty POSTHOG_API_KEY above
+    // keeps it inert. Removing the calls belongs in the fork, once,
+    // rather than being patched around here.
+    implementation("com.posthog:posthog-android:3.8.0")
+    implementation("com.auth0.android:jwtdecode:2.0.2")
 
     // Real, proprietary Samsung Performance SDK jar, referenced directly
-    // from vendor/gamenative's own src/main/lib/ (live reference, not a
-    // copy — same real file app.gamenative.powercontrol.drivers.
-    // SamsungPerformanceDriver.kt (this module's own local, lightly-
-    // modified file — see the android{} block's own comment above) needs
-    // it to compile. A real, optional device-specific driver: on any
-    // non-Samsung device this SDK's own runtime checks make it a no-op,
-    // not something droidtop's build assumes will always be present.
+    // from the vendor tree (live reference, not a copy). On non-Samsung
+    // devices its own runtime checks make it a no-op.
     implementation(files("../vendor/gamenative/app/src/main/lib/perfsdk-v1.0.0.jar"))
+
+    // Deviation 3: gamenative's test dependencies are not mirrored —
+    // its test sources live in the vendor tree's own test roots, which
+    // this module does not reference, so the deps would be dead weight.
 }
