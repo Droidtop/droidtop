@@ -85,11 +85,29 @@ internal suspend fun scrapeSystemArtwork(
     val gamesRoot = folder.parentFile ?: folder
     val romFiles = folder.walkTopDown().filter { it.isFile && it.extension.lowercase() in system.extensions }.toList()
     val dao = RomDatabase.get(context).romDao()
-    val existingMetadataIds = dao.getGameMetadata(romFiles.map { it.absolutePath }).map { it.id }.toSet()
-    val missing = romFiles.filter {
-        EsDeArtwork.resolve(gamesRoot, system.id, it.nameWithoutExtension) == null || it.absolutePath !in existingMetadataIds
+    val metadataRows = dao.getGameMetadata(romFiles.map { it.absolutePath })
+    val existingMetadataIds = metadataRows.map { it.id }.toSet()
+    val favoriteIds = metadataRows.filter { it.favorite }.map { it.id }.toSet()
+    // The ES-DE-style game filter (ScrapeOptionsPrefs, set in the
+    // scraper settings screen) decides WHICH games this pass touches.
+    val filter = dev.droidtop.library.scraper.ScrapeOptionsPrefs.filter(context)
+    val wantMetadata = dev.droidtop.library.scraper.ScrapeOptionsPrefs.scrapeMetadata(context)
+    val wantArtwork = dev.droidtop.library.scraper.ScrapeOptionsPrefs.scrapeArtwork(context)
+    if (!wantMetadata && !wantArtwork) {
+        return@withContext "${system.displayName}: both content types are disabled in scrape options."
     }
-    if (missing.isEmpty()) return@withContext "${system.displayName}: every ROM already has real artwork and metadata."
+    val missing = romFiles.filter { romFile ->
+        val noArt = EsDeArtwork.resolve(gamesRoot, system.id, romFile.nameWithoutExtension) == null
+        val noMeta = romFile.absolutePath !in existingMetadataIds
+        when (filter) {
+            dev.droidtop.library.scraper.ScrapeFilter.MISSING_ANY -> noArt || noMeta
+            dev.droidtop.library.scraper.ScrapeFilter.MISSING_ARTWORK -> noArt
+            dev.droidtop.library.scraper.ScrapeFilter.MISSING_METADATA -> noMeta
+            dev.droidtop.library.scraper.ScrapeFilter.FAVORITES -> romFile.absolutePath in favoriteIds
+            dev.droidtop.library.scraper.ScrapeFilter.ALL -> true
+        }
+    }
+    if (missing.isEmpty()) return@withContext "${system.displayName}: nothing matches the \"${filter.label}\" scrape filter."
 
     val source = ScraperSourcePrefs.get(context)
     val screenScraperSystemId = if (source == ScraperSource.SCREENSCRAPER) ScreenScraperSystemIds.forSystemId(system.id) else null
@@ -109,6 +127,7 @@ internal suspend fun scrapeSystemArtwork(
     var found = 0
     var failed = 0
     var hashMatched = 0
+    var thumbnailed = 0
     missing.forEachIndexed { index, romFile ->
         onProgress(index, missing.size)
         try {
@@ -144,8 +163,20 @@ internal suspend fun scrapeSystemArtwork(
                 TheGamesDbClient.findMetadata(gamesDbApiKey, context.cacheDir, it, romFile.nameWithoutExtension)
             }
 
-            val coverUrl = screenScraperResult?.coverUrl ?: gamesDbResult?.coverUrl
-            if (coverUrl != null && EsDeArtwork.resolve(gamesRoot, system.id, romFile.nameWithoutExtension) == null) {
+            // Keyless boxart fallback, consulted only when the selected
+            // credentialed source produced no cover (fresh installs have
+            // no ScreenScraper dev ID and no TheGamesDB key at all).
+            val thumbnailUrl = if (
+                wantArtwork &&
+                screenScraperResult?.coverUrl == null &&
+                gamesDbResult?.coverUrl == null &&
+                EsDeArtwork.resolve(gamesRoot, system.id, romFile.nameWithoutExtension) == null
+            ) {
+                dev.droidtop.library.scraper.LibretroThumbnails.coverUrl(system.id, romFile.nameWithoutExtension)
+            } else null
+            if (thumbnailUrl != null) thumbnailed++
+            val coverUrl = screenScraperResult?.coverUrl ?: gamesDbResult?.coverUrl ?: thumbnailUrl
+            if (wantArtwork && coverUrl != null && EsDeArtwork.resolve(gamesRoot, system.id, romFile.nameWithoutExtension) == null) {
                 val destination = File(File(File(gamesRoot, "downloaded_media"), system.id), "covers/${romFile.nameWithoutExtension}.png")
                 downloadImage(coverUrl, destination)
             }
@@ -157,7 +188,8 @@ internal suspend fun scrapeSystemArtwork(
             val releaseDate = screenScraperResult?.releaseDate ?: gamesDbResult?.releaseDate
             val players = screenScraperResult?.players ?: gamesDbResult?.players
             val rating = screenScraperResult?.rating
-            val hasAnyMetadata = listOfNotNull(description, developer, publisher, genre, releaseDate, players, rating).isNotEmpty()
+            val hasAnyMetadata = wantMetadata &&
+                listOfNotNull(description, developer, publisher, genre, releaseDate, players, rating).isNotEmpty()
             if (hasAnyMetadata) {
                 // Real fix: this used to build a fresh GameMetadataEntity
                 // with a hardcoded favorite=false, silently wiping out a
@@ -193,8 +225,9 @@ internal suspend fun scrapeSystemArtwork(
     // identical to ScreenScraper's own dump digest. The remainder of
     // $found matched by name search only, which is worth the user
     // knowing: right most of the time, verified never.
-    "${system.displayName}: found $found ($hashMatched verified by file hash), " +
-        "no match for ${missing.size - found - failed}, $failed failed (of ${missing.size} missing artwork/metadata)."
+    "${system.displayName}: found $found ($hashMatched verified by file hash, " +
+        "$thumbnailed boxarts from libretro thumbnails), no match for " +
+        "${missing.size - found - failed}, $failed failed (of ${missing.size} matching the filter)."
 }
 
 /** Downloads [imageUrl] straight to [destination], creating parent directories as needed -- a plain generic helper, not tied to any one scraper source. */
