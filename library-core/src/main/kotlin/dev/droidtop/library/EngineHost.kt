@@ -160,7 +160,8 @@ object EngineHost {
             // that the caller does not grant its UID by passing a URI.
             putExtra("path", gameFolder.absolutePath)
             if (!hasOwnConfig) {
-                if (engineVersion == null) {
+                val effectiveVersion = engineVersion ?: target.versionSelectorFallback
+                if (effectiveVersion == null) {
                     // The contract's own flow for an undetectable
                     // version: open enginehost's CONFIGURE screen (with
                     // what droidtop DID determine prefilled) so the user
@@ -174,7 +175,7 @@ object EngineHost {
                     LaunchDisplay.start(context, configureIntent(gameFolder, target))
                     return
                 }
-                putExtra("config", target.toConfigJson(engineVersion).toString())
+                putExtra("config", target.toConfigJson(effectiveVersion).toString())
                 // Confident = we know the exact compatibility line AND the
                 // exact version. A family whose context droidtop cannot
                 // yet determine (RPG Maker 2000 vs 2003, CMVS ps2 vs ps3)
@@ -209,6 +210,17 @@ data class EnginehostTarget(
      * must not resolve a Ruby 3.1 capability).
      */
     val runtimeRequirements: Map<String, String> = emptyMap(),
+    /**
+     * A version value to launch with when detection finds none --
+     * ONLY for engines whose engineVersion is an implementation
+     * SELECTOR rather than a metadata claim (per direction: KiriKiri's
+     * accepts any value; an unmapped one falls through to the default
+     * implementation, and only one exists). Null everywhere the field
+     * is real metadata, which keeps the CONFIGURE detour for exactly
+     * the engines whose version genuinely matters and genuinely can't
+     * be detected.
+     */
+    val versionSelectorFallback: String? = null,
 ) {
     /**
      * [engineVersion] nullable for the CONFIGURE prefill case: the
@@ -252,7 +264,16 @@ val ENGINEHOST_TARGETS: Map<GameEngine, EnginehostTarget> = mapOf(
     // contexts -- see enginehost-claude-requests.md, which asks for a
     // real disambiguating signal rather than picking one at random.
     GameEngine.RPG_MAKER_2000_2003 to EnginehostTarget("rpgmaker", null),
-    GameEngine.KIRIKIRI to EnginehostTarget("kirikiri2", "default"),
+    GameEngine.KIRIKIRI to EnginehostTarget(
+        "kirikiri2",
+        "default",
+        // Selector fall-through, not a version claim -- "0" maps to no
+        // implementation string, which by the engine's own semantics
+        // selects the sole default. Lets a confirmed-working engine
+        // (device-accepted 2026-08-31) launch without a CONFIGURE
+        // detour despite its version being honestly undetectable.
+        versionSelectorFallback = "0",
+    ),
     GameEngine.BURIKO to EnginehostTarget("buriko", "compiled-script-v1"),
     GameEngine.AUGUST to EnginehostTarget("buriko", "august-compiled-script-v1"),
     GameEngine.CATSYSTEM2 to EnginehostTarget("catsystem2", "cst"),
