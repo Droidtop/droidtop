@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -1168,15 +1169,25 @@ private fun GamesSection(
         .filter { it != LibraryEntryKind.CONSOLE_ROM && it != LibraryEntryKind.WINE_PROFILE }
         .map { GameGroup.Engine(it) }
         .filter { byGroup.containsKey(it) }
-    val orderedSystemGroups = byGroup.keys
-        .filterIsInstance<GameGroup.System>()
-        .sortedBy { it.label.lowercase() }
-    // Real collections (auto + custom) lead the carousel -- quick access
-    // to Favorites/Last played/etc. without scrolling past every real
-    // console system, same real spirit as real ES-DE's own collections
-    // (a droidtop-side ordering choice; real ES-DE's own default
-    // placement isn't itself part of the theme-engine spec this follows).
-    val orderedGroups: List<GameGroup> = collectionGroups + orderedEngineGroups + orderedSystemGroups
+    // Keyed on the platform database's load version as well as the
+    // groups: labels resolve through its cache, which warms on a
+    // background thread -- sorting before the warm lands used raw
+    // system ids and froze "switch" at the end of the carousel
+    // (observed live) instead of "Nintendo Switch" among the Nintendos.
+    val platformsLoadVersion by dev.droidtop.library.consoles.PlatformsDatabase.loadVersion.collectAsState()
+    val orderedSystemGroups = remember(byGroup, platformsLoadVersion) {
+        byGroup.keys
+            .filterIsInstance<GameGroup.System>()
+            .sortedBy { it.label.lowercase() }
+    }
+    // Carousel order, per direction (2026-08-31): "All games" leads
+    // straight into the real systems -- Favorites/Last played/custom
+    // collections were wedged between them, which meant scrolling past
+    // chrome to reach content. They trail at the end instead.
+    val leadingCollections = collectionGroups.filter { it.id == AutoCollections.ALL_GAMES_ID }
+    val trailingCollections = collectionGroups.filterNot { it.id == AutoCollections.ALL_GAMES_ID }
+    val orderedGroups: List<GameGroup> =
+        leadingCollections + orderedEngineGroups + orderedSystemGroups + trailingCollections
     // Real per-group item counts -- byGroup covers the strict
     // system/engine partition, collectionGroupMembers covers the
     // cross-cutting collections (see GameGroup.Collection's own doc
