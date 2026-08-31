@@ -316,15 +316,25 @@ class MainActivity : AppCompatActivity() {
                 val shellOnSecond = handheld && secondAvailable &&
                     DisplayRolePrefs.shellTarget(this@MainActivity) == DisplayRolePrefs.ShellTarget.SECOND_WHEN_PRESENT
 
-                dev.droidtop.library.LaunchDisplay.targetDisplayId = when {
-                    !handheld || second == null -> null
-                    else -> when (DisplayRolePrefs.gameLaunchTarget(this@MainActivity)) {
-                        DisplayRolePrefs.GameLaunchTarget.FOLLOW_SHELL ->
-                            if (shellOnSecond) second.androidDisplayId else null
-                        DisplayRolePrefs.GameLaunchTarget.BUILT_IN -> null
-                        DisplayRolePrefs.GameLaunchTarget.SECOND -> second.androidDisplayId
-                    }
+                val launchTarget = if (handheld && second != null) DisplayRolePrefs.gameLaunchTarget(this@MainActivity) else null
+                dev.droidtop.library.LaunchDisplay.targetDisplayId = when (launchTarget) {
+                    null, DisplayRolePrefs.GameLaunchTarget.ASK, DisplayRolePrefs.GameLaunchTarget.BUILT_IN -> null
+                    DisplayRolePrefs.GameLaunchTarget.FOLLOW_SHELL ->
+                        if (shellOnSecond) second!!.androidDisplayId else null
+                    DisplayRolePrefs.GameLaunchTarget.SECOND -> second!!.androidDisplayId
                 }
+                // Per direction, ASK is the default: with two displays and
+                // no explicit target, every launch asks which screen via
+                // the shell's chooser (LaunchDisplay.chooser).
+                dev.droidtop.library.LaunchDisplay.askOptions =
+                    if (launchTarget == DisplayRolePrefs.GameLaunchTarget.ASK) {
+                        listOf(
+                            dev.droidtop.library.LaunchDisplayOption(second!!.androidDisplayId, "Second display"),
+                            dev.droidtop.library.LaunchDisplayOption(null, "Built-in screen"),
+                        )
+                    } else {
+                        null
+                    }
 
                 when {
                     // No second display -- or one an app was launched onto

@@ -198,6 +198,30 @@ fun GamepadShell(
     // live: the first real on-device game launch threw from a preset's
     // bad boolean extra and took the whole app down to its crash-recovery
     // screen. The error surfaces to the user instead.
+    // Per-launch display chooser (docs/SPEC.md §4, "ask every time"
+    // default): LaunchDisplay.start defers to this whenever askOptions has
+    // more than one candidate; state renders LaunchDisplayChooserDialog
+    // below. Installed only while this composition is live.
+    var displayChoice by remember {
+        mutableStateOf<Pair<List<dev.droidtop.library.LaunchDisplayOption>, (Int?) -> Unit>?>(null)
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        dev.droidtop.library.LaunchDisplay.chooser = { options, onChosen ->
+            displayChoice = options to onChosen
+        }
+        onDispose { dev.droidtop.library.LaunchDisplay.chooser = null }
+    }
+    displayChoice?.let { (options, onChosen) ->
+        LaunchDisplayChooserDialog(
+            options = options,
+            onPick = { displayId ->
+                displayChoice = null
+                onChosen(displayId)
+            },
+            onCancel = { displayChoice = null },
+        )
+    }
+
     val onLaunch: (LibraryEntry) -> Unit = { entry ->
         scope.launch {
             launchError = null

@@ -202,11 +202,12 @@ object HandheldSettingsCatalog {
         id = ID_DISPLAY_GAME_LAUNCH_TARGET,
         title = "Games launch on",
         options = listOf(
+            ChoiceOption("ASK", "Ask every time (default)"),
             ChoiceOption("FOLLOW_SHELL", "Same display as the shell"),
             ChoiceOption("BUILT_IN", "Built-in screen"),
             ChoiceOption("SECOND", "Second display"),
         ),
-        current = CatalogPrefs.prefs(context).getString(ID_DISPLAY_GAME_LAUNCH_TARGET, "FOLLOW_SHELL"),
+        current = CatalogPrefs.prefs(context).getString(ID_DISPLAY_GAME_LAUNCH_TARGET, "ASK"),
         onSelect = { ctx, value ->
             CatalogPrefs.prefs(ctx).edit().putString(ID_DISPLAY_GAME_LAUNCH_TARGET, value).apply()
         },
