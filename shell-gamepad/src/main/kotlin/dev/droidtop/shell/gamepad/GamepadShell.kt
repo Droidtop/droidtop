@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
@@ -202,6 +203,11 @@ fun GamepadShell(
     // default): LaunchDisplay.start defers to this whenever askOptions has
     // more than one candidate; state renders LaunchDisplayChooserDialog
     // below. Installed only while this composition is live.
+    // Quick Menu (hold SELECT) -- see QuickMenu.kt for the paradigm.
+    var quickMenuOpen by remember { mutableStateOf(false) }
+    // Swallows the key-UP of the hold that opened the menu, so the
+    // shell's ordinary short-press Select action doesn't ALSO fire.
+    var swallowSelectUp by remember { mutableStateOf(false) }
     var displayChoice by remember {
         mutableStateOf<Pair<List<dev.droidtop.library.LaunchDisplayOption>, (Int?) -> Unit>?>(null)
     }
@@ -220,6 +226,10 @@ fun GamepadShell(
             },
             onCancel = { displayChoice = null },
         )
+    }
+
+    if (quickMenuOpen) {
+        QuickMenu(onDismiss = { quickMenuOpen = false })
     }
 
     val onLaunch: (LibraryEntry) -> Unit = { entry ->
@@ -321,6 +331,23 @@ fun GamepadShell(
             // etc. all take priority since they're closer to the focused
             // node in the bubbling chain).
             .onKeyEvent { event ->
+                // Quick Menu trigger: HOLD Select. repeatCount >= 1 is
+                // the system's own key-repeat threshold (~500ms) -- a
+                // timing-free long-press, and short-press Select keeps
+                // its existing meaning because only the repeat opens it.
+                if (GamepadKeyMap.actionFor(event.key) == GamepadAction.SELECT) {
+                    if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount >= 1) {
+                        if (!quickMenuOpen) {
+                            quickMenuOpen = true
+                            swallowSelectUp = true
+                        }
+                        return@onKeyEvent true
+                    }
+                    if (event.type == KeyEventType.KeyUp && swallowSelectUp) {
+                        swallowSelectUp = false
+                        return@onKeyEvent true
+                    }
+                }
                 if (event.type != KeyEventType.KeyUp || detailEntry != null) return@onKeyEvent false
                 val sections = HandheldSection.entries
                 val currentIndex = sections.indexOf(section)

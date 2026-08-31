@@ -35,6 +35,23 @@ object HandheldSettingsCatalog {
     const val ID_SYSTEM_BRIGHTNESS = "pref_handheld_system_brightness"
     const val ID_SYSTEM_BRIGHTNESS_GRANT = "pref_handheld_system_brightness_grant"
     const val ID_SYSTEM_BLUETOOTH = "pref_handheld_system_bluetooth"
+    const val ID_SYSTEM_DND = "pref_handheld_system_dnd"
+    const val ID_SYSTEM_DND_GRANT = "pref_handheld_system_dnd_grant"
+    const val ID_SYSTEM_ADAPTIVE = "pref_handheld_system_adaptive"
+    const val ID_SYSTEM_ROTATE = "pref_handheld_system_rotate"
+    const val ID_SYSTEM_TIMEOUT = "pref_handheld_system_timeout"
+    const val ID_SYSTEM_ANDROID_LINKS = "pref_handheld_system_android_links"
+
+    /** Real values the stock Settings app offers, labelled the same way. */
+    private val TIMEOUT_OPTIONS = listOf(
+        15_000 to "15 seconds",
+        30_000 to "30 seconds",
+        60_000 to "1 minute",
+        120_000 to "2 minutes",
+        300_000 to "5 minutes",
+        600_000 to "10 minutes",
+        1_800_000 to "30 minutes",
+    )
     const val ID_GAME_FOLDERS = "pref_handheld_game_folders"
     const val ID_DISPLAY_SHELL_TARGET = "pref_display_shell_target"
     const val ID_DISPLAY_GAME_LAUNCH_TARGET = "pref_display_game_launch_target"
@@ -223,12 +240,71 @@ object HandheldSettingsCatalog {
                         ),
                     )
                 }
+                // The controls Android actually lets an app OWN, owned
+                // (per direction: consume the user's UI needs in-app;
+                // the Settings app is for linking into, not living in).
+                if (controls.hasDndAccess(context)) {
+                    add(
+                        ToggleItem(
+                            id = ID_SYSTEM_DND,
+                            title = "Do Not Disturb",
+                            current = controls.dndEnabled(context),
+                            onToggle = { ctx, on -> controls.setDnd(ctx, on) },
+                        ),
+                    )
+                } else {
+                    add(
+                        ActionItem(
+                            id = ID_SYSTEM_DND_GRANT,
+                            title = "Allow Do Not Disturb control",
+                            subtitle = "One-time grant on the system screen this opens; afterwards DND is a toggle right here",
+                            run = { ctx -> ctx.startActivity(controls.dndGrantIntent()) },
+                        ),
+                    )
+                }
+                if (controls.canWriteBrightness(context)) {
+                    add(
+                        ToggleItem(
+                            id = ID_SYSTEM_ADAPTIVE,
+                            title = "Adaptive brightness",
+                            current = controls.adaptiveBrightness(context),
+                            onToggle = { ctx, on -> controls.setAdaptiveBrightness(ctx, on) },
+                        ),
+                    )
+                    add(
+                        ToggleItem(
+                            id = ID_SYSTEM_ROTATE,
+                            title = "Auto-rotate",
+                            current = controls.autoRotate(context),
+                            onToggle = { ctx, on -> controls.setAutoRotate(ctx, on) },
+                        ),
+                    )
+                    add(
+                        ChoiceItem(
+                            id = ID_SYSTEM_TIMEOUT,
+                            title = "Screen timeout",
+                            options = TIMEOUT_OPTIONS.map { (ms, label) -> ChoiceOption(ms.toString(), label) },
+                            current = controls.screenTimeoutMs(context)?.toString(),
+                            onSelect = { ctx, value ->
+                                value.toIntOrNull()?.let { controls.setScreenTimeoutMs(ctx, it) }
+                            },
+                        ),
+                    )
+                }
                 add(
                     ActionItem(
                         id = ID_SYSTEM_BLUETOOTH,
                         title = "Bluetooth",
                         subtitle = "Pair controllers and audio in the system Bluetooth screen",
                         run = { ctx -> ctx.startActivity(controls.bluetoothSettingsIntent()) },
+                    ),
+                )
+                add(
+                    NestedScreenItem(
+                        id = ID_SYSTEM_ANDROID_LINKS,
+                        title = "Android settings",
+                        subtitle = "Every reachable system screen, one hop away -- plus droidtop's own permission grants",
+                        registryId = "android_settings",
                     ),
                 )
             },

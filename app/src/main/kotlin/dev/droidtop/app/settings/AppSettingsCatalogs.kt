@@ -60,6 +60,7 @@ object AppSettingsCatalogs {
     const val SCREEN_PLATFORMS = "manage_platforms"
     const val SCREEN_INTEGRATIONS = "integrations"
     const val SCREEN_WINDOWS_GAMES = "windows_games"
+    const val SCREEN_ANDROID_SETTINGS = "android_settings"
 
     // How deep folderLooksRomLike is willing to walk -- see the doc
     // comment at the original ConsoleSystemsActivity site this moved from.
@@ -76,6 +77,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(platformsScreen())
         SettingsScreenRegistry.register(integrationsScreen())
         SettingsScreenRegistry.register(windowsGamesScreen())
+        SettingsScreenRegistry.register(androidSettingsScreen())
     }
 
     // ------------------------------------------------------------------
@@ -498,6 +500,73 @@ object AppSettingsCatalogs {
      * Windows game could be detected, offered Wine, and then fail with
      * instructions the user could not act on.
      */
+    // ------------------------------------------------------------------
+    // Android settings, one hop away.
+    // ------------------------------------------------------------------
+
+    /**
+     * Direct links into every system screen the platform refuses to let
+     * an app own, plus droidtop's own special-access grants -- per
+     * direction: consume as much of the user's UI needs in-app as
+     * possible, and make the Settings app something droidtop LINKS INTO,
+     * never something the user has to go spelunking in. The link list is
+     * filtered to what actually resolves on this device, so an OEM build
+     * missing a screen never produces a dead row.
+     */
+    private fun androidSettingsScreen() = CatalogScreen(
+        id = SCREEN_ANDROID_SETTINGS,
+        title = "Android settings",
+        subtitle = "Direct links to every reachable system screen, and droidtop's own permission grants",
+        groups = { context ->
+            val controls = dev.droidtop.runtime.systemstatus.SystemControls
+            listOf(
+                CatalogGroup(
+                    id = "droidtop_grants",
+                    title = "droidtop's access",
+                    items = listOf(
+                        ActionItem(
+                            id = "grant_app_details",
+                            title = "droidtop's app info",
+                            subtitle = "Permissions, storage, notifications for droidtop itself",
+                            run = { ctx -> ctx.startActivity(controls.appDetailsIntent(ctx)) },
+                        ),
+                        ActionItem(
+                            id = "grant_write_settings",
+                            title = "Modify system settings",
+                            subtitle = if (controls.canWriteBrightness(context)) {
+                                "Granted -- brightness, timeout, and rotation are controlled in droidtop"
+                            } else {
+                                "Not granted -- needed for brightness, screen timeout, and auto-rotate"
+                            },
+                            run = { ctx -> ctx.startActivity(controls.brightnessGrantIntent(ctx)) },
+                        ),
+                        ActionItem(
+                            id = "grant_dnd",
+                            title = "Do Not Disturb access",
+                            subtitle = if (controls.hasDndAccess(context)) {
+                                "Granted -- DND is a toggle in every droidtop mode"
+                            } else {
+                                "Not granted -- needed for the DND toggle"
+                            },
+                            run = { ctx -> ctx.startActivity(controls.dndGrantIntent()) },
+                        ),
+                    ),
+                ),
+                CatalogGroup(
+                    id = "android_links",
+                    title = "System screens",
+                    items = controls.settingsLinks(context).map { link ->
+                        ActionItem(
+                            id = "link_${link.id}",
+                            title = link.label,
+                            run = { ctx -> ctx.startActivity(link.intent) },
+                        )
+                    },
+                ),
+            )
+        },
+    )
+
     private fun windowsGamesScreen() = CatalogScreen(
         id = SCREEN_WINDOWS_GAMES,
         title = "Windows games",
