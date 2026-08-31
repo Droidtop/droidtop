@@ -24,8 +24,6 @@ import org.json.JSONObject
  */
 object PlatformsDatabase {
     private const val DB_FILE_NAME = "platforms-database.json"
-    const val DEFAULT_URL =
-        "https://raw.githubusercontent.com/bi0shacker001/droidtop-platforms/main/platforms-database.json"
 
     @Volatile
     private var cached: List<ConsoleSystemDef>? = null
@@ -74,7 +72,7 @@ object PlatformsDatabase {
     }
 
     /** Same validate-before-replace atomic-write contract as [PlayersDatabaseUpdater]. Returns the platform count. */
-    fun update(context: Context, url: String = DEFAULT_URL): Int {
+    fun update(context: Context, url: String = PlatformDatabaseSource.urlFor(context, DB_FILE_NAME)): Int {
         val connection = URL(url).openConnection() as HttpURLConnection
         connection.connectTimeout = 15_000
         connection.readTimeout = 30_000
