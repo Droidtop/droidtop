@@ -115,7 +115,7 @@ object HandheldSettingsCatalog {
                         id = ID_SYNC_THEME_INDEX,
                         title = "Sync theme index",
                         subtitle = "Update the real ES-DE theme list; run this before Browse themes if that list is empty",
-                        run = { ctx ->
+                        run = { ctx, _ ->
                             val result = ThemeDownloader.syncThemesList(ThemeAssets.userThemesDir(ctx))
                             when (result.status) {
                                 ThemeDownloader.ThemeSyncStatus.CLONED -> "Theme index downloaded"
