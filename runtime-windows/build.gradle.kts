@@ -77,6 +77,12 @@ android {
     sourceSets {
         getByName("main") {
             java.srcDir("../vendor/gamenative/app/src/main/java")
+            // The non-XR flavor source root: main code calls straight
+            // into it (MainActivity -> installLaunchReadiness), and
+            // upstream selects nonXr vs modernXr per flavor. droidtop is
+            // flavorless and mirrors the modern (non-XR) flavor's
+            // BuildConfig values, so nonXr is the matching half.
+            java.srcDir("../vendor/gamenative/app/src/nonXr/java")
             res.srcDir("../vendor/gamenative/app/src/main/res")
             // The tree reads real assets by name — common_dlls.json the
             // moment a container is created, gpu_cards.json,
