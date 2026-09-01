@@ -28,6 +28,24 @@ import java.io.File
  * source, not assumed).
  */
 object EngineHost {
+
+    /**
+     * Installed by the shell that owns launch UI: presents the real
+     * installed [EnginehostRunOption]s for a game droidtop could not
+     * classify, and calls back with the user's pick.
+     *
+     * Same swappable-seam pattern as [LaunchDisplay.chooser] and
+     * [PcGameRuntimeRegistry] -- library-core cannot show UI, and the
+     * alternative (handing the user to enginehost's own CONFIGURE
+     * screen) is the forced hand-off this exists to avoid.
+     */
+    @Volatile
+    var runOptionChooser: ((
+        gameFolder: java.io.File,
+        options: List<EnginehostRunOption>,
+        onChosen: (EnginehostRunOption) -> Unit,
+    ) -> Unit)? = null
+
     const val PACKAGE_NAME = "dev.enginehost"
 
     /**
@@ -160,8 +178,47 @@ object EngineHost {
             // that the caller does not grant its UID by passing a URI.
             putExtra("path", gameFolder.absolutePath)
             if (!hasOwnConfig) {
+                // An answer already recorded for this game makes every
+                // later launch fully programmatic.
+                val remembered = EnginehostManualChoicePrefs.get(context, gameFolder)
+                if (remembered != null) {
+                    putExtra(
+                        "config",
+                        target.copy(engineContext = remembered.engineContext)
+                            .toConfigJson(remembered.engineVersion)
+                            .toString(),
+                    )
+                    if (remembered.engineContext != null) putExtra("autoinstallPlugin", true)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    LaunchDisplay.start(context, this)
+                    return
+                }
+
                 val effectiveVersion = engineVersion ?: target.versionSelectorFallback
                 if (effectiveVersion == null) {
+                    // Ask in DROIDTOP, over what enginehost actually has
+                    // installed, rather than handing the user to another
+                    // app's UI. The answer is then persisted -- into the
+                    // game's own enginehost.json when the folder is
+                    // writable, so any caller benefits and it travels with
+                    // the game, otherwise into droidtop's preferences.
+                    val options = EnginehostCapabilities.runOptionsFor(context, target.engine)
+                    val ask = runOptionChooser
+                    if (options.isNotEmpty() && ask != null) {
+                        ask(gameFolder, options) { chosen ->
+                            val choice = EnginehostManualChoicePrefs.Choice(
+                                chosen.engineContext,
+                                chosen.engineVersion,
+                            )
+                            val wroteFolder = EnginehostManualChoicePrefs
+                                .writeFolderConfig(gameFolder, target.engine, choice)
+                            if (!wroteFolder) {
+                                EnginehostManualChoicePrefs.set(context, gameFolder, choice)
+                            }
+                            launch(context, gameFolder, target, chosen.engineVersion)
+                        }
+                        return
+                    }
                     // The contract's own flow for an undetectable
                     // version: open enginehost's CONFIGURE screen (with
                     // what droidtop DID determine prefilled) so the user
