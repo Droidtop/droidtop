@@ -25,7 +25,7 @@ import dev.droidtop.library.LibraryEntry
  * There were two hosts for this surface and they had drifted:
  * [CompanionActivity] (used when the Handheld shell sits on the ADDON
  * screen, so the companion lands on the built-in one) drew the system
- * bar, live notifications and the user's widgets; [SecondScreenPresentation]
+ * bar, live notifications and the user's widgets; the second-screen host
  * (the far more common arrangement — shell built-in, companion on the
  * addon) drew only [CompanionContent]'s backdrop. Since that backdrop
  * renders nothing but a wordmark until a game is focused, and nothing

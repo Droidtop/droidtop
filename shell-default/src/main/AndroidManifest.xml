@@ -190,24 +190,19 @@
         </activity>
 
         <!--
-        Launcher activity for secondary display - the SECONDARY_HOME
-        category is Android's own mechanism for a launcher to provide a
-        home screen on a secondary Display. This is the real starting
-        point for droidtop's multi-display patch work; see this file's
-        top-of-file comment.
+        Launcher3's secondary-display UI. It KEEPS the Activity but no
+        longer claims SECONDARY_HOME: :display's SecondaryDisplayActivity
+        is droidtop's single holder of that category, and hands off to
+        this one when the active mode is Standard (see docs/SPEC.md
+        section 4c). Two activities claiming the category is exactly the
+        duplication that consolidation removes.
         -->
         <activity
             android:name="com.android.launcher3.secondarydisplay.SecondaryDisplayLauncher"
             android:theme="@style/AppTheme"
             android:launchMode="singleTop"
             android:exported="true"
-            android:enabled="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.SECONDARY_HOME" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </activity>
+            android:enabled="true" />
 
         <meta-data
             android:name="com.android.systemui.action.PLUGIN_CONNECTED"

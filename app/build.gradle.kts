@@ -130,6 +130,7 @@ dependencies {
     implementation(project(":input-seat"))
     implementation(project(":input-keyboard"))
     implementation(project(":library-core"))
+    implementation(project(":display"))
     implementation(project(":shell-default"))
     implementation(project(":shell-desktop"))
     implementation(project(":shell-gamepad"))
