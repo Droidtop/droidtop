@@ -1205,12 +1205,11 @@ private fun GamesSection(
     LaunchedEffect(gamelistTheme) { EsDeNavigationSounds.load(gamelistTheme) }
     if (gamelistOptionsOpen) {
         val group = selectedGroup
-        if (group == null) {
-            gamelistOptionsOpen = false
-        } else {
+        run {
             GamelistOptionsMenu(
-                groupKey = group.label,
-                groupLabel = group.label,
+                // An empty key is the library scope: no group is open.
+                groupKey = group?.label.orEmpty(),
+                groupLabel = group?.label ?: "Library",
                 systemId = (group as? GameGroup.System)?.systemId,
                 onSortChanged = { sortVersion += 1 },
                 // A finished scrape/import refreshes the REAL library
@@ -1403,7 +1402,10 @@ private fun GamesSection(
                     // PATTERN in droidtop's own placement (short-press
                     // Select, which had no gamelist meaning; the Quick
                     // Menu stays on hold/R2).
-                    action == GamepadAction.SELECT && group != null -> {
+                    // Select opens options for WHERE YOU ARE: a system's
+                    // gamelist gets sort/scrape/import, the carousel gets
+                    // the library-wide actions.
+                    action == GamepadAction.SELECT -> {
                         gamelistOptionsOpen = true
                         true
                     }

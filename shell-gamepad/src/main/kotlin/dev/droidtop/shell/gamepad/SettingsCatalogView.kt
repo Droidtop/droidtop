@@ -263,18 +263,7 @@ fun CatalogNavigator(
 
     Column(modifier = Modifier.fillMaxSize()) {
         if (stack.size > 1 || screen.subtitle != null) {
-            Column(Modifier.padding(horizontal = 48.dp).padding(top = 18.dp, bottom = 2.dp)) {
-                Text(screen.title, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                screen.subtitle?.let {
-                    Text(
-                        it,
-                        color = Color(0xFF8A93A1),
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 2,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    )
-                }
-            }
+            MenuHeader(screen.title, screen.subtitle)
         }
         LazyColumn(
             state = listState,
@@ -308,20 +297,12 @@ fun CatalogNavigator(
                         else -> false
                     }
                 }
-                .padding(horizontal = 48.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+                .padding(MenuListPadding),
+            verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
         ) {
             itemsIndexed(rows) { index, row ->
                 Column {
-                    row.headerAbove?.let { header ->
-                        Text(
-                            header.uppercase(),
-                            color = Color(0xFF7D8794),
-                            style = MaterialTheme.typography.labelMedium,
-                            letterSpacing = androidx.compose.ui.unit.TextUnit(1.2f, androidx.compose.ui.unit.TextUnitType.Sp),
-                            modifier = Modifier.padding(top = 18.dp, bottom = 6.dp, start = 4.dp),
-                        )
-                    }
+                    row.headerAbove?.let { header -> MenuSectionLabel(header) }
                     CatalogRowView(
                         row = row,
                         isSelected = index == selected,
@@ -390,82 +371,32 @@ private fun CatalogRowView(
     onClick: () -> Unit,
 ) {
     val item = row.item
-    val accent = (item as? NestedScreenItem)?.accent?.let { Color(it) }
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (isSelected) Color(0x2BFFFFFF) else Color(0x0DFFFFFF))
-            // Touch still works alongside pure gamepad input -- same
-            // reasoning as the rest of the shell's touch support.
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-    ) {
-        if (accent != null) {
-            Box(
-                Modifier
-                    .width(4.dp)
-                    .height(32.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(accent),
-            )
-            Spacer(Modifier.width(12.dp))
-        }
-        Column(Modifier.weight(1f)) {
-            Text(
-                if (confirmArmed) "${item.title} -- press A again to confirm" else item.title,
-                color = if (confirmArmed) Color(0xFFFFB4AB) else Color.White,
-                fontWeight = FontWeight.Medium,
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-            )
-            val detail = status ?: item.subtitle
-            if (detail != null) {
-                Text(
-                    detail,
-                    color = Color(0xFF8A93A1),
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 2,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                )
-            }
-        }
-        Spacer(Modifier.width(16.dp))
-        val context = LocalContext.current
-        // Value and navigation are DIFFERENT trailing affordances: a
-        // chevron never dresses up as a value again, and "(not set)"
-        // stops shouting in body-large.
-        val chevron = item is NestedScreenItem || item is SubScreenItem
-        val value = when (item) {
-            is ChoiceItem -> item.currentLabel()
-            is ToggleItem -> if (item.current) "On" else "Off"
-            is SliderItem -> item.current.toString()
-            is TextInputItem -> if (item.secret && item.value.isNotEmpty()) "••••" else item.value.ifEmpty { null }
-            is NestedScreenItem -> item.valueLabel?.invoke(context)
-            else -> null
-        }
-        val placeholder = value == null && item is TextInputItem
-        if (value != null || placeholder) {
-            val adjustable = (item is ChoiceItem && item.options.size <= 6) || item is ToggleItem || item is SliderItem
-            Text(
-                if (isSelected && adjustable) "‹ ${value ?: ""} ›" else (value ?: "not set"),
-                color = when {
-                    placeholder -> Color(0xFF6B7480)
-                    isSelected -> Color.White
-                    else -> Color(0xFFAEB7C4)
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-            )
-        }
-        if (chevron) {
-            Spacer(Modifier.width(8.dp))
-            Text("›", color = Color(0xFF6B7480), style = MaterialTheme.typography.bodyLarge)
-        }
+    val context = LocalContext.current
+    // A chevron means "opens"; a value means "is set to". Keeping them
+    // separate is what stopped nested screens rendering a chevron in
+    // the value column.
+    val chevron = item is NestedScreenItem || item is SubScreenItem
+    val value = when (item) {
+        is ChoiceItem -> item.currentLabel()
+        is ToggleItem -> if (item.current) "On" else "Off"
+        is SliderItem -> item.current.toString()
+        is TextInputItem -> if (item.secret && item.value.isNotEmpty()) "••••" else item.value.ifEmpty { null }
+        is NestedScreenItem -> item.valueLabel?.invoke(context)
+        else -> null
     }
+    val placeholder = value == null && item is TextInputItem
+    MenuRow(
+        title = if (confirmArmed) "${item.title} -- press A again to confirm" else item.title,
+        subtitle = status ?: item.subtitle,
+        value = value ?: if (placeholder) "not set" else null,
+        placeholder = placeholder,
+        adjustable = (item is ChoiceItem && item.options.size <= 6) || item is ToggleItem || item is SliderItem,
+        chevron = chevron,
+        selected = isSelected,
+        danger = confirmArmed,
+        accent = (item as? NestedScreenItem)?.accent?.let { Color(it) },
+        onClick = onClick,
+    )
 }
 
 /** Full-screen option list for large [ChoiceItem]s (system pickers etc.). */
@@ -483,12 +414,7 @@ private fun ChoicePickerScreen(
     BackHandler { onDismiss() }
 
     Column(Modifier.fillMaxSize()) {
-        Text(
-            item.title,
-            color = Color.White,
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(horizontal = 48.dp).padding(top = 20.dp, bottom = 8.dp),
-        )
+        MenuHeader(item.title)
         LazyColumn(
             state = listState,
             modifier = Modifier
@@ -513,23 +439,14 @@ private fun ChoicePickerScreen(
                         else -> false
                     }
                 }
-                .padding(horizontal = 48.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+                .padding(MenuListPadding),
+            verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
         ) {
             itemsIndexed(item.options) { index, option ->
-                Text(
-                    option.label,
-                    color = if (index == selected) Color.White else Color(0xFFAEB7C4),
-                    fontWeight = if (index == selected) FontWeight.Medium else FontWeight.Normal,
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (index == selected) Color(0x2BFFFFFF) else Color(0x0DFFFFFF))
-                        .clickable { onPick(option.value) }
-                        .padding(horizontal = 16.dp, vertical = 9.dp),
+                MenuRow(
+                    title = option.label,
+                    selected = index == selected,
+                    onClick = { onPick(option.value) },
                 )
             }
         }
@@ -546,20 +463,20 @@ private fun TextEditDialog(
     Dialog(onDismissRequest = onDismiss) {
         Column(
             Modifier
-                .clip(RoundedCornerShape(14.dp))
-                .background(Color(0xFF1A1A1A))
+                .clip(MenuTokens.OverlayShape)
+                .background(MenuTokens.OverlaySurface)
                 .padding(20.dp),
         ) {
-            Text(item.title, color = Color(0xFFEDEDED), style = MaterialTheme.typography.titleMedium)
+            Text(item.title, color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
             item.subtitle?.let {
-                Text(it, color = Color(0xFF9AA4B2), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
+                Text(it, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
             }
             BasicTextField(
                 value = value,
                 onValueChange = { value = it },
                 singleLine = !item.multiline,
                 visualTransformation = if (item.secret) PasswordVisualTransformation() else VisualTransformation.None,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFFEDEDED)),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MenuTokens.OnSurface),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 12.dp)
@@ -571,10 +488,10 @@ private fun TextEditDialog(
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = {
                     clipboard.getText()?.text?.trim()?.takeIf { it.isNotEmpty() }?.let { value = it }
-                }) { Text("Paste", color = Color(0xFF8AB4FF)) }
+                }) { Text("Paste", color = MenuTokens.Accent) }
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = onDismiss) { Text("Cancel", color = Color(0xFF9AA4B2)) }
-                TextButton(onClick = { onCommit(value) }) { Text("Save", color = Color(0xFF8AB4FF)) }
+                TextButton(onClick = onDismiss) { Text("Cancel", color = MenuTokens.OnSurfaceMuted) }
+                TextButton(onClick = { onCommit(value) }) { Text("Save", color = MenuTokens.Accent) }
             }
         }
     }

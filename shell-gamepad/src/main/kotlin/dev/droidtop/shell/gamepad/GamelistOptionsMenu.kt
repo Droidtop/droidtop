@@ -1,16 +1,8 @@
 package dev.droidtop.shell.gamepad
 
 import android.content.Context
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -20,11 +12,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -105,18 +94,20 @@ internal fun GamelistOptionsMenu(
     var sort by remember { mutableStateOf(GamelistSortPrefs.get(context, groupKey)) }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
-    // A Dialog window drops key events unless something focusable in it
-    // actually holds focus -- confirmed live: the first build's overlay
-    // ignored every D-pad press. Same requestFocusWhenAttached guard the
-    // rest of the shell uses.
-    val menuFocus = remember { FocusRequester() }
-    androidx.compose.runtime.LaunchedEffect(Unit) { requestFocusWhenAttached(menuFocus, "Gamelist options") }
 
+    val libraryScope = groupKey.isEmpty()
     val actions = buildList {
-        add("Sort: ${sort.label}")
-        if (systemId != null) {
-            add("Scrape this system")
-            add("Import gamelist.xml")
+        if (libraryScope) {
+            // The library-wide actions that used to live in Settings.
+            add("Rescan library")
+            add("Scrape all systems")
+            add("Update platform databases")
+        } else {
+            add("Sort: ${sort.label}")
+            if (systemId != null) {
+                add("Scrape this system")
+                add("Import gamelist.xml")
+            }
         }
         add("Close")
     }
@@ -133,6 +124,60 @@ internal fun GamelistOptionsMenu(
 
     fun activate(index: Int) {
         when (actions[index]) {
+            "Rescan library" -> {
+                onScraped()
+                onDismiss()
+            }
+            "Scrape all systems" -> {
+                if (busy) return
+                busy = true
+                scope.launch {
+                    val summary = withContext(Dispatchers.IO) {
+                        val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
+                        val folders = GamesRoots.current(context).flatMap { root ->
+                            (root.listFiles() ?: emptyArray()).filter { it.isDirectory }
+                        }
+                        val targets = folders.mapNotNull { folder ->
+                            SystemOverridePrefs.resolveForFolder(
+                                context,
+                                folder.absolutePath,
+                                folder.name,
+                                systemsById,
+                            )?.let { folder to it }
+                        }
+                        if (targets.isEmpty()) {
+                            "No game folders to scrape."
+                        } else {
+                            var done = 0
+                            targets.forEach { (folder, system) ->
+                                done++
+                                status = "[$done/${targets.size}] ${system.displayName}"
+                                scrapeSystemArtwork(context, folder, system) { fileDone, total ->
+                                    status = "[$done/${targets.size}] ${system.displayName}: $fileDone/$total"
+                                }
+                            }
+                            "Scraped ${targets.size} systems."
+                        }
+                    }
+                    status = summary
+                    busy = false
+                    onScraped()
+                }
+            }
+            "Update platform databases" -> {
+                if (busy) return
+                busy = true
+                scope.launch {
+                    status = withContext(Dispatchers.IO) {
+                        runCatching {
+                            val players = dev.droidtop.library.consoles.PlayersDatabaseUpdater.update(context)
+                            val engines = dev.droidtop.library.EnginesDatabase.update(context)
+                            "Updated: $players players, $engines engines."
+                        }.getOrElse { "Update failed: ${it.message}" }
+                    }
+                    busy = false
+                }
+            }
             "Sort: ${sort.label}" -> {
                 sort = GamelistSortPrefs.cycle(context, groupKey)
                 onSortChanged()
@@ -182,15 +227,13 @@ internal fun GamelistOptionsMenu(
     }
 
     Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 8.dp,
-            modifier = Modifier
-                .width(520.dp)
-                .focusRequester(menuFocus)
-                .focusable()
-                .onPreviewKeyEvent { event ->
-                    if (event.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
+        MenuPanel(
+            modifier = Modifier.width(520.dp),
+            focusLabel = "Gamelist options",
+            onKey = { event ->
+                if (event.type != KeyEventType.KeyUp) {
+                    false
+                } else {
                     when (GamepadKeyMap.actionFor(event.key)) {
                         GamepadAction.UP -> {
                             focusIndex = (focusIndex - 1 + actions.size) % actions.size
@@ -212,38 +255,27 @@ internal fun GamelistOptionsMenu(
                         }
                         else -> false
                     }
-                },
+                }
+            },
         ) {
-            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(groupLabel, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
-                actions.forEachIndexed { index, label ->
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = if (index == focusIndex) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                if (index == focusIndex) MaterialTheme.colorScheme.surfaceVariant
-                                else MaterialTheme.colorScheme.surface,
-                            )
-                            // Touch parity, same as every other shell row.
-                            .clickable {
-                                focusIndex = index
-                                activate(index)
-                            }
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                    )
-                }
-                status?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Text(
-                    "Up/Down moves, A activates, B closes",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Text(
+                groupLabel,
+                style = MaterialTheme.typography.titleLarge,
+                color = MenuTokens.OnSurface,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            )
+            actions.forEachIndexed { index, label ->
+                MenuRow(
+                    title = label,
+                    selected = index == focusIndex,
+                    onClick = {
+                        focusIndex = index
+                        activate(index)
+                    },
                 )
             }
+            status?.let { MenuRow(title = it.lineSequence().first(), subtitle = it.substringAfter('\n', "").ifEmpty { null }) }
+            MenuHint("Up/Down moves, A activates, B closes")
         }
     }
 }
