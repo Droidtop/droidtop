@@ -240,10 +240,10 @@ enum class GameLaunchStrategy {
     /** Hand off to the third-party Kirikiroid2/krkr2 interpreter — see [Kirikiroid2]. Real, wired today, but generic-open-only (opens the app, not a specific game — see that class's own doc comment for why). */
     KIRIKIROID2,
 
-    /** Run inside a Wine prefix (`:runtime-windows`'s `WineSession`) — works for any engine's Windows/.exe export. Recognized as available; not wired to an actual running container/prefix yet (needs a real `WineSession` instance, which nothing in `library-core` has access to). */
+    /** Run inside a Wine prefix (`:runtime-windows`'s `WineSession`) — works for any engine's Windows/.exe export. Really launches, through the `PcGameRuntime` seam `:app` fills in (see `launchOnPcRuntime`) -- `library-core` reaches a live prefix without needing a `WineSession` of its own. */
     WINE_PREFIX,
 
-    /** Run as a native process inside a Linux container (`runtime-common`'s `NativeLinuxGameSession`) — only meaningful for an engine/export that actually has a Linux build. Recognized as available; not wired to an actual running container yet, same gap as [WINE_PREFIX]. */
+    /** Run as a native process inside a Linux container (`runtime-common`'s `NativeLinuxGameSession`) — only meaningful for an engine/export that actually has a Linux build. Really launches, through the same `PcGameRuntime` seam as [WINE_PREFIX]. */
     LINUX_CONTAINER,
 }
 
@@ -352,9 +352,8 @@ private fun GameEngine.toLibraryEntryKind(): LibraryEntryKind = when (this) {
  * real interpreter actually handles the entry's [GameEngine] ([EngineHost]
  * for the 11 VN-shaped engines it covers, [Kirikiroid2] for Kirikiri;
  * [GameLaunchStrategy.WINE_PREFIX]/[GameLaunchStrategy.LINUX_CONTAINER]
- * are recognized by [GameLaunchStrategyResolver] but not wired to an
- * actual running session yet), not a single hardcoded path for every
- * kind. JoiPlay direct-launch support was removed entirely (not just
+ * both launch through the `PcGameRuntime` seam), not a single hardcoded
+ * path for every kind. JoiPlay direct-launch support was removed entirely (not just
  * deprioritized) — real, confirmed: JoiPlay doesn't expose an intent
  * contract that lets an external caller launch a specific game, so the
  * old `ACTION_VIEW`-at-the-executable integration never actually worked,

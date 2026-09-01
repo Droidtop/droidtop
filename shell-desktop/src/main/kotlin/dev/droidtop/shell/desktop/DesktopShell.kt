@@ -52,11 +52,14 @@ import java.util.Locale
  * container's compositor output, which :host-bridge presents onto a real
  * Android [Surface] (see [HostBridge.presentOutput]).
  *
- * [hostBridge] and [primaryOutput] are nullable on purpose: as of this
- * writing, dev.droidtop.app.DesktopSessionService — the thing that's
- * actually supposed to create the primary container and connect a
- * [HostBridge] to its Wayland socket — is still a TODO stub (see its own
- * source). Passing null here (which :app does today) renders this shell's
+ * [hostBridge] and [primaryOutput] are nullable on purpose, but no longer
+ * because nothing fills them: dev.droidtop.app.DesktopSessionService does
+ * real orchestration (root detection, backend selection, container
+ * create/start, HostBridge connect) and MainActivity passes its live
+ * values through. They stay nullable because the session can genuinely be
+ * absent — not started, or failed — and because the non-root ProotRuntime
+ * path is still `TODO()` throughout, so on an unrooted device there is
+ * really nothing to connect to. Passing null renders this shell's
  * real chrome — taskbar, start menu, launching library entries all work
  * right now — with an honest "no desktop session" placeholder standing in
  * for the live output, rather than faking a connection that doesn't exist.

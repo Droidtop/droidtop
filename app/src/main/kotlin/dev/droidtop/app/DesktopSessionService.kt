@@ -67,9 +67,12 @@ sealed interface DesktopSessionState {
  * to actually install a compositor into it. This is what makes §3a's "any
  * OCI image works" genuinely true for the PRIMARY role too.
  *
- * [state] is how `:shell-desktop`'s `DesktopShell`/`:app`'s `MainActivity`
- * are meant to observe the real session instead of the `null`/`null`
- * placeholder they currently pass in — that wiring isn't done yet either.
+ * [state] is how `:shell-desktop`'s `DesktopShell` and `:app`'s
+ * `MainActivity` observe the real session — wired: MainActivity collects
+ * this flow and passes the live `hostBridge`/`primaryOutput` out of a
+ * `Connected` state straight into `DesktopShell`, falling back to the
+ * honest "no desktop session" message otherwise. What remains unproven is
+ * the session itself against real hardware, not the plumbing to it.
  */
 class DesktopSessionService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
