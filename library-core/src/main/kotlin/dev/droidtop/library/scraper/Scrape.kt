@@ -315,6 +315,59 @@ suspend fun importGamelistXml(
         if (missing > 0) " ($missing point at files that aren't here)." else "."
 }
 
+/**
+ * Applies a match the USER picked (see the shell's manual match picker)
+ * to one game: the same metadata write and cover download the automatic
+ * scrape performs, without the searching that got it wrong.
+ *
+ * User-edited fields are preserved exactly as the automatic path
+ * preserves them -- a manual match corrects the scraped fields, it does
+ * not reset somebody's favourite flag or their own edits.
+ */
+suspend fun applyManualMatch(
+    context: Context,
+    entry: dev.droidtop.library.LibraryEntry,
+    theGamesDbId: Int,
+): String = withContext(Dispatchers.IO) {
+    val romFile = File(entry.id)
+    val systemId = entry.systemId ?: return@withContext "No system for ${entry.title}."
+    val apiKey = TheGamesDbPrefs.apiKey(context)
+    if (apiKey.isBlank()) return@withContext "TheGamesDB needs its API key."
+    val metadata = TheGamesDbClient.metadataForId(apiKey, context.cacheDir, theGamesDbId)
+        ?: return@withContext "That match returned nothing."
+
+    val gamesRoot = dev.droidtop.library.GamesRoots.current(context)
+        .firstOrNull { romFile.absolutePath.startsWith(it.absolutePath) }
+        ?: romFile.parentFile?.parentFile
+    val baseName = romFile.nameWithoutExtension
+    if (gamesRoot != null && metadata.coverUrl != null) {
+        val destination = File(
+            File(File(File(gamesRoot, "downloaded_media"), systemId), "covers"),
+            "$baseName.png",
+        )
+        // A hand-picked match REPLACES the wrong cover; the automatic
+        // path skips an existing file, which here would leave the
+        // picture of the game the user just rejected.
+        runCatching { downloadImage(metadata.coverUrl, destination) }
+        runCatching { File(File(File(gamesRoot, "downloaded_media"), systemId), "miximages/$baseName.png").delete() }
+    }
+
+    val dao = RomDatabase.get(context).romDao()
+    val existing = dao.getGameMetadataSingle(romFile.absolutePath)
+    dao.upsertGameMetadata(
+        (existing ?: GameMetadataEntity(id = romFile.absolutePath)).copy(
+            description = metadata.description ?: existing?.description,
+            developer = metadata.developer ?: existing?.developer,
+            publisher = metadata.publisher ?: existing?.publisher,
+            genre = metadata.genre ?: existing?.genre,
+            releaseDate = metadata.releaseDate ?: existing?.releaseDate,
+            players = metadata.players ?: existing?.players,
+            scrapeConfidence = "manual",
+        ),
+    )
+    "Matched ${entry.title} to ${metadata.name ?: "that entry"}."
+}
+
 /** Downloads [imageUrl] straight to [destination], creating parent directories as needed -- a plain generic helper, not tied to any one scraper source. */
 private fun downloadImage(imageUrl: String, destination: File) {
     destination.parentFile?.mkdirs()
