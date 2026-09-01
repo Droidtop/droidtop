@@ -206,12 +206,21 @@ fun GamepadShell(
     // the several seconds a cold emulator start takes, which reads as a
     // hang rather than as work).
     var launching by remember { mutableStateOf<LibraryEntry?>(null) }
+    // Kiosk/Kid: read once per composition of the shell, and re-read
+    // when the Quick Menu changes it (UiModeRefresh).
+    val uiMode by dev.droidtop.library.settings.UiModeRefresh.mode.collectAsState()
+    LaunchedEffect(Unit) { dev.droidtop.library.settings.UiModeRefresh.load(context) }
     // Idle tracking for the screensaver: every key press the shell sees
     // bumps this, and the timer below restarts from it. A launch counts
     // as activity too (the shell is not idle, it is behind a game).
     var lastInputMs by remember { mutableStateOf(android.os.SystemClock.elapsedRealtime()) }
     var screensaverOn by remember { mutableStateOf(false) }
     val screensaverMode = remember { ScreensaverPrefs.mode(context) }
+    LaunchedEffect(uiMode) {
+        if (uiMode.hidesSettings && section == HandheldSection.SETTINGS) {
+            section = HandheldSection.GAMES
+        }
+    }
     LaunchedEffect(lastInputMs, screensaverMode, launching) {
         if (screensaverMode == ScreensaverMode.OFF || launching != null) return@LaunchedEffect
         kotlinx.coroutines.delay(screensaverMode.idleSeconds * 1000L)
@@ -430,7 +439,7 @@ fun GamepadShell(
                     }
                 }
                 if (event.type != KeyEventType.KeyUp || detailEntry != null) return@onKeyEvent false
-                val sections = HandheldSection.entries
+                val sections = sectionsFor(uiMode)
                 val currentIndex = sections.indexOf(section)
                 when (GamepadKeyMap.actionFor(event.key)) {
                     GamepadAction.L -> {
@@ -450,6 +459,7 @@ fun GamepadShell(
             onSelect = selectSection,
             currentTabFocus = tabBarFocus,
             onQuickMenu = { quickMenuOpen = true },
+            sections = sectionsFor(uiMode),
         )
         // Launch-failure banner (see onLaunch's crash boundary): visible,
         // dismisses itself after a few seconds, never blocks input.
@@ -561,7 +571,9 @@ fun GamepadShell(
                 section == HandheldSection.APPS && appEntries == null -> CircularProgressIndicator(color = Color.White)
                 else -> when (section) {
                     HandheldSection.GAMES -> GamesSection(
-                        entries = gameEntries.orEmpty(),
+                        entries = gameEntries.orEmpty().let { all ->
+                            if (uiMode.kidGamesOnly) all.filter { it.kidGame } else all
+                        },
                         library = library,
                         onLaunch = onLaunch,
                         onShowDetail = { detailEntry = it },
@@ -1004,6 +1016,18 @@ private fun ButtonHint(button: String, action: String) {
 
 internal enum class HandheldSection { GAMES, APPS, SETTINGS }
 
+/**
+ * The sections a given UI mode allows. Kiosk and Kid hide Settings --
+ * the point of both is handing the device to somebody without handing
+ * over the device's configuration.
+ */
+internal fun sectionsFor(mode: dev.droidtop.library.settings.UiMode): List<HandheldSection> =
+    if (mode.hidesSettings) {
+        listOf(HandheldSection.GAMES, HandheldSection.APPS)
+    } else {
+        HandheldSection.entries
+    }
+
 private val APP_KINDS = setOf(
     LibraryEntryKind.NATIVE_ANDROID_APP,
     LibraryEntryKind.WINE_PROFILE,
@@ -1028,12 +1052,13 @@ private fun SectionTabBar(
     onSelect: (HandheldSection) -> Unit,
     currentTabFocus: FocusRequester,
     onQuickMenu: () -> Unit,
+    sections: List<HandheldSection> = HandheldSection.entries,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(32.dp),
     ) {
-        HandheldSection.entries.forEach { entrySection ->
+        sections.forEach { entrySection ->
             val focused = entrySection == current
             Text(
                 text = entrySection.displayName(),
