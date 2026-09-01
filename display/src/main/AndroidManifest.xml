@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The ONE holder of android.intent.category.SECONDARY_HOME in droidtop.
+
+  shell-default's forked Launcher3 used to declare its own
+  SecondaryDisplayLauncher for this category while the Handheld shell
+  pushed a Presentation at the same display by hand. Two claimants plus
+  the platform's own placement is the duplication docs/SPEC.md section 4c
+  directs us to remove; the active mode now selects what this single
+  activity renders.
+
+  Attributes match what a home activity needs and what iiSU's own
+  SecondaryHomeActivity declares: re-delivered rather than recreated,
+  able to start with no saved state, and not a task the user navigates
+  back through.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <activity
+            android:name="dev.droidtop.display.SecondaryDisplayActivity"
+            android:exported="true"
+            android:enabled="true"
+            android:launchMode="singleTop"
+            android:stateNotNeeded="true"
+            android:excludeFromRecents="true"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboardHidden|keyboard">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.SECONDARY_HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
