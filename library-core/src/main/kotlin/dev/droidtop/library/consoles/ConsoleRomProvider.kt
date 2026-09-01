@@ -489,6 +489,12 @@ class ConsoleRomProvider(
             val entryWithCollection = if (entry.id in inAnyCollection) entry.copy(inCollection = true) else entry
             if (meta == null) return@map entryWithCollection
             entryWithCollection.copy(
+                // downloaded_media convention first; an imported
+                // gamelist.xml's own referenced files fill the gaps.
+                artworkUri = entryWithCollection.artworkUri
+                    ?: meta.artworkPath?.takeIf { java.io.File(it).isFile },
+                videoUri = entryWithCollection.videoUri
+                    ?: meta.videoPath?.takeIf { java.io.File(it).isFile },
                 description = meta.description,
                 developer = meta.developer,
                 publisher = meta.publisher,

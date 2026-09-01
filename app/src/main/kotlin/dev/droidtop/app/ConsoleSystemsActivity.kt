@@ -230,6 +230,63 @@ internal suspend fun scrapeSystemArtwork(
         "${missing.size - found - failed}, $failed failed (of ${missing.size} matching the filter)."
 }
 
+/**
+ * Ingests an external scraper's gamelist.xml for [folder] (docs/SPEC.md
+ * section 7b, directed 2026-08-31): metadata upserts into the same
+ * game_metadata rows the built-in scraper fills, media stays exactly
+ * where the external tool wrote it (referenced by absolute path, never
+ * copied). favorite/completed merge as logical OR with what the user
+ * already set here; everything else the gamelist carries overwrites the
+ * scraper-owned fields, which is what "import" means.
+ */
+internal suspend fun importGamelistXml(
+    context: android.content.Context,
+    folder: File,
+): String = withContext(Dispatchers.IO) {
+    val gamelist = dev.droidtop.library.consoles.GamelistXml.fileFor(folder)
+    if (!gamelist.isFile) return@withContext "No gamelist.xml in ${folder.name} -- run an external scraper against this folder first."
+    val entries = try {
+        dev.droidtop.library.consoles.GamelistXml.parse(gamelist)
+    } catch (t: Exception) {
+        return@withContext "Couldn't parse ${gamelist.absolutePath}: ${t.message}"
+    }
+    val dao = RomDatabase.get(context).romDao()
+    var imported = 0
+    var missing = 0
+    entries.forEach { entry ->
+        val romFile = dev.droidtop.library.consoles.GamelistXml.resolve(folder, entry.path)
+        if (!romFile.isFile) {
+            missing++
+            return@forEach
+        }
+        val artwork = entry.imagePath
+            ?.let { dev.droidtop.library.consoles.GamelistXml.resolve(folder, it) }
+            ?.takeIf { it.isFile }?.absolutePath
+        val video = entry.videoPath
+            ?.let { dev.droidtop.library.consoles.GamelistXml.resolve(folder, it) }
+            ?.takeIf { it.isFile }?.absolutePath
+        val existing = dao.getGameMetadataSingle(romFile.absolutePath)
+        dao.upsertGameMetadata(
+            (existing ?: GameMetadataEntity(id = romFile.absolutePath)).copy(
+                description = entry.description ?: existing?.description,
+                developer = entry.developer ?: existing?.developer,
+                publisher = entry.publisher ?: existing?.publisher,
+                genre = entry.genre ?: existing?.genre,
+                releaseDate = entry.releaseDate ?: existing?.releaseDate,
+                rating = entry.rating ?: existing?.rating,
+                players = entry.players ?: existing?.players,
+                favorite = (existing?.favorite == true) || entry.favorite,
+                completed = (existing?.completed == true) || entry.completed,
+                artworkPath = artwork ?: existing?.artworkPath,
+                videoPath = video ?: existing?.videoPath,
+            ),
+        )
+        imported++
+    }
+    "${folder.name}: imported $imported of ${entries.size} gamelist entries" +
+        if (missing > 0) " ($missing point at files that aren't here)." else "."
+}
+
 /** Downloads [imageUrl] straight to [destination], creating parent directories as needed -- a plain generic helper, not tied to any one scraper source. */
 private fun downloadImage(imageUrl: String, destination: File) {
     destination.parentFile?.mkdirs()
