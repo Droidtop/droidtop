@@ -66,6 +66,8 @@ object MenuTokens {
     val Placeholder = Color(0xFF6B7480)
     val Accent = Color(0xFF8AB4FF)
     val Danger = Color(0xFFFFB4AB)
+    /** "This is on / included" -- the one affirmative in the menus. */
+    val Affirmative = Color(0xFF7FE08A)
     val SectionLabel = Color(0xFF7D8794)
 
     val RowShape = RoundedCornerShape(10.dp)

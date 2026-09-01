@@ -202,7 +202,7 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
 private fun SectionLabel(text: String) {
     Text(
         text.uppercase(),
-        color = Color(0xFF9A9A9A),
+        color = MenuTokens.OnSurfaceMuted,
         style = MaterialTheme.typography.labelMedium,
         modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
     )
@@ -249,12 +249,12 @@ private fun MetadataToggleRow(label: String, value: Boolean, onToggle: (Boolean)
                     false
                 }
             }
-            .background(if (focused) Color(0xFF2A2A2A) else Color.Transparent, RoundedCornerShape(8.dp))
+            .background(if (focused) MenuTokens.SurfaceSelected else Color.Transparent, RoundedCornerShape(8.dp))
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(label, color = Color.White, style = MaterialTheme.typography.bodyLarge)
-        Text(if (value) "On" else "Off", color = if (value) Color(0xFF7FE08A) else Color.Gray, style = MaterialTheme.typography.bodyLarge)
+        Text(if (value) "On" else "Off", color = if (value) MenuTokens.Affirmative else Color.Gray, style = MaterialTheme.typography.bodyLarge)
     }
 }
 
@@ -275,7 +275,7 @@ private fun MetadataPickerRow(label: String, currentValueLabel: String, onClick:
                     false
                 }
             }
-            .background(if (focused) Color(0xFF2A2A2A) else Color.Transparent, RoundedCornerShape(8.dp))
+            .background(if (focused) MenuTokens.SurfaceSelected else Color.Transparent, RoundedCornerShape(8.dp))
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -333,7 +333,7 @@ private fun ControllerRow(label: String, isCurrent: Boolean, onPick: () -> Unit)
                     false
                 }
             }
-            .background(if (focused) Color(0xFF2A2A2A) else Color.Transparent, RoundedCornerShape(8.dp))
+            .background(if (focused) MenuTokens.SurfaceSelected else Color.Transparent, RoundedCornerShape(8.dp))
             .padding(12.dp),
     )
 }

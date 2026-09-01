@@ -965,9 +965,9 @@ object AppSettingsCatalogs {
     private fun scraperScreen() = CatalogScreen(
         id = SCREEN_SCRAPER,
         title = "Artwork & metadata scraper",
-        subtitle = "One source at a time, exactly like real ES-DE. ScreenScraper needs at least a dev ID " +
-            "(or the debug credentials file); TheGamesDB needs its own free API key. Without either, " +
-            "only the keyless libretro boxart fallback fills anything",
+        subtitle = "One source at a time, like real ES-DE. TheGamesDB needs its own free API key; " +
+            "ScreenScraper needs a registered developer ID, which droidtop does not have yet. " +
+            "The libretro database needs no account at all",
         groups = { context ->
             listOf(
                 CatalogGroup(
