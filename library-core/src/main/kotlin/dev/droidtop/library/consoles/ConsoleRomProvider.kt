@@ -53,9 +53,28 @@ fun availablePlayers(context: Context, system: ConsoleSystemDef): List<Player.Am
     return (custom + known + listOfNotNull(retroArch)).filter { isPackageInstalled(context, it.packageName) }
 }
 
-/** [PlayerOverridePrefs]'s choice if it's still a real, available candidate; otherwise the first available one. */
-fun resolvePlayer(context: Context, system: ConsoleSystemDef): Player.AmStart? {
+/**
+ * Which player actually launches a game, most specific choice first:
+ * the GAME's own alternative emulator, then the SYSTEM's override, then
+ * the first available candidate.
+ *
+ * [altEmulator] is real ES-DE's own per-game concept (MetaData.cpp's
+ * `altemulator`), which droidtop has stored and rendered a badge for
+ * since the metadata editor existed while the launch path ignored it
+ * entirely -- a setting that looked applied and did nothing. Matched
+ * against both the player id and its label, because a person editing
+ * that field by hand types the name they see ("RetroArch"), not an
+ * internal id. An alternative naming nothing installed falls through to
+ * the system's own choice rather than failing the launch: the game
+ * still starts, just not with a player that isn't there.
+ */
+fun resolvePlayer(context: Context, system: ConsoleSystemDef, altEmulator: String? = null): Player.AmStart? {
     val candidates = availablePlayers(context, system)
+    val alt = altEmulator?.trim()?.takeIf { it.isNotEmpty() }
+    if (alt != null) {
+        candidates.firstOrNull { it.id.equals(alt, ignoreCase = true) || it.name.equals(alt, ignoreCase = true) }
+            ?.let { return it }
+    }
     val overrideId = PlayerOverridePrefs.get(context, system.id)
     return candidates.firstOrNull { it.id == overrideId } ?: candidates.firstOrNull()
 }
@@ -613,7 +632,7 @@ class ConsoleRomProvider(
         val system = entry.systemId?.let { systemsById[it] }
             ?: SystemOverridePrefs.resolveForFolder(context, parentFolder?.absolutePath ?: "", parentFolder?.name ?: "", systemsById)
             ?: error("Couldn't resolve a console system for ${entry.id}")
-        val player = resolvePlayer(context, system)
+        val player = resolvePlayer(context, system, entry.altEmulator)
             ?: error(noEmulatorInstalledMessage(context, system))
         if (player.killPackageProcesses) killPackageProcessesBestEffort(player.packageName)
         // Beyond {file.path}/{file.uri}: the MAME4droid presets generated
