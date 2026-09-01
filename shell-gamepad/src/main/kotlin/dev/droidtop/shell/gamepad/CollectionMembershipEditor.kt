@@ -160,13 +160,13 @@ private fun CollectionToggleRow(label: String, isMember: Boolean?, onClick: () -
                     false
                 }
             }
-            .background(if (focused) Color(0xFF2A2A2A) else Color.Transparent, RoundedCornerShape(8.dp))
+            .background(if (focused) MenuTokens.SurfaceSelected else Color.Transparent, RoundedCornerShape(8.dp))
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(label, color = Color.White, style = MaterialTheme.typography.bodyLarge)
         if (isMember != null) {
-            Text(if (isMember) "In collection" else "Not in collection", color = if (isMember) Color(0xFF7FE08A) else Color.Gray, style = MaterialTheme.typography.bodyLarge)
+            Text(if (isMember) "In collection" else "Not in collection", color = if (isMember) MenuTokens.Affirmative else Color.Gray, style = MaterialTheme.typography.bodyLarge)
         }
     }
 }
