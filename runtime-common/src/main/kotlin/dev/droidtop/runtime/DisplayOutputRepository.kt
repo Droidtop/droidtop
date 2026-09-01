@@ -58,6 +58,9 @@ class DisplayOutputRepository(private val context: Context) {
     // this repository never reports the display existing in the first
     // place. Also drops the STATE_ON filter this same real reference
     // implementation never applies, for the same reason.
+    /** One-shot read, for callers that act rather than observe. */
+    fun currentOutputsSnapshot(): List<DisplayOutput> = currentOutputs()
+
     private fun currentOutputs(): List<DisplayOutput> {
         val primary = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
         val presentationDisplays = displayManager.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)

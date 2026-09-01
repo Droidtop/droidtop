@@ -60,6 +60,8 @@ object HandheldSettingsCatalog {
     const val ID_GAME_FOLDERS = "pref_handheld_game_folders"
     const val ID_DISPLAY_SHELL_TARGET = "pref_display_shell_target"
     const val ID_DISPLAY_GAME_LAUNCH_TARGET = "pref_display_game_launch_target"
+    const val ID_DISPLAY_SWAP = "action_display_swap"
+    const val ID_DISPLAY_REINIT = "action_display_reinit"
     const val ID_RESCAN_LIBRARY = "pref_handheld_rescan_library"
     const val ID_THEME = "pref_handheld_theme"
     const val ID_THEME_COLOR_SCHEME = "pref_handheld_theme_colorscheme"
@@ -175,6 +177,26 @@ object HandheldSettingsCatalog {
                 )
                 add(displayShellTargetItem(context))
                 add(displayGameLaunchTargetItem(context))
+                // Detection can only guess which physical panel is which --
+                // Android exposes no position signal -- so the correction
+                // is an action, right here in the Quick Menu's System tab,
+                // reachable from whichever screen the user is looking at.
+                add(
+                    AsyncActionItem(
+                        id = ID_DISPLAY_SWAP,
+                        title = "Swap screens",
+                        subtitle = "Move the shell to the other panel when droidtop guessed wrong",
+                        run = { ctx, _ -> dev.droidtop.runtime.DisplayArrangement.swap(ctx) },
+                    ),
+                )
+                add(
+                    ActionItem(
+                        id = ID_DISPLAY_REINIT,
+                        title = "Reinitialize displays",
+                        subtitle = "Detect connected screens again and re-place the shell",
+                        run = { _ -> dev.droidtop.runtime.DisplayArrangement.reinitialize() },
+                    ),
+                )
                 add(
                     ActionItem(
                         id = ID_RESCAN_LIBRARY,
