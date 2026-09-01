@@ -19,6 +19,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -50,10 +58,12 @@ object ScreensaverPrefs {
     private const val PREFS_NAME = "com.android.launcher3.prefs"
     private const val KEY_MODE = "droidtop_screensaver_mode"
 
+    // OFF by default (directed): a slideshow that appears on its own
+    // is an interruption unless somebody asked for it.
     fun mode(context: Context): ScreensaverMode {
         val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(KEY_MODE, null) ?: return ScreensaverMode.AFTER_5
-        return runCatching { ScreensaverMode.valueOf(raw) }.getOrDefault(ScreensaverMode.AFTER_5)
+            .getString(KEY_MODE, null) ?: return ScreensaverMode.OFF
+        return runCatching { ScreensaverMode.valueOf(raw) }.getOrDefault(ScreensaverMode.OFF)
     }
 
     fun setMode(context: Context, mode: ScreensaverMode) {
@@ -70,13 +80,38 @@ object ScreensaverPrefs {
 private const val SLIDE_SECONDS = 12L
 
 @Composable
-internal fun Screensaver(entries: List<LibraryEntry>) {
+internal fun Screensaver(entries: List<LibraryEntry>, onDismiss: () -> Unit) {
+    // Owns focus and input: any key or tap dismisses it. Without this
+    // the shell's own key handler never runs, because entering this
+    // branch leaves nothing in the tree focused and an unfocused
+    // Compose tree receives no key events (confirmed on device: the
+    // screensaver appeared and could not be dismissed).
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { requestFocusWhenAttached(focus, "Screensaver") }
+    val dismissModifier = Modifier
+        .focusRequester(focus)
+        .focusable()
+        .onKeyEvent { event ->
+            if (event.type == KeyEventType.KeyDown) {
+                onDismiss()
+                true
+            } else {
+                // Swallow the matching key-up too, or it reaches
+                // whatever the screensaver was covering.
+                true
+            }
+        }
+        .pointerInput(Unit) { detectTapGestures { onDismiss() } }
+
     val withArt = remember(entries) { entries.filter { it.artworkUri != null } }
     if (withArt.isEmpty()) {
         // Nothing scraped yet: still dim the shell rather than leaving a
         // menu burning in, but say why it is empty instead of showing a
         // black rectangle that looks like a crash.
-        Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.fillMaxSize().background(Color.Black).then(dismissModifier),
+            contentAlignment = Alignment.Center,
+        ) {
             Text(
                 "Nothing scraped yet",
                 color = MenuTokens.Placeholder,
@@ -96,7 +131,7 @@ internal fun Screensaver(entries: List<LibraryEntry>) {
     }
     val entry = withArt[index.coerceIn(withArt.indices)]
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    Box(Modifier.fillMaxSize().background(Color.Black).then(dismissModifier)) {
         Crossfade(targetState = entry, animationSpec = tween(1200), label = "screensaver-slide") { shown ->
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 AsyncImage(
