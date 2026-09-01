@@ -76,11 +76,19 @@ object LibretroThumbnails {
      * the system has no known playlist name or the repo has no file
      * under this name. One HEAD-equivalent GET; the caller downloads.
      */
-    fun coverUrl(systemId: String, gameName: String): String? {
+    fun coverUrl(systemId: String, gameName: String): String? = urlFor(systemId, gameName, "Named_Boxarts")
+
+    /** In-game screenshot repo (the thumbnails project's Named_Snaps). */
+    fun screenshotUrl(systemId: String, gameName: String): String? = urlFor(systemId, gameName, "Named_Snaps")
+
+    /** Title-screen repo (Named_Titles). */
+    fun titleUrl(systemId: String, gameName: String): String? = urlFor(systemId, gameName, "Named_Titles")
+
+    private fun urlFor(systemId: String, gameName: String, repo: String): String? {
         val systemName = SYSTEM_NAMES[systemId] ?: return null
         val encodedSystem = URLEncoder.encode(systemName, "UTF-8").replace("+", "%20")
         val encodedName = URLEncoder.encode(thumbnailName(gameName), "UTF-8").replace("+", "%20")
-        val url = "https://thumbnails.libretro.com/$encodedSystem/Named_Boxarts/$encodedName.png"
+        val url = "https://thumbnails.libretro.com/$encodedSystem/$repo/$encodedName.png"
         return runCatching {
             val connection = URL(url).openConnection() as HttpURLConnection
             connection.requestMethod = "HEAD"
