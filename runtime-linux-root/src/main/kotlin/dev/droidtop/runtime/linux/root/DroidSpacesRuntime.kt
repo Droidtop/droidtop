@@ -1,5 +1,7 @@
 package dev.droidtop.runtime.linux.root
 
+import dev.droidtop.runtime.RootProcess
+import dev.droidtop.runtime.RootProcessResult
 import android.content.Context
 import dev.droidtop.runtime.Container
 import dev.droidtop.runtime.ContainerBackend

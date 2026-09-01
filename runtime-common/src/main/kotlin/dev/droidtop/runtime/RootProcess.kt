@@ -1,4 +1,4 @@
-package dev.droidtop.runtime.linux.root
+package dev.droidtop.runtime
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -10,9 +10,11 @@ data class RootProcessResult(val exitCode: Int, val stdout: String, val stderr: 
 
 /**
  * Runs a command as root via `su -c`, the standard interface every common
- * Android root solution (Magisk, KernelSU, APatch) provides — droidspaces
- * itself needs root for the namespace/cgroup/mount operations its CLI
- * performs (see vendor/droidspaces' `check` command, which verifies this).
+ * Android root solution (Magisk, KernelSU, APatch) provides. Lives in
+ * runtime-common because more than one consumer needs it: droidspaces
+ * (namespace/cgroup/mount operations, see vendor/droidspaces' `check`
+ * command) and the GameNative migration in :runtime-windows, which
+ * reads another app's data directory with the user's consent.
  *
  * UNVERIFIED against a real device: written against the documented `su -c`
  * contract every root solution follows, but never actually run against

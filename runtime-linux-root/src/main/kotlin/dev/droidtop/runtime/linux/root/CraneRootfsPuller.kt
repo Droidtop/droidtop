@@ -1,5 +1,6 @@
 package dev.droidtop.runtime.linux.root
 
+import dev.droidtop.runtime.RootProcess
 import android.content.Context
 import dev.droidtop.runtime.ImageCache
 import dev.droidtop.runtime.ImageCachePolicy

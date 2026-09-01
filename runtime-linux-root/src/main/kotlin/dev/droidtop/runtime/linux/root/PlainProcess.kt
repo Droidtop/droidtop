@@ -1,5 +1,7 @@
 package dev.droidtop.runtime.linux.root
 
+import dev.droidtop.runtime.RootProcess
+import dev.droidtop.runtime.RootProcessResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
