@@ -18,8 +18,11 @@ suspend fun scrapeSystemArtwork(
     context: android.content.Context,
     folder: File,
     system: ConsoleSystemDef,
-    onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
+    // Before onProgress on purpose: every existing call site passes the
+    // progress callback as a trailing lambda, which binds to the LAST
+    // parameter.
     onlyRom: File? = null,
+    onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
 ): String = withContext(Dispatchers.IO) {
     val gamesRoot = folder.parentFile ?: folder
     val romFiles = folder.walkTopDown().filter { it.isFile && it.extension.lowercase() in system.extensions }.toList()
