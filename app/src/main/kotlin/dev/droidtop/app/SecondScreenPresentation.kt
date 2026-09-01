@@ -52,7 +52,7 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
     // Its own host, so widgets the user already added render on this
     // display too. Listening starts/stops with the presentation.
     private val widgetManager = android.appwidget.AppWidgetManager.getInstance(outerContext)
-    private val widgetHost = android.appwidget.AppWidgetHost(outerContext, COMPANION_WIDGET_HOST_ID)
+    private val widgetHost = CompanionWidgets.host(outerContext)
     private val widgetIds = CompanionWidgetPrefs.widgetIds(outerContext)
 
     private val savedStateOwner = object : SavedStateRegistryOwner {
@@ -98,19 +98,13 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
         super.onStart()
         // Without this a hosted widget renders once and then never
         // updates -- no clock tick, no now-playing change.
-        runCatching { widgetHost.startListening() }
+        CompanionWidgets.startListening(context)
         lifecycleOwner.registry.currentState = Lifecycle.State.RESUMED
     }
 
     override fun onStop() {
-        runCatching { widgetHost.stopListening() }
+        CompanionWidgets.stopListening()
         lifecycleOwner.registry.currentState = Lifecycle.State.DESTROYED
         super.onStop()
-    }
-
-    private companion object {
-        // Distinct from CompanionActivity's host id: two AppWidgetHosts
-        // sharing an id in one process fight over the same listener set.
-        const val COMPANION_WIDGET_HOST_ID = 0x64726F71
     }
 }
