@@ -746,12 +746,22 @@ private fun LibraryEntry.toRomEntity(romsRoot: String, systemFolderId: String): 
     systemFolderId = systemFolderId,
 )
 
-private fun RomEntity.toLibraryEntry(): LibraryEntry = LibraryEntry(
-    id = id,
-    title = title,
-    kind = LibraryEntryKind.CONSOLE_ROM,
-    systemId = systemId,
-    artworkUri = artworkUri,
-    manualUri = manualUri,
-    videoUri = videoUri,
-)
+private fun RomEntity.toLibraryEntry(): LibraryEntry {
+    // Media resolves LIVE against the filesystem, not from the cached
+    // column: artwork scraped AFTER this row was cached must show
+    // without a manual rescan, and a freshly composed miximage must
+    // outrank whatever cover the scan once saw (EsDeArtwork's own
+    // miximages-first priority). The persisted value stays as the
+    // fallback for anything the convention walk can't see.
+    val baseName = File(id).nameWithoutExtension
+    val root = File(romsRoot)
+    return LibraryEntry(
+        id = id,
+        title = title,
+        kind = LibraryEntryKind.CONSOLE_ROM,
+        systemId = systemId,
+        artworkUri = EsDeArtwork.resolve(root, systemId, baseName) ?: artworkUri,
+        manualUri = manualUri,
+        videoUri = EsDeArtwork.resolveVideo(root, systemId, baseName) ?: videoUri,
+    )
+}
