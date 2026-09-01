@@ -10,10 +10,10 @@ import android.content.Context
  * have several real candidate launch paths, same idea as Daijishō's
  * `PlatformEntity.playerIdList`/`defaultPlayerId` this whole session keeps
  * coming back to). Stores [GameLaunchStrategy.name], keyed by
- * [LibraryEntry.id]. No settings UI wired to this yet -- see
- * [EngineGameProvider.launch]'s own doc comment for why a real per-entry
- * picker (matching ConsoleSystemsActivity's PlayerPicker) is the natural
- * next step, not built in this pass.
+ * [LibraryEntry.id]. A real per-entry picker IS wired to this: the
+ * Handheld shell's game detail screen reads it and writes the user's
+ * choice back (see `GamepadShell`), matching ConsoleSystemsActivity's
+ * PlayerPicker for ROMs.
  */
 object LaunchStrategyOverridePrefs {
     private const val PREFS_NAME = "com.android.launcher3.prefs"
