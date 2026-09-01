@@ -95,6 +95,14 @@ include(":input-seat")
 // layer a future launcher shell (:shell-gamepad) will read from.
 include(":library-core")
 
+// Secondary-display behaviour for EVERY mode, in one place: the single
+// SECONDARY_HOME activity plus the mode registry that selects what it
+// renders. Exists because shell-default's forked Launcher3 and the
+// Handheld shell each had their own second-screen handling and competed
+// for the same display -- see docs/SPEC.md section 4c. Depends only on
+// :runtime-common, so no shell owns the type the other shells read.
+include(":display")
+
 // "Standard" shell: forked-in Murine Launcher (github.com/alesimula/Murine-launcher,
 // itself a de-privileged, standalone-Gradle-buildable fork of AOSP Launcher3),
 // stripped/patched for droidtop rather than kept as a passive vendor/ reference —

@@ -35,6 +35,13 @@ import dev.droidtop.library.displayName
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
+ * NOTE: the `SecondScreenPresentation` class that used to head this file
+ * is gone. droidtop no longer pushes a `Presentation` at the second
+ * screen; `:display`'s `SecondaryDisplayActivity` holds
+ * `SECONDARY_HOME` and the platform places it (docs/SPEC.md section 4c).
+ * What remains here is the companion's own state and backdrop, which
+ * both hosts still render.
+ *
  * Rich companion display for the second/lower screen — per direction:
  * "we want the second screen to be a very rich informational display,"
  * not just a passive keyboard/trackpad surface. `android.app.Presentation`
@@ -56,83 +63,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * documented, standard Android API usage, but this exact class has not
  * been run against a live second screen.
  */
-class SecondScreenPresentation(outerContext: Context, display: Display) : android.app.Presentation(outerContext, display) {
-    private val lifecycleOwner = object : LifecycleOwner {
-        val registry = LifecycleRegistry(this)
-        override val lifecycle: Lifecycle get() = registry
-    }
-    // Its own host, so widgets the user already added render on this
-    // display too. Listening starts/stops with the presentation.
-    private val widgetManager = android.appwidget.AppWidgetManager.getInstance(outerContext)
-    private val widgetHost = android.appwidget.AppWidgetHost(outerContext, COMPANION_WIDGET_HOST_ID)
-    private val widgetIds = CompanionWidgetPrefs.widgetIds(outerContext)
-
-    private val savedStateOwner = object : SavedStateRegistryOwner {
-        val controller = SavedStateRegistryController.create(this)
-        override val lifecycle: Lifecycle get() = lifecycleOwner.lifecycle
-        override val savedStateRegistry: SavedStateRegistry get() = controller.savedStateRegistry
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        savedStateOwner.controller.performRestore(null)
-        lifecycleOwner.registry.currentState = Lifecycle.State.CREATED
-
-        val composeView = ComposeView(context).apply {
-            setViewTreeLifecycleOwner(lifecycleOwner)
-            setViewTreeSavedStateRegistryOwner(savedStateOwner)
-            setContent {
-                val entry by CompanionState.focusedEntry.collectAsState()
-                // darkTheme = true: an ambient always-dark companion
-                // surface (black ground is the design, like an idle
-                // screen) -- see DroidtopTheme's own doc comment.
-                dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
-                    // The SAME surface CompanionActivity hosts, not a
-                    // reduced copy -- see CompanionSurface's doc comment
-                    // for the bug that divergence caused.
-                    CompanionSurface(
-                        entry = entry,
-                        widgetIds = widgetIds,
-                        widgetManager = widgetManager,
-                        widgetHost = widgetHost,
-                        // No add/remove controls: binding a widget needs an
-                        // Activity result and a Presentation cannot receive
-                        // one. Already-added widgets still render here.
-                        controls = null,
-                    )
-                }
-            }
-        }
-        setContentView(composeView)
-    }
-
-    override fun onStart() {
-        super.onStart()
-        // Without this a hosted widget renders once and then never
-        // updates -- no clock tick, no now-playing change.
-        runCatching { widgetHost.startListening() }
-        lifecycleOwner.registry.currentState = Lifecycle.State.RESUMED
-    }
-
-    override fun onStop() {
-        runCatching { widgetHost.stopListening() }
-        lifecycleOwner.registry.currentState = Lifecycle.State.DESTROYED
-        super.onStop()
-    }
-
-    private companion object {
-        // Distinct from CompanionActivity's host id: two AppWidgetHosts
-        // sharing an id in one process fight over the same listener set.
-        const val COMPANION_WIDGET_HOST_ID = 0x64726F71
-    }
-}
-
 /**
  * The one place the focused-entry feed lives — written by whatever drives
  * the shell ([dev.droidtop.shell.gamepad.GamepadShell]'s focus callback,
  * via MainActivity), read by BOTH companion hosts ([CompanionActivity] on
  * the built-in screen when the shell is on the addon, and
- * [SecondScreenPresentation] on the addon when the shell stays built-in).
+ * :display's SecondaryDisplayActivity on the addon when the shell
+ * stays built-in).
  * A process-wide flow rather than a field on either host, since which
  * host exists changes with [DisplayRolePrefs] + live display attach.
  */

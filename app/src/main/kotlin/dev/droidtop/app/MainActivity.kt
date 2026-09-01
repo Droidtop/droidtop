@@ -65,7 +65,6 @@ import kotlinx.coroutines.launch
  */
 class MainActivity : AppCompatActivity() {
 
-    private var secondScreenPresentation: SecondScreenPresentation? = null
     private lateinit var library: Library
     private var mode by mutableStateOf<String?>(null)
 
@@ -339,7 +338,7 @@ class MainActivity : AppCompatActivity() {
      * addon is the upper/main screen) and the built-in screen gets the
      * widgets panel ([CompanionActivity] — a real Activity, since
      * `Presentation` can only target non-default displays). The
-     * [SecondScreenPresentation] path stays as the real implementation of
+     * companion path stays as the real implementation of
      * the other choice (shell on built-in, widgets on the addon). Launch
      * ordering under SECOND_WHEN_PRESENT: companion first, then the shell
      * task moves (singleTask + setLaunchDisplayId relocates this same
@@ -451,18 +450,19 @@ class MainActivity : AppCompatActivity() {
                         null
                     }
 
-                when {
-                    // No second display -- or one an app was launched onto
-                    // (parked): tear our Presentation down (it would layer
-                    // ABOVE the running app's window) and touch nothing
-                    // else on it.
-                    second == null || !secondAvailable -> {
-                        secondScreenPresentation?.dismiss()
-                        secondScreenPresentation = null
-                    }
-                    shellOnSecond -> {
-                        secondScreenPresentation?.dismiss()
-                        secondScreenPresentation = null
+                // The second display needs no work from droidtop at all
+                // now: the platform places :display's
+                // SecondaryDisplayActivity on every secondary display and
+                // re-places it when whatever ran there finishes. This used
+                // to push a Presentation onto the same display and race
+                // the platform for it -- see docs/SPEC.md section 4c.
+                //
+                // What remains is the one case the platform cannot cover:
+                // SECONDARY_HOME never applies to the DEFAULT display, so
+                // when the user has assigned the addon as the main output
+                // the shell is moved there and the built-in gets the
+                // companion as an ordinary Activity.
+                if (shellOnSecond && second != null) {
                         val currentDisplayId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                             display?.displayId ?: android.view.Display.DEFAULT_DISPLAY
                         } else {
@@ -535,18 +535,7 @@ class MainActivity : AppCompatActivity() {
                                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                             )
                         }
-                    }
-                    else -> {
-                        // Shell stays on the built-in screen; the addon gets
-                        // the widgets panel via Presentation. Skip if already
-                        // presenting on this exact display (avoids teardown on
-                        // every unrelated DisplayListener callback).
-                        if (secondScreenPresentation?.display?.displayId != second.androidDisplayId) {
-                            secondScreenPresentation?.dismiss()
-                            val display = displayManager.getDisplay(second.androidDisplayId) ?: return@collectLatest
-                            secondScreenPresentation = SecondScreenPresentation(applicationContext, display).also { it.show() }
-                        }
-                    }
+                }
                 }
             }
         }
@@ -568,8 +557,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        secondScreenPresentation?.dismiss()
-        secondScreenPresentation = null
         super.onDestroy()
     }
 
