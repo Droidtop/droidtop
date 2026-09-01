@@ -173,6 +173,12 @@ data class GameMetadataEntity(
      * the time, but not verified. Null means never scraped.
      */
     @ColumnInfo(name = "scrape_confidence") val scrapeConfidence: String? = null,
+    // Absolute media paths referenced from an imported gamelist.xml (an
+    // external scraper's own output, living wherever it wrote them) --
+    // consulted only when the ES-DE downloaded_media convention has
+    // nothing for the game. Never copied; the user's files stay theirs.
+    @ColumnInfo(name = "artwork_path") val artworkPath: String? = null,
+    @ColumnInfo(name = "video_path") val videoPath: String? = null,
 )
 
 @Entity(tableName = "scan_metadata", primaryKeys = ["roms_root", "system_folder_id"])
@@ -428,12 +434,19 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
     }
 }
 
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE game_metadata ADD COLUMN artwork_path TEXT")
+        db.execSQL("ALTER TABLE game_metadata ADD COLUMN video_path TEXT")
+    }
+}
+
 @Database(
     entities = [
         RomEntity::class, ScanMetadataEntity::class, GameMetadataEntity::class,
         CollectionEntity::class, CollectionMemberEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = false,
 )
 abstract class RomDatabase : RoomDatabase() {
@@ -458,7 +471,7 @@ abstract class RomDatabase : RoomDatabase() {
                     // because game_metadata holds real user data that
                     // must survive it -- see that migration's own doc
                     // comment.
-                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build().also { instance = it }
             }
