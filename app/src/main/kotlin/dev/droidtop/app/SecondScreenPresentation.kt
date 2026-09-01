@@ -61,6 +61,12 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
         val registry = LifecycleRegistry(this)
         override val lifecycle: Lifecycle get() = registry
     }
+    // Its own host, so widgets the user already added render on this
+    // display too. Listening starts/stops with the presentation.
+    private val widgetManager = android.appwidget.AppWidgetManager.getInstance(outerContext)
+    private val widgetHost = android.appwidget.AppWidgetHost(outerContext, COMPANION_WIDGET_HOST_ID)
+    private val widgetIds = CompanionWidgetPrefs.widgetIds(outerContext)
+
     private val savedStateOwner = object : SavedStateRegistryOwner {
         val controller = SavedStateRegistryController.create(this)
         override val lifecycle: Lifecycle get() = lifecycleOwner.lifecycle
@@ -80,7 +86,21 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
                 // darkTheme = true: an ambient always-dark companion
                 // surface (black ground is the design, like an idle
                 // screen) -- see DroidtopTheme's own doc comment.
-                dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) { CompanionContent(entry) }
+                dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
+                    // The SAME surface CompanionActivity hosts, not a
+                    // reduced copy -- see CompanionSurface's doc comment
+                    // for the bug that divergence caused.
+                    CompanionSurface(
+                        entry = entry,
+                        widgetIds = widgetIds,
+                        widgetManager = widgetManager,
+                        widgetHost = widgetHost,
+                        // No add/remove controls: binding a widget needs an
+                        // Activity result and a Presentation cannot receive
+                        // one. Already-added widgets still render here.
+                        controls = null,
+                    )
+                }
             }
         }
         setContentView(composeView)
@@ -88,12 +108,22 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
 
     override fun onStart() {
         super.onStart()
+        // Without this a hosted widget renders once and then never
+        // updates -- no clock tick, no now-playing change.
+        runCatching { widgetHost.startListening() }
         lifecycleOwner.registry.currentState = Lifecycle.State.RESUMED
     }
 
     override fun onStop() {
+        runCatching { widgetHost.stopListening() }
         lifecycleOwner.registry.currentState = Lifecycle.State.DESTROYED
         super.onStop()
+    }
+
+    private companion object {
+        // Distinct from CompanionActivity's host id: two AppWidgetHosts
+        // sharing an id in one process fight over the same listener set.
+        const val COMPANION_WIDGET_HOST_ID = 0x64726F71
     }
 }
 
@@ -113,12 +143,13 @@ object CompanionState {
 @Composable
 internal fun CompanionContent(entry: LibraryEntry?) {
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        if (entry == null) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("droidtop", color = Color.DarkGray, style = MaterialTheme.typography.headlineMedium)
-            }
-            return@Box
-        }
+        // Nothing focused: draw only the ground. This used to paint a
+        // "droidtop" wordmark, which meant the companion screen showed a
+        // black rectangle with a word on it whenever the user was
+        // anywhere but a themed gamelist -- most of the time. The status
+        // bar, notifications and widgets composited above are the real
+        // idle content, and they need a clean ground, not a placeholder.
+        if (entry == null) return@Box
         // No artwork here by design (per direction): this panel is the
         // ambient WIDGETS/INFO surface (§4's dual-screen roles -- the
         // shell itself lives on the other display when both exist), so
