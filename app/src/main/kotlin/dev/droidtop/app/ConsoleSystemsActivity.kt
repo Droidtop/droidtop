@@ -134,6 +134,7 @@ internal suspend fun scrapeSystemArtwork(
     var failed = 0
     var hashMatched = 0
     var thumbnailed = 0
+    var miximaged = 0
     missing.forEachIndexed { index, romFile ->
         onProgress(index, missing.size)
         try {
@@ -183,9 +184,76 @@ internal suspend fun scrapeSystemArtwork(
             } else null
             if (thumbnailUrl != null) thumbnailed++
             val coverUrl = screenScraperResult?.coverUrl ?: gamesDbResult?.coverUrl ?: thumbnailUrl
-            if (wantArtwork && coverUrl != null && EsDeArtwork.resolve(gamesRoot, system.id, romFile.nameWithoutExtension) == null) {
-                val destination = File(File(File(gamesRoot, "downloaded_media"), system.id), "covers/${romFile.nameWithoutExtension}.png")
-                downloadImage(coverUrl, destination)
+            val mediaRoot = File(File(gamesRoot, "downloaded_media"), system.id)
+            val baseName = romFile.nameWithoutExtension
+            if (wantArtwork && coverUrl != null && EsDeArtwork.resolve(gamesRoot, system.id, baseName) == null) {
+                downloadImage(coverUrl, File(mediaRoot, "covers/$baseName.png"))
+            }
+            // The full media set (real ES-DE's own Scrape* toggles, all
+            // default-on): each type lands in its ES-DE downloaded_media
+            // directory, skipped when the file already exists. The
+            // keyless libretro repos stand in for screenshots and title
+            // screens when the selected source has nothing.
+            val ssMedia = screenScraperResult?.mediaUrls ?: emptyMap()
+            fun fetchMedia(enabled: Boolean, dir: String, url: String?, extension: String = "png") {
+                if (!enabled || url == null) return
+                val destination = File(mediaRoot, "$dir/$baseName.$extension")
+                if (destination.isFile) return
+                try {
+                    downloadImage(url, destination)
+                } catch (t: Exception) {
+                    android.util.Log.w("droidtop.Scraper", "Media $dir for ${romFile.name} failed: ${t.message}")
+                }
+            }
+            val wantLibretroFallback = source == ScraperSource.LIBRETRO || ssMedia.isEmpty()
+            fetchMedia(
+                dev.droidtop.library.scraper.ScrapeOptionsPrefs.scrapeScreenshots(context),
+                "screenshots",
+                ssMedia["ss"] ?: if (wantLibretroFallback) {
+                    dev.droidtop.library.scraper.LibretroThumbnails.screenshotUrl(system.id, baseName)
+                } else null,
+            )
+            fetchMedia(
+                dev.droidtop.library.scraper.ScrapeOptionsPrefs.scrapeTitleScreens(context),
+                "titlescreens",
+                ssMedia["sstitle"] ?: if (wantLibretroFallback) {
+                    dev.droidtop.library.scraper.LibretroThumbnails.titleUrl(system.id, baseName)
+                } else null,
+            )
+            fetchMedia(
+                dev.droidtop.library.scraper.ScrapeOptionsPrefs.scrapeMarquees(context),
+                "marquees",
+                ssMedia["wheel-hd"] ?: ssMedia["wheel"],
+            )
+            fetchMedia(
+                dev.droidtop.library.scraper.ScrapeOptionsPrefs.scrapePhysicalMedia(context),
+                "physicalmedia",
+                ssMedia["support-2D"],
+            )
+            fetchMedia(
+                dev.droidtop.library.scraper.ScrapeOptionsPrefs.scrapeFanArt(context),
+                "fanart",
+                ssMedia["fanart"],
+            )
+            fetchMedia(
+                dev.droidtop.library.scraper.ScrapeOptionsPrefs.scrapeVideos(context),
+                "videos",
+                ssMedia["video-normalized"] ?: ssMedia["video"],
+                extension = "mp4",
+            )
+            if (dev.droidtop.library.scraper.ScrapeOptionsPrefs.generateMiximages(context)) {
+                val miximage = File(mediaRoot, "miximages/$baseName.png")
+                val screenshotFile = File(mediaRoot, "screenshots/$baseName.png")
+                if (!miximage.isFile && screenshotFile.isFile) {
+                    val composed = dev.droidtop.library.scraper.MiximageGenerator.generate(
+                        screenshot = screenshotFile,
+                        marquee = File(mediaRoot, "marquees/$baseName.png").takeIf { it.isFile },
+                        cover = File(mediaRoot, "covers/$baseName.png").takeIf { it.isFile },
+                        physicalMedia = File(mediaRoot, "physicalmedia/$baseName.png").takeIf { it.isFile },
+                        output = miximage,
+                    )
+                    if (composed) miximaged++
+                }
             }
 
             val description = screenScraperResult?.description ?: gamesDbResult?.description
@@ -233,7 +301,7 @@ internal suspend fun scrapeSystemArtwork(
     // $found matched by name search only, which is worth the user
     // knowing: right most of the time, verified never.
     "${system.displayName}: found $found ($hashMatched verified by file hash, " +
-        "$thumbnailed boxarts from libretro thumbnails), no match for " +
+        "$thumbnailed boxarts from libretro thumbnails, $miximaged miximages composed), no match for " +
         "${missing.size - found - failed}, $failed failed (of ${missing.size} matching the filter)."
 }
 
