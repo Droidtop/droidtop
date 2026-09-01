@@ -96,7 +96,7 @@ class OnboardingActivity : AppCompatActivity() {
 private enum class OnboardingStep {
     WELCOME, HOME_CHOICE, STANDARD_SETUP, ALTERNATIVE_SETUP,
     CONFIGURE_MORE, DESKTOP_SETUP, STORAGE_PERMISSION, GAMES_FOLDERS,
-    DEFAULT_MODE_CHOICE,
+    KEYBOARD, DEFAULT_MODE_CHOICE,
 }
 
 /**
@@ -163,11 +163,14 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
             OnboardingStep.CONFIGURE_MORE ->
                 if (configureDesktop) OnboardingStep.DESKTOP_SETUP
                 else if (configureHandheld) OnboardingStep.STORAGE_PERMISSION
-                else OnboardingStep.DEFAULT_MODE_CHOICE
+                // Still the keyboard step: it is the one offer that
+                // matters whichever mode the user picked.
+                else OnboardingStep.KEYBOARD
             OnboardingStep.DESKTOP_SETUP ->
-                if (configureHandheld) OnboardingStep.STORAGE_PERMISSION else OnboardingStep.DEFAULT_MODE_CHOICE
+                if (configureHandheld) OnboardingStep.STORAGE_PERMISSION else OnboardingStep.KEYBOARD
             OnboardingStep.STORAGE_PERMISSION -> OnboardingStep.GAMES_FOLDERS
-            OnboardingStep.GAMES_FOLDERS -> OnboardingStep.DEFAULT_MODE_CHOICE
+            OnboardingStep.GAMES_FOLDERS -> OnboardingStep.KEYBOARD
+            OnboardingStep.KEYBOARD -> OnboardingStep.DEFAULT_MODE_CHOICE
             OnboardingStep.DEFAULT_MODE_CHOICE -> OnboardingStep.DEFAULT_MODE_CHOICE
         }
     }
@@ -240,6 +243,16 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
                     unresolvedFolderWarning = unresolvedFolderWarning,
                     onAddFolder = { pickFolder.launch(null) },
                     onDone = { advanceFrom(OnboardingStep.GAMES_FOLDERS) },
+                )
+
+                OnboardingStep.KEYBOARD -> KeyboardStep(
+                    onEnable = {
+                        dev.droidtop.library.settings.Keyboards.openSystemSettings(context)
+                    },
+                    onPick = {
+                        dev.droidtop.library.settings.Keyboards.showPicker(context)
+                    },
+                    onContinue = { advanceFrom(OnboardingStep.KEYBOARD) },
                 )
 
                 OnboardingStep.DEFAULT_MODE_CHOICE -> DefaultModeChoiceStep(
@@ -468,6 +481,51 @@ private fun StoragePermissionStep(onGrant: () -> Unit, onSkip: () -> Unit) {
     )
     Button(onClick = onGrant) { Text("Grant access") }
     TextButton(onClick = onSkip) { Text("Skip -- I'm not using this for games") }
+}
+
+/**
+ * OPTIONAL step. droidtop runs fine without its own keyboard; what it
+ * cannot do without one is drive a terminal or a Windows application,
+ * because no stock phone keyboard has Ctrl, Alt, Esc, Tab, arrows or a
+ * function row (docs/SPEC.md section 6a).
+ *
+ * droidtop cannot set the system input method itself -- that needs
+ * WRITE_SECURE_SETTINGS, which a normal app is never granted -- so this
+ * states the reason and opens Android's own screens. Declining is a real
+ * answer, not a nag to be repeated.
+ */
+@Composable
+private fun KeyboardStep(
+    onEnable: () -> Unit,
+    onPick: () -> Unit,
+    onContinue: () -> Unit,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // Re-read on every recomposition: the user leaves for Android's
+    // settings and comes back, and the step has to reflect what they did.
+    val enabled = dev.droidtop.library.settings.Keyboards.ownKeyboardEnabled(context)
+    val active = dev.droidtop.library.settings.Keyboards.ownKeyboardActive(context)
+
+    Text("Keyboard", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineSmall)
+    Text(
+        dev.droidtop.library.settings.Keyboards.WHY,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    when {
+        active -> Text(
+            "Hacker's Keyboard is active.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        // An installed-but-not-enabled input method never appears in the
+        // picker at all, so enabling has to come first.
+        !enabled -> Button(onClick = onEnable) { Text("Turn it on") }
+        else -> Button(onClick = onPick) { Text("Switch to it") }
+    }
+    TextButton(onClick = onContinue) {
+        Text(if (active) "Continue" else "Not now -- use my current keyboard")
+    }
 }
 
 @Composable
