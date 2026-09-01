@@ -27,6 +27,7 @@ object HandheldSettingsCatalog {
     const val ID_GLOBAL_SETTINGS = "pref_global_settings"
     const val ID_DEFAULT_SECTION = "pref_handheld_default_section"
     const val ID_SHOW_HINTS = "pref_handheld_show_hints"
+    const val ID_SCRAPER = "pref_handheld_scraper"
     const val ID_CONSOLE_SYSTEMS = "pref_handheld_console_systems"
     const val ID_WINDOWS_GAMES = "pref_handheld_windows_games"
     const val GROUP_SYSTEM = "handheld_system"
@@ -98,6 +99,18 @@ object HandheldSettingsCatalog {
                 // by :app's SettingsCatalogInitProvider), so they render
                 // in-place in whichever surface is showing this catalog
                 // instead of bouncing to a differently-chromed activity.
+                // Scraper leads, its own row -- real ES-DE keeps the
+                // scraper on the MAIN menu (GuiMenu -> GuiScraperMenu),
+                // not buried under management screens, and the direction
+                // was explicit that droidtop matches that.
+                add(
+                    NestedScreenItem(
+                        id = ID_SCRAPER,
+                        title = "Scraper",
+                        subtitle = "Sources, filters, and content options for artwork and metadata",
+                        registryId = "rom_scraper",
+                    ),
+                )
                 add(
                     NestedScreenItem(
                         id = ID_CONSOLE_SYSTEMS,

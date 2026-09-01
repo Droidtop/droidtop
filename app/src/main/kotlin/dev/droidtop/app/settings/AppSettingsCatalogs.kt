@@ -296,6 +296,15 @@ object AppSettingsCatalogs {
                                             },
                                         ),
                                     )
+                                    add(
+                                        AsyncActionItem(
+                                            id = "folder_gamelist_${folder.absolutePath}",
+                                            title = "Import gamelist.xml",
+                                            subtitle = "Ingests an external scraper's output (Skraper, Skyscraper, ARRM, ES-DE) " +
+                                                "for this folder: metadata into droidtop, media referenced where it sits",
+                                            run = { ctx, _ -> importGamelistXml(ctx, folder) },
+                                        ),
+                                    )
                                     // Third-party "get games for this system"
                                     // hooks the user declared (docs/SPEC.md
                                     // section 12). The system and its real
