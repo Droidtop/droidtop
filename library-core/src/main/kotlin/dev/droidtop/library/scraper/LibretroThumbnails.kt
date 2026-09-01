@@ -64,6 +64,8 @@ object LibretroThumbnails {
         "dos" to "DOS",
     )
 
+    fun systemNameFor(systemId: String): String? = SYSTEM_NAMES[systemId]
+
     private val FORBIDDEN = Regex("[&*/:`<>?\\\\|\"]")
 
     /** The repository's own filename for a game title. */

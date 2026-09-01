@@ -2,7 +2,7 @@ package dev.droidtop.library.scraper
 
 import android.content.Context
 
-enum class ScraperSource { SCREENSCRAPER, THEGAMESDB }
+enum class ScraperSource { SCREENSCRAPER, THEGAMESDB, LIBRETRO }
 
 /**
  * Real, single selected ROM scraper source -- matching real ES-DE's own

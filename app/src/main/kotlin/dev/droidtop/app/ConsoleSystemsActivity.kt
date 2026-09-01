@@ -123,6 +123,12 @@ internal suspend fun scrapeSystemArtwork(
     if (source == ScraperSource.THEGAMESDB && (gamesDbSystemId == null || !TheGamesDbPrefs.isConfigured(context))) {
         return@withContext "${system.displayName}: TheGamesDB needs a configured API key and platform support for this system."
     }
+    // The keyless libretro-database source: one cached DAT set per
+    // system, matched by the same No-Intro naming as the thumbnails.
+    val libretroLookup = if (source == ScraperSource.LIBRETRO) {
+        dev.droidtop.library.scraper.LibretroMetadata.load(context, system.id)
+            ?: return@withContext "${system.displayName}: no libretro database name is mapped for this system."
+    } else null
 
     var found = 0
     var failed = 0
@@ -162,6 +168,7 @@ internal suspend fun scrapeSystemArtwork(
             val gamesDbResult = gamesDbSystemId?.let {
                 TheGamesDbClient.findMetadata(gamesDbApiKey, context.cacheDir, it, romFile.nameWithoutExtension)
             }
+            val libretroResult = libretroLookup?.find(romFile.nameWithoutExtension)
 
             // Keyless boxart fallback, consulted only when the selected
             // credentialed source produced no cover (fresh installs have
@@ -182,11 +189,11 @@ internal suspend fun scrapeSystemArtwork(
             }
 
             val description = screenScraperResult?.description ?: gamesDbResult?.description
-            val developer = screenScraperResult?.developer ?: gamesDbResult?.developer
-            val publisher = screenScraperResult?.publisher ?: gamesDbResult?.publisher
-            val genre = screenScraperResult?.genre ?: gamesDbResult?.genre
-            val releaseDate = screenScraperResult?.releaseDate ?: gamesDbResult?.releaseDate
-            val players = screenScraperResult?.players ?: gamesDbResult?.players
+            val developer = screenScraperResult?.developer ?: gamesDbResult?.developer ?: libretroResult?.developer
+            val publisher = screenScraperResult?.publisher ?: gamesDbResult?.publisher ?: libretroResult?.publisher
+            val genre = screenScraperResult?.genre ?: gamesDbResult?.genre ?: libretroResult?.genre
+            val releaseDate = screenScraperResult?.releaseDate ?: gamesDbResult?.releaseDate ?: libretroResult?.releaseDate
+            val players = screenScraperResult?.players ?: gamesDbResult?.players ?: libretroResult?.players
             val rating = screenScraperResult?.rating
             val hasAnyMetadata = wantMetadata &&
                 listOfNotNull(description, developer, publisher, genre, releaseDate, players, rating).isNotEmpty()
