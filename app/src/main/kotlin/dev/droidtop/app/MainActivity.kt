@@ -92,6 +92,15 @@ class MainActivity : AppCompatActivity() {
     // attach/detach events alone don't cover those triggers.
     private val roleRefresh = kotlinx.coroutines.flow.MutableStateFlow(0)
 
+    // The display ids the last orchestration pass saw. A CHANGE to this
+    // set is a real topology event (a screen plugged in or unplugged),
+    // which must not be swallowed by the relocation cooldown -- that
+    // cooldown exists to stop a relaunch LOOP, and "the hardware changed"
+    // is the opposite of a loop. Without this, plugging a screen in
+    // within the cooldown window did nothing at all until something else
+    // happened to retrigger orchestration.
+    private var lastDisplayIds: Set<Int> = emptySet()
+
     companion object DisplayRelocation {
         // Process-wide (companion), not per-instance: the relaunch loop
         // recreates the Activity, so an instance field would reset each
@@ -317,6 +326,33 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             kotlinx.coroutines.flow.combine(displayOutputs.observe(), roleRefresh) { outputs, _ -> outputs }
                 .collectLatest { outputs ->
+                val displayIds = outputs.map { it.androidDisplayId }.toSet()
+                if (displayIds != lastDisplayIds) {
+                    lastDisplayIds = displayIds
+                    lastRelocationAttemptMs = 0L
+                }
+                // A shell left on a display that no longer exists is the
+                // unplug case: Android does not necessarily bring the
+                // activity home by itself, and a shell nobody can see is
+                // indistinguishable from a crash. Come back to the
+                // built-in screen immediately, ahead of any role logic.
+                val currentDisplay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    display?.displayId ?: android.view.Display.DEFAULT_DISPLAY
+                } else {
+                    @Suppress("DEPRECATION")
+                    windowManager.defaultDisplay.displayId
+                }
+                if (currentDisplay != android.view.Display.DEFAULT_DISPLAY && currentDisplay !in displayIds) {
+                    dev.droidtop.library.LaunchDisplay.parkedDisplayId = null
+                    startActivity(
+                        Intent(intent).setClass(this@MainActivity, MainActivity::class.java)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        android.app.ActivityOptions.makeBasic()
+                            .setLaunchDisplayId(android.view.Display.DEFAULT_DISPLAY)
+                            .toBundle(),
+                    )
+                    return@collectLatest
+                }
                 val second = outputs.firstOrNull { it.kind == DisplayOutputKind.SECOND_SCREEN }
                 val handheld = mode == BackButtonMenu.MODE_HANDHELD
                 // A display an app was launched onto is PARKED: droidtop
@@ -448,6 +484,21 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * A foldable changes the shape of the SAME display rather than
+     * adding one, so unfolding arrives here (the activity survives it --
+     * see this activity's own configChanges) and not necessarily through
+     * DisplayListener. Role orchestration has to re-run either way: an
+     * unfolded inner screen can be a different enough surface to deserve
+     * a different role, and the cooldown is cleared for the same reason
+     * a topology change clears it.
+     */
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        lastRelocationAttemptMs = 0L
+        roleRefresh.value++
     }
 
     override fun onDestroy() {
