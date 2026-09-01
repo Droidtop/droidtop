@@ -136,7 +136,62 @@ data class LibraryEntry(
     // unmodeled: droidtop's ROM scan has no folder/subdirectory concept
     // at all, a genuinely separate, bigger gap than collections was.
     val inCollection: Boolean = false,
+    // Set only for PC games (store-owned or folder-scanned); null for
+    // ROMs, native apps and engine games. See [PcInfo].
+    val pcInfo: PcInfo? = null,
 )
+
+/**
+ * Facts that only a PC game from a store or a scanned folder has, kept
+ * as one nested value rather than four loose fields, so [LibraryEntry]'s
+ * own vocabulary stays ES-DE's metadata schema (docs/SPEC.md §7g).
+ *
+ * Produced by `:runtime-windows`'s `PcLibrary` from the vendored
+ * gamenative-tux data layer. Null for everything that is not a PC game.
+ */
+data class PcInfo(
+    /** Display name of where it came from: "Steam", "GOG", "Epic", "Amazon", "Folder". */
+    val source: String,
+    val installed: Boolean,
+    /** On-disk size when installed, download size when not, 0 when unknown. */
+    val sizeBytes: Long = 0,
+    val installPath: String? = null,
+    /**
+     * Community compatibility reports, from gamenative's own game-runs
+     * service.
+     *
+     * **Reference, never a gate** (directed 2026-09-01): droidtop shows
+     * this and the user decides. It must never block a download, hide an
+     * entry, or reorder the library on its own — it is other people's
+     * results on other hardware, which makes it useful information and a
+     * bad decision-maker.
+     */
+    val compatibility: PcCompatibility? = null,
+)
+
+/** @see PcInfo.compatibility — reference only. */
+data class PcCompatibility(
+    val averageRating: Float,
+    val playableReports: Int,
+    val gpuPlayableReports: Int,
+    val hasBeenTried: Boolean,
+    val reportedNotWorking: Boolean,
+) {
+    /**
+     * One short line for a badge or detail row. Deliberately factual
+     * ("3 of 5 reports playable") rather than a verdict ("works"), so the
+     * user reads evidence and judges it themselves.
+     */
+    fun summary(): String = when {
+        !hasBeenTried -> "No compatibility reports yet"
+        reportedNotWorking && playableReports == 0 -> "Reported not working"
+        playableReports > 0 -> {
+            val stars = String.format("%.1f", averageRating)
+            "$playableReports playable ${if (playableReports == 1) "report" else "reports"} - $stars/5"
+        }
+        else -> "Tried, no playable reports"
+    }
+}
 
 enum class LibraryEntryKind {
     NATIVE_ANDROID_APP,
