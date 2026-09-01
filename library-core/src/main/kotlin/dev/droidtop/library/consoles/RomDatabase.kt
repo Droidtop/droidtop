@@ -253,6 +253,15 @@ interface RomDao {
     @Query("SELECT * FROM game_metadata WHERE id IN (:ids)")
     suspend fun getGameMetadata(ids: List<String>): List<GameMetadataEntity>
 
+    // Housekeeping (OrphanedMedia): every metadata row's key IS the
+    // ROM's absolute path, so "does that file still exist" is the whole
+    // orphan test.
+    @Query("SELECT id FROM game_metadata")
+    suspend fun getAllGameMetadataIds(): List<String>
+
+    @Query("DELETE FROM game_metadata WHERE id IN (:ids)")
+    suspend fun deleteGameMetadata(ids: List<String>)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertGameMetadata(metadata: GameMetadataEntity)
 

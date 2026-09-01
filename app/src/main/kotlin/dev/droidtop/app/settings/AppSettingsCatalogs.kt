@@ -150,6 +150,34 @@ object AppSettingsCatalogs {
                         registryId = SCREEN_ENGINEHOST,
                     ),
                     AsyncActionItem(
+                        id = "console_systems_orphans_find",
+                        title = "Find orphaned media",
+                        subtitle = "Artwork and metadata left behind by games that are no longer here",
+                        run = { ctx, onStatus ->
+                            onStatus("Looking...")
+                            val report = dev.droidtop.library.scraper.OrphanedMedia.find(ctx)
+                            if (report.isEmpty) {
+                                report.describe()
+                            } else {
+                                report.describe() + " Use \"Delete orphaned media\" to remove them."
+                            }
+                        },
+                    ),
+                    AsyncActionItem(
+                        id = "console_systems_orphans_delete",
+                        title = "Delete orphaned media",
+                        subtitle = "Permanently removes what the check above found",
+                        run = { ctx, onStatus ->
+                            // Recomputed rather than carried over from
+                            // the check: acting on a report the library
+                            // may have moved on from is how the wrong
+                            // files get deleted.
+                            onStatus("Checking again before deleting...")
+                            val report = dev.droidtop.library.scraper.OrphanedMedia.find(ctx)
+                            dev.droidtop.library.scraper.OrphanedMedia.clean(ctx, report)
+                        },
+                    ),
+                    AsyncActionItem(
                         id = "console_systems_scrape_all",
                         title = "Scrape all systems",
                         subtitle = "Runs the artwork & metadata scrape for every game folder, one system at a time",
