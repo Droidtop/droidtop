@@ -100,6 +100,9 @@ class GameLaunchStrategyResolverTest {
         val strategies = GameLaunchStrategyResolver.resolve(
             GameEngine.UNITY, tmp.root,
             engineHostInstalled = true, engineHostEngineVersion = "1.0.0",
+            // The registry fact this test models: the engines database
+            // declares no enginehost mapping for unity.
+            enginehostSupported = false,
         )
         assertFalse(GameLaunchStrategy.ENGINEHOST in strategies)
     }

@@ -65,4 +65,8 @@ dependencies {
     ksp(libs.androidx.room.compiler)
 
     testImplementation(libs.junit)
+    // The registry parser (EngineRegistryParser) runs in JVM unit tests
+    // against the real shipped seed JSON; android.jar's org.json is a
+    // throwing stub there, so the real library backs the tests.
+    testImplementation("org.json:json:20240303")
 }
