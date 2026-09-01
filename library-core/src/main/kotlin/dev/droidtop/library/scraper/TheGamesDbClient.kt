@@ -136,6 +136,76 @@ object TheGamesDbClient {
 
     fun cleanSearchName(raw: String): String = DECORATION.replace(raw, "").trim().ifEmpty { raw }
 
+    /** One candidate from a name search, enough to tell them apart in a list. */
+    data class Candidate(val id: Int, val name: String, val releaseYear: String?)
+
+    /**
+     * Every candidate a name search returns, in the API's own order.
+     *
+     * This exists because automatic matching is wrong often enough to
+     * matter: on a real device pass "Pokemon - Crystal Version" matched
+     * a fan game called "Pokemon Black and White 3: Genesis", because
+     * that is what the API returned first. Ranking helps and cannot
+     * fix it; a person looking at the list can.
+     */
+    fun searchCandidates(
+        apiKey: String,
+        thegamesdbSystemId: String,
+        gameTitle: String,
+        limit: Int = 12,
+    ): List<Candidate> {
+        val searchUrl = URL(
+            "$BASE_URL/Games/ByGameName?apikey=${URLEncoder.encode(apiKey, "UTF-8")}" +
+                "&fields=release_date" +
+                "&name=${URLEncoder.encode(cleanSearchName(gameTitle), "UTF-8")}" +
+                "&filter%5Bplatform%5D=${URLEncoder.encode(thegamesdbSystemId, "UTF-8")}",
+        )
+        val connection = (searchUrl.openConnection() as HttpURLConnection).apply { requestMethod = "GET" }
+        if (connection.responseCode != 200) return emptyList()
+        val response = JSONObject(connection.inputStream.bufferedReader().readText())
+        val games = response.optJSONObject("data")?.optJSONArray("games") ?: return emptyList()
+        return (0 until minOf(games.length(), limit)).mapNotNull { index ->
+            val game = games.optJSONObject(index) ?: return@mapNotNull null
+            val id = game.optInt("id", -1).takeIf { it >= 0 } ?: return@mapNotNull null
+            Candidate(
+                id = id,
+                name = game.optString("game_title", "").ifBlank { return@mapNotNull null },
+                releaseYear = game.optString("release_date", "").take(4).ifBlank { null },
+            )
+        }
+    }
+
+    /** The full metadata for one candidate the user picked. */
+    fun metadataForId(apiKey: String, cacheDir: File, gameId: Int): TheGamesDbMetadata? {
+        val developers = cachedReferenceList(apiKey, "/Developers", "developers", File(cacheDir, "thegamesdb_developers.json"))
+        val publishers = cachedReferenceList(apiKey, "/Publishers", "publishers", File(cacheDir, "thegamesdb_publishers.json"))
+        val genres = cachedReferenceList(apiKey, "/Genres", "genres", File(cacheDir, "thegamesdb_genres.json"))
+        val url = URL(
+            "$BASE_URL/Games/ByGameID?apikey=${URLEncoder.encode(apiKey, "UTF-8")}" +
+                "&fields=players,publishers,genres,overview,release_date&id=$gameId",
+        )
+        val connection = (url.openConnection() as HttpURLConnection).apply { requestMethod = "GET" }
+        if (connection.responseCode != 200) return null
+        val response = JSONObject(connection.inputStream.bufferedReader().readText())
+        val game = response.optJSONObject("data")?.optJSONArray("games")?.optJSONObject(0) ?: return null
+        return TheGamesDbMetadata(
+            name = game.optString("game_title", "").ifBlank { null },
+            description = game.optString("overview", "").ifBlank { null },
+            developer = game.optJSONArray("developers")?.let { arr ->
+                (0 until arr.length()).mapNotNull { developers[arr.optInt(it, -1)] }.joinToString(", ").ifBlank { null }
+            },
+            publisher = game.optJSONArray("publishers")?.let { arr ->
+                (0 until arr.length()).mapNotNull { publishers[arr.optInt(it, -1)] }.joinToString(", ").ifBlank { null }
+            },
+            genre = game.optJSONArray("genres")?.let { arr ->
+                (0 until arr.length()).mapNotNull { genres[arr.optInt(it, -1)] }.joinToString(", ").ifBlank { null }
+            },
+            releaseDate = game.optString("release_date", "").ifBlank { null }?.let { parseReleaseDate(it) },
+            players = game.optInt("players", -1).takeIf { it >= 0 }?.toString(),
+            coverUrl = fetchCoverUrl(apiKey, gameId),
+        )
+    }
+
     fun findMetadata(apiKey: String, cacheDir: File, thegamesdbSystemId: String, gameTitle: String): TheGamesDbMetadata? {
         @Suppress("NAME_SHADOWING")
         val gameTitle = cleanSearchName(gameTitle)

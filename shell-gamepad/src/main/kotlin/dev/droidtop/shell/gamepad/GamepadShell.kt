@@ -682,6 +682,9 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
 
     var editingMetadata by remember { mutableStateOf(false) }
     var viewingMedia by remember(entry) { mutableStateOf(false) }
+    var pickingMatch by remember(entry) { mutableStateOf(false) }
+    var scrapeStatus by remember(entry) { mutableStateOf<String?>(null) }
+    var scrapeResult by remember(entry) { mutableStateOf<String?>(null) }
     // Everything scraped for this game, for the media viewer. Read off
     // the filesystem once per entry rather than per frame.
     val media = remember(entry) {
@@ -714,6 +717,13 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
             onDismiss = { editingMetadata = false },
         )
         return
+    }
+    if (pickingMatch) {
+        ManualMatchPicker(
+            entry = entry,
+            onApplied = { scrapeResult = it },
+            onDismiss = { pickingMatch = false },
+        )
     }
     if (viewingMedia) {
         MediaViewer(title = entry.title, media = media, onClose = { viewingMedia = false })
@@ -811,8 +821,6 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
             Text("Played ${entry.playtimeSeconds / 60} min", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
         }
         val detailScope = rememberCoroutineScope()
-        var scrapeStatus by remember(entry) { mutableStateOf<String?>(null) }
-        var scrapeResult by remember(entry) { mutableStateOf<String?>(null) }
         Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             ActionChip("Launch", highlighted = true, modifier = Modifier.focusRequester(launchFocus), onClick = onLaunch)
             // Only shown when there is a real choice to make. Cycles
@@ -834,6 +842,9 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
             // Real ConsoleRomProvider-specific concept -- same honest
             // "not applicable" gating Library.toggleFavorite/
             // saveMetadata already use for a non-ROM entry.
+            if (isRomEntry) {
+                ActionChip("Choose match", highlighted = false, onClick = { pickingMatch = true })
+            }
             if (media.size > 1) {
                 ActionChip("View media (${media.size})", highlighted = false, onClick = { viewingMedia = true })
             }
