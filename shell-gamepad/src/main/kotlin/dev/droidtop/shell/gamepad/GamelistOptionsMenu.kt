@@ -2,6 +2,8 @@ package dev.droidtop.shell.gamepad
 
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +20,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -101,6 +105,12 @@ internal fun GamelistOptionsMenu(
     var sort by remember { mutableStateOf(GamelistSortPrefs.get(context, groupKey)) }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
+    // A Dialog window drops key events unless something focusable in it
+    // actually holds focus -- confirmed live: the first build's overlay
+    // ignored every D-pad press. Same requestFocusWhenAttached guard the
+    // rest of the shell uses.
+    val menuFocus = remember { FocusRequester() }
+    androidx.compose.runtime.LaunchedEffect(Unit) { requestFocusWhenAttached(menuFocus, "Gamelist options") }
 
     val actions = buildList {
         add("Sort: ${sort.label}")
@@ -177,6 +187,8 @@ internal fun GamelistOptionsMenu(
             tonalElevation = 8.dp,
             modifier = Modifier
                 .width(520.dp)
+                .focusRequester(menuFocus)
+                .focusable()
                 .onPreviewKeyEvent { event ->
                     if (event.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
                     when (GamepadKeyMap.actionFor(event.key)) {
@@ -215,6 +227,11 @@ internal fun GamelistOptionsMenu(
                                 if (index == focusIndex) MaterialTheme.colorScheme.surfaceVariant
                                 else MaterialTheme.colorScheme.surface,
                             )
+                            // Touch parity, same as every other shell row.
+                            .clickable {
+                                focusIndex = index
+                                activate(index)
+                            }
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                     )
                 }
