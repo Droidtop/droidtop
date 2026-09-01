@@ -196,6 +196,11 @@ fun GamepadShell(
     // Real user-visible launch-failure state -- see launchError's render
     // site. A failed launch must inform, never kill.
     var launchError by remember { mutableStateOf<String?>(null) }
+    // The game being started, if any: drives the launch screen (real
+    // ES-DE has one; without it the shell simply freezes mid-frame for
+    // the several seconds a cold emulator start takes, which reads as a
+    // hang rather than as work).
+    var launching by remember { mutableStateOf<LibraryEntry?>(null) }
     // Never-crash boundary: a launch failure (bad emulator preset, missing
     // app, malformed template) must NEVER kill the shell -- confirmed
     // live: the first real on-device game launch threw from a preset's
@@ -248,11 +253,21 @@ fun GamepadShell(
         EsDeNavigationSounds.play("launch")
         scope.launch {
             launchError = null
+            launching = entry
             runCatching { library.launch(entry) }
                 .onFailure {
                     android.util.Log.e("droidtop.GamepadShell", "Launching ${entry.title} failed", it)
                     launchError = "Couldn't launch ${entry.title}: ${it.message}"
                 }
+            // Held briefly after the launch call returns: the call
+            // returns as soon as the intent is dispatched, while the
+            // emulator's own window takes a moment more to cover us.
+            // Clearing immediately would flash the shell back for a
+            // frame, which is exactly the stutter this screen exists to
+            // remove. onStop clears it too, for the case where the game
+            // arrives sooner.
+            kotlinx.coroutines.delay(2500)
+            launching = null
         }
     }
     val tabBarFocus = remember { FocusRequester() }
@@ -429,6 +444,18 @@ fun GamepadShell(
         Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
             val entry = detailEntry
             when {
+                // Starting a game owns the content area until the game's
+                // own window arrives. Checked FIRST so it covers the
+                // detail screen the launch was triggered from.
+                launching != null -> {
+                    val starting = launching
+                    if (starting != null) {
+                        LaunchScreen(starting)
+                        // A launch that never produces a window must
+                        // never trap the shell behind this.
+                        androidx.activity.compose.BackHandler(enabled = true) { launching = null }
+                    }
+                }
                 // Real bug this fixes: the loading spinner used to gate this
                 // entire content area unconditionally, before `section` was
                 // ever checked -- Settings (which needs zero scan data) was
