@@ -25,11 +25,19 @@ object ScraperSourcePrefs {
 
     fun get(context: Context): ScraperSource {
         val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_SOURCE, null)
-        return if (raw == "thegamesdb") ScraperSource.THEGAMESDB else ScraperSource.SCREENSCRAPER
+        return when (raw) {
+            "thegamesdb" -> ScraperSource.THEGAMESDB
+            "libretro" -> ScraperSource.LIBRETRO
+            else -> ScraperSource.SCREENSCRAPER
+        }
     }
 
     fun set(context: Context, source: ScraperSource) {
-        val raw = if (source == ScraperSource.THEGAMESDB) "thegamesdb" else "screenscraper"
+        val raw = when (source) {
+            ScraperSource.THEGAMESDB -> "thegamesdb"
+            ScraperSource.LIBRETRO -> "libretro"
+            ScraperSource.SCREENSCRAPER -> "screenscraper"
+        }
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putString(KEY_SOURCE, raw).apply()
     }
 }
