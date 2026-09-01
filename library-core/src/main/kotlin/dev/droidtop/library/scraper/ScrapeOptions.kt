@@ -43,6 +43,30 @@ object ScrapeOptionsPrefs {
             .edit().putBoolean(KEY_CONTENT_METADATA, value).apply()
     }
 
+    private fun bool(context: Context, key: String, default: Boolean = true): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(key, default)
+
+    private fun setBool(context: Context, key: String, value: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(key, value).apply()
+    }
+
+    // Per-media-type toggles, every default ON exactly like real ES-DE's
+    // own Scrape* settings defaults (Settings.cpp, read directly).
+    fun scrapeScreenshots(context: Context) = bool(context, "droidtop_scrape_screenshots")
+    fun setScrapeScreenshots(context: Context, value: Boolean) = setBool(context, "droidtop_scrape_screenshots", value)
+    fun scrapeTitleScreens(context: Context) = bool(context, "droidtop_scrape_titlescreens")
+    fun setScrapeTitleScreens(context: Context, value: Boolean) = setBool(context, "droidtop_scrape_titlescreens", value)
+    fun scrapeMarquees(context: Context) = bool(context, "droidtop_scrape_marquees")
+    fun setScrapeMarquees(context: Context, value: Boolean) = setBool(context, "droidtop_scrape_marquees", value)
+    fun scrapePhysicalMedia(context: Context) = bool(context, "droidtop_scrape_physicalmedia")
+    fun setScrapePhysicalMedia(context: Context, value: Boolean) = setBool(context, "droidtop_scrape_physicalmedia", value)
+    fun scrapeFanArt(context: Context) = bool(context, "droidtop_scrape_fanart")
+    fun setScrapeFanArt(context: Context, value: Boolean) = setBool(context, "droidtop_scrape_fanart", value)
+    fun scrapeVideos(context: Context) = bool(context, "droidtop_scrape_videos")
+    fun setScrapeVideos(context: Context, value: Boolean) = setBool(context, "droidtop_scrape_videos", value)
+    fun generateMiximages(context: Context) = bool(context, "droidtop_scrape_miximages")
+    fun setGenerateMiximages(context: Context, value: Boolean) = setBool(context, "droidtop_scrape_miximages", value)
+
     fun scrapeArtwork(context: Context): Boolean =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_CONTENT_ARTWORK, true)
 

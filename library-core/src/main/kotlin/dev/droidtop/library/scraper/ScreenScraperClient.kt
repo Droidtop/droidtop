@@ -21,6 +21,8 @@ import java.util.TimeZone
 data class ScreenScraperGameMetadata(
     val name: String?,
     val coverUrl: String?,
+    /** ScreenScraper media-type name (box-2D, ss, sstitle, wheel, support-2D, fanart, video...) to URL; first region wins. */
+    val mediaUrls: Map<String, String> = emptyMap(),
     val description: String?,
     val developer: String?,
     val publisher: String?,
@@ -70,6 +72,10 @@ data class ScreenScraperGameMetadata(
  * work for whoever owns this project.
  */
 object ScreenScraperClient {
+
+    private val WANTED_MEDIA = setOf(
+        "box-2D", "ss", "sstitle", "wheel", "wheel-hd", "support-2D", "fanart", "video", "video-normalized",
+    )
     /**
      * Real fallback-priority attribute lookup -- ports ES-DE's own real
      * `find_child_by_attribute_list` (ScreenScraper.cpp): given a parent
@@ -187,6 +193,7 @@ object ScreenScraperClient {
         var players: String? = null
         var noteRaw: String? = null
         var coverUrl: String? = null
+        val mediaUrls = mutableMapOf<String, String>()
         var romMd5: String? = null
         var foundJeu = false
 
@@ -224,8 +231,15 @@ object ScreenScraperClient {
                     "rommd5" -> if (foundJeu) {
                         romMd5 = readElementText(parser).lowercase().ifBlank { null }
                     }
-                    "media" -> if (foundJeu && parser.getAttributeValue(null, "type") == "box-2D") {
-                        coverUrl = readElementText(parser).ifBlank { null }
+                    "media" -> if (foundJeu) {
+                        // The full media set real ES-DE scrapes (its own
+                        // ssConfig media_* names): first entry per type
+                        // wins, which is the response's own region
+                        // ordering.
+                        val mediaType = parser.getAttributeValue(null, "type")
+                        if (mediaType != null && mediaType in WANTED_MEDIA && mediaType !in mediaUrls) {
+                            readElementText(parser).ifBlank { null }?.let { mediaUrls[mediaType] = it }
+                        }
                     }
                 }
             }
@@ -257,7 +271,8 @@ object ScreenScraperClient {
 
         return ScreenScraperGameMetadata(
             name = name,
-            coverUrl = coverUrl,
+            coverUrl = coverUrl ?: mediaUrls["box-2D"],
+            mediaUrls = mediaUrls,
             description = description,
             developer = developer,
             publisher = publisher,
