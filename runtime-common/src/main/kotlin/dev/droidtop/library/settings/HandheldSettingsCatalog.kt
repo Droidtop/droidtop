@@ -29,6 +29,7 @@ object HandheldSettingsCatalog {
     const val ID_SHOW_HINTS = "pref_handheld_show_hints"
     const val ID_SCRAPER = "pref_handheld_scraper"
     const val ID_SCREENSAVER = "pref_handheld_screensaver"
+    const val ID_UI_MODE = "pref_handheld_ui_mode"
     const val ID_CONSOLE_SYSTEMS = "pref_handheld_console_systems"
     const val ID_WINDOWS_GAMES = "pref_handheld_windows_games"
     const val GROUP_SYSTEM = "handheld_system"
@@ -38,6 +39,7 @@ object HandheldSettingsCatalog {
     const val ID_SYSTEM_BRIGHTNESS_GRANT = "pref_handheld_system_brightness_grant"
     const val ID_SYSTEM_BLUETOOTH = "pref_handheld_system_bluetooth"
     const val ID_SYSTEM_VPN = "pref_handheld_system_vpn"
+    const val ID_SYSTEM_LEAVE_UI_MODE = "pref_handheld_system_leave_ui_mode"
     const val ID_SYSTEM_DND = "pref_handheld_system_dnd"
     const val ID_SYSTEM_DND_GRANT = "pref_handheld_system_dnd_grant"
     const val ID_SYSTEM_ADAPTIVE = "pref_handheld_system_adaptive"
@@ -104,6 +106,19 @@ object HandheldSettingsCatalog {
                 // scraper on the MAIN menu (GuiMenu -> GuiScraperMenu),
                 // not buried under management screens, and the direction
                 // was explicit that droidtop matches that.
+                add(
+                    ChoiceItem(
+                        id = ID_UI_MODE,
+                        title = "UI mode",
+                        subtitle = "Kiosk hides Settings; Kid also shows only kid-friendly games. " +
+                            "Leave either from the Quick Menu's System tab",
+                        options = UiMode.entries.map { ChoiceOption(it.name, it.label) },
+                        current = UiModePrefs.get(context).name,
+                        onSelect = { ctx, value ->
+                            UiModeRefresh.set(ctx, runCatching { UiMode.valueOf(value) }.getOrDefault(UiMode.FULL))
+                        },
+                    ),
+                )
                 add(
                     ChoiceItem(
                         id = ID_SCREENSAVER,
@@ -331,6 +346,20 @@ object HandheldSettingsCatalog {
                             onSelect = { ctx, value ->
                                 value.toIntOrNull()?.let { controls.setScreenTimeoutMs(ctx, it) }
                             },
+                        ),
+                    )
+                }
+                // Only while restricted: a row offering to leave a mode
+                // nobody is in is noise, and this is the ONE way back
+                // once Settings is hidden.
+                if (UiModePrefs.get(context).hidesSettings) {
+                    add(
+                        ActionItem(
+                            id = ID_SYSTEM_LEAVE_UI_MODE,
+                            title = "Leave ${UiModePrefs.get(context).label}",
+                            subtitle = "Restores Settings and the full library",
+                            confirmTitle = "Leave restricted mode?",
+                            run = { ctx -> UiModeRefresh.set(ctx, UiMode.FULL) },
                         ),
                     )
                 }
