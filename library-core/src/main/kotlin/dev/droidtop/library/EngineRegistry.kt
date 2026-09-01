@@ -148,9 +148,9 @@ object EngineRegistryParser {
             buildMap { json.keys().forEach { key -> put(key, json.getString(key)) } }
         } ?: emptyMap()
         return EnginehostTarget(
-            engineFamily = eh.getString("family"),
+            engine = eh.getString("family"),
             engineContext = if (eh.isNull("context")) null else eh.getString("context"),
-            extras = extras,
+            runtimeRequirements = extras,
             versionSelectorFallback = eh.optString("versionSelectorFallback").ifEmpty { null },
         )
     }
