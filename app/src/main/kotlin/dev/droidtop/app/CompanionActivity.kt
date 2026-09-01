@@ -54,62 +54,21 @@ class CompanionActivity : AppCompatActivity() {
         setContent {
             dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
                 val entry by CompanionState.focusedEntry.collectAsState()
-                Box(modifier = Modifier.fillMaxSize()) {
-                    // droidtop's info stays the BACKGROUND layer; user
-                    // widgets composite above it (per direction).
-                    CompanionContent(entry)
-                    val density = androidx.compose.ui.platform.LocalDensity.current
-                    Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-                        // Status + controls bar, always the first row --
-                        // the companion is the glanceable screen, and
-                        // "is my Wi-Fi ok / how much battery" is the
-                        // glance (per direction: wifi status and system
-                        // controls in every mode except Standard).
-                        CompanionSystemBar()
-                        // The Quick Menu's device-management surface,
-                        // mirrored to the always-on screen (per
-                        // direction): live notifications with
-                        // tap-to-open and per-item dismiss, no
-                        // controller needed. The system controls
-                        // already sit in the bar above.
-                        CompanionNotifications()
-                        widgetIds.forEach { widgetId ->
-                            val info = widgetManager.getAppWidgetInfo(widgetId)
-                            if (info != null) {
-                                // minHeight is real PIXELS (AppWidgetProviderInfo),
-                                // converted properly rather than reinterpreted as dp.
-                                val widgetHeight = with(density) { maxOf(info.minHeight, 200).toDp() }
-                                AndroidView(
-                                    factory = { context ->
-                                        widgetHost.createView(context.applicationContext, widgetId, info).apply {
-                                            setAppWidget(widgetId, info)
-                                        }
-                                    },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(widgetHeight)
-                                        .padding(vertical = 4.dp),
-                                )
+                CompanionSurface(
+                    entry = entry,
+                    widgetIds = widgetIds,
+                    widgetManager = widgetManager,
+                    widgetHost = widgetHost,
+                ) {
+                    androidx.compose.foundation.layout.Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        TextButton(onClick = { pickWidget() }) { Text("Add widget") }
+                        if (widgetIds.isNotEmpty()) {
+                            TextButton(onClick = { removeLastWidget() }) {
+                                Text("Remove widget", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                        androidx.compose.foundation.layout.Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            TextButton(onClick = { pickWidget() }) { Text("Add widget") }
-                            if (widgetIds.isNotEmpty()) {
-                                TextButton(onClick = { removeLastWidget() }) {
-                                    Text("Remove widget", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                        }
-                    }
-                    if (widgetIds.isEmpty()) {
-                        Text(
-                            "Add widgets — music controls, calendars, anything installed.",
-                            color = Color.DarkGray,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
-                        )
                     }
                 }
             }
