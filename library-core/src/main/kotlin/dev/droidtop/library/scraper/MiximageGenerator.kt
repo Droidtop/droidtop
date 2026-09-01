@@ -203,7 +203,7 @@ object MiximageGenerator {
         Color.alpha(pixel) == 0 || (Color.red(pixel) < 10 && Color.green(pixel) < 10 && Color.blue(pixel) < 10)
     }
 
-    private inline fun trimEdges(bitmap: Bitmap, isPadding: (Int) -> Boolean): Bitmap {
+    private fun trimEdges(bitmap: Bitmap, isPadding: (Int) -> Boolean): Bitmap {
         var top = 0
         var bottom = bitmap.height - 1
         var left = 0
