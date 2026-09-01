@@ -84,3 +84,40 @@ class DualScreenCoordinator(private val store: DualScreenAssignmentStore) {
         store.set(flipped)
     }
 }
+
+/**
+ * The user-facing display actions: swap which physical panel is the main
+ * output, and force a fresh detection pass.
+ *
+ * These live here rather than on the Activity because everything they
+ * need -- [DisplayOutputRepository], [DualScreenCoordinator],
+ * [PrefsDualScreenAssignmentStore] -- is already in this module, and a
+ * settings catalog item only ever gets a `Context`.
+ *
+ * [refresh] is the signal back to whatever is orchestrating displays:
+ * writing the assignment changes no `DisplayManager` state, so nothing
+ * would re-emit on its own and a swap would appear to do nothing until
+ * the next unrelated display event.
+ */
+object DisplayArrangement {
+    val refresh = kotlinx.coroutines.flow.MutableStateFlow(0)
+
+    /**
+     * Flips which panel is [DualScreenRole.UPPER_OUTPUT] and remembers it.
+     * Returns a line for the user, since the screen they are reading may
+     * be the one that just moved.
+     */
+    suspend fun swap(context: Context): String {
+        val outputs = DisplayOutputRepository(context).currentOutputsSnapshot()
+        if (outputs.size < 2) return "Only one display is connected."
+        DualScreenCoordinator(PrefsDualScreenAssignmentStore(context)).swap(outputs)
+        refresh.value++
+        return "Swapped. The main screen is now the other panel."
+    }
+
+    /** Re-runs detection and orchestration from scratch. */
+    fun reinitialize(): String {
+        refresh.value++
+        return "Displays reinitialized."
+    }
+}
