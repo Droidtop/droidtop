@@ -3,6 +3,7 @@ package dev.droidtop.shell.gamepad
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -228,6 +229,10 @@ internal fun MenuPanel(
             .focusRequester(focus)
             .focusable()
             .onPreviewKeyEvent(onKey)
+            // A panel whose content can outgrow the screen must scroll:
+            // the jump-to-letter list reaches 27 rows on a library that
+            // spans the alphabet, which is taller than the display.
+            .verticalScroll(androidx.compose.foundation.rememberScrollState())
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
         content = content,
