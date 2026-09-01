@@ -34,6 +34,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +46,9 @@ import app.gamenative.ui.screen.login.QrCodeImage
 import dev.droidtop.app.ui.DroidtopTheme
 import dev.droidtop.library.GamesRoots
 import dev.droidtop.runtime.windows.SteamAccess
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * droidtop's OWN Steam surface (per direction: gamenative's UI stays out
@@ -172,7 +176,65 @@ private fun LibraryPanel(username: String?) {
     var games by remember { mutableStateOf<List<SteamAccess.OwnedGame>>(emptyList()) }
     val progress = remember { mutableStateMapOf<Int, Float>() }
     var useExternal by remember { mutableStateOf(PrefManager.useExternalStorage) }
+    // Whether a Wine environment exists at all. A downloaded Windows
+    // game with nowhere to run is a wasted download, so this is checked
+    // before the first one starts rather than at launch time.
+    var provisioned by remember { mutableStateOf<Boolean?>(null) }
+    var setupStatus by remember { mutableStateOf<String?>(null) }
+    var setupRunning by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     LaunchedEffect(refresh) { games = SteamAccess.ownedGames(context) }
+    LaunchedEffect(refresh, setupRunning) {
+        provisioned = withContext(Dispatchers.IO) {
+            dev.droidtop.library.PcGameRuntimeRegistry.runtime?.isProvisioned == true
+        }
+    }
+
+    fun runSetup() {
+        if (setupRunning) return
+        val runtime = dev.droidtop.library.PcGameRuntimeRegistry.runtime
+        if (runtime == null) {
+            setupStatus = "This build has no Windows runtime registered."
+            return
+        }
+        setupRunning = true
+        setupStatus = "Setting up the Windows environment..."
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runtime.provision(dev.droidtop.library.GamesRoots.current(context)) { status ->
+                    setupStatus = status
+                }
+            }
+            setupStatus = result.message
+            setupRunning = false
+        }
+    }
+
+    if (provisioned == false) {
+        // Stated once, above the library, rather than as a failure after
+        // somebody has already waited for a download.
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                "Windows games need a Wine environment before they can run.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                setupStatus ?: "Downloading and installing it takes several hundred megabytes, once.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(enabled = !setupRunning, onClick = { runSetup() }) {
+                Text(if (setupRunning) "Setting up..." else "Set up Windows games")
+            }
+        }
+    } else if (setupStatus != null) {
+        Text(setupStatus!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 
     Text(
         "Signed in${username?.let { " as $it" } ?: ""}. ${games.size} games known" +
@@ -232,6 +294,12 @@ private fun LibraryPanel(username: String?) {
                     }
                     progress[game.appId] != null -> Text("${((progress[game.appId] ?: 0f) * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
                     else -> TextButton(onClick = {
+                        if (provisioned == false) {
+                            // Offer the environment instead of starting a
+                            // download that cannot be played.
+                            setupStatus = "Set up the Windows environment first -- the button is above the list."
+                            return@TextButton
+                        }
                         val started = SteamAccess.startDownload(game.appId) { value -> progress[game.appId] = value }
                         if (started) progress[game.appId] = 0f
                     }) { Text("Download") }
