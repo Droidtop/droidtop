@@ -114,6 +114,18 @@ internal fun usableEmulatorNames(labels: List<String>): List<String> = labels
  * and had just filtered that list down to the installed ones, so it
  * could name them and simply didn't.
  */
+/**
+ * A launch that failed for a reason the user can actually fix, carrying
+ * enough to offer that fix at the point of failure. A plain message
+ * would leave the shell parsing English to decide what to show.
+ */
+class NoEmulatorInstalled(
+    val systemId: String,
+    val systemName: String,
+    val suggestions: List<String>,
+    message: String,
+) : IllegalStateException(message)
+
 internal fun noEmulatorInstalledMessage(context: Context, system: ConsoleSystemDef): String {
     val suggestions = usableEmulatorNames(KnownPlayers.forSystem(context, system.id).map { it.label })
     val base = "No emulator for ${system.displayName} is installed"
@@ -633,7 +645,12 @@ class ConsoleRomProvider(
             ?: SystemOverridePrefs.resolveForFolder(context, parentFolder?.absolutePath ?: "", parentFolder?.name ?: "", systemsById)
             ?: error("Couldn't resolve a console system for ${entry.id}")
         val player = resolvePlayer(context, system, entry.altEmulator)
-            ?: error(noEmulatorInstalledMessage(context, system))
+            ?: throw NoEmulatorInstalled(
+                systemId = system.id,
+                systemName = system.displayName,
+                suggestions = usableEmulatorNames(KnownPlayers.forSystem(context, system.id).map { it.label }),
+                message = noEmulatorInstalledMessage(context, system),
+            )
         if (player.killPackageProcesses) killPackageProcessesBestEffort(player.packageName)
         // Beyond {file.path}/{file.uri}: the MAME4droid presets generated
         // from ES-DE's own es_systems.xml build a -rompath out of the
