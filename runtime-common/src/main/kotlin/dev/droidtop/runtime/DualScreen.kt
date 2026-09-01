@@ -110,9 +110,14 @@ object DisplayArrangement {
     suspend fun swap(context: Context): String {
         val outputs = DisplayOutputRepository(context).currentOutputsSnapshot()
         if (outputs.size < 2) return "Only one display is connected."
-        DualScreenCoordinator(PrefsDualScreenAssignmentStore(context)).swap(outputs)
+        val coordinator = DualScreenCoordinator(PrefsDualScreenAssignmentStore(context))
+        coordinator.swap(outputs)
         refresh.value++
-        return "Swapped. The main screen is now the other panel."
+        val upper = coordinator.resolve(outputs).entries
+            .firstOrNull { it.value == DualScreenRole.UPPER_OUTPUT }
+            ?.key
+        val label = upper?.name?.takeIf { it.isNotBlank() }
+        return if (label != null) "Main screen is now $label." else "Swapped to the other panel."
     }
 
     /** Re-runs detection and orchestration from scratch. */
