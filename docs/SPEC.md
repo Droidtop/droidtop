@@ -1178,6 +1178,58 @@ compositor only ever sees one logical pointer and keyboard.
   pointer capture (issue #1555). This needs real design and testing effort,
   not inherited code.
 
+## 6a. Keyboard ownership (directed 2026-09-01)
+
+droidtop ships **Hacker's Keyboard** — `:input-keyboard`, forked from
+klausw/hackerskeyboard (`org.pocketworkstation.pckeyboard`). Its main
+class is named `LatinIME` because Hacker's Keyboard is itself an AOSP
+LatinIME fork that kept the class name; the project is not AOSP's
+keyboard, and a report that said otherwise was reading the class rather
+than the package.
+
+**It is droidtop's default keyboard, by design.** A device meant to
+replace a computer needs a keyboard that computer software can be driven
+from: Ctrl, Alt, Esc, Tab, arrow keys and the function row. A terminal
+(§4b), a Wine application, or any real desktop program is unusable
+without them, and no stock phone keyboard has them. That is why it is
+forked in rather than recommended as a download.
+
+Being the active input method has a second real effect, stated plainly
+rather than left as a hidden benefit: from Android 10, only a focused app
+or the **current input method** may read the clipboard, so droidtop's
+host↔container clipboard bridge works properly exactly when its own
+keyboard is active.
+
+### The ownership principle, and its limit
+
+Standing direction: droidtop wants to own the device as much as it
+usefully can — it is not merely a launcher. The limit is equally
+standing: **the user keeps control and is told why.**
+
+Concretely, droidtop cannot silently become the input method even if it
+wanted to. Setting `Settings.Secure.DEFAULT_INPUT_METHOD` requires
+`WRITE_SECURE_SETTINGS`, which a normal app is never granted, and
+handheld/launcher features must never depend on root. So the whole
+mechanism is: enumerate what is installed, explain the reason once, and
+open Android's own pickers.
+
+- `InputMethodManager.enabledInputMethodList` — what is installed, with
+  droidtop's own and the active one marked.
+- `InputMethodManager.showInputMethodPicker()` — the system's own
+  switcher, no permission needed. **This is how a user swaps keyboards
+  from inside droidtop**, and it is the system drawing it, not droidtop
+  impersonating it.
+- `Settings.ACTION_INPUT_METHOD_SETTINGS` — needed the first time,
+  because an installed-but-not-enabled IME does not appear in the picker
+  at all.
+- An IME may also call `switchInputMethod`/`switchToNextInputMethod` for
+  itself, so droidtop's own keyboard can offer "switch keyboard" from a
+  key — a real future addition, not built yet.
+
+`Keyboards` (`:runtime-common`) is the single surface for all of this,
+and the settings catalog shows the active keyboard, says what it is, and
+offers the switch. It never nags and never changes the setting itself.
+
 ## 7. Library / launcher-readiness
 
 `:library-core` models every runnable thing — native Android app, Wine

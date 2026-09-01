@@ -62,6 +62,8 @@ object HandheldSettingsCatalog {
     const val ID_DISPLAY_GAME_LAUNCH_TARGET = "pref_display_game_launch_target"
     const val ID_DISPLAY_SWAP = "action_display_swap"
     const val ID_DISPLAY_REINIT = "action_display_reinit"
+    const val ID_KEYBOARD_PICK = "action_keyboard_pick"
+    const val ID_KEYBOARD_ENABLE = "action_keyboard_enable"
     const val ID_RESCAN_LIBRARY = "pref_handheld_rescan_library"
     const val ID_THEME = "pref_handheld_theme"
     const val ID_THEME_COLOR_SCHEME = "pref_handheld_theme_colorscheme"
@@ -189,6 +191,30 @@ object HandheldSettingsCatalog {
                         run = { ctx, _ -> dev.droidtop.runtime.DisplayArrangement.swap(ctx) },
                     ),
                 )
+                // Keyboard. droidtop ships Hacker's Keyboard because a
+                // device meant to replace a computer needs Ctrl/Alt/Esc/
+                // Tab/arrows/function keys, and it cannot silently set the
+                // system input method -- that needs WRITE_SECURE_SETTINGS,
+                // which a normal app is not granted. So: say why, then
+                // open Android's own pickers.
+                add(
+                    ActionItem(
+                        id = ID_KEYBOARD_PICK,
+                        title = "Keyboard",
+                        subtitle = keyboardSubtitle(context),
+                        run = { ctx -> Keyboards.showPicker(ctx) },
+                    ),
+                )
+                if (!Keyboards.ownKeyboardEnabled(context)) {
+                    add(
+                        ActionItem(
+                            id = ID_KEYBOARD_ENABLE,
+                            title = "Turn on Hacker's Keyboard",
+                            subtitle = Keyboards.WHY,
+                            run = { ctx -> Keyboards.openSystemSettings(ctx) },
+                        ),
+                    )
+                }
                 add(
                     ActionItem(
                         id = ID_DISPLAY_REINIT,
@@ -552,5 +578,19 @@ object HandheldSettingsCatalog {
             }
         }
         ctx.startActivity(intent)
+    }
+}
+
+/**
+ * Names the active keyboard, and says plainly when it is not droidtop's
+ * own -- rather than nagging, or silently doing nothing about it.
+ */
+private fun keyboardSubtitle(context: android.content.Context): String {
+    val keyboards = Keyboards.enabled(context)
+    val current = keyboards.firstOrNull { it.isCurrent }
+    return when {
+        current == null -> "Choose which keyboard to use"
+        current.isDroidtops -> "${current.label} - full desktop key set"
+        else -> "${current.label} - tap to switch"
     }
 }
