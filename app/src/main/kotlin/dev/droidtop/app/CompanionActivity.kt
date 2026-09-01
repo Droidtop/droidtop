@@ -49,7 +49,7 @@ class CompanionActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         widgetManager = AppWidgetManager.getInstance(this)
-        widgetHost = AppWidgetHost(this, WIDGET_HOST_ID)
+        widgetHost = CompanionWidgets.host(this)
         widgetIds = CompanionWidgetPrefs.widgetIds(this)
         setContent {
             dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
@@ -134,7 +134,6 @@ class CompanionActivity : AppCompatActivity() {
     }
 
     companion object {
-        private const val WIDGET_HOST_ID = 0xD801
         private const val REQUEST_PICK_WIDGET = 71
         private const val REQUEST_CONFIGURE_WIDGET = 72
 

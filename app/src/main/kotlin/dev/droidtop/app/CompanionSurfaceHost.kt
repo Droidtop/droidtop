@@ -22,14 +22,15 @@ import dev.droidtop.library.LibraryEntry
 fun CompanionSurfaceHost(entry: LibraryEntry?) {
     val context = LocalContext.current
     val widgetManager = remember { AppWidgetManager.getInstance(context) }
-    val widgetHost = remember { AppWidgetHost(context.applicationContext, WIDGET_HOST_ID) }
+    val widgetHost = remember { CompanionWidgets.host(context) }
     val widgetIds = remember { CompanionWidgetPrefs.widgetIds(context) }
 
     // Without listening, a hosted widget renders once and then never
-    // updates -- no clock tick, no now-playing change.
-    DisposableEffect(widgetHost) {
-        runCatching { widgetHost.startListening() }
-        onDispose { runCatching { widgetHost.stopListening() } }
+    // updates -- no clock tick, no now-playing change. Reference counted,
+    // since the companion can be on screen twice at once.
+    DisposableEffect(Unit) {
+        CompanionWidgets.startListening(context)
+        onDispose { CompanionWidgets.stopListening() }
     }
 
     CompanionSurface(
@@ -40,7 +41,3 @@ fun CompanionSurfaceHost(entry: LibraryEntry?) {
         controls = null,
     )
 }
-
-// Distinct from CompanionActivity's own host id: two AppWidgetHosts
-// sharing an id in one process fight over the same listener set.
-private const val WIDGET_HOST_ID = 0x64726F71

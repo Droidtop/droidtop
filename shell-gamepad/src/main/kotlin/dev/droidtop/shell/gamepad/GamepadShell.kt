@@ -772,25 +772,21 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
     // is what makes that a real, user-visible option instead of something
     // only settable by hand-editing LaunchStrategyOverridePrefs. Bumped to
     // force re-reading the override after a pick.
-    var overrideVersion by remember { mutableStateOf(0) }
     var pickingStrategy by remember { mutableStateOf(false) }
-    val engineProvider = remember(context) { EngineGameProvider(context) }
-    val isEngineGame = remember(entry.kind) { entry.kind in engineProvider.kinds }
-    val availableStrategies = remember(entry, isEngineGame) {
-        if (isEngineGame) engineProvider.availableStrategies(entry) else emptyList()
-    }
-    val currentStrategy = remember(entry, availableStrategies, overrideVersion) {
-        val overrideName = LaunchStrategyOverridePrefs.get(context, entry.id)
-        availableStrategies.firstOrNull { it.name == overrideName } ?: availableStrategies.firstOrNull()
-    }
+    // Derived from `strategies` above, which resolves off the main thread
+    // and tolerates a game folder that vanished after the scan. An earlier
+    // version of this screen resolved its own copy synchronously here,
+    // which both duplicated the control below and did filesystem work on
+    // the main thread.
+    val currentStrategy = strategies.firstOrNull { it.name == chosenStrategy } ?: strategies.firstOrNull()
 
     if (pickingStrategy) {
         LaunchStrategyPicker(
-            strategies = availableStrategies,
+            strategies = strategies,
             current = currentStrategy,
             onPick = { strategy ->
                 LaunchStrategyOverridePrefs.set(context, entry.id, strategy)
-                overrideVersion++
+                chosenStrategy = strategy.name
                 pickingStrategy = false
             },
             onDismiss = { pickingStrategy = false },
@@ -850,22 +846,6 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
         val detailScope = rememberCoroutineScope()
         Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             ActionChip("Launch", highlighted = true, modifier = Modifier.focusRequester(launchFocus), onClick = onLaunch)
-            // Only shown when there is a real choice to make. Cycles
-            // rather than opening a picker: there are at most a handful of
-            // backends, and cycling matches how every other choice in this
-            // shell is adjusted (see SettingsCatalogView's left/right).
-            if (strategies.size > 1) {
-                val active = strategies.firstOrNull { it.name == chosenStrategy } ?: strategies.first()
-                ActionChip(
-                    "Runs with: ${active.displayName()}",
-                    highlighted = false,
-                    onClick = {
-                        val next = strategies[(strategies.indexOf(active) + 1) % strategies.size]
-                        LaunchStrategyOverridePrefs.set(context, entry.id, next)
-                        chosenStrategy = next.name
-                    },
-                )
-            }
             // Real ConsoleRomProvider-specific concept -- same honest
             // "not applicable" gating Library.toggleFavorite/
             // saveMetadata already use for a non-ROM entry.
@@ -913,7 +893,7 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
         }
         // Only shown when there's an actual choice to make -- a single
         // available strategy (or none) has nothing for a picker to offer.
-        if (isEngineGame && availableStrategies.size > 1 && currentStrategy != null) {
+        if (strategies.size > 1 && currentStrategy != null) {
             Text("Launch via", color = Color.Gray, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
             ActionChip(currentStrategy.launchStrategyDisplayName(), highlighted = false, onClick = { pickingStrategy = true })
         }
