@@ -847,20 +847,23 @@ private fun ButtonHint(button: String, action: String) {
 
 internal enum class HandheldSection { GAMES, APPS, SETTINGS }
 
-/** Emulated/interpreted content — droidtop's equivalent of ES-DE's "systems." Everything else (native/Wine/Linux/remote) is Apps, not a system. */
-private val GAME_KINDS = setOf(
-    LibraryEntryKind.RENPY,
-    LibraryEntryKind.RPG_MAKER_MV,
-    LibraryEntryKind.RPG_MAKER_MZ,
-    LibraryEntryKind.RPG_MAKER_VX_ACE,
-    LibraryEntryKind.CONSOLE_ROM,
-)
 private val APP_KINDS = setOf(
     LibraryEntryKind.NATIVE_ANDROID_APP,
     LibraryEntryKind.WINE_PROFILE,
     LibraryEntryKind.LINUX_CONTAINER_APP,
     LibraryEntryKind.REMOTE_STREAM,
 )
+
+/**
+ * Emulated/interpreted content — droidtop's equivalent of ES-DE's
+ * "systems." Everything else (native/Wine/Linux/remote) is Apps, not a
+ * system. THE COMPLEMENT on purpose: this used to be a hand-kept list
+ * of four engine kinds, which silently dropped every OTHER engine
+ * (KiriKiri, RM2000/2003, Buriko, CatSystem2, CMVS, Flash, Godot,
+ * Twine, ...) from both sections — a new engine kind now lands in
+ * Games automatically instead of nowhere.
+ */
+private val GAME_KINDS = LibraryEntryKind.entries.toSet() - APP_KINDS
 
 @Composable
 private fun SectionTabBar(
