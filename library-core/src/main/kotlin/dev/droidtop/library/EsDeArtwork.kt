@@ -74,6 +74,41 @@ object EsDeArtwork {
      * sibling `ES-DE/downloaded_media` layout first, then a direct
      * `downloaded_media` under [gamesRoot] itself.
      */
+    /**
+     * Every scraped image for a game, in display order, labelled for a
+     * viewer. [resolve] answers "the single best one and stop", which is
+     * right for a theme element and useless for browsing what was
+     * actually scraped.
+     */
+    fun allMedia(gamesRoot: File, system: String, romBaseName: String): List<Pair<String, String>> {
+        val labels = mapOf(
+            "miximages" to "Mix image",
+            "covers" to "Box art",
+            "screenshots" to "Screenshot",
+            "titlescreens" to "Title screen",
+            "marquees" to "Marquee",
+            "physicalmedia" to "Physical media",
+            "fanart" to "Fan art",
+        )
+        val candidateMediaRoots = listOf(
+            File(gamesRoot.parentFile ?: gamesRoot, "ES-DE/downloaded_media"),
+            File(gamesRoot, "downloaded_media"),
+        )
+        val found = mutableListOf<Pair<String, String>>()
+        for (mediaType in MEDIA_TYPES_BY_PRIORITY) {
+            for (mediaRoot in candidateMediaRoots) {
+                val hit = EXTENSIONS.asSequence()
+                    .map { ext -> File(File(File(mediaRoot, system), mediaType), "$romBaseName.$ext") }
+                    .firstOrNull { it.isFile }
+                if (hit != null) {
+                    found += (labels[mediaType] ?: mediaType) to hit.absolutePath
+                    break
+                }
+            }
+        }
+        return found
+    }
+
     fun resolve(gamesRoot: File, system: String, romBaseName: String): String? =
         resolve(gamesRoot, system, romBaseName, MEDIA_TYPES_BY_PRIORITY.mapNotNull { folder ->
             IMAGE_TYPE_TO_FOLDER.entries.firstOrNull { it.value == folder }?.key
