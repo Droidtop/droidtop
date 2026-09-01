@@ -126,7 +126,19 @@ object TheGamesDbClient {
      * app-private directory (e.g. `context.cacheDir`), same convention as
      * [TheGamesDbSystemIds]' sibling scraper clients.
      */
+    // Real ES-DE strips parenthesized/bracketed groups before a NAME
+    // search (Utils::String::removeParenthesis at its ScreenScraper call
+    // site; the same convention applies here): "Pokemon - Emerald
+    // Version (USA, Europe)" finds nothing, "Pokemon - Emerald Version"
+    // does. Confirmed by a real on-device pass going 0-for-6 on a GBA
+    // folder of properly named No-Intro files.
+    private val DECORATION = Regex("""\s*[\(\[][^)\]]*[\)\]]""")
+
+    fun cleanSearchName(raw: String): String = DECORATION.replace(raw, "").trim().ifEmpty { raw }
+
     fun findMetadata(apiKey: String, cacheDir: File, thegamesdbSystemId: String, gameTitle: String): TheGamesDbMetadata? {
+        @Suppress("NAME_SHADOWING")
+        val gameTitle = cleanSearchName(gameTitle)
         val developers = cachedReferenceList(apiKey, "/Developers", "developers", File(cacheDir, "thegamesdb_developers.json"))
         val publishers = cachedReferenceList(apiKey, "/Publishers", "publishers", File(cacheDir, "thegamesdb_publishers.json"))
         val genres = cachedReferenceList(apiKey, "/Genres", "genres", File(cacheDir, "thegamesdb_genres.json"))

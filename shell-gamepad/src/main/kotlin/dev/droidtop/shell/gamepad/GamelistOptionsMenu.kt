@@ -19,6 +19,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
@@ -110,7 +111,7 @@ internal fun GamelistOptionsMenu(
         add("Close")
     }
 
-    fun consoleFoldersFor(id: String): List<java.io.File> {
+    suspend fun consoleFoldersFor(id: String): List<java.io.File> {
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         return GamesRoots.current(context).flatMap { root ->
             (root.listFiles() ?: emptyArray()).filter { folder ->
@@ -137,9 +138,14 @@ internal fun GamelistOptionsMenu(
                         val folders = consoleFoldersFor(system.id)
                         if (folders.isEmpty()) return@withContext listOf("No folder for ${system.displayName} in any games root.")
                         folders.map { folder ->
-                            scrapeSystemArtwork(context, folder, system) { done, total ->
-                                status = "Scraping ${system.displayName}: $done/$total"
-                            }
+                            scrapeSystemArtwork(
+                                context,
+                                folder,
+                                system,
+                                onProgress = { done, total ->
+                                    status = "Scraping ${system.displayName}: $done/$total"
+                                },
+                            )
                         }
                     }
                     status = results.joinToString("\n")
