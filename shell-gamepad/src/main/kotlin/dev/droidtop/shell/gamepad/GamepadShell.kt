@@ -1220,6 +1220,10 @@ private fun GamesSection(
                     onRequestRescan()
                 },
                 onDismiss = { gamelistOptionsOpen = false },
+                games = systemGamesForGroup,
+                onJumpTo = { index ->
+                    focusedGameIndex = index.coerceIn(0, (systemGamesForGroup.lastIndex).coerceAtLeast(0))
+                },
             )
         }
     }
@@ -1243,9 +1247,13 @@ private fun GamesSection(
                 collectionGroupMembers[group].orEmpty().sortedBy { it.title.lowercase() }
             }
             // The stored per-group sort (GamelistSortPrefs), NAME by
-            // default which is real ES-DE's own gamelist default.
-            else -> entries.filter { it.gameGroup() == group }
-                .sortedWith(GamelistSortPrefs.comparator(GamelistSortPrefs.get(context, group.label)))
+            // default which is real ES-DE's own gamelist default, and
+            // the stored per-group filter (ALL by default).
+            else -> {
+                val filter = GamelistFilterPrefs.get(context, group.label)
+                entries.filter { it.gameGroup() == group && filter.matches(it) }
+                    .sortedWith(GamelistSortPrefs.comparator(GamelistSortPrefs.get(context, group.label)))
+            }
         }
     }
     // Real, unified themed-gamelist condition -- ONE real render path
