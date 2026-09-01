@@ -442,10 +442,25 @@ class MainActivity : AppCompatActivity() {
                 // the shell's chooser (LaunchDisplay.chooser).
                 dev.droidtop.library.LaunchDisplay.askOptions =
                     if (launchTarget == DisplayRolePrefs.GameLaunchTarget.ASK) {
-                        listOf(
-                            dev.droidtop.library.LaunchDisplayOption(second!!.androidDisplayId, "Second display"),
-                            dev.droidtop.library.LaunchDisplayOption(null, "Built-in screen"),
-                        )
+                        // Relative first, absolute only as the clarifier.
+                        // "The other screen" is right however Android
+                        // enumerated the panels, and there is no reliable
+                        // physical-position signal that would make a bare
+                        // "second display" label trustworthy -- see
+                        // docs/SPEC.md section 4c.
+                        val shellOnAddon = shellOnSecond
+                        val addonId = second!!.androidDisplayId
+                        if (shellOnAddon) {
+                            listOf(
+                                dev.droidtop.library.LaunchDisplayOption(addonId, "This screen (add-on)"),
+                                dev.droidtop.library.LaunchDisplayOption(null, "The other screen (built-in)"),
+                            )
+                        } else {
+                            listOf(
+                                dev.droidtop.library.LaunchDisplayOption(null, "This screen (built-in)"),
+                                dev.droidtop.library.LaunchDisplayOption(addonId, "The other screen (add-on)"),
+                            )
+                        }
                     } else {
                         null
                     }
@@ -535,7 +550,6 @@ class MainActivity : AppCompatActivity() {
                                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                             )
                         }
-                }
                 }
             }
         }
