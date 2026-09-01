@@ -49,6 +49,7 @@ object GameNativeMigration {
     data class Availability(
         val installed: Boolean,
         val rootAvailable: Boolean,
+        val stagingError: String? = null,
         val schemaVersion: Int?,
         val steamApps: Int,
         val installedGames: Int,
@@ -66,9 +67,10 @@ object GameNativeMigration {
             // request simply gets denied. "Needs root" was true and
             // useless; this says what to actually do.
             !rootAvailable ->
-                "GameNative is installed, but droidtop was refused root. Approve droidtop in your root " +
-                    "manager (Magisk/KernelSU/APatch) when it asks, or grant it there first, then run " +
-                    "this again. Reading another app's data is impossible without it."
+                "GameNative is installed, but its data could not be read" +
+                    (stagingError?.let { ": $it" } ?: "") +
+                    ". If droidtop has not been granted root, approve it in your root manager " +
+                    "(Magisk/KernelSU/APatch) and run this again."
             schemaVersion == null -> "GameNative is installed but its database couldn't be read."
             schemaTooNew ->
                 "That GameNative install uses database version $schemaVersion; this droidtop build " +
@@ -91,14 +93,14 @@ object GameNativeMigration {
      */
     suspend fun probe(context: Context): Availability {
         val installed = isInstalled(context)
-        if (!installed) return Availability(false, false, null, 0, 0, 0, 0, 0)
+        if (!installed) return Availability(installed = false, rootAvailable = false, schemaVersion = null, steamApps = 0, installedGames = 0, gogGames = 0, epicGames = 0, amazonGames = 0)
         val staged = stageUpstreamFiles(context)
         // rootAvailable = false covers both "no su on this device" and
         // "su refused us", which read identically from here; the message
         // above covers both cases honestly rather than guessing.
-        if (staged == null) return Availability(true, false, null, 0, 0, 0, 0, 0)
+        if (staged == null) return Availability(installed = true, rootAvailable = false, stagingError = lastStagingError, schemaVersion = null, steamApps = 0, installedGames = 0, gogGames = 0, epicGames = 0, amazonGames = 0)
         val database = staged.database
-        if (!database.isFile) return Availability(true, true, null, 0, 0, 0, 0, 0)
+        if (!database.isFile) return Availability(installed = true, rootAvailable = true, schemaVersion = null, steamApps = 0, installedGames = 0, gogGames = 0, epicGames = 0, amazonGames = 0)
         return runCatching {
             SQLiteDatabase.openDatabase(database.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { db ->
                 Availability(
@@ -112,7 +114,7 @@ object GameNativeMigration {
                     amazonGames = db.count("amazon_games"),
                 )
             }
-        }.getOrElse { Availability(true, true, null, 0, 0, 0, 0, 0) }
+        }.getOrElse { Availability(installed = true, rootAvailable = true, schemaVersion = null, steamApps = 0, installedGames = 0, gogGames = 0, epicGames = 0, amazonGames = 0) }
     }
 
     /**
@@ -160,11 +162,26 @@ object GameNativeMigration {
     private class Staged(val root: File, val database: File, val preferences: File?)
 
     /**
-     * Copies the upstream files into droidtop's cache with root, then
-     * hands them to droidtop's own uid so ordinary file APIs can read
-     * them. `cat` rather than `cp` on purpose: the destination file is
-     * created by droidtop, so it already carries droidtop's ownership
-     * and SELinux label and nothing has to be relabelled afterwards.
+     * Why the last staging attempt failed, so the UI can say something
+     * true instead of assuming a root refusal.
+     */
+    @Volatile
+    private var lastStagingError: String? = null
+
+    /**
+     * Copies the upstream files into droidtop's cache with root.
+     *
+     * `cat` into a file droidtop CREATED FIRST, rather than `cp`: the
+     * redirect truncates the existing file instead of making a new one,
+     * so it keeps droidtop's ownership and SELinux label and nothing
+     * has to be relabelled afterwards.
+     *
+     * Success is judged by the RESULT, never by su's exit code.
+     * Confirmed on a real device: Magisk logs policy ALLOW and the copy
+     * genuinely works, while its own logging helper (`content call ...
+     * --method log`) crashes and su reports that crash as its exit
+     * status. Believing the messenger threw away a perfectly good
+     * database and then blamed a root refusal that never happened.
      */
     private suspend fun stageUpstreamFiles(context: Context): Staged? {
         val stagingRoot = File(context.cacheDir, "gamenative-migration")
@@ -172,6 +189,9 @@ object GameNativeMigration {
         stagingRoot.mkdirs()
 
         val database = File(stagingRoot, DATABASE_NAME)
+        // Created by droidtop so the root redirect below inherits this
+        // file's ownership rather than making a root-owned one.
+        runCatching { database.createNewFile() }
         val upstreamData = "/data/data/$UPSTREAM_PACKAGE"
         // Checkpoint first: an upstream database with an unmerged
         // write-ahead log would otherwise arrive missing its newest
@@ -185,7 +205,22 @@ object GameNativeMigration {
             "sh", "-c",
             "cat $upstreamData/databases/$DATABASE_NAME > ${database.absolutePath}",
         )
-        if (!copied.succeeded || !database.isFile || database.length() == 0L) {
+        // SQLite's own file magic: a database that arrived truncated or
+        // as an error message is worse than one that never arrived,
+        // because everything downstream would treat it as real.
+        val looksLikeDatabase = database.isFile && database.length() > 0 && runCatching {
+            database.inputStream().use { stream ->
+                val header = ByteArray(15)
+                stream.read(header) == 15 && String(header, Charsets.US_ASCII) == "SQLite format 3"
+            }
+        }.getOrDefault(false)
+        if (!looksLikeDatabase) {
+            android.util.Log.w(
+                "droidtop.Migration",
+                "Staging failed: exit=${copied.exitCode} size=${database.length()} stderr=${copied.stderr.take(200)}",
+            )
+            lastStagingError = copied.stderr.lineSequence().firstOrNull { it.isNotBlank() }
+                ?: "su exited ${copied.exitCode}"
             stagingRoot.deleteRecursively()
             return null
         }
