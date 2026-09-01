@@ -73,6 +73,36 @@ object EnginehostCapabilities {
         bundles
     }.getOrDefault(emptyList())
 
+    /**
+     * Every distinct way [engineFamily] could actually be run right now,
+     * built from installed bundles so droidtop only ever offers something
+     * that resolves. Used by the manual path when detection cannot name a
+     * context or a version -- see [EnginehostManualChoicePrefs].
+     *
+     * Advisory still holds: this decides what droidtop OFFERS, never what
+     * enginehost resolves.
+     */
+    fun runOptionsFor(context: Context, engineFamily: String): List<EnginehostRunOption> =
+        installedBundles(context)
+            .filter { it.engine.equals(engineFamily, ignoreCase = true) }
+            .mapNotNull { bundle ->
+                // A bundle with no runtime version cannot answer the
+                // contract's required engineVersion, so it is not offerable.
+                val version = bundle.runtimeVersion ?: return@mapNotNull null
+                EnginehostRunOption(
+                    engineContext = bundle.engineContext,
+                    engineVersion = version,
+                    label = buildString {
+                        append(bundle.engineContext ?: "default")
+                        append(" - ")
+                        append(version)
+                        bundle.pluginVersion?.let { append(" (plugin ").append(it).append(')') }
+                    },
+                    bundleId = bundle.bundleId,
+                )
+            }
+            .distinctBy { it.engineContext to it.engineVersion }
+
     private fun jsonStrings(raw: String?): List<String> = runCatching {
         if (raw.isNullOrBlank()) return emptyList()
         val array = JSONArray(raw)
