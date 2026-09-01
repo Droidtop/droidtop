@@ -138,7 +138,12 @@ class MainActivity : AppCompatActivity() {
                 NativeAppProvider(applicationContext),
                 EngineGameProvider(
                     applicationContext,
-                    extraRoots = { dev.droidtop.runtime.windows.SteamAccess.installRoots() },
+                    // Every store's install directories, not just Steam's, so a
+                    // Ren'Py or RPG Maker game installed from GOG/Epic/Amazon
+                    // flows through the same engine detection and launch
+                    // resolution as one sitting in a games folder (docs/SPEC.md
+                    // section 7g).
+                    extraRoots = { dev.droidtop.runtime.windows.PcLibrary.knownInstallRoots() },
                 ),
                 // Same roots as EngineGameProvider -- a folder can hold
                 // real console ROMs (<root>/<systemId>/<romFile>), engine
