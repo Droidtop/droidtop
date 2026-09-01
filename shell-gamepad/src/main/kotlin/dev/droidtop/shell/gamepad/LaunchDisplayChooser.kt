@@ -51,7 +51,7 @@ internal fun LaunchDisplayChooserDialog(
         Column(
             Modifier
                 .clip(RoundedCornerShape(14.dp))
-                .background(Color(0xFF1A1A1A))
+                .background(MenuTokens.OverlaySurface)
                 .focusRequester(focus)
                 .focusable()
                 .onKeyEvent { event ->
@@ -78,23 +78,23 @@ internal fun LaunchDisplayChooserDialog(
                 }
                 .padding(20.dp),
         ) {
-            Text("Launch on which display?", color = Color(0xFFEDEDED), style = MaterialTheme.typography.titleMedium)
+            Text("Launch on which display?", color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
             Text(
                 "B cancels the launch",
-                color = Color(0xFF9AA4B2),
+                color = MenuTokens.OnSurfaceMuted,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
             )
             options.forEachIndexed { index, option ->
                 Text(
                     option.label,
-                    color = if (index == selected) Color.White else Color(0xFFB9C2CE),
+                    color = if (index == selected) Color.White else MenuTokens.Value,
                     fontWeight = if (index == selected) FontWeight.SemiBold else FontWeight.Normal,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (index == selected) Color(0x33FFFFFF) else Color.Transparent)
+                        .background(if (index == selected) MenuTokens.SurfaceSelected else Color.Transparent)
                         .clickable { onPick(option.displayId) }
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                 )
