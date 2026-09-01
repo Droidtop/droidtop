@@ -940,6 +940,77 @@ Top to bottom, each layer earning its space:
   shows the ground. A wordmark on a black rectangle is the bug this
   section exists to close.
 
+## 4e. General-compute parity: status ledger (assessed 2026-09-01)
+
+§1 and §4b already set the goal and the test — *"if the user ever has to
+think 'I'll need to pull out my computer for that,' it's a failing."*
+This section measures against it rather than restating it.
+
+### What prior art says parity requires
+
+**ChromeOS Crostini** is the closest shipping analogue to droidtop's
+architecture (containers, integrated rather than isolated), and its
+integration list is effectively the checklist: bidirectional file sharing
+surfaced in the host's own file manager; **clipboard forwarding** between
+container and host, which its Sommelier Wayland proxy handles alongside
+input and window events; audio in/out; OpenGL; USB passthrough (still
+only partial even there, after years); printing. Notably Crostini treats
+clipboard and file sharing as core, not polish — they are what make two
+environments feel like one machine.
+
+**Samsung DeX** is the instructive failure. Its ceiling is not the
+hardware, it is that *every app is the same mobile app, stretched*:
+reviewers consistently land on stripped-down Office, phone-shaped Slack
+and Teams, and photo editors that cannot do the job. This validates
+droidtop's core architectural bet — running real desktop software through
+containers and Wine, rather than enlarging Android apps, is the only
+route to the standing test. It also warns about the second-order problem
+DeX has: capping concurrent apps and losing window arrangements makes a
+desktop stop feeling like one.
+
+### Ledger
+
+Measured by what droidtop's own code actually touches.
+
+| Capability | Spec | Status |
+|---|---|---|
+| Container lifecycle (root) | §3 | **built** — `DroidSpacesRuntime` implements create/start/stop/list/exec/destroy |
+| Container manager UI | §4b | **built** — `ContainersActivity` over `listContainers` |
+| Bind-mounted Android storage | §3 | **built** — `hostStorageToContainerPath`, whole app-storage dir mounted |
+| Audio | §2 | **configured, unverified** — droidspaces' own `enable_pulseaudio=1`; never confirmed on device |
+| Keyboard/mouse injection | §6 | **built** — host-bridge virtual-pointer/virtual-keyboard, unproven live |
+| External display | §4 | **built** |
+| **Terminal into a container** | §4b | **NOT BUILT** — zero files. §4b's own words: "a computer the user can't open a shell on isn't a computer" |
+| **Clipboard host↔container** | — | **NOT BUILT**, and **not in the spec at all** until now. Crostini treats this as core |
+| **USB peripherals** | §4b | **NOT BUILT** — zero files |
+| **Printing** | §4b | **NOT BUILT** — zero files |
+| **VPN for the whole device** | §4a | **NOT BUILT** — zero files, despite a fully designed section |
+| GPU acceleration | §3c | **barely touched** — one file references it |
+| Non-root path | §3 | **NOT BUILT** — `ProotRuntime` is 7 `TODO()`s, so an unrooted device has no desktop at all |
+| Desktop session end-to-end | §10 | **unproven** — real code, never run against live hardware |
+
+### What actually makes a user reach for a real computer today
+
+In rough order of how often it would bite:
+
+1. **No terminal.** Anything shell-shaped is impossible.
+2. **No clipboard bridge.** Text cannot move between Android and the
+   container, which is constant friction rather than an occasional need.
+   This is the biggest gap the spec did not already name.
+3. **No USB.** No flash drives, no serial adapters, no scanners.
+4. **No printing.**
+5. **No VPN**, despite §4a being fully designed.
+6. **Nothing at all without root**, which is a coverage problem rather
+   than a capability one, and the largest single body of unwritten work.
+
+### Correction to the record
+
+Six doc comments describing unfinished work outlived the work itself and
+were repeatedly read back as gaps (fixed 2026-09-01). The lesson for this
+ledger: status claims belong in ONE place that is checked against code,
+which is what this section is. Prefer measuring what the code touches
+over trusting a comment about intent.
+
 ## 5. Windows compatibility — no real virtualization
 
 Confirmed via research, treat as settled: genuine hardware-accelerated x86
