@@ -7,7 +7,7 @@ import dev.droidtop.runtime.linux.noroot.ProotRuntime
 import dev.droidtop.runtime.linux.root.CraneRootfsPuller
 import dev.droidtop.runtime.linux.root.DroidSpacesRuntime
 import dev.droidtop.runtime.linux.root.FileImageCache
-import dev.droidtop.runtime.linux.root.RootProcess
+import dev.droidtop.runtime.RootProcess
 
 /**
  * The one place backend selection happens — root gives
