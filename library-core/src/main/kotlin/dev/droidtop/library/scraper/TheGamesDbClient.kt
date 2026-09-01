@@ -154,7 +154,31 @@ object TheGamesDbClient {
         val searchResponse = JSONObject(searchConnection.inputStream.bufferedReader().readText())
         val games = searchResponse.optJSONObject("data")?.optJSONArray("games") ?: return null
         if (games.length() == 0) return null
-        val game = games.getJSONObject(0)
+        // The API's fuzzy ordering put a fan game ("Pokemon Black and
+        // White 3: Genesis") above Pokemon Crystal on a real pass --
+        // rank the response ourselves: exact title match first, then
+        // prefix, then the API's own first result. Comparison ignores
+        // case and the punctuation that legitimately differs between
+        // No-Intro naming and TGDB titles (dashes vs colons).
+        fun normalize(value: String): String =
+            value.lowercase().replace(Regex("[^a-z0-9]+"), " ").trim()
+        val wanted = normalize(gameTitle)
+        var game = games.getJSONObject(0)
+        var bestScore = -1
+        for (i in 0 until games.length()) {
+            val candidate = games.getJSONObject(i)
+            val candidateName = normalize(candidate.optString("game_title", ""))
+            val score = when {
+                candidateName == wanted -> 2
+                candidateName.startsWith(wanted) || wanted.startsWith(candidateName) -> 1
+                else -> 0
+            }
+            if (score > bestScore) {
+                bestScore = score
+                game = candidate
+                if (score == 2) break
+            }
+        }
 
         val gameId = game.optInt("id", -1)
         val name = game.optString("game_title", "").ifBlank { null }
