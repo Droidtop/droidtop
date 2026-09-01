@@ -263,10 +263,16 @@ fun CatalogNavigator(
 
     Column(modifier = Modifier.fillMaxSize()) {
         if (stack.size > 1 || screen.subtitle != null) {
-            Column(Modifier.padding(horizontal = 48.dp).padding(top = 20.dp, bottom = 4.dp)) {
-                Text(screen.title, color = Color.White, style = MaterialTheme.typography.headlineSmall)
+            Column(Modifier.padding(horizontal = 48.dp).padding(top = 18.dp, bottom = 2.dp)) {
+                Text(screen.title, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                 screen.subtitle?.let {
-                    Text(it, color = Color(0xFF9AA4B2), style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        it,
+                        color = Color(0xFF8A93A1),
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
@@ -303,16 +309,17 @@ fun CatalogNavigator(
                     }
                 }
                 .padding(horizontal = 48.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             itemsIndexed(rows) { index, row ->
                 Column {
                     row.headerAbove?.let { header ->
                         Text(
-                            header,
-                            color = Color(0xFF9AA4B2),
-                            style = MaterialTheme.typography.titleSmall,
-                            modifier = Modifier.padding(top = 20.dp, bottom = 6.dp, start = 12.dp),
+                            header.uppercase(),
+                            color = Color(0xFF7D8794),
+                            style = MaterialTheme.typography.labelMedium,
+                            letterSpacing = androidx.compose.ui.unit.TextUnit(1.2f, androidx.compose.ui.unit.TextUnitType.Sp),
+                            modifier = Modifier.padding(top = 18.dp, bottom = 6.dp, start = 4.dp),
                         )
                     }
                     CatalogRowView(
@@ -389,23 +396,17 @@ private fun CatalogRowView(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(
-                when {
-                    isSelected -> Color(0x33FFFFFF)
-                    accent != null -> accent.copy(alpha = 0.12f)
-                    else -> Color.Transparent
-                },
-            )
+            .background(if (isSelected) Color(0x2BFFFFFF) else Color(0x0DFFFFFF))
             // Touch still works alongside pure gamepad input -- same
             // reasoning as the rest of the shell's touch support.
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
         if (accent != null) {
             Box(
                 Modifier
                     .width(4.dp)
-                    .height(36.dp)
+                    .height(32.dp)
                     .clip(RoundedCornerShape(2.dp))
                     .background(accent),
             )
@@ -415,35 +416,54 @@ private fun CatalogRowView(
             Text(
                 if (confirmArmed) "${item.title} -- press A again to confirm" else item.title,
                 color = if (confirmArmed) Color(0xFFFFB4AB) else Color.White,
-                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                fontWeight = FontWeight.Medium,
                 style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             )
             val detail = status ?: item.subtitle
             if (detail != null) {
                 Text(
                     detail,
-                    color = Color(0xFF9AA4B2),
+                    color = Color(0xFF8A93A1),
                     style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 )
             }
         }
+        Spacer(Modifier.width(16.dp))
         val context = LocalContext.current
+        // Value and navigation are DIFFERENT trailing affordances: a
+        // chevron never dresses up as a value again, and "(not set)"
+        // stops shouting in body-large.
+        val chevron = item is NestedScreenItem || item is SubScreenItem
         val value = when (item) {
             is ChoiceItem -> item.currentLabel()
             is ToggleItem -> if (item.current) "On" else "Off"
             is SliderItem -> item.current.toString()
-            is TextInputItem -> if (item.secret && item.value.isNotEmpty()) "••••" else item.value.ifEmpty { null } ?: "(not set)"
-            is NestedScreenItem -> item.valueLabel?.invoke(context) ?: "›"
-            is SubScreenItem -> "›"
+            is TextInputItem -> if (item.secret && item.value.isNotEmpty()) "••••" else item.value.ifEmpty { null }
+            is NestedScreenItem -> item.valueLabel?.invoke(context)
             else -> null
         }
-        if (value != null) {
+        val placeholder = value == null && item is TextInputItem
+        if (value != null || placeholder) {
             val adjustable = (item is ChoiceItem && item.options.size <= 6) || item is ToggleItem || item is SliderItem
             Text(
-                if (isSelected && adjustable) "‹ $value ›" else value,
-                color = if (isSelected) Color.White else Color(0xFFB9C2CE),
-                style = MaterialTheme.typography.bodyLarge,
+                if (isSelected && adjustable) "‹ ${value ?: ""} ›" else (value ?: "not set"),
+                color = when {
+                    placeholder -> Color(0xFF6B7480)
+                    isSelected -> Color.White
+                    else -> Color(0xFFAEB7C4)
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             )
+        }
+        if (chevron) {
+            Spacer(Modifier.width(8.dp))
+            Text("›", color = Color(0xFF6B7480), style = MaterialTheme.typography.bodyLarge)
         }
     }
 }
@@ -499,15 +519,17 @@ private fun ChoicePickerScreen(
             itemsIndexed(item.options) { index, option ->
                 Text(
                     option.label,
-                    color = if (index == selected) Color.White else Color(0xFFB9C2CE),
-                    fontWeight = if (index == selected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (index == selected) Color.White else Color(0xFFAEB7C4),
+                    fontWeight = if (index == selected) FontWeight.Medium else FontWeight.Normal,
                     style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (index == selected) Color(0x33FFFFFF) else Color.Transparent)
+                        .background(if (index == selected) Color(0x2BFFFFFF) else Color(0x0DFFFFFF))
                         .clickable { onPick(option.value) }
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .padding(horizontal = 16.dp, vertical = 9.dp),
                 )
             }
         }
@@ -545,7 +567,12 @@ private fun TextEditDialog(
                     .background(Color(0xFF2A2A2A))
                     .padding(12.dp),
             )
+            val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = {
+                    clipboard.getText()?.text?.trim()?.takeIf { it.isNotEmpty() }?.let { value = it }
+                }) { Text("Paste", color = Color(0xFF8AB4FF)) }
+                Spacer(Modifier.weight(1f))
                 TextButton(onClick = onDismiss) { Text("Cancel", color = Color(0xFF9AA4B2)) }
                 TextButton(onClick = { onCommit(value) }) { Text("Save", color = Color(0xFF8AB4FF)) }
             }
