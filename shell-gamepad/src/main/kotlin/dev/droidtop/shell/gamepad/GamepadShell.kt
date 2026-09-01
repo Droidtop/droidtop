@@ -467,6 +467,7 @@ fun GamepadShell(
                         onFocusedEntryChanged = onFocusedEntryChanged,
                         onThemeHandlesHints = { themeHandlesHints = it },
                         onToggleFavorite = onToggleFavorite,
+                        onRequestRescan = { rescanTrigger++ },
                     )
                     HandheldSection.APPS -> {
                         canGoBack = false
@@ -1119,6 +1120,7 @@ private fun GamesSection(
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
     onThemeHandlesHints: (Boolean) -> Unit = {},
     onToggleFavorite: (LibraryEntry) -> Unit = {},
+    onRequestRescan: () -> Unit = {},
 ) {
     var selectedGroup by remember { mutableStateOf<GameGroup?>(null) }
     var recentOnly by remember { mutableStateOf(false) }
@@ -1211,7 +1213,13 @@ private fun GamesSection(
                 groupLabel = group.label,
                 systemId = (group as? GameGroup.System)?.systemId,
                 onSortChanged = { sortVersion += 1 },
-                onScraped = { sortVersion += 1 },
+                // A finished scrape/import refreshes the REAL library
+                // scan -- cached rows now live-resolve media, so the
+                // refresh is what makes new art visible immediately.
+                onScraped = {
+                    sortVersion += 1
+                    onRequestRescan()
+                },
                 onDismiss = { gamelistOptionsOpen = false },
             )
         }
