@@ -1275,30 +1275,6 @@ private fun GamesSection(
     // system rebind to identical paths (cache hits, see
     // EsDeNavigationSounds.load's own doc comment).
     LaunchedEffect(gamelistTheme) { EsDeNavigationSounds.load(gamelistTheme) }
-    if (gamelistOptionsOpen) {
-        val group = selectedGroup
-        run {
-            GamelistOptionsMenu(
-                // An empty key is the library scope: no group is open.
-                groupKey = group?.label.orEmpty(),
-                groupLabel = group?.label ?: "Library",
-                systemId = (group as? GameGroup.System)?.systemId,
-                onSortChanged = { sortVersion += 1 },
-                // A finished scrape/import refreshes the REAL library
-                // scan -- cached rows now live-resolve media, so the
-                // refresh is what makes new art visible immediately.
-                onScraped = {
-                    sortVersion += 1
-                    onRequestRescan()
-                },
-                onDismiss = { gamelistOptionsOpen = false },
-                games = systemGamesForGroup,
-                onJumpTo = { index ->
-                    focusedGameIndex = index.coerceIn(0, (systemGamesForGroup.lastIndex).coerceAtLeast(0))
-                },
-            )
-        }
-    }
     val gamelistView = gamelistTheme?.views?.get("gamelist")
     val gamelistHasListWidget = remember(gamelistView) { gamelistView?.primaryListElement() != null }
     // Alphabetical -- real ES-DE's own default gamelist sort order, and a
@@ -1328,6 +1304,31 @@ private fun GamesSection(
             }
         }
     }
+    if (gamelistOptionsOpen) {
+        val group = selectedGroup
+        run {
+            GamelistOptionsMenu(
+                // An empty key is the library scope: no group is open.
+                groupKey = group?.label.orEmpty(),
+                groupLabel = group?.label ?: "Library",
+                systemId = (group as? GameGroup.System)?.systemId,
+                onSortChanged = { sortVersion += 1 },
+                // A finished scrape/import refreshes the REAL library
+                // scan -- cached rows now live-resolve media, so the
+                // refresh is what makes new art visible immediately.
+                onScraped = {
+                    sortVersion += 1
+                    onRequestRescan()
+                },
+                onDismiss = { gamelistOptionsOpen = false },
+                games = systemGamesForGroup,
+                onJumpTo = { index ->
+                    focusedGameIndex = index.coerceIn(0, (systemGamesForGroup.lastIndex).coerceAtLeast(0))
+                },
+            )
+        }
+    }
+
     // Real, unified themed-gamelist condition -- ONE real render path
     // below handles ANY theme with a real "gamelist" view, whether or not
     // it declares its own <carousel>/<grid>/<textlist>
