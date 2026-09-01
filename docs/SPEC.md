@@ -2012,11 +2012,17 @@ backs; a native Linux depot still wins where one exists (§5a).
 
 ### Dead weight to remove
 
-- **`runtime-remote-stream/`** — not in `settings.gradle.kts`, zero
-  sources, only stale `.cxx` output from a former moonlight build.
-  Streaming is windowcast's, exclusively (directed, restated
-  2026-09-01). Delete the module and the `moonlight-common-c` and
-  `mbedtls` submodules it pulled in.
+- **`runtime-remote-stream/`** — already gone from git: zero tracked
+  files, absent from `settings.gradle.kts`, and the `moonlight-common-c`
+  and `mbedtls` submodules it once used are not in `.gitmodules` either.
+  What survived is untracked `.cxx`/`build` residue in working copies,
+  deleted 2026-09-01. Streaming is windowcast's exclusively (directed,
+  restated 2026-09-01). Note the Windows mirror at `G:\dev\and-pc` still
+  carries those stale submodule directories; the WSL clone is
+  authoritative and is already clean.
+  `LibraryEntryKind.REMOTE_STREAM` **stays** — it is how a
+  windowcast-launched entry appears in the same library model as
+  everything else, which is the point of that model.
 - **`runtime-linux-noroot`** is 7 `TODO()`s against a real
   `DefaultProotContainerBackend` sitting in the fork — port it rather
   than leaving a backend that throws.
