@@ -480,6 +480,120 @@ not settled designs):
   missing pieces. This is the moment-of-friction fix: execution already
   works, the tap on the download is what currently dead-ends.
 
+## 4c. Multi-display: what iiSU does, and why droidtop fights the platform (2026-09-01)
+
+Read directly off the installed `com.iisulauncher` 0.1.6.1 APK
+(`/root/re/iisu` in the dev container). The code is obfuscated; the
+manifest and resources are not, and they were enough — class names,
+intent filters and user-facing strings all survive.
+
+### iiSU uses Android's own secondary-display home
+
+```
+com.iisulauncher.launcher.SecondaryHomeActivity
+  MAIN + android.intent.category.SECONDARY_HOME + DEFAULT
+  launchMode=singleTop  stateNotNeeded  excludeFromRecents
+  configChanges=0x5a0   exported=true
+```
+
+`SECONDARY_HOME` is the platform's own mechanism for a launcher to own
+the home surface on secondary displays. Android places that activity on
+each secondary display itself and re-places it when whatever ran there
+finishes. Two supporting pieces complete it:
+
+- `com.iisulauncher.launcher.RootlessExternalBackstopActivity` — its own
+  `taskAffinity` (`com.iisulauncher.rootless_backstop`), singleTask,
+  `excludeFromRecents`, `autoRemoveFromRecents`. A throwaway task used to
+  hold and reclaim the external display without root.
+- `com.iisulauncher.launcher.dualdisplay.LauncherKeepAliveService` — a
+  `specialUse` foreground service whose own manifest property reads
+  "Keeps iiSU dual-display restore state alive while an externally
+  launched app is active." That is exactly droidtop's parked-display
+  problem, solved by outliving the Activity rather than by bookkeeping
+  inside one.
+
+It also holds `REORDER_TASKS`, which droidtop does not.
+
+### droidtop already has the mechanism and does not use it
+
+`shell-default`'s manifest declares Launcher3's own
+`com.android.launcher3.secondarydisplay.SecondaryDisplayLauncher` with
+`SECONDARY_HOME`, and that file's own comment says wiring it up "is the
+real starting point for droidtop's multi-display patch work ... not
+building multi-display support from nothing." That wiring was never done.
+
+Instead the Handheld shell uses `Presentation` for the companion plus
+manual `startActivity` + `setLaunchDisplayId` relocation for itself. So
+on a live dual-screen device two things compete for the second display:
+Android placing the SECONDARY_HOME activity there, and droidtop pushing
+its own Presentation and relocated shell there. That competition is the
+best available explanation for the symptoms already documented in
+`MainActivity` as confirmed-live: a relaunch loop that needed a cooldown
+guard, a companion that "landed behind the shell", and the built-in panel
+winning regardless of preference.
+
+**Direction: move the Handheld shell's second-screen handling onto
+`SECONDARY_HOME`** and delete the relocation/cooldown machinery it
+replaces, rather than continuing to harden a mechanism that races the
+platform. The role assignment wired in on 2026-09-01 stays useful — it is
+still how a user says which panel is which — but it should drive which
+activity Android hosts where, not a manual relocation.
+
+**One module owns secondary-display behaviour; the active mode selects it
+(directed 2026-09-01).** The forked launcher already has secondary-display
+behaviour and the Handheld shell has its own. These must not become two
+implementations of one job. A single module owns:
+
+- the one `SECONDARY_HOME` activity in the merged manifest — Launcher3's
+  `SecondaryDisplayLauncher` and any Handheld equivalent collapse into
+  it, since two activities both claiming that category is precisely the
+  duplication to remove;
+- what that activity renders, chosen by the active mode: Standard gets
+  the launcher's secondary-display UI, Handheld gets the companion
+  surface, Desktop gets its input surface (§4);
+- the panel role assignment and swap (`DualScreenCoordinator`);
+- launch-target resolution, relative vocabulary first.
+
+One controlling configuration read by every mode, rather than each shell
+carrying its own display logic. `:app` hosts it; the shells contribute
+only their own content.
+
+### The launch-target vocabulary is relative, not absolute
+
+iiSU's own strings, which are the more important lesson:
+
+```
+"Launch in this screen"        "Launch in the other screen"
+"Always Launch in this screen" "Always Launch in the other screen"
+"Always Launch in Top Screen"  "Always Launch in Bottom Screen"
+"Choose preferred Screen"      "Choose preferred Screen (%1$s)"
+"Delete preferred Screen"      "Default Launch Screen" / "Default display"
+"Open on the internal display" "Open on the external display"
+"Launch app on the opposite display"
+"Select which display to open ROMs from this tab."
+"Tune individual platforms"
+```
+
+Three things droidtop should copy:
+
+1. **Relative targeting sidesteps detection entirely.** "The other
+   screen" is always correct no matter which panel Android enumerated
+   first. droidtop's current `GameLaunchTarget` vocabulary
+   (`BUILT_IN`/`SECOND`) is absolute and therefore only as good as a
+   guess that has no reliable signal behind it. Offer relative first,
+   absolute as the explicit choice.
+2. **A per-platform default, with a per-game override, and a way to clear
+   it** — "Select which display to open ROMs from this tab", "Tune
+   individual platforms", "Delete preferred Screen". The same
+   default-plus-priority model already directed for emulator players
+   (§7e2), applied to displays. Deleting a preference is a first-class
+   action, not something buried.
+3. **Say it in the user's terms**: top/bottom and internal/external, not
+   display ids.
+
+This supersedes the `ShellTarget`/`GameLaunchTarget` enums as the design
+target; they stay until the replacement lands so nothing regresses.
+
 ## 4. Display
 
 - One `DisplayOutput` per Android `Display` the device currently has: the
