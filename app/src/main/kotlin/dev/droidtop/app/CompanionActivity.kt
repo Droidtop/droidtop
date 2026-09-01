@@ -182,7 +182,7 @@ object CompanionWidgetPrefs {
  * one.
  */
 @androidx.compose.runtime.Composable
-private fun CompanionNotifications() {
+internal fun CompanionNotifications() {
     val items by dev.droidtop.runtime.systemstatus.NotificationsStore.items.collectAsState()
     if (items.isEmpty()) return
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -225,7 +225,7 @@ private fun CompanionNotifications() {
 }
 
 @androidx.compose.runtime.Composable
-private fun CompanionSystemBar() {
+internal fun CompanionSystemBar() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val status by androidx.compose.runtime.remember {
         dev.droidtop.runtime.systemstatus.SystemStatus.flow(context)
