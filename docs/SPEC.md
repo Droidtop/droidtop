@@ -748,7 +748,14 @@ picked it. They are now real launches, through a seam:
   detail screen, backed by the previously-unwired
   `LaunchStrategyOverridePrefs`.
 
-**Known blocker, confirmed on-device:** droidtop has no flow to *create*
+**Status (corrected 2026-09-01): no longer a blocker in code.**
+`DroidtopPcGameRuntime.provision()` now really does create the container,
+download the imagefs via `SteamService.fetchFileWithFallback`, install it
+through `ImageFsInstaller`, and activate it, and the Steam library offers
+it at the point of need ("Set up Windows games") rather than hiding it in
+settings. It has still never been *run* on a device, so the paragraph
+below describes what was true before that work and what remains unproven
+hands-on. Originally: droidtop had no flow to *create*
 a Wine container at all — `files/imagefs/home` does not exist on a real
 install, so `ContainerManager.containers` is empty and every Wine launch
 correctly reports "no Wine container exists yet". The gamenative
@@ -1910,6 +1917,128 @@ mechanism (`DebugCredentials` in library-core) for every current and
 future credentialed integration; ScreenScraper and TheGamesDB consume
 it today.
 
+## 7g. One library across every source (audit + plan, directed 2026-09-01)
+
+A full audit of droidtop and every vendored repo, against the question
+"what would actually be best for users." Two user corrections framed it:
+Wine is the fallback for any Windows game *not backed by something else*,
+and the per-platform/per-game default-with-priority model (Daijisho's
+`playerIdList` + `defaultPlayerId`) is correct — what is missing is not
+the default, it is the user's ability to *see and change* it.
+
+### The finding that reframes everything
+
+droidtop compiles **830 gamenative main-source files** and references
+**eight symbols** from them:
+
+```
+PluviaApp, PluviaApp.bootstrap, PrefManager, SteamAppDao,
+LoginResult, SteamEvent, SteamService, QrCodeImage
+```
+
+Every one is Steam or bootstrap. The fork already carries complete,
+tested services droidtop reaches none of:
+
+| Capability | Where it lives | User-visible value today |
+|---|---|---|
+| GOG library, auth, manifests, downloads, cloud saves | `service/gog/` (11 files) | none — invisible |
+| Epic, same shape | `service/epic/` (12 files) | none — invisible |
+| Amazon, same shape | `service/amazon/` (11 files) | none — invisible |
+| Loose/DRM-free Windows games in a folder | `utils/CustomGameScanner.kt` | none — invisible |
+| Per-game compatibility rating | `GameCompatibilityStatus` | none |
+| Automatic per-game workarounds | `gamefixes/` | none |
+| Playtime + last-played | `LibraryPlayHistoryDao` | none (playtime reads 0) |
+| Mods / Workshop | `mods/`, `workshop/` | none |
+
+`data/LibraryItem.kt` + `GameSource` (STEAM, GOG, EPIC, AMAZON,
+CUSTOM_GAME) is already the unified model, and `sync/FrontendSyncManager`
+exists specifically to publish installed games to a frontend launcher
+like ES-DE. droidtop **is** that frontend, in-process — so it should read
+the DAOs directly rather than consume that manager's exported file drops.
+
+So the gap was never "droidtop cannot discover Windows games." It is that
+`PcGameProvider.scan()` reads Wine container shortcuts and `SteamAccess`
+wraps `SteamService` alone. Everything else is built and unplugged.
+
+Not present upstream, genuinely absent: **itch.io** (the keyword hits are
+`switch`/`IconSwitcher`). Origin/Uplay unverified.
+
+### What is best for users, concretely
+
+1. **One library, not five.** Nobody should care whether a game arrived
+   from Steam, GOG, Epic, Amazon, a folder of files, or a ROM. Same grid,
+   same metadata, same artwork, same "Runs with" control. Source becomes a
+   filter, never a separate screen.
+2. **Never download what cannot run.** Already true for Steam (the
+   provisioning prompt); generalize to every source.
+3. **Say whether it will work before the download.**
+   `GameCompatibilityStatus` is a rating this device can show up front.
+   This is the difference between a launcher users trust and one they
+   test by wasting an hour on a 40 GB download.
+4. **Apply fixes without teaching users they exist.** `gamefixes/` is a
+   registry of per-game workarounds; the correct UX is that it is simply
+   applied, and mentioned only when it changes something visible.
+5. **Progress follows the user.** Cloud saves exist for all four stores.
+   Wiring them means putting the handheld down and resuming on a PC.
+6. **Playtime and last-played become real**, which makes "recently
+   played", sorting, and the ES-DE gamelist fields honest. Fixes the
+   standing playtime-always-0 defect for PC games.
+7. **Storage is legible.** `isInstalled`/`sizeBytes` per entry lets a
+   handheld user see what is installed and reclaim space, which matters
+   far more on an SD card than on a desktop.
+8. **Configuration lives where the thing is.** Per-game choices in
+   context on the game; per-platform defaults in that platform's
+   settings; nothing important reachable only through a settings hunt.
+
+### Launch resolution: keep the default, expose it
+
+The Daijisho model stands, and droidtop half-implements it already. The
+defect is surfacing, not policy:
+
+- `LaunchStrategyOverridePrefs` (engine games) exists with no settings
+  screen attached; the engines database's `strategies` priority is
+  therefore an invisible constant to the user.
+- ROMs have `PlayerOverridePrefs` and a picker, but no per-platform
+  *default* editor of the kind §7e2 describes.
+- `firstOrNull()` in `GameEngineDetector.launch` and
+  `ConsoleRomProvider` stays — with exactly one candidate that is not a
+  decision, and with several it is a stated default, not a silent one.
+
+Work: a per-platform launch section (ordered candidate list + default,
+user-reorderable) covering ROM players, engine strategies, and PC
+backends under one control, with the per-game override in context on the
+game. Wine is the declared fallback for Windows titles nothing else
+backs; a native Linux depot still wins where one exists (§5a).
+
+### Dead weight to remove
+
+- **`runtime-remote-stream/`** — not in `settings.gradle.kts`, zero
+  sources, only stale `.cxx` output from a former moonlight build.
+  Streaming is windowcast's, exclusively (directed, restated
+  2026-09-01). Delete the module and the `moonlight-common-c` and
+  `mbedtls` submodules it pulled in.
+- **`runtime-linux-noroot`** is 7 `TODO()`s against a real
+  `DefaultProotContainerBackend` sitting in the fork — port it rather
+  than leaving a backend that throws.
+- **`vendor/lemuroid`** is a reference checkout, not a build input: its
+  detection code was copied into `library-core/.../romdetect/`. Legitimate,
+  but it should be documented as reference-only so nobody assumes a
+  dependency exists.
+
+### Order of work
+
+1. Source-agnostic PC library: rewrite `SteamAccess` over
+   `LibraryItem`/`GameSource` backed by the four DAOs plus
+   `CustomGameScanner`; point `PcGameProvider.scan()` at it. One change
+   surfaces GOG, Epic, Amazon and loose Windows games at once.
+2. Compatibility rating, installed state and size onto library entries.
+3. Widen the gamenative migration to all four stores' tables.
+4. Per-platform launch settings + in-context per-game override.
+5. Playtime/last-played from `LibraryPlayHistoryDao`.
+6. Cloud saves across the four stores.
+7. Delete the dead streaming module and submodules.
+8. Port the proot backend.
+
 ## 8. Licensing
 
 `vendor/gamenative` and `vendor/droidspaces` are GPL-3.0.
@@ -1959,6 +2088,8 @@ shell-desktop           → "Desktop" shell's Android-side half (§2a): cross-co
 shell-gamepad           → "Handheld" shell: optional gamepad console UI, multiple
                           selectable paradigms — see §7; depends on library-core
 
+runtime-remote-stream   → DELETED (2026-09-01). Never in settings.gradle.kts,
+                          zero sources. Streaming is windowcast's alone — see §7a.
 pc-helper/               → separate Go program, runs on the remote gaming PC, not an
                             Android module — Sunshine REST API client + (limited) Steam
                             install trigger; see §7a
