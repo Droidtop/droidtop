@@ -73,12 +73,27 @@ class DisplayOutputRepository(private val context: Context) {
         return displays.map { display ->
             @Suppress("DEPRECATION") // Display.getRealSize is deprecated API 30+ (WindowMetrics instead) but works down to minSdk 26 without an Activity/Window context, which a Presentation-target Display doesn't have yet
             val point = android.graphics.Point().also { display.getRealSize(it) }
+            // Real signals, not enumeration order. Confirmed against this
+            // hardware (`dumpsys display`, Retroid + dual-screen add-on):
+            //   Display 0 "Built-in Screen", type INTERNAL, no FLAG_PRESENTATION
+            //   Display 9 "DP Screen",       type EXTERNAL, FLAG_PRESENTATION
+            // FLAG_PRESENTATION is public API and is what
+            // DISPLAY_CATEGORY_PRESENTATION itself selects on, so a panel
+            // that is genuinely a secondary output says so. The displayId
+            // check stays as the fallback for anything that does not.
+            val presentation = (display.flags and Display.FLAG_PRESENTATION) != 0
             DisplayOutput(
                 id = display.displayId.toString(),
                 androidDisplayId = display.displayId,
-                kind = if (display.displayId == Display.DEFAULT_DISPLAY) DisplayOutputKind.PRIMARY_SCREEN else DisplayOutputKind.SECOND_SCREEN,
+                kind = if (display.displayId == Display.DEFAULT_DISPLAY) {
+                    DisplayOutputKind.PRIMARY_SCREEN
+                } else {
+                    DisplayOutputKind.SECOND_SCREEN
+                },
                 widthPx = point.x,
                 heightPx = point.y,
+                name = display.name.orEmpty(),
+                isPresentation = presentation,
             )
         }
     }
