@@ -104,6 +104,12 @@ class MainActivity : AppCompatActivity() {
     // distinguishable from an ordinary re-emission.
     private var lastArrangementSeq: Int = -1
 
+    // The LIVE companion window on the second screen, owned by this
+    // foreground shell. :display's SecondaryDisplayActivity is the IDLE
+    // surface underneath it; see that class and SecondScreenPresentation
+    // for why droidtop needs both rather than one.
+    private var secondScreenPresentation: SecondScreenPresentation? = null
+
     // Which physical panel is the main output. Written by
     // DisplayArrangement.swap, read on every orchestration pass. Android
     // exposes no reliable physical-position signal, so this is a guess
@@ -477,6 +483,27 @@ class MainActivity : AppCompatActivity() {
                 // when the user has assigned the addon as the main output
                 // the shell is moved there and the built-in gets the
                 // companion as an ordinary Activity.
+                // Second screen, shell NOT on it: this shell is foreground
+                // on the built-in panel, so it drives the companion
+                // directly as a Presentation. The SECONDARY_HOME activity
+                // stays underneath as the idle surface for when droidtop
+                // is not foreground; this window sits above it while it is.
+                if (!shellOnSecond && handheld && second != null && secondAvailable) {
+                    if (secondScreenPresentation?.display?.displayId != second.androidDisplayId) {
+                        secondScreenPresentation?.dismiss()
+                        val display = displayManager.getDisplay(second.androidDisplayId)
+                        secondScreenPresentation = display?.let {
+                            SecondScreenPresentation(applicationContext, it).also { p -> p.show() }
+                        }
+                    }
+                } else {
+                    // No second display, one parked by a launched app (a
+                    // Presentation would layer ABOVE that app), or the
+                    // shell itself lives there.
+                    secondScreenPresentation?.dismiss()
+                    secondScreenPresentation = null
+                }
+
                 if (shellOnSecond && second != null) {
                         val currentDisplayId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                             display?.displayId ?: android.view.Display.DEFAULT_DISPLAY
@@ -570,7 +597,27 @@ class MainActivity : AppCompatActivity() {
         roleRefresh.value++
     }
 
+    override fun onStop() {
+        super.onStop()
+        // The shell is no longer foreground -- a game may have started, or
+        // the user switched apps. Take the live companion window down so
+        // :display's SecondaryDisplayActivity, the idle surface Android
+        // places, is what remains on that screen. Leaving it up would
+        // layer this shell's companion over whatever is now running.
+        secondScreenPresentation?.dismiss()
+        secondScreenPresentation = null
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Coming back to the foreground re-asserts the live companion,
+        // through the same orchestration pass everything else uses.
+        roleRefresh.value++
+    }
+
     override fun onDestroy() {
+        secondScreenPresentation?.dismiss()
+        secondScreenPresentation = null
         super.onDestroy()
     }
 

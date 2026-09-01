@@ -532,10 +532,37 @@ best available explanation for the symptoms already documented in
 guard, a companion that "landed behind the shell", and the built-in panel
 winning regardless of preference.
 
-**Direction: move the Handheld shell's second-screen handling onto
-`SECONDARY_HOME`** and delete the relocation/cooldown machinery it
-replaces, rather than continuing to harden a mechanism that races the
-platform. The role assignment wired in on 2026-09-01 stays useful — it is
+**Correction (2026-09-01, same day): iiSU uses BOTH, and so must
+droidtop.** An earlier version of this section was read as "Presentation
+is unnecessary" and the Presentation path was deleted. That was wrong.
+iiSU's own dex references `Landroid/app/Presentation` in both class files
+and carries a full state model around it — `usingPresentation`,
+`usingPresentationExternal`, `retainPresentation`,
+`temporaryPresentationDisabled`, `currentPresentationDisplayId`,
+`allowPresentation`, `updateSecondaryPresentation:start/resolved/configure`,
+`HomePresentationLayoutState(hasDualDisplay=…)`. The two mechanisms answer
+different questions:
+
+- **`SECONDARY_HOME` is the IDLE surface** — what a secondary display
+  shows when droidtop is not foreground: at boot, after a game on that
+  display exits, while the user is in another app. The platform places
+  and re-places it.
+- **`Presentation` is the ACTIVE surface** — a window owned by the
+  foreground shell, so companion content tracks shell focus without a
+  second Activity competing for input focus.
+
+Two things the Activity alone cannot do, which is why droidtop keeps
+both: a `SECONDARY_HOME` activity is placed only while droidtop holds the
+HOME role, so droidtop run as an ordinary app would show no companion at
+all; and being a real Activity it can take input focus, which a
+Presentation window never does. The handoff is the shell's own
+foreground state — `onStop` drops the live window, `onStart` re-asserts
+it — which is what `temporaryPresentationDisabled` encodes upstream.
+
+**Direction: adopt `SECONDARY_HOME` as the idle surface** alongside the
+existing Presentation, rather than continuing to have nothing underneath
+the Presentation and relocating by hand into a display the platform is
+also trying to fill. The role assignment wired in on 2026-09-01 stays useful — it is
 still how a user says which panel is which — but it should drive which
 activity Android hosts where, not a manual relocation.
 
