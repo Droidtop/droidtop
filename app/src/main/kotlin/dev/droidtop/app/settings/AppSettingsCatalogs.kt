@@ -757,6 +757,44 @@ object AppSettingsCatalogs {
                     ),
                 ),
             ),
+            // Only offered when there is actually something to import:
+            // a row saying "GameNative isn't installed" is noise on
+            // every device that never had it.
+            *(
+                if (withContext(Dispatchers.IO) {
+                        dev.droidtop.runtime.windows.GameNativeMigration.isInstalled(context)
+                    }
+                ) {
+                    arrayOf(
+                        CatalogGroup(
+                            id = "windows_gamenative_migration",
+                            title = "Migrate from GameNative",
+                            items = listOf(
+                                AsyncActionItem(
+                                    id = "gamenative_migration_probe",
+                                    title = "Check what can be imported",
+                                    subtitle = "Reads the installed GameNative's library without changing anything (needs root)",
+                                    run = { ctx, _ ->
+                                        dev.droidtop.runtime.windows.GameNativeMigration.probe(ctx).describe()
+                                    },
+                                ),
+                                AsyncActionItem(
+                                    id = "gamenative_migration_run",
+                                    title = "Import GameNative's library",
+                                    subtitle = "Steam/GOG/Epic/Amazon libraries, install records, play history and settings. " +
+                                        "Replaces droidtop's own (a backup is kept). Restart afterwards",
+                                    run = { ctx, onStatus ->
+                                        onStatus("Importing from GameNative...")
+                                        dev.droidtop.runtime.windows.GameNativeMigration.migrate(ctx)
+                                    },
+                                ),
+                            ),
+                        ),
+                    )
+                } else {
+                    emptyArray()
+                }
+            ),
             CatalogGroup(
                 id = "windows_setup",
                 title = null,
