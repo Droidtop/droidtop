@@ -61,7 +61,14 @@ object GameNativeMigration {
 
         fun describe(): String = when {
             !installed -> "GameNative isn't installed, so there is nothing to migrate."
-            !rootAvailable -> "GameNative is installed, but reading another app's data needs root."
+            // Confirmed on a real rooted device: the first `su` a new app
+            // asks for is a PROMPT in the root manager, and an unattended
+            // request simply gets denied. "Needs root" was true and
+            // useless; this says what to actually do.
+            !rootAvailable ->
+                "GameNative is installed, but droidtop was refused root. Approve droidtop in your root " +
+                    "manager (Magisk/KernelSU/APatch) when it asks, or grant it there first, then run " +
+                    "this again. Reading another app's data is impossible without it."
             schemaVersion == null -> "GameNative is installed but its database couldn't be read."
             schemaTooNew ->
                 "That GameNative install uses database version $schemaVersion; this droidtop build " +
@@ -86,6 +93,9 @@ object GameNativeMigration {
         val installed = isInstalled(context)
         if (!installed) return Availability(false, false, null, 0, 0, 0, 0, 0)
         val staged = stageUpstreamFiles(context)
+        // rootAvailable = false covers both "no su on this device" and
+        // "su refused us", which read identically from here; the message
+        // above covers both cases honestly rather than guessing.
         if (staged == null) return Availability(true, false, null, 0, 0, 0, 0, 0)
         val database = staged.database
         if (!database.isFile) return Availability(true, true, null, 0, 0, 0, 0, 0)
