@@ -1,6 +1,5 @@
 package dev.droidtop.shell.gamepad.input
 
-import android.content.Context
 import androidx.compose.ui.input.key.Key
 
 /**
@@ -28,12 +27,11 @@ enum class GamepadAction {
  * droidtop's own existing hardcoded assumptions from before this file
  * existed, now centralized instead of duplicated -- confirmed against
  * every real `Key.Button*`/`Key.Direction*` check previously scattered
- * across `GamepadShell.kt`. [InputMapPrefs] exists so a future real
- * remap screen (an actual es_input.xml-style override UI) has somewhere
- * to persist a user's own mapping -- reading it isn't wired into
- * [actionFor] yet (real, scoped follow-up work, not attempted here),
- * this is deliberately just the abstraction layer other real screens can
- * be built on.
+ * across `GamepadShell.kt`. A future real remap screen (an actual
+ * es_input.xml-style override UI) would need its own persistence and
+ * would wire into [actionFor] then (real, scoped follow-up work, not
+ * attempted here); this is deliberately just the abstraction layer
+ * other real screens can be built on.
  */
 object GamepadKeyMap {
     private val DEFAULT: Map<Key, GamepadAction> = mapOf(
@@ -87,36 +85,5 @@ object GamepadKeyMap {
         GamepadAction.L3 -> "L3"
         GamepadAction.R3 -> "R3"
         GamepadAction.BACK -> "B"
-    }
-}
-
-/**
- * Storage for a future real per-user remap (same SharedPreferences
- * convention as [dev.droidtop.library.consoles.CustomPlayerPrefs] and
- * every other droidtop `*Prefs` object -- see that class's own doc
- * comment). Not yet read by [GamepadKeyMap.actionFor]; exists now so
- * that wiring doesn't need a second pass through every call site again
- * once a real remap screen is built.
- */
-object InputMapPrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
-    private const val KEY_PREFIX = "droidtop_gamepad_remap_"
-
-    fun get(context: Context, action: GamepadAction): Int? {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val stored = prefs.getInt("$KEY_PREFIX${action.name}", -1)
-        return stored.takeIf { it != -1 }
-    }
-
-    fun set(context: Context, action: GamepadAction, keyCode: Int) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
-            .putInt("$KEY_PREFIX${action.name}", keyCode)
-            .apply()
-    }
-
-    fun clear(context: Context, action: GamepadAction) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
-            .remove("$KEY_PREFIX${action.name}")
-            .apply()
     }
 }
