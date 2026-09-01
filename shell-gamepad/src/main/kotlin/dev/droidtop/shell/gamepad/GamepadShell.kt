@@ -196,6 +196,11 @@ fun GamepadShell(
     // Real user-visible launch-failure state -- see launchError's render
     // site. A failed launch must inform, never kill.
     var launchError by remember { mutableStateOf<String?>(null) }
+    // The fixable half of a launch failure: which system had no
+    // emulator, so the banner can offer to go get one.
+    var missingEmulator by remember {
+        mutableStateOf<dev.droidtop.library.consoles.NoEmulatorInstalled?>(null)
+    }
     // The game being started, if any: drives the launch screen (real
     // ES-DE has one; without it the shell simply freezes mid-frame for
     // the several seconds a cold emulator start takes, which reads as a
@@ -268,6 +273,8 @@ fun GamepadShell(
             runCatching { library.launch(entry) }
                 .onFailure {
                     android.util.Log.e("droidtop.GamepadShell", "Launching ${entry.title} failed", it)
+                    launching = null
+                    missingEmulator = it as? dev.droidtop.library.consoles.NoEmulatorInstalled
                     launchError = "Couldn't launch ${entry.title}: ${it.message}"
                 }
             // Held briefly after the launch call returns: the call
@@ -448,8 +455,52 @@ fun GamepadShell(
         // dismisses itself after a few seconds, never blocks input.
         launchError?.let { message ->
             LaunchedEffect(message) {
-                kotlinx.coroutines.delay(6000)
-                if (launchError == message) launchError = null
+                // A failure offering a fix stays until it is dealt with;
+                // one that is only information gets out of the way.
+                if (missingEmulator == null) {
+                    kotlinx.coroutines.delay(6000)
+                    if (launchError == message) launchError = null
+                }
+            }
+            missingEmulator?.let { problem ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 4.dp),
+                ) {
+                    ActionChip(
+                        "Get an emulator",
+                        highlighted = true,
+                        onClick = {
+                            // The players database's own package for this
+                            // system, straight to the store: the fix, at
+                            // the point of failure.
+                            val pkg = dev.droidtop.library.consoles.KnownPlayers
+                                .forSystem(context, problem.systemId)
+                                .firstOrNull()?.player?.packageName
+                            val uri = if (pkg != null) {
+                                android.net.Uri.parse("market://details?id=$pkg")
+                            } else {
+                                android.net.Uri.parse("market://search?q=${problem.systemName} emulator")
+                            }
+                            runCatching {
+                                context.startActivity(
+                                    android.content.Intent(android.content.Intent.ACTION_VIEW, uri)
+                                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                            }
+                            missingEmulator = null
+                            launchError = null
+                        },
+                    )
+                    ActionChip(
+                        "Dismiss",
+                        highlighted = false,
+                        onClick = {
+                            missingEmulator = null
+                            launchError = null
+                        },
+                    )
+                }
             }
             Text(
                 message,
