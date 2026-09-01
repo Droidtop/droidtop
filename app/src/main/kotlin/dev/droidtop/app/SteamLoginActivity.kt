@@ -205,7 +205,7 @@ private fun LibraryPanel(username: String?) {
                     setupStatus = status
                 }
             }
-            setupStatus = result.message
+            setupStatus = result.detail
             setupRunning = false
         }
     }
