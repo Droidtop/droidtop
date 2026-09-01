@@ -852,6 +852,94 @@ target; they stay until the replacement lands so nothing regresses.
   this gets built out (workspace switching, per-app window rules, etc.),
   not a component to fork code from.
 
+## 4d. The companion screen, designed (research 2026-09-01)
+
+droidtop's companion currently renders a status bar, notifications and
+any Android widgets the user added, over a black ground. On a real device
+that is mostly empty space. This section is what it should be, and why.
+
+### What the research actually says
+
+**Glanceable-display research** (Matthews/Forlizzi on peripheral displays;
+"calm technology"): a glanceable surface must communicate its key message
+in one to two seconds, with deliberate visual hierarchy and LOW
+information density. It informs without demanding attention from the
+primary task. This is the constraint that rules out "put everything on
+it" — the failure mode for a second screen is clutter, not emptiness.
+
+**Steam Deck's Quick Access Menu**: five tabs, and a performance overlay
+with five graduated LEVELS from off (FPS only) through full GPU/CPU/VRAM/
+frametime detail, with an explicit note that higher levels are more
+obtrusive. The lesson is progressive density: the user picks how much,
+rather than the designer picking for everyone.
+
+**Wii U GamePad**: the durable idea was that the second screen holds what
+a game's PAUSE screen would hold — inventory, map, management — so it
+COMPLEMENTS rather than duplicates the primary screen. Asymmetric, not
+mirrored.
+
+**Retroid dual-screen add-on users**: the dominant real use is DS/3DS
+dual-screen emulation, second is media on one screen while playing on the
+other. Both matter to droidtop: the companion must get out of the way
+entirely when a game owns that panel.
+
+**iiSU 0.1.6.1**, read from its own resources (same hardware class, so
+this is the most direct evidence available):
+
+- `"Show Hero on Idle Bottom Screen"` — the idle state is HERO ARTWORK,
+  not a placeholder. This is the direct answer to droidtop's empty screen.
+- `"Add a universal post-idle delay before hero, title, and backdrop
+  artwork commits"` — artwork does not change until browsing settles, so
+  scrolling does not thrash the second screen.
+- Its own widget set beyond Android widgets: `Clock`, `Calendar`,
+  `Image`, `Web` (a URL or HTML file), `Achievements`, `Active Tasks`,
+  `Library Stats`, `Playtime Activity`, `Playtime Stats`.
+- `"Set Bottom Screen Brightness"` — per-panel brightness.
+- Layout modes: `Dual Screen`, `Single Screen mode`, `Bottom Screen
+  Only`, `Show Home on Bottom screen`, `Horizontal Grid on Dual Screen`.
+- `"Enlarge title artwork on the secondary display while keeping it
+  within the detail layout."`
+- A notification "bell capsule" that animates arrivals.
+- Download state surfaced as `"Downloads waiting for Wi-Fi"`.
+- System reach: Wi-Fi, Bluetooth, Do Not Disturb, Low Power Mode,
+  Brightness, and separate music/soundbite volumes.
+
+### droidtop's companion, layered
+
+Top to bottom, each layer earning its space:
+
+1. **Status bar** (built): clock, Wi-Fi, VPN, battery, Controls.
+2. **Focused entry** (partly built): when the user is browsing, the
+   companion shows what the main screen cannot fit — hero art, full
+   description, developer/publisher/year/genre/players, rating, playtime,
+   and for a PC entry its `PcInfo` (source, install size, and community
+   compatibility as REFERENCE, never a verdict — §7g). This is the Wii U
+   lesson: the detail you would otherwise open a submenu for.
+3. **Idle state** (to build): when nothing is focused, a slow hero/marquee
+   rotation drawn from the library plus the clock — calm, ambient, never a
+   wordmark. A post-idle delay before artwork commits, so fast scrolling
+   does not thrash.
+4. **Notifications** (built).
+5. **droidtop-native widgets** (to build): library stats, playtime,
+   recently played, and live scan/scrape/download progress — the things
+   droidtop already knows and currently shows nowhere.
+6. **Android widgets** (built).
+7. **Controls** (partly built): per-panel brightness, Wi-Fi, Bluetooth,
+   DND, volume.
+
+### Rules this design commits to
+
+- **Complement, never mirror.** The companion shows what the primary
+  screen is not showing. Duplicating the shell is the failure mode.
+- **Density is the user's choice**, Steam Deck style. A default that is
+  calm, and an explicit way to show more.
+- **Yield completely.** When a game or app owns that panel, the companion
+  is gone — not layered over it. This is already why a launched display is
+  parked (§4c) and why the Presentation is dismissed on `onStop`.
+- **Never a placeholder.** An idle companion shows something real or
+  shows the ground. A wordmark on a black rectangle is the bug this
+  section exists to close.
+
 ## 5. Windows compatibility — no real virtualization
 
 Confirmed via research, treat as settled: genuine hardware-accelerated x86
