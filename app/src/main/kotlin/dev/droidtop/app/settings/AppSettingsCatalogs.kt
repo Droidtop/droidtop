@@ -3,8 +3,8 @@ package dev.droidtop.app.settings
 import android.content.Context
 import android.net.Uri
 import dev.droidtop.app.GamesRootPrefs
-import dev.droidtop.app.importGamelistXml
-import dev.droidtop.app.scrapeSystemArtwork
+import dev.droidtop.library.scraper.importGamelistXml
+import dev.droidtop.library.scraper.scrapeSystemArtwork
 import dev.droidtop.library.consoles.ConsoleSystemDef
 import dev.droidtop.library.consoles.ConsoleSystemEntity
 import dev.droidtop.library.consoles.ConsoleSystemsDatabase

@@ -677,6 +677,9 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
         if (entry.playtimeSeconds > 0) {
             Text("Played ${entry.playtimeSeconds / 60} min", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
         }
+        val detailScope = rememberCoroutineScope()
+        var scrapeStatus by remember(entry) { mutableStateOf<String?>(null) }
+        var scrapeResult by remember(entry) { mutableStateOf<String?>(null) }
         Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             ActionChip("Launch", highlighted = true, modifier = Modifier.focusRequester(launchFocus), onClick = onLaunch)
             // Only shown when there is a real choice to make. Cycles
@@ -701,8 +704,38 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
             if (isRomEntry) {
                 ActionChip("Edit metadata", highlighted = false, onClick = { editingMetadata = true })
                 ActionChip("Collections", highlighted = false, onClick = { editingCollections = true })
+                ActionChip(
+                    scrapeStatus?.let { "Scraping…" } ?: "Scrape",
+                    highlighted = false,
+                    onClick = {
+                        if (scrapeStatus == null) {
+                            scrapeStatus = "Scraping ${entry.title}…"
+                            detailScope.launch {
+                                val romFile = java.io.File(entry.id)
+                                val folder = romFile.parentFile
+                                val systemsById = dev.droidtop.library.consoles.ConsoleSystemsRepository
+                                    .allSystems(context).associateBy { it.id }
+                                val system = entry.systemId?.let { systemsById[it] }
+                                scrapeResult = if (folder == null || system == null) {
+                                    "Can't resolve this game's system folder."
+                                } else {
+                                    dev.droidtop.library.scraper.scrapeSystemArtwork(
+                                        context,
+                                        folder,
+                                        system,
+                                        onlyRom = romFile,
+                                    )
+                                }
+                                scrapeStatus = null
+                            }
+                        }
+                    },
+                )
             }
             ActionChip("Back", highlighted = false, onClick = onClose)
+        }
+        (scrapeStatus ?: scrapeResult)?.let {
+            Text(it, color = Color.Gray, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
         }
         // Only shown when there's an actual choice to make -- a single
         // available strategy (or none) has nothing for a picker to offer.
@@ -1089,6 +1122,12 @@ private fun GamesSection(
 ) {
     var selectedGroup by remember { mutableStateOf<GameGroup?>(null) }
     var recentOnly by remember { mutableStateOf(false) }
+    // The in-gamelist options overlay (sort, scrape, import) -- see
+    // GamelistOptionsMenu. sortVersion invalidates the games ordering
+    // below when the overlay cycles the stored sort; scrapeVersion does
+    // the same for artwork after an in-place scrape.
+    var gamelistOptionsOpen by remember { mutableStateOf(false) }
+    var sortVersion by remember { mutableIntStateOf(0) }
     val firstFocus = remember { FocusRequester() }
     val context = LocalContext.current
 
@@ -1162,12 +1201,27 @@ private fun GamesSection(
     // system rebind to identical paths (cache hits, see
     // EsDeNavigationSounds.load's own doc comment).
     LaunchedEffect(gamelistTheme) { EsDeNavigationSounds.load(gamelistTheme) }
+    if (gamelistOptionsOpen) {
+        val group = selectedGroup
+        if (group == null) {
+            gamelistOptionsOpen = false
+        } else {
+            GamelistOptionsMenu(
+                groupKey = group.label,
+                groupLabel = group.label,
+                systemId = (group as? GameGroup.System)?.systemId,
+                onSortChanged = { sortVersion += 1 },
+                onScraped = { sortVersion += 1 },
+                onDismiss = { gamelistOptionsOpen = false },
+            )
+        }
+    }
     val gamelistView = gamelistTheme?.views?.get("gamelist")
     val gamelistHasListWidget = remember(gamelistView) { gamelistView?.primaryListElement() != null }
     // Alphabetical -- real ES-DE's own default gamelist sort order, and a
     // real, stable Up/Down order for the headless (no list widget) case
     // below, unlike allGames' own natural Library order.
-    val systemGamesForGroup = remember(selectedGroup, entries, collectionGroupMembers) {
+    val systemGamesForGroup = remember(selectedGroup, entries, collectionGroupMembers, sortVersion) {
         val group = selectedGroup
         when (group) {
             null -> emptyList()
@@ -1181,7 +1235,10 @@ private fun GamesSection(
             } else {
                 collectionGroupMembers[group].orEmpty().sortedBy { it.title.lowercase() }
             }
-            else -> entries.filter { it.gameGroup() == group }.sortedBy { it.title.lowercase() }
+            // The stored per-group sort (GamelistSortPrefs), NAME by
+            // default which is real ES-DE's own gamelist default.
+            else -> entries.filter { it.gameGroup() == group }
+                .sortedWith(GamelistSortPrefs.comparator(GamelistSortPrefs.get(context, group.label)))
         }
     }
     // Real, unified themed-gamelist condition -- ONE real render path
@@ -1331,6 +1388,15 @@ private fun GamesSection(
                         val step = if (action == GamepadAction.L) -1 else 1
                         EsDeNavigationSounds.play("quicksysselect")
                         selectedGroup = orderedGroups[(index + step + orderedGroups.size) % orderedGroups.size]
+                        true
+                    }
+                    // Gamelist options (sort/scrape/import) right where
+                    // the user is -- the ES-DE GuiGamelistOptions
+                    // PATTERN in droidtop's own placement (short-press
+                    // Select, which had no gamelist meaning; the Quick
+                    // Menu stays on hold/R2).
+                    action == GamepadAction.SELECT && group != null -> {
+                        gamelistOptionsOpen = true
                         true
                     }
                     action == GamepadAction.LEFT && group != null && orderedGroups.size > 1 -> {
