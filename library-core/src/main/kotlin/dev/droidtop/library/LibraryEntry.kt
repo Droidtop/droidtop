@@ -66,10 +66,10 @@ data class LibraryEntry(
     // Real ES-DE's own ScreenScraper.cpp confirmed no ESRB/age-rating
     // field exists anywhere in its schema at all -- an earlier version of
     // this list guessed one; dropped, not real ES-DE parity.
-    // Populated by a real scraper (ScreenScraperClient/TheGamesDbClient/
-    // Libretro* in library-core/scraper/, run via Scrape.kt's
-    // scrapeSystemArtwork) -- null/default until a user actually
-    // scrapes a folder, same as artworkUri already was.
+    // Populated by a real scraper (LutrisScraperClient/IgdbScraperClient
+    // in library-core/scraper/, wired into ConsoleSystemsActivity's
+    // existing manual "scrape artwork" action) -- null/default until a
+    // user actually scrapes a folder, same as artworkUri already was.
     val description: String? = null,
     val developer: String? = null,
     val publisher: String? = null,

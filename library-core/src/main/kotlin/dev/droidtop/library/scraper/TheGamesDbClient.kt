@@ -79,7 +79,7 @@ object TheGamesDbClient {
      * file (same real ES-DE convention: never re-fetched once a real
      * cache file exists, since these lists change rarely). [cacheDir]
      * matches this codebase's own existing convention of a caller-
-     * supplied [File] destination (see `downloadImage` in Scrape.kt),
+     * supplied [File] destination (see [IgdbScraperClient.downloadImage]),
      * not a stored Context.
      */
     private fun cachedReferenceList(apiKey: String, endpoint: String, resourceName: String, cacheFile: File): Map<Int, String> {
