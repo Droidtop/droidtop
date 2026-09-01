@@ -172,6 +172,56 @@ ground) and ambient second-screen companion surfaces; ES-DE-themed
 Handheld views take every color from the active ES-DE theme (§7f) and
 are outside Material theming entirely.
 
+## 2b. Desktop mode gets the library context, and Android apps as windows (directed 2026-09-01)
+
+Desktop mode currently has a container and a shell and no library. The
+whole gamenative/Wine context that Handheld now reaches through
+`PcLibrary` — store library managers, installed games, owned-but-not-
+installed titles, and the Wine container shortcuts — belongs in Desktop
+too, as ordinary desktop entries.
+
+Not a second implementation: `PcLibrary` already returns a
+source-agnostic list (§7g) and `ContainerManager.loadShortcuts()` already
+enumerates Wine-prefix shortcuts. Desktop's task manager and launcher
+surface should read the same `LibraryEntry` stream `:shell-gamepad`
+reads, differing only in presentation. Same rule as the secondary display
+(§4c): one mechanism, the active mode selects what it looks like.
+
+Two things this needs that Handheld did not:
+
+- **Shortcuts as first-class desktop objects.** A Wine shortcut has an
+  icon, a working directory and an executable — everything a `.desktop`
+  entry has. Desktop should place them the way a Linux desktop does,
+  rather than treating them as rows in a game list.
+- **Windowed launching.** Handheld launches fullscreen to a display;
+  Desktop launches into a window on the shared desktop
+  (`WindowPlacement`, §4), which is a different launch path through the
+  same entry.
+
+### Emulators, and Android apps as windows
+
+Directed as the same problem: droidtop should be able to wire an ANDROID
+application in as a window on the desktop — an emulator being the
+motivating case, since a native Android emulator is often the best way to
+run a console game and there is no reason it should be unavailable in
+Desktop mode just because it is not a Linux binary.
+
+This is genuinely harder than the rest of this section and is **future
+work, not scheduled here**. An Android Activity renders to an Android
+`Display`, not to the container's Wayland compositor, so "as a window"
+means either presenting that Activity onto a virtual display whose output
+is composited into the desktop, or the reverse — hosting the desktop's
+compositor output inside Android's window manager. `:host-bridge` already
+does the second direction for the container (wlr-screencopy into an
+Android `Surface`); the first direction, an Android app's own surface
+appearing as a window INSIDE the container's desktop, has no existing
+path in this repo and needs real design before any estimate is honest.
+
+Recording it so the library and launch layers are not built in a way that
+forecloses it: entries carry their `LibraryEntryKind` all the way to
+launch, and nothing in Desktop's launch path should assume "a window
+means a Linux process."
+
 ## 3. Containers
 
 One `ContainerRuntime` interface (`runtime-common`), two interchangeable
