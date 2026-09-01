@@ -201,6 +201,17 @@ fun GamepadShell(
     // the several seconds a cold emulator start takes, which reads as a
     // hang rather than as work).
     var launching by remember { mutableStateOf<LibraryEntry?>(null) }
+    // Idle tracking for the screensaver: every key press the shell sees
+    // bumps this, and the timer below restarts from it. A launch counts
+    // as activity too (the shell is not idle, it is behind a game).
+    var lastInputMs by remember { mutableStateOf(android.os.SystemClock.elapsedRealtime()) }
+    var screensaverOn by remember { mutableStateOf(false) }
+    val screensaverMode = remember { ScreensaverPrefs.mode(context) }
+    LaunchedEffect(lastInputMs, screensaverMode, launching) {
+        if (screensaverMode == ScreensaverMode.OFF || launching != null) return@LaunchedEffect
+        kotlinx.coroutines.delay(screensaverMode.idleSeconds * 1000L)
+        screensaverOn = true
+    }
     // Never-crash boundary: a launch failure (bad emulator preset, missing
     // app, malformed template) must NEVER kill the shell -- confirmed
     // live: the first real on-device game launch threw from a preset's
@@ -363,6 +374,15 @@ fun GamepadShell(
             // etc. all take priority since they're closer to the focused
             // node in the bubbling chain).
             .onKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown) {
+                    lastInputMs = android.os.SystemClock.elapsedRealtime()
+                    if (screensaverOn) {
+                        // The press that wakes the shell belongs to the
+                        // screensaver, not to whatever it was over.
+                        screensaverOn = false
+                        return@onKeyEvent true
+                    }
+                }
                 // Quick Menu trigger: R2, the dedicated quick-device-
                 // management button (per direction), named on screen by
                 // the R2 pill in the top-right corner. KeyDown opens;
@@ -447,6 +467,10 @@ fun GamepadShell(
                 // Starting a game owns the content area until the game's
                 // own window arrives. Checked FIRST so it covers the
                 // detail screen the launch was triggered from.
+                screensaverOn -> {
+                    Screensaver(gameEntries.orEmpty())
+                    androidx.activity.compose.BackHandler(enabled = true) { screensaverOn = false }
+                }
                 launching != null -> {
                     val starting = launching
                     if (starting != null) {
@@ -594,6 +618,20 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
     LaunchedEffect(entry) { launchFocus.requestFocus() }
 
     var editingMetadata by remember { mutableStateOf(false) }
+    var viewingMedia by remember(entry) { mutableStateOf(false) }
+    // Everything scraped for this game, for the media viewer. Read off
+    // the filesystem once per entry rather than per frame.
+    val media = remember(entry) {
+        val romFile = java.io.File(entry.id)
+        val gamesRoot = dev.droidtop.library.GamesRoots.current(context)
+            .firstOrNull { romFile.absolutePath.startsWith(it.absolutePath) }
+        val systemId = entry.systemId
+        if (gamesRoot != null && systemId != null) {
+            dev.droidtop.library.EsDeArtwork.allMedia(gamesRoot, systemId, romFile.nameWithoutExtension)
+        } else {
+            emptyList()
+        }
+    }
     var editingCollections by remember { mutableStateOf(false) }
 
     // Which launch backends this particular game can actually use right
@@ -612,6 +650,10 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
             library = library,
             onDismiss = { editingMetadata = false },
         )
+        return
+    }
+    if (viewingMedia) {
+        MediaViewer(title = entry.title, media = media, onClose = { viewingMedia = false })
         return
     }
     if (editingCollections) {
@@ -729,6 +771,9 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
             // Real ConsoleRomProvider-specific concept -- same honest
             // "not applicable" gating Library.toggleFavorite/
             // saveMetadata already use for a non-ROM entry.
+            if (media.size > 1) {
+                ActionChip("View media (${media.size})", highlighted = false, onClick = { viewingMedia = true })
+            }
             if (isRomEntry) {
                 ActionChip("Edit metadata", highlighted = false, onClick = { editingMetadata = true })
                 ActionChip("Collections", highlighted = false, onClick = { editingCollections = true })

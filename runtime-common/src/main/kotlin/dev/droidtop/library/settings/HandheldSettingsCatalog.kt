@@ -28,6 +28,7 @@ object HandheldSettingsCatalog {
     const val ID_DEFAULT_SECTION = "pref_handheld_default_section"
     const val ID_SHOW_HINTS = "pref_handheld_show_hints"
     const val ID_SCRAPER = "pref_handheld_scraper"
+    const val ID_SCREENSAVER = "pref_handheld_screensaver"
     const val ID_CONSOLE_SYSTEMS = "pref_handheld_console_systems"
     const val ID_WINDOWS_GAMES = "pref_handheld_windows_games"
     const val GROUP_SYSTEM = "handheld_system"
@@ -103,6 +104,25 @@ object HandheldSettingsCatalog {
                 // scraper on the MAIN menu (GuiMenu -> GuiScraperMenu),
                 // not buried under management screens, and the direction
                 // was explicit that droidtop matches that.
+                add(
+                    ChoiceItem(
+                        id = ID_SCREENSAVER,
+                        title = "Screensaver",
+                        subtitle = "Shows your library's artwork when the shell sits idle",
+                        options = listOf(
+                            ChoiceOption("OFF", "Off"),
+                            ChoiceOption("AFTER_2", "After 2 minutes"),
+                            ChoiceOption("AFTER_5", "After 5 minutes"),
+                            ChoiceOption("AFTER_10", "After 10 minutes"),
+                        ),
+                        current = context.getSharedPreferences("com.android.launcher3.prefs", Context.MODE_PRIVATE)
+                            .getString("droidtop_screensaver_mode", null) ?: "AFTER_5",
+                        onSelect = { ctx, value ->
+                            ctx.getSharedPreferences("com.android.launcher3.prefs", Context.MODE_PRIVATE)
+                                .edit().putString("droidtop_screensaver_mode", value).apply()
+                        },
+                    ),
+                )
                 add(
                     NestedScreenItem(
                         id = ID_SCRAPER,
