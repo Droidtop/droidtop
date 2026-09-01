@@ -43,6 +43,44 @@ enum class GamelistSort(val label: String) {
     LAST_PLAYED("Last played"),
 }
 
+/**
+ * Which games a gamelist shows (the GuiGamelistFilter idea, kept to the
+ * states droidtop actually stores per game). Persisted per group like
+ * the sort order, so a filtered list stays filtered on the way back.
+ */
+enum class GamelistFilter(val label: String) {
+    ALL("All games"),
+    FAVORITES("Favorites"),
+    COMPLETED("Completed"),
+    UNPLAYED("Never played"),
+    ;
+
+    fun matches(entry: LibraryEntry): Boolean = when (this) {
+        ALL -> true
+        FAVORITES -> entry.favorite
+        COMPLETED -> entry.completed
+        UNPLAYED -> entry.lastPlayedEpochMs == null
+    }
+}
+
+object GamelistFilterPrefs {
+    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val KEY_PREFIX = "droidtop_gamelist_filter_"
+
+    fun get(context: Context, groupKey: String): GamelistFilter {
+        val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_PREFIX + groupKey, null) ?: return GamelistFilter.ALL
+        return runCatching { GamelistFilter.valueOf(raw) }.getOrDefault(GamelistFilter.ALL)
+    }
+
+    fun cycle(context: Context, groupKey: String): GamelistFilter {
+        val next = GamelistFilter.entries[(get(context, groupKey).ordinal + 1) % GamelistFilter.entries.size]
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_PREFIX + groupKey, next.name).apply()
+        return next
+    }
+}
+
 object GamelistSortPrefs {
     private const val PREFS_NAME = "com.android.launcher3.prefs"
     private const val KEY_PREFIX = "droidtop_gamelist_sort_"
@@ -87,6 +125,10 @@ internal fun GamelistOptionsMenu(
     onSortChanged: () -> Unit,
     onScraped: () -> Unit,
     onDismiss: () -> Unit,
+    // The gamelist as it is currently shown, so jump and random address
+    // exactly what the user is looking at rather than a second copy.
+    games: List<LibraryEntry> = emptyList(),
+    onJumpTo: (Int) -> Unit = {},
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
@@ -94,6 +136,15 @@ internal fun GamelistOptionsMenu(
     var sort by remember { mutableStateOf(GamelistSortPrefs.get(context, groupKey)) }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
+    var filter by remember { mutableStateOf(GamelistFilterPrefs.get(context, groupKey)) }
+    // The letter list replaces the action list in place: a menu that
+    // pushes a second dialog on a handheld is a menu you get lost in.
+    var pickingLetter by remember { mutableStateOf(false) }
+    val letters = remember(games) {
+        games.map { entry ->
+            entry.title.firstOrNull()?.uppercaseChar()?.takeIf { it.isLetter() } ?: '#'
+        }.distinct().sorted()
+    }
 
     val libraryScope = groupKey.isEmpty()
     val actions = buildList {
@@ -104,6 +155,11 @@ internal fun GamelistOptionsMenu(
             add("Update platform databases")
         } else {
             add("Sort: ${sort.label}")
+            add("Show: ${filter.label}")
+            if (games.isNotEmpty()) {
+                add("Jump to letter")
+                add("Random game")
+            }
             if (systemId != null) {
                 add("Scrape this system")
                 add("Import gamelist.xml")
@@ -119,6 +175,17 @@ internal fun GamelistOptionsMenu(
                 folder.isDirectory &&
                     SystemOverridePrefs.resolveForFolder(context, folder.absolutePath, folder.name, systemsById)?.id == id
             }
+        }
+    }
+
+    fun jumpToLetter(index: Int) {
+        val letter = letters.getOrNull(index) ?: return
+        val target = games.indexOfFirst { entry ->
+            (entry.title.firstOrNull()?.uppercaseChar()?.takeIf { it.isLetter() } ?: '#') == letter
+        }
+        if (target >= 0) {
+            onJumpTo(target)
+            onDismiss()
         }
     }
 
@@ -182,6 +249,20 @@ internal fun GamelistOptionsMenu(
                 sort = GamelistSortPrefs.cycle(context, groupKey)
                 onSortChanged()
             }
+            "Show: ${filter.label}" -> {
+                filter = GamelistFilterPrefs.cycle(context, groupKey)
+                onSortChanged()
+            }
+            "Jump to letter" -> {
+                pickingLetter = true
+                focusIndex = 0
+            }
+            "Random game" -> {
+                if (games.isNotEmpty()) {
+                    onJumpTo(games.indices.random())
+                    onDismiss()
+                }
+            }
             "Scrape this system" -> {
                 if (busy) return
                 busy = true
@@ -234,23 +315,31 @@ internal fun GamelistOptionsMenu(
                 if (event.type != KeyEventType.KeyUp) {
                     false
                 } else {
+                    val itemCount = if (pickingLetter) letters.size else actions.size
                     when (GamepadKeyMap.actionFor(event.key)) {
                         GamepadAction.UP -> {
-                            focusIndex = (focusIndex - 1 + actions.size) % actions.size
+                            if (itemCount > 0) focusIndex = (focusIndex - 1 + itemCount) % itemCount
                             EsDeNavigationSounds.play("scroll")
                             true
                         }
                         GamepadAction.DOWN -> {
-                            focusIndex = (focusIndex + 1) % actions.size
+                            if (itemCount > 0) focusIndex = (focusIndex + 1) % itemCount
                             EsDeNavigationSounds.play("scroll")
                             true
                         }
                         GamepadAction.A -> {
-                            activate(focusIndex)
+                            if (pickingLetter) jumpToLetter(focusIndex) else activate(focusIndex)
                             true
                         }
                         GamepadAction.B, GamepadAction.BACK, GamepadAction.SELECT -> {
-                            onDismiss()
+                            // Back out of the letter list to the actions
+                            // first; only then close the menu.
+                            if (pickingLetter) {
+                                pickingLetter = false
+                                focusIndex = 0
+                            } else {
+                                onDismiss()
+                            }
                             true
                         }
                         else -> false
@@ -264,18 +353,33 @@ internal fun GamelistOptionsMenu(
                 color = MenuTokens.OnSurface,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
             )
-            actions.forEachIndexed { index, label ->
-                MenuRow(
-                    title = label,
-                    selected = index == focusIndex,
-                    onClick = {
-                        focusIndex = index
-                        activate(index)
-                    },
-                )
+            if (pickingLetter) {
+                letters.forEachIndexed { index, letter ->
+                    MenuRow(
+                        title = letter.toString(),
+                        selected = index == focusIndex,
+                        onClick = {
+                            focusIndex = index
+                            jumpToLetter(index)
+                        },
+                    )
+                }
+            } else {
+                actions.forEachIndexed { index, label ->
+                    MenuRow(
+                        title = label,
+                        selected = index == focusIndex,
+                        onClick = {
+                            focusIndex = index
+                            activate(index)
+                        },
+                    )
+                }
             }
             status?.let { MenuRow(title = it.lineSequence().first(), subtitle = it.substringAfter('\n', "").ifEmpty { null }) }
-            MenuHint("Up/Down moves, A activates, B closes")
+            MenuHint(
+                if (pickingLetter) "Up/Down moves, A jumps, B goes back" else "Up/Down moves, A activates, B closes",
+            )
         }
     }
 }
