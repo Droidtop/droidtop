@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -389,6 +390,18 @@ fun GamepadShell(
             // screen's own Back handling, individual card key handlers,
             // etc. all take priority since they're closer to the focused
             // node in the bubbling chain).
+            // Touch counts as activity too: only key events reset the
+            // idle timer before this, so the screensaver could appear
+            // while somebody was actively tapping. Initial pass, so it
+            // observes without consuming anything.
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                        lastInputMs = android.os.SystemClock.elapsedRealtime()
+                    }
+                }
+            }
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown) {
                     lastInputMs = android.os.SystemClock.elapsedRealtime()
@@ -529,7 +542,10 @@ fun GamepadShell(
                 // own window arrives. Checked FIRST so it covers the
                 // detail screen the launch was triggered from.
                 screensaverOn -> {
-                    Screensaver(gameEntries.orEmpty())
+                    Screensaver(gameEntries.orEmpty()) {
+                        screensaverOn = false
+                        lastInputMs = android.os.SystemClock.elapsedRealtime()
+                    }
                     androidx.activity.compose.BackHandler(enabled = true) { screensaverOn = false }
                 }
                 launching != null -> {
