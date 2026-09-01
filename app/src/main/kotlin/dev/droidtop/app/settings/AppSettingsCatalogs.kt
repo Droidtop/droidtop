@@ -941,6 +941,10 @@ object AppSettingsCatalogs {
                             options = listOf(
                                 ChoiceOption(ScraperSource.SCREENSCRAPER.name, "ScreenScraper (ES-DE's default)"),
                                 ChoiceOption(ScraperSource.THEGAMESDB.name, "TheGamesDB"),
+                                ChoiceOption(
+                                    ScraperSource.LIBRETRO.name,
+                                    "libretro database (no account; genre/developer/year, boxart, no descriptions)",
+                                ),
                             ),
                             current = ScraperSourcePrefs.get(context).name,
                             onSelect = { ctx, value -> ScraperSourcePrefs.set(ctx, ScraperSource.valueOf(value)) },
