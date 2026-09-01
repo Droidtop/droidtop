@@ -101,6 +101,36 @@ class MainActivity : AppCompatActivity() {
     // happened to retrigger orchestration.
     private var lastDisplayIds: Set<Int> = emptySet()
 
+    // Last seen DisplayArrangement.refresh value, so an explicit swap is
+    // distinguishable from an ordinary re-emission.
+    private var lastArrangementSeq: Int = -1
+
+    // Which physical panel is the main output. Written by
+    // DisplayArrangement.swap, read on every orchestration pass. Android
+    // exposes no reliable physical-position signal, so this is a guess
+    // the user can correct and droidtop then remembers -- never a
+    // decision droidtop keeps making for them.
+    private val dualScreenStore by lazy {
+        dev.droidtop.runtime.PrefsDualScreenAssignmentStore(applicationContext)
+    }
+    private val dualScreenCoordinator by lazy {
+        dev.droidtop.runtime.DualScreenCoordinator(dualScreenStore)
+    }
+
+    /**
+     * Re-runs orchestration from scratch: drops the parked display and the
+     * relocation cooldown so the next pass really acts rather than being
+     * suppressed as a repeat attempt. Called by the double-tap-home hard
+     * reinit and by [dev.droidtop.runtime.DisplayArrangement]'s own
+     * swap/reinitialize actions.
+     */
+    fun reinitializeDisplays() {
+        dev.droidtop.library.LaunchDisplay.parkedDisplayId = null
+        lastRelocationAttemptMs = 0L
+        lastDisplayIds = emptySet()
+        roleRefresh.value++
+    }
+
     companion object DisplayRelocation {
         // Process-wide (companion), not per-instance: the relaunch loop
         // recreates the Activity, so an instance field would reset each
@@ -236,10 +266,10 @@ class MainActivity : AppCompatActivity() {
         // display AND the relocation cooldown so the orchestration acts
         // immediately instead of waiting out the guard window.
         if (intent.getBooleanExtra(BackButtonMenu.EXTRA_DISPLAY_REINIT_FORCE, false)) {
-            dev.droidtop.library.LaunchDisplay.parkedDisplayId = null
-            lastRelocationAttemptMs = 0L
+            reinitializeDisplays()
+        } else {
+            roleRefresh.value++
         }
-        roleRefresh.value++
     }
 
     /**
@@ -329,8 +359,24 @@ class MainActivity : AppCompatActivity() {
         dev.droidtop.library.LaunchDisplay.onLaunched = { roleRefresh.value++ }
 
         lifecycleScope.launch {
-            kotlinx.coroutines.flow.combine(displayOutputs.observe(), roleRefresh) { outputs, _ -> outputs }
-                .collectLatest { outputs ->
+            kotlinx.coroutines.flow.combine(
+                displayOutputs.observe(),
+                roleRefresh,
+                // Swapping panels writes a preference and changes nothing
+                // Android reports, so without this the new assignment
+                // would sit unused until some unrelated display event.
+                dev.droidtop.runtime.DisplayArrangement.refresh,
+            ) { outputs, _, arrangement -> outputs to arrangement }
+                .collectLatest { pair ->
+                val (outputs, arrangementSeq) = pair
+                // An explicit swap or reinitialize must actually act: it
+                // leaves the display id set identical, so the check below
+                // would never clear the cooldown for it.
+                if (arrangementSeq != lastArrangementSeq) {
+                    lastArrangementSeq = arrangementSeq
+                    dev.droidtop.library.LaunchDisplay.parkedDisplayId = null
+                    lastRelocationAttemptMs = 0L
+                }
                 val displayIds = outputs.map { it.androidDisplayId }.toSet()
                 if (displayIds != lastDisplayIds) {
                     lastDisplayIds = displayIds
@@ -367,8 +413,23 @@ class MainActivity : AppCompatActivity() {
                 // with apps we've launched" half of the home-press reinit.
                 val parked = dev.droidtop.library.LaunchDisplay.parkedDisplayId
                 val secondAvailable = second != null && second.androidDisplayId != parked
-                val shellOnSecond = handheld && secondAvailable &&
+                // The user's own panel assignment wins when they have made
+                // one; the ShellTarget preference is only the seed for
+                // before they ever have. Previously this read the
+                // preference alone, so DualScreenCoordinator's whole
+                // resolve/swap/persist mechanism -- written, unit-tested,
+                // and wired to nothing -- could never affect anything, and
+                // "swap my screens" had no way to take effect.
+                val roles = dualScreenCoordinator.resolve(outputs)
+                val assignedUpper = roles.entries
+                    .firstOrNull { it.value == dev.droidtop.runtime.DualScreenRole.UPPER_OUTPUT }
+                    ?.key
+                val hasSavedAssignment = dualScreenStore.get().size >= 2
+                val shellOnSecond = handheld && secondAvailable && if (hasSavedAssignment) {
+                    assignedUpper?.androidDisplayId == second!!.androidDisplayId
+                } else {
                     DisplayRolePrefs.shellTarget(this@MainActivity) == DisplayRolePrefs.ShellTarget.SECOND_WHEN_PRESENT
+                }
 
                 val launchTarget = if (handheld && second != null) DisplayRolePrefs.gameLaunchTarget(this@MainActivity) else null
                 dev.droidtop.library.LaunchDisplay.targetDisplayId = when (launchTarget) {
