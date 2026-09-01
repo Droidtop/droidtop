@@ -118,6 +118,13 @@ import kotlinx.coroutines.withContext
 fun GamepadShell(
     library: Library,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit = {},
+    /**
+     * The scanned game list, published so a second-screen companion can
+     * show ambient artwork without running its own scan (docs/SPEC.md
+     * section 4d). Default no-op: nothing about this shell depends on
+     * anyone listening.
+     */
+    onEntriesChanged: (List<LibraryEntry>) -> Unit = {},
     // Real deep-link params from :app's MainActivity, which itself reads
     // them from an Intent extra sent by :shell-default's
     // SettingsHandheldFragment -- a different module with no compile
@@ -317,7 +324,11 @@ fun GamepadShell(
     // needing to know anything about how the underlying scan is chunked.
     LaunchedEffect(library, rescanTrigger) {
         val flow = if (rescanTrigger == 0) library.scanKindsProgressive(GAME_KINDS) else library.rescanKindsProgressive(GAME_KINDS)
-        flow.collect { gameEntries = it.filter { entry -> entry.kind in GAME_KINDS } }
+        flow.collect {
+            val games = it.filter { entry -> entry.kind in GAME_KINDS }
+            gameEntries = games
+            onEntriesChanged(games)
+        }
     }
     LaunchedEffect(library, rescanTrigger) {
         val flow = if (rescanTrigger == 0) library.scanKindsProgressive(APP_KINDS) else library.rescanKindsProgressive(APP_KINDS)

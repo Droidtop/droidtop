@@ -222,6 +222,12 @@ class MainActivity : AppCompatActivity() {
                 BackButtonMenu.MODE_HANDHELD -> GamepadShell(
                     library = library,
                     onFocusedEntryChanged = { CompanionState.focusedEntry.value = it },
+                    // The companion's idle rotation draws from this
+                    // (docs/SPEC.md section 4d). Published here rather
+                    // than scanned there: the companion renders on a
+                    // screen the user is not driving and must not do
+                    // work of its own.
+                    onEntriesChanged = { CompanionState.libraryEntries.value = it },
                     deepLinkToken = handheldDeepLinkToken,
                     startSectionName = handheldStartSection,
                     triggerRescan = handheldTriggerRescan,

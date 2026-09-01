@@ -75,18 +75,30 @@ import kotlinx.coroutines.flow.MutableStateFlow
  */
 object CompanionState {
     val focusedEntry = MutableStateFlow<LibraryEntry?>(null)
+
+    /**
+     * The library the idle rotation draws from (docs/SPEC.md section 4d).
+     * Published by whatever drives the shell, same as [focusedEntry] --
+     * the companion must not run its own scan, both because it would
+     * duplicate work and because it renders on a screen the user is not
+     * driving.
+     */
+    val libraryEntries = MutableStateFlow<List<LibraryEntry>>(emptyList())
 }
 
 @Composable
 internal fun CompanionContent(entry: LibraryEntry?) {
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        // Nothing focused: draw only the ground. This used to paint a
-        // "droidtop" wordmark, which meant the companion screen showed a
-        // black rectangle with a word on it whenever the user was
-        // anywhere but a themed gamelist -- most of the time. The status
-        // bar, notifications and widgets composited above are the real
-        // idle content, and they need a clean ground, not a placeholder.
-        if (entry == null) return@Box
+        // Nothing focused: a slow rotation of the user's own library
+        // artwork (docs/SPEC.md section 4d, from iiSU's "Show Hero on Idle
+        // Bottom Screen"). This used to paint a "droidtop" wordmark, which
+        // is the one thing a glanceable surface must never do: occupy a
+        // whole panel and say nothing.
+        if (entry == null) {
+            val entries by CompanionState.libraryEntries.collectAsState()
+            CompanionIdle(entries)
+            return@Box
+        }
         // No artwork here by design (per direction): this panel is the
         // ambient WIDGETS/INFO surface (§4's dual-screen roles -- the
         // shell itself lives on the other display when both exist), so
@@ -135,7 +147,37 @@ internal fun CompanionContent(entry: LibraryEntry?) {
                 if (entry.playtimeSeconds > 0) {
                     Text("Played ${entry.playtimeSeconds / 60} min", color = Color.Gray, style = MaterialTheme.typography.bodyLarge)
                 }
+                // PC entries carry facts a ROM does not: which store it
+                // came from, how much disk it holds, and what other
+                // people's machines made of it. The compatibility line is
+                // REFERENCE, never a verdict (docs/SPEC.md section 7g) --
+                // it is phrased as counts so the user judges it.
+                entry.pcInfo?.let { pc ->
+                    val facts = buildList {
+                        add(pc.source)
+                        if (!pc.installed) add("Not installed")
+                        if (pc.sizeBytes > 0) add(formatSize(pc.sizeBytes))
+                    }
+                    Text(
+                        facts.joinToString("  ·  "),
+                        color = Color(0xFF9BB4D0),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    pc.compatibility?.let { compat ->
+                        Text(
+                            compat.summary(),
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
             }
         }
     }
+}
+
+/** Human-readable install size; GB once it passes a gigabyte, MB below. */
+private fun formatSize(bytes: Long): String = when {
+    bytes >= 1_000_000_000L -> String.format("%.1f GB", bytes / 1_000_000_000.0)
+    else -> "${bytes / 1_000_000} MB"
 }
