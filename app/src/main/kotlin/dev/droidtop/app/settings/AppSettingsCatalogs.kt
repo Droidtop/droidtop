@@ -923,6 +923,8 @@ object AppSettingsCatalogs {
                                 title = integration.label,
                                 subtitle = buildString {
                                     append(integration.capability.display)
+                                    append(" on ")
+                                    append(integration.capability.surface)
                                     append(" - ")
                                     append(if (installed) integration.packageName else "${integration.packageName} is NOT installed, so this is hidden elsewhere")
                                     IntegrationPlaceholders.usedIn(integration.argumentsTemplate)
