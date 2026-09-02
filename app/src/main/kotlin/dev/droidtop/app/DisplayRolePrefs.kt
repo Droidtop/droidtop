@@ -1,11 +1,12 @@
 package dev.droidtop.app
 
 import android.content.Context
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * User-configurable dual-screen role mapping for the launcher system
  * (docs/SPEC.md §4, handheld dual-screen roles — directed 2026-08-30).
- * Same shared "com.android.launcher3.prefs" file/`KEY_`-object convention
+ * Same shared LAUNCHER_PREFS_FILE_NAME file/`KEY_`-object convention
  * as every other settings concern, written by :shell-default's settings
  * rows and read here.
  *
@@ -13,7 +14,7 @@ import android.content.Context
  * input surface (§4), not a shell/widgets target.
  */
 object DisplayRolePrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_SHELL_DISPLAY = "pref_display_shell_target"
     private const val KEY_GAME_LAUNCH_DISPLAY = "pref_display_game_launch_target"
 

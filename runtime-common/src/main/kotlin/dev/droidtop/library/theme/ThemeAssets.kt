@@ -22,8 +22,8 @@ import java.util.Locale
  *   [BUNDLED_THEMES_ASSET_ROOT] (droidtop's APK-bundled equivalent of
  *   real ES-DE's read-only program-data theme dir) plus [userThemesDir]
  *   (droidtop's equivalent of real ES-DE's writable user theme
- *   directory -- where a future real theme downloader, not yet built,
- *   would extract downloaded themes to).
+ *   directory -- where [ThemeDownloader], a real, working JGit-based
+ *   theme downloader, clones downloaded themes to).
  * - A theme's real name is its own folder name (`Theme::getName()` is
  *   literally `Utils::FileSystem::getStem(path)`) -- never a
  *   droidtop-invented display name.

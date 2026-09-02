@@ -3,6 +3,7 @@ package dev.droidtop.library
 import android.content.Context
 import java.io.File
 import org.json.JSONObject
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * The manual path for engines droidtop cannot version or classify itself.
@@ -36,7 +37,7 @@ import org.json.JSONObject
  * CONFIGURE screen does — just without the forced hand-off.
  */
 object EnginehostManualChoicePrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_PREFIX = "droidtop_enginehost_choice_"
 
     /** One resolved answer: the compatibility line and the runtime version. */

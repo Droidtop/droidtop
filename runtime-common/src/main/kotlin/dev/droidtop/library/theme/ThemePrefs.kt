@@ -1,6 +1,7 @@
 package dev.droidtop.library.theme
 
 import android.content.Context
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * Real, single selected Handheld theme NAME -- a runtime setting, not a
@@ -29,7 +30,7 @@ import android.content.Context
  * need.
  */
 object ThemePrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_ACTIVE_THEME = "droidtop_active_theme"
 
     // Real, confirmed-live bug this fixes: `:shell-default`'s Theme

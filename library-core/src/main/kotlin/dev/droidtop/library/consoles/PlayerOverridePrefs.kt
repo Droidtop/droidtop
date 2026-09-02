@@ -1,6 +1,7 @@
 package dev.droidtop.library.consoles
 
 import android.content.Context
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * User's explicit choice of which [Player] handles a given console system,
@@ -11,7 +12,7 @@ import android.content.Context
  * same shared prefs file every other droidtop setting already uses.
  */
 object PlayerOverridePrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_PREFIX = "droidtop_player_override_"
 
     fun get(context: Context, systemId: String): String? =

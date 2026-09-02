@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import java.util.concurrent.atomic.AtomicBoolean
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * First-run gate for droidtop's own onboarding flow (welcome + games-folder
@@ -18,7 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * OnboardingActivity by explicit component name rather than a typed Intent.
  */
 object OnboardingGate {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_COMPLETE = "droidtop_onboarding_complete"
     private const val ONBOARDING_ACTIVITY = "dev.droidtop.app.OnboardingActivity"
 

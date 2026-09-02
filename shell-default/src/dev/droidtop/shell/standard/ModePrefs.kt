@@ -1,6 +1,7 @@
 package dev.droidtop.shell.standard
 
 import android.content.Context
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * Remembers whichever shell the user last switched to via [BackButtonMenu]
@@ -29,7 +30,7 @@ import android.content.Context
  * which is what stops the redirect bouncing straight back.
  */
 object ModePrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_LAST_MODE = "droidtop_last_mode"
     // Real, distinct from KEY_LAST_MODE: a user-set preference ("always
     // start in Handheld"), not auto-overwritten every time the user

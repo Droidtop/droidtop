@@ -1,6 +1,7 @@
 package dev.droidtop.library.scraper
 
 import android.content.Context
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * User-supplied IGDB/Twitch developer credentials -- see
@@ -10,7 +11,7 @@ import android.content.Context
  * other droidtop setting already uses.
  */
 object ScraperPrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_CLIENT_ID = "droidtop_igdb_client_id"
     private const val KEY_CLIENT_SECRET = "droidtop_igdb_client_secret"
 
