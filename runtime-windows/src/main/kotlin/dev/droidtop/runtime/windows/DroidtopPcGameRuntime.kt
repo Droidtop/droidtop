@@ -6,7 +6,6 @@ import app.gamenative.service.SteamService
 import app.gamenative.utils.LaunchDependencies
 import com.winlator.container.Container
 import com.winlator.container.ContainerManager
-import com.winlator.core.FileUtils
 import com.winlator.xenvironment.ImageFs
 import com.winlator.xenvironment.ImageFsInstaller
 import dev.droidtop.library.PcGameRuntime
@@ -240,17 +239,21 @@ class DroidtopPcGameRuntime(
             val halfMade = File(imageFs.rootDir, "home/${ImageFs.USER}-$CONTAINER_ID")
             if (halfMade.isDirectory) {
                 onStatus("Clearing an unfinished setup…")
-                // FileUtils.delete, NOT Kotlin's deleteRecursively. A Wine
-                // prefix contains dosdevices/z:, a symlink to the
-                // filesystem root, and every drive letter is a symlink to
-                // somewhere outside the prefix. deleteRecursively walks
-                // through symlinked directories, so it does not delete
-                // this directory -- it walks out of it and deletes
-                // whatever it can reach. That happened on the test device
-                // and took the contents of internal storage with it.
-                // gamenative's own delete refuses to descend into a
-                // symlink, which is exactly why it exists.
-                FileUtils.delete(halfMade)
+                // NEVER a plain recursive walk here. A Wine prefix
+                // contains dosdevices/z:, a symlink to the filesystem
+                // root, and one symlink per drive letter; Kotlin's
+                // deleteRecursively follows symlinked directories, and
+                // on the test device the walk left the prefix and
+                // emptied internal storage. SafeDelete proves the
+                // target is inside the ImageFs before deleting and its
+                // walk cannot follow a symlink at all -- containment is
+                // verified, not delegated to a helper that refuses.
+                if (!SafeDelete.deleteWithin(imageFs.rootDir, halfMade)) {
+                    return@withContext PcProvisionResult(
+                        false,
+                        "couldn't clear the unfinished setup at ${halfMade.absolutePath} -- nothing was deleted",
+                    )
+                }
             }
         }
 
