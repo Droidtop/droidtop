@@ -1896,6 +1896,13 @@ private fun GamesSection(
                                 countsOnly = (focusedGroup as? GameGroup.Collection)?.id
                                     ?.let { it == AutoCollections.FAVORITES_ID || it == AutoCollections.LAST_PLAYED_ID } == true,
                             ),
+                            // droidtop's own real equivalent of ES-DE's
+                            // Window::isBackgroundDimmed -- the options
+                            // menu is a Compose Dialog drawn over this
+                            // view with a scrim, so the theme's own
+                            // helpsystem *Dimmed variants apply while it
+                            // is open. See EsDeThemedHelpSystem.
+                            backgroundDimmed = gamelistOptionsOpen,
                         )
                         // NO droidtop chrome over a themed screen: the
                         // "Continue Playing" overlay sat directly on top of
@@ -1982,6 +1989,7 @@ private fun GamesSection(
                     countsOnly = (group as? GameGroup.Collection)?.id
                         ?.let { it == AutoCollections.FAVORITES_ID || it == AutoCollections.LAST_PLAYED_ID } == true,
                 ),
+                backgroundDimmed = gamelistOptionsOpen,
             )
         } else {
             val allGames = entries.filter { it.gameGroup() == group }

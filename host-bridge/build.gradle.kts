@@ -54,4 +54,6 @@ android {
 dependencies {
     implementation(project(":runtime-common"))
     implementation(libs.androidx.core.ktx)
+
+    testImplementation(libs.junit)
 }

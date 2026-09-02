@@ -457,13 +457,38 @@ the `ContainerRuntime` interface that already exists (§3):
   inspectable and disable-able per container), bind-mounts (Android
   shared storage in/out), autostart-with-session.
 - **A real terminal into any container** — a computer the user can't
-  open a shell on isn't a computer. One terminal-emulator surface in
-  droidtop (Compose-hosted), attached to `exec` in a chosen container
-  (root backend: `droidspaces exec`-equivalent; noroot: proot exec).
-  Which terminal-view implementation to adopt/fork is an open technical
-  choice (Termux's terminal-view and Jackpal's Android-Terminal-Emulator
-  are the two real prior-art candidates; license and embedding fit not
-  yet compared) — the requirement itself is settled.
+  open a shell on isn't a computer. **Decided and built 2026-09-02, the
+  other way round from this section's original sketch**: droidtop does
+  NOT host a Compose terminal view of its own, and neither Termux's
+  terminal-view nor Jackpal's Android-Terminal-Emulator is forked in.
+  The terminal is a real terminal application (`foot`) running *inside*
+  the container, provisioned alongside the compositor and launched
+  through the `exec` this section already named, appearing as an ordinary
+  window on the shared desktop. See `runtime-common`'s
+  `ContainerTerminal` for the argument in full; in short:
+
+  - `ContainerRuntime.exec` is run-to-completion and returns captured
+    output. An Android-side terminal view needs a pty and a live stream,
+    so it would begin by widening `ContainerRuntime` with a streaming
+    primitive every backend then owes — including the one that is still
+    `TODO()`. The in-container terminal needs nothing new from that
+    interface at all.
+  - Above the pty it would still need a VT parser and renderer. A real
+    terminal already exists in every distro's package repository.
+  - §6a's whole justification for forking a keyboard in is that a
+    terminal needs Ctrl/Alt/Esc/Tab/arrows/function keys. Those already
+    reach the container through `:input-seat` → `:host-bridge`'s virtual
+    keyboard; an Android-side view would use none of that path.
+  - It is what distrobox — and BoxBuddy/DistroShelf over it, §7c — do.
+
+  The cost, stated rather than hidden: a terminal that lives in the
+  compositor is unreachable when the compositor is not running, which is
+  when a shell would help most for debugging. No second non-interactive
+  path is built to cover that, deliberately; a container that will not
+  boot is this section's container-manager problem, not the terminal's.
+  Today it opens on the PRIMARY container only — siblings share the
+  Wayland socket but are not compositor-provisioned, so per-container
+  terminal provisioning is what makes "any container" literally true.
 - The desktop session's PRIMARY container is listed like everything else
   but guarded (can't be deleted while it's the active desktop).
 
@@ -1086,8 +1111,8 @@ Measured by what droidtop's own code actually touches.
 | Second-screen trackpad + keyboard | §4/§6c | **built, unproven live** — `TrackpadGestureEngine`/`TrackpadView` plus the forked keyboard, hosted on the addon display. The gesture model, acceleration curve, millimetre scale, focus stepper and key translation are unit-tested; everything downstream of a real finger on a real second panel is not |
 | Keyboard/mouse injection | §6 | **built, unproven live** — host-bridge's virtual-pointer/virtual-keyboard injection, and (since §6b) the desktop surface that feeds it. Between the assessment above and §6b the primitive existed but nothing called it: `InputSeat` was constructed only by its own unit test, so the presented desktop was a video feed with no way to click it |
 | External display | §4 | **built** |
-| **Terminal into a container** | §4b | **NOT BUILT** — zero files. §4b's own words: "a computer the user can't open a shell on isn't a computer" |
-| **Clipboard host↔container** | — | **NOT BUILT**, and **not in the spec at all** until now. Crostini treats this as core |
+| **Terminal into a container** | §4b, §3d | **built 2026-09-02, unproven live** — `ContainerTerminal` + a Taskbar entry, provisioned by `CompositorProvisioning` and launched through the existing `exec`. An in-container terminal, not an Android terminal view — §3d carries the argument. PRIMARY container only so far |
+| **Clipboard host↔container** | §6c | **built 2026-09-02, unproven live** — `ext-data-control-v1` in `:host-bridge`'s native client, `ClipboardBridge`/`ClipboardSync` on the Android side, both directions. Was not in the spec at all before; §6c is now where it lives |
 | **USB peripherals** | §4b | **NOT BUILT** — zero files |
 | **Printing** | §4b | **NOT BUILT** — zero files |
 | **VPN for the whole device** | §4a | **NOT BUILT** — zero files, despite a fully designed section |
@@ -1097,17 +1122,26 @@ Measured by what droidtop's own code actually touches.
 
 ### What actually makes a user reach for a real computer today
 
-In rough order of how often it would bite:
+In rough order of how often it would bite. The first two were closed on
+2026-09-02 (§3d, §6c) and are struck through rather than deleted, because
+neither has been seen working on hardware and this section's value is that
+it does not overclaim:
 
-1. **No terminal.** Anything shell-shaped is impossible.
-2. **No clipboard bridge.** Text cannot move between Android and the
-   container, which is constant friction rather than an occasional need.
-   This is the biggest gap the spec did not already name.
+1. ~~**No terminal.**~~ Built. Not yet run against a live compositor.
+2. ~~**No clipboard bridge.**~~ Built, both directions. Not yet run
+   against a live compositor.
 3. **No USB.** No flash drives, no serial adapters, no scanners.
 4. **No printing.**
 5. **No VPN**, despite §4a being fully designed.
 6. **Nothing at all without root**, which is a coverage problem rather
    than a capability one, and the largest single body of unwritten work.
+   Both of the two items just closed sit on top of it: the terminal runs
+   through `ContainerRuntime.exec`, which is `TODO()` in `ProotRuntime`,
+   and the clipboard needs a running compositor, which the no-root path
+   cannot start. Neither adds any *new* root dependency — the clipboard
+   client needs none at all, and the terminal uses the `exec` that was
+   already there — but neither serves an unrooted device until that path
+   is real.
 
 ### Correction to the record
 
@@ -1663,6 +1697,67 @@ documented on this device; that `InputConnection.sendKeyEvent` reaches the
 editor the user expects; and every latency and feel judgement, which is
 the whole reason the acceleration curve is written as constants that can
 be read and changed rather than tuned by hand.
+
+## 6c. Clipboard bridge, host↔container (built 2026-09-02)
+
+Text copied in Android pastes in the container, and text copied in the
+container pastes in Android. §4e ranked this second behind the terminal;
+in practice it bites more often, because it is friction on ordinary work
+rather than an occasional need — which is also why Crostini treats
+clipboard forwarding as core rather than polish (§4e).
+
+**The Wayland seam is `ext-data-control-v1`**, bound by `:host-bridge`'s
+native client next to the screencopy and virtual-input protocols it
+already speaks.
+
+- `wl_data_device` — the ordinary clipboard protocol — is not merely
+  inconvenient here, it is *unavailable*: it only delivers a selection to
+  the client holding keyboard focus on one of its own surfaces, and
+  host-bridge has no surface at all. It is a screencopy + virtual-input
+  client by design (§2), so it can never hold focus.
+- `ext-data-control-v1` exists for exactly this: a privileged client that
+  observes and sets a seat's selection without focus — the
+  clipboard-manager role.
+- It is the stabilised successor to `wlr-data-control-unstable-v1`.
+  `vendor/sway` creates **both** globals unconditionally
+  (`sway/server.c`), so the ext one is always present in the compositor
+  droidtop itself provisions and no runtime fallback to the deprecated
+  zwlr one is carried. One protocol, one code path.
+
+**Neither direction polls.** Android reports changes through
+`OnPrimaryClipChangedListener`; the compositor reports them through the
+protocol's own `selection` event. The single non-event read is one read
+on regaining window focus, which exists because of the restriction below,
+not as a disguised timer.
+
+**What happens when Android refuses a read.** From Android 10, only the
+focused app or the owner of the current input method may read the
+clipboard — everyone else gets null, silently, and from Android 12 a
+successful read shows the user a toast. droidtop satisfies the second
+clause by shipping its own IME (§6a); that was already stated there as a
+real benefit of the fork, and this is the thing that consumes it. A
+refused read is skipped and logged, explicitly **not** treated as "the
+clipboard was cleared" and pushed to the container as an empty selection.
+The container→Android direction has no such gate: `setPrimaryClip` is not
+focus-restricted. The bridge is owned by `MainActivity` rather than by
+`DesktopSessionService` for the same reason — window focus is an Activity
+fact and a Service has none to report.
+
+**Scope, and what is deliberately not bridged.** Text only. A null
+selection from the container is not mirrored: wiping the user's phone
+clipboard because a container application exited is destructive, and
+nothing about "the container has no selection" implies they wanted it.
+The middle-click primary selection is not bridged either — Android has no
+counterpart to bridge it to. Both directions cap at 1 MiB and drop rather
+than truncate, so nothing silently lies about what was copied.
+
+**Echo suppression is one object, not two flags.** Pushing to the
+container makes the compositor announce "a new selection"; setting
+Android's clipboard fires droidtop's own change listener. Both directions
+run through the same `ClipboardSync`, and because they share its one
+piece of state, each direction's echo is recognised as already-synced
+text and dropped. That is the whole loop-prevention mechanism and it
+lives in exactly one place, under unit test.
 
 ## 6a. Keyboard ownership (directed 2026-09-01)
 
@@ -2448,6 +2543,27 @@ GitHub-refresh + validate-before-replace:
   subtree extension search, for the compiled-Ren'Py fallback),
   `startup.tjs`, corroborated `RPG_RT.ldb`+(`exe`|`lmt`),
   `project.godot`, `.cst`, `.ps3`/`.ps2`, and `data01000.arc`.
+
+  **Where the game ROOT is, versus which engine it is (2026-09-02).**
+  The database answers "which engine", in file order, for one folder.
+  It does not answer "which folder is the game root", and v5's first
+  subtree rule (`anyFileExtensionDeep`, the compiled-Ren'Py fallback)
+  made the difference visible: it matched a wrapper folder whose real
+  markers sat one level down, so `GameEngineDetector.detectGame`
+  returned the wrapper as the game root and never looked inside it --
+  breaking the version-folder shape 7g relies on, and with it the
+  determinism guarantee on the nested search. Both changes were green
+  on their own branches and only met on `main`. `detectGame` therefore
+  searches in three tiers: evidence AT the folder that the folder is a
+  game root; then that same precise question of each subfolder, in name
+  order; then, only if nothing more precise exists anywhere, the
+  subtree rules against the folder itself. A rule is a subtree rule if
+  any of its conditions can be satisfied from a subdirectory the rule
+  never names (`anyFileExtensionDeep` with a non-zero depth, the
+  `unity` probe's 3-deep search). Classification is unchanged: `detect`
+  still evaluates every row in file order, so file order remains the
+  sole precedence rule shared with enginehost, and a subtree match is
+  never downgraded to no match -- only to a later tier.
 - `bios-database.json` — §7e4's firmware registry.
 
 One user action refreshes all four ("Update platform databases" in the
@@ -2957,7 +3073,10 @@ have; `helpsystem`'s whole `*Dimmed` family (4/4/2/2/2/2) fires only
 while ES-DE's own menu overlay dims the background, and droidtop renders
 no such overlay, so implementing it would mean inventing the state;
 `gameselector`'s `selection` (3); `grid`'s `textBackgroundCornerRadius`
-(1); and `datetime`'s `displayRelative` (1). **Nothing in this pass was
+(1); and `datetime`'s `displayRelative` (1). (All of those are
+implemented as of 2026-09-02 — see "Closing the used set" below; the
+badges reason held, the helpsystem one turned out to rest on a false
+premise about droidtop's own menus.) **Nothing in this pass was
 checked on a real screen** -- the device was off-limits, so verification
 is by unit test (`EsDeVideoLayoutTest`, `EsDeTileSizeTest`) and by
 reading real ES-DE's source. The video pillarbox/black-frame geometry,
@@ -3097,6 +3216,141 @@ screenshot diff once the device is available: whether the apparent
 scroll rate of a description panel matches ES-DE's on the same theme at
 this device's resolution, the vertical snap and leading-inset clip at the
 top and bottom edges, and the marquee's gap on decaffe's own system view.
+
+**Closing the used set (2026-09-02)**: every remaining unrendered
+property from the ten-theme measurement above is implemented, all ported
+from cited real ES-DE source. The one member of that set deliberately
+still left is `helpsystem`'s `originDimmed`, for the reason recorded at
+the end of this entry; the count is otherwise closed. (This is stated as
+"the measured set minus one" rather than as a fresh N-of-282 figure
+because the measurement itself was not re-run in this pass -- the ten
+clones it read are not on this machine any more, and quoting a recomputed
+number without recomputing it would be worse than not quoting one.)
+
+- `gameselector`'s `selection`, all three real modes
+  (`GameSelectorComponent::refreshGames`, GameSelectorComponent.h:51-129,
+  plus `FileData::updateLastPlayedList`/`updateMostPlayedList`,
+  FileData.cpp:906-940). `lastplayed`/`mostplayed` sort descending and
+  skip never-played/never-launched games, which
+  `LibraryEntry.lastPlayedEpochMs`/`playCount` already carried. Three
+  real bugs went with it: `GameSelector`'s own doc comment claimed ES-DE
+  has `similar` and `sameSystem` modes, which exist nowhere in its source
+  and were invented; `allowDuplicates` defaulted to true where real ES-DE
+  defaults to false, so an unset theme got a mosaic allowed to repeat one
+  game; and a `gameCount` larger than the library padded with repeats
+  rather than stopping, which is what ES-DE's own retry loop does
+  (GameSelectorComponent.h:72-74). `gameCount` is now clamped 1..30 as
+  well (:168).
+- `datetime`'s `displayRelative`, ported as pure Kotlin in
+  `runtime-common/.../EsDeDateTime.kt` from
+  `DateTimeComponent::getDisplayString` (DateTimeComponent.cpp:86-135)
+  and `Utils::Time::Duration` (TimeUtil.cpp:73-80): the coarsest non-zero
+  unit wins, and there is a real 82800-second guard because a stored
+  epoch 0 read back through a local timezone is not zero. `lastplayed` is
+  bound too (it turns `displayRelative` on implicitly,
+  DateTimeComponent.cpp:368-369, and the property overrides that in both
+  directions) — the earlier "not modeled yet" note was stale, the field
+  existed. ES-DE's real "unknown"/"never" defaults now show where a value
+  is absent instead of nothing.
+- `carousel`/`grid`'s `imageColorEnd`/`imageGradientType`/
+  `imageSelectedColorEnd`/`imageSelectedGradientType`, and `image`'s own
+  `colorEnd` when it is declared without a `gradientType`. These were
+  left before as needing a shader. They do not: ES-DE puts the start
+  color on two of the quad's corners and the end color on the other two
+  (`ImageComponent::updateColors`, ImageComponent.cpp:935-947) and
+  `core.glsl:147-152` multiplies the interpolated vertex color into the
+  sampled texel, which is exactly a linear-gradient fill in
+  `BlendMode.Modulate` over the drawn image. The flat shift drops out of
+  the `ColorMatrix` when a gradient is active so the color is not applied
+  twice. The fallback chain is ES-DE's own and is not per-property
+  constants: `imageColor` also sets the end color, the selected pair
+  starts as the unselected pair, `imageSelectedColor` in turn sets
+  `imageSelectedColorEnd`, and the two gradient axes default to
+  horizontal independently.
+- `defaultImage` on `carousel`/`grid`, so the primary-element fallback
+  chain no longer ends at the pre-resolved artwork
+  (`CarouselComponent::onDemandTextureLoad`, CarouselComponent.h:578-579;
+  SystemView.cpp:615-618/:868). This is the answer to droidtop's most
+  common real gap — a system whose `${system.theme}` logo the theme does
+  not ship now draws the theme's declared default rather than falling
+  through to text.
+- `grid`'s `textBackgroundCornerRadius` (GridComponent.h:394,
+  :1395-1398), which rounds the fallback TEXT item's background box, not
+  the entry's background layer.
+- `video`'s `audio`, `iterationCount` + `onIterationsDone`, and
+  `imageMaxSize`. `iterationCount` (VideoComponent.cpp:237-238) was
+  ignored entirely — every themed video looped forever regardless — and
+  `onIterationsDone` is meaningless without it: at the count real ES-DE
+  renders nothing at all, or the static image
+  (VideoFFmpegComponent.cpp:200-203). `imageMaxSize` exposed a bigger
+  miss: a `video` element has TWO independent size groups, and droidtop
+  read only the video's. The static-image group and its inheritance rule
+  (`VideoFFmpegComponent::setResize`/`setMaxSize`/`setCroppedSize` forward
+  to the static image only when the image group is unset,
+  VideoFFmpegComponent.cpp:66-98) are now pure Kotlin in
+  `EsDeVideoLayout.kt`. `audio` (VideoComponent.cpp:254-255, real default
+  true) is honoured for real rather than kept unconditionally muted; the
+  reason it was muted — no "is this view actually visible" signal — is
+  fixed rather than worked around, by tying playback to the host
+  activity's real lifecycle.
+- `badges`' `controllerPos`/`controllerSize`/`folderLinkPos`/
+  `folderLinkSize`. The placement is ported from
+  `FlexboxComponent::calculateLayout` (FlexboxComponent.cpp:222-231) and
+  unit-tested. The ART is theme-supplied only: ES-DE's own defaults are
+  the 36 `:/graphics/controllers/*.svg` files and
+  `badge_folderlink_overlay.svg`, Qt resources compiled into its binary,
+  the same assets droidtop already declines to redistribute for the base
+  badges and the systemstatus icons. A theme CAN ship them —
+  `customControllerIcon`/`customFolderLinkIcon` are real schema
+  properties droidtop already parses — and when it does not, no overlay
+  is drawn, which is real ES-DE's own behaviour for an overlay with no
+  texture (FlexboxComponent.cpp:222) rather than a droidtop shortcut. No
+  glyph stand-in here: the base badge already is a controller glyph, and
+  stacking a second one would be invented art, not missing art.
+- `helpsystem`'s `*Dimmed` family. The earlier pass left this because
+  droidtop rendered no menu overlay to trigger it, and inventing the
+  trigger would have been worse than the gap. That premise turned out to
+  be wrong: droidtop's in-context options menu is a Compose `Dialog`
+  drawn OVER the themed view with a scrim, so the help bar really is on
+  screen behind a dimmed background — which is exactly what real ES-DE's
+  `Window::isBackgroundDimmed` means ("the GUI stack has more than one
+  entry", Window.cpp:513-516). The trigger is now threaded through as
+  `EsDeThemedView(backgroundDimmed = …)` and every dimmed variant falls
+  back to its undimmed counterpart when unset, ES-DE's own rule
+  (HelpComponent.cpp:97-294). `opacityDimmed`'s real clamp is 0.2..1.0,
+  not 0..1 — ES-DE will not let a theme hide the help bar behind a menu.
+
+Deliberately still not implemented, with reasons: `helpsystem`'s
+`originDimmed`, because plain `origin` is unimplemented on that element
+too — the help bar is a wrapping Row whose width is not measured before
+placement, so there is nothing to offset an origin against, and doing one
+without the other would be worse than neither. `carousel`'s
+`textRelativeScale`, the `textHorizontalScroll*` family, `selectorImageTile`,
+`collectionIndicators`, `fadeAbovePrimary` and `grid`'s `imageCropPos` are
+unchanged from the previous pass's own recorded reasons.
+
+Two pieces of duplication were consolidated on the way past. The six
+identical local `float()`/`bool()`/`str()`/`path()`/`pair()`/`color()`
+helpers redeclared inside `esDeCarouselConfig`, `esDeGridConfig` and
+`esDeTextListConfig` are now one set of extension functions on
+`EsDeThemeElement?` next to `valueOrNull` in `EsDeTheme.kt`; and
+`EsDeArtwork` rebuilt its two-candidate `downloaded_media` root list
+identically at five call sites, which is now one private helper.
+
+**Nothing in this pass was checked on a real screen** — the device
+remained off-limits, and nothing was seen on a display at any point.
+Verification is by unit test (`EsDeDateTimeTest`, `EsDeBadgeOverlayTest`,
+`GameSelectorTest`, plus new cases in `EsDeVideoLayoutTest` and
+`EsDeGridLayoutTest`, every expected value derived by hand from the cited
+C++) and by reading real ES-DE's source. What wants a real screenshot
+diff against each theme's own bundled reference render once the device is
+available: the positional image gradients on a theme that sets
+`imageColorEnd` (Modulate is the right operation on paper, but whether
+Compose's gradient endpoints land on the same corners as ES-DE's quad
+vertices is a pixel question), the badge overlay placement on a theme
+that ships its own controller icons, the helpsystem dimmed variants with
+the options menu open over a themed gamelist, and `defaultImage` on a
+system carousel where several systems have no logo art.
 
 **Five-theme on-device review + fixes (2026-08-30, later same day)**:
 the theme downloader ran end-to-end for the first time — three real
@@ -3415,7 +3669,8 @@ and dependency rationale; each module also has its own README. Summary:
 
 ```
 app                    → depends on everything; owns DesktopSessionService + MainActivity
-host-bridge             → native Wayland client + JNI; frame passthrough + input injection
+host-bridge             → native Wayland client + JNI; frame passthrough, input injection,
+                          and the host<->container clipboard bridge (§6c)
 runtime-common          → shared types (Container, DisplayOutput, RootfsImage); no deps
 runtime-windows         → Wine/Box64 (fork: vendor/gamenative), no display code of its own
 runtime-linux-root      → DroidSpaces fork (vendor/droidspaces), namespaces/cgroups, needs root

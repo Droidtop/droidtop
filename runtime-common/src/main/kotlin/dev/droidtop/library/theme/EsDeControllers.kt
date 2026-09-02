@@ -75,3 +75,52 @@ object EsDeControllers {
     fun byShortName(shortName: String?): EsDeController =
         all.firstOrNull { it.shortName == shortName } ?: all.last()
 }
+
+/** Where a badge's OVERLAY icon sits and how big it is, in the same units as the base badge cell. */
+data class EsDeBadgeOverlay(
+    val x: Float,
+    val y: Float,
+    val size: Float,
+)
+
+/**
+ * Real badge OVERLAY placement, ported from
+ * `FlexboxComponent::calculateLayout` (FlexboxComponent.cpp:222-231).
+ *
+ * Two of ES-DE's nine badge slots can carry a second, smaller icon drawn
+ * on top of the badge itself: `controller` (the game's specific controller
+ * type) and `folder` (a "this folder is a folder link" marker). Their
+ * placement is the same three lines for both -- the overlay is sized as a
+ * fraction of the BASE badge's width and then CENTRED on the point
+ * `overlayPosition` names inside the base badge, which is why the position
+ * clamp reaches outside 0..1: an overlay is routinely meant to hang off a
+ * corner.
+ *
+ * ES-DE resizes the overlay by width only and lets the image's own aspect
+ * ratio set the height (`setResize(w, 0)`); droidtop's badge cells are
+ * square by the documented approximation in `EsDeThemedBadges`, so the
+ * overlay is square here too and one [size] covers both axes.
+ *
+ * [baseX]/[baseY] are the base badge's top-left, [baseWidth]/[baseHeight]
+ * its size. Real defaults are position (0.5, 0.5) and size 0.5
+ * (FlexboxComponent.h:27-28). Clamps are the caller's, because they differ
+ * per slot: position is -1..2 on both axes for both slots, but the size
+ * clamp is 0.1..1.0 for `folderLinkSize` (BadgeComponent.cpp:487-490) and
+ * 0.1..2.0 for `controllerSize` (:504-506).
+ */
+fun esDeBadgeOverlay(
+    baseX: Float,
+    baseY: Float,
+    baseWidth: Float,
+    baseHeight: Float,
+    overlayPositionX: Float,
+    overlayPositionY: Float,
+    overlaySize: Float,
+): EsDeBadgeOverlay {
+    val size = baseWidth * overlaySize
+    return EsDeBadgeOverlay(
+        x = baseX + baseWidth * overlayPositionX - size / 2f,
+        y = baseY + baseHeight * overlayPositionY - size / 2f,
+        size = size,
+    )
+}
