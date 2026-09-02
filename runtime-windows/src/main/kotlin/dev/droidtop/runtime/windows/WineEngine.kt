@@ -25,28 +25,36 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 
 /**
- * Runs a Windows executable in a Wine prefix, whichever way this device
- * can actually do it.
+ * Runs a Windows executable in a Wine prefix, as the app's own uid and
+ * NEVER with root.
  *
- * This interface is the backend-neutral entry point the Windows launch
- * path was missing. Before it, both launch sites demanded a live
+ * SECURITY BOUNDARY (docs/SPEC.md 5b, stated 2026-09-02): Wine exists
+ * to execute arbitrary third-party Windows binaries -- code the user
+ * downloaded from somewhere. A guest that wants to be malicious does
+ * not need an exploit if the process it runs in has root; it just
+ * needs to be run. So the Wine guest process must never execute in a
+ * root-capable context: not on a rooted device, not in desktop mode,
+ * not as an optimisation. That is why this is a SEALED interface that
+ * deliberately cannot be handed a `ContainerRuntime`: the runtime
+ * selection (`ContainerRuntimeFactory.select`) yields the root-backed
+ * droidspaces runtime whenever root is present, and an engine built on
+ * it would silently run guests as root on exactly the devices where it
+ * matters. An implementation outside this module cannot exist, and one
+ * inside it that touches `RootProcess` or `ContainerRuntime` is a
+ * boundary violation, whatever it is called.
+ *
+ * History, so the pre-boundary shape does not return: both launch
+ * sites used to demand a live
  * `dev.droidtop.runtime.PrimaryContainerSession` -- a droidspaces
- * container, which only exists under root -- and executed Wine through
- * `ContainerRuntime.exec`. That made Windows games root-only by accident
- * rather than by design: the no-root backend's `exec` is a `TODO()`, so
- * on a stock device the branch could not run at all, while the prefix
- * was being provisioned into an ImageFs the launch path never entered.
- * See docs/SPEC.md 5b.
- *
- * The environment is a runtime choice, not a structural one. The default
- * and only implementation today, [BionicWineEngine], needs no root and
- * therefore works in handheld mode as well as desktop; a droidspaces
- * `exec` implementation can join it here later as a desktop
- * optimisation, without either one re-provisioning what the other
- * installed. What must not come back is the assumption at the call site
- * that the environment IS a primary container.
+ * container, root-only -- and executed Wine through
+ * `ContainerRuntime.exec`. That made Windows games root-only by
+ * accident (the no-root backend's `exec` was a `TODO()`), and had it
+ * ever worked, it would have run downloaded binaries as root. The
+ * seam stays because execution *mechanism* can still vary (box64
+ * today, arm64ec/FEX deliberately later) -- but every variant runs as
+ * the app's own uid.
  */
-interface WineEngine {
+sealed interface WineEngine {
 
     /** Whether this engine could run something right now, and why not when it cannot. */
     fun readiness(prefix: Container): WineEngineReadiness

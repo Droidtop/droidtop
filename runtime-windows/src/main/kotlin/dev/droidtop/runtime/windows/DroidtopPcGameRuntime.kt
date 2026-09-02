@@ -34,10 +34,14 @@ import org.json.JSONObject
  * The two halves reach their environment differently, and deliberately:
  *
  *  - Windows software goes through the [WineEngine] seam, which needs no
- *    root and no droidspaces container. It used to demand a live
+ *    root and no droidspaces container -- and, stronger, MUST NEVER be
+ *    given either: Wine runs downloaded third-party binaries, and the
+ *    guest process must not execute in a root-capable context on any
+ *    device (the sealed [WineEngine]'s own doc states the boundary;
+ *    docs/SPEC.md 5b records it). It used to demand a live
  *    [PrimaryContainerSession] as well, which made Windows games
- *    root-only by accident (docs/SPEC.md 5b) -- the prefix was
- *    provisioned into an ImageFs that the launch path never entered.
+ *    root-only by accident -- the prefix was provisioned into an
+ *    ImageFs that the launch path never entered.
  *  - A native Linux build genuinely does need a Linux rootfs to run in,
  *    so [launchLinux] still asks for the primary container. That is a
  *    real requirement of the job, not an assumption inherited from the
