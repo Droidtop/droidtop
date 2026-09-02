@@ -447,8 +447,22 @@ class ConsoleRomProvider(
         // See EsDeArtwork's own doc comment for why droidtop reads this
         // rather than scraping itself.
         val gamesRoot = systemFolder.parentFile ?: systemFolder
-        val allFiles = systemFolder.walkTopDown().filter { it.isFile }.toList()
-        val romFiles = allFiles.filter { it.extension.lowercase() in system.extensions }
+        // Not a plain walkTopDown any more: a directory of DLC, updates
+        // or BIOS images carries the system's own ROM extension and used
+        // to become one library entry per file (a real case on this
+        // device: one Rune Factory 5 DLC directory became twelve games,
+        // each with its own metadata row and cover). RomScanWalk owns
+        // that rule and its reasoning, and the scraper walks through the
+        // same function so the two can never disagree about what a game
+        // is.
+        val romScan = RomScanWalk.walk(systemFolder, system.extensions)
+        val romFiles = romScan.files
+        romScan.skipped.forEach { (directory, reason) ->
+            android.util.Log.i(
+                "droidtop.RomScan",
+                "Not listing games in ${directory.absolutePath}: $reason",
+            )
+        }
         // Real, genuine file detection beyond what either ES-DE or EmuDeck
         // actually do (both confirmed this session to be purely
         // folder+extension-based, no content/filename lookup at all --
