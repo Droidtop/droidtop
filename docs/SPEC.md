@@ -3364,25 +3364,49 @@ silent decision this project does not make. What follows is a concrete
 proposal to accept, reject or amend, not a description of code that
 exists.
 
-### 12a. Plugin half — proposal, pending a decision (2026-09-02)
+### 12a. Plugin half — DECIDED (2026-09-02)
 
 The one line already decided in §12 is the constraint that shapes
 everything else: *integrations do not reach into droidtop's internals;
 droidtop exposes a surface and the integration talks to that surface.*
 
-**Where the JSON/plugin line falls (proposed).** JSON owns everything
-expressible as one outbound, fire-and-forget Intent — "go do this over
-there". A plugin exists only where droidtop needs something **back**: a
-search that returns results droidtop renders in its own library UI, a
-now-playing state it polls, a metadata source it queries. That is a real
-boundary rather than a vague "richer" one, and it means no case is served
-by both halves. Every example in §12 sorts cleanly: the video player, the
-browser and the ROM-downloader hand-off are JSON; a search-and-add
-content source and a Spotify-style now-playing client are plugin.
+**Where the JSON/plugin line falls.** JSON owns everything expressible as
+one outbound, fire-and-forget Intent — "go do this over there". A plugin
+exists only where droidtop needs something **back**: a search that returns
+results droidtop renders, a now-playing state it polls, a metadata source
+it queries. Every example in §12 sorts cleanly under that, so no case is
+served by both halves.
 
-**Form (proposed): a normally-installed APK exposing a bound Service.
-Not a Python module, and not code loaded into droidtop's own process.**
-Reasoning, all of it from positions already held here:
+**Form: a downloadable SUBPLUGIN, distributed and verified by exactly the
+same engine that distributes engine plugins. Not a separate APK, not a
+bound Service, not a third-party app droidtop talks to.**
+
+An earlier proposal here argued for an installed APK exposing a bound
+Service, on the grounds that a separate app is a separate uid and
+therefore the only sandbox Android gives for free. That is rejected. The
+reason is the directive this project keeps returning to: one mechanism
+per job, and shared modules wherever a capability already exists.
+droidtop already has a complete apparatus for distributing third-party
+extension code — signed `.enginehost.tar.xz` bundles, per-origin pinned
+keys certified under one root, an install path that verifies every
+payload file, and a trust screen the user approves before anything runs.
+Tying integrations to APKs would mean a second distribution channel, a
+second trust model, a second install flow and a second failure mode, to
+solve a problem the first one already solves.
+
+So an integration plugin is a subplugin: the same bundle format, the
+same signing and pinning, the same catalogue and download path, the same
+approval. The subplugin concept is not integration-specific — it exists
+because engine plugins need extensions too (the Godot Spine runtime is
+the first), and integrations are simply another consumer of it.
+
+Consequences that follow and are therefore also decided: a plugin is
+never "an app the user already installed", so discovery is a catalogue
+question rather than a package-manager query; not-installed still means
+hidden rather than offered-and-broken; and the trust boundary is the one
+that already exists, so discovery does not equal activation — a
+downloaded subplugin is approved before it runs, per the existing trust
+screen.
 
 - droidtop **never** downloads or side-loads third-party code, and will
   never grow a WebView or in-app download path for it. So a plugin has
