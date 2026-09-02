@@ -68,7 +68,12 @@ data class Integration(
  * "acquire content into my library" hands over a writable games folder
  * and expects something to appear in it (SPEC §12's own point).
  */
-enum class IntegrationCapability(val id: String, val display: String) {
+enum class IntegrationCapability(
+    val id: String,
+    val display: String,
+    /** Where in droidtop this capability is actually offered -- so the management screen can say so rather than leaving the user to guess. */
+    val surface: String,
+) {
     /**
      * Fetch content into one of droidtop's own configured library
      * folders -- the first real use case: a per-system "get games"
@@ -76,10 +81,17 @@ enum class IntegrationCapability(val id: String, val display: String) {
      * destination folder, so the result lands where droidtop already
      * scans.
      */
-    ACQUIRE_CONTENT("acquire_content", "Get content"),
+    ACQUIRE_CONTENT("acquire_content", "Get content", "a system's own settings screen"),
 
-    /** Open a file droidtop would otherwise handle itself (video, document) in a preferred app. */
-    OPEN_WITH("open_with", "Open with"),
+    /**
+     * Open a real file droidtop HAS but has no viewer of its own for --
+     * the scraped manual and the scraped preview video (see
+     * [openWithTargetsFor]). Addition, never substitution: it may not
+     * claim the game file, because which app launches a ROM is already
+     * owned by the player database, per system and per game, with its
+     * own override UI.
+     */
+    OPEN_WITH("open_with", "Open with", "a game's own detail screen"),
     ;
 
     companion object {
