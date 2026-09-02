@@ -92,8 +92,19 @@ fun DesktopShell(
     hostBridge: HostBridge?,
     primaryOutput: DisplayOutput?,
     sessionMessage: DesktopSessionMessage = DesktopSessionMessage.Idle,
+    onOpenTerminal: (suspend () -> String?)? = null,
 ) {
     var startMenuOpen by remember { mutableStateOf(false) }
+    var terminalError by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    val openTerminal: (() -> Unit)? = onOpenTerminal?.let { open ->
+        {
+            terminalError = null
+            scope.launch { terminalError = open() }
+            Unit
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         DesktopViewport(hostBridge, primaryOutput, sessionMessage)
@@ -101,7 +112,15 @@ fun DesktopShell(
         Taskbar(
             startMenuOpen = startMenuOpen,
             onToggleStartMenu = { startMenuOpen = !startMenuOpen },
+            // Absent rather than disabled when there is no live session:
+            // a Terminal button that cannot open a terminal is a lie about
+            // what the desktop can do right now.
+            onOpenTerminal = openTerminal,
         )
+
+        terminalError?.let { message ->
+            TerminalErrorBanner(message = message, onDismiss = { terminalError = null })
+        }
 
         if (startMenuOpen) {
             StartMenu(
@@ -109,6 +128,44 @@ fun DesktopShell(
                 onDismiss = { startMenuOpen = false },
             )
         }
+    }
+}
+
+/**
+ * A terminal that never appeared has to say why. The failure text comes
+ * from [dev.droidtop.runtime.ContainerTerminal.failureMessage], which
+ * distinguishes "the package isn't in this container" from anything else,
+ * rather than being invented here.
+ */
+@Composable
+private fun BoxScope.TerminalErrorBanner(message: String, onDismiss: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .align(Alignment.TopCenter)
+            .padding(top = 64.dp)
+            .background(MaterialTheme.colorScheme.errorContainer)
+            .clickable(onClick = onDismiss)
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            "Couldn't open a terminal",
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            message,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Text(
+            "Tap to dismiss",
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.padding(top = 8.dp),
+        )
     }
 }
 
@@ -235,7 +292,11 @@ private fun BoxScope.DesktopViewport(
 }
 
 @Composable
-private fun BoxScope.Taskbar(startMenuOpen: Boolean, onToggleStartMenu: () -> Unit) {
+private fun BoxScope.Taskbar(
+    startMenuOpen: Boolean,
+    onToggleStartMenu: () -> Unit,
+    onOpenTerminal: (() -> Unit)?,
+) {
     val context = LocalContext.current
     var clockText by remember { mutableStateOf(formatClock()) }
     LaunchedEffect(Unit) {
@@ -258,6 +319,11 @@ private fun BoxScope.Taskbar(startMenuOpen: Boolean, onToggleStartMenu: () -> Un
         }
         Spacer(modifier = Modifier.width(1.dp).height(32.dp).background(MaterialTheme.colorScheme.outline))
         Spacer(modifier = Modifier.weight(1f))
+        if (onOpenTerminal != null) {
+            Button(onClick = onOpenTerminal, modifier = Modifier.padding(horizontal = 8.dp)) {
+                Text("Terminal")
+            }
+        }
         Button(onClick = { openContainers(context) }, modifier = Modifier.padding(horizontal = 8.dp)) {
             Text("Containers")
         }

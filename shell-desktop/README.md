@@ -9,13 +9,20 @@ presents the live desktop via `:host-bridge`'s `HostBridge` (see
 ## Status
 
 **UI chrome is real: taskbar, start menu (library list, launches entries),
-clock, and the `SurfaceView` viewport that `HostBridge.presentOutput`
-targets.** What's NOT real yet: `dev.droidtop.app.DesktopSessionService`
-(the thing responsible for actually creating the primary container and
-connecting a `HostBridge` to its Wayland socket) is still a TODO stub, so
-`:app` currently passes `hostBridge = null` / `primaryOutput = null` into
-`DesktopShell` — you'll see the "desktop session not started" placeholder,
-not a live desktop, until that's implemented. The moment
-`DesktopSessionService` produces a real `HostBridge` + `DisplayOutput`, wiring
-them into this composable's existing parameters is the only change needed
-here; no reachitecture required.
+clock, system tray, the Terminal entry, and the `SurfaceView` viewport that
+`HostBridge.presentOutput` targets — which is also the input surface, driving
+`:input-seat`'s `DesktopInputRouter` (see `docs/SPEC.md` §6b).**
+`dev.droidtop.app.DesktopSessionService` does real orchestration now and
+`:app` passes its live `HostBridge` + `DisplayOutput` through, so the
+Idle/Connecting/Failed/Connected states this shell renders are the real
+session's, not a placeholder.
+
+The Terminal entry opens a real shell in the primary container by `exec`-ing
+a terminal application into the shared compositor — not an Android-side
+terminal view. `runtime-common`'s `ContainerTerminal` carries the argument
+for that choice, and `docs/SPEC.md` §3d records it. The button is absent,
+rather than present-and-disabled, when there is no live session: a Terminal
+button that cannot open a terminal misrepresents what the desktop can do.
+
+**What is still not proven:** none of it has been run against a live
+compositor on real hardware.
