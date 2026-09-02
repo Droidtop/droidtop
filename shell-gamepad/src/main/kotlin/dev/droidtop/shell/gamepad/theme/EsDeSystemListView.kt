@@ -54,7 +54,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import dev.droidtop.library.EsDeArtwork
+import dev.droidtop.library.GameMediaLocator
 import dev.droidtop.library.theme.EsDeCarouselPlacement
+import dev.droidtop.library.theme.EsDeImageTypes
 import dev.droidtop.library.theme.EsDeCarouselType
 import dev.droidtop.library.theme.EsDeGridConfig
 import dev.droidtop.library.theme.EsDeGridLayout
@@ -112,7 +115,45 @@ data class EsDeListItem(
     // rule that reads it is real, and half-implementing that rule would
     // silently paint folders in the wrong color the day folders land.
     val isSecondary: Boolean = false,
+    // Where this item's game keeps its scraped media, so a carousel or
+    // grid that declared an `<imageType>` can resolve THAT type instead of
+    // always showing [logoPath]. Null for a system-list item (a system has
+    // no per-game media) and for any game with no ES-DE media layout.
+    // See dev.droidtop.library.GameMediaLocator.
+    val mediaLocator: GameMediaLocator? = null,
 )
+
+/**
+ * The image a `carousel`/`grid` entry should draw, honouring the
+ * element's own `<imageType>`.
+ *
+ * Real ES-DE, ported from GridComponent.h:490-522 (CarouselComponent.h:
+ * 548-580 is the same code): walk the declared types in the THEME's
+ * order, take the first that has a file, and stop; `none` breaks the loop
+ * immediately, which is the theme explicitly asking for the game's name
+ * as text instead of an image.
+ *
+ * Two deliberate points where this is not a literal port:
+ *
+ *  * When nothing resolves, real ES-DE falls back to the element's own
+ *    `defaultImage` and then to text. droidtop falls back to [logoPath]
+ *    -- the entry's single pre-resolved artwork -- FIRST. This is a
+ *    knowing divergence, not an accident: droidtop's own scraper writes
+ *    covers and little else, so a strict port would blank out a fully
+ *    scraped library the moment a theme asked for a marquee. `none` is
+ *    exempt, because there the theme did not fail to find media, it asked
+ *    for text.
+ *  * `defaultImage` itself is not implemented on these two elements yet
+ *    (it is not part of this change), so the chain ends at [logoPath].
+ */
+internal fun EsDeListItem.esDePrimaryImage(imageTypes: List<String>): String? {
+    if (imageTypes.isEmpty()) return logoPath
+    val untilNone = imageTypes.takeWhile { it != "none" }
+    val resolved = mediaLocator?.let { EsDeArtwork.resolveImageTypes(it, untilNone) }
+    if (resolved != null) return resolved
+    // `none` reached without a match: the theme asked for text.
+    return if (untilNone.size != imageTypes.size) null else logoPath
+}
 
 /**
  * Renders [items] using whichever real shape the loaded theme's
@@ -143,11 +184,35 @@ fun EsDeSystemListView(
     val themedArea = LocalEsDeThemedAreaSize.current
     val resolvedWidth = themedArea?.width ?: configuration.screenWidthDp.dp
     val resolvedHeight = themedArea?.height ?: configuration.screenHeightDp.dp
+    // Real `imageType` on the two primary elements that accept it
+    // (`carousel` and `grid`; `textlist` has no image at all, and real
+    // ES-DE's schema does not give it the property either). Resolved once
+    // here, at the single dispatch point, rather than inside both widgets
+    // -- one mechanism, and the per-item filesystem lookups are memoised
+    // for as long as this list is composed rather than repeated per frame.
+    //
+    // Real ES-DE gates this on being a GAMELIST view (`mGamelistView` in
+    // CarouselComponent.h:1367 / GridComponent.h:988) -- a SYSTEM carousel
+    // shows system logos, which are theme art, not scraped game media. The
+    // gate here is the same fact expressed through the data: a system-list
+    // item carries no [EsDeListItem.mediaLocator], so nothing resolves and
+    // its logo is kept.
+    val imageTypes = remember(element) {
+        if (element?.type == "carousel" || element?.type == "grid") {
+            EsDeImageTypes.forPrimaryElement(element.valueOrNull<EsDeThemeValue.Str>("imageType")?.value)
+        } else {
+            emptyList()
+        }
+    }
+    val typedItems = remember(items, imageTypes) {
+        if (imageTypes.isEmpty()) items
+        else items.map { item -> item.copy(logoPath = item.esDePrimaryImage(imageTypes)) }
+    }
     when (element?.type) {
         // The grid doesn't get onFocusedIndexChanged wired through -- it
         // still delegates its cursor to LazyVerticalGrid's own focus
         // traversal and has no single cursor of its own to report.
-        "grid" -> EsDeGrid(element, items, firstItemFocus, modifier, resolvedWidth, resolvedHeight)
+        "grid" -> EsDeGrid(element, typedItems, firstItemFocus, modifier, resolvedWidth, resolvedHeight)
         // textlist DOES get onFocusedIndexChanged now: it owns its own
         // cursor (real TextListComponent architecture, see EsDeTextList),
         // so a theme whose system view is a textlist rather than a
@@ -158,7 +223,7 @@ fun EsDeSystemListView(
         // "carousel", or no theme-declared element at all -- carousel is
         // ES-DE's own real default shape and the one droidtop already
         // shipped, so it's the honest fallback rather than an arbitrary one.
-        else -> EsDeCarousel(element, items, firstItemFocus, modifier, onFocusedIndexChanged, resolvedWidth, resolvedHeight)
+        else -> EsDeCarousel(element, typedItems, firstItemFocus, modifier, onFocusedIndexChanged, resolvedWidth, resolvedHeight)
     }
 }
 
@@ -195,11 +260,13 @@ fun EsDeSystemListView(
  * `posMax` handling) -- droidtop's list isn't circular in its animation,
  * so a direct `animateTo` is the correct real behavior here.
  *
- * Honestly still unimplemented here, and NOT faked: `imageType` (which
- * scraped media type a gamelist carousel shows per game -- droidtop's
- * `LibraryEntry` carries one already-resolved `artworkUri` and no
- * per-type media map, so honoring it needs a library-core data-model
- * change, not a renderer one), `imageColorEnd`/`imageGradientType`/
+ * `imageType` IS now honored (the library-core data-model change it was
+ * blocked on landed as `LibraryEntry.mediaLocator`) -- see
+ * [esDePrimaryImage], which is where the real per-entry resolution and
+ * the real two-entry cap live.
+ *
+ * Honestly still unimplemented here, and NOT faked:
+ * `imageColorEnd`/`imageGradientType`/
  * `imageSelectedColorEnd`/`imageSelectedGradientType` (a POSITIONAL
  * gradient applied as a color shift over an image, which a Compose
  * `ColorFilter` cannot express -- it needs a shader), `textRelativeScale`/
@@ -896,9 +963,11 @@ private fun EsDeTextListRow(
  * `systemdata` text element the theme places where it wants, which
  * droidtop already renders.
  *
- * Honestly still unimplemented, and NOT faked: `imageType` (the same
- * "LibraryEntry carries one already-resolved artwork" blocker as the
- * carousel), the `imageColorEnd`/`imageGradientType`/
+ * `imageType` IS now honored, through the same [esDePrimaryImage] the
+ * carousel uses.
+ *
+ * Honestly still unimplemented, and NOT faked:
+ * the `imageColorEnd`/`imageGradientType`/
  * `imageSelectedColorEnd`/`imageSelectedGradientType` positional
  * gradients, `imageCropPos`,
  * `textBackgroundCornerRadius`, the four `textHorizontalScroll*`
