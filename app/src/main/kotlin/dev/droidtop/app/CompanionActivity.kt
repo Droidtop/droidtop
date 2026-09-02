@@ -54,6 +54,17 @@ class CompanionActivity : AppCompatActivity() {
         widgetIds = CompanionWidgetPrefs.widgetIds(this)
         setContent {
             dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
+                // The same mode+role selection every other second-screen
+                // host applies (SecondScreenPresentation, :display's
+                // SecondaryDisplayActivity): with the shell relocated to
+                // the addon, THIS activity is what the remaining panel
+                // shows, and in Desktop mode that panel is the input
+                // surface (trackpad + keyboard) by default, not widgets.
+                val mode = dev.droidtop.display.SecondaryDisplayContent.currentMode(this)
+                if (SecondScreenInputPrefs.role(this, mode) == SecondScreenInputPrefs.Role.INPUT) {
+                    SecondScreenInputSurface(mode)
+                    return@DroidtopTheme
+                }
                 val entry by CompanionState.focusedEntry.collectAsState()
                 CompanionSurface(
                     entry = entry,

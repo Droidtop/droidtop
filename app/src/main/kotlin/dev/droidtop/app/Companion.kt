@@ -84,6 +84,18 @@ object CompanionState {
      * driving.
      */
     val libraryEntries = MutableStateFlow<List<LibraryEntry>>(emptyList())
+
+    /**
+     * Tap-to-launch, installed by MainActivity (the owner of the one
+     * [dev.droidtop.library.Library] instance) and invoked by the
+     * companion's recent-games rail. Null while no shell is alive to
+     * launch through -- the rail still renders, and a tap simply does
+     * nothing rather than half-launching outside the real launch path
+     * (play history, launch-screen memory, error handling all live
+     * there).
+     */
+    @Volatile
+    var onLaunchEntry: ((LibraryEntry) -> Unit)? = null
 }
 
 @Composable
