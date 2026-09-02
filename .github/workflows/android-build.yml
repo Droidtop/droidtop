@@ -248,6 +248,29 @@ jobs:
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk droidtop-debug-latest.apk
 
+          # release-info.json is the in-app update check's one probe
+          # (app/.../update/AppSelfUpdate.kt): the app downloads this small
+          # file unauthenticated, compares versionCode (the run number, the
+          # same value baked into the APK) with its own, and verifies any
+          # downloaded APK against apkSha256 before handing it to the
+          # Android installer.
+          python3 - <<'PY'
+          import hashlib, json
+          digest = hashlib.sha256(open("droidtop-debug-latest.apk", "rb").read()).hexdigest().upper()
+          json.dump(
+              {
+                  "formatVersion": 1,
+                  "versionCode": ${{ github.run_number }},
+                  "versionName": "0.1.0-dev-${{ github.run_number }}",
+                  "apkName": "droidtop-debug-latest.apk",
+                  "apkSha256": digest,
+                  "commit": "${{ github.sha }}",
+              },
+              open("release-info.json", "w"),
+              indent=2,
+          )
+          PY
+
           # Rolling release, not one-per-commit: this project is under
           # active development with no version numbers yet, so "latest"
           # always pointing at the newest working build is more useful
@@ -255,7 +278,7 @@ jobs:
           # + recreate rather than `gh release upload --clobber` onto an
           # existing release, so the notes/timestamp stay accurate too.
           gh release delete latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create latest droidtop-debug-latest.apk \
+          gh release create latest droidtop-debug-latest.apk release-info.json \
             --title "DroidTop — latest debug build" \
             --notes "Automatically built from commit ${{ github.sha }}. Debug build (signed with a persistent DroidTop dev key — see .signing/ / SIGNING_KEYSTORE_BASE64, so it installs over a previous \"latest\" without uninstalling first; arm64-v8a + x86_64 fat APK) — not for production use, and functionality is still early: see docs/SPEC.md for current status."
 
