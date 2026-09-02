@@ -1221,11 +1221,33 @@ by droidtop and keyed by game, never by whichever container happened to
 launch it. Execution is a **runtime** choice, not a structural one:
 
 - the bionic direct-exec path is the universal default, works with no
-  root, and is therefore what the handheld uses;
-- droidspaces `exec` is an optimization available in desktop mode where
-  root is legitimate, never a precondition;
-- neither may re-provision anything the other already installed. The test
-  is that the same game with the same prefix launches in both modes.
+  root, and is what BOTH modes use to run Wine;
+- **Wine never runs with root -- a hard security boundary, not a
+  preference** (stated 2026-09-02, superseding the earlier "droidspaces
+  `exec` as a desktop optimization" shape recorded here). Wine's whole
+  job is executing arbitrary third-party Windows binaries; a malicious
+  game in a root-capable context needs no exploit, only to be run. So
+  the Wine launch path must not pass through
+  `ContainerRuntimeFactory.select` at all -- on a rooted device that
+  selection silently yields the root-backed droidspaces runtime. The
+  constraint is structural: `WineEngine` is a *sealed* interface that
+  cannot be handed a `ContainerRuntime`, so "run Wine as root" is not
+  expressible outside `:runtime-windows`, and inside it any
+  implementation touching `RootProcess`/`ContainerRuntime` is a
+  boundary violation by definition. Provisioning is separate from
+  execution: laying out the ImageFs is droidtop's own work on its own
+  directories and needs no root either (the only root use in
+  `:runtime-windows` is the optional GameNative data import, which
+  reads another app's database and never executes a guest).
+  `RootfsDelete` (root, `:runtime-linux-root`) is droidspaces container
+  lifecycle only; `:runtime-windows` does not depend on that module, so
+  the Wine path cannot reach a root-capable delete, and a Wine prefix
+  can never be handed to it;
+- root elsewhere in desktop mode (droidspaces containers for the Linux
+  desktop itself) is unchanged -- the ban is on the Wine *guest*;
+- neither mode may re-provision anything the other already installed.
+  The test is that the same game with the same prefix launches in both
+  modes.
 
 That means `PcGameRuntime`'s implementation must stop treating a live
 `PrimaryContainerSession` as the precondition for launching Windows
@@ -1234,11 +1256,100 @@ express "run this command in this environment"; what is not adequate is
 the assumption at the call site that the environment IS a droidspaces
 primary container.
 
-Packaging the vendored `jniLibs` (both `src/main` and `src/modern`, the
-same split upstream applies to its Java sources) is done. Remaining, in
-order: give the Wine launch a backend-neutral entry point with no
-`PrimaryContainerSession` requirement; then prove provisioning and one
-launch on hardware before porting anything further.
+### What the hardware said (2026-09-02)
+
+The seam exists: `WineEngine`, with `BionicWineEngine` behind it, and no
+launch site asks for a `PrimaryContainerSession` any more.
+`WineSession`/`WineLaunchEnvironment` are gone -- they existed only to
+run Wine through `ContainerRuntime.exec`, and the hand-transcribed guest
+environment is superseded by the vendored launcher component's own.
+
+Packaging was not one omission but three, each fatal on its own and each
+found by the next one failing on the device:
+
+- the vendored `jniLibs` (fixed previously);
+- the modern flavor's **assets**. `MODERN_ANDROID` makes every guest
+  process `LD_PRELOAD` `libredirect-bionic-wx.so`, which
+  `ImageFsInstaller` copies out of `src/modern/assets` -- a source dir
+  nothing referenced;
+- `useLegacyPackaging` for `jniLibs`. The runtime hands native library
+  *paths* to processes it starts (`libevshim.so` out of
+  `ApplicationInfo.nativeLibraryDir`), and without extraction at install
+  time that directory is empty. Confirmed on the device: 35 libraries in
+  the APK, `lib/arm64` empty.
+
+Provisioning also could not have worked as written, for two reasons
+beyond the missing natives:
+
+- it created the container from `Container.DEFAULT_VARIANT`, which reads
+  `DefaultVersion.VARIANT` -- `glibc` at class-load time. droidtop now
+  names bionic and a bionic wine version explicitly;
+- **order**. Creating a container copies Wine's own DLLs into the new
+  prefix, so Wine has to be installed first; and gamenative's proton
+  launch dependency downloads through `SteamService.downloadFile`, which
+  dereferences a service droidtop never starts. droidtop fetches the
+  archive with the instance-free downloader and lets the dependency do
+  the rest.
+
+**Milestone 1 is met.** On build 388 the ImageFs rootfs installs for the
+first time: 175MB base system downloaded and extracted to a 947MB rootfs
+with `bin`/`etc`/`lib`/`usr`/`opt`, `opt/proton-9.0-x86_64` symlinked
+into a 358MB shared Proton store. Before this it had never once
+completed.
+
+**Milestone 2 is not.** The run ended in a destructive bug of droidtop's
+own making, recorded here so it is never repeated: a half-finished
+container directory was cleaned up with Kotlin's `deleteRecursively`,
+which follows symlinked directories. A Wine prefix contains
+`dosdevices/z: -> /`. The walk left the prefix, and emptied what it
+could reach on internal storage before it was stopped. gamenative's
+`FileUtils.delete` refuses to descend into a symlink -- that is why it
+exists, and it is what the cleanup uses now. **Never point a
+walk-and-delete at a Wine prefix.**
+
+### Destructive-operation audit (2026-09-02, after the incident)
+
+Every recursive removal on the branch, checked for the same defect
+class -- a delete that can leave the tree it was pointed at:
+
+- **Wine-prefix cleanup** (`DroidtopPcGameRuntime.provision`): now goes
+  through droidtop's own `SafeDelete.deleteWithin(imageFs.rootDir, ...)`
+  rather than trusting a helper to refuse -- it proves the target is
+  inside the ImageFs (parent canonicalized first, so a symlinked
+  ancestor can't redirect it) and walks with `Files.walkFileTree`
+  without `FOLLOW_LINKS`, which cannot enter a symlink. A refusal
+  aborts provisioning, deleting nothing. Regression-tested against the
+  incident's exact shape (`SafeDeleteTest`).
+- **`DroidSpacesRuntime.destroy` / `CraneRootfsPuller` stale-rootfs
+  wipe**: both previously hazardous. `destroy` used Kotlin's
+  `deleteRecursively` on a Linux rootfs -- a tree full of symlinks,
+  root-owned so the app-side walk couldn't even work, while the walk
+  itself could still follow a rootfs symlink into shared storage. The
+  puller used a bare root `rm -rf`, which never follows symlinks but
+  DOES descend into a live mount -- and droidspaces bind-mounts the
+  app-storage dir into every rootfs, with leaked instances confirmed
+  to keep those mounts alive. Both now go through `RootfsDelete`:
+  root `rm -rf`, refused while `/proc/mounts` shows anything mounted
+  under the canonicalized path.
+- **Archive extraction** (`TarCompressorUtils.extract`, gamenative
+  fork `4ac3f2a8`): entry names are network input and were joined to
+  the destination unchecked. Extraction now refuses any entry whose
+  canonicalized parent is outside the destination (covers `../`
+  traversal and writes routed through a symlink an earlier entry
+  planted) and unlinks a symlink sitting where a regular file is about
+  to be written. Archives keep their legitimate internal symlinks.
+- **Safe by construction, left as they are**: `GameNativeMigration`
+  staging (flat files droidtop itself writes into its own cache),
+  `FileImageCache.clear` (flat `.tar`s in cache), `ThemeAssets`
+  (APK-asset extraction -- assets cannot be symlinks),
+  `BackupHelper` (entry names whitelisted to exact known filenames,
+  staging dirs hold only droidtop-written flat files), and test-only
+  temp dirs.
+
+Remaining: repeat provisioning through container creation on hardware,
+then one Windows launch. Presentation is separate and unstarted -- the
+engine runs Wine against a headless X server, and nothing composites its
+output into droidtop's own surface yet.
 
 ## 6. Input
 
