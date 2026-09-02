@@ -270,14 +270,21 @@ jobs:
       # is installing the CI artifact on a device each morning, and
       # blocking that on a unit test would trade something real for a
       # convention. The signal is what matters here, not the gate.
+      # :runtime-common joins the run because the ES-DE theme engine lives
+      # there, and its carousel/textlist geometry is a literal port of real
+      # ES-DE formulas -- exactly the kind of code a unit test can verify
+      # without a screen, which is otherwise the only way this project
+      # checks theme rendering at all.
       - name: Run unit tests
         if: always()
-        run: ./gradlew :library-core:testDebugUnitTest --stacktrace
+        run: ./gradlew :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest --stacktrace
 
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: unit-test-reports
-          path: library-core/build/reports/tests/
+          path: |
+            library-core/build/reports/tests/
+            runtime-common/build/reports/tests/
           if-no-files-found: ignore
