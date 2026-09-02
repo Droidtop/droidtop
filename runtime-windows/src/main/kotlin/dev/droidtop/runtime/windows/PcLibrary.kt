@@ -124,7 +124,26 @@ object PcLibrary {
                 }.getOrDefault(emptyList()),
             )
         }.sortedBy { it.title.lowercase() }
+            // Recording the roots here, in the one place every source's
+            // install directories are already known, is what keeps
+            // [knownInstallRoots] answerable synchronously. It used to be
+            // a separate `installRoots(context)` entry point that nothing
+            // ever called, so the store half of that list stayed empty
+            // forever and only Steam's own paths reached engine detection.
+            .also { games -> storeInstallRoots = games.toInstallRoots() }
     }
+
+    /**
+     * The PARENT of each game's install directory, not the directory
+     * itself. Engine detection reads a root's children as candidate game
+     * folders (see `GameEngineDetector.scan`), so handing it a game's own
+     * folder points it one level too deep and it finds nothing there.
+     * Steam's paths already arrive as library roots, which is why a
+     * Steam-installed Ren'Py game was detected and a GOG one would not
+     * have been even once this list was populated.
+     */
+    private fun List<Game>.toInstallRoots(): List<String> =
+        mapNotNull { it.installDir?.parentFile?.absolutePath }.distinct()
 
     /** Only what is actually on this device — what the library grid shows. */
     suspend fun installedGames(context: Context): List<Game> = allGames(context).filter { it.installed }
@@ -137,31 +156,25 @@ object PcLibrary {
      * That is the whole reason this returns roots rather than a store's
      * own launch command.
      */
-    suspend fun installRoots(context: Context): List<File> {
-        val stores = runCatching { allGames(context).mapNotNull { it.installDir } }.getOrDefault(emptyList())
-        storeInstallDirs = stores.map { it.absolutePath }
-        return knownInstallRoots()
-    }
-
     /**
-     * Install directories discovered by the most recent [allGames] call,
-     * plus Steam's own paths (which the service can answer synchronously).
+     * Install roots discovered by the most recent [allGames] call, plus
+     * Steam's own paths (which the service can answer synchronously).
      *
-     * This exists because engine detection's `extraRoots` hook is
-     * synchronous and must not block a scan thread on four Room queries.
-     * The store half is therefore one scan behind on a cold start — a
-     * GOG-installed Ren'Py game is detected on the second scan, not the
-     * first — which is the right trade against stalling every scan.
+     * Synchronous because engine detection's `extraRoots` hook is, and
+     * must not block a scan thread on four Room queries. The store half
+     * is therefore one scan behind on a cold start — a GOG-installed
+     * Ren'Py game is detected on the second scan, not the first — which
+     * is the right trade against stalling every scan.
      */
     fun knownInstallRoots(): List<File> {
         val steam = runCatching { SteamService.allInstallPaths }.getOrDefault(emptyList())
-        return (steam + storeInstallDirs).map(::File)
+        return (steam + storeInstallRoots).map(::File)
             .filter { it.isDirectory }
             .distinctBy { it.absolutePath }
     }
 
     @Volatile
-    private var storeInstallDirs: List<String> = emptyList()
+    private var storeInstallRoots: List<String> = emptyList()
 
     /**
      * Cached community compatibility only — no network call. Scanning a

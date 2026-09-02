@@ -1152,6 +1152,93 @@ rather than through Winlator.
   Windows today) would need real changes, which is deep surgery into a
   large vendored file not attempted here.
 
+## 5b. One Wine engine, one prefix store, whichever backend is live (assessed 2026-09-02)
+
+Re-derived from the code rather than from any earlier summary, because
+two descriptions of this path were in circulation and both were partly
+wrong.
+
+### What the code actually does today
+
+- `DroidtopPcGameRuntime.provision()` builds the Wine environment through
+  gamenative's own `ContainerManager` + `ImageFs` + `ImageFsInstaller`.
+  That machinery needs no root: the prefix and the rootfs live under the
+  app's private storage.
+- `DroidtopPcGameRuntime.launchWindows()` and `PcGameProvider.launch()`
+  both require a `PrimaryContainerSession` before they will run anything,
+  and execute `box64 wine <exe>` through `ContainerRuntime.exec` with
+  `WINEPREFIX` translated by `hostStorageToContainerPath`. `isAvailable`
+  is literally `primarySession() != null`.
+- `ContainerRuntimeFactory.select` probes for root and returns
+  `DroidSpacesRuntime` when it finds it and `ProotRuntime` otherwise, and
+  `ProotRuntime` is seven `TODO()`s including `exec`.
+
+Those three facts compose into the real defect: **Windows games are
+root-only today**, not by design but because the only backend whose
+`exec` is implemented is the one that needs root. The prefix is
+provisioned into a rootfs the launch path never runs in.
+
+### The correction that matters most
+
+The obvious repair — "port `DefaultProotContainerBackend` into
+`ProotRuntime`" — does not work as stated, and the entry in §7g saying so
+is now wrong:
+
+- `runtime-windows` compiles the vendored tree with
+  `MODERN_ANDROID = true`, which is not a preference: Android refuses to
+  `exec()` extracted binaries above `targetSdk 28`, so it is the only
+  value that can work for droidtop.
+- On that path gamenative uses the **bionic** container variant, and
+  `BionicProgramLauncherComponent` runs the guest with a plain
+  `ProcessHelper.exec` against the ImageFs root. **No proot, and no Linux
+  container.** proot is the *glibc* variant's mechanism.
+- The arm64 `libproot.so` / `libproot-loader.so` were deleted from the
+  vendor tree upstream (commit `dad82a8d`); only an armeabi-v7a pair
+  survives under the legacy flavor, and `src/main/cpp/proot`'s CMake
+  build is commented out upstream with a note that a cmake-built proot
+  fails on `ld-2.31.so`. There is no arm64 proot binary to port to.
+
+So the no-root Windows path does not need proot at all. It needs the
+bionic direct-exec model that gamenative already uses everywhere modern
+Android is the target.
+
+### The blocker that makes all of it inert right now
+
+`runtime-windows`'s `sourceSets` pull `java`, `res` and `assets` from the
+vendor tree and **not `jniLibs`**, and no droidtop module declares a
+`jniLibs` source dir anywhere. None of gamenative's native payload
+(`libwinlator.so`, `libpatchelf.so`, `libc++_shared.so`, the pulse
+libraries) ships in the APK. Confirmed on the device: `files/imagefs`
+contains a single `.winlator/.container_migration_version` marker, no
+rootfs, and `ContainerManager` has never held a container. Provisioning
+has therefore never completed on real hardware, which is why no Windows
+game has ever launched through droidtop.
+
+### The shape this settles on
+
+One Wine engine, installed once. One droidtop-owned prefix store, owned
+by droidtop and keyed by game, never by whichever container happened to
+launch it. Execution is a **runtime** choice, not a structural one:
+
+- the bionic direct-exec path is the universal default, works with no
+  root, and is therefore what the handheld uses;
+- droidspaces `exec` is an optimization available in desktop mode where
+  root is legitimate, never a precondition;
+- neither may re-provision anything the other already installed. The test
+  is that the same game with the same prefix launches in both modes.
+
+That means `PcGameRuntime`'s implementation must stop treating a live
+`PrimaryContainerSession` as the precondition for launching Windows
+software at all. `ContainerRuntime` as an interface is adequate to
+express "run this command in this environment"; what is not adequate is
+the assumption at the call site that the environment IS a droidspaces
+primary container.
+
+Remaining work, in order: package the vendored `jniLibs` so the native
+payload exists; give the Wine launch a backend-neutral entry point with
+no `PrimaryContainerSession` requirement; then prove provisioning and one
+launch on hardware before porting anything further.
+
 ## 6. Input
 
 One Wayland seat (`:input-seat`), fed from every physical source: touch,
@@ -2593,6 +2680,37 @@ backends under one control, with the per-game override in context on the
 game. Wine is the declared fallback for Windows titles nothing else
 backs; a native Linux depot still wins where one exists (§5a).
 
+### Store-installed engine games actually reaching enginehost (fixed 2026-09-02)
+
+The intent was already stated in three places: a Ren'Py game installed
+from a store should resolve exactly like one in a games folder,
+enginehost included. Two defects stopped the store half of that from
+ever happening.
+
+- `PcLibrary.installRoots(context)` — the function that populated the
+  store-side roots — had no callers anywhere. Only the synchronous
+  `knownInstallRoots()` was wired into `EngineGameProvider`, and its
+  store half was therefore permanently empty. Recording the roots inside
+  `allGames` instead removes the second entry point rather than adding a
+  call to it.
+- The roots it recorded were each game's own install *directory*, but
+  `GameEngineDetector.scan` reads a root's children as candidate game
+  folders, so those pointed one level too deep. The parent is the root.
+
+Steam was unaffected by both, because `SteamService.allInstallPaths`
+already returns `steamapps/common`-shaped library roots — which is why a
+Steam-installed Ren'Py game does reach enginehost today and a GOG one
+did not. `SteamAccess.installRoots()` was a third, uncalled copy of the
+Steam half and is gone; `PcLibrary.knownInstallRoots()` is the one
+mechanism.
+
+Still open, and visible to the user: a store-installed engine game is
+returned by `EngineGameProvider` *and* by `PcGameProvider`, so it appears
+twice, and the two entries route differently — the engine entry to
+enginehost, the `pc` entry straight to `GameExecutableResolver` and then
+Wine, with no engine detection consulted. Deduplicating those two
+providers against each other is the remaining half of this.
+
 ### Dead weight to remove
 
 - **`runtime-remote-stream/`** — already gone from git: zero tracked
@@ -2606,9 +2724,13 @@ backs; a native Linux depot still wins where one exists (§5a).
   `LibraryEntryKind.REMOTE_STREAM` **stays** — it is how a
   windowcast-launched entry appears in the same library model as
   everything else, which is the point of that model.
-- **`runtime-linux-noroot`** is 7 `TODO()`s against a real
-  `DefaultProotContainerBackend` sitting in the fork — port it rather
-  than leaving a backend that throws.
+- **`runtime-linux-noroot`** is 7 `TODO()`s. The obvious repair (port
+  `DefaultProotContainerBackend` out of the fork) does not apply on this
+  target — see §5b: droidtop builds `MODERN_ANDROID`, that path uses the
+  bionic variant's direct exec rather than proot, and no arm64 proot
+  binary exists in the vendor tree to port to. The class still needs
+  filling in for Linux containers generally; it is not what stands
+  between droidtop and a Windows game.
 - **`vendor/lemuroid`** is a reference checkout, not a build input: its
   detection code was copied into `library-core/.../romdetect/`. Legitimate,
   but it should be documented as reference-only so nobody assumes a
@@ -2626,7 +2748,8 @@ backs; a native Linux depot still wins where one exists (§5a).
 5. Playtime/last-played from `LibraryPlayHistoryDao`.
 6. Cloud saves across the four stores.
 7. Delete the dead streaming module and submodules.
-8. Port the proot backend.
+8. Give `runtime-linux-noroot` a real no-root backend (§5b for why
+   that is not simply a `DefaultProotContainerBackend` port).
 
 ## 8. Licensing
 

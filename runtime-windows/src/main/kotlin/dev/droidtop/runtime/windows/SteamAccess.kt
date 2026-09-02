@@ -137,18 +137,6 @@ object SteamAccess {
     fun installedDirFor(appId: Int): File? =
         runCatching { File(SteamService.getAppDirPath(appId)) }.getOrNull()?.takeIf { it.isDirectory }
 
-    /**
-     * Every Steam `steamapps/common` directory games can be installed
-     * under, existing ones only. This is what droidtop's engine-game
-     * scan consumes so a Steam-installed Ren'Py/RPG Maker/KiriKiri game
-     * flows through the SAME detection, grouping, and launch-strategy
-     * resolution as one in a games folder, enginehost included.
-     */
-    fun installRoots(): List<File> =
-        runCatching { SteamService.allInstallPaths }.getOrDefault(emptyList())
-            .map(::File)
-            .filter { it.isDirectory }
-
     private fun bindListeners() {
         if (listenersBound) return
         listenersBound = true
