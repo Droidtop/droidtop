@@ -66,6 +66,23 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
         savedStateOwner.controller.performRestore(null)
         lifecycleOwner.registry.currentState = Lifecycle.State.CREATED
 
+        // Which mode's second-screen role applies, read from the same
+        // place :display reads it, so this live surface and the idle
+        // SECONDARY_HOME surface underneath always agree about what this
+        // screen is for.
+        val mode = dev.droidtop.display.SecondaryDisplayContent.currentMode(context)
+        if (SecondScreenInputPrefs.role(context, mode) == SecondScreenInputPrefs.Role.INPUT) {
+            // Keyboard and trackpad instead of the companion. A plain View
+            // tree, not Compose: both halves are already Views (the forked
+            // keyboard's own key grid, :input-seat's trackpad), and
+            // wrapping them in Compose here would add a layer that does
+            // nothing. `context` is the Presentation's own display
+            // context, which is what the keyboard needs in order to lay
+            // itself out for THIS panel rather than the primary one.
+            setContentView(SecondScreenInputView(context, mode))
+            return
+        }
+
         val composeView = ComposeView(context).apply {
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(savedStateOwner)
