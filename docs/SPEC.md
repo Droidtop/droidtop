@@ -3600,6 +3600,72 @@ Verified: a real built APK contains distinct `lib/arm64-v8a/` and
 `lib/x86_64/` native libraries plus both `droidspaces-arm64-v8a` and
 `droidspaces-x86_64` assets (confirmed via `unzip -l`, not assumed).
 
+## 10b. Releases and updates (directed 2026-09-02)
+
+Distribution is three different problems wearing one word, and each gets the
+strongest mechanism that is actually available to it -- nothing pretends to a
+capability Android does not grant.
+
+**Versioning.** "Is this newer" must be answerable by machines. The CI run
+number (already the `-dev-N` suffix in `versionName`) is now also the
+`versionCode`: a plain monotonic integer, so Android itself refuses
+downgrades and the update check is a single integer comparison. The rolling
+`latest` release carries `release-info.json` -- formatVersion, versionCode,
+versionName, apkName, apkSha256, commit -- published by the same workflow
+run that built the APK. Enginehost mirrors this exactly (its
+`codex/engine-bundles` line publishes the same shape of rolling release).
+
+**Update check (droidtop and enginehost APKs).** At most once a day, at
+process start, the app downloads that one small file unauthenticated and
+compares versionCode. Privacy is the design constraint, not an afterthought:
+nothing about the device, settings, or library is sent -- GitHub sees an IP
+address fetching a public release asset, which is the floor for fetching
+anything at all. Offline or failed checks are silent and simply retried
+after the next interval. Settings > Software updates has the off switch
+("Check for updates once a day"), and off means zero automatic update
+traffic. A manual "Check now" lives on the same screen.
+
+**Self-update (both APKs) -- what is honestly possible.** A normally
+installed app cannot silently replace itself. What it can do, and what is
+built: download the release APK, verify it against the published sha256,
+open a PackageInstaller session for its own package, and let the system
+take over -- Android verifies signing-key continuity against the persistent
+CI key (which is why that key exists) and asks the user to confirm; the
+first time, the user must also grant "install unknown apps". On Android 12+
+the session requests `USER_ACTION_NOT_REQUIRED`, which the system honors
+only when the app is its own installer of record (true from the second
+in-app update onward) -- genuine silent updates where allowed, the
+confirmation dialog everywhere else. No installer permission is assumed, no
+root is used (root stays desktop-only), and nothing is sideloaded around
+the platform's checks.
+
+**Engine-plugin bundles -- where auto-update genuinely lives.** Bundles are
+enginehost's own signed payloads, so replacing one is not an APK install
+and the platform imposes no dialog; the trust model imposes the gates
+instead. Within one `bundleId`, a strictly higher `pluginVersion` from the
+same origin (verified against the same pinned key) is an update and
+replaces the old build in place; a different origin or ID never is.
+Enginehost checks daily against exactly the repositories it has bundles
+installed from, can optionally auto-install (off by default), and in every
+path the execution approval stays bound to the exact archive digest and
+signer -- an updated bundle re-prompts before it runs anything. Approval is
+never inherited; there is deliberately no path that skips it. Details:
+enginehost's docs/plugin-catalog.md (Updates) and docs/engine-bundle-format.md.
+
+**Publishing bundles -- the gate is hardware evidence.** Plugin CI signs a
+bundle on every push, but a green build proves packaging, not that the
+runtime boots; the project's bar for a published release is "installed and
+booted a real game on hardware". Promotion is one deliberate command --
+enginehost's `scripts/promote-plugin-release.py` -- which re-verifies the
+bundle offline against the key document committed at the run's own commit,
+requires an `--evidence` statement of what was seen on-device (written
+verbatim into the release notes, never invented), assembles a draft, and
+publishes only when every asset is up. Published releases are permanent
+(older games may pin older builds). As of this writing only Ren'Py 8.2 has
+met the bar (8.2/8.3 releases exist on enginehost-renpy-plugin); everything
+else stays a CI artifact until proven, and proving it makes publishing a
+one-command act.
+
 ## 11. Open risks to verify hands-on, not assume
 
 - Whether sway's headless backend + `wlr-screencopy` performs well enough
