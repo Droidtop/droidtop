@@ -2718,10 +2718,15 @@ scroll rate of a description panel matches ES-DE's on the same theme at
 this device's resolution, the vertical snap and leading-inset clip at the
 top and bottom edges, and the marquee's gap on decaffe's own system view.
 
-**Closing the used set (2026-09-02)**: the remaining unrendered members
-of the 282 real themes actually use are implemented, all ported from
-cited real ES-DE source. Rendered coverage of the used set is now 281 of
-282.
+**Closing the used set (2026-09-02)**: every remaining unrendered
+property from the ten-theme measurement above is implemented, all ported
+from cited real ES-DE source. The one member of that set deliberately
+still left is `helpsystem`'s `originDimmed`, for the reason recorded at
+the end of this entry; the count is otherwise closed. (This is stated as
+"the measured set minus one" rather than as a fresh N-of-282 figure
+because the measurement itself was not re-run in this pass -- the ten
+clones it read are not on this machine any more, and quoting a recomputed
+number without recomputing it would be worse than not quoting one.)
 
 - `gameselector`'s `selection`, all three real modes
   (`GameSelectorComponent::refreshGames`, GameSelectorComponent.h:51-129,
