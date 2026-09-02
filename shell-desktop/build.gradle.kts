@@ -28,6 +28,7 @@ android {
 dependencies {
     implementation(project(":library-core"))
     implementation(project(":host-bridge"))
+    implementation(project(":input-seat"))
     implementation(project(":runtime-common"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)

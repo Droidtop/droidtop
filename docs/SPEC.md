@@ -978,7 +978,7 @@ Measured by what droidtop's own code actually touches.
 | Container manager UI | §4b | **built** — `ContainersActivity` over `listContainers` |
 | Bind-mounted Android storage | §3 | **built** — `hostStorageToContainerPath`, whole app-storage dir mounted |
 | Audio | §2 | **configured, unverified** — droidspaces' own `enable_pulseaudio=1`; never confirmed on device |
-| Keyboard/mouse injection | §6 | **built** — host-bridge virtual-pointer/virtual-keyboard, unproven live |
+| Keyboard/mouse injection | §6 | **built, unproven live** — host-bridge's virtual-pointer/virtual-keyboard injection, and (since §6b) the desktop surface that feeds it. Between the assessment above and §6b the primitive existed but nothing called it: `InputSeat` was constructed only by its own unit test, so the presented desktop was a video feed with no way to click it |
 | External display | §4 | **built** |
 | **Terminal into a container** | §4b | **NOT BUILT** — zero files. §4b's own words: "a computer the user can't open a shell on isn't a computer" |
 | **Clipboard host↔container** | — | **NOT BUILT**, and **not in the spec at all** until now. Crostini treats this as core |
@@ -1177,6 +1177,56 @@ compositor only ever sees one logical pointer and keyboard.
   Winlator has a known, open, acknowledged gap in native/Bluetooth mouse
   pointer capture (issue #1555). This needs real design and testing effort,
   not inherited code.
+
+## 6b. Desktop surface input (built 2026-09-01)
+
+The seat in §6 was a primitive with no caller. `:shell-desktop`'s
+`SurfaceView` handed its surface to `HostBridge.presentOutput` and stopped
+there, so the desktop rendered and could not be touched. `DesktopInputRouter`
+(`:input-seat`) is what closes that: it is installed on the surface, it holds
+one `InputSeat` per live `HostBridge`, and it is the only thing in the app
+that drives the seat. Nothing reaches `HostBridgeInput` around it — that is
+what keeps §6's "one logical pointer and keyboard" true no matter how many
+physical devices are attached.
+
+**Coordinate space.** Touch and mouse position are mapped through
+`PointerTransform`, from Android view space into the compositor output's own
+pixel space, and handed to `zwlr_virtual_pointer_v1.motion_absolute` together
+with the extent they were scaled against. The transform is rebuilt in
+`surfaceChanged`, because the surface's size is the only geometry that can be
+read honestly there: it is not the panel size (the taskbar takes 48dp of it)
+and it is not the output size.
+
+The default fit is `STRETCH`, because that is what the present path actually
+does — `presentPrimaryOutput` sets the buffer geometry to the output size and
+SurfaceFlinger scales that buffer to fill the view's bounds, per axis, with no
+letterboxing anywhere. Under `STRETCH` only the ratio x/x_extent reaches the
+compositor, so the fact that Kotlin only knows the *Android panel* size and
+not the true compositor output size (which arrives natively, in the screencopy
+`buffer` event) cannot produce a scale error. A `LETTERBOX` fit exists and is
+tested alongside it, for the moment the present path grows an
+aspect-preserving mode; that mode makes the aspect ratio load-bearing, so
+taking it requires plumbing the real output size up from native first.
+
+**Keys.** Android keycodes are translated to Linux evdev codes and injected
+raw. There is no second layout table: the layout is entirely the XKB keymap
+`:host-bridge` already hands the compositor, and the translation table is
+checked against that keymap's own `xkb_keycodes` section (XKB keycode = evdev
++ 8). Back, Home, Recents, Power and the volume keys are deliberately not
+forwarded — swallowing them would strand the user inside a full-screen
+desktop.
+
+**Gamepad.** The right stick drives the pointer and the two stick clicks are
+left/right button; the D-pad, face buttons, shoulders and left stick are left
+alone. The shell around the surface — taskbar, start menu, settings — is
+Compose focus navigation driven by D-pad and A, and claiming those would break
+navigation in exactly the case a gamepad pointer is for (no mouse attached).
+The right stick and stick clicks are the controls that navigation does not use.
+
+Known gaps, stated rather than guessed at: no long-press-to-right-click on the
+touchscreen (a hold threshold is not worth inventing without a device to tune
+it on), and the second-screen trackpad surface of §6 is still unbuilt — the
+router already has the relative-motion path it will use.
 
 ## 6a. Keyboard ownership (directed 2026-09-01)
 
