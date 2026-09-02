@@ -51,12 +51,20 @@ permissions:
 # this, every push queued another full build and nothing cancelled the run
 # it had just obsoleted, so a five-push fix session burned five builds and
 # could email five failures for one problem. Keyed on the ref, so branches
-# and pull requests never cancel each other. Pushes to main are the
-# exception: that run publishes a release, and cancelling it midway could
-# leave a release deleted but not recreated.
+# and pull requests never cancel each other.
+#
+# This applies to main as well, where roughly two thirds of this repo's
+# runs happen. The one thing at risk there is the rolling "latest" release
+# published at the very end of the job: it is deleted and recreated, so a
+# cancellation inside that few-second window can leave "latest" missing.
+# That is recoverable by construction, because the only thing that can
+# cancel a main run is a newer main run, and that newer run republishes
+# "latest" when it finishes. Trading a seconds-wide window on a rare
+# interleaving against two thirds of the wasted builds is the right side
+# of that bargain.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: true
 
 jobs:
   build:
