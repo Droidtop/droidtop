@@ -2504,6 +2504,84 @@ textlist, `helpsystem`'s dimmed-state and entry-layout properties
 (13/31), and the `rotationOrigin`/`stationary` pair that recurs across
 nearly every element type.
 
+**Measured against real themes, then closed by usage (2026-09-02)**: the
+"N of 472 properties" figure above is a poor guide to what to do next,
+because most of those 472 are set by no theme at all. This pass replaced
+it with a measurement. Ten real themes were shallow-cloned from the same
+`themes.json` index `ThemeDownloader` itself uses, chosen for variety of
+primary view and complexity: DEcaffe (`9adb55a`), Art Book Next
+(`d772d07`), Slate (`58041e2`), Modern (`692eb36`), ES-DE-Mini
+(`416407f`), Retrofix Revisited (`b43c09d`), TexGriddy (`4db705b`),
+Alekfull NX (`645b2bc`), Epic Noir Revisited (`0db85d7`) and Carbon
+(`3f3b4cd`). Across all of their `<view>` XML the ten themes together use
+282 of the 472 schema properties, and **not one property that the schema
+does not know** -- `ES_DE_ELEMENT_SCHEMA` is confirmed complete against
+real-world usage, not just against `ThemeData::sElementMap`.
+
+Ranked by how many of the ten themes use each unrendered property, this
+pass implemented, all ported from cited real ES-DE source:
+
+- `video`: `pillarboxes` (9 themes) and `pillarboxThreshold` (5), plus
+  the bug they exposed -- every themed video was drawn with ExoPlayer's
+  `RESIZE_MODE_ZOOM`, which CROPS, while real ES-DE fits the frame and
+  fills the remainder with a black frame. The fit and the bar geometry
+  are now pure, unit-tested Kotlin in `runtime-common/.../
+  EsDeVideoLayout.kt` (ported from `VideoFFmpegComponent::resize()` and
+  `::updateBlackFramePosition()`). Also `delay` (9, the static image now
+  really does fill the delay), `videoCornerRadius` (which droidtop was
+  reading as `imageCornerRadius`, a genuinely different real property
+  belonging to the static image), `scrollFadeIn` (5) and `interpolation`
+  (5, on the static-image half only).
+- `image`: `tile` + `tileSize` (8) -- tiled art was being stretched;
+  `interpolation` (7); `scrollFadeIn` (3); `saturation` (2) and
+  `brightness` (1), folded into the ONE `esDeImageColorFilter` shader
+  pipeline this package already had rather than a second copy.
+- The `backgroundColor`/`backgroundHorizontalPadding`/
+  `backgroundVerticalPadding`/`backgroundCornerRadius` group on `clock`
+  (5), `systemstatus` (5), `helpsystem` (4) and `datetime`. Each padding
+  pair is (LEADING, TRAILING) on its own axis, not a width/height pair --
+  and `clock`/`systemstatus` previously drew no background box at all.
+- `helpsystem`: `entryRelativeScale` (5) and `iconTextSpacing` (3, which
+  was a hardcoded 6dp).
+- `systemstatus`: `customIcon` (4) -- themes ship a full wifi/cellular/
+  battery icon set and droidtop drew unicode glyphs over the top of it.
+  Real ES-DE's own defaults are Qt-resource SVGs droidtop cannot
+  redistribute, so the glyphs remain the fallback.
+- `rating`: `overlay` (4) and `interpolation` (4) -- and with them real
+  ES-DE's CONTINUOUS clip geometry, so a 0.7 rating renders three and a
+  half stars rather than droidtop's previous rounding to four.
+- `carousel`/`grid`: `imageInterpolation` (4).
+- `metadataElement` on `text` (5), `image` (3) and `video` -- a real
+  binding, since `LibraryEntry.hideMetadata` already exists.
+
+Two honest divergences are recorded in the code rather than hidden.
+`interpolation` maps to Compose's `FilterQuality`, which is a single
+knob, while real ES-DE's flag is magnify-only -- so an unset
+`interpolation` deliberately keeps Compose's filtered default instead of
+adopting ES-DE's `nearest` member default, which through the wrong knob
+would degrade every downscaled image in every theme. And a `video`
+element's `interpolation` reaches only its static image; ExoPlayer's
+surface exposes no texture-filter knob.
+
+The measurement also re-prioritised what is left. `imageType` is now
+confirmed as the single most-used unrendered property in the schema
+(video 10/10, image 8, grid 4, carousel 3) and stays blocked on the same
+one library-core data-model change. `text`'s `container*` family is
+second (8/7/5/3/3). Deliberately still not implemented, with reasons:
+`badges`' `controllerSize`/`controllerPos`/`folderLinkSize`/
+`folderLinkPos` family (8/7/5/4) needs overlay icon art droidtop does not
+have; `helpsystem`'s whole `*Dimmed` family (4/4/2/2/2/2) fires only
+while ES-DE's own menu overlay dims the background, and droidtop renders
+no such overlay, so implementing it would mean inventing the state;
+`gameselector`'s `selection` (3); `grid`'s `textBackgroundCornerRadius`
+(1); and `datetime`'s `displayRelative` (1). **Nothing in this pass was
+checked on a real screen** -- the device was off-limits, so verification
+is by unit test (`EsDeVideoLayoutTest`, `EsDeTileSizeTest`) and by
+reading real ES-DE's source. The video pillarbox/black-frame geometry,
+tiled backgrounds, the fractional rating clip and the clock/systemstatus
+background boxes all want a real screenshot diff against each theme's own
+bundled reference render once the device is available again.
+
 **Five-theme on-device review + fixes (2026-08-30, later same day)**:
 the theme downloader ran end-to-end for the first time — three real
 community themes (Adroit/Catppuccin/ES-DWEE) installed live through
