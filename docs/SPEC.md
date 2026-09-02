@@ -2202,18 +2202,20 @@ paradigm (§2a's earlier "multiple selectable paradigms" framing is
 superseded, see that section's own updated note).** droidtop's Handheld
 mode renders real, vendored ES-DE (EmulationStation Desktop Edition)
 themes — currently `decaffe-es-de` (bundled, CC-BY-NC-SA) and
-`art-book-next-es-de` (bundled, structurally different — real multi-file
-`<include>` chain, per-aspect-ratio XML, real `<textlist>`/`<grid>`
-gamelist widget, unlike decaffe's widget-less one — deliberately kept
-bundled to stress-test the engine against more than one real theme
-shape) — parsed by a real clean-room port of ES-DE's own theme.xml
+`art-book-next-es-de` (no longer bundled — it was kept in the APK to
+stress-test the engine against a second real theme shape, and was removed
+once the theme downloader could fetch it on demand, cutting roughly 220MB
+from the install; structurally different — real multi-file `<include>`
+chain, per-aspect-ratio XML, real `<textlist>`/`<grid>` gamelist widget,
+unlike decaffe's widget-less one) — parsed by a real clean-room port of ES-DE's own theme.xml
 parsing rules (`library-core/.../theme/EsDeThemeParser.kt`,
 `EsDeTheme.kt`'s `ES_DE_ELEMENT_SCHEMA`) and rendered by
 `shell-gamepad/.../theme/EsDeThemeRenderer.kt`.
 
 **Real, working today** (each confirmed against real ES-DE source,
 `/root/es-de-reference` in the dev container — see `coordination/
-HANDOFF.md` for full detail/citations, this section is the durable
+/root/coordination/HANDOFF.md` for full detail/citations (that path is
+outside this repository), this section is the durable
 summary):
 
 - Real multi-theme discovery/selection (`ThemeAssets.discoverThemes`/
@@ -2384,7 +2386,7 @@ it could turn out to already be fixed as a side effect.
 
 Full real history/reasoning for each of the above (commit-by-commit,
 with citations to the exact real ES-DE source lines each decision was
-verified against) lives in `coordination/HANDOFF.md`'s own theme-engine
+verified against) lives in `/root/coordination/HANDOFF.md`'s own theme-engine
 section, not reproduced here — that file is the working log; this
 section is the durable, periodically-refreshed summary per this
 project's own convention of writing real decisions into SPEC.md itself.
@@ -2413,8 +2415,14 @@ their own theme presentation via `${system.theme}` = their own
 collection-folder name (`auto-allgames` etc.) — droidtop invented an
 unrelated "subfolder theme.xml" mechanism that matches no real bundled
 theme, so collections lose their themed presentation entirely.
-Decision: a scoped refactor (R1–R5, tracked in
-`coordination/HANDOFF.md`), not further incremental patches — R1 (full,
+Decision: a scoped refactor, not further incremental patches. It was
+planned as R1–R5 and described as tracked in `coordination/HANDOFF.md`;
+neither held. There is no `coordination/` directory in this repository,
+and `/root/coordination/HANDOFF.md` contains no R1–R5. The numbering was
+abandoned after R2: the later passes are recorded below under dated
+descriptive headings instead, so R3–R5 were never delivered under those
+names and should not be looked for. The plan below is kept for the shape
+of the work, not as a live tracker — R1 (full,
 verbatim `ThemeData::sElementMap` schema transcription, landed this
 commit, including the real XML-attribute-keyed `customBadgeIcon`/
 `customControllerIcon` parsing droidtop's parser never implemented at
@@ -2495,12 +2503,8 @@ every favorite. droidtop emits U+2605 BLACK STAR instead -- same
 behavior, a codepoint platform font fallback actually covers. The
 `ascii` mode is exact.
 
-Deliberately NOT implemented, rather than approximated: `imageType` for
-both carousel and grid (which scraped media type a gamelist item shows
-per game -- `LibraryEntry` carries one already-resolved `artworkUri` and
-no per-type media map, so this is a library-core data-model change, not a
-renderer one, and it is the single largest remaining item in this area);
-the `imageColorEnd`/`imageGradientType`/`imageSelectedColorEnd`/
+Deliberately NOT implemented, rather than approximated: the
+`imageColorEnd`/`imageGradientType`/`imageSelectedColorEnd`/
 `imageSelectedGradientType` gradient color-shifts (a POSITIONAL gradient
 modulated over an image, which a Compose `ColorFilter` cannot express --
 it needs a shader); all four `textHorizontalScroll*` properties on every
@@ -2546,13 +2550,220 @@ cursor for per-system theme reloading, which only the carousel did
 before.
 
 Still open after this, in rough order of how much a real theme notices:
-`text`'s `container*` scrolling-container family (which is what long
-scraped game descriptions actually need), `imageType` across
-carousel/grid/image (one library-core data-model change unblocks all
-three), the `textHorizontalScroll*` family shared by carousel, grid and
+the `textHorizontalScroll*` family shared by carousel, grid and
 textlist, `helpsystem`'s dimmed-state and entry-layout properties
 (13/31), and the `rotationOrigin`/`stationary` pair that recurs across
 nearly every element type.
+
+**Measured against real themes, then closed by usage (2026-09-02)**: the
+"N of 472 properties" figure above is a poor guide to what to do next,
+because most of those 472 are set by no theme at all. This pass replaced
+it with a measurement. Ten real themes were shallow-cloned from the same
+`themes.json` index `ThemeDownloader` itself uses, chosen for variety of
+primary view and complexity: DEcaffe (`9adb55a`), Art Book Next
+(`d772d07`), Slate (`58041e2`), Modern (`692eb36`), ES-DE-Mini
+(`416407f`), Retrofix Revisited (`b43c09d`), TexGriddy (`4db705b`),
+Alekfull NX (`645b2bc`), Epic Noir Revisited (`0db85d7`) and Carbon
+(`3f3b4cd`). Across all of their `<view>` XML the ten themes together use
+282 of the 472 schema properties, and **not one property that the schema
+does not know** -- `ES_DE_ELEMENT_SCHEMA` is confirmed complete against
+real-world usage, not just against `ThemeData::sElementMap`.
+
+Ranked by how many of the ten themes use each unrendered property, this
+pass implemented, all ported from cited real ES-DE source:
+
+- `video`: `pillarboxes` (9 themes) and `pillarboxThreshold` (5), plus
+  the bug they exposed -- every themed video was drawn with ExoPlayer's
+  `RESIZE_MODE_ZOOM`, which CROPS, while real ES-DE fits the frame and
+  fills the remainder with a black frame. The fit and the bar geometry
+  are now pure, unit-tested Kotlin in `runtime-common/.../
+  EsDeVideoLayout.kt` (ported from `VideoFFmpegComponent::resize()` and
+  `::updateBlackFramePosition()`). Also `delay` (9, the static image now
+  really does fill the delay), `videoCornerRadius` (which droidtop was
+  reading as `imageCornerRadius`, a genuinely different real property
+  belonging to the static image), `scrollFadeIn` (5) and `interpolation`
+  (5, on the static-image half only).
+- `image`: `tile` + `tileSize` (8) -- tiled art was being stretched;
+  `interpolation` (7); `scrollFadeIn` (3); `saturation` (2) and
+  `brightness` (1), folded into the ONE `esDeImageColorFilter` shader
+  pipeline this package already had rather than a second copy.
+- The `backgroundColor`/`backgroundHorizontalPadding`/
+  `backgroundVerticalPadding`/`backgroundCornerRadius` group on `clock`
+  (5), `systemstatus` (5), `helpsystem` (4) and `datetime`. Each padding
+  pair is (LEADING, TRAILING) on its own axis, not a width/height pair --
+  and `clock`/`systemstatus` previously drew no background box at all.
+- `helpsystem`: `entryRelativeScale` (5) and `iconTextSpacing` (3, which
+  was a hardcoded 6dp).
+- `systemstatus`: `customIcon` (4) -- themes ship a full wifi/cellular/
+  battery icon set and droidtop drew unicode glyphs over the top of it.
+  Real ES-DE's own defaults are Qt-resource SVGs droidtop cannot
+  redistribute, so the glyphs remain the fallback.
+- `rating`: `overlay` (4) and `interpolation` (4) -- and with them real
+  ES-DE's CONTINUOUS clip geometry, so a 0.7 rating renders three and a
+  half stars rather than droidtop's previous rounding to four.
+- `carousel`/`grid`: `imageInterpolation` (4).
+- `metadataElement` on `text` (5), `image` (3) and `video` -- a real
+  binding, since `LibraryEntry.hideMetadata` already exists.
+
+Two honest divergences are recorded in the code rather than hidden.
+`interpolation` maps to Compose's `FilterQuality`, which is a single
+knob, while real ES-DE's flag is magnify-only -- so an unset
+`interpolation` deliberately keeps Compose's filtered default instead of
+adopting ES-DE's `nearest` member default, which through the wrong knob
+would degrade every downscaled image in every theme. And a `video`
+element's `interpolation` reaches only its static image; ExoPlayer's
+surface exposes no texture-filter knob.
+
+The measurement also re-prioritised what is left. `imageType` was
+confirmed as the single most-used unrendered property in the schema
+(video 10/10, image 8, grid 4, carousel 3); it is now implemented, see
+below. `text`'s `container*` family is second (8/7/5/3/3/0); it is now implemented too, see below. Deliberately still not implemented, with reasons:
+`badges`' `controllerSize`/`controllerPos`/`folderLinkSize`/
+`folderLinkPos` family (8/7/5/4) needs overlay icon art droidtop does not
+have; `helpsystem`'s whole `*Dimmed` family (4/4/2/2/2/2) fires only
+while ES-DE's own menu overlay dims the background, and droidtop renders
+no such overlay, so implementing it would mean inventing the state;
+`gameselector`'s `selection` (3); `grid`'s `textBackgroundCornerRadius`
+(1); and `datetime`'s `displayRelative` (1). **Nothing in this pass was
+checked on a real screen** -- the device was off-limits, so verification
+is by unit test (`EsDeVideoLayoutTest`, `EsDeTileSizeTest`) and by
+reading real ES-DE's source. The video pillarbox/black-frame geometry,
+tiled backgrounds, the fractional rating clip and the clock/systemstatus
+background boxes all want a real screenshot diff against each theme's own
+bundled reference render once the device is available again.
+
+**`imageType` (2026-09-02)**: the most-used unrendered property is now
+implemented, for `video`, `image`, `grid` and `carousel`. It was never a
+rendering problem. `imageType` selects WHICH scraped media a themed
+element shows -- a theme routinely wants the marquee in one element, the
+box art in another, a screenshot in a third -- and a `LibraryEntry`
+carried one already-resolved `artworkUri`, so there was nothing to
+choose between.
+
+What real ES-DE does, read from source rather than inferred:
+`GamelistView::setGameImage` (GamelistView.cpp:1255-1330) walks the
+THEME's own declared order and takes the first type that has a file on
+disk. The order is the theme's, not a fixed preference of ES-DE's:
+`marquee,cover` and `cover,marquee` are different requests. When nothing
+in the list resolves it calls `setImage("")` -- the element shows its own
+`<default>` if it declared one and otherwise shows nothing; it does not
+substitute the box art. One value, `image`, names no folder at all: it is
+`FileData::getImagePath` (FileData.cpp:360-379), itself a chain of
+miximage, then screenshot, then title screen, then cover. `carousel` and
+`grid` are a genuinely different case (CarouselComponent.h:1367-1409,
+GridComponent.h:988-1029): at most TWO entries, real ES-DE truncating the
+rest for performance, no `image` pseudo-type, and `none` meaning "draw
+the game's name as text". Every invalid case -- an unsupported value, a
+duplicate -- clears the whole list rather than dropping one entry.
+
+The data-model change is `LibraryEntry.mediaLocator`: the games root,
+system id and base name, as three strings. Not a resolved per-type media
+map -- resolving ten media types for every entry at scan time would cost
+a library of hundreds of ROMs ten folders times four extensions times two
+candidate media roots of `stat` per game, per scan, to answer a question
+most elements never ask. Constructing a locator touches the filesystem
+zero times and every scan site already had all three strings in hand, so
+**the scan-time cost of this change is nil**. The lookup happens where
+the question is asked -- in an element that declared an `imageType`, for
+the games currently on screen, memoised by the renderer for as long as
+that element is composed. Real ES-DE resolves lazily inside its own
+render window for the same reason, and caps the primary elements at two
+types because of it. Entries with no ES-DE media layout behind them
+(native Android apps, store PC games with remote art) carry no locator
+and keep using `artworkUri` exactly as before.
+
+One deliberate divergence, documented in the code at each site: when the
+theme's declared types resolve to nothing, droidtop falls back to the
+entry's single `artworkUri` before falling back to the element's
+`<default>`. Real ES-DE goes straight to `<default>`. droidtop's own
+scraper writes covers and little else, so a strict port would blank a
+fully scraped library the moment a theme asked for a marquee. `none` is
+exempt from that fallback, because there the theme did not fail to find
+media -- it asked for text. Also fixed on the way past: the media-type
+map was missing `3dbox` -> `3dboxes` and `backcover` -> `backcovers`
+(FileData.cpp:381-391), and the extension walk was missing `webp`
+(FileData.h:161), so real ES-DE WebP output resolved nothing at all.
+
+**Nothing in this pass was checked on a real screen** -- the device
+remained off-limits. Verification is by unit test
+(`EsDeImageTypesTest` for the parse and validation rules,
+`EsDeArtworkImageTypeTest` for the resolution and fallback order, both
+deriving expected values by hand from the C++) and by reading real ES-DE
+source. A screenshot diff against a theme that sets `imageType` on its
+gamelist carousel or grid, on a library with more than one media type
+scraped, is what would confirm the wiring end to end.
+
+**`text`'s `container*` family (2026-09-02)**: the second most-used
+unrendered property family is now implemented. Re-measured across the
+same ten themes: `container` 8, `containerStartDelay` 7,
+`containerScrollSpeed` 5, `containerType` 3, `containerVerticalSnap` 3,
+`containerResetDelay` 3, `containerScrollGap` 0. Every use of
+`containerType` in the ten is `horizontal`. Before this, a scraped game
+description longer than its box was simply cut off, because a Compose
+`Text` clips at its constraints -- that implicit truncation is what this
+replaces, and there is only one text path now, not two.
+
+The family is two unrelated implementations wearing one name, and real
+ES-DE picks between them at GamelistView.cpp:293-305: a `containerType`
+of `horizontal` is NOT wrapped in a scrollable container at all, it turns
+the `TextComponent` itself into a marquee. `container` defaults to true
+for `metadata=description` and false otherwise, needs a horizontal
+`size`, and `containerType` is honoured only when the theme wrote
+`container` itself.
+
+The VERTICAL container (`ScrollableContainer.cpp`) waits
+`containerStartDelay` (default 4.5 s), then moves the text up exactly one
+pixel per interval, stops one pixel past the bottom, holds for
+`containerResetDelay` (default 7 s), then jumps to the top and fades the
+text in over a hard-coded 300 ms during which the start delay is re-armed
+-- so the period is delay + travel + reset + 300. The delay is measured
+from the last reset, which is the cursor moving to another game
+(GamelistView.cpp:914-919), not from when the view appeared. Text that
+fits its container never moves at all.
+
+Speed is the part that does not survive a naive port. It is not a
+velocity: it is milliseconds per ONE PIXEL, computed as
+`clamp(contentWidth / (fontSize * 1.3), 10, 40) * (4.0 /
+containerScrollSpeed) / resolutionModifier`, then scaled again by
+`rows/8` for containers under eight rows tall. `resolutionModifier` is
+`min(screenWidth, screenHeight) / 1080` (Renderer.cpp:188-191, :307-310),
+so the interval is secretly resolution-dependent by design; droidtop
+passes its real viewport pixels, which is what keeps a theme covering the
+same fraction of the screen per second on a handheld as on a desktop.
+`containerScrollSpeed` divides into ES-DE's 4.0 constant, so it is a
+multiplier on the auto-calculated base and larger is faster.
+`containerVerticalSnap` (default true) reduces only the CLIP height to a
+whole number of rows, never the element's declared size.
+
+The HORIZONTAL marquee (`TextComponent::update`) is unrelated: it
+converts line breaks to spaces, lays the text out on one line, and after
+`containerStartDelay` (default 1.5 s here, not 4.5) runs continuously
+with no pause at the end, a second copy looping in behind the first once
+a `containerScrollGap`-wide hole opens. Its speed is
+`Font::getSizeReference() * 0.247 * containerScrollSpeed` pixels per
+second, where the size reference is the summed advance of the 26 Latin
+capitals at that font size -- so it is already relative to the font, and
+needs no resolution term at all. The gap is a fixed distance: the speed
+multiplier cancels out of ES-DE's own expression for it.
+
+Nothing was left out of the family. All seven members are implemented,
+`containerScrollGap` included even though none of the ten themes sets it.
+The timing and geometry are pure Kotlin in `runtime-common/.../
+EsDeTextContainer.kt`, free of Compose and Android, in the same shape as
+`EsDeVideoLayout.kt`; the drawing is a `Canvas` so the frame clock moves
+the text without recomposing, and the frame loop only runs while
+something is actually scrolling. One deviation from the C++ is recorded
+at the site: an interval that truncates to zero is raised to one, because
+real ES-DE's `while (accumulator >= 0)` loop would spin forever on it.
+
+**Nothing in this pass was checked on a real screen** -- the device
+remained off-limits. Verification is by unit test
+(`EsDeTextContainerTest`, every expected value derived by hand from the
+C++ formulas) and by reading real ES-DE's source. What wants a real
+screenshot diff once the device is available: whether the apparent
+scroll rate of a description panel matches ES-DE's on the same theme at
+this device's resolution, the vertical snap and leading-inset clip at the
+top and bottom edges, and the marquee's gap on decaffe's own system view.
 
 **Five-theme on-device review + fixes (2026-08-30, later same day)**:
 the theme downloader ran end-to-end for the first time — three real
