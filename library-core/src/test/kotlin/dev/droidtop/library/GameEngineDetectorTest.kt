@@ -211,6 +211,20 @@ class GameEngineDetectorTest {
     }
 
     @Test
+    fun `a subtree rule still names this folder as the root when nothing more precise exists`() {
+        // The renpy-fallback row through detectGame: no precise match at
+        // this folder and none in any subfolder either, so the folder
+        // holding the compiled archive stays the game root. The tiering
+        // in detectGame must not turn a subtree match into no match.
+        touch("game", "archive.rpa")
+
+        val detected = GameEngineDetector.detectGame(tmp.root, defs)
+        org.junit.Assert.assertEquals(GameEngine.RENPY, detected?.engine)
+        assertEquals(tmp.root, detected?.displayFolder)
+        assertEquals(tmp.root, detected?.gameRoot)
+    }
+
+    @Test
     fun `every registry row with rules maps to a compiled engine`() {
         // A row this app cannot resolve is legal (future database), but
         // the SHIPPED seed and this app must agree completely -- except
