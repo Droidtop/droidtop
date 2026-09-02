@@ -80,9 +80,18 @@ object GameEngineDetector {
      * byte-magic probes below ([builtinProbe]) stay code; the database
      * decides where they apply.
      */
-    fun detect(folder: File, defs: List<EngineDef>): GameEngine? =
+    fun detect(folder: File, defs: List<EngineDef>): GameEngine? = detect(folder, defs) { true }
+
+    /**
+     * [detect] restricted to the rules [ruleFilter] accepts -- how
+     * [detectGame] separates "this folder IS a game root" evidence from
+     * "an engine game is somewhere under this folder" evidence
+     * (see [DetectRule.readsUnnamedSubtree]). Row order within a tier is
+     * still the database's own file order.
+     */
+    private fun detect(folder: File, defs: List<EngineDef>, ruleFilter: (DetectRule) -> Boolean): GameEngine? =
         defs.firstOrNull { def ->
-            def.engine != null && EngineDetectRules.matches(def.detect, folder, ::builtinProbe)
+            def.engine != null && EngineDetectRules.matches(def.detect.filter(ruleFilter), folder, ::builtinProbe)
         }?.engine
 
     private fun builtinProbe(name: String, folder: File): Boolean = when (name) {
@@ -217,6 +226,19 @@ object GameEngineDetector {
      * [File.listFiles] order, which is filesystem-defined and can differ
      * between scans: a wrapper folder containing two detectable
      * subfolders must resolve to the same [DetectedGame] every time.
+     *
+     * Three tiers, because "which engine is this" and "which folder is
+     * the game root" are different questions and the database only
+     * answers the first. A rule that reads an unnamed subtree
+     * ([DetectRule.readsUnnamedSubtree] -- the compiled-Ren'Py
+     * `.rpa`/`.rpyc` fallback, Unity's depth-limited player search)
+     * proves an engine game is somewhere below, not that it is HERE, so
+     * it must not pre-empt a precise match on an actual subfolder: the
+     * wrapper folder would become its own game root and the version
+     * folder inside it would never be looked at. Classification order
+     * itself is untouched -- [detect] still evaluates every row in the
+     * database's file order, which stays the sole precedence rule
+     * droidtop and enginehost share (docs/SPEC.md 7e2b).
      */
     fun detectGame(
         folder: File,
@@ -224,13 +246,26 @@ object GameEngineDetector {
         override: (File) -> GameEngine? = { null },
     ): DetectedGame? {
         override(folder)?.let { return DetectedGame(folder, folder, it) }
-        detect(folder, defs)?.let { return DetectedGame(folder, folder, it) }
-        return (folder.listFiles() ?: emptyArray())
+        // Tier 1: evidence AT this folder that this folder is the game
+        // root (renpy/ + game/, RPG_RT.ldb, project.godot, ...).
+        detect(folder, defs) { !it.readsUnnamedSubtree }?.let { return DetectedGame(folder, folder, it) }
+        // Tier 2: the same precise question asked of each subfolder --
+        // the version-folder wrapper shape. Precise there too: a
+        // subtree rule matching a subfolder proves no more about that
+        // subfolder than it already proved about this one.
+        (folder.listFiles() ?: emptyArray())
             .asSequence()
             .filter { it.isDirectory }
             .sortedBy { it.name }
-            .mapNotNull { nested -> detect(nested, defs)?.let { DetectedGame(folder, nested, it) } }
+            .mapNotNull { nested ->
+                detect(nested, defs) { !it.readsUnnamedSubtree }?.let { DetectedGame(folder, nested, it) }
+            }
             .firstOrNull()
+            ?.let { return it }
+        // Tier 3: only now the subtree rules, which say an engine game
+        // is somewhere below without naming where. Nothing more precise
+        // was found, so this folder is the best root available.
+        return detect(folder, defs) { it.readsUnnamedSubtree }?.let { DetectedGame(folder, folder, it) }
     }
 
     /**
