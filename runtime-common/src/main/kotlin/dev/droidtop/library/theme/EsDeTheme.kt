@@ -98,6 +98,46 @@ data class EsDeThemeElement(
 fun EsDeThemeView.primaryListElement(): EsDeThemeElement? =
     elements.values.firstOrNull { it.type in ES_DE_PRIMARY_LIST_TYPES }
 
+/*
+ * Typed property accessors over a NULLABLE element.
+ *
+ * Every layout port in this package reads a theme element the same way:
+ * "this property, at this real ES-DE property type, or null if the theme
+ * didn't set it" -- and a null element means "all defaults", because a
+ * view may legitimately declare no such element at all. These were six
+ * identical local helper declarations repeated inside esDeCarouselConfig,
+ * esDeGridConfig and esDeTextListConfig; one declaration each now, next
+ * to [EsDeThemeElement.valueOrNull], which is what they all wrap.
+ */
+
+/** Real FLOAT property, or null when the theme didn't set it. */
+fun EsDeThemeElement?.floatOrNull(name: String): Float? =
+    this?.valueOrNull<EsDeThemeValue.FloatValue>(name)?.value
+
+/** Real BOOLEAN property, or null when the theme didn't set it. */
+fun EsDeThemeElement?.boolOrNull(name: String): Boolean? =
+    this?.valueOrNull<EsDeThemeValue.Bool>(name)?.value
+
+/** Real STRING property, or null when the theme didn't set it. */
+fun EsDeThemeElement?.strOrNull(name: String): String? =
+    this?.valueOrNull<EsDeThemeValue.Str>(name)?.value
+
+/** Real PATH property, already resolved against the theme dir, or null when unset. */
+fun EsDeThemeElement?.pathOrNull(name: String): String? =
+    this?.valueOrNull<EsDeThemeValue.Path>(name)?.resolved
+
+/** Real NORMALIZED_PAIR property, or null when the theme didn't set it. */
+fun EsDeThemeElement?.pairOrNull(name: String): EsDeThemeValue.Pair? =
+    this?.valueOrNull<EsDeThemeValue.Pair>(name)
+
+/** Real COLOR property as packed RRGGBBAA, or null when the theme didn't set it. */
+fun EsDeThemeElement?.colorOrNull(name: String): Long? =
+    this?.valueOrNull<EsDeThemeValue.Color>(name)?.argbLikeRgba
+
+/** Real UNSIGNED_INTEGER property, or null when the theme didn't set it. */
+fun EsDeThemeElement?.uintOrNull(name: String): Long? =
+    this?.valueOrNull<EsDeThemeValue.UInt>(name)?.value
+
 sealed interface EsDeThemeValue {
     data class Pair(val x: Float, val y: Float) : EsDeThemeValue
     data class Rect(val left: Float, val top: Float, val right: Float, val bottom: Float) : EsDeThemeValue

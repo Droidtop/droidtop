@@ -68,6 +68,10 @@ import dev.droidtop.library.theme.EsDeTextListConfig
 import dev.droidtop.library.theme.EsDeThemeElement
 import dev.droidtop.library.theme.EsDeThemeValue
 import dev.droidtop.library.theme.applyTo
+import dev.droidtop.library.theme.colorOrNull
+import dev.droidtop.library.theme.floatOrNull
+import dev.droidtop.library.theme.pathOrNull
+import dev.droidtop.library.theme.strOrNull
 import dev.droidtop.library.theme.esDeCarouselConfig
 import dev.droidtop.library.theme.esDeGridConfig
 import dev.droidtop.library.theme.esDeGridItemCenter
@@ -133,26 +137,38 @@ data class EsDeListItem(
  * immediately, which is the theme explicitly asking for the game's name
  * as text instead of an image.
  *
- * Two deliberate points where this is not a literal port:
+ * [defaultImage] is the element's own real `defaultImage` property, and it
+ * is the LAST link of the chain in both real views:
+ * `CarouselComponent::onDemandTextureLoad` (CarouselComponent.h:578-579,
+ * `GridComponent`'s copy is identical) assigns it whenever the type walk
+ * produced nothing, and the system view assigns it per entry the same way
+ * (SystemView.cpp:615-618 reads it, :868/:880 puts it on every entry) so
+ * that a system with no logo art of its own still draws something. That
+ * makes it the answer to droidtop's most common real case: a system whose
+ * `${system.theme}` logo the theme doesn't ship. The item's own name is
+ * drawn as text only when this is null too.
  *
- *  * When nothing resolves, real ES-DE falls back to the element's own
- *    `defaultImage` and then to text. droidtop falls back to [logoPath]
- *    -- the entry's single pre-resolved artwork -- FIRST. This is a
- *    knowing divergence, not an accident: droidtop's own scraper writes
- *    covers and little else, so a strict port would blank out a fully
- *    scraped library the moment a theme asked for a marquee. `none` is
- *    exempt, because there the theme did not fail to find media, it asked
- *    for text.
- *  * `defaultImage` itself is not implemented on these two elements yet
- *    (it is not part of this change), so the chain ends at [logoPath].
+ * One deliberate point where this is not a literal port: when nothing
+ * resolves, droidtop tries [logoPath] -- the entry's single pre-resolved
+ * artwork -- BEFORE [defaultImage]. A knowing divergence, not an accident:
+ * droidtop's own scraper writes covers and little else, so a strict port
+ * would blank a fully scraped library the moment a theme asked for a
+ * marquee. `none` is exempt from THAT step, because there the theme did
+ * not fail to find media, it asked for text -- but not from
+ * [defaultImage], because real ES-DE's own `none` branch breaks out of the
+ * walk and then falls into exactly the same empty-path default assignment
+ * (CarouselComponent.h:571-579).
  */
-internal fun EsDeListItem.esDePrimaryImage(imageTypes: List<String>): String? {
-    if (imageTypes.isEmpty()) return logoPath
+internal fun EsDeListItem.esDePrimaryImage(imageTypes: List<String>, defaultImage: String?): String? {
+    if (imageTypes.isEmpty()) return logoPath ?: defaultImage
     val untilNone = imageTypes.takeWhile { it != "none" }
     val resolved = mediaLocator?.let { EsDeArtwork.resolveImageTypes(it, untilNone) }
     if (resolved != null) return resolved
-    // `none` reached without a match: the theme asked for text.
-    return if (untilNone.size != imageTypes.size) null else logoPath
+    // `none` reached without a match: the theme asked for text, so the
+    // pre-resolved artwork is skipped -- but the declared default still is
+    // what real ES-DE assigns here.
+    if (untilNone.size != imageTypes.size) return defaultImage
+    return logoPath ?: defaultImage
 }
 
 /**
@@ -204,9 +220,21 @@ fun EsDeSystemListView(
             emptyList()
         }
     }
-    val typedItems = remember(items, imageTypes) {
-        if (imageTypes.isEmpty()) items
-        else items.map { item -> item.copy(logoPath = item.esDePrimaryImage(imageTypes)) }
+    // Real `defaultImage` on `carousel`/`grid` -- the last link of the
+    // per-entry image chain, see [esDePrimaryImage]. Real ES-DE checks the
+    // file exists at theme-apply time (SystemView.cpp:615-617) and again
+    // before drawing (CarouselComponent.h:343-344), so a theme pointing at
+    // a missing file falls through to text rather than to a blank.
+    val defaultImage = remember(element) {
+        if (element?.type == "carousel" || element?.type == "grid") {
+            element.pathOrNull("defaultImage")?.takeIf { java.io.File(it).isFile }
+        } else {
+            null
+        }
+    }
+    val typedItems = remember(items, imageTypes, defaultImage) {
+        if (imageTypes.isEmpty() && defaultImage == null) items
+        else items.map { item -> item.copy(logoPath = item.esDePrimaryImage(imageTypes, defaultImage)) }
     }
     when (element?.type) {
         // The grid doesn't get onFocusedIndexChanged wired through -- it
@@ -265,14 +293,16 @@ fun EsDeSystemListView(
  * [esDePrimaryImage], which is where the real per-entry resolution and
  * the real two-entry cap live.
  *
- * Honestly still unimplemented here, and NOT faked:
- * `imageColorEnd`/`imageGradientType`/
- * `imageSelectedColorEnd`/`imageSelectedGradientType` (a POSITIONAL
- * gradient applied as a color shift over an image, which a Compose
- * `ColorFilter` cannot express -- it needs a shader), `textRelativeScale`/
- * `textBackgroundCornerRadius`, and the four `textHorizontalScroll*`
- * properties. `imageInterpolation` IS now honored (see
- * esDeFilterQuality).
+ * `imageColorEnd`/`imageGradientType`/`imageSelectedColorEnd`/
+ * `imageSelectedGradientType` ARE now honored: the positional gradient a
+ * `ColorFilter` cannot express is drawn as a [BlendMode.Modulate] pass
+ * over the image instead, which is the same multiply ES-DE's own shader
+ * performs -- see [esDeColorShiftGradient]. `imageInterpolation` IS
+ * honored too (see esDeFilterQuality).
+ *
+ * Honestly still unimplemented here, and NOT faked: `textRelativeScale`
+ * (the carousel's own -- the grid's is implemented) and the four
+ * `textHorizontalScroll*` properties.
  */
 @Composable
 private fun EsDeCarousel(
@@ -331,6 +361,20 @@ private fun EsDeCarousel(
     // `imageSelectedColor` replaces it for the focused item.
     val imageColor = element?.valueOrNull<EsDeThemeValue.Color>("imageColor")?.let { colorOf(it) }
     val imageSelectedColor = element?.valueOrNull<EsDeThemeValue.Color>("imageSelectedColor")?.let { colorOf(it) } ?: imageColor
+    // Real `imageColorEnd`/`imageGradientType`/`imageSelectedColorEnd`/
+    // `imageSelectedGradientType` (CarouselComponent.h:1628-1649 and the
+    // identical `imageSelectedColor*` block). The fallback chain is real
+    // ES-DE's own, not per-property constants: `imageColor` also sets the
+    // end color, the selected pair starts out as the unselected pair, and
+    // `imageSelectedColor` in turn sets `imageSelectedColorEnd`. Both
+    // gradient axes default to horizontal independently -- the selected
+    // one does NOT inherit `imageGradientType`.
+    val imageColorEnd = element?.valueOrNull<EsDeThemeValue.Color>("imageColorEnd")?.let { colorOf(it) } ?: imageColor
+    val imageSelectedColorEnd = element?.valueOrNull<EsDeThemeValue.Color>("imageSelectedColorEnd")?.let { colorOf(it) }
+        ?: element?.valueOrNull<EsDeThemeValue.Color>("imageSelectedColor")?.let { colorOf(it) }
+        ?: imageColorEnd
+    val imageGradientHorizontal = element.strOrNull("imageGradientType") != "vertical"
+    val imageSelectedGradientHorizontal = element.strOrNull("imageSelectedGradientType") != "vertical"
     // Real `imageFit` (CarouselComponent.h:1515-1534): contain (default) /
     // fill / cover map onto exactly Compose's Fit / FillBounds / Crop.
     val imageFit = when (element?.valueOrNull<EsDeThemeValue.Str>("imageFit")?.value) {
@@ -454,6 +498,10 @@ private fun EsDeCarousel(
                     fontFamily = itemFontFamily,
                     imageColorShift = imageColor,
                     imageSelectedColorShift = imageSelectedColor,
+                    imageColorShiftEnd = imageColorEnd,
+                    imageSelectedColorShiftEnd = imageSelectedColorEnd,
+                    imageGradientHorizontal = imageGradientHorizontal,
+                    imageSelectedGradientHorizontal = imageSelectedGradientHorizontal,
                     imageSaturation = placement.saturation ?: config.imageSaturation,
                     imageBrightness = config.imageBrightness,
                     dimming = placement.dimming,
@@ -496,6 +544,10 @@ private fun EsDeCarousel(
                 fontFamily = itemFontFamily,
                 imageColorShift = imageColor,
                 imageSelectedColorShift = imageSelectedColor,
+                imageColorShiftEnd = imageColorEnd,
+                imageSelectedColorShiftEnd = imageSelectedColorEnd,
+                imageGradientHorizontal = imageGradientHorizontal,
+                imageSelectedGradientHorizontal = imageSelectedGradientHorizontal,
                 imageSaturation = placement.saturation ?: config.imageSaturation,
                 imageBrightness = config.imageBrightness,
                 dimming = placement.dimming,
@@ -586,6 +638,12 @@ private fun EsDeCarouselItem(
     fontFamily: androidx.compose.ui.text.font.FontFamily?,
     imageColorShift: Color?,
     imageSelectedColorShift: Color?,
+    // Real `imageColorEnd`/`imageSelectedColorEnd` and their gradient
+    // axes -- see [esDeColorShiftGradient].
+    imageColorShiftEnd: Color?,
+    imageSelectedColorShiftEnd: Color?,
+    imageGradientHorizontal: Boolean,
+    imageSelectedGradientHorizontal: Boolean,
     imageSaturation: Float,
     imageBrightness: Float,
     dimming: Float,
@@ -603,13 +661,23 @@ private fun EsDeCarouselItem(
 
     if (item.logoPath != null) {
         val shift = if (isFocused) imageSelectedColorShift else imageColorShift
+        val shiftEnd = if (isFocused) imageSelectedColorShiftEnd else imageColorShiftEnd
+        val horizontal = if (isFocused) imageSelectedGradientHorizontal else imageGradientHorizontal
+        // A positional gradient replaces the flat shift in the ColorFilter
+        // -- applying both would multiply the color in twice.
+        val gradient = esDeHasColorGradient(shift, shiftEnd)
         AsyncImage(
             model = item.logoPath,
             contentDescription = null,
             contentScale = imageContentScale,
             filterQuality = imageFilterQuality,
-            colorFilter = esDeImageColorFilter(shift, imageSaturation, imageBrightness, dimming),
-            modifier = baseModifier,
+            colorFilter = esDeImageColorFilter(
+                if (gradient) null else shift,
+                imageSaturation,
+                imageBrightness,
+                dimming,
+            ),
+            modifier = baseModifier.esDeColorShiftGradient(shift, shiftEnd, horizontal),
         )
     } else {
         Text(
@@ -676,6 +744,47 @@ internal fun esDeImageColorFilter(
         ),
     )
 }
+
+/**
+ * Real ES-DE POSITIONAL color shift -- the `colorEnd`/`gradientType` half
+ * of the color pipeline, which [esDeImageColorFilter] cannot express
+ * because a `ColorFilter` is uniform across the whole draw.
+ *
+ * It is not really a gradient drawn over the image. ES-DE puts the start
+ * color on two of the quad's vertices and the end color on the other two
+ * (`ImageComponent::updateColors`, ImageComponent.cpp:935-947 -- note it
+ * is the quad's CORNERS, so the axis choice is literally which pair gets
+ * which color), and `core.glsl:147-152` then does `sampledColor *= color`
+ * with the rasterizer's interpolated vertex color. That is exactly a
+ * per-pixel multiply of the image by a linear gradient, which Compose can
+ * do without a shader: draw the image, then fill the same bounds with the
+ * gradient using [BlendMode.Modulate] (Skia's dst*src on all four
+ * channels, the same operation as the GLSL multiply for a straight-alpha
+ * texture).
+ *
+ * Returns the receiver unchanged when there is no gradient to apply --
+ * which is also how real ES-DE decides (`if (mImageColorShiftEnd !=
+ * mImageColorShift)`, CarouselComponent.h:336) -- so the flat case keeps
+ * going through the single ColorFilter and costs no extra layer. Callers
+ * MUST pass a null shift to [esDeImageColorFilter] when this returns a
+ * modified modifier, or the color would be multiplied in twice.
+ */
+internal fun Modifier.esDeColorShiftGradient(start: Color?, end: Color?, horizontal: Boolean): Modifier {
+    if (start == null || end == null || start == end) return this
+    val brush = if (horizontal) {
+        Brush.horizontalGradient(listOf(start, end))
+    } else {
+        Brush.verticalGradient(listOf(start, end))
+    }
+    return this.drawWithContent {
+        drawContent()
+        drawRect(brush = brush, blendMode = BlendMode.Modulate)
+    }
+}
+
+/** True when [start]/[end] really describe a gradient, i.e. when [esDeColorShiftGradient] will do something. */
+internal fun esDeHasColorGradient(start: Color?, end: Color?): Boolean =
+    start != null && end != null && start != end
 
 /** Real `letterCase` parsing, shared by every list widget (real ES-DE's own four values). */
 private fun esDeLetterCaseOf(value: String?): EsDeLetterCase = when (value) {
@@ -966,12 +1075,13 @@ private fun EsDeTextListRow(
  * `imageType` IS now honored, through the same [esDePrimaryImage] the
  * carousel uses.
  *
- * Honestly still unimplemented, and NOT faked:
- * the `imageColorEnd`/`imageGradientType`/
- * `imageSelectedColorEnd`/`imageSelectedGradientType` positional
- * gradients, `imageCropPos`,
- * `textBackgroundCornerRadius`, the four `textHorizontalScroll*`
- * properties, and `fadeAbovePrimary`. Real ES-DE's own easing between
+ * `defaultImage`, `textBackgroundCornerRadius` and the
+ * `imageColorEnd`/`imageGradientType`/`imageSelectedColorEnd`/
+ * `imageSelectedGradientType` positional gradients ARE now honored -- see
+ * [esDePrimaryImage] and [esDeColorShiftGradient].
+ *
+ * Honestly still unimplemented, and NOT faked: `imageCropPos`, the four
+ * `textHorizontalScroll*` properties, and `fadeAbovePrimary`. Real ES-DE's own easing between
  * scroll rows and between item scales is not ported either -- the
  * resting positions are real, the motion between them is a plain Compose
  * animation.
@@ -1170,13 +1280,21 @@ private fun EsDeGridEntry(
     // The item itself -- an image, or its name as text when it has none,
     // which is real ES-DE's own fallback rather than a placeholder.
     if (item.logoPath != null) {
+        // Real `imageColorEnd`/`imageSelectedColorEnd` positional gradient
+        // -- see [esDeColorShiftGradient]; the flat shift drops out of the
+        // ColorFilter when one is active so the color isn't applied twice.
+        val shift = (if (selected) config.imageSelectedColor else config.imageColor)?.let { colorOfPacked(it) }
+        val shiftEnd = (if (selected) config.imageSelectedColorEnd else config.imageColorEnd)?.let { colorOfPacked(it) }
+        val horizontal =
+            if (selected) config.imageSelectedGradientHorizontal else config.imageGradientHorizontal
+        val gradient = esDeHasColorGradient(shift, shiftEnd)
         AsyncImage(
             model = item.logoPath,
             contentDescription = null,
             contentScale = imageContentScale,
             filterQuality = imageFilterQuality,
             colorFilter = esDeImageColorFilter(
-                (if (selected) config.imageSelectedColor else config.imageColor)?.let { colorOfPacked(it) },
+                if (gradient) null else shift,
                 saturation,
                 config.imageBrightness,
                 dimming,
@@ -1185,6 +1303,7 @@ private fun EsDeGridEntry(
                 .placeGridLayer(centerX, centerY, config, config.imageRelativeScale, scale, originX, originY)
                 .graphicsLayer { alpha = opacity }
                 .clip(RoundedCornerShape(config.imageCornerRadius.dp))
+                .esDeColorShiftGradient(shift, shiftEnd, horizontal)
                 .clickable(onClick = onSelect),
         )
     } else {
@@ -1192,6 +1311,10 @@ private fun EsDeGridEntry(
             modifier = Modifier
                 .placeGridLayer(centerX, centerY, config, config.textRelativeScale, scale, originX, originY)
                 .graphicsLayer { alpha = opacity }
+                // Real `textBackgroundCornerRadius` (GridComponent.h:394,
+                // set on this exact fallback TextComponent and nothing
+                // else) -- rounds the text item's own background box.
+                .clip(RoundedCornerShape(config.textBackgroundCornerRadius.dp))
                 .background(
                     colorOfPacked(if (selected) config.textSelectedBackgroundColor else config.textBackgroundColor),
                 )

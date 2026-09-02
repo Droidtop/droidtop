@@ -1,6 +1,7 @@
 package dev.droidtop.shell.gamepad.theme
 
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.BitmapFactory
@@ -66,6 +67,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.layout.Row
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
@@ -82,8 +86,22 @@ import dev.droidtop.library.theme.EsDeImageTypes
 import dev.droidtop.library.theme.BADGE_SLOTS
 import dev.droidtop.library.theme.EsDeThemeElement
 import dev.droidtop.library.theme.EsDeThemeValue
+import dev.droidtop.library.theme.EsDeControllers
+import dev.droidtop.library.theme.EsDeDateTimeDisplay
+import dev.droidtop.library.theme.esDeBadgeOverlay
 import dev.droidtop.library.theme.EsDeThemeView
+import dev.droidtop.library.theme.esDeDateTimeDisplay
+import dev.droidtop.library.theme.esDeDisplayRelative
+import dev.droidtop.library.theme.boolOrNull
+import dev.droidtop.library.theme.colorOrNull
+import dev.droidtop.library.theme.floatOrNull
+import dev.droidtop.library.theme.pairOrNull
+import dev.droidtop.library.theme.pathOrNull
+import dev.droidtop.library.theme.strOrNull
+import dev.droidtop.library.theme.uintOrNull
+import dev.droidtop.library.theme.EsDeImageFit
 import dev.droidtop.library.theme.esDeVideoFrame
+import dev.droidtop.library.theme.esDeVideoStaticImageArea
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import androidx.compose.ui.text.font.Font
@@ -221,6 +239,14 @@ fun EsDeThemedView(
     // System-level bindings for `systemdata` text elements (see
     // [EsDeSystemContext]) -- null for callers with no system concept.
     systemContext: EsDeSystemContext? = null,
+    // droidtop's own equivalent of real ES-DE's `Window::isBackgroundDimmed`
+    // (Window.cpp:513-516: "there is more than one GUI on the stack"): true
+    // while one of droidtop's in-context menus is open OVER this themed
+    // view, which is a Compose Dialog with a scrim, so the view -- and its
+    // help bar -- really is still on screen behind a dimmed background.
+    // Read only by `helpsystem`'s own real `*Dimmed` property family; see
+    // [EsDeThemedHelpSystem].
+    backgroundDimmed: Boolean = false,
 ) {
     BoxWithConstraints(modifier = modifier) {
         val viewWidth = maxWidth
@@ -235,13 +261,22 @@ fun EsDeThemedView(
         // doc comment for why that distinction matters for a real
         // "stable until you change platform" game-preview collage.
         val gameSelector = view.elements.values.firstOrNull { it.type == "gameselector" }
-        val gameCount = gameSelector?.valueOrNull<EsDeThemeValue.UInt>("gameCount")?.value?.toInt() ?: 1
-        val allowDuplicates = gameSelector?.valueOrNull<EsDeThemeValue.Bool>("allowDuplicates")?.value ?: true
+        // Real clamp and real defaults, GameSelectorComponent.h:24-25 and
+        // :167-171. `allowDuplicates` defaults to FALSE in ES-DE; droidtop
+        // defaulted it to true, so a theme that never set it got a mosaic
+        // allowed to repeat the same game in several tiles.
+        val gameCount = (gameSelector.uintOrNull("gameCount")?.toInt() ?: 1).coerceIn(1, 30)
+        val allowDuplicates = gameSelector.boolOrNull("allowDuplicates") ?: false
+        // Real `selection` (GameSelectorComponent.h:144-165), see
+        // [EsDeGameSelection].
+        val selection = remember(gameSelector) {
+            EsDeGameSelection.parse(gameSelector.strOrNull("selection"))
+        }
         val gameSelection = if (gameSelector == null && focusedGameIndex != null) {
             listOfNotNull(focusedSystemEntries.getOrNull(focusedGameIndex))
         } else {
-            remember(focusedSystemEntries) {
-                GameSelector.select(focusedSystemEntries, gameCount, allowDuplicates)
+            remember(focusedSystemEntries, selection, gameCount, allowDuplicates) {
+                GameSelector.select(focusedSystemEntries, gameCount, allowDuplicates, selection)
             }
         }
         view.elements.values
@@ -346,7 +381,7 @@ fun EsDeThemedView(
                 properties = helpElements.fold(emptyMap()) { acc, element -> acc + element.properties },
             )
             if (merged.valueOrNull<EsDeThemeValue.Bool>("visible")?.value != false) {
-                EsDeThemedHelpSystem(merged, viewWidth, viewHeight, hints)
+                EsDeThemedHelpSystem(merged, viewWidth, viewHeight, hints, backgroundDimmed)
             }
         }
         }
@@ -397,11 +432,18 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // this renderer is simplest to reproduce as a plain gradient-filled
     // box at the same real pos/size -- visually equivalent, no image
     // decode needed.
-    val gradientType = element.valueOrNull<EsDeThemeValue.Str>("gradientType")?.value
+    val gradientType = element.strOrNull("gradientType")
     val startColor = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) }
-    if (gradientType != null && startColor != null) {
-        val endColor = element.valueOrNull<EsDeThemeValue.Color>("colorEnd")?.let { colorOf(it) } ?: startColor.copy(alpha = 0f)
-        val brush = if (gradientType == "horizontal") {
+    val declaredEndColor = element.valueOrNull<EsDeThemeValue.Color>("colorEnd")?.let { colorOf(it) }
+    // Real ES-DE treats a declared `colorEnd` as a gradient on its own
+    // (ImageComponent.cpp:745-746 sets the end color; `gradientType` at
+    // :747-761 only chooses the AXIS and defaults to horizontal). Gating
+    // this branch on `gradientType` being present meant a theme writing
+    // just `color` + `colorEnd` fell through to the flat-tint path and
+    // lost its fade entirely.
+    if (startColor != null && (gradientType != null || declaredEndColor != null)) {
+        val endColor = declaredEndColor ?: startColor.copy(alpha = 0f)
+        val brush = if (gradientType != "vertical") {
             Brush.horizontalGradient(listOf(startColor, endColor))
         } else {
             Brush.verticalGradient(listOf(startColor, endColor))
@@ -1013,21 +1055,32 @@ private fun EsDeAutoOriginBox(
  * (`androidx.media3:media3-exoplayer`, `:media3-ui`), not a static poster,
  * when the selected game has a real, scraped [LibraryEntry.videoUri] (see
  * [dev.droidtop.library.EsDeArtwork.resolveVideo]'s own doc comment for
- * the real ES-DE `videos` media-type convention this reads). Loops
- * (`repeatMode = Player.REPEAT_MODE_ONE`, matching real ES-DE's own
- * gamelist-preview behavior of looping a short clip while a game stays
- * selected) and plays MUTED -- real ES-DE's own default is audible
- * preview audio, but droidtop has no per-view "is this screen actually
- * focused/visible" signal this composable can see (unlike real ES-DE's
- * own view-lifecycle hook that stops playback on navigating away), so
- * muted is the honest, safe default rather than risking audio from an
- * off-screen or backgrounded preview; a future volume/mute setting is a
- * real, separate, smaller follow-up once that signal exists. Falls back
- * to [EsDeThemedFallbackImage]'s exact same static-poster path (its own
- * `default`/`defaultImage`/`path`/gameselector-artwork chain) when no
- * video is present -- e.g. this specific game was never scraped for
- * video, or this is a gameselector mosaic-tile slot with no video concept
- * at all.
+ * the real ES-DE `videos` media-type convention this reads).
+ *
+ * Real `iterationCount` (VideoComponent.cpp:237-238, clamped 0..10 with 0
+ * meaning "loop forever" -- the real default) and `onIterationsDone`
+ * (:240-251) decide what happens at the end. ES-DE counts completed plays
+ * in `VideoFFmpegComponent::handleLooping` (:1711-1723) and restarts the
+ * stream while `playCount < iterationCount`; once the count is reached
+ * `render()` returns before drawing anything at all (:200-203), except
+ * that `onIterationsDone=image` draws the element's own static image
+ * instead. Both branches are ported here; droidtop previously pinned
+ * `REPEAT_MODE_ONE` unconditionally, so a theme asking for a single play
+ * got an endless loop.
+ *
+ * Real `audio` (VideoComponent.cpp:254-255, default true): the theme
+ * decides whether the preview has sound. Playback is additionally tied to
+ * the host activity's real lifecycle -- paused on ON_STOP, resumed on
+ * ON_START -- which is what makes honouring an audible default safe here;
+ * the previous unconditional mute existed only because no such signal was
+ * wired, and inventing one silent-by-default rule for every theme is not
+ * what ES-DE does.
+ *
+ * Falls back to [EsDeThemedFallbackImage]'s exact same static-poster path
+ * (its own `default`/`defaultImage`/`path`/gameselector-artwork chain)
+ * when no video is present -- e.g. this specific game was never scraped
+ * for video, or this is a gameselector mosaic-tile slot with no video
+ * concept at all.
  */
 @Composable
 private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp, gameSelection: List<LibraryEntry>) {
@@ -1078,17 +1131,32 @@ private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f) *
         esDeScrollFadeInAlpha(element, selected)
 
+    // Real `iterationCount` (VideoComponent.cpp:237-238): 0..10, 0 means
+    // loop forever, which is also the real default.
+    val iterationCount = (element.uintOrNull("iterationCount")?.toInt() ?: 0).coerceIn(0, 10)
+    // Real `onIterationsDone` (VideoComponent.cpp:240-251): "nothing" (the
+    // real default) or "image"; anything else warns and keeps the default.
+    val showImageWhenDone = element.strOrNull("onIterationsDone") == "image"
+    // Real `audio` (VideoComponent.cpp:254-255), real default true.
+    val playAudio = element.boolOrNull("audio") ?: true
+
     val context = LocalContext.current
     var videoSize by remember(videoUri) { mutableStateOf(VideoSize.UNKNOWN) }
+    // ES-DE's own mPlayCount (VideoComponent.cpp:59, reset on every new
+    // stream at :518) -- completed plays of THIS video.
+    var playCount by remember(videoUri) { mutableStateOf(0) }
     val player = remember(videoUri) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(videoUri))
-            repeatMode = Player.REPEAT_MODE_ONE
-            volume = 0f
+            // Only ES-DE's "loop forever" case maps to the player's own
+            // repeat; a finite count is counted in the listener below,
+            // exactly as handleLooping does.
+            repeatMode = if (iterationCount == 0) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
             prepare()
             playWhenReady = true
         }
     }
+    LaunchedEffect(player, playAudio) { player.volume = if (playAudio) 1f else 0f }
     DisposableEffect(player) {
         // The decoded frame's real dimensions are what real ES-DE's own
         // fit and pillarbox rules are computed from
@@ -1098,12 +1166,50 @@ private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight
             override fun onVideoSizeChanged(size: VideoSize) {
                 videoSize = size
             }
+
+            // VideoFFmpegComponent::handleLooping (:1711-1723): count the
+            // completed play, then restart while more iterations remain.
+            override fun onPlaybackStateChanged(state: Int) {
+                if (state != Player.STATE_ENDED || iterationCount == 0) return
+                playCount += 1
+                if (playCount < iterationCount) {
+                    player.seekTo(0)
+                    player.play()
+                }
+            }
         }
         player.addListener(listener)
         onDispose {
             player.removeListener(listener)
             player.release()
         }
+    }
+    // Real ES-DE stops playback when the view goes away; droidtop's
+    // equivalent for "the whole app went away" is the host activity's
+    // lifecycle. Without this, honouring the real audible default would
+    // leak preview audio out of a backgrounded app.
+    val lifecycleOwner = context.findLifecycleOwner()
+    DisposableEffect(lifecycleOwner, player) {
+        val lifecycle = lifecycleOwner?.lifecycle
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> player.pause()
+                Lifecycle.Event.ON_START -> player.play()
+                else -> Unit
+            }
+        }
+        lifecycle?.addObserver(observer)
+        onDispose { lifecycle?.removeObserver(observer) }
+    }
+
+    // VideoFFmpegComponent.cpp:200-203: once the iterations are done the
+    // component renders NOTHING -- not even its black frame -- unless
+    // `onIterationsDone=image`, in which case it renders its static image.
+    if (iterationCount != 0 && playCount >= iterationCount) {
+        if (showImageWhenDone) {
+            EsDeThemedFallbackImage(element, viewWidth, viewHeight, gameSelection)
+        }
+        return
     }
 
     // Real `pillarboxes` (VideoComponent.cpp:419-420, default TRUE at
@@ -1374,7 +1480,24 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
             ?: element.valueOrNull<EsDeThemeValue.Path>("defaultImage")?.resolved?.takeIf { File(it).exists() }
             ?: element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved?.takeIf { File(it).exists() }
     } ?: return
-    val (width, height) = sizeOf(element, viewWidth, viewHeight)
+    // Real `imageSize`/`imageMaxSize`/`imageCropSize` -- a video element's
+    // STATIC image has its own size group, separate from the playing
+    // surface's `size`/`maxSize`/`cropSize`, and only inherits the video's
+    // box when it declares none of its own. See
+    // [dev.droidtop.library.theme.esDeVideoStaticImageArea]. droidtop read
+    // only the video group before, so `imageMaxSize` did nothing.
+    val staticArea = esDeVideoStaticImageArea(
+        imageSize = element.pairOrNull("imageSize"),
+        imageMaxSize = element.pairOrNull("imageMaxSize"),
+        imageCropSize = element.pairOrNull("imageCropSize"),
+        videoSize = element.pairOrNull("size"),
+        videoMaxSize = element.pairOrNull("maxSize"),
+        videoCropSize = element.pairOrNull("cropSize"),
+        areaWidth = viewWidth.value,
+        areaHeight = viewHeight.value,
+    )
+    val width = staticArea.width.dp
+    val height = staticArea.height.dp
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
     val tint = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) }
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
@@ -1389,9 +1512,13 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
     // mRenderer->getScreenWidth()), the one axis-exception also found for
     // help-bar entrySpacing (see EsDeThemedHelpSystem's own comment).
     val cornerRadius = (cornerRadiusFraction * viewWidth.value).dp
-    // Same real cropSize approximation as EsDeThemedImage -- see that
-    // function's own doc comment.
-    val hasCropSize = element.valueOrNull<EsDeThemeValue.Pair>("cropSize") != null
+    // The real sizing verb for the box resolved above, which is not
+    // necessarily the video's own (see esDeVideoStaticImageArea).
+    val contentScale = when (staticArea.fit) {
+        EsDeImageFit.STRETCH -> ContentScale.FillBounds
+        EsDeImageFit.FIT -> ContentScale.Fit
+        EsDeImageFit.CROP -> ContentScale.Crop
+    }
     // Real `interpolation` -- on a `video` element real ES-DE applies the
     // same value to BOTH the video texture and this static image
     // (VideoComponent.cpp:270-284 calls mStaticImage.setLinearInterpolation
@@ -1418,7 +1545,7 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
         // Compose's real multiply-blend equivalent.
         colorFilter = tint?.let { ColorFilter.tint(it, BlendMode.Modulate) },
         alpha = opacity,
-        contentScale = if (hasCropSize) ContentScale.Crop else ContentScale.Fit,
+        contentScale = contentScale,
         modifier = Modifier
             .absoluteOffset(x = offsetX, y = offsetY)
             .size(width = width, height = height)
@@ -1484,35 +1611,65 @@ private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight
  * convention -- see [LibraryEntry.releaseDate]'s own doc comment) and
  * formats it via the element's own real strftime-style `format` property
  * ONCE, not a live-ticking clock. Other real ES-DE datetime metadata keys
- * (`lastplayed`) aren't modeled on [LibraryEntry] yet -- a real, honest
- * gap, not silently pretended away.
+ * Both real ES-DE `metadata` values are bound: `releasedate` (real ES-DE's
+ * own "YYYYMMDDT000000" MD_DATE convention -- see
+ * [LibraryEntry.releaseDate]) and `lastplayed` (from
+ * [LibraryEntry.lastPlayedEpochMs]). Those two are the whole set real ES-DE
+ * accepts for this element (DateTimeComponent.cpp:351); anything else logs
+ * a warning there and shows nothing, same as here.
+ *
+ * What to show when there is no value, and the whole `displayRelative`
+ * ("3 days ago") branch, is real `DateTimeComponent::getDisplayString`,
+ * ported as pure Kotlin in
+ * [dev.droidtop.library.theme.esDeDateTimeDisplay] so it is unit-testable
+ * without Compose.
  */
 @Composable
 private fun EsDeThemedDateTime(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp, gameSelection: List<LibraryEntry>) {
-    val metadata = element.valueOrNull<EsDeThemeValue.Str>("metadata")?.value
+    val metadata = element.strOrNull("metadata")
     // Real ES-DE's own datetime schema has no gameselectorEntry property
     // (confirmed against EsDeTheme.kt's schema) -- implicit entry 0,
     // same real convention already used for text's own metadata binding.
-    val rawDate = when (metadata) {
-        "releasedate" -> gameSelection.getOrNull(0)?.releaseDate
-        else -> null
+    val entry = gameSelection.getOrNull(0)
+    // Real ES-DE accepts exactly two `metadata` values here
+    // (DateTimeComponent.cpp:351) and warns on anything else. `lastplayed`
+    // is now wired: [LibraryEntry.lastPlayedEpochMs] already existed, so
+    // the earlier "not modeled yet" note was stale.
+    val epochSeconds = when (metadata) {
+        "releasedate" -> entry?.releaseDate?.let { esDeMetaDateToEpochSeconds(it) } ?: 0L
+        "lastplayed" -> (entry?.lastPlayedEpochMs ?: 0L) / 1000L
+        else -> 0L
     }
-    val format = element.valueOrNull<EsDeThemeValue.Str>("format")?.value ?: "%Y-%m-%d"
-    val formatted = remember(rawDate, format) {
-        rawDate?.let {
-            runCatching {
-                val sourceFormat = SimpleDateFormat("yyyyMMdd'T'HHmmss", Locale.US)
-                sourceFormat.timeZone = TimeZone.getTimeZone("UTC")
-                val parsed = sourceFormat.parse(it) ?: return@runCatching null
-                SimpleDateFormat(strftimeToJavaPattern(format), Locale.getDefault()).format(parsed)
-            }.getOrNull()
-        }
-    } ?: element.valueOrNull<EsDeThemeValue.Str>("defaultValue")?.value
+    val format = element.strOrNull("format") ?: "%Y-%m-%d"
     // Same real ":space:" blank-token convention (case-insensitive) as
     // EsDeThemedText -- decaffe's own gamelbl datetime uses it as its
     // defaultValue, which rendered the literal ":SPACE:" on-device for
-    // any game with no release date.
-    if (formatted.isNullOrBlank() || formatted.equals(":space:", ignoreCase = true)) return
+    // any game with no release date. Real ES-DE does this substitution at
+    // parse time (DateTimeComponent.cpp:354-357).
+    val declaredDefault = element.strOrNull("defaultValue")
+    val defaultValue = if (declaredDefault.equals(":space:", ignoreCase = true)) " " else declaredDefault
+    // Real `displayRelative` (DateTimeComponent.cpp:368-372) -- implicitly
+    // ON for `lastplayed`, overridable in both directions.
+    val displayRelative = esDeDisplayRelative(metadata, element.boolOrNull("displayRelative"))
+    // "now" only has to be current to the minute for the coarsest unit
+    // this can print to be right, and a relative datetime is the only
+    // consumer -- ticked on the same 30s cadence rather than per frame.
+    val nowSeconds by produceState(System.currentTimeMillis() / 1000L, displayRelative) {
+        while (displayRelative) {
+            delay(30_000)
+            value = System.currentTimeMillis() / 1000L
+        }
+    }
+    val formatted = remember(epochSeconds, nowSeconds, displayRelative, defaultValue, format) {
+        when (val display = esDeDateTimeDisplay(epochSeconds, nowSeconds, displayRelative, defaultValue)) {
+            is EsDeDateTimeDisplay.Literal -> display.text
+            is EsDeDateTimeDisplay.Formatted -> runCatching {
+                SimpleDateFormat(strftimeToJavaPattern(format), Locale.getDefault())
+                    .format(Date(display.epochSeconds * 1000L))
+            }.getOrNull()
+        }
+    }
+    if (formatted.isNullOrBlank()) return
 
     val hasSize = element.valueOrNull<EsDeThemeValue.Pair>("size") != null
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
@@ -1600,10 +1757,15 @@ private val BADGE_GLYPHS = mapOf(
  *   partially-filled last row separately from full rows above it) --
  *   only visibly different when the badge count doesn't evenly divide
  *   `itemsPerLine`.
- * - The real "controller" slot's own per-game controller-specific
- *   OVERLAY icon (`setBadges`' own real runtime texture swap) has no
- *   droidtop asset to render -- shows the generic controller glyph only,
- *   same honest gap as the rest of this function's glyph fallbacks.
+ * - The real per-slot OVERLAY icon and its `controllerPos`/
+ *   `controllerSize`/`folderLinkPos`/`folderLinkSize` placement ARE now
+ *   implemented (see [dev.droidtop.library.theme.esDeBadgeOverlay]), but
+ *   only for art the THEME supplies through its own real
+ *   `customControllerIcon`/`customFolderLinkIcon` properties. ES-DE's own
+ *   default overlay art is Qt-resource SVG compiled into its binary,
+ *   which droidtop does not redistribute; with no theme art, no overlay
+ *   is drawn, which is also what real ES-DE does for an overlay with no
+ *   texture (FlexboxComponent.cpp:222).
  * - `folder` (the last of the 9 real slots) is never active -- see
  *   [dev.droidtop.library.theme.BADGE_SLOTS]'s own doc comment for why
  *   (real ES-DE gamelist subfolders have no droidtop equivalent --
@@ -1706,6 +1868,54 @@ private fun EsDeThemedBadges(element: EsDeThemeElement, viewWidth: Dp, viewHeigh
                 color = badgeColor.copy(alpha = badgeColor.alpha * opacity),
                 fontSize = with(density) { cellSize.toSp() },
                 modifier = Modifier.absoluteOffset(x = cellX, y = cellY),
+            )
+        }
+
+        // Real OVERLAY icon for the two slots that have one
+        // (BadgeComponent.cpp:454-507). The ART is the part droidtop can
+        // only get from the theme: ES-DE's own defaults for both -- the 36
+        // `:/graphics/controllers/*.svg` files and
+        // `badge_folderlink_overlay.svg` -- are Qt resources compiled into
+        // its binary, the same assets droidtop already declines to
+        // redistribute for the base badges and systemstatus icons. A theme
+        // CAN supply them, and many do: `<customControllerIcon
+        // controller="gamepad_snes">` and `customFolderLinkIcon` are real
+        // schema properties, parsed here as `controller_<shortName>` and
+        // `customFolderLinkIcon`. When the theme supplies nothing, no
+        // overlay is drawn -- which is real ES-DE's own behaviour for an
+        // overlay with no texture (FlexboxComponent.cpp:222 gates the whole
+        // placement on `getTexture() != nullptr`), not a droidtop-only
+        // shortcut. No glyph substitute here: the base badge already IS a
+        // controller glyph, and stacking a second one on it would be
+        // invented art rather than missing art.
+        val overlayIcon = when (slot) {
+            "controller" -> element.pathOrNull("controller_${EsDeControllers.byShortName(entry.controllerShortName).shortName}")
+            "folder" -> element.pathOrNull("customFolderLinkIcon")
+            else -> null
+        }?.takeIf { File(it).isFile }
+        if (overlayIcon != null) {
+            // Real clamps, which differ per slot: BadgeComponent.cpp:480-490
+            // (folderLink) and :493-506 (controller).
+            val posProperty = if (slot == "controller") "controllerPos" else "folderLinkPos"
+            val sizeProperty = if (slot == "controller") "controllerSize" else "folderLinkSize"
+            val maxSize = if (slot == "controller") 2f else 1f
+            val pos = element.pairOrNull(posProperty)
+            val overlay = esDeBadgeOverlay(
+                baseX = cellX.value,
+                baseY = cellY.value,
+                baseWidth = cellSize.value,
+                baseHeight = cellSize.value,
+                overlayPositionX = pos?.x?.coerceIn(-1f, 2f) ?: 0.5f,
+                overlayPositionY = pos?.y?.coerceIn(-1f, 2f) ?: 0.5f,
+                overlaySize = element.floatOrNull(sizeProperty)?.coerceIn(0.1f, maxSize) ?: 0.5f,
+            )
+            AsyncImage(
+                model = overlayIcon,
+                contentDescription = null,
+                modifier = Modifier
+                    .absoluteOffset(x = overlay.x.dp, y = overlay.y.dp)
+                    .size(overlay.size.dp)
+                    .graphicsLayer { alpha = opacity },
             )
         }
     }
@@ -2030,17 +2240,28 @@ private fun EsDeRatingIconRow(
  * `backgroundVerticalPadding`/`backgroundCornerRadius` (see
  * [EsDeBackgroundBox]), `iconTextSpacing` and `entryRelativeScale`.
  *
+ * The `*Dimmed` family (`posDimmed`/`textColorDimmed`/`iconColorDimmed`/
+ * `fontSizeDimmed`/`opacityDimmed`/`entrySpacingDimmed`/
+ * `iconTextSpacingDimmed`) is implemented. Real ES-DE switches to it while
+ * a GUI is open on top of the current view and dimming it
+ * (HelpComponent.cpp:634 reads `mWindow->isBackgroundDimmed()`, which is
+ * literally "the GUI stack has more than one entry", Window.cpp:513-516).
+ * droidtop's real equivalent is [dimmed]: its own in-context options menu
+ * is a Compose `Dialog` drawn OVER the themed view with a scrim, so the
+ * help bar really is still on screen behind a dimmed background, which is
+ * the exact situation these properties exist for. Each one falls back to
+ * its undimmed counterpart when the theme omits it, which is ES-DE's own
+ * rule too (`else mXDimmed = mX` at HelpComponent.cpp:97-294) rather than
+ * a separate set of defaults.
+ *
  * Honestly still unimplemented, and NOT faked: `customButtonIcon` (real
  * per-theme glyph art for each button, which would replace the platform
- * button LABEL this draws -- a separate piece of work), and the whole
- * `*Dimmed` family (`posDimmed`/`originDimmed`/`textColorDimmed`/
- * `iconColorDimmed`/`fontSizeDimmed`/`opacityDimmed`/`entrySpacingDimmed`/
- * `iconTextSpacingDimmed`). Real ES-DE switches to those only while its
- * own menu overlay is dimming the background
- * (HelpComponent.cpp:76-80, `mWindow->isBackgroundDimmed()`); droidtop
- * renders no such overlay at all -- `scope=menu` help declarations are
- * skipped outright, see [EsDeThemedView] -- so there is no real state to
- * key them off, and implementing them would mean inventing one.
+ * button LABEL this draws -- a separate piece of work), and `originDimmed`
+ * -- for the same reason plain `origin` is unimplemented on this element,
+ * namely that this help bar is a wrapping Row whose own width is not
+ * measured before it is placed, so there is nothing to offset the origin
+ * against. Implementing one and not the other would be worse than
+ * neither.
  */
 @Composable
 private fun EsDeThemedHelpSystem(
@@ -2048,34 +2269,56 @@ private fun EsDeThemedHelpSystem(
     viewWidth: Dp,
     viewHeight: Dp,
     hints: List<kotlin.Pair<GamepadAction, String>>,
+    dimmed: Boolean,
 ) {
     if (hints.isEmpty()) return
-    val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight)
+    // Real ES-DE's own dimmed-variant fallback (HelpComponent.cpp:97-294):
+    // a `*Dimmed` property applies only while the background is dimmed,
+    // and when the theme omits it the undimmed value is used rather than a
+    // separate default.
+    fun dimmedFloat(name: String): Float? =
+        (if (dimmed) element.floatOrNull("${name}Dimmed") else null) ?: element.floatOrNull(name)
+    fun dimmedColor(name: String): Color? =
+        ((if (dimmed) element.colorOrNull("${name}Dimmed") else null) ?: element.colorOrNull(name))
+            ?.let { colorOf(EsDeThemeValue.Color(it)) }
+
+    // HelpComponent.cpp:97-101.
+    val pos = (if (dimmed) element.pairOrNull("posDimmed") else null) ?: element.pairOrNull("pos")
+    val offsetX = viewWidth * (pos?.x ?: 0f)
+    val offsetY = viewHeight * (pos?.y ?: 0f)
     // Real HelpComponent.cpp defaults (0x777777FF, gray) for BOTH colors --
     // droidtop previously guessed White/Black, confirmed wrong against real
     // ES-DE source: a theme that sets only one of textColor/iconColor would
     // have paired it with an arbitrary, wrong color for the other.
     val defaultHelpColor = Color(0xFF777777)
-    val textColor = element.valueOrNull<EsDeThemeValue.Color>("textColor")?.let { colorOf(it) } ?: defaultHelpColor
-    val iconColor = element.valueOrNull<EsDeThemeValue.Color>("iconColor")?.let { colorOf(it) } ?: defaultHelpColor
-    val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
+    val textColor = dimmedColor("textColor") ?: defaultHelpColor
+    val iconColor = dimmedColor("iconColor") ?: defaultHelpColor
+    // HelpComponent.cpp:291-294 -- opacityDimmed's own clamp is 0.2..1.0,
+    // not 0..1: real ES-DE refuses to let a theme make the help bar
+    // invisible behind a menu.
+    val opacity = if (dimmed && element.floatOrNull("opacityDimmed") != null) {
+        element.floatOrNull("opacityDimmed")!!.coerceIn(0.2f, 1f)
+    } else {
+        (element.floatOrNull("opacity") ?: 1f).coerceIn(0f, 1f)
+    }
     // Real default: HelpComponent constructs with FONT_SIZE_SMALL (0.035),
     // not 0.025 -- confirmed against real ES-DE source (Font.h/HelpComponent.h).
-    val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.035f
+    val fontSizeFraction = dimmedFloat("fontSize") ?: 0.035f
     val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * viewHeight.value).dp.toSp() }
     // Real ES-DE HelpComponent.cpp: entrySpacing is a fraction of screen
     // WIDTH, not height (droidtop previously used height, matching every
     // other element's own real height-based convention, but help-bar
     // spacing is confirmed real-source to be the one exception) -- real
     // default is 0.00833, not 0.02 (droidtop's own earlier guess was
-    // ~2.4x too large).
-    val entrySpacing = (element.valueOrNull<EsDeThemeValue.FloatValue>("entrySpacing")?.value ?: 0.00833f) * viewWidth.value
+    // ~2.4x too large). HelpComponent.cpp:272-275 gives the dimmed variant
+    // the same 0..0.04 clamp.
+    val entrySpacing = (dimmedFloat("entrySpacing") ?: 0.00833f).coerceIn(0f, 0.04f) * viewWidth.value
     // Real `iconTextSpacing` (HelpComponent.cpp:277-278) -- the gap
     // between one entry's own button glyph and its label, clamped to
     // 0..0.04 and, like entrySpacing, a fraction of screen WIDTH
     // (HelpComponent.cpp:687). Real default 0.00416
     // (HelpComponent.cpp:47); droidtop previously hardcoded 6dp.
-    val iconTextSpacing = (element.valueOrNull<EsDeThemeValue.FloatValue>("iconTextSpacing")?.value ?: 0.00416f)
+    val iconTextSpacing = (dimmedFloat("iconTextSpacing") ?: 0.00416f)
         .coerceIn(0f, 0.04f) * viewWidth.value
     // Real `entryRelativeScale` (HelpComponent.cpp:182-183), clamped to
     // 0.2..3.0. Real ES-DE only ever applies it to SHRINK the label font
@@ -2084,7 +2327,7 @@ private fun EsDeThemedHelpSystem(
     // divided by the scale so it grows relative to the text
     // (HelpComponent.cpp:664-667). Both halves are reproduced here; a
     // value of exactly 1.0 is a no-op either way.
-    val entryRelativeScale = (element.valueOrNull<EsDeThemeValue.FloatValue>("entryRelativeScale")?.value ?: 1f)
+    val entryRelativeScale = (element.floatOrNull("entryRelativeScale") ?: 1f)
         .coerceIn(0.2f, 3.0f)
     val labelFontSizeSp = if (entryRelativeScale < 1f) fontSizeSp * entryRelativeScale else fontSizeSp
     val iconFontSizeSp = if (entryRelativeScale < 1f) fontSizeSp else fontSizeSp / entryRelativeScale
@@ -2150,6 +2393,36 @@ private val STRFTIME_TO_JAVA = listOf(
     "%B" to "MMMM", "%b" to "MMM",
     "%%" to "%",
 )
+
+/**
+ * The host activity behind a Compose [Context], as a [LifecycleOwner].
+ * Used to tie a themed `video` element's playback to the app actually
+ * being in the foreground -- see [EsDeThemedVideo]'s `audio` handling.
+ * Null (so playback is simply never paused) if this composable is hosted
+ * somewhere with no lifecycle at all, which is not a case droidtop has.
+ */
+private fun Context.findLifecycleOwner(): LifecycleOwner? {
+    var current: Context? = this
+    while (current != null) {
+        if (current is LifecycleOwner) return current
+        current = (current as? ContextWrapper)?.baseContext
+    }
+    return null
+}
+
+/**
+ * Real ES-DE MD_DATE storage format ("YYYYMMDDT000000",
+ * `Utils::Time::stringToTime`'s own default `%Y%m%dT%H%M%S`) to epoch
+ * seconds. Returns 0 for an unparseable or absent value, which is exactly
+ * how real ES-DE represents "no date at all" -- see
+ * [dev.droidtop.library.theme.esDeDateTimeDisplay], which keys its
+ * "unknown"/"never" branches off that same 0.
+ */
+private fun esDeMetaDateToEpochSeconds(raw: String): Long = runCatching {
+    val sourceFormat = SimpleDateFormat("yyyyMMdd'T'HHmmss", Locale.US)
+    sourceFormat.timeZone = TimeZone.getTimeZone("UTC")
+    (sourceFormat.parse(raw)?.time ?: 0L) / 1000L
+}.getOrDefault(0L)
 
 private fun strftimeToJavaPattern(format: String): String {
     val sb = StringBuilder()
