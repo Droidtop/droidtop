@@ -17,12 +17,12 @@ data class PcProvisionResult(val succeeded: Boolean, val detail: String)
 /**
  * The seam through which `library-core` reaches droidtop's real PC
  * runtimes: Wine/Box64 for Windows executables (`runtime-windows`'
- * `WineSession`) and the container runtime for native Linux builds
+ * `WineEngine`) and the container runtime for native Linux builds
  * (`runtime-common`'s `NativeLinuxGameSession`).
  *
  * It exists because `library-core` cannot depend on either module, and
- * both need a live container session that only `:app` knows how to
- * obtain. Rather than duplicate that knowledge, `:app` installs an
+ * the native-Linux half needs a live container session that only `:app`
+ * knows how to obtain. Rather than duplicate that knowledge, `:app` installs an
  * implementation into [PcGameRuntimeRegistry] at startup and every
  * caller here goes through this interface -- the same swappable-seam
  * pattern [LaunchDisplay.chooser] and gamenative-tux's own
@@ -37,10 +37,16 @@ data class PcProvisionResult(val succeeded: Boolean, val detail: String)
  */
 interface PcGameRuntime {
     /**
-     * Whether a launch could succeed right now. False when no container
-     * session is live -- droidtop's Wine runs as a process *inside* a
-     * running container (see `WineSession`'s own doc comment), so there
-     * is nothing to launch into until Desktop mode has connected one.
+     * Whether any launch could succeed right now: a Wine prefix exists
+     * for Windows software, or a container session is live for a native
+     * Linux build. Which of the two a given game needs is decided by
+     * [launchWindows] / [launchLinux], and each names its own missing
+     * piece -- this only answers "is there any point going further".
+     *
+     * Deliberately no longer "is a container session live". Windows
+     * games run through droidtop's Wine engine, which needs no root and
+     * no container session; requiring one made them root-only by
+     * accident (docs/SPEC.md 5b).
      */
     val isAvailable: Boolean
 
