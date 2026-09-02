@@ -34,7 +34,7 @@ sealed interface DesktopSessionState {
     data class Connected(
         val hostBridge: HostBridge,
         val primaryOutput: DisplayOutput,
-        /** The running primary container + the runtime that created it — what `:runtime-windows`'s `WineSession`/`PcGameProvider` need to launch a Windows game as a Wayland client sharing this same desktop. */
+        /** The running primary container + the runtime that created it — what a native Linux game needs to run as a Wayland client sharing this same desktop (Windows games go through `:runtime-windows`'s own `WineEngine` and need neither). */
         val runtime: ContainerRuntime,
         val container: Container,
     ) : DesktopSessionState
