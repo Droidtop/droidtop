@@ -170,14 +170,18 @@ project(":SettingsLib-MainSwitchPreference").projectDir = file("shell-default/Se
 include(":systemUIPluginCore")
 project(":systemUIPluginCore").projectDir = file("shell-default/systemUIPluginCore")
 
-// Optional gamepad-console-style launcher shell. Stub only for now — depends on
-// :library-core's plugin interface being stable before this gets built out.
+// Optional gamepad-console-style launcher shell — the Handheld shell.
+// The best-developed module in the repo (~8,000 lines): real ES-DE theme
+// rendering, gamepad navigation, and the full library/settings surface.
 include(":shell-gamepad")
 
 // Second-screen persistent keyboard (docs/SPEC.md §4/§6) — forked from
-// Hacker's Keyboard (Apache-2.0), not built from scratch. Not wired up to
-// the second screen / :input-seat yet; just made to compile as its own
-// module so far.
+// Hacker's Keyboard (Apache-2.0), not built from scratch. Shipping
+// (~17,600 lines) as a real Android IME, surfaced as an optional step in
+// :app's own onboarding (OnboardingActivity's KeyboardStep). The
+// second-screen persistent surface / :input-seat integration this module
+// was originally forked in for is still TODO — see its own
+// build.gradle.kts.
 include(":input-keyboard")
 
 // Optional desktop-style shell: taskbar + start-menu chrome around the
