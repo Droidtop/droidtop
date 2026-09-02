@@ -67,6 +67,11 @@ dependencies {
     // handling: B doubles as KEYCODE_BACK on this hardware and arrives via
     // the dispatcher, not as a key event.
     implementation(libs.androidx.activity.compose)
+    // Real `video` element `audio` support: a themed video now honours the
+    // theme's own audible default, so playback has to stop when the app
+    // leaves the foreground. That needs the host activity's real
+    // Lifecycle, named here directly rather than relied on transitively.
+    implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.coil.compose)
     implementation(libs.coil.android)
     // Real system logos (see theme/ThemeAssets.kt) are the bundled DEcaffe

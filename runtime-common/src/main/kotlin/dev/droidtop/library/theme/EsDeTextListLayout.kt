@@ -93,48 +93,41 @@ fun esDeTextListConfig(
     screenHeight: Float,
     fontSize: Float,
 ): EsDeTextListConfig {
-    fun float(name: String): Float? = element?.valueOrNull<EsDeThemeValue.FloatValue>(name)?.value
-    fun bool(name: String): Boolean? = element?.valueOrNull<EsDeThemeValue.Bool>(name)?.value
-    fun str(name: String): String? = element?.valueOrNull<EsDeThemeValue.Str>(name)?.value
-    fun path(name: String): String? = element?.valueOrNull<EsDeThemeValue.Path>(name)?.resolved
-    fun pair(name: String): EsDeThemeValue.Pair? = element?.valueOrNull<EsDeThemeValue.Pair>(name)
-    fun color(name: String): Long? = element?.valueOrNull<EsDeThemeValue.Color>(name)?.argbLikeRgba
-
     // TextListComponent.h:485-495 -- selectorColorEnd defaults to
     // selectorColor, so a theme setting only the former still gets a
     // flat bar rather than a gradient into the built-in default.
-    val selectorColor = color("selectorColor") ?: 0x333333FFL
-    val selectorColorEnd = color("selectorColorEnd") ?: selectorColor
+    val selectorColor = element.colorOrNull("selectorColor") ?: 0x333333FFL
+    val selectorColorEnd = element.colorOrNull("selectorColorEnd") ?: selectorColor
 
     // TextListComponent.h:505-524 -- the real fallback chain, which is
     // NOT "each color independently defaults to a constant":
     // selectedColor falls back to primaryColor, selectedSecondaryColor to
     // selectedColor, and selectedSecondaryBackgroundColor to
     // selectedBackgroundColor.
-    val primaryColor = color("primaryColor") ?: 0x0000FFFFL
-    val secondaryColor = color("secondaryColor") ?: 0x00FF00FFL
-    val selectedColor = color("selectedColor") ?: primaryColor
-    val selectedSecondaryColor = color("selectedSecondaryColor") ?: selectedColor
-    val selectedBackgroundColor = color("selectedBackgroundColor") ?: 0x00000000L
-    val selectedSecondaryBackgroundColor = color("selectedSecondaryBackgroundColor") ?: selectedBackgroundColor
+    val primaryColor = element.colorOrNull("primaryColor") ?: 0x0000FFFFL
+    val secondaryColor = element.colorOrNull("secondaryColor") ?: 0x00FF00FFL
+    val selectedColor = element.colorOrNull("selectedColor") ?: primaryColor
+    val selectedSecondaryColor = element.colorOrNull("selectedSecondaryColor") ?: selectedColor
+    val selectedBackgroundColor = element.colorOrNull("selectedBackgroundColor") ?: 0x00000000L
+    val selectedSecondaryBackgroundColor = element.colorOrNull("selectedSecondaryBackgroundColor") ?: selectedBackgroundColor
 
-    val lineSpacing = float("lineSpacing")?.coerceIn(0.5f, 3f) ?: 1.5f
+    val lineSpacing = element.floatOrNull("lineSpacing")?.coerceIn(0.5f, 3f) ?: 1.5f
 
     // TextListComponent.h:641-668 -- selectorHeight is a fraction of the
     // SCREEN height, falling back to 1.5 font sizes (which is the row
     // height at the default lineSpacing, but is deliberately not tied to
     // lineSpacing in real ES-DE).
-    val selectorHeight = float("selectorHeight")?.coerceIn(0f, 1f)?.times(screenHeight)
+    val selectorHeight = element.floatOrNull("selectorHeight")?.coerceIn(0f, 1f)?.times(screenHeight)
         ?: (fontSize * 1.5f)
     // TextListComponent.h:723-727 -- selectorWidth falls back to the
     // textlist's own width, not the screen's.
-    val selectorWidth = float("selectorWidth")?.coerceIn(0f, 1f)?.times(screenWidth) ?: width
-    val selectorHorizontalOffset = float("selectorHorizontalOffset")?.coerceIn(-1f, 1f)?.times(screenWidth) ?: 0f
+    val selectorWidth = element.floatOrNull("selectorWidth")?.coerceIn(0f, 1f)?.times(screenWidth) ?: width
+    val selectorHorizontalOffset = element.floatOrNull("selectorHorizontalOffset")?.coerceIn(-1f, 1f)?.times(screenWidth) ?: 0f
     // TextListComponent.h:653-659. (Real ES-DE also reads a legacy
     // `selectorOffsetY` spelling right after this, but that name is not in
     // its own `sElementMap` schema, so no theme can actually declare it and
     // droidtop's parser correctly drops it -- deliberately not ported.)
-    val selectorVerticalOffset = float("selectorVerticalOffset")?.coerceIn(-1f, 1f)?.times(screenHeight) ?: 0f
+    val selectorVerticalOffset = element.floatOrNull("selectorVerticalOffset")?.coerceIn(-1f, 1f)?.times(screenHeight) ?: 0f
 
     return EsDeTextListConfig(
         fontSize = fontSize,
@@ -147,9 +140,9 @@ fun esDeTextListConfig(
         selectorColorEnd = selectorColorEnd,
         // TextListComponent.h:487-503 -- an unrecognized value warns and
         // falls back to horizontal.
-        selectorColorGradientHorizontal = str("selectorGradientType") != "vertical",
-        selectorImagePath = path("selectorImagePath"),
-        selectorImageTile = bool("selectorImageTile") ?: false,
+        selectorColorGradientHorizontal = element.strOrNull("selectorGradientType") != "vertical",
+        selectorImagePath = element.pathOrNull("selectorImagePath"),
+        selectorImageTile = element.boolOrNull("selectorImageTile") ?: false,
         primaryColor = primaryColor,
         secondaryColor = secondaryColor,
         selectedColor = selectedColor,
@@ -158,41 +151,41 @@ fun esDeTextListConfig(
         selectedSecondaryBackgroundColor = selectedSecondaryBackgroundColor,
         // TextListComponent.h:526-537 -- margins clamp 0-0.5 and scale by
         // screen WIDTH for both components, corner radius likewise.
-        selectedBackgroundMarginsX = (pair("selectedBackgroundMargins")?.x?.coerceIn(0f, 0.5f) ?: 0f) * screenWidth,
-        selectedBackgroundMarginsY = (pair("selectedBackgroundMargins")?.y?.coerceIn(0f, 0.5f) ?: 0f) * screenWidth,
+        selectedBackgroundMarginsX = (element.pairOrNull("selectedBackgroundMargins")?.x?.coerceIn(0f, 0.5f) ?: 0f) * screenWidth,
+        selectedBackgroundMarginsY = (element.pairOrNull("selectedBackgroundMargins")?.y?.coerceIn(0f, 0.5f) ?: 0f) * screenWidth,
         selectedBackgroundCornerRadius =
-            (float("selectedBackgroundCornerRadius")?.coerceIn(0f, 0.5f) ?: 0f) * screenWidth,
+            (element.floatOrNull("selectedBackgroundCornerRadius")?.coerceIn(0f, 0.5f) ?: 0f) * screenWidth,
         // TextListComponent.h:539-553.
-        horizontalScrolling = bool("textHorizontalScrolling") ?: true,
-        horizontalScrollSpeed = float("textHorizontalScrollSpeed")?.coerceIn(0.1f, 10f) ?: 1f,
-        horizontalScrollDelayMs = (float("textHorizontalScrollDelay")?.coerceIn(0f, 10f) ?: 3f) * 1000f,
-        horizontalScrollGap = float("textHorizontalScrollGap")?.coerceIn(0.1f, 5f) ?: 1.5f,
+        horizontalScrolling = element.boolOrNull("textHorizontalScrolling") ?: true,
+        horizontalScrollSpeed = element.floatOrNull("textHorizontalScrollSpeed")?.coerceIn(0.1f, 10f) ?: 1f,
+        horizontalScrollDelayMs = (element.floatOrNull("textHorizontalScrollDelay")?.coerceIn(0f, 10f) ?: 3f) * 1000f,
+        horizontalScrollGap = element.floatOrNull("textHorizontalScrollGap")?.coerceIn(0.1f, 5f) ?: 1.5f,
         // TextListComponent.h:557-580 -- the real default alignment for a
         // textlist is LEFT (set before applyTheme reads the property),
         // not the ALIGN_CENTER the constructor initializes.
-        alignment = when (str("horizontalAlignment")) {
+        alignment = when (element.strOrNull("horizontalAlignment")) {
             "center" -> EsDePrimaryAlignment.CENTER
             "right" -> EsDePrimaryAlignment.RIGHT
             else -> EsDePrimaryAlignment.LEFT
         },
-        horizontalMargin = (float("horizontalMargin") ?: 0f) * screenWidth,
-        letterCase = letterCase(str("letterCase")) ?: EsDeLetterCase.NONE,
-        letterCaseAutoCollections = letterCase(str("letterCaseAutoCollections")) ?: EsDeLetterCase.UNDEFINED,
-        letterCaseCustomCollections = letterCase(str("letterCaseCustomCollections")) ?: EsDeLetterCase.UNDEFINED,
+        horizontalMargin = (element.floatOrNull("horizontalMargin") ?: 0f) * screenWidth,
+        letterCase = letterCase(element.strOrNull("letterCase")) ?: EsDeLetterCase.NONE,
+        letterCaseAutoCollections = letterCase(element.strOrNull("letterCaseAutoCollections")) ?: EsDeLetterCase.UNDEFINED,
+        letterCaseCustomCollections = letterCase(element.strOrNull("letterCaseCustomCollections")) ?: EsDeLetterCase.UNDEFINED,
         // TextListComponent.h:668-703 -- an unrecognized value warns and
         // falls back to symbols; "none" is valid for indicators only.
-        indicators = when (str("indicators")) {
+        indicators = when (element.strOrNull("indicators")) {
             "ascii" -> EsDeIndicators.ASCII
             "none" -> EsDeIndicators.NONE
             else -> EsDeIndicators.SYMBOLS
         },
-        collectionIndicators = when (str("collectionIndicators")) {
+        collectionIndicators = when (element.strOrNull("collectionIndicators")) {
             "ascii" -> EsDeIndicators.ASCII
             else -> EsDeIndicators.SYMBOLS
         },
-        systemNameSuffix = bool("systemNameSuffix") ?: true,
-        letterCaseSystemNameSuffix = letterCase(str("letterCaseSystemNameSuffix")) ?: EsDeLetterCase.UPPERCASE,
-        fadeAbovePrimary = bool("fadeAbovePrimary") ?: false,
+        systemNameSuffix = element.boolOrNull("systemNameSuffix") ?: true,
+        letterCaseSystemNameSuffix = letterCase(element.strOrNull("letterCaseSystemNameSuffix")) ?: EsDeLetterCase.UPPERCASE,
+        fadeAbovePrimary = element.boolOrNull("fadeAbovePrimary") ?: false,
     )
 }
 

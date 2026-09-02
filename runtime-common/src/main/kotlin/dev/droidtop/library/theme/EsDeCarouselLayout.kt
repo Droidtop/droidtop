@@ -183,15 +183,9 @@ fun esDeCarouselConfig(
     screenWidth: Float,
     screenHeight: Float,
 ): EsDeCarouselConfig {
-    fun float(name: String): Float? = element?.valueOrNull<EsDeThemeValue.FloatValue>(name)?.value
-    fun bool(name: String): Boolean? = element?.valueOrNull<EsDeThemeValue.Bool>(name)?.value
-    fun str(name: String): String? = element?.valueOrNull<EsDeThemeValue.Str>(name)?.value
-    fun pair(name: String): EsDeThemeValue.Pair? = element?.valueOrNull<EsDeThemeValue.Pair>(name)
-    fun uint(name: String): Long? = element?.valueOrNull<EsDeThemeValue.UInt>(name)?.value
-
     // CarouselComponent.h:1346-1366 -- an unrecognized value logs a
     // warning and falls back to horizontal, it is not a parse failure.
-    val type = when (str("type")) {
+    val type = when (element.strOrNull("type")) {
         "horizontal" -> EsDeCarouselType.HORIZONTAL
         "horizontalWheel" -> EsDeCarouselType.HORIZONTAL_WHEEL
         "vertical" -> EsDeCarouselType.VERTICAL
@@ -203,7 +197,7 @@ fun esDeCarouselConfig(
     // CarouselComponent.h:1497-1500 -- itemSize is a fraction of the
     // themed area, clamped 0.05-1.0; the real constructor default is
     // 0.25 x 0.155 of it.
-    val itemSize = pair("itemSize")
+    val itemSize = element.pairOrNull("itemSize")
     val itemSizeX = (itemSize?.x?.coerceIn(0.05f, 1f) ?: 0.25f) * screenWidth
     val itemSizeY = (itemSize?.y?.coerceIn(0.05f, 1f) ?: 0.155f) * screenHeight
 
@@ -211,47 +205,47 @@ fun esDeCarouselConfig(
     // types, and both scale by screen WIDTH for a horizontal carousel and
     // screen HEIGHT for a vertical one.
     val marginScale = if (type == EsDeCarouselType.HORIZONTAL) screenWidth else screenHeight
-    val selectedItemMargins = pair("selectedItemMargins")?.takeIf { isPlain }
-    val selectedItemOffset = pair("selectedItemOffset")?.takeIf { isPlain }
+    val selectedItemMargins = element.pairOrNull("selectedItemMargins")?.takeIf { isPlain }
+    val selectedItemOffset = element.pairOrNull("selectedItemOffset")?.takeIf { isPlain }
 
     // CarouselComponent.h:1574-1582 -- clamped +-0.5, scaled by the
     // dimension the carousel does NOT advance along, non-wheel only.
-    val diagonalOffset = float("itemDiagonalOffset")?.takeIf { isPlain }?.coerceIn(-0.5f, 0.5f)
+    val diagonalOffset = element.floatOrNull("itemDiagonalOffset")?.takeIf { isPlain }?.coerceIn(-0.5f, 0.5f)
     val diagonalScale = if (type == EsDeCarouselType.HORIZONTAL) screenHeight else screenWidth
 
     return EsDeCarouselConfig(
         type = type,
         // CarouselComponent.h:1512-1533.
-        itemStacking = when (str("itemStacking")) {
+        itemStacking = when (element.strOrNull("itemStacking")) {
             "ascending" -> EsDeItemStacking.ASCENDING
             "ascendingRaised" -> EsDeItemStacking.ASCENDING_RAISED
             "descending" -> EsDeItemStacking.DESCENDING
             "descendingRaised" -> EsDeItemStacking.DESCENDING_RAISED
             else -> EsDeItemStacking.CENTERED
         },
-        maxItemCount = float("maxItemCount")?.coerceIn(0.5f, 30f) ?: 3f,
+        maxItemCount = element.floatOrNull("maxItemCount")?.coerceIn(0.5f, 30f) ?: 3f,
         // CarouselComponent.h:1470-1476 -- clamped 0-20, default 8 each.
-        itemsBeforeCenter = uint("itemsBeforeCenter")?.toInt()?.coerceIn(0, 20) ?: 8,
-        itemsAfterCenter = uint("itemsAfterCenter")?.toInt()?.coerceIn(0, 20) ?: 8,
+        itemsBeforeCenter = element.uintOrNull("itemsBeforeCenter")?.toInt()?.coerceIn(0, 20) ?: 8,
+        itemsAfterCenter = element.uintOrNull("itemsAfterCenter")?.toInt()?.coerceIn(0, 20) ?: 8,
         itemSizeX = itemSizeX,
         itemSizeY = itemSizeY,
-        itemScale = float("itemScale")?.coerceIn(0.2f, 3f) ?: 1.2f,
+        itemScale = element.floatOrNull("itemScale")?.coerceIn(0.2f, 3f) ?: 1.2f,
         // CarouselComponent.h:1502-1506 -- both clamped -0.5 to 1.0.
-        itemLinearScaleX = pair("itemLinearScale")?.x?.coerceIn(-0.5f, 1f) ?: 0f,
-        itemLinearScaleY = pair("itemLinearScale")?.y?.coerceIn(-0.5f, 1f) ?: 0f,
-        itemLinearSpacingX = pair("itemLinearSpacing")?.x?.coerceIn(-0.5f, 1f) ?: 0f,
-        itemLinearSpacingY = pair("itemLinearSpacing")?.y?.coerceIn(-0.5f, 1f) ?: 0f,
+        itemLinearScaleX = element.pairOrNull("itemLinearScale")?.x?.coerceIn(-0.5f, 1f) ?: 0f,
+        itemLinearScaleY = element.pairOrNull("itemLinearScale")?.y?.coerceIn(-0.5f, 1f) ?: 0f,
+        itemLinearSpacingX = element.pairOrNull("itemLinearSpacing")?.x?.coerceIn(-0.5f, 1f) ?: 0f,
+        itemLinearSpacingY = element.pairOrNull("itemLinearSpacing")?.y?.coerceIn(-0.5f, 1f) ?: 0f,
         selectedItemMarginsX = (selectedItemMargins?.x?.coerceIn(-1f, 1f) ?: 0f) * marginScale,
         selectedItemMarginsY = (selectedItemMargins?.y?.coerceIn(-1f, 1f) ?: 0f) * marginScale,
         selectedItemOffsetX = (selectedItemOffset?.x?.coerceIn(-1f, 1f) ?: 0f) * marginScale,
         selectedItemOffsetY = (selectedItemOffset?.y?.coerceIn(-1f, 1f) ?: 0f) * marginScale,
         // CarouselComponent.h:1618-1627 -- itemRotation/itemRotationOrigin
         // are deliberately UNCLAMPED in real ES-DE.
-        itemRotation = float("itemRotation") ?: 7.5f,
-        itemRotationOriginX = pair("itemRotationOrigin")?.x ?: -3f,
-        itemRotationOriginY = pair("itemRotationOrigin")?.y ?: 0.5f,
-        itemAxisHorizontal = bool("itemAxisHorizontal") ?: false,
-        itemAxisRotation = float("itemAxisRotation") ?: 0f,
+        itemRotation = element.floatOrNull("itemRotation") ?: 7.5f,
+        itemRotationOriginX = element.pairOrNull("itemRotationOrigin")?.x ?: -3f,
+        itemRotationOriginY = element.pairOrNull("itemRotationOrigin")?.y ?: 0.5f,
+        itemAxisHorizontal = element.boolOrNull("itemAxisHorizontal") ?: false,
+        itemAxisRotation = element.floatOrNull("itemAxisRotation") ?: 0f,
         itemDiagonalOffset = (diagonalOffset ?: 0f) * diagonalScale,
         // CarouselComponent.h:1652-1690 -- itemHorizontalAlignment is
         // ignored for both horizontal types (they align along that axis
@@ -259,40 +253,40 @@ fun esDeCarouselConfig(
         itemHorizontalAlignment = if (type == EsDeCarouselType.HORIZONTAL || type == EsDeCarouselType.HORIZONTAL_WHEEL) {
             EsDeHorizontalAlign.CENTER
         } else {
-            horizontalAlign(str("itemHorizontalAlignment"))
+            horizontalAlign(element.strOrNull("itemHorizontalAlignment"))
         },
         itemVerticalAlignment = if (type == EsDeCarouselType.VERTICAL) {
             EsDeVerticalAlign.CENTER
         } else {
-            verticalAlign(str("itemVerticalAlignment"))
+            verticalAlign(element.strOrNull("itemVerticalAlignment"))
         },
         // CarouselComponent.h:1691-1728 -- each wheel alignment applies to
         // exactly one wheel type.
         wheelHorizontalAlignment = if (type == EsDeCarouselType.VERTICAL_WHEEL) {
-            horizontalAlign(str("wheelHorizontalAlignment"))
+            horizontalAlign(element.strOrNull("wheelHorizontalAlignment"))
         } else {
             EsDeHorizontalAlign.CENTER
         },
         wheelVerticalAlignment = if (type == EsDeCarouselType.HORIZONTAL_WHEEL) {
-            verticalAlign(str("wheelVerticalAlignment"))
+            verticalAlign(element.strOrNull("wheelVerticalAlignment"))
         } else {
             EsDeVerticalAlign.CENTER
         },
-        horizontalOffset = float("horizontalOffset")?.coerceIn(-1f, 1f) ?: 0f,
-        verticalOffset = float("verticalOffset")?.coerceIn(-1f, 1f) ?: 0f,
+        horizontalOffset = element.floatOrNull("horizontalOffset")?.coerceIn(-1f, 1f) ?: 0f,
+        verticalOffset = element.floatOrNull("verticalOffset")?.coerceIn(-1f, 1f) ?: 0f,
         // CarouselComponent.h:1730-1752 -- reflections are only supported
         // for the plain horizontal type; real ES-DE logs a warning and
         // ignores the property for every other type.
-        reflections = (bool("reflections") ?: false) && type == EsDeCarouselType.HORIZONTAL,
-        reflectionsOpacity = float("reflectionsOpacity")?.coerceIn(0.1f, 1f) ?: 0.5f,
-        reflectionsFalloff = float("reflectionsFalloff")?.coerceIn(0f, 10f) ?: 1f,
-        unfocusedItemOpacity = float("unfocusedItemOpacity")?.coerceIn(0.1f, 1f) ?: 0.5f,
-        unfocusedItemSaturation = float("unfocusedItemSaturation")?.coerceIn(0f, 1f),
-        unfocusedItemDimming = float("unfocusedItemDimming")?.coerceIn(0f, 1f) ?: 1f,
-        imageSaturation = float("imageSaturation")?.coerceIn(0f, 1f) ?: 1f,
-        imageBrightness = float("imageBrightness")?.coerceIn(-2f, 2f) ?: 0f,
-        instantItemTransitions = str("itemTransitions") == "instant",
-        fastScrolling = bool("fastScrolling") ?: false,
+        reflections = (element.boolOrNull("reflections") ?: false) && type == EsDeCarouselType.HORIZONTAL,
+        reflectionsOpacity = element.floatOrNull("reflectionsOpacity")?.coerceIn(0.1f, 1f) ?: 0.5f,
+        reflectionsFalloff = element.floatOrNull("reflectionsFalloff")?.coerceIn(0f, 10f) ?: 1f,
+        unfocusedItemOpacity = element.floatOrNull("unfocusedItemOpacity")?.coerceIn(0.1f, 1f) ?: 0.5f,
+        unfocusedItemSaturation = element.floatOrNull("unfocusedItemSaturation")?.coerceIn(0f, 1f),
+        unfocusedItemDimming = element.floatOrNull("unfocusedItemDimming")?.coerceIn(0f, 1f) ?: 1f,
+        imageSaturation = element.floatOrNull("imageSaturation")?.coerceIn(0f, 1f) ?: 1f,
+        imageBrightness = element.floatOrNull("imageBrightness")?.coerceIn(-2f, 2f) ?: 0f,
+        instantItemTransitions = element.strOrNull("itemTransitions") == "instant",
+        fastScrolling = element.boolOrNull("fastScrolling") ?: false,
     )
 }
 
