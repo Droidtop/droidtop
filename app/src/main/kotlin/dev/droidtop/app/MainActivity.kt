@@ -12,12 +12,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
+import dev.droidtop.hostbridge.ClipboardBridge
 import dev.droidtop.library.EngineGameProvider
 import dev.droidtop.library.Library
 import dev.droidtop.library.NativeAppProvider
 import dev.droidtop.library.RoomPlayHistoryStore
 import dev.droidtop.library.consoles.ConsoleRomProvider
-import dev.droidtop.hostbridge.ClipboardBridge
 import dev.droidtop.runtime.ContainerTerminal
 import dev.droidtop.runtime.DisplayOutputKind
 import dev.droidtop.runtime.DisplayOutputRepository
@@ -377,24 +377,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Dual-screen role orchestration (docs/SPEC.md §4, handheld
-     * dual-screen roles — directed after the first live addon session):
-     * when a second display is present and [DisplayRolePrefs.shellTarget]
-     * says so (the default), the HANDHELD SHELL ITSELF moves to it (the
-     * addon is the upper/main screen) and the built-in screen gets the
-     * widgets panel ([CompanionActivity] — a real Activity, since
-     * `Presentation` can only target non-default displays). The
-     * companion path stays as the real implementation of
-     * the other choice (shell on built-in, widgets on the addon). Launch
-     * ordering under SECOND_WHEN_PRESENT: companion first, then the shell
-     * task moves (singleTask + setLaunchDisplayId relocates this same
-     * instance) — so window focus, and every gamepad event with it, ends
-     * on the shell. Also maintains [LaunchDisplay.targetDisplayId] — the
-     * launcher-wide "games launch on which display" setting. Desktop mode
-     * deliberately opts out of all of this (§4: its lower screen is an
-     * input surface).
-     */
-    /**
      * Keeps exactly one [ClipboardBridge] alive per live HostBridge. A
      * session that goes away and comes back gets a fresh bridge rather than
      * one still holding the previous connection's synced text.
@@ -426,6 +408,24 @@ class MainActivity : AppCompatActivity() {
         clipboardBridge?.onWindowFocusChanged(hasFocus)
     }
 
+    /**
+     * Dual-screen role orchestration (docs/SPEC.md §4, handheld
+     * dual-screen roles — directed after the first live addon session):
+     * when a second display is present and [DisplayRolePrefs.shellTarget]
+     * says so (the default), the HANDHELD SHELL ITSELF moves to it (the
+     * addon is the upper/main screen) and the built-in screen gets the
+     * widgets panel ([CompanionActivity] — a real Activity, since
+     * `Presentation` can only target non-default displays). The
+     * companion path stays as the real implementation of
+     * the other choice (shell on built-in, widgets on the addon). Launch
+     * ordering under SECOND_WHEN_PRESENT: companion first, then the shell
+     * task moves (singleTask + setLaunchDisplayId relocates this same
+     * instance) — so window focus, and every gamepad event with it, ends
+     * on the shell. Also maintains [LaunchDisplay.targetDisplayId] — the
+     * launcher-wide "games launch on which display" setting. Desktop mode
+     * deliberately opts out of all of this (§4: its lower screen is an
+     * input surface).
+     */
     private fun observeSecondScreen() {
         val displayOutputs = DisplayOutputRepository(applicationContext)
         val displayManager = getSystemService(DisplayManager::class.java)
