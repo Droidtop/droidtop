@@ -272,12 +272,14 @@ jobs:
       # convention. The signal is what matters here, not the gate.
       - name: Run unit tests
         if: always()
-        run: ./gradlew :library-core:testDebugUnitTest --stacktrace
+        run: ./gradlew :library-core:testDebugUnitTest :input-seat:testDebugUnitTest --stacktrace
 
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: unit-test-reports
-          path: library-core/build/reports/tests/
+          path: |
+            library-core/build/reports/tests/
+            input-seat/build/reports/tests/
           if-no-files-found: ignore
