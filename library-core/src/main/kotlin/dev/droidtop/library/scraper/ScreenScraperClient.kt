@@ -69,7 +69,8 @@ data class ScreenScraperGameMetadata(
  * blank rather than requiring registration before this client can be
  * used at all. droidtop now has its own registered devid/devpassword pair,
  * shipped XOR-scrambled in [ScreenScraperDevCredentials] the way ES-DE ships
- * its own, so requests carry the higher application rate limit by default.
+ * its own. That pair is what lets the client reach the API rather than a
+ * quota tier -- the scraping limit is a property of the user's own account.
  */
 object ScreenScraperClient {
 

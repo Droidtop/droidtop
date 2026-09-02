@@ -26,10 +26,10 @@ object ScreenScraperPrefs {
      * overridden them.
      *
      * ScreenScraper's devid/devpassword identify the calling application rather
-     * than the person using it, so shipping droidtop's own pair is the point of
-     * having one: without it every install shares the anonymous rate limit. An
-     * explicitly stored value still wins, for anyone running their own registered
-     * pair. This is separate from ssid/sspassword, which stay the user's own.
+     * than the person using it, and are what let a client reach the API at all.
+     * They are not a quota tier: the scraping limit belongs to the user's own
+     * account (ssid/sspassword), which stays theirs. An explicitly stored value
+     * still wins, for anyone running their own registered pair.
      */
     fun devId(context: Context): String =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_DEV_ID, "")

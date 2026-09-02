@@ -5,9 +5,12 @@ package dev.droidtop.library.scraper
  *
  * ScreenScraper's API identifies the calling APPLICATION, not the end user: every
  * client registers one devid/devpassword pair with them and every copy of that
- * client sends it. Requests without one fall back to a much lower anonymous rate
- * limit, which is what droidtop used until now. A per-user account (ssid/
- * sspassword) is separate, optional, and still the user's own to supply.
+ * client sends it. It is an access requirement rather than a quota tier -- the
+ * pair is what lets a client talk to the API at all, anonymously or otherwise.
+ *
+ * The scraping quota is a property of the USER's own account (ssid/sspassword),
+ * which stays theirs to supply and can be substantially larger for supporters.
+ * So this pair does not raise anyone's limit; it makes the client work.
  *
  * The pair is stored XOR-scrambled against a key rather than as plain literals,
  * which is exactly what ES-DE does (Utils::String::scramble, with the credentials
