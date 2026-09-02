@@ -2324,13 +2324,46 @@ but nothing sets it yet: in real ES-DE exactly one thing is secondary, a
 FOLDER entry in a gamelist, and droidtop's ROM scan is still flat -- the
 same standing gap the `folder` badge slot documents.
 
+The `grid` went the same way in the same pass, and for the same reason:
+its model could not express its schema. droidtop drew a
+`LazyVerticalGrid` of tiles that were pure invention -- a dark rounded
+card with an accent border and an "N items" line, none of which exists in
+ES-DE -- and that card occupied exactly the surface a theme's own
+`backgroundColor`/`backgroundImage` and `selectorColor`/`selectorImage`
+layers are supposed to own. A real grid entry is up to three stacked
+layers, ordered by `selectorLayer` (top/middle/bottom), each sized by its
+own `*RelativeScale` and rounded by its own `*CornerRadius`, and that is
+what renders now, along with `backgroundColorEnd`/
+`backgroundGradientType`/`selectorColorEnd`/`selectorGradientType`,
+`scaleInwards` (an edge item grows into the grid rather than off it),
+`fractionalRows`, `itemTransitions`/`rowTransitions`,
+`unfocusedItemDimming`, `imageRelativeScale`/`imageCornerRadius`/
+`imageBrightness`, `textRelativeScale` and the full `letterCase` set. Two
+more real defaults were wrong here: `itemSpacing` is AUTO-CALCULATED from
+`itemScale` when a theme omits it (droidtop used a flat 16dp), and the
+grid's own default text color is black on transparent, not white. Its
+`itemScale` clamp is also 0.5-2.0, not the carousel's 0.2-3.0. The
+tile's item count is gone with the tile and nothing is lost: real ES-DE's
+own mechanism for it is a `systemdata` text element the theme places
+itself, which droidtop already renders.
+
+All three list widgets now share one architecture, which is ES-DE's own:
+the WIDGET owns the cursor and the key handling, and items are render
+output with no focus identity of their own. That fixed a real navigation
+bug on the way past -- a vertical carousel could not be navigated at all,
+because ES-DE moves the vertical types on up/down rather than left/right
+-- and it is what let a textlist in a system view finally report its
+cursor for per-system theme reloading, which only the carousel did
+before.
+
 Still open after this, in rough order of how much a real theme notices:
-`grid`'s own selector/background family (27/64, structurally the same
-work as the textlist selector), `text`'s `container*` scrolling-container
-family (which is what long scraped game descriptions actually need),
-`helpsystem`'s dimmed-state and entry-layout properties (13/31), and the
-`rotationOrigin`/`stationary` pair that recurs across nearly every
-element type.
+`text`'s `container*` scrolling-container family (which is what long
+scraped game descriptions actually need), `imageType` across
+carousel/grid/image (one library-core data-model change unblocks all
+three), the `textHorizontalScroll*` family shared by carousel, grid and
+textlist, `helpsystem`'s dimmed-state and entry-layout properties
+(13/31), and the `rotationOrigin`/`stationary` pair that recurs across
+nearly every element type.
 
 **Five-theme on-device review + fixes (2026-08-30, later same day)**:
 the theme downloader ran end-to-end for the first time — three real

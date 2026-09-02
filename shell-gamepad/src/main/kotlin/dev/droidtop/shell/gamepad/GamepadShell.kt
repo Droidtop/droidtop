@@ -1454,9 +1454,7 @@ private fun GamesSection(
             EsDeListItem(
                 key = entry.id,
                 label = entry.title,
-                count = null,
                 logoPath = entry.artworkUri,
-                accentColor = null,
                 onSelect = { onLaunch(entry) },
                 // Real ES-DE textlist indicators: a favorite game gets a
                 // leading marker before its name in a gamelist.
@@ -1496,14 +1494,6 @@ private fun GamesSection(
     val trailingCollections = collectionGroups.filterNot { it.id == AutoCollections.ALL_GAMES_ID }
     val orderedGroups: List<GameGroup> =
         leadingCollections + orderedEngineGroups + orderedSystemGroups + trailingCollections
-    // Real per-group item counts -- byGroup covers the strict
-    // system/engine partition, collectionGroupMembers covers the
-    // cross-cutting collections (see GameGroup.Collection's own doc
-    // comment for why these can't share one plain groupBy).
-    val groupItemCounts: Map<GameGroup, Int> = remember(byGroup, collectionGroupMembers) {
-        byGroup.mapValues { it.value.size } + collectionGroupMembers.mapValues { it.value.size }
-    }
-
     LaunchedEffect(selectedGroup, hasThemedGamelist, focusedGameIndex) {
         // Real regardless of whether the theme's gamelist has its own
         // list widget -- a widget's onFocusedIndexChanged (wired at the
@@ -1707,16 +1697,12 @@ private fun GamesSection(
                     // recomposes every animation frame. Keyed on
                     // ThemePrefs.version so a live theme switch still
                     // rebuilds the logo paths.
-                    val items = remember(orderedGroups, groupItemCounts, ThemePrefs.version) {
+                    val items = remember(orderedGroups, ThemePrefs.version) {
                         orderedGroups.map { entryGroup ->
                             EsDeListItem(
                                 key = entryGroup.key,
                                 label = entryGroup.label,
-                                count = groupItemCounts[entryGroup] ?: 0,
                                 logoPath = entryGroup.systemThemeFolder?.let { ThemeAssets.systemLogoPath(context, it) },
-                                accentColor = entryGroup.systemThemeFolder
-                                    ?.let { SystemThemeColors.forSystem(context, it) }
-                                    ?.let { Color(it) },
                                 // Real ES-DE select sound -- entering a
                                 // system from the system view plays
                                 // SELECTSOUND (SystemView.cpp:129).
