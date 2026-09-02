@@ -21,6 +21,14 @@ package dev.droidtop.library.scraper
  * these identify droidtop to ScreenScraper, they are not a user secret.
  *
  * The transform is symmetric, so the same routine both scrambles and recovers.
+ *
+ * PROVENANCE, because scrambled bytes cannot answer this for a reader and a
+ * previous review could not rule out the bad cases: this pair was registered
+ * with ScreenScraper by droidtop's owner and supplied by them directly. It was
+ * not generated, not guessed, and not taken from another client. ES-DE is cited
+ * above only as the source of the scrambling TECHNIQUE, never of the values.
+ * Anyone replacing these must register their own pair the same way -- through
+ * ScreenScraper's forum, as a human.
  */
 internal object ScreenScraperDevCredentials {
 
