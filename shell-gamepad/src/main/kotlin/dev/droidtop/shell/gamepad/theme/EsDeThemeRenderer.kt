@@ -2293,14 +2293,12 @@ private fun EsDeThemedHelpSystem(
     val defaultHelpColor = Color(0xFF777777)
     val textColor = dimmedColor("textColor") ?: defaultHelpColor
     val iconColor = dimmedColor("iconColor") ?: defaultHelpColor
-    // HelpComponent.cpp:291-294 -- opacityDimmed's own clamp is 0.2..1.0,
-    // not 0..1: real ES-DE refuses to let a theme make the help bar
-    // invisible behind a menu.
-    val opacity = if (dimmed && element.floatOrNull("opacityDimmed") != null) {
-        element.floatOrNull("opacityDimmed")!!.coerceIn(0.2f, 1f)
-    } else {
-        (element.floatOrNull("opacity") ?: 1f).coerceIn(0f, 1f)
-    }
+    // HelpComponent.cpp:288-294 -- BOTH `opacity` and `opacityDimmed`
+    // clamp to 0.2..1.0 on this element, not 0..1: real ES-DE refuses to
+    // let a theme make the help bar invisible. droidtop clamped the
+    // undimmed one to 0..1, so a theme asking for 0 really did erase its
+    // own help bar where ES-DE would have shown it at 20%.
+    val opacity = (dimmedFloat("opacity") ?: 1f).coerceIn(0.2f, 1f)
     // Real default: HelpComponent constructs with FONT_SIZE_SMALL (0.035),
     // not 0.025 -- confirmed against real ES-DE source (Font.h/HelpComponent.h).
     val fontSizeFraction = dimmedFloat("fontSize") ?: 0.035f
