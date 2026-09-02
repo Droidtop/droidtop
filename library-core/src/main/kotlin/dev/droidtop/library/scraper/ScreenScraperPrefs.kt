@@ -7,9 +7,11 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * ScreenScraper credentials. The USERNAME/PASSWORD pair is the user's
  * own screenscraper.fr account (optional; raises rate limits). The dev
  * pair is an APPLICATION credential (real ES-DE embeds its own and
- * never surfaces it) -- no settings field exposes it; it arrives via
- * settings restore (the whole-prefs backup carries every key here) or a
- * compiled-in registered pair once droidtop has one. Same shared prefs
+ * never surfaces it) -- no settings field exposes it; it falls back to
+ * the compiled-in pair in [ScreenScraperDevCredentials], and a stored
+ * value (from settings restore -- the whole-prefs backup carries every
+ * key here -- or from anyone running their own registered pair) wins
+ * over it. Same shared prefs
  * file every other droidtop setting uses, which is exactly what makes
  * the existing backup/restore cover credentials for free (directed
  * 2026-08-31, replacing the retired debug-credentials file).
