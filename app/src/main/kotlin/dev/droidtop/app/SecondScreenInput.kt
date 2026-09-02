@@ -26,7 +26,7 @@ import dev.droidtop.input.TrackpadOutput
 import dev.droidtop.input.TrackpadView
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 import org.pocketworkstation.pckeyboard.AndroidCharKeyResolver
-import org.pocketworkstation.pckeyboard.LatinIME
+
 import org.pocketworkstation.pckeyboard.LatinKeyboardView
 import org.pocketworkstation.pckeyboard.SecondScreenKeyboard
 import org.pocketworkstation.pckeyboard.SecondScreenKeyboardListener
@@ -236,7 +236,7 @@ class SecondScreenInputView(
             SecondScreenKeyboardListener(
                 send = { keyCode, down ->
                     metaState = updatedMetaState(metaState, keyCode, down)
-                    val connection = LatinIME.sInstance?.currentInputConnection
+                    val connection = SecondScreenKeyboard.androidTarget
                     if (connection == null) {
                         status.text = statusText()
                     } else {
@@ -248,7 +248,7 @@ class SecondScreenInputView(
                     }
                 },
                 resolver = AndroidCharKeyResolver(),
-                commit = { text -> LatinIME.sInstance?.currentInputConnection?.commitText(text, 1) },
+                commit = { text -> SecondScreenKeyboard.androidTarget?.commitText(text, 1) },
                 onLayoutToggle = ::toggleLayout,
             )
         }
@@ -273,7 +273,7 @@ class SecondScreenInputView(
                 "No desktop session — start one to use this surface"
             }
 
-        LatinIME.sInstance == null ->
+        !SecondScreenKeyboard.imeRunning ->
             "Swipe to navigate. Typing needs droidtop's keyboard picked in Android's keyboard switcher."
 
         !SecondScreenKeyboard.androidTargetAvailable() ->
