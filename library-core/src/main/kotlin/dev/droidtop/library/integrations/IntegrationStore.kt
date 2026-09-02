@@ -81,6 +81,12 @@ object IntegrationStore {
         systemName: String? = null,
         systemFolder: File? = null,
         query: String? = null,
+        // The one real file an OPEN_WITH integration is being pointed at
+        // (see [openWithTargetsFor]). Kept separate from [systemFolder]
+        // rather than overloading it: they are different trust shapes --
+        // this one becomes a read-only, per-call FileProvider grant for
+        // exactly this file, and nothing else on disk.
+        file: File? = null,
     ) {
         check(isInstalled(context, integration.packageName)) {
             "${integration.label} needs ${integration.packageName}, which isn't installed."
@@ -100,7 +106,7 @@ object IntegrationStore {
             AmStartCommandToIntentConverter.toIntent(
                 context,
                 integration.argumentsTemplate,
-                systemFolder?.absolutePath,
+                (file ?: systemFolder)?.absolutePath,
                 placeholders,
             ),
         )
@@ -140,7 +146,28 @@ object IntegrationStore {
           {system.folder}  absolute path droidtop scans for that system
           {query}          a search string, when the surface collected one
 
-        capability is one of: acquire_content, open_with.
+        capability is one of the two below, and it decides both where
+        droidtop offers the integration and what it hands over:
+
+          acquire_content  Offered inside a system's own settings screen,
+                           where the system and its real destination
+                           folder are both known. Gets {system.*}.
+                           droidtop hands over a folder PATH, not write
+                           access -- the other app writes with its own
+                           storage permissions, or not at all.
+
+          open_with        Offered on a game's own detail screen, one
+                           chip per file droidtop has but cannot open
+                           itself: the scraped manual (PDF) and the
+                           scraped preview video. Use {file.uri} (and
+                           -t, e.g. -t application/pdf) to receive it.
+                           The grant is READ-ONLY and covers that one
+                           file only.
+
+        open_with deliberately cannot claim the game itself. Which app
+        launches a ROM is already owned by the player database, per
+        system and per game, with its own override UI -- an integration
+        must not become a second, silent way to change that.
 
         The target app must actually accept what you send it. An app that
         only declares MAIN/LAUNCHER can be opened but not directed, so

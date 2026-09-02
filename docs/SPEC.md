@@ -1225,11 +1225,33 @@ by droidtop and keyed by game, never by whichever container happened to
 launch it. Execution is a **runtime** choice, not a structural one:
 
 - the bionic direct-exec path is the universal default, works with no
-  root, and is therefore what the handheld uses;
-- droidspaces `exec` is an optimization available in desktop mode where
-  root is legitimate, never a precondition;
-- neither may re-provision anything the other already installed. The test
-  is that the same game with the same prefix launches in both modes.
+  root, and is what BOTH modes use to run Wine;
+- **Wine never runs with root -- a hard security boundary, not a
+  preference** (stated 2026-09-02, superseding the earlier "droidspaces
+  `exec` as a desktop optimization" shape recorded here). Wine's whole
+  job is executing arbitrary third-party Windows binaries; a malicious
+  game in a root-capable context needs no exploit, only to be run. So
+  the Wine launch path must not pass through
+  `ContainerRuntimeFactory.select` at all -- on a rooted device that
+  selection silently yields the root-backed droidspaces runtime. The
+  constraint is structural: `WineEngine` is a *sealed* interface that
+  cannot be handed a `ContainerRuntime`, so "run Wine as root" is not
+  expressible outside `:runtime-windows`, and inside it any
+  implementation touching `RootProcess`/`ContainerRuntime` is a
+  boundary violation by definition. Provisioning is separate from
+  execution: laying out the ImageFs is droidtop's own work on its own
+  directories and needs no root either (the only root use in
+  `:runtime-windows` is the optional GameNative data import, which
+  reads another app's database and never executes a guest).
+  `RootfsDelete` (root, `:runtime-linux-root`) is droidspaces container
+  lifecycle only; `:runtime-windows` does not depend on that module, so
+  the Wine path cannot reach a root-capable delete, and a Wine prefix
+  can never be handed to it;
+- root elsewhere in desktop mode (droidspaces containers for the Linux
+  desktop itself) is unchanged -- the ban is on the Wine *guest*;
+- neither mode may re-provision anything the other already installed.
+  The test is that the same game with the same prefix launches in both
+  modes.
 
 That means `PcGameRuntime`'s implementation must stop treating a live
 `PrimaryContainerSession` as the precondition for launching Windows
@@ -1238,11 +1260,100 @@ express "run this command in this environment"; what is not adequate is
 the assumption at the call site that the environment IS a droidspaces
 primary container.
 
-Packaging the vendored `jniLibs` (both `src/main` and `src/modern`, the
-same split upstream applies to its Java sources) is done. Remaining, in
-order: give the Wine launch a backend-neutral entry point with no
-`PrimaryContainerSession` requirement; then prove provisioning and one
-launch on hardware before porting anything further.
+### What the hardware said (2026-09-02)
+
+The seam exists: `WineEngine`, with `BionicWineEngine` behind it, and no
+launch site asks for a `PrimaryContainerSession` any more.
+`WineSession`/`WineLaunchEnvironment` are gone -- they existed only to
+run Wine through `ContainerRuntime.exec`, and the hand-transcribed guest
+environment is superseded by the vendored launcher component's own.
+
+Packaging was not one omission but three, each fatal on its own and each
+found by the next one failing on the device:
+
+- the vendored `jniLibs` (fixed previously);
+- the modern flavor's **assets**. `MODERN_ANDROID` makes every guest
+  process `LD_PRELOAD` `libredirect-bionic-wx.so`, which
+  `ImageFsInstaller` copies out of `src/modern/assets` -- a source dir
+  nothing referenced;
+- `useLegacyPackaging` for `jniLibs`. The runtime hands native library
+  *paths* to processes it starts (`libevshim.so` out of
+  `ApplicationInfo.nativeLibraryDir`), and without extraction at install
+  time that directory is empty. Confirmed on the device: 35 libraries in
+  the APK, `lib/arm64` empty.
+
+Provisioning also could not have worked as written, for two reasons
+beyond the missing natives:
+
+- it created the container from `Container.DEFAULT_VARIANT`, which reads
+  `DefaultVersion.VARIANT` -- `glibc` at class-load time. droidtop now
+  names bionic and a bionic wine version explicitly;
+- **order**. Creating a container copies Wine's own DLLs into the new
+  prefix, so Wine has to be installed first; and gamenative's proton
+  launch dependency downloads through `SteamService.downloadFile`, which
+  dereferences a service droidtop never starts. droidtop fetches the
+  archive with the instance-free downloader and lets the dependency do
+  the rest.
+
+**Milestone 1 is met.** On build 388 the ImageFs rootfs installs for the
+first time: 175MB base system downloaded and extracted to a 947MB rootfs
+with `bin`/`etc`/`lib`/`usr`/`opt`, `opt/proton-9.0-x86_64` symlinked
+into a 358MB shared Proton store. Before this it had never once
+completed.
+
+**Milestone 2 is not.** The run ended in a destructive bug of droidtop's
+own making, recorded here so it is never repeated: a half-finished
+container directory was cleaned up with Kotlin's `deleteRecursively`,
+which follows symlinked directories. A Wine prefix contains
+`dosdevices/z: -> /`. The walk left the prefix, and emptied what it
+could reach on internal storage before it was stopped. gamenative's
+`FileUtils.delete` refuses to descend into a symlink -- that is why it
+exists, and it is what the cleanup uses now. **Never point a
+walk-and-delete at a Wine prefix.**
+
+### Destructive-operation audit (2026-09-02, after the incident)
+
+Every recursive removal on the branch, checked for the same defect
+class -- a delete that can leave the tree it was pointed at:
+
+- **Wine-prefix cleanup** (`DroidtopPcGameRuntime.provision`): now goes
+  through droidtop's own `SafeDelete.deleteWithin(imageFs.rootDir, ...)`
+  rather than trusting a helper to refuse -- it proves the target is
+  inside the ImageFs (parent canonicalized first, so a symlinked
+  ancestor can't redirect it) and walks with `Files.walkFileTree`
+  without `FOLLOW_LINKS`, which cannot enter a symlink. A refusal
+  aborts provisioning, deleting nothing. Regression-tested against the
+  incident's exact shape (`SafeDeleteTest`).
+- **`DroidSpacesRuntime.destroy` / `CraneRootfsPuller` stale-rootfs
+  wipe**: both previously hazardous. `destroy` used Kotlin's
+  `deleteRecursively` on a Linux rootfs -- a tree full of symlinks,
+  root-owned so the app-side walk couldn't even work, while the walk
+  itself could still follow a rootfs symlink into shared storage. The
+  puller used a bare root `rm -rf`, which never follows symlinks but
+  DOES descend into a live mount -- and droidspaces bind-mounts the
+  app-storage dir into every rootfs, with leaked instances confirmed
+  to keep those mounts alive. Both now go through `RootfsDelete`:
+  root `rm -rf`, refused while `/proc/mounts` shows anything mounted
+  under the canonicalized path.
+- **Archive extraction** (`TarCompressorUtils.extract`, gamenative
+  fork `4ac3f2a8`): entry names are network input and were joined to
+  the destination unchecked. Extraction now refuses any entry whose
+  canonicalized parent is outside the destination (covers `../`
+  traversal and writes routed through a symlink an earlier entry
+  planted) and unlinks a symlink sitting where a regular file is about
+  to be written. Archives keep their legitimate internal symlinks.
+- **Safe by construction, left as they are**: `GameNativeMigration`
+  staging (flat files droidtop itself writes into its own cache),
+  `FileImageCache.clear` (flat `.tar`s in cache), `ThemeAssets`
+  (APK-asset extraction -- assets cannot be symlinks),
+  `BackupHelper` (entry names whitelisted to exact known filenames,
+  staging dirs hold only droidtop-written flat files), and test-only
+  temp dirs.
+
+Remaining: repeat provisioning through container creation on hardware,
+then one Windows launch. Presentation is separate and unstarted -- the
+engine runs Wine against a headless X server, and nothing composites its
+output into droidtop's own surface yet.
 
 ## 6. Input
 
@@ -2200,6 +2311,41 @@ GitHub-refresh + validate-before-replace:
   `xp`/`vx`, detected via their real archive/project/Game.ini RGSS
   signatures). The unit tests parse the SHIPPED seed file, so registry
   edits that break detection fail CI before they ship.
+
+  **v5 — one detection authority for droidtop AND enginehost (decided
+  2026-09-02).** droidtop and enginehost briefly carried two independent
+  engine detectors, extended separately, that could classify the same
+  folder differently (library says one thing, launch does another). The
+  resolution: `engines-database.json` is the single classification
+  authority for both apps. enginehost bundles the same file as its seed
+  and refreshes it from the same droidtop-platforms URL, evaluating the
+  same rows with the same semantics (rules OR, conditions AND, file
+  order is the sole precedence), so scan-time and launch-time
+  classification agree by construction and a detection fix ships once,
+  as data, to both. The alternative — droidtop asking enginehost at scan
+  time — was rejected: droidtop classifies hundreds of folders per scan
+  and must work with enginehost absent, and detection also drives
+  non-enginehost routes (Wine/Linux/Kirikiroid2, the §7g store-ownership
+  rule, Unreal/Unity). A compiled shared module across the two repos was
+  rejected too (two release cadences, separate CI): the DATA is the
+  shared module; each app keeps a thin interpreter of the documented
+  format, and both test suites parse the same shipped seed file. Three
+  consequences: (1) rows an app's id map doesn't know are skipped by
+  that app — `rpgmaker-mvmz` and `flash-swf` are enginehost-only by
+  design (plain `.swf` stays droidtop's players-database path);
+  (2) enginehost's richer per-engine parsing (RGSS version out of
+  `Game.ini`, `RPGMAKER_VERSION`, Ren'Py's `vc_version.py`, GDPC/SWF
+  headers) is ENRICHMENT, run after classification and keyed on the
+  classified family — it prefills version/execFile/evidence and can
+  never change which engine a folder is; (3) where one engine id spans
+  multiple rows (`cmvs`/`cmvs-ps3`/`cmvs-ps2`), the FIRST row is the
+  canonical launch row (`EnginesDatabase.defFor`), so the generic
+  context-null row is listed first and the context-refining rows after
+  it. New in v5, every marker taken from one the two detectors had
+  already verified, none invented: `anyFileExtensionDeep` (depth-capped
+  subtree extension search, for the compiled-Ren'Py fallback),
+  `startup.tjs`, corroborated `RPG_RT.ldb`+(`exe`|`lmt`),
+  `project.godot`, `.cst`, `.ps3`/`.ps2`, and `data01000.arc`.
 - `bios-database.json` — §7e4's firmware registry.
 
 One user action refreshes all four ("Update platform databases" in the
@@ -3418,10 +3564,38 @@ declaring which installed app to drive and how:
   action inside that system's own settings screen, where the system id
   and its destination folder are both already known.
 
-**The PLUGIN half (APK or Python module) is deliberately not built.**
-Nothing in the first real use case needs it, and a sandbox/trust model
-for running foreign code is a far larger design than a declarative Intent
-description.
+**`open_with` surfaced (2026-09-02).** It was declared and documented
+from the start but had zero call sites: a user could write a valid
+`open_with` integration and nothing would ever invoke it. It is now
+offered on a game's own detail screen (`EntryDetailScreen`), one chip per
+real file droidtop has and has no viewer of its own for, which today is
+exactly two:
+
+- the scraped **manual** (`downloaded_media/<system>/manuals/<rom>.pdf`),
+  which droidtop resolves at scan time and then only ever renders a badge
+  for — there is no PDF reader anywhere in droidtop;
+- the scraped **preview video**, which today can only auto-play muted
+  inside a theme element and cannot be opened, paused or scrubbed.
+
+Three rules make this an *addition* rather than a substitution, and they
+are the decision, not the implementation detail:
+
+1. **`open_with` may never claim the game file itself.** Which app
+   launches a ROM is already owned end-to-end by the player database,
+   per system and per game, with its own real override UI. An
+   integration that could also claim the launch path would be a second
+   mechanism for a job that already has one, and a silent way to change
+   a behaviour the user configured somewhere else.
+2. **A target must be a file droidtop genuinely has and genuinely cannot
+   open.** Scraped artwork is not a target: droidtop has its own media
+   viewer for it. This is what keeps the capability from creeping into
+   "hand droidtop's jobs to other apps".
+3. **Nothing is ranked or auto-picked.** Two declared `open_with` hooks
+   produce two chips and the user chooses. droidtop does not decide.
+
+The grant is the narrow one the existing `am start` path already
+produces: a read-only FileProvider `content://` URI for that one file,
+revoked when the receiving task dies.
 
 **Known limitation, confirmed against a real app:** an integration can
 only drive an app as far as that app's own exported surface allows. The
@@ -3431,16 +3605,114 @@ or a destination, and extras are simply ignored. Making that case work
 needs an intent surface added to the *target* app, not more integration
 machinery here.
 
-Real open questions a full design pass still needs to answer (not
-resolved here): the exact shape of droidtop's internal API surface both
-integration types talk to, how a JSON integration's manifest is
-structured, how a PLUGIN integration (APK or Python module) is
-sandboxed/invoked and what it's allowed to call back into, how droidtop
-discovers what's installed and integration-capable, and what a real
-permission/trust model looks like for letting a third-party integration
-receive data from or act on behalf of droidtop (a "search+add-to-library"
-JSON integration is a very different trust shape
-than "render this video" or "show now-playing controls").
+**The PLUGIN half (APK or Python module) is still not built** — and,
+after a pass over what it would take, deliberately so: the shape is
+genuinely undecided (see the open questions below, all of which are
+still open), and picking one unilaterally would be exactly the kind of
+silent decision this project does not make. What follows is a concrete
+proposal to accept, reject or amend, not a description of code that
+exists.
+
+### 12a. Plugin half — DECIDED (2026-09-02)
+
+The one line already decided in §12 is the constraint that shapes
+everything else: *integrations do not reach into droidtop's internals;
+droidtop exposes a surface and the integration talks to that surface.*
+
+**Where the JSON/plugin line falls.** JSON owns everything expressible as
+one outbound, fire-and-forget Intent — "go do this over there". A plugin
+exists only where droidtop needs something **back**: a search that returns
+results droidtop renders, a now-playing state it polls, a metadata source
+it queries. Every example in §12 sorts cleanly under that, so no case is
+served by both halves.
+
+**Form: a downloadable SUBPLUGIN, distributed and verified by exactly the
+same engine that distributes engine plugins. Not a separate APK, not a
+bound Service, not a third-party app droidtop talks to.**
+
+An earlier proposal here argued for an installed APK exposing a bound
+Service, on the grounds that a separate app is a separate uid and
+therefore the only sandbox Android gives for free. That is rejected. The
+reason is the directive this project keeps returning to: one mechanism
+per job, and shared modules wherever a capability already exists.
+droidtop already has a complete apparatus for distributing third-party
+extension code — signed `.enginehost.tar.xz` bundles, per-origin pinned
+keys certified under one root, an install path that verifies every
+payload file, and a trust screen the user approves before anything runs.
+Tying integrations to APKs would mean a second distribution channel, a
+second trust model, a second install flow and a second failure mode, to
+solve a problem the first one already solves.
+
+So an integration plugin is a subplugin: the same bundle format, the
+same signing and pinning, the same catalogue and download path, the same
+approval. The subplugin concept is not integration-specific — it exists
+because engine plugins need extensions too (the Godot Spine runtime is
+the first), and integrations are simply another consumer of it.
+
+Consequences that follow and are therefore also decided: a plugin is
+never "an app the user already installed", so discovery is a catalogue
+question rather than a package-manager query; not-installed still means
+hidden rather than offered-and-broken; and the trust boundary is the one
+that already exists, so discovery does not equal activation — a
+downloaded subplugin is approved before it runs, per the existing trust
+screen.
+
+- droidtop **never** downloads or side-loads third-party code, and will
+  never grow a WebView or in-app download path for it. So a plugin has
+  to be something the user installed themselves by the normal means,
+  which on Android is an APK.
+- A separate app is a separate uid in a separate process. That is the
+  only sandbox Android hands you for free, and the only one droidtop
+  would not have to invent and then get wrong. A Python module means
+  droidtop shipping an interpreter and executing foreign source **inside
+  its own process**, with droidtop's own permissions and no boundary at
+  all — the opposite of a sandbox.
+- A bound Service gives a typed request/response surface, which is the
+  half an Intent cannot do.
+
+**Discovery (proposed).** droidtop enumerates installed apps declaring a
+Service with a droidtop-owned intent-filter action, plus `<meta-data>`
+naming which capabilities it implements. Same rule as JSON: not
+installed means not shown, never shown-and-broken.
+
+**Trust (proposed).** Discovery must not equal activation. A discovered
+plugin appears in the integrations settings screen as *available*, and
+does nothing until the user enables it there — per plugin, and per
+capability where a plugin declares more than one. droidtop passes values
+out and takes values back; it never hands over a handle to the library,
+the database, or a directory. File access, if any, stays what the JSON
+half already does: a read-only per-call `content://` grant for one named
+file.
+
+**Still genuinely open, for the user to settle:**
+
+- Are Python-module plugins in scope at all, or is the APK the whole
+  answer? (§12's original wording allows both; the sandbox argument
+  above is the case against Python, but it is an argument, not a
+  decision.)
+- May a plugin contribute **library entries** — things that show up as
+  games — or only metadata, media and actions attached to entries
+  droidtop found itself? This is the largest open question, because
+  "yes" turns plugins into a second library-source mechanism alongside
+  the existing `LibraryProvider`s, and §7g just spent a whole pass
+  unifying those.
+- Does a plugin get to declare a capability outside the closed
+  `IntegrationCapability` set, and if so, what stops the trust model
+  from becoming per-plugin freeform?
+- What happens to entries or state a plugin contributed once the user
+  uninstalls or disables it.
+
+Until those are answered, nothing plugin-side is built. The `open_with`
+work above is the part of §12 that was decided and merely unbuilt.
+
+The original open-questions list from this section — the shape of the
+internal API surface, how a plugin is sandboxed and invoked, how
+droidtop discovers what is installed and integration-capable, and what
+the permission/trust model is — is answered as a **proposal** in §12a
+above for the plugin half, and answered in fact for the JSON half by
+what is built: the surface is the closed `IntegrationCapability` set
+plus the placeholders each one is given, the manifest is the `.json`
+file, and the trust model is per-capability rather than per-app.
 
 ## 7h. Scraper honesty, and what counts as a game (directed 2026-09-02)
 

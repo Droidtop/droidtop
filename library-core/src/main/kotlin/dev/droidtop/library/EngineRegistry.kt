@@ -38,6 +38,7 @@ sealed interface DetectCondition {
     data class FileExists(val path: String) : DetectCondition
     data class AnyFileNameContains(val value: String) : DetectCondition
     data class AnyFileExtension(val value: String) : DetectCondition
+    data class AnyFileExtensionDeep(val value: String, val maxDepth: Int) : DetectCondition
     data class AnyFileNameIn(val values: Set<String>) : DetectCondition
     data class DirNamePrefixCount(val prefix: String, val min: Int) : DetectCondition
     data class FileHeadRegex(val path: String, val regex: Regex) : DetectCondition
@@ -60,9 +61,16 @@ object EngineRegistryParser {
         "buriko" to GameEngine.BURIKO,
         "catsystem2" to GameEngine.CATSYSTEM2,
         "cmvs" to GameEngine.CMVS,
+        // Generation-specific CMVS rows (v5): same compiled engine, but
+        // the row carries the ps3/ps2 context enginehost needs.
+        "cmvs-ps3" to GameEngine.CMVS,
+        "cmvs-ps2" to GameEngine.CMVS,
         "flash-air" to GameEngine.FLASH_AIR,
         "twine" to GameEngine.TWINE,
         "godot" to GameEngine.GODOT,
+        // Late compiled-files fallback row (v5) -- same engine, looser
+        // evidence, deliberately ordered after every richer signature.
+        "renpy-fallback" to GameEngine.RENPY,
         "unreal" to GameEngine.UNREAL,
         "unity" to GameEngine.UNITY,
     )
@@ -104,6 +112,7 @@ object EngineRegistryParser {
                     "fileExists" -> DetectCondition.FileExists(c.getString("path"))
                     "anyFileNameContains" -> DetectCondition.AnyFileNameContains(c.getString("value").lowercase())
                     "anyFileExtension" -> DetectCondition.AnyFileExtension(c.getString("value").lowercase())
+                    "anyFileExtensionDeep" -> DetectCondition.AnyFileExtensionDeep(c.getString("value").lowercase(), c.getInt("maxDepth"))
                     "anyFileNameIn" -> DetectCondition.AnyFileNameIn(
                         buildSet {
                             val values = c.getJSONArray("values")
@@ -177,6 +186,8 @@ object EngineDetectRules {
                 folder.listFiles()?.any { it.isFile && it.name.lowercase().contains(condition.value) } == true
             is DetectCondition.AnyFileExtension ->
                 folder.listFiles()?.any { it.isFile && it.extension.lowercase() == condition.value } == true
+            is DetectCondition.AnyFileExtensionDeep ->
+                anyFileExtensionWithin(folder, condition.value, condition.maxDepth)
             is DetectCondition.AnyFileNameIn ->
                 folder.listFiles()?.any { it.isFile && it.name.lowercase() in condition.values } == true
             is DetectCondition.DirNamePrefixCount ->
@@ -192,4 +203,17 @@ object EngineDetectRules {
             }
             is DetectCondition.Builtin -> builtinProbe(condition.name, folder)
         }
+
+    /**
+     * [DetectCondition.AnyFileExtensionDeep]: like AnyFileExtension but
+     * descending [maxDepth] directory levels (maxDepth 0 = root only).
+     * Depth-capped for the same reason Unity's builtin probe is: this
+     * runs against every scanned folder, some of which are huge.
+     */
+    private fun anyFileExtensionWithin(folder: File, extension: String, maxDepth: Int): Boolean {
+        val entries = folder.listFiles() ?: return false
+        if (entries.any { it.isFile && it.extension.lowercase() == extension }) return true
+        if (maxDepth <= 0) return false
+        return entries.any { it.isDirectory && anyFileExtensionWithin(it, extension, maxDepth - 1) }
+    }
 }
