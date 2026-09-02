@@ -42,6 +42,14 @@ data class LibraryEntry(
     // a real gameplay-preview clip instead of falling back to a static
     // image when one exists.
     val videoUri: String? = null,
+    // Where this game's scraped media lives, so a themed element can ask
+    // for the media type it actually declared (`<imageType>marquee</...>`)
+    // instead of every element getting the one pre-resolved [artworkUri].
+    // Coordinates only -- see [GameMediaLocator] for why this is not a
+    // resolved per-type map, and [mediaForImageTypes] for the lookup.
+    // Null for entries with no ES-DE media layout behind them (native
+    // apps, store PC games with remote art), which keep using [artworkUri].
+    val mediaLocator: GameMediaLocator? = null,
     val playtimeSeconds: Long = 0,
     val lastPlayedEpochMs: Long? = null,
     // Real, persisted count of how many times this entry has actually been
@@ -141,7 +149,30 @@ data class LibraryEntry(
     // Set only for PC games (store-owned or folder-scanned); null for
     // ROMs, native apps and engine games. See [PcInfo].
     val pcInfo: PcInfo? = null,
-)
+) {
+    /**
+     * The image file this entry should show for a themed element that
+     * declared [imageTypes], or null if it has none of them.
+     *
+     * Real ES-DE semantics, ported from GamelistView::setGameImage
+     * (GamelistView.cpp:1255-1330): first declared type that exists wins,
+     * and "none of them exist" means NO IMAGE -- the element falls back to
+     * its own `<default>`, not to the box art. Callers must therefore
+     * distinguish "the theme asked for a type" (honour the null) from "the
+     * theme asked for nothing" (keep using [artworkUri], droidtop's
+     * existing single-artwork default), which is what
+     * [EsDeImageTypes.forImageElement] returning an empty list expresses.
+     *
+     * Returns null unconditionally for an entry with no [mediaLocator],
+     * for the same reason: an entry with no ES-DE media layout genuinely
+     * has no marquee, and pretending otherwise by handing back
+     * [artworkUri] would put the wrong picture in a marquee slot.
+     */
+    fun mediaForImageTypes(imageTypes: List<String>): String? {
+        val locator = mediaLocator ?: return null
+        return EsDeArtwork.resolveImageTypes(locator, imageTypes)
+    }
+}
 
 /**
  * Facts that only a PC game from a store or a scanned folder has, kept

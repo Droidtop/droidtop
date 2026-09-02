@@ -1476,6 +1476,10 @@ private fun GamesSection(
                 label = entry.title,
                 logoPath = entry.artworkUri,
                 onSelect = { onLaunch(entry) },
+                // Lets a themed carousel/grid honour its own real
+                // <imageType> for this game instead of always drawing the
+                // one pre-resolved artwork. Coordinates only, no I/O here.
+                mediaLocator = entry.mediaLocator,
                 // Real ES-DE textlist indicators: a favorite game gets a
                 // leading marker before its name in a gamelist.
                 favorite = entry.favorite,
