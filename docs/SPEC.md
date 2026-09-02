@@ -1221,11 +1221,33 @@ by droidtop and keyed by game, never by whichever container happened to
 launch it. Execution is a **runtime** choice, not a structural one:
 
 - the bionic direct-exec path is the universal default, works with no
-  root, and is therefore what the handheld uses;
-- droidspaces `exec` is an optimization available in desktop mode where
-  root is legitimate, never a precondition;
-- neither may re-provision anything the other already installed. The test
-  is that the same game with the same prefix launches in both modes.
+  root, and is what BOTH modes use to run Wine;
+- **Wine never runs with root -- a hard security boundary, not a
+  preference** (stated 2026-09-02, superseding the earlier "droidspaces
+  `exec` as a desktop optimization" shape recorded here). Wine's whole
+  job is executing arbitrary third-party Windows binaries; a malicious
+  game in a root-capable context needs no exploit, only to be run. So
+  the Wine launch path must not pass through
+  `ContainerRuntimeFactory.select` at all -- on a rooted device that
+  selection silently yields the root-backed droidspaces runtime. The
+  constraint is structural: `WineEngine` is a *sealed* interface that
+  cannot be handed a `ContainerRuntime`, so "run Wine as root" is not
+  expressible outside `:runtime-windows`, and inside it any
+  implementation touching `RootProcess`/`ContainerRuntime` is a
+  boundary violation by definition. Provisioning is separate from
+  execution: laying out the ImageFs is droidtop's own work on its own
+  directories and needs no root either (the only root use in
+  `:runtime-windows` is the optional GameNative data import, which
+  reads another app's database and never executes a guest).
+  `RootfsDelete` (root, `:runtime-linux-root`) is droidspaces container
+  lifecycle only; `:runtime-windows` does not depend on that module, so
+  the Wine path cannot reach a root-capable delete, and a Wine prefix
+  can never be handed to it;
+- root elsewhere in desktop mode (droidspaces containers for the Linux
+  desktop itself) is unchanged -- the ban is on the Wine *guest*;
+- neither mode may re-provision anything the other already installed.
+  The test is that the same game with the same prefix launches in both
+  modes.
 
 That means `PcGameRuntime`'s implementation must stop treating a live
 `PrimaryContainerSession` as the precondition for launching Windows
