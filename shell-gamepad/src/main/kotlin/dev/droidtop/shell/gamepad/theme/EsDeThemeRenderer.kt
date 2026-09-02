@@ -519,8 +519,14 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
             sourceHeightPx = tileBitmap.height.toFloat(),
         )
         if (tile != null) {
-            val brush = remember(tileBitmap, filterQuality) {
-                ShaderBrush(ImageShader(tileBitmap, TileMode.Repeated, TileMode.Repeated, filterQuality))
+            // Honest gap, narrow and deliberate: this Compose version's
+            // ImageShader takes no filterQuality, and a per-tile
+            // drawImage loop (which does) would be tens of thousands of
+            // draws for a small tile over a full-screen box. So a TILED
+            // image keeps the platform's own filtering regardless of its
+            // `interpolation` -- every other image path honors it.
+            val brush = remember(tileBitmap) {
+                ShaderBrush(ImageShader(tileBitmap, TileMode.Repeated, TileMode.Repeated))
             }
             val scaleX = tile.first / tileBitmap.width
             val scaleY = tile.second / tileBitmap.height
