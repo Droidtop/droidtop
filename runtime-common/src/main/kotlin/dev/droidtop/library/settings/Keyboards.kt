@@ -40,19 +40,30 @@ object Keyboards {
         val isCurrent: Boolean,
     )
 
-    /** droidtop's own IME id prefix — the forked Hacker's Keyboard. */
-    private const val OWN_PACKAGE = "org.pocketworkstation.pckeyboard"
-
-    /** Every enabled input method, with droidtop's own marked. */
+    /**
+     * Every enabled input method, with droidtop's own marked.
+     *
+     * droidtop's own keyboard is identified by the APK it ships in, NOT by
+     * Hacker's Keyboard's upstream package name. `:input-keyboard` is a
+     * library module whose manifest still carries
+     * `package="org.pocketworkstation.pckeyboard"`, but AGP ignores that
+     * attribute for library modules — `LatinIME` merges into the
+     * application id instead. Matching the upstream name therefore never
+     * matched anything at runtime and left [ownKeyboardActive] permanently
+     * false, which is load-bearing rather than cosmetic: the host↔container
+     * clipboard bridge's read permission (`:host-bridge`'s ClipboardAccess)
+     * is gated on exactly that answer.
+     */
     fun enabled(context: Context): List<Keyboard> {
         val imm = context.getSystemService(InputMethodManager::class.java) ?: return emptyList()
         val current = currentId(context)
+        val ownPackage = context.packageName
         return runCatching {
             imm.enabledInputMethodList.map { info ->
                 Keyboard(
                     id = info.id,
                     label = info.loadLabel(context.packageManager).toString(),
-                    isDroidtops = info.packageName == OWN_PACKAGE,
+                    isDroidtops = info.packageName == ownPackage,
                     isCurrent = info.id == current,
                 )
             }

@@ -12,11 +12,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
+import dev.droidtop.hostbridge.ClipboardBridge
 import dev.droidtop.library.EngineGameProvider
 import dev.droidtop.library.Library
 import dev.droidtop.library.NativeAppProvider
 import dev.droidtop.library.RoomPlayHistoryStore
 import dev.droidtop.library.consoles.ConsoleRomProvider
+import dev.droidtop.runtime.ContainerTerminal
 import dev.droidtop.runtime.DisplayOutputKind
 import dev.droidtop.runtime.DisplayOutputRepository
 import dev.droidtop.runtime.PrimaryContainerSession
@@ -103,6 +105,16 @@ class MainActivity : AppCompatActivity() {
     // Last seen DisplayArrangement.refresh value, so an explicit swap is
     // distinguishable from an ordinary re-emission.
     private var lastArrangementSeq: Int = -1
+
+    /**
+     * The host↔container clipboard bridge for the CURRENT desktop session,
+     * rebuilt whenever the session's HostBridge changes and torn down with
+     * it. Lives here rather than in DesktopSessionService because Android
+     * only lets the focused app (or the active IME's owner) read the
+     * clipboard — window focus is an Activity fact, and a Service has none
+     * to report.
+     */
+    private var clipboardBridge: ClipboardBridge? = null
 
     // The LIVE companion window on the second screen, owned by this
     // foreground shell. :display's SecondaryDisplayActivity is the IDLE
@@ -219,6 +231,7 @@ class MainActivity : AppCompatActivity() {
         refreshModeIfUndecided()
 
         observeSecondScreen()
+        observeClipboardBridge()
 
         setContent {
             // DroidtopTheme provides Material tokens for droidtop's own
@@ -253,6 +266,20 @@ class MainActivity : AppCompatActivity() {
                             is DesktopSessionState.Connecting -> DesktopSessionMessage.Connecting
                             is DesktopSessionState.Connected -> DesktopSessionMessage.Idle
                             is DesktopSessionState.Failed -> DesktopSessionMessage.Failed(state.message)
+                        },
+                        // Only offered when there is a live session to open a
+                        // terminal in -- see DesktopShell's own comment on
+                        // why the button is absent rather than disabled.
+                        // Suspends until the terminal window is closed, since
+                        // it is an ordinary foreground process on the shared
+                        // desktop, and reports whatever went wrong if it
+                        // never appeared.
+                        onOpenTerminal = connected?.let { session ->
+                            suspend {
+                                ContainerTerminal.failureMessage(
+                                    ContainerTerminal.open(session.runtime, session.container),
+                                )
+                            }
                         },
                     )
                 }
@@ -348,6 +375,38 @@ class MainActivity : AppCompatActivity() {
         }
         if (resolved != null) ModePrefs.setLastMode(this, resolved)
         return resolved
+    }
+
+    /**
+     * Keeps exactly one [ClipboardBridge] alive per live HostBridge. A
+     * session that goes away and comes back gets a fresh bridge rather than
+     * one still holding the previous connection's synced text.
+     */
+    private fun observeClipboardBridge() {
+        lifecycleScope.launch {
+            DesktopSessionService.state.collectLatest { state ->
+                val hostBridge = (state as? DesktopSessionState.Connected)?.hostBridge
+                if (hostBridge == null) {
+                    clipboardBridge?.stop()
+                    clipboardBridge = null
+                    return@collectLatest
+                }
+                clipboardBridge?.stop()
+                clipboardBridge = ClipboardBridge(applicationContext, hostBridge).also {
+                    it.start()
+                    // The Activity is already focused by the time a session
+                    // connects, and nothing will tell the new bridge that
+                    // unless it is told here -- without this its first read
+                    // would wait for a focus change that may never come.
+                    it.onWindowFocusChanged(hasWindowFocus())
+                }
+            }
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        clipboardBridge?.onWindowFocusChanged(hasFocus)
     }
 
     /**
@@ -632,6 +691,8 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         secondScreenPresentation?.dismiss()
         secondScreenPresentation = null
+        clipboardBridge?.stop()
+        clipboardBridge = null
         super.onDestroy()
     }
 
