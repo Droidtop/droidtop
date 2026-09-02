@@ -37,6 +37,11 @@ class SettingsCatalogInitProvider : ContentProvider() {
             Thread {
                 runCatching { dev.droidtop.library.consoles.PlatformsDatabase.builtIns(appContext) }
             }.start()
+            // The at-most-daily release probe (one small unauthenticated
+            // download, off switch in Settings > Software updates). Process
+            // start is the honest trigger: droidtop is a launcher, so its
+            // process starts roughly once per boot rather than per use.
+            dev.droidtop.app.update.AppSelfUpdate.maybeCheck(appContext)
         }
         return true
     }
