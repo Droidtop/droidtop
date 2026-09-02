@@ -291,7 +291,7 @@ enum class GameLaunchStrategy {
     /** Hand off to the third-party Kirikiroid2/krkr2 interpreter — see [Kirikiroid2]. Real, wired today, but generic-open-only (opens the app, not a specific game — see that class's own doc comment for why). */
     KIRIKIROID2,
 
-    /** Run inside a Wine prefix (`:runtime-windows`'s `WineSession`) — works for any engine's Windows/.exe export. Really launches, through the `PcGameRuntime` seam `:app` fills in (see `launchOnPcRuntime`) -- `library-core` reaches a live prefix without needing a `WineSession` of its own. */
+    /** Run inside a Wine prefix (`:runtime-windows`'s `WineEngine`) — works for any engine's Windows/.exe export. Really launches, through the `PcGameRuntime` seam `:app` fills in (see `launchOnPcRuntime`) -- `library-core` reaches a live prefix without needing a Wine engine of its own. */
     WINE_PREFIX,
 
     /** Run as a native process inside a Linux container (`runtime-common`'s `NativeLinuxGameSession`) — only meaningful for an engine/export that actually has a Linux build. Really launches, through the same `PcGameRuntime` seam as [WINE_PREFIX]. */
@@ -601,8 +601,12 @@ class EngineGameProvider(
                     "droidtop app rather than a standalone surface.",
             )
         check(runtime.isAvailable) {
-            "Start Desktop mode first: droidtop runs Wine and native Linux games as processes " +
-                "inside a live container, and none is connected right now."
+            if (windows) {
+                "The Windows environment isn't set up yet -- run \"Set up Windows games\" in Settings."
+            } else {
+                "Start Desktop mode first: a native Linux build runs inside a live container, " +
+                    "and none is connected right now."
+            }
         }
 
         val executable = if (windows) {
