@@ -1,6 +1,7 @@
 package dev.droidtop.library.consoles
 
 import android.content.Context
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * Explicit folder-to-system assignment, overriding [resolveSystem]'s
@@ -15,7 +16,7 @@ import android.content.Context
  * doesn't recognize at all, not just a known alias mismatch).
  */
 object SystemOverridePrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_PREFIX = "droidtop_system_override_"
 
     fun get(context: Context, folderPath: String): String? =

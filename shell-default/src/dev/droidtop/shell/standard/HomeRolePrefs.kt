@@ -3,6 +3,7 @@ package dev.droidtop.shell.standard
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * Owns which of droidtop's own two `CATEGORY_HOME` activities is actually
@@ -21,7 +22,7 @@ import android.content.pm.PackageManager
  * `docs/SPEC.md`'s Onboarding section).
  */
 object HomeRolePrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_ALTERNATIVE_TARGET = "droidtop_alternative_launcher_target"
 
     private const val STANDARD_ACTIVITY = "com.android.launcher3.Launcher"

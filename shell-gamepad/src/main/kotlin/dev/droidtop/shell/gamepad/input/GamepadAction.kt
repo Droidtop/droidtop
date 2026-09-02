@@ -2,6 +2,7 @@ package dev.droidtop.shell.gamepad.input
 
 import android.content.Context
 import androidx.compose.ui.input.key.Key
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * Real logical gamepad actions -- the same vocabulary real ES-DE's own
@@ -99,7 +100,7 @@ object GamepadKeyMap {
  * once a real remap screen is built.
  */
 object InputMapPrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_PREFIX = "droidtop_gamepad_remap_"
 
     fun get(context: Context, action: GamepadAction): Int? {
