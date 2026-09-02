@@ -46,6 +46,7 @@ object HandheldSettingsCatalog {
     const val ID_SYSTEM_ROTATE = "pref_handheld_system_rotate"
     const val ID_SYSTEM_TIMEOUT = "pref_handheld_system_timeout"
     const val ID_SYSTEM_ANDROID_LINKS = "pref_handheld_system_android_links"
+    const val ID_SYSTEM_UPDATES = "pref_handheld_system_updates"
 
     /** Real values the stock Settings app offers, labelled the same way. */
     private val TIMEOUT_OPTIONS = listOf(
@@ -430,6 +431,16 @@ object HandheldSettingsCatalog {
                         title = "Bluetooth",
                         subtitle = "Pair controllers and audio in the system Bluetooth screen",
                         run = { ctx -> ctx.startActivity(controls.bluetoothSettingsIntent()) },
+                    ),
+                )
+                add(
+                    NestedScreenItem(
+                        id = ID_SYSTEM_UPDATES,
+                        title = "Software updates",
+                        subtitle = "Check for and install newer droidtop builds",
+                        // Owned by :app (which this module cannot depend on),
+                        // resolved through the registry like android_settings.
+                        registryId = "updates",
                     ),
                 )
                 add(

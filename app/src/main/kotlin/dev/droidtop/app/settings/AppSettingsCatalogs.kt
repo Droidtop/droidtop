@@ -64,6 +64,7 @@ object AppSettingsCatalogs {
     const val SCREEN_WINDOWS_GAMES = "windows_games"
     const val SCREEN_ANDROID_SETTINGS = "android_settings"
     const val SCREEN_ENGINEHOST = "enginehost"
+    const val SCREEN_UPDATES = "updates"
 
     // How deep folderLooksRomLike is willing to walk -- see the doc
     // comment at the original ConsoleSystemsActivity site this moved from.
@@ -82,6 +83,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(windowsGamesScreen())
         SettingsScreenRegistry.register(androidSettingsScreen())
         SettingsScreenRegistry.register(enginehostScreen())
+        SettingsScreenRegistry.register(updatesScreen())
     }
 
     // ------------------------------------------------------------------
@@ -697,6 +699,72 @@ object AppSettingsCatalogs {
                             )
                         }
                     },
+                ),
+            )
+        },
+    )
+
+    // ------------------------------------------------------------------
+    // Software updates: droidtop's own release check and self-update
+    // (docs/SPEC.md "Releases and updates"; machinery in AppSelfUpdate).
+    // ------------------------------------------------------------------
+
+    private fun updatesScreen() = CatalogScreen(
+        id = SCREEN_UPDATES,
+        title = "Software updates",
+        subtitle = "Check for and install newer droidtop builds from the project's own releases",
+        groups = { context ->
+            val update = dev.droidtop.app.update.AppSelfUpdate
+            listOf(
+                CatalogGroup(
+                    id = "updates_droidtop",
+                    title = null,
+                    items = listOf(
+                        ToggleItem(
+                            id = "updates_check_daily",
+                            title = "Check for updates once a day",
+                            subtitle = "Downloads one small release-description file from droidtop's GitHub releases; " +
+                                "nothing about this device or your library is sent, and turning this off stops " +
+                                "all automatic update traffic",
+                            current = update.checkDaily(context),
+                            onToggle = { ctx, value -> update.setCheckDaily(ctx, value) },
+                        ),
+                        AsyncActionItem(
+                            id = "updates_check_now",
+                            title = "Check for a droidtop update",
+                            subtitle = "Installed: ${update.installedVersionName(context)} " +
+                                "(build ${update.installedVersionCode(context)})",
+                            run = { ctx, onStatus ->
+                                onStatus("Checking...")
+                                val info = withContext(Dispatchers.IO) { update.fetch() }
+                                if (info.versionCode > update.installedVersionCode(ctx)) {
+                                    "${info.versionName} (build ${info.versionCode}) is available -- " +
+                                        "use \"Download and install\" below."
+                                } else {
+                                    "This is the newest published build."
+                                }
+                            },
+                        ),
+                        AsyncActionItem(
+                            id = "updates_install",
+                            title = "Download and install the newest build",
+                            subtitle = "Verified against the digest published with the release, then handed to " +
+                                "the Android installer -- Android checks the signing key and asks you to confirm",
+                            run = { ctx, onStatus ->
+                                onStatus("Checking...")
+                                val info = withContext(Dispatchers.IO) { update.fetch() }
+                                if (info.versionCode <= update.installedVersionCode(ctx)) {
+                                    "Already the newest published build."
+                                } else {
+                                    withContext(Dispatchers.IO) {
+                                        update.downloadAndInstall(ctx, info, onStatus)
+                                    }
+                                    "Handed ${info.versionName} to the Android installer. If nothing happens, " +
+                                        "allow droidtop to install apps when asked and try again."
+                                }
+                            },
+                        ),
+                    ),
                 ),
             )
         },
