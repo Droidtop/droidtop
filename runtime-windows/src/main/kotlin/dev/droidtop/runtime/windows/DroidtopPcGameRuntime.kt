@@ -116,6 +116,36 @@ class DroidtopPcGameRuntime(
         // (BionicDefaultProtonDependency and friends), used rather than
         // reimplemented: it is what knows which archive a given wine
         // version needs and where it unpacks to.
+        // The one piece of that dependency droidtop cannot use: it
+        // fetches the archive through SteamService.downloadFile, which
+        // dereferences the running SteamService instance, and droidtop
+        // never starts that service. Confirmed on hardware -- the whole
+        // step failed with a KotlinNullPointerException carrying no
+        // message at all ("Setup failed: couldn't install Wine").
+        //
+        // Fetching it here with the instance-free downloader (the same
+        // one the base system uses below) makes the dependency's own
+        // isFileInstallable check short-circuit, so it still owns the
+        // extraction and the on-disk layout. The archive is named after
+        // the wine version, exactly as ImageFsInstaller's own
+        // installWineFromDownloads assumes.
+        val wineArchive = File(context.filesDir, "$WINE_VERSION.txz")
+        if (!(wineArchive.isFile && wineArchive.length() > 0)) {
+            onStatus("Downloading Wine…")
+            val fetched = runCatching {
+                SteamService.fetchFileWithFallback(wineArchive.name, wineArchive, context) { fraction ->
+                    onStatus("Downloading Wine… ${(fraction * 100).toInt()}%")
+                }
+            }
+            if (fetched.isFailure) {
+                return@withContext PcProvisionResult(
+                    false,
+                    fetched.exceptionOrNull()?.message
+                        ?: "couldn't download Wine -- check the network and retry",
+                )
+            }
+        }
+
         val dependencies = runCatching {
             LaunchDependencies().ensureLaunchDependencies(
                 context = context,
