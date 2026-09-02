@@ -31,7 +31,37 @@ data class EngineDef(
     val enginehost: EnginehostTarget?,
 )
 
-data class DetectRule(val all: List<DetectCondition>)
+data class DetectRule(val all: List<DetectCondition>) {
+    /**
+     * Whether this rule can be satisfied by evidence sitting in a
+     * subdirectory the rule never names -- i.e. it proves "some engine
+     * game is somewhere under here", not "THIS folder is the game root".
+     *
+     * Only [GameEngineDetector.detectGame] cares, and only to order its
+     * own search (docs/SPEC.md 7e2b): a wrapper folder whose real
+     * markers sit one level down must resolve to the inner folder, so a
+     * subtree rule matching the outer folder must not pre-empt a
+     * precise match on an actual subfolder. Classification itself is
+     * unaffected -- [GameEngineDetector.detect] still evaluates every
+     * row in file order, which stays the sole precedence rule shared
+     * with enginehost.
+     */
+    val readsUnnamedSubtree: Boolean = all.any { it.readsUnnamedSubtree }
+}
+
+/** See [DetectRule.readsUnnamedSubtree]. */
+private val DetectCondition.readsUnnamedSubtree: Boolean
+    get() = when (this) {
+        is DetectCondition.AnyFileExtensionDeep -> maxDepth > 0
+        // The code probes that search below the folder themselves --
+        // GameEngineDetector.isUnity walks 3 folders deep. Every other
+        // probe reads only the folder it is given, and an unknown probe
+        // is treated as direct (it fails its rule anyway).
+        is DetectCondition.Builtin -> name in SUBTREE_BUILTIN_PROBES
+        else -> false
+    }
+
+private val SUBTREE_BUILTIN_PROBES = setOf("unity")
 
 sealed interface DetectCondition {
     data class DirExists(val path: String) : DetectCondition
