@@ -270,6 +270,11 @@ jobs:
       # is installing the CI artifact on a device each morning, and
       # blocking that on a unit test would trade something real for a
       # convention. The signal is what matters here, not the gate.
+      # :runtime-common joins the run because the ES-DE theme engine lives
+      # there, and its carousel/textlist geometry is a literal port of real
+      # ES-DE formulas -- exactly the kind of code a unit test can verify
+      # without a screen, which is otherwise the only way this project
+      # checks theme rendering at all.
       - name: Run unit tests
         # All five modules that actually have a src/test tree (library-core,
         # runtime-common, shell-gamepad, input-seat, runtime-windows), not

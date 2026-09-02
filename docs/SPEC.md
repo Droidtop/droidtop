@@ -2286,6 +2286,136 @@ and theme infrastructure (discovery, JGit downloader, prefs) were
 confirmed sound in the same audit and are NOT being rewritten — this is
 a renderer + schema correction, not a rewrite.
 
+**R2, primary-component renderer parity (2026-09-01)**: R1 left the
+parser complete (472 real properties across 16 real element types) and
+the renderer at roughly half of it. A fresh count of how many of those
+472 property names are referenced anywhere in `:shell-gamepad`'s render
+code put it at 242 -- and that count is generous, since it credits a
+property whose name merely appears somewhere. The two clusters where the
+gap actually made real community themes render WRONG rather than plain
+were `carousel` (28/73) and `textlist` (12/38); both are addressed here.
+
+The shape of the fix is the same for both, and it is architectural
+rather than a property checklist: the geometry moved out of the Compose
+composables into pure, dependency-free Kotlin in `:runtime-common`
+(`EsDeCarouselLayout.kt`, `EsDeTextListLayout.kt`) that is a literal port
+of real ES-DE's own `CarouselComponent<T>::render()`/`applyTheme()` and
+`TextListComponent<T>::render()`/`applyTheme()`, and is unit tested
+against values derived by hand from those formulas. The composables now
+only draw what the layout says.
+
+For `carousel` the headline is real `type` support. droidtop implemented
+exactly ONE of ES-DE's four real types (`horizontal`) and drew
+`vertical`/`verticalWheel`/`horizontalWheel` themes -- both wheel types
+are common in real community themes -- with horizontal geometry, and a
+vertical carousel could not even be navigated (real ES-DE moves the
+vertical types on UP/DOWN, not LEFT/RIGHT). All four now render with
+their own real geometry, and with them the whole family of properties
+that only exists because of it: `itemStacking` (real draw order for
+overlapping items), `itemsBeforeCenter`/`itemsAfterCenter` (which is what
+sizes a wheel's visible window, not `maxItemCount`), `itemRotation`/
+`itemRotationOrigin`/`itemAxisHorizontal`/`itemAxisRotation`,
+`itemHorizontalAlignment`/`itemVerticalAlignment`,
+`wheelHorizontalAlignment`/`wheelVerticalAlignment`, `horizontalOffset`/
+`verticalOffset`, `itemLinearScale`/`itemLinearSpacing`,
+`selectedItemOffset`, `itemDiagonalOffset`, `unfocusedItemDimming`,
+`imageBrightness`, `itemTransitions`, and `reflections`/
+`reflectionsOpacity`/`reflectionsFalloff` (the falloff ported off ES-DE's
+own `core.glsl` fragment shader). Two real defaults were wrong and are
+fixed: `unfocusedItemOpacity` defaults to 0.5, not 1.0, so a theme
+omitting it lost its dimming entirely; and the carousel's gradient
+direction was read from a `colorGradientHorizontal` property that exists
+nowhere in ES-DE's schema (the real name is `gradientType`), so no theme
+could ever influence it. The image color pipeline is now one ColorMatrix
+in ES-DE's own shader order (brightness, saturation, color-shift
+multiply, dimming), replacing an "unfocused saturation lowers alpha by
+15%" approximation.
+
+For `textlist` the model itself was wrong: a `LazyColumn` of
+individually-focusable rows, with the highlight drawn as a per-row
+background and a hardcoded 48dp horizontal padding that has no basis in
+ES-DE at all. Real ES-DE draws a FIXED window of rows and ONE selector
+bar at `(cursor - startEntry) * entrySize + selectorVerticalOffset`. With
+the real model in place, so is the real schema: `selectorWidth`/
+`selectorHeight`/`selectorHorizontalOffset`/`selectorVerticalOffset`/
+`selectorImagePath` and the `selectorColor`/`selectorColorEnd`/
+`selectorGradientType` gradient; `secondaryColor`/
+`selectedSecondaryColor` and `selectedBackgroundColor`/
+`selectedSecondaryBackgroundColor`/`selectedBackgroundMargins`/
+`selectedBackgroundCornerRadius` (including ES-DE's real fallback CHAIN,
+where `selectedColor` falls back to `primaryColor` rather than to a
+constant); the real `horizontalMargin` (default zero) and
+`horizontalAlignment`; the full four-value `letterCase`; and
+`indicators`.
+
+One honest substitution is worth recording because it is visible:
+ES-DE's `indicators="symbols"` draws Font Awesome's own U+F005 star from
+the `fontawesome-webfont.ttf` ES-DE bundles in its own resources.
+droidtop bundles no Font Awesome, and no theme's font carries that
+private-use codepoint, so emitting it would draw a missing-glyph box on
+every favorite. droidtop emits U+2605 BLACK STAR instead -- same
+behavior, a codepoint platform font fallback actually covers. The
+`ascii` mode is exact.
+
+Deliberately NOT implemented, rather than approximated: `imageType` for
+both carousel and grid (which scraped media type a gamelist item shows
+per game -- `LibraryEntry` carries one already-resolved `artworkUri` and
+no per-type media map, so this is a library-core data-model change, not a
+renderer one, and it is the single largest remaining item in this area);
+the `imageColorEnd`/`imageGradientType`/`imageSelectedColorEnd`/
+`imageSelectedGradientType` gradient color-shifts (a POSITIONAL gradient
+modulated over an image, which a Compose `ColorFilter` cannot express --
+it needs a shader); all four `textHorizontalScroll*` properties on every
+element that has them; `selectorImageTile`; `collectionIndicators` (real
+ES-DE only shows those while a custom collection is being edited IN the
+list, a mode droidtop has no equivalent of -- its collection editor is a
+separate screen); and `fadeAbovePrimary`. `secondaryColor`'s selection
+rule is implemented and its input is modeled (`EsDeListItem.isSecondary`)
+but nothing sets it yet: in real ES-DE exactly one thing is secondary, a
+FOLDER entry in a gamelist, and droidtop's ROM scan is still flat -- the
+same standing gap the `folder` badge slot documents.
+
+The `grid` went the same way in the same pass, and for the same reason:
+its model could not express its schema. droidtop drew a
+`LazyVerticalGrid` of tiles that were pure invention -- a dark rounded
+card with an accent border and an "N items" line, none of which exists in
+ES-DE -- and that card occupied exactly the surface a theme's own
+`backgroundColor`/`backgroundImage` and `selectorColor`/`selectorImage`
+layers are supposed to own. A real grid entry is up to three stacked
+layers, ordered by `selectorLayer` (top/middle/bottom), each sized by its
+own `*RelativeScale` and rounded by its own `*CornerRadius`, and that is
+what renders now, along with `backgroundColorEnd`/
+`backgroundGradientType`/`selectorColorEnd`/`selectorGradientType`,
+`scaleInwards` (an edge item grows into the grid rather than off it),
+`fractionalRows`, `itemTransitions`/`rowTransitions`,
+`unfocusedItemDimming`, `imageRelativeScale`/`imageCornerRadius`/
+`imageBrightness`, `textRelativeScale` and the full `letterCase` set. Two
+more real defaults were wrong here: `itemSpacing` is AUTO-CALCULATED from
+`itemScale` when a theme omits it (droidtop used a flat 16dp), and the
+grid's own default text color is black on transparent, not white. Its
+`itemScale` clamp is also 0.5-2.0, not the carousel's 0.2-3.0. The
+tile's item count is gone with the tile and nothing is lost: real ES-DE's
+own mechanism for it is a `systemdata` text element the theme places
+itself, which droidtop already renders.
+
+All three list widgets now share one architecture, which is ES-DE's own:
+the WIDGET owns the cursor and the key handling, and items are render
+output with no focus identity of their own. That fixed a real navigation
+bug on the way past -- a vertical carousel could not be navigated at all,
+because ES-DE moves the vertical types on up/down rather than left/right
+-- and it is what let a textlist in a system view finally report its
+cursor for per-system theme reloading, which only the carousel did
+before.
+
+Still open after this, in rough order of how much a real theme notices:
+`text`'s `container*` scrolling-container family (which is what long
+scraped game descriptions actually need), `imageType` across
+carousel/grid/image (one library-core data-model change unblocks all
+three), the `textHorizontalScroll*` family shared by carousel, grid and
+textlist, `helpsystem`'s dimmed-state and entry-layout properties
+(13/31), and the `rotationOrigin`/`stationary` pair that recurs across
+nearly every element type.
+
 **Five-theme on-device review + fixes (2026-08-30, later same day)**:
 the theme downloader ran end-to-end for the first time — three real
 community themes (Adroit/Catppuccin/ES-DWEE) installed live through
