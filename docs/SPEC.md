@@ -3280,10 +3280,38 @@ declaring which installed app to drive and how:
   action inside that system's own settings screen, where the system id
   and its destination folder are both already known.
 
-**The PLUGIN half (APK or Python module) is deliberately not built.**
-Nothing in the first real use case needs it, and a sandbox/trust model
-for running foreign code is a far larger design than a declarative Intent
-description.
+**`open_with` surfaced (2026-09-02).** It was declared and documented
+from the start but had zero call sites: a user could write a valid
+`open_with` integration and nothing would ever invoke it. It is now
+offered on a game's own detail screen (`EntryDetailScreen`), one chip per
+real file droidtop has and has no viewer of its own for, which today is
+exactly two:
+
+- the scraped **manual** (`downloaded_media/<system>/manuals/<rom>.pdf`),
+  which droidtop resolves at scan time and then only ever renders a badge
+  for — there is no PDF reader anywhere in droidtop;
+- the scraped **preview video**, which today can only auto-play muted
+  inside a theme element and cannot be opened, paused or scrubbed.
+
+Three rules make this an *addition* rather than a substitution, and they
+are the decision, not the implementation detail:
+
+1. **`open_with` may never claim the game file itself.** Which app
+   launches a ROM is already owned end-to-end by the player database,
+   per system and per game, with its own real override UI. An
+   integration that could also claim the launch path would be a second
+   mechanism for a job that already has one, and a silent way to change
+   a behaviour the user configured somewhere else.
+2. **A target must be a file droidtop genuinely has and genuinely cannot
+   open.** Scraped artwork is not a target: droidtop has its own media
+   viewer for it. This is what keeps the capability from creeping into
+   "hand droidtop's jobs to other apps".
+3. **Nothing is ranked or auto-picked.** Two declared `open_with` hooks
+   produce two chips and the user chooses. droidtop does not decide.
+
+The grant is the narrow one the existing `am start` path already
+produces: a read-only FileProvider `content://` URI for that one file,
+revoked when the receiving task dies.
 
 **Known limitation, confirmed against a real app:** an integration can
 only drive an app as far as that app's own exported surface allows. The
@@ -3293,16 +3321,90 @@ or a destination, and extras are simply ignored. Making that case work
 needs an intent surface added to the *target* app, not more integration
 machinery here.
 
-Real open questions a full design pass still needs to answer (not
-resolved here): the exact shape of droidtop's internal API surface both
-integration types talk to, how a JSON integration's manifest is
-structured, how a PLUGIN integration (APK or Python module) is
-sandboxed/invoked and what it's allowed to call back into, how droidtop
-discovers what's installed and integration-capable, and what a real
-permission/trust model looks like for letting a third-party integration
-receive data from or act on behalf of droidtop (a "search+add-to-library"
-JSON integration is a very different trust shape
-than "render this video" or "show now-playing controls").
+**The PLUGIN half (APK or Python module) is still not built** — and,
+after a pass over what it would take, deliberately so: the shape is
+genuinely undecided (see the open questions below, all of which are
+still open), and picking one unilaterally would be exactly the kind of
+silent decision this project does not make. What follows is a concrete
+proposal to accept, reject or amend, not a description of code that
+exists.
+
+### 12a. Plugin half — proposal, pending a decision (2026-09-02)
+
+The one line already decided in §12 is the constraint that shapes
+everything else: *integrations do not reach into droidtop's internals;
+droidtop exposes a surface and the integration talks to that surface.*
+
+**Where the JSON/plugin line falls (proposed).** JSON owns everything
+expressible as one outbound, fire-and-forget Intent — "go do this over
+there". A plugin exists only where droidtop needs something **back**: a
+search that returns results droidtop renders in its own library UI, a
+now-playing state it polls, a metadata source it queries. That is a real
+boundary rather than a vague "richer" one, and it means no case is served
+by both halves. Every example in §12 sorts cleanly: the video player, the
+browser and the ROM-downloader hand-off are JSON; a search-and-add
+content source and a Spotify-style now-playing client are plugin.
+
+**Form (proposed): a normally-installed APK exposing a bound Service.
+Not a Python module, and not code loaded into droidtop's own process.**
+Reasoning, all of it from positions already held here:
+
+- droidtop **never** downloads or side-loads third-party code, and will
+  never grow a WebView or in-app download path for it. So a plugin has
+  to be something the user installed themselves by the normal means,
+  which on Android is an APK.
+- A separate app is a separate uid in a separate process. That is the
+  only sandbox Android hands you for free, and the only one droidtop
+  would not have to invent and then get wrong. A Python module means
+  droidtop shipping an interpreter and executing foreign source **inside
+  its own process**, with droidtop's own permissions and no boundary at
+  all — the opposite of a sandbox.
+- A bound Service gives a typed request/response surface, which is the
+  half an Intent cannot do.
+
+**Discovery (proposed).** droidtop enumerates installed apps declaring a
+Service with a droidtop-owned intent-filter action, plus `<meta-data>`
+naming which capabilities it implements. Same rule as JSON: not
+installed means not shown, never shown-and-broken.
+
+**Trust (proposed).** Discovery must not equal activation. A discovered
+plugin appears in the integrations settings screen as *available*, and
+does nothing until the user enables it there — per plugin, and per
+capability where a plugin declares more than one. droidtop passes values
+out and takes values back; it never hands over a handle to the library,
+the database, or a directory. File access, if any, stays what the JSON
+half already does: a read-only per-call `content://` grant for one named
+file.
+
+**Still genuinely open, for the user to settle:**
+
+- Are Python-module plugins in scope at all, or is the APK the whole
+  answer? (§12's original wording allows both; the sandbox argument
+  above is the case against Python, but it is an argument, not a
+  decision.)
+- May a plugin contribute **library entries** — things that show up as
+  games — or only metadata, media and actions attached to entries
+  droidtop found itself? This is the largest open question, because
+  "yes" turns plugins into a second library-source mechanism alongside
+  the existing `LibraryProvider`s, and §7g just spent a whole pass
+  unifying those.
+- Does a plugin get to declare a capability outside the closed
+  `IntegrationCapability` set, and if so, what stops the trust model
+  from becoming per-plugin freeform?
+- What happens to entries or state a plugin contributed once the user
+  uninstalls or disables it.
+
+Until those are answered, nothing plugin-side is built. The `open_with`
+work above is the part of §12 that was decided and merely unbuilt.
+
+The original open-questions list from this section — the shape of the
+internal API surface, how a plugin is sandboxed and invoked, how
+droidtop discovers what is installed and integration-capable, and what
+the permission/trust model is — is answered as a **proposal** in §12a
+above for the plugin half, and answered in fact for the JSON half by
+what is built: the surface is the closed `IntegrationCapability` set
+plus the placeholders each one is given, the manifest is the `.json`
+file, and the trust model is per-capability rather than per-app.
 
 ## 7h. Scraper honesty, and what counts as a game (directed 2026-09-02)
 
