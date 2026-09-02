@@ -254,8 +254,9 @@ interface RomDao {
     suspend fun getGameMetadata(ids: List<String>): List<GameMetadataEntity>
 
     // Housekeeping (OrphanedMedia): every metadata row's key IS the
-    // ROM's absolute path, so "does that file still exist" is the whole
-    // orphan test.
+    // entry's own absolute path, so "does that path still exist" is the
+    // whole orphan test -- a path, not specifically a file: an engine
+    // game's entry is its folder.
     @Query("SELECT id FROM game_metadata")
     suspend fun getAllGameMetadataIds(): List<String>
 

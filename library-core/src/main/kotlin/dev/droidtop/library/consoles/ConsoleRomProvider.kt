@@ -7,6 +7,7 @@ import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
+import dev.droidtop.library.withScrapedMetadata
 import dev.droidtop.library.integrations.IntegrationPlaceholders
 import dev.droidtop.library.romdetect.LibretroDatabase
 import dev.droidtop.library.romdetect.PlayStationDiscType
@@ -509,44 +510,13 @@ class ConsoleRomProvider(
      */
     private suspend fun List<LibraryEntry>.withMetadata(): List<LibraryEntry> {
         if (isEmpty()) return this
-        val metadataById = dao.getGameMetadata(map { it.id }).associateBy { it.id }
         // Real reverse query for the badge "collection" slot -- separate
-        // from metadataById since collection membership lives in its own
-        // table, unrelated to whether a game has a game_metadata row at
-        // all (see LibraryEntry.inCollection's own doc comment).
+        // from the metadata merge since collection membership lives in
+        // its own table, unrelated to whether a game has a game_metadata
+        // row at all (see LibraryEntry.inCollection's own doc comment).
         val inAnyCollection = dao.getGameIdsInAnyCollection().toHashSet()
-        return map { entry ->
-            val meta = metadataById[entry.id]
-            val entryWithCollection = if (entry.id in inAnyCollection) entry.copy(inCollection = true) else entry
-            if (meta == null) return@map entryWithCollection
-            entryWithCollection.copy(
-                // downloaded_media convention first; an imported
-                // gamelist.xml's own referenced files fill the gaps.
-                artworkUri = entryWithCollection.artworkUri
-                    ?: meta.artworkPath?.takeIf { java.io.File(it).isFile },
-                videoUri = entryWithCollection.videoUri
-                    ?: meta.videoPath?.takeIf { java.io.File(it).isFile },
-                description = meta.description,
-                developer = meta.developer,
-                publisher = meta.publisher,
-                genre = meta.genre,
-                releaseDate = meta.releaseDate,
-                rating = meta.rating,
-                players = meta.players,
-                favorite = meta.favorite,
-                completed = meta.completed,
-                kidGame = meta.kidGame,
-                hidden = meta.hidden,
-                broken = meta.broken,
-                noGameCount = meta.noGameCount,
-                noMultiScrape = meta.noMultiScrape,
-                hideMetadata = meta.hideMetadata,
-                controllerShortName = meta.controllerShortName,
-                altEmulator = meta.altEmulator,
-                launchScreen = meta.launchScreen,
-                sortName = meta.sortName,
-                collectionSortName = meta.collectionSortName,
-            )
+        return withScrapedMetadata(dao).map { entry ->
+            if (entry.id in inAnyCollection) entry.copy(inCollection = true) else entry
         }
     }
 
