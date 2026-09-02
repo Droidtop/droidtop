@@ -62,26 +62,46 @@ object OrphanedMedia {
                 (mediaRoot.listFiles() ?: emptyArray()).filter { it.isDirectory }.forEach { systemDir ->
                     val systemId = systemDir.name
                     val system = systemsById[systemId]
-                    // The folder holding this system's games, resolved the
-                    // same way the scan resolves it.
-                    val gameFolders = (root.listFiles() ?: emptyArray()).filter { folder ->
-                        folder.isDirectory &&
-                            SystemOverridePrefs.resolveForFolder(
-                                context,
-                                folder.absolutePath,
-                                folder.name,
-                                systemsById,
-                            )?.id == systemId
+                    val liveBaseNames = if (system != null) {
+                        // The folder holding this system's games, resolved
+                        // the same way the scan resolves it.
+                        val gameFolders = (root.listFiles() ?: emptyArray()).filter { folder ->
+                            folder.isDirectory &&
+                                SystemOverridePrefs.resolveForFolder(
+                                    context,
+                                    folder.absolutePath,
+                                    folder.name,
+                                    systemsById,
+                                )?.id == systemId
+                        }
+                        // No folder for this system at all: the games may
+                        // simply not be mounted. Leave it alone.
+                        if (gameFolders.isEmpty()) return@forEach
+                        val extensions = system.extensions
+                        gameFolders
+                            .flatMap { folder -> folder.walkTopDown().filter { it.isFile }.toList() }
+                            .filter { extensions.isEmpty() || it.extension.lowercase() in extensions }
+                            .map { it.nameWithoutExtension }
+                            .toHashSet()
+                    } else {
+                        // An engine-game bucket (`renpy`, `godot`, ...):
+                        // there is no console system behind it, and its
+                        // media is keyed by the GAME FOLDER's own name,
+                        // which is exactly what the engine provider files
+                        // artwork under. Every folder in the root counts
+                        // as live regardless of which engine it turned out
+                        // to be -- deliberately conservative: this deletes
+                        // real files, and the cost of keeping one stale
+                        // image is nothing next to deleting the art of a
+                        // game whose engine detection merely changed.
+                        val folderNames = (root.listFiles() ?: emptyArray())
+                            .filter { it.isDirectory }
+                            .map { it.name }
+                        // An empty root is an unmounted card, not an empty
+                        // library: same reasoning as the branch above.
+                        if (folderNames.isEmpty()) return@forEach
+                        folderNames.toHashSet()
                     }
-                    // No folder for this system at all: the games may
-                    // simply not be mounted. Leave it alone.
-                    if (gameFolders.isEmpty()) return@forEach
-                    val extensions = system?.extensions.orEmpty()
-                    val liveBaseNames = gameFolders
-                        .flatMap { folder -> folder.walkTopDown().filter { it.isFile }.toList() }
-                        .filter { extensions.isEmpty() || it.extension.lowercase() in extensions }
-                        .map { it.nameWithoutExtension }
-                        .toHashSet()
 
                     (systemDir.listFiles() ?: emptyArray()).filter { it.isDirectory }.forEach { mediaTypeDir ->
                         (mediaTypeDir.listFiles() ?: emptyArray()).filter { it.isFile }.forEach { media ->
@@ -95,13 +115,20 @@ object OrphanedMedia {
             }
         }
 
-        // Metadata rows are keyed by absolute ROM path, so "the file is
-        // gone" is the whole test -- but only for paths under a root
-        // that currently exists, for the same unmounted-card reason.
+        // Metadata rows are keyed by the entry's own absolute path, so
+        // "the path is gone" is the whole test -- but only for paths
+        // under a root that currently exists, for the same unmounted-card
+        // reason.
+        //
+        // exists(), not isFile(): an engine game's entry is its FOLDER,
+        // not a file, so the old file-only test called every scraped
+        // Ren'Py/Wine game's metadata row an orphan and offered to delete
+        // it. Nothing hit it before only because nothing could write such
+        // a row yet.
         val dao = RomDatabase.get(context).romDao()
         val liveRootPaths = roots.filter { it.isDirectory }.map { it.absolutePath }
         val orphanedMetadata = dao.getAllGameMetadataIds()
-            .filter { id -> liveRootPaths.any { id.startsWith(it) } && !File(id).isFile }
+            .filter { id -> liveRootPaths.any { id.startsWith(it) } && !File(id).exists() }
 
         Report(orphanFiles, orphanedMetadata, bytes)
     }
