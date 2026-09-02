@@ -90,6 +90,22 @@ android {
             // redirect.tzst, and the box86_64/fexcore/wowbox64 translator
             // payloads.
             assets.srcDir("../vendor/gamenative/app/src/main/assets")
+            // The native half of the same tree. Without this the module
+            // compiled 830 Java/Kotlin files whose entire reason to exist
+            // is calling into libwinlator.so, libpatchelf.so and the
+            // pulse libraries, and shipped none of them: an APK built
+            // from this module before now carried eleven arm64 .so files,
+            // not one of them gamenative's. That is why provisioning a
+            // Wine environment has never completed on a real device.
+            //
+            // Two roots because upstream splits them the same way it
+            // splits its Java sources: src/main for what every flavor
+            // gets, src/modern for the non-XR modern-Android flavor whose
+            // BuildConfig values this module already mirrors (see
+            // MODERN_ANDROID above -- not a preference, the only value
+            // that can work above targetSdk 28).
+            jniLibs.srcDir("../vendor/gamenative/app/src/main/jniLibs")
+            jniLibs.srcDir("../vendor/gamenative/app/src/modern/jniLibs")
         }
     }
 
