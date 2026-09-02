@@ -3092,3 +3092,79 @@ permission/trust model looks like for letting a third-party integration
 receive data from or act on behalf of droidtop (a "search+add-to-library"
 JSON integration is a very different trust shape
 than "render this video" or "show now-playing controls").
+
+## 7h. Scraper honesty, and what counts as a game (directed 2026-09-02)
+
+An overnight ScreenScraper pass over the user's real library — 46 ROMs
+across 11 systems — returned HTTP 403 for **all 46** requests: zero
+successes, zero exceptions, zero files written. The app reported it as
+`no match for 46, 0 failed`. Two rules come out of that, and they are
+binding on every scraper source, not just ScreenScraper.
+
+**A refusal is not a miss, and the type system says so.**
+`ScreenScraperClient.findMetadata` no longer returns a nullable metadata
+object. It returns `ScreenScraperLookup`, which is exactly one of
+`Found`, `NoMatch` (the server answered HTTP 200 and its response carried
+no game — the only outcome that is a statement about the user's library)
+or `Refused(httpStatus, reason)` (the server would not serve the request
+at all — a statement about the API, about credentials, or about a quota,
+and about nothing else). A transport failure stays a thrown exception and
+stays counted as `failed`. The scrape summary reports all four buckets
+separately and may never fold any of the other three into "no match"; a
+pass that was refused everything it asked for leads with that instead of
+reporting a count. `formatScrapeSummary` is a pure function so this
+arithmetic is unit-tested rather than only observable on hardware.
+
+**The server's own reason is surfaced, not discarded.** ScreenScraper
+answers a non-200 with a short human-readable explanation in the response
+body. That body is read from `errorStream` under a hard 512-character
+bound, has every non-blank credential the request carried redacted out of
+it *before* anything else touches it, is stripped of any markup an
+intermediary added, and then appears both in logcat (tag
+`droidtop.Scraper`) and in the summary the user reads. Credentials
+themselves are still never logged — only whether they are present.
+
+**A repeated refusal ends the pass.** Five consecutive refusals stop the
+run and report; 46 refusals paced ~11s apart buy no information that the
+first five did not.
+
+**Not decided here, deliberately:** the cause of the 2026-09-01 403s.
+Credentials were verified present, verified to descramble, and the
+personal account was configured. The two candidates — a newly registered
+ScreenScraper application pair still awaiting manual approval, and
+`softname` needing to match the *registered application name* — are
+documented in `ScreenScraperClient.refusalHint` and printed on a 403.
+`softname` is **not** changed speculatively: only the person who
+registered the application knows what it was registered as.
+
+### One ROM walk, and a DLC folder is not twelve games
+
+A `Rune Factory 5` DLC directory produced twelve separate library
+entries, each with its own metadata row and cover, because twelve add-on
+files carried the system's ROM extension and the scan was a plain
+`walkTopDown()`. The library scan and the scraper each had their own copy
+of that walk and could disagree about what a game is; they now share
+`RomScanWalk`, which owns the rule:
+
+1. Recursion stays. Reorganising a large system into subfolders must
+   never hide files.
+2. A directory whose **final name token** is one of `dlc`/`dlcs`,
+   `update`/`updates`, `patch`/`patches`, `addon`/`addons`, `bios` or
+   `firmware` holds content that attaches to a game rather than being
+   one, and is not descended into. Matching the final token is what makes
+   this a rule instead of a special case for one title: it covers `DLC`,
+   `Rune Factory 5 (DLC)`, `Zelda - Updates` and `_patches` without
+   knowing any game's name.
+3. The marker list is deliberately short, and `mods`/`hacks`/`romhacks`
+   are pointedly **not** on it. A ROM hack is a playable game. A rule that
+   hides real games to tidy a list is worse than the bug it fixes.
+4. The system folder itself is never excluded by its own name, so this
+   can never empty out a whole system.
+5. The user's override is ES-DE's own real `noload.txt`
+   (`SystemData::populateFolder`): a directory containing that file, and
+   everything under it, is skipped. droidtop honours the existing
+   mechanism rather than inventing a second one.
+
+Every skipped directory is logged with its reason, so this never loses
+files silently.
+
