@@ -49,18 +49,53 @@ class SettingsCatalogInitProvider : ContentProvider() {
 }
 
 /**
- * Handheld draws the companion surface; Standard hands off to Launcher3's
- * own secondary-display UI. Desktop registers nothing yet -- its lower
- * screen is an input surface (docs/SPEC.md section 4), which is separate
- * work, and a mode that registers nothing simply draws the ground.
+ * Handheld draws either the companion surface or the input surface, per
+ * the user's role choice for that mode; Standard hands off to Launcher3's
+ * own secondary-display UI; Desktop draws the input surface, which is what
+ * docs/SPEC.md section 4 says its lower screen is for.
+ *
+ * The role is read at composition rather than captured once: the same
+ * registration is used by the idle SECONDARY_HOME activity, which is
+ * re-rendered on resume, so a role changed in settings takes effect the
+ * next time that screen comes up rather than needing a restart.
  */
 private fun registerSecondaryDisplayContent() {
     dev.droidtop.display.SecondaryDisplayContent.register(
         dev.droidtop.display.SecondaryDisplayContent.Mode.HANDHELD,
     ) {
-        val entry by dev.droidtop.app.CompanionState.focusedEntry.collectAsState()
-        dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
-            dev.droidtop.app.CompanionSurfaceHost(entry)
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val role = dev.droidtop.app.SecondScreenInputPrefs.role(
+            context,
+            dev.droidtop.display.SecondaryDisplayContent.Mode.HANDHELD,
+        )
+        if (role == dev.droidtop.app.SecondScreenInputPrefs.Role.INPUT) {
+            dev.droidtop.app.SecondScreenInputSurface(
+                dev.droidtop.display.SecondaryDisplayContent.Mode.HANDHELD,
+            )
+        } else {
+            val entry by dev.droidtop.app.CompanionState.focusedEntry.collectAsState()
+            dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
+                dev.droidtop.app.CompanionSurfaceHost(entry)
+            }
+        }
+    }
+    dev.droidtop.display.SecondaryDisplayContent.register(
+        dev.droidtop.display.SecondaryDisplayContent.Mode.DESKTOP,
+    ) {
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val role = dev.droidtop.app.SecondScreenInputPrefs.role(
+            context,
+            dev.droidtop.display.SecondaryDisplayContent.Mode.DESKTOP,
+        )
+        if (role == dev.droidtop.app.SecondScreenInputPrefs.Role.INPUT) {
+            dev.droidtop.app.SecondScreenInputSurface(
+                dev.droidtop.display.SecondaryDisplayContent.Mode.DESKTOP,
+            )
+        } else {
+            val entry by dev.droidtop.app.CompanionState.focusedEntry.collectAsState()
+            dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
+                dev.droidtop.app.CompanionSurfaceHost(entry)
+            }
         }
     }
     dev.droidtop.display.SecondaryDisplayContent.registerHandoff(

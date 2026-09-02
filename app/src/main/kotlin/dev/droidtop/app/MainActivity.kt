@@ -313,6 +313,17 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         refreshModeIfUndecided()
+        // Where the second screen's trackpad sends navigation keys in
+        // Handheld mode: this window, through ordinary dispatchKeyEvent.
+        // See ForegroundShell for why that is the only route available.
+        ForegroundShell.set(this)
+    }
+
+    override fun onPause() {
+        // Cleared rather than left stale, so a trackpad swipe cannot
+        // deliver keys into a window the user has navigated away from.
+        if (ForegroundShell.current() === this) ForegroundShell.set(null)
+        super.onPause()
     }
 
     private fun refreshModeIfUndecided() {
@@ -501,7 +512,15 @@ class MainActivity : AppCompatActivity() {
                 // directly as a Presentation. The SECONDARY_HOME activity
                 // stays underneath as the idle surface for when droidtop
                 // is not foreground; this window sits above it while it is.
-                if (!shellOnSecond && handheld && second != null && secondAvailable) {
+                //
+                // No longer gated on `handheld`: Desktop mode wants this
+                // window too, because that is where its second-screen
+                // keyboard and trackpad live (docs/SPEC.md 4, 6c), and the
+                // live window is the one that exists whether or not
+                // droidtop holds the home role. `shellOnSecond` is only
+                // ever true in Handheld mode, so the Handheld behaviour
+                // this condition already had is unchanged.
+                if (!shellOnSecond && second != null && secondAvailable) {
                     if (secondScreenPresentation?.display?.displayId != second.androidDisplayId) {
                         secondScreenPresentation?.dismiss()
                         val display = displayManager.getDisplay(second.androidDisplayId)
