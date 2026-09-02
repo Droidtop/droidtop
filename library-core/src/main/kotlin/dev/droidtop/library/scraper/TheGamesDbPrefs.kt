@@ -1,6 +1,7 @@
 package dev.droidtop.library.scraper
 
 import android.content.Context
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * Real, user-supplied TheGamesDB API key -- see [TheGamesDbClient]'s own
@@ -10,7 +11,7 @@ import android.content.Context
  * uses.
  */
 object TheGamesDbPrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_API_KEY = "droidtop_thegamesdb_apikey"
 
     fun apiKey(context: Context): String =

@@ -2,6 +2,7 @@ package dev.droidtop.display
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * The one place droidtop decides what the secondary screen shows.
@@ -76,6 +77,6 @@ object SecondaryDisplayContent {
         }
     }
 
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_LAST_MODE = "droidtop_last_mode"
 }

@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.library.LibraryEntry
 import kotlinx.coroutines.delay
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * Idle screensaver: a slow slideshow of the library's own artwork (real
@@ -55,7 +56,7 @@ enum class ScreensaverMode(val label: String, val idleSeconds: Int) {
 }
 
 object ScreensaverPrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_MODE = "droidtop_screensaver_mode"
 
     // OFF by default (directed): a slideshow that appears on its own

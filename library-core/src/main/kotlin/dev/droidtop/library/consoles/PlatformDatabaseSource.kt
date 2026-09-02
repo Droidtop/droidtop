@@ -1,6 +1,7 @@
 package dev.droidtop.library.consoles
 
 import android.content.Context
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * The one place the platform-database repository lives (docs/SPEC.md
@@ -25,7 +26,7 @@ object PlatformDatabaseSource {
     const val DEFAULT_BASE_URL =
         "https://raw.githubusercontent.com/droidtop/droidtop-platforms/main"
 
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     const val KEY_BASE_URL = "pref_platform_database_base_url"
 
     /** The configured base, or [DEFAULT_BASE_URL]; never with a trailing slash. */

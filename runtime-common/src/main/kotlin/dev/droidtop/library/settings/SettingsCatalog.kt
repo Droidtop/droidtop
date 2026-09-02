@@ -222,10 +222,7 @@ object SettingsScreenRegistry {
 
 /** Shared helpers for catalogs storing into the launcher prefs file. */
 object CatalogPrefs {
-    // com.android.launcher3.LauncherFiles.SHARED_PREFERENCES_KEY -- by
-    // literal name, since :runtime-common cannot depend on the launcher
-    // module (same established pattern as GamepadShell's own pref reads).
-    const val PREFS_NAME = "com.android.launcher3.prefs"
+    const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
 
     fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
