@@ -2164,7 +2164,8 @@ parsing rules (`library-core/.../theme/EsDeThemeParser.kt`,
 
 **Real, working today** (each confirmed against real ES-DE source,
 `/root/es-de-reference` in the dev container — see `coordination/
-HANDOFF.md` for full detail/citations, this section is the durable
+/root/coordination/HANDOFF.md` for full detail/citations (that path is
+outside this repository), this section is the durable
 summary):
 
 - Real multi-theme discovery/selection (`ThemeAssets.discoverThemes`/
@@ -2335,7 +2336,7 @@ it could turn out to already be fixed as a side effect.
 
 Full real history/reasoning for each of the above (commit-by-commit,
 with citations to the exact real ES-DE source lines each decision was
-verified against) lives in `coordination/HANDOFF.md`'s own theme-engine
+verified against) lives in `/root/coordination/HANDOFF.md`'s own theme-engine
 section, not reproduced here — that file is the working log; this
 section is the durable, periodically-refreshed summary per this
 project's own convention of writing real decisions into SPEC.md itself.
@@ -2364,8 +2365,14 @@ their own theme presentation via `${system.theme}` = their own
 collection-folder name (`auto-allgames` etc.) — droidtop invented an
 unrelated "subfolder theme.xml" mechanism that matches no real bundled
 theme, so collections lose their themed presentation entirely.
-Decision: a scoped refactor (R1–R5, tracked in
-`coordination/HANDOFF.md`), not further incremental patches — R1 (full,
+Decision: a scoped refactor, not further incremental patches. It was
+planned as R1–R5 and described as tracked in `coordination/HANDOFF.md`;
+neither held. There is no `coordination/` directory in this repository,
+and `/root/coordination/HANDOFF.md` contains no R1–R5. The numbering was
+abandoned after R2: the later passes are recorded below under dated
+descriptive headings instead, so R3–R5 were never delivered under those
+names and should not be looked for. The plan below is kept for the shape
+of the work, not as a live tracker — R1 (full,
 verbatim `ThemeData::sElementMap` schema transcription, landed this
 commit, including the real XML-attribute-keyed `customBadgeIcon`/
 `customControllerIcon` parsing droidtop's parser never implemented at
