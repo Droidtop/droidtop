@@ -78,6 +78,7 @@ import com.github.penfeizhou.animation.apng.APNGDrawable
 import com.github.penfeizhou.animation.gif.GifDrawable
 import com.github.penfeizhou.animation.loader.FileLoader
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.theme.EsDeImageTypes
 import dev.droidtop.library.theme.BADGE_SLOTS
 import dev.droidtop.library.theme.EsDeThemeElement
 import dev.droidtop.library.theme.EsDeThemeValue
@@ -421,18 +422,38 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // Real gameselector-driven artwork: an element with `gameselectorEntry`
     // (DEcaffe's own game1..game9 mosaic tiles) has no static `path` of
     // its own at all -- its real image comes from whichever game
-    // GameSelector picked for that slot, using that game's OWN already-
-    // resolved artwork (LibraryEntry.artworkUri, the same real per-game
-    // media EsDeArtwork.resolve found at scan time). This uses droidtop's
-    // default miximage/cover/screenshot/... priority rather than THIS
-    // element's own real `imageType` ordering (e.g. "screenshot,cover,
-    // titlescreen") -- a real, honest simplification: re-deriving the
-    // exact gamesRoot/system/romBaseName EsDeArtwork.resolve's imageTypes
-    // overload needs from a LibraryEntry alone isn't reliably possible
-    // for every provider today, so this reuses the artwork already
-    // resolved once at scan time instead of re-resolving per element.
+    // GameSelector picked for that slot.
+    //
+    // WHICH media of that game is the element's own real `imageType`
+    // (ImageComponent.cpp:612-647 parses it; GamelistView.cpp:1255-1330
+    // resolves it): the theme's own declared order, first type that
+    // exists wins. This used to be unimplementable -- a LibraryEntry
+    // carried one already-resolved artworkUri and nothing to choose
+    // between -- and is now resolved through LibraryEntry.mediaLocator.
+    // The `?: artworkUri` tail is droidtop's own documented divergence
+    // from ES-DE, see LibraryEntry.mediaForImageTypes.
     val gameselectorEntry = element.valueOrNull<EsDeThemeValue.UInt>("gameselectorEntry")?.value?.toInt()
-    val path = if (gameselectorEntry != null) {
+    val imageTypes = remember(element) {
+        EsDeImageTypes.forImageElement(element.valueOrNull<EsDeThemeValue.Str>("imageType")?.value)
+    }
+    // Real precedence (GamelistView.cpp:834 + SystemView.cpp:1042-1043):
+    // DECLARING an imageType is what makes an image element game-driven,
+    // whether or not it also names a gameselectorEntry -- ES-DE resolves
+    // per-game media for every image component whose type list is
+    // non-empty, and skips every component whose list is empty. The
+    // entry index defaults to 0 (`getThemeGameSelectorEntry`'s own
+    // default, clamped to the selector's game count, SystemView.cpp:1069
+    // -1072), which is the currently selected game.
+    val path = if (imageTypes.isNotEmpty()) {
+        gameSelection.getOrNull(gameselectorEntry ?: 0)?.let { entry ->
+            entry.mediaForImageTypes(imageTypes) ?: entry.artworkUri
+        }
+        // Nothing resolved: real ES-DE calls setImage("") and the
+        // element's own `default` is what remains (GamelistView.cpp:1331
+        // -1334). `path` is deliberately NOT consulted -- a game-driven
+        // element's static path is not a fallback in real ES-DE.
+            ?: element.valueOrNull<EsDeThemeValue.Path>("default")?.resolved?.takeIf { File(it).exists() }
+    } else if (gameselectorEntry != null) {
         gameSelection.getOrNull(gameselectorEntry)?.artworkUri
     } else {
         // Real ImageComponent behavior: `path` applies only when its file
@@ -1246,17 +1267,38 @@ private fun EsDeThemedAnimation(element: EsDeThemeElement, viewWidth: Dp, viewHe
  * static image -- or, for a gameselector-driven element (DEcaffe's own
  * `screen2`, the large game-preview poster, which has NO static path
  * property of its own at all), the selected game's own already-resolved
- * artwork, same real per-game-image approach as [EsDeThemedImage]'s own
- * gameselectorEntry handling (see that function's doc comment for the
- * same "default priority order, not this element's own imageType"
- * simplification). [EsDeThemedVideo]'s own fallback when a `video`
+ * media for its own declared `imageType`, same real per-game-image
+ * approach as [EsDeThemedImage]'s own gameselectorEntry handling.
+ * [EsDeThemedVideo]'s own fallback when a `video`
  * element's selected game has no scraped video; `animation` elements now
  * play for real instead -- see [EsDeThemedAnimation].
  */
 @Composable
 private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp, gameSelection: List<LibraryEntry>) {
     val gameselectorEntry = element.valueOrNull<EsDeThemeValue.UInt>("gameselectorEntry")?.value?.toInt()
-    val path = if (gameselectorEntry != null) {
+    // A `video` element's own real `imageType` (VideoComponent.cpp:350-391)
+    // selects the STATIC image it shows -- the same GamelistView::
+    // setGameImage call real ES-DE makes for video components
+    // (GamelistView.cpp:836-838) as for image ones. `none` is legal here
+    // and legal ONLY here: it names no media, so it simply matches
+    // nothing and the walk continues, which is exactly what real ES-DE's
+    // setGameImage does with it (its loop has no "none" branch at all --
+    // VideoComponent's mImageTypeNone flag only affects start-delay
+    // behaviour, not which file is chosen).
+    val imageTypes = remember(element) {
+        EsDeImageTypes.forVideoElement(element.valueOrNull<EsDeThemeValue.Str>("imageType")?.value)
+    }
+    // Same real precedence as EsDeThemedImage: a declared imageType makes
+    // this game-driven regardless of gameselectorEntry, and real ES-DE
+    // runs the identical setGameImage call over its video components
+    // (GamelistView.cpp:836-838) as over its image ones.
+    val path = if (imageTypes.isNotEmpty()) {
+        gameSelection.getOrNull(gameselectorEntry ?: 0)?.let { entry ->
+            entry.mediaForImageTypes(imageTypes) ?: entry.artworkUri
+        }
+            ?: element.valueOrNull<EsDeThemeValue.Path>("default")?.resolved?.takeIf { File(it).exists() }
+            ?: element.valueOrNull<EsDeThemeValue.Path>("defaultImage")?.resolved?.takeIf { File(it).exists() }
+    } else if (gameselectorEntry != null) {
         gameSelection.getOrNull(gameselectorEntry)?.artworkUri
     } else {
         // Same real apply-time existence checks as EsDeThemedImage's own

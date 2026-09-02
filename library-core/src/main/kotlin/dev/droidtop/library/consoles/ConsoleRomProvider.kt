@@ -3,6 +3,7 @@ package dev.droidtop.library.consoles
 import android.content.Context
 import dev.droidtop.library.LaunchDisplay
 import dev.droidtop.library.EsDeArtwork
+import dev.droidtop.library.GameMediaLocator
 import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
@@ -508,6 +509,13 @@ class ConsoleRomProvider(
                     artworkUri = EsDeArtwork.resolve(gamesRoot, effectiveSystemId, romFile.nameWithoutExtension),
                     manualUri = EsDeArtwork.resolveManual(gamesRoot, effectiveSystemId, romFile.nameWithoutExtension),
                     videoUri = EsDeArtwork.resolveVideo(gamesRoot, effectiveSystemId, romFile.nameWithoutExtension),
+                    // Three strings already in hand -- no extra scan-time
+                    // filesystem work at all. See GameMediaLocator.
+                    mediaLocator = GameMediaLocator(
+                        gamesRoot.absolutePath,
+                        effectiveSystemId,
+                        romFile.nameWithoutExtension,
+                    ),
                 )
             }
         }.awaitAll().withMetadata()
@@ -783,5 +791,9 @@ private fun RomEntity.toLibraryEntry(): LibraryEntry {
         artworkUri = EsDeArtwork.resolve(root, systemId, baseName) ?: artworkUri,
         manualUri = manualUri,
         videoUri = EsDeArtwork.resolveVideo(root, systemId, baseName) ?: videoUri,
+        // Rebuilt from the columns this row already stores, for the same
+        // reason the media above resolves live: it costs nothing and it
+        // must stay valid for art scraped after the row was cached.
+        mediaLocator = GameMediaLocator(root.absolutePath, systemId, baseName),
     )
 }
