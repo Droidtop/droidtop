@@ -2211,6 +2211,27 @@ GitHub-refresh + validate-before-replace:
   subtree extension search, for the compiled-Ren'Py fallback),
   `startup.tjs`, corroborated `RPG_RT.ldb`+(`exe`|`lmt`),
   `project.godot`, `.cst`, `.ps3`/`.ps2`, and `data01000.arc`.
+
+  **Where the game ROOT is, versus which engine it is (2026-09-02).**
+  The database answers "which engine", in file order, for one folder.
+  It does not answer "which folder is the game root", and v5's first
+  subtree rule (`anyFileExtensionDeep`, the compiled-Ren'Py fallback)
+  made the difference visible: it matched a wrapper folder whose real
+  markers sat one level down, so `GameEngineDetector.detectGame`
+  returned the wrapper as the game root and never looked inside it --
+  breaking the version-folder shape 7g relies on, and with it the
+  determinism guarantee on the nested search. Both changes were green
+  on their own branches and only met on `main`. `detectGame` therefore
+  searches in three tiers: evidence AT the folder that the folder is a
+  game root; then that same precise question of each subfolder, in name
+  order; then, only if nothing more precise exists anywhere, the
+  subtree rules against the folder itself. A rule is a subtree rule if
+  any of its conditions can be satisfied from a subdirectory the rule
+  never names (`anyFileExtensionDeep` with a non-zero depth, the
+  `unity` probe's 3-deep search). Classification is unchanged: `detect`
+  still evaluates every row in file order, so file order remains the
+  sole precedence rule shared with enginehost, and a subtree match is
+  never downgraded to no match -- only to a later tier.
 - `bios-database.json` — §7e4's firmware registry.
 
 One user action refreshes all four ("Update platform databases" in the
