@@ -731,15 +731,18 @@ target; they stay until the replacement lands so nothing regresses.
   mapping). Making the lower screen an independent output (its own
   `SecondaryDisplayLauncher` or mirrored desktop) is one of the per-output
   roles above, opt-in like everything else in this section.
-  - **Concrete for Desktop mode specifically**: the lower screen's default
-    input role is a *persistent* on-screen keyboard (forked from Hacker's
-    Keyboard — see §6) plus a trackpad region beneath/alongside it, always
-    available rather than popping up only when a text field is focused
-    (the normal Android IME behavior would be wrong here — a desktop
-    keyboard is expected to just be there). **Toggleable**: a user who'd
-    rather use the lower screen as an independent output (mirrored, or
-    its own `SecondaryDisplayLauncher`) turns this off, per the per-output
-    role model above.
+  - **Concrete for Desktop mode specifically** (BUILT — see §6c): the
+    lower screen's default input role is a *persistent* on-screen keyboard
+    (the forked Hacker's Keyboard's own `LatinKeyboardView` — see §6) plus
+    a trackpad region beneath it, always available rather than popping up
+    only when a text field is focused. That last part is not achievable as
+    an IME window — Android places those itself, §6c has the detail — so
+    it is an ordinary droidtop window on that display, and droidtop's IME
+    is told to stop drawing over the primary one while it is up.
+    **Toggleable**: "Second screen in Desktop mode" and "Second screen in
+    Handheld mode" in settings choose between this input surface and the
+    companion/widgets surface, per mode, per the per-output role model
+    above. Handheld defaults to the companion, Desktop to input.
 - **Handheld dual-screen roles (directed 2026-08-30, first live addon
   session)**: when the Dual-Screen Add-On (or any second display) is
   present, the HANDHELD SHELL ITSELF moves to it — the addon is the
@@ -978,6 +981,7 @@ Measured by what droidtop's own code actually touches.
 | Container manager UI | §4b | **built** — `ContainersActivity` over `listContainers` |
 | Bind-mounted Android storage | §3 | **built** — `hostStorageToContainerPath`, whole app-storage dir mounted |
 | Audio | §2 | **configured, unverified** — droidspaces' own `enable_pulseaudio=1`; never confirmed on device |
+| Second-screen trackpad + keyboard | §4/§6c | **built, unproven live** — `TrackpadGestureEngine`/`TrackpadView` plus the forked keyboard, hosted on the addon display. The gesture model, acceleration curve, millimetre scale, focus stepper and key translation are unit-tested; everything downstream of a real finger on a real second panel is not |
 | Keyboard/mouse injection | §6 | **built, unproven live** — host-bridge's virtual-pointer/virtual-keyboard injection, and (since §6b) the desktop surface that feeds it. Between the assessment above and §6b the primitive existed but nothing called it: `InputSeat` was constructed only by its own unit test, so the presented desktop was a video feed with no way to click it |
 | External display | §4 | **built** |
 | **Terminal into a container** | §4b | **NOT BUILT** — zero files. §4b's own words: "a computer the user can't open a shell on isn't a computer" |
@@ -1247,9 +1251,11 @@ gamepad-as-pointer, the second-screen trackpad/keyboard, or a lapdock's
 physical peripherals. All normalized before reaching `:host-bridge`, so the
 compositor only ever sees one logical pointer and keyboard.
 
-- Second-screen trackpad interaction model: borrow Moonlight Android's
+- Second-screen trackpad interaction model (BUILT — §6c): the
   `AbsoluteTouchContext` (primary screen = absolute cursor position) /
-  `RelativeTouchContext` (trackpad = relative deltas) split.
+  `RelativeTouchContext` (trackpad = relative deltas) split, which is
+  Moonlight Android's, is now the split between `DesktopInputRouter`'s
+  own touch path and `TrackpadGestureEngine`.
 - Keyboard forwarding: reference KDE Connect Android's Remote Input plugin.
 - **Second-screen persistent keyboard (Desktop mode's default second-screen
   role, §4)**: a fork of [Hacker's Keyboard](
@@ -1259,8 +1265,9 @@ compositor only ever sees one logical pointer and keyboard.
   keyboard built from scratch — it already has the physical-keyboard-style
   layout (dedicated Ctrl/Alt/Esc/arrow keys, unlike stock Android IMEs) a
   desktop-input surface actually wants. Forked in and adapted the same way
-  as `:shell-default`, not kept as a passive `vendor/` reference. Not
-  implemented yet.
+  as `:shell-default`, not kept as a passive `vendor/` reference. BUILT as
+  a second-screen surface — see §6c, including what Android does and does
+  not permit for a keyboard on a secondary display.
 - **Do not assume Winlator/GameNative's input code is a safe base** —
   Winlator has a known, open, acknowledged gap in native/Bluetooth mouse
   pointer capture (issue #1555). This needs real design and testing effort,
@@ -1313,8 +1320,136 @@ The right stick and stick clicks are the controls that navigation does not use.
 
 Known gaps, stated rather than guessed at: no long-press-to-right-click on the
 touchscreen (a hold threshold is not worth inventing without a device to tune
-it on), and the second-screen trackpad surface of §6 is still unbuilt — the
-router already has the relative-motion path it will use.
+it on). The second-screen trackpad surface of §6 is built on top of this
+router's relative-motion path — see §6c.
+
+## 6c. Second-screen input (built 2026-09-02)
+
+Until now the second screen was output only, which §4 and §6 both name as
+the point of the Dual-Screen Add-On and neither had. It is now an input
+surface: droidtop's own keyboard above a trackpad, selectable per mode
+against the companion/widgets surface it competes with.
+
+### What Android permits for a keyboard on a secondary display
+
+Established before designing, because the obvious approach does not work.
+An IME's window is placed by the PLATFORM. Android chooses the display
+from `WindowManager#getDisplayImePolicy()` for the display the focused app
+is on, and the only outcomes are the focused app's display, the default
+display, or nowhere; changing that policy needs a system permission, and
+the platform additionally refuses to show an IME on displays it does not
+own. "Persistent" is also not an IME concept — the soft input window is
+shown when an editor asks and hidden when none does.
+
+So a persistent second-screen keyboard **cannot be an IME window**, and
+building one as though it could would ship something that silently does
+nothing.
+
+What it is instead: an ordinary droidtop window on the second screen
+containing a real `LatinKeyboardView` — the fork's own key grid, themes
+and `kbd_full` layout, with the function row, Ctrl, Alt, Esc and the arrow
+cluster that §6a is about. `LatinIME.onEvaluateInputViewShown` returns
+false while that surface is up, which is the platform's own mechanism for
+"there is a real keyboard elsewhere" and is what stops droidtop covering
+the primary screen with a second one.
+
+Keys are delivered on a HARDWARE-keyboard model, one model for both
+destinations: a key is pressed and released, and the far side decides what
+that produces.
+
+- **Into a container** (Desktop mode): each key becomes an Android keycode
+  handed to `DesktopInputRouter`, which already turns those into evdev
+  keys. The compositor's XKB keymap applies the layout and its own
+  auto-repeat, exactly as for a lapdock's physical keyboard. No IME
+  involved, no editor focus needed.
+- **Into an Android app** (Handheld and Standard): each key becomes an
+  `InputConnection.sendKeyEvent`, whose contract is precisely "as though a
+  hardware key was pressed". This needs droidtop's IME to be the selected
+  input method (that is what supplies the connection) and an editor to
+  have focus (that is what it points at). Both are the platform's
+  conditions, not droidtop's, and the surface says which one is missing
+  rather than dropping keystrokes.
+
+Nothing calls into `LatinIME`'s internals: with the on-primary input view
+suppressed those internals have no view to work against.
+
+What the hardware-key model gives up, stated rather than hidden: no
+autocorrect, no suggestion strip, no dead-key composition, and the key
+labels on this surface do not relabel for Shift. For a keyboard whose
+purpose is driving a terminal, Wine and a desktop (§6a) those are the
+right things to lose; a user who wants them turns this surface off and
+uses the ordinary on-primary keyboard.
+
+The translation is Hacker's Keyboard's own encoding read back, not a new
+table: the fork already encodes every non-printable key as the NEGATED
+Android keycode (`KEYCODE_ESCAPE` is -111 against Android's 111,
+`KEYCODE_FKEY_F1` is -131 against `KEYCODE_F1`), and printable characters
+go through Android's own `KeyCharacterMap` rather than a hand-written
+list. From there `EvdevKeys` and the compositor's keymap finish the chain.
+Three links, no branch duplicating another.
+
+### The trackpad, and what it means in each mode
+
+Relative, not absolute: the screens are different sizes and the user is
+not pointing at the second screen. `TrackpadGestureEngine` speaks
+millimetres, so every threshold is a property of finger travel rather than
+of a panel's pixel density, and `MmScale` discards the implausible `xdpi`
+values panels really do report.
+
+The gesture model is libinput's, deliberately not droidtop's own: one
+finger moves, one-finger tap is left click, two-finger tap is right click,
+three-finger tap is middle click, two fingers scroll, and tap-then-touch
+again drags with the button held. Drag lock, bottom-edge software buttons
+and edge scrolling are all omitted for the reasons libinput omits or
+supersedes them. A trackpad that behaves like every other trackpad needs
+no learning.
+
+Acceleration is libinput's adaptive profile reduced to its two knees: a
+flat slow plateau so a slow finger can land on a small target, a flat fast
+plateau so a flick crosses the screen, a straight ramp between. Gain is
+derived from the DESTINATION output's width — 160 mm of finger travel
+crosses it once at factor 1.0 — so the same hand movement crosses a
+1080-wide container output and a 2560-wide lapdock alike.
+
+**Where the pointer goes is not the same question in each mode**, and the
+two answers are different features rather than one feature configured
+twice:
+
+- **Desktop**: a real pointer in the primary container, through the same
+  single `InputSeat` the desktop surface's own touch and keyboard use.
+  `InputSeats` now hands out that one seat per live `HostBridge` instead
+  of `DesktopShell` constructing its own, because two surfaces now drive
+  it and two seats over one bridge would break the one-normalized-seat
+  invariant §6 exists for.
+- **Handheld / Standard**: there is no pointer, and droidtop cannot make
+  one — moving a system cursor over another app's window needs
+  `INJECT_EVENTS`, a signature permission, and the Handheld shell is
+  Compose focus navigation driven by a D-pad, so a drawn arrow would have
+  nothing to click. The trackpad drives what the shell actually
+  understands: `DirectionalStepper` quantises travel into focus steps
+  (with the dominant axis locked, so a mostly-horizontal swipe cannot
+  jump a row), a tap is confirm and a two-finger tap is back. Those reach
+  the shell as ordinary `Activity.dispatchKeyEvent` calls into droidtop's
+  own window, which needs no permission, and they are read through the
+  existing `GamepadKeyMap` vocabulary rather than a second mapping.
+
+### What is verified, and what is not
+
+Unit-tested, in `:input-seat` and `:input-keyboard`: the gesture state
+machine (including the cases that are invisible on a screenshot and fatal
+in use — a button left stuck by a second finger landing mid-drag, a tap
+that fires twice, a cursor teleporting when a finger is added), the
+acceleration curve, the millimetre scale's fallbacks, the step quantiser's
+axis lock, and the key translation including modifier latching and
+auto-repeat suppression.
+
+NOT verified, because it needs the hardware: that the addon panel reports
+a usable `xdpi`; that the keyboard lays out correctly at 45% of a
+1080x1920 panel; that suppressing the on-primary input view behaves as
+documented on this device; that `InputConnection.sendKeyEvent` reaches the
+editor the user expects; and every latency and feel judgement, which is
+the whole reason the acceleration curve is written as constants that can
+be read and changed rather than tuned by hand.
 
 ## 6a. Keyboard ownership (directed 2026-09-01)
 
@@ -3053,11 +3188,13 @@ shell-desktop           → "Desktop" shell's Android-side half (§2a): cross-co
 shell-gamepad           → "Handheld" shell: optional gamepad console UI, multiple
                           selectable paradigms — see §7; depends on library-core.
                           The best-developed module in the repo (~8,000 lines)
-input-keyboard          → second-screen persistent keyboard (§4/§6), forked from
-                          Hacker's Keyboard; shipping (~17,600 lines) as a real
-                          Android IME, surfaced in :app's onboarding; the
-                          second-screen/:input-seat integration it was forked in
-                          for is still TODO
+input-keyboard          → second-screen persistent keyboard (§4/§6/§6c), forked
+                          from Hacker's Keyboard; shipping (~17,600 lines) as a
+                          real Android IME, surfaced in :app's onboarding, and
+                          since §6c also hosted as an ordinary window on the
+                          second screen, its keys routed either into a container
+                          (through :input-seat) or into Android's focused editor
+                          (through its own InputConnection)
 
 runtime-remote-stream   → DELETED (2026-09-01). Never in settings.gradle.kts,
                           zero sources. Streaming is windowcast's alone — see §7a.
@@ -3110,6 +3247,7 @@ points from droidtop settings into gamenative's container-config UI
 5. `runtime-linux-noroot` — the largest genuinely-new piece; can proceed in
    parallel with 3-4 once the shared container contract is stable.
 6. `input-seat` (second-screen trackpad/keyboard), in parallel with 3-5.
+   Done: §6b built the desktop surface's own input, §6c the second screen's.
 7. `library-core` + `shell-default` — first real end-to-end usable app.
 8. `shell-gamepad` — last, deliberately, and only once `library-core` has a
    working `LibraryProvider` to build a real UI against.

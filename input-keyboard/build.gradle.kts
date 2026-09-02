@@ -6,11 +6,15 @@
 // (persistent-not-popup presentation, trackpad-region integration,
 // :input-seat wiring) that a vendor/+wrapper relationship wouldn't fit.
 //
-// Not implemented/wired up yet — this is the source brought in and made
-// to compile as its own module; the actual second-screen persistent
-// surface, trackpad region, and :input-seat integration are still TODO.
+// The second-screen surface itself is now built (SecondScreenKeyboard.kt
+// here, hosted by :app on the addon display). What Android permits for a
+// secondary-display keyboard, and why it is an ordinary window rather than
+// an IME window, is written up in that file and in docs/SPEC.md §6c.
 plugins {
     alias(libs.plugins.android.library)
+    // The second-screen additions are Kotlin; the forked-in upstream tree
+    // stays Java and is untouched apart from the one hook in LatinIME.
+    alias(libs.plugins.kotlin.android)
 }
 
 android {
@@ -50,6 +54,9 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 
     lint {
         abortOnError = false
@@ -60,4 +67,6 @@ dependencies {
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)
+
+    testImplementation(libs.junit)
 }

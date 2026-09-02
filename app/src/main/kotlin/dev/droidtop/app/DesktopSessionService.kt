@@ -99,6 +99,10 @@ class DesktopSessionService : Service() {
             }
         }
         _stateHolder.value = DesktopSessionState.Idle
+        // The seat belongs to the bridge that has just gone away. Dropped
+        // here so no surface -- the desktop viewport or the second screen
+        // -- can be handed one pointing at a dead connection.
+        dev.droidtop.input.InputSeats.clear()
         scope.cancel()
         super.onDestroy()
     }

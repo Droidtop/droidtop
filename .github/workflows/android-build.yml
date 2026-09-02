@@ -276,12 +276,13 @@ jobs:
       # without a screen, which is otherwise the only way this project
       # checks theme rendering at all.
       - name: Run unit tests
-        # All five modules that actually have a src/test tree (library-core,
-        # runtime-common, shell-gamepad, input-seat, runtime-windows), not
-        # just library-core — that narrower scope meant roughly 30% of this
+        # Every module that actually has a src/test tree (library-core,
+        # runtime-common, shell-gamepad, input-seat, runtime-windows, and
+        # input-keyboard since the second-screen keyboard landed), not just
+        # library-core — that narrower scope meant roughly 30% of this
         # repo's test methods had never once run in CI.
         if: always()
-        run: ./gradlew :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :runtime-windows:testDebugUnitTest --stacktrace
+        run: ./gradlew :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :runtime-windows:testDebugUnitTest :input-keyboard:testDebugUnitTest --stacktrace
 
       - name: Upload test reports
         if: always()
@@ -294,4 +295,5 @@ jobs:
             shell-gamepad/build/reports/tests/
             input-seat/build/reports/tests/
             runtime-windows/build/reports/tests/
+            input-keyboard/build/reports/tests/
           if-no-files-found: ignore
