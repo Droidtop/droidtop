@@ -3,7 +3,25 @@ name: Android build
 on:
   push:
     branches: [main]
+    # A commit that only edits prose does not need a 25-minute Android
+    # build. Deliberately NOT a blanket "**.md": the decaffe ES-DE theme
+    # ships .md files as APK assets under shell-gamepad/src/main/assets,
+    # and those are real build inputs. Only these four paths are inert.
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - "NOTICE.md"
+      - "LICENSE"
   pull_request:
+    # A commit that only edits prose does not need a 25-minute Android
+    # build. Deliberately NOT a blanket "**.md": the decaffe ES-DE theme
+    # ships .md files as APK assets under shell-gamepad/src/main/assets,
+    # and those are real build inputs. Only these four paths are inert.
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - "NOTICE.md"
+      - "LICENSE"
   workflow_dispatch:
 
 env:
@@ -28,6 +46,17 @@ env:
 # default GITHUB_TOKEN is read-only unless granted this explicitly.
 permissions:
   contents: write
+
+# One agent push supersedes the previous one instead of racing it. Before
+# this, every push queued another full build and nothing cancelled the run
+# it had just obsoleted, so a five-push fix session burned five builds and
+# could email five failures for one problem. Keyed on the ref, so branches
+# and pull requests never cancel each other. Pushes to main are the
+# exception: that run publishes a release, and cancelling it midway could
+# leave a release deleted but not recreated.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   build:
