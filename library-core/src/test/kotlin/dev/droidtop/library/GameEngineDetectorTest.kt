@@ -65,17 +65,76 @@ class GameEngineDetectorTest {
     }
 
     @Test
-    fun `detects RPG Maker 2000-2003 via RPG_RT-dot-exe`() {
+    fun `detects RPG Maker 2000-2003 via RPG_RT exe plus ldb`() {
         touch("RPG_RT.exe")
+        touch("RPG_RT.ldb")
         assertEquals(GameEngine.RPG_MAKER_2000_2003, GameEngineDetector.detect(tmp.root, defs))
     }
 
     @Test
-    fun `detects RPG Maker 2000-2003 via RPG_RT-dot-ldb alone`() {
+    fun `detects RPG Maker 2000-2003 via ldb plus lmt without the exe`() {
         // A real distribution can ship without the .exe (Linux/EasyRPG-only
-        // release) -- the .ldb database file alone is still a real signal.
+        // release) -- the .ldb database plus the .lmt map tree.
         touch("RPG_RT.ldb")
+        touch("RPG_RT.lmt")
         assertEquals(GameEngine.RPG_MAKER_2000_2003, GameEngineDetector.detect(tmp.root, defs))
+    }
+
+    @Test
+    fun `a stray RPG_RT exe without its database is not a game`() {
+        // v5 tightening (aligned with enginehost's verified pairing): the
+        // exe alone proves nothing without the .ldb it loads.
+        touch("RPG_RT.exe")
+        assertNull(GameEngineDetector.detect(tmp.root, defs))
+    }
+
+    @Test
+    fun `detects Kirikiri via startup tjs with no archive`() {
+        touch("startup.tjs")
+        assertEquals(GameEngine.KIRIKIRI, GameEngineDetector.detect(tmp.root, defs))
+    }
+
+    @Test
+    fun `detects CatSystem2 via a loose cst script`() {
+        touch("scene00.cst")
+        assertEquals(GameEngine.CATSYSTEM2, GameEngineDetector.detect(tmp.root, defs))
+    }
+
+    @Test
+    fun `detects CMVS via a ps3 script`() {
+        touch("script.ps3")
+        assertEquals(GameEngine.CMVS, GameEngineDetector.detect(tmp.root, defs))
+    }
+
+    @Test
+    fun `detects Buriko via its archive-set head`() {
+        touch("data01000.arc")
+        assertEquals(GameEngine.BURIKO, GameEngineDetector.detect(tmp.root, defs))
+    }
+
+    @Test
+    fun `detects Godot via project-dot-godot`() {
+        touch("project.godot")
+        assertEquals(GameEngine.GODOT, GameEngineDetector.detect(tmp.root, defs))
+    }
+
+    @Test
+    fun `detects compiled-only RenPy via a nested rpa archive`() {
+        // The renpy-fallback row: no renpy/ runtime dir at all, just the
+        // compiled archive where Ren'Py really puts it (game/).
+        touch("game", "archive.rpa")
+        assertEquals(GameEngine.RENPY, GameEngineDetector.detect(tmp.root, defs))
+    }
+
+    @Test
+    fun `enginehost-only rows are skipped by droidtop`() {
+        // flash-swf: plain .swf stays droidtop's players-database path.
+        touch("movie.swf")
+        assertNull(GameEngineDetector.detect(tmp.root, defs))
+        // rpgmaker-mvmz: droidtop has no MV-or-MZ engine to map it to.
+        touch("js", "main.js")
+        touch("index.html")
+        assertNull(GameEngineDetector.detect(tmp.root, defs))
     }
 
     @Test
@@ -154,10 +213,18 @@ class GameEngineDetectorTest {
     @Test
     fun `every registry row with rules maps to a compiled engine`() {
         // A row this app cannot resolve is legal (future database), but
-        // the SHIPPED seed and this app must agree completely.
+        // the SHIPPED seed and this app must agree completely -- except
+        // the rows the seed itself declares enginehost-only (v5: the
+        // database is the shared classification authority for BOTH apps,
+        // and some classifications only exist on enginehost's side).
+        val enginehostOnly = setOf("rpgmaker-mvmz", "flash-swf")
         org.junit.Assert.assertTrue(defs.isNotEmpty())
         defs.forEach { def ->
-            org.junit.Assert.assertNotNull("seed row ${def.id} has no compiled engine", def.engine)
+            if (def.id in enginehostOnly) {
+                org.junit.Assert.assertNull("row ${def.id} must stay enginehost-only", def.engine)
+            } else {
+                org.junit.Assert.assertNotNull("seed row ${def.id} has no compiled engine", def.engine)
+            }
             org.junit.Assert.assertTrue("seed row ${def.id} has no detection rules", def.detect.isNotEmpty())
         }
     }
