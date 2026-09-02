@@ -121,9 +121,12 @@ object ThemeAssets {
      * rendering instead of decaffe's, not a rendering bug in the carousel
      * math at all. Real ES-DE's own `sThemes.begin()` fallback is a
      * reasonable rule for a program that ships with exactly one bundled
-     * theme (or where the user picked one during setup) -- droidtop
-     * currently bundles two with no selection UI yet, so blindly following
-     * that same rule silently serves the wrong one. decaffe is droidtop's
+     * theme (or where the user picked one during setup). droidtop bundled
+     * two when this was written, so blindly following that rule silently
+     * served the wrong one; art-book-next has since been dropped from the
+     * APK and is fetched on demand, but preferring decaffe by name stays
+     * correct and stays necessary the moment a second theme is present
+     * again -- which a single download now makes true. decaffe is droidtop's
      * own real, intended default (see docs/SPEC.md's own Handheld section)
      * -- prefer it by name when unset, THEN fall back to alphabetically
      * first among whatever remains (still real ES-DE parity for any

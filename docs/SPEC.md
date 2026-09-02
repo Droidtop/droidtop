@@ -2152,11 +2152,12 @@ paradigm (§2a's earlier "multiple selectable paradigms" framing is
 superseded, see that section's own updated note).** droidtop's Handheld
 mode renders real, vendored ES-DE (EmulationStation Desktop Edition)
 themes — currently `decaffe-es-de` (bundled, CC-BY-NC-SA) and
-`art-book-next-es-de` (bundled, structurally different — real multi-file
-`<include>` chain, per-aspect-ratio XML, real `<textlist>`/`<grid>`
-gamelist widget, unlike decaffe's widget-less one — deliberately kept
-bundled to stress-test the engine against more than one real theme
-shape) — parsed by a real clean-room port of ES-DE's own theme.xml
+`art-book-next-es-de` (no longer bundled — it was kept in the APK to
+stress-test the engine against a second real theme shape, and was removed
+once the theme downloader could fetch it on demand, cutting roughly 220MB
+from the install; structurally different — real multi-file `<include>`
+chain, per-aspect-ratio XML, real `<textlist>`/`<grid>` gamelist widget,
+unlike decaffe's widget-less one) — parsed by a real clean-room port of ES-DE's own theme.xml
 parsing rules (`library-core/.../theme/EsDeThemeParser.kt`,
 `EsDeTheme.kt`'s `ES_DE_ELEMENT_SCHEMA`) and rendered by
 `shell-gamepad/.../theme/EsDeThemeRenderer.kt`.
