@@ -131,15 +131,36 @@ object GameExecutableResolver {
     )
 
     /**
-     * A native Linux launcher. Ren'Py and most engines that ship a Linux
-     * build put a `<GameName>.sh` beside the Windows `.exe`; extensionless
-     * ELF binaries are the other real shape.
+     * A native Linux launcher, in the order the real shapes should win:
+     *
+     * 1. `<GameName>.sh` -- Ren'Py and most engines that ship a Linux
+     *    build put a shell wrapper beside the Windows `.exe`, and when
+     *    one exists it is the entry point the build intends (it sets up
+     *    the environment before exec'ing the ELF next to it).
+     * 2. `<GameName>.x86_64` / `<GameName>.x86` -- the conventional
+     *    extension for a bare Linux ELF launcher, and the shape this
+     *    resolver used to miss entirely. Nothing engine-specific: it is
+     *    what Godot's Linux export template produces (see
+     *    [GameEngineDetector]'s own GDPC probe, which already knew these
+     *    two extensions) and what most other exporters emit for a
+     *    64-bit Linux build. Deliberately NOT gated on [File.canExecute]:
+     *    the games live on removable storage, and exFAT/FAT32 carry no
+     *    execute bit at all, so requiring one would reject every real
+     *    SD-card install.
+     * 3. An extensionless executable -- the remaining real shape, and the
+     *    only one where the execute bit is the only evidence the file is
+     *    a program rather than a data blob, so it stays required there.
      */
     fun linuxExecutable(gameRoot: File): File? {
         val shell = candidates(gameRoot) { it.extension.equals("sh", ignoreCase = true) }
         if (shell.isNotEmpty()) return pickOne(shell, gameRoot)
+        val elf = candidates(gameRoot) { it.extension.lowercase() in LINUX_ELF_EXTENSIONS }
+        if (elf.isNotEmpty()) return pickOne(elf, gameRoot)
         return pickOne(candidates(gameRoot) { it.extension.isEmpty() && it.canExecute() }, gameRoot)
     }
+
+    /** Conventional extensions for a native Linux ELF launcher. */
+    private val LINUX_ELF_EXTENSIONS = setOf("x86_64", "x86")
 
     private fun candidates(gameRoot: File, matches: (File) -> Boolean): List<File> =
         (gameRoot.listFiles() ?: emptyArray())
