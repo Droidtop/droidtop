@@ -3,12 +3,15 @@ package dev.droidtop.shell.gamepad.theme
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.BitmapFactory
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.BatteryManager
 import android.widget.ImageView
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +19,9 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -26,18 +32,30 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.ImageShader
+import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
@@ -50,6 +68,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.layout.Row
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
@@ -63,11 +82,14 @@ import dev.droidtop.library.theme.BADGE_SLOTS
 import dev.droidtop.library.theme.EsDeThemeElement
 import dev.droidtop.library.theme.EsDeThemeValue
 import dev.droidtop.library.theme.EsDeThemeView
+import dev.droidtop.library.theme.esDeVideoFrame
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -332,9 +354,17 @@ private fun EsDeThemedListElement(
 
 @Composable
 private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp, gameSelection: List<LibraryEntry>) {
+    val selected = gameSelection.getOrNull(0)
+    // Real `metadataElement` -- see esDeHiddenByMetadataFlag's own doc comment.
+    if (esDeHiddenByMetadataFlag(element, selected)) return
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
-    val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
+    // Real `scrollFadeIn` -- multiplies into the element's own real
+    // opacity rather than replacing it, matching real ES-DE's own
+    // setOpacity animation running on top of the themed value
+    // (GamelistView.cpp:896-903).
+    val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f) *
+        esDeScrollFadeInAlpha(element, selected)
 
     // Real gradient-band rendering (DEcaffe's own leftband/rightband
     // elements: a thin vertical divider fading from `color` to
@@ -418,9 +448,24 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
             ?: element.valueOrNull<EsDeThemeValue.Path>("default")?.resolved?.takeIf { File(it).exists() }
     } ?: return
     val tint = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) }
-    // Real properties (ImageComponent's own opacity/cornerRadius), already
-    // parsed but previously unread -- opacity in particular matters a lot
-    // for real themes that fade decorative art in/out.
+    // Real `brightness` (GuiComponent.cpp:393-394, clamped -2..2) and
+    // `saturation` (GuiComponent.cpp:404-405, clamped 0..1), applied by
+    // core.glsl:117-134 together with the `color` colorShift. Reuses the
+    // ONE real implementation of that shader pipeline this package
+    // already has -- esDeImageColorFilter, written for the
+    // carousel/grid/textlist item images -- rather than a second copy of
+    // the same maths. `dimming` is 1.0 here: it is real ES-DE's
+    // unfocused-ITEM dimming, which only exists inside a primary list
+    // widget, not for a standalone `image` element.
+    val brightness = (element.valueOrNull<EsDeThemeValue.FloatValue>("brightness")?.value ?: 0f)
+        .coerceIn(-2f, 2f)
+    val saturation = (element.valueOrNull<EsDeThemeValue.FloatValue>("saturation")?.value ?: 1f)
+        .coerceIn(0f, 1f)
+    val imageColorFilter = esDeImageColorFilter(tint, saturation, brightness, dimming = 1f)
+    val filterQuality = esDeFilterQuality(element) ?: FilterQuality.Low
+    // Real properties (ImageComponent's own opacity/cornerRadius) --
+    // opacity in particular matters a lot for real themes that fade
+    // decorative art in/out.
     val cornerRadiusFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("cornerRadius")?.value ?: 0f
     // Real ImageComponent.cpp: cornerRadius scales against screen WIDTH,
     // not height -- confirmed against real ES-DE source (glm::clamp(...) *
@@ -447,6 +492,58 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // match, same "no intrinsic-size decode" limitation sizeOf's own doc
     // comment already notes for maxSize.
     val hasCropSize = element.valueOrNull<EsDeThemeValue.Pair>("cropSize") != null
+    val placement = Modifier
+        .absoluteOffset(x = offsetX, y = offsetY)
+        .size(width = width, height = height)
+        .graphicsLayer {
+            transformOrigin = TransformOrigin(originFraction.x, originFraction.y)
+            rotationZ = rotation
+            scaleX = if (flipHorizontal) -1f else 1f
+            scaleY = if (flipVertical) -1f else 1f
+        }
+        .let { if (cornerRadius > 0.dp) it.clip(RoundedCornerShape(cornerRadius)) else it }
+
+    // Real `tile` -- repeats the source texture across the element's box
+    // instead of stretching one copy over it. Falls through to the plain
+    // stretched draw below when the source can't be decoded to a bitmap
+    // (an SVG tile) -- see rememberTileBitmap's own doc comment.
+    val tileEnabled = element.valueOrNull<EsDeThemeValue.Bool>("tile")?.value == true
+    val tileBitmap = rememberTileBitmap(if (tileEnabled) path else null)
+    if (tileBitmap != null) {
+        val tileSize = element.valueOrNull<EsDeThemeValue.Pair>("tileSize")
+        val density = LocalDensity.current
+        val tile = esDeTileSize(
+            declaredWidthPx = if (tileSize == null) null else with(density) { (viewWidth * tileSize.x.coerceIn(0f, 1f)).toPx() },
+            declaredHeightPx = if (tileSize == null) null else with(density) { (viewHeight * tileSize.y.coerceIn(0f, 1f)).toPx() },
+            sourceWidthPx = tileBitmap.width.toFloat(),
+            sourceHeightPx = tileBitmap.height.toFloat(),
+        )
+        if (tile != null) {
+            val brush = remember(tileBitmap, filterQuality) {
+                ShaderBrush(ImageShader(tileBitmap, TileMode.Repeated, TileMode.Repeated, filterQuality))
+            }
+            val scaleX = tile.first / tileBitmap.width
+            val scaleY = tile.second / tileBitmap.height
+            Box(
+                modifier = placement.drawBehind {
+                    // The shader repeats at the bitmap's own pixel size, so
+                    // the whole tiled fill is drawn scaled by the requested
+                    // tile size over the un-scaled box -- equivalent to
+                    // repeating at the tile size itself.
+                    scale(scaleX = scaleX, scaleY = scaleY, pivot = Offset.Zero) {
+                        drawRect(
+                            brush = brush,
+                            size = Size(size.width / scaleX, size.height / scaleY),
+                            alpha = opacity,
+                            colorFilter = imageColorFilter,
+                        )
+                    }
+                },
+            )
+            return
+        }
+    }
+
     AsyncImage(
         model = path,
         contentDescription = null,
@@ -460,22 +557,86 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         // a flat, featureless silhouette instead of its own real
         // shape/gradient/texture tinted through, a real, confirmed-live
         // bug found by diffing an on-device screenshot against the
-        // theme's own bundled reference render. BlendMode.Modulate is
-        // Compose's real multiply-blend equivalent.
-        colorFilter = tint?.let { ColorFilter.tint(it, BlendMode.Modulate) },
+        // theme's own bundled reference render. The colorShift is now the
+        // multiply ROW of esDeColorMatrix instead of a separate
+        // BlendMode.Modulate tint, so it composes with the element's own
+        // real brightness/saturation in one filter.
+        colorFilter = imageColorFilter,
         alpha = opacity,
+        filterQuality = filterQuality,
         contentScale = if (hasCropSize) ContentScale.Crop else ContentScale.Fit,
-        modifier = Modifier
-            .absoluteOffset(x = offsetX, y = offsetY)
-            .size(width = width, height = height)
-            .graphicsLayer {
-                transformOrigin = TransformOrigin(originFraction.x, originFraction.y)
-                rotationZ = rotation
-                scaleX = if (flipHorizontal) -1f else 1f
-                scaleY = if (flipVertical) -1f else 1f
-            }
-            .let { if (cornerRadius > 0.dp) it.clip(RoundedCornerShape(cornerRadius)) else it },
+        modifier = placement,
     )
+}
+
+/**
+ * Decodes a theme's own local image file to a bitmap so the real
+ * `tile`/`tileSize` rules can be applied -- they all need the source's
+ * real intrinsic pixel size (ImageComponent.cpp:838-850), which Coil's
+ * AsyncImage never hands back. Theme assets are always real files on
+ * disk, so BitmapFactory reads them directly, off the main thread.
+ *
+ * Returns null for [path] null (the element isn't tiled) and for any file
+ * BitmapFactory can't decode -- notably SVG, which is the honest gap
+ * here: an SVG tile falls back to the plain stretched draw rather than
+ * being rendered as something invented.
+ */
+@Composable
+private fun rememberTileBitmap(path: String?): ImageBitmap? {
+    val bitmap by produceState<ImageBitmap?>(initialValue = null, path) {
+        value = if (path == null) {
+            null
+        } else {
+            withContext(Dispatchers.IO) {
+                runCatching { BitmapFactory.decodeFile(path)?.asImageBitmap() }.getOrNull()
+            }
+        }
+    }
+    return bitmap
+}
+
+/**
+ * Real ES-DE tile sizing, transcribed from ImageComponent.cpp:653-673
+ * (the theme parse) and ImageComponent.cpp:838-850 (the fallbacks):
+ *
+ *  - `tileSize` is a fraction of the PARENT's size
+ *    (ImageComponent.cpp:525-527 -- for a top-level themed element that
+ *    parent is the view itself), which is why this takes it already
+ *    resolved to pixels.
+ *  - A `tileSize` of exactly 0 0 is rejected outright and turns tiling
+ *    off (ImageComponent.cpp:657-663), which is what null means here.
+ *  - No `tileSize` at all means the texture's own intrinsic size
+ *    (ImageComponent.cpp:838-842).
+ *  - Exactly one zero component is derived from the other via the
+ *    source's real aspect ratio (ImageComponent.cpp:845-850).
+ *
+ * `tileHorizontalAlignment`/`tileVerticalAlignment`
+ * (ImageComponent.cpp:686-716) are deliberately not implemented: neither
+ * appears in any of the ten real themes measured for this pass, and the
+ * anchor they choose only shows when the tile grid doesn't divide the box
+ * evenly.
+ */
+internal fun esDeTileSize(
+    declaredWidthPx: Float?,
+    declaredHeightPx: Float?,
+    sourceWidthPx: Float,
+    sourceHeightPx: Float,
+): kotlin.Pair<Float, Float>? {
+    if (sourceWidthPx <= 0f || sourceHeightPx <= 0f) return null
+    if (declaredWidthPx == 0f && declaredHeightPx == 0f) return null
+    var width = declaredWidthPx ?: 0f
+    var height = declaredHeightPx ?: 0f
+    val ratio = sourceWidthPx / sourceHeightPx
+    if (width == 0f && height == 0f) {
+        width = sourceWidthPx
+        height = sourceHeightPx
+    } else if (width == 0f) {
+        width = kotlin.math.round(height * ratio)
+    } else if (height == 0f) {
+        height = kotlin.math.round(width / ratio)
+    }
+    if (width <= 0f || height <= 0f) return null
+    return width to height
 }
 
 /**
@@ -509,6 +670,11 @@ private fun EsDeThemedText(
     gameSelection: List<LibraryEntry>,
     systemContext: EsDeSystemContext? = null,
 ) {
+    // Real `metadataElement` -- see esDeHiddenByMetadataFlag's own doc
+    // comment. `text` is where real themes flag it most (five of the ten
+    // measured for this pass), since a hidden-metadata game is exactly the
+    // case where a theme wants its per-game labels to disappear.
+    if (esDeHiddenByMetadataFlag(element, gameSelection.getOrNull(0))) return
     // Real gameselector-bound title text (DEcaffe's own `text name="game"`,
     // `metadata=name`): previously fell through the plain `?: return`
     // below every single time, since a metadata-bound element has no
@@ -773,16 +939,54 @@ private fun EsDeAutoOriginBox(
 @Composable
 private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp, gameSelection: List<LibraryEntry>) {
     val gameselectorEntry = element.valueOrNull<EsDeThemeValue.UInt>("gameselectorEntry")?.value?.toInt()
-    val videoUri = gameSelection.getOrNull(gameselectorEntry ?: 0)?.videoUri
+    val selected = gameSelection.getOrNull(gameselectorEntry ?: 0)
+    // Real `metadataElement` -- see esDeHiddenByMetadataFlag's own doc comment.
+    if (esDeHiddenByMetadataFlag(element, selected)) return
+    val videoUri = selected?.videoUri
     if (videoUri == null) {
         EsDeThemedFallbackImage(element, viewWidth, viewHeight, gameSelection)
         return
     }
+
+    // Real `delay` (VideoComponent.cpp:325-330): seconds, clamped to
+    // 0..15, before playback starts -- and real ES-DE sets
+    // `showStaticImageDelay` when it is non-zero (VideoComponent.cpp:329-
+    // 330), i.e. the element's own static image is what fills the delay,
+    // which is exactly the fallback this renderer already draws. Keyed on
+    // the video itself so moving the cursor to another game restarts the
+    // delay rather than skipping it.
+    val delaySeconds = (element.valueOrNull<EsDeThemeValue.FloatValue>("delay")?.value ?: 0f)
+        .coerceIn(0f, 15f)
+    var delayElapsed by remember(videoUri) { mutableStateOf(delaySeconds == 0f) }
+    LaunchedEffect(videoUri, delaySeconds) {
+        if (delaySeconds > 0f) {
+            delay((delaySeconds * 1000f).toLong())
+            delayElapsed = true
+        }
+    }
+    if (!delayElapsed) {
+        EsDeThemedFallbackImage(element, viewWidth, viewHeight, gameSelection)
+        return
+    }
+
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
-    val cornerRadiusFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("imageCornerRadius")?.value ?: 0f
+    // Real `videoCornerRadius` (VideoComponent.cpp:291-293) -- the PLAYING
+    // surface's own radius. `imageCornerRadius` (VideoComponent.cpp:287-
+    // 289) is a separate real property belonging to this element's static
+    // image, which is why it stays where it is, in
+    // EsDeThemedFallbackImage. droidtop previously read imageCornerRadius
+    // here, so a theme that rounded only its static poster also rounded
+    // its playing video and one that rounded only the video rounded
+    // neither.
+    val cornerRadiusFraction = (element.valueOrNull<EsDeThemeValue.FloatValue>("videoCornerRadius")?.value ?: 0f)
+        .coerceIn(0f, 0.5f)
     val cornerRadius = (cornerRadiusFraction * viewWidth.value).dp
+    val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f) *
+        esDeScrollFadeInAlpha(element, selected)
+
     val context = LocalContext.current
+    var videoSize by remember(videoUri) { mutableStateOf(VideoSize.UNKNOWN) }
     val player = remember(videoUri) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(videoUri))
@@ -793,21 +997,92 @@ private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         }
     }
     DisposableEffect(player) {
-        onDispose { player.release() }
-    }
-    AndroidView(
-        factory = { ctx ->
-            PlayerView(ctx).apply {
-                useController = false
-                this.player = player
-                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+        // The decoded frame's real dimensions are what real ES-DE's own
+        // fit and pillarbox rules are computed from
+        // (VideoFFmpegComponent.cpp:122) -- ExoPlayer only knows them once
+        // the track is read, so the geometry below recomposes when it does.
+        val listener = object : Player.Listener {
+            override fun onVideoSizeChanged(size: VideoSize) {
+                videoSize = size
             }
-        },
+        }
+        player.addListener(listener)
+        onDispose {
+            player.removeListener(listener)
+            player.release()
+        }
+    }
+
+    // Real `pillarboxes` (VideoComponent.cpp:419-420, default TRUE at
+    // VideoComponent.cpp:51) and `pillarboxThreshold`
+    // (VideoComponent.cpp:430-434, real defaults 0.85/0.90 at
+    // VideoComponent.cpp:39). See EsDeVideoLayout.kt for the geometry and
+    // for the RESIZE_MODE_ZOOM cropping bug this replaces.
+    val drawPillarboxes = element.valueOrNull<EsDeThemeValue.Bool>("pillarboxes")?.value ?: true
+    val threshold = element.valueOrNull<EsDeThemeValue.Pair>("pillarboxThreshold")
+    // Real ES-DE stretches only for a two-component `size`; `maxSize`
+    // fits (VideoFFmpegComponent.cpp:127-142 vs :173-176). Every one of
+    // the ten real themes measured for this pass uses `maxSize`.
+    val declaredSize = element.valueOrNull<EsDeThemeValue.Pair>("size")
+    val stretch = declaredSize != null && declaredSize.x > 0f && declaredSize.y > 0f
+    val frame = esDeVideoFrame(
+        areaWidth = width.value,
+        areaHeight = height.value,
+        sourceWidth = videoSize.width,
+        sourceHeight = videoSize.height,
+        stretch = stretch,
+        drawPillarboxes = drawPillarboxes,
+        thresholdX = threshold?.x ?: 0.85f,
+        thresholdY = threshold?.y ?: 0.90f,
+        cornerRadius = cornerRadius.value,
+    )
+
+    Box(
         modifier = Modifier
             .absoluteOffset(x = offsetX, y = offsetY)
             .size(width = width, height = height)
-            .let { if (cornerRadius > 0.dp) it.clip(RoundedCornerShape(cornerRadius)) else it },
-    )
+            .graphicsLayer { alpha = opacity },
+        contentAlignment = Alignment.Center,
+    ) {
+        // The black frame real ES-DE renders BEHIND every video
+        // (VideoFFmpegComponent.cpp:220-223) -- it is what the
+        // pillarboxes/letterboxes actually are, and it also covers the
+        // moment before the first frame decodes.
+        Box(
+            modifier = Modifier
+                .size(width = frame.frameWidth.dp, height = frame.frameHeight.dp)
+                .let { if (cornerRadius > 0.dp) it.clip(RoundedCornerShape(cornerRadius)) else it }
+                .background(Color.Black),
+        )
+        AndroidView(
+            factory = { ctx ->
+                PlayerView(ctx).apply {
+                    useController = false
+                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    this.player = player
+                    // Real ES-DE CONTAINS the video in its themed area
+                    // (VideoFFmpegComponent.cpp:127-142) or stretches it
+                    // (:173-176) -- it never crops, which is what the
+                    // previous RESIZE_MODE_ZOOM did.
+                    resizeMode = if (stretch) {
+                        AspectRatioFrameLayout.RESIZE_MODE_FILL
+                    } else {
+                        AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    }
+                }
+            },
+            modifier = Modifier
+                .fillMaxSize()
+                .let {
+                    if (cornerRadius > 0.dp && frame.roundVideoCorners) {
+                        it.clip(RoundedCornerShape(cornerRadius))
+                    } else {
+                        it
+                    }
+                },
+        )
+    }
 }
 
 /**
@@ -1003,9 +1278,18 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
     // Same real cropSize approximation as EsDeThemedImage -- see that
     // function's own doc comment.
     val hasCropSize = element.valueOrNull<EsDeThemeValue.Pair>("cropSize") != null
+    // Real `interpolation` -- on a `video` element real ES-DE applies the
+    // same value to BOTH the video texture and this static image
+    // (VideoComponent.cpp:270-284 calls mStaticImage.setLinearInterpolation
+    // alongside its own flag). The static image half is the half droidtop
+    // can honour; ExoPlayer's SurfaceView exposes no texture-filter knob,
+    // so the playing surface keeps the platform default -- an honest gap,
+    // not a silent one.
+    val filterQuality = esDeFilterQuality(element) ?: FilterQuality.Low
     AsyncImage(
         model = path,
         contentDescription = null,
+        filterQuality = filterQuality,
         // Real ES-DE `<color>` on an image is a colorSHIFT -- a real
         // multiply of the color into the texture's own existing pixels
         // (ImageComponent::setColorShift, real default 0xFFFFFFFF = a
@@ -1061,12 +1345,21 @@ private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // default for this element type, confirmed against real ES-DE source.
     val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.035f
     val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * viewHeight.value).dp.toSp() }
+    // Real clock background box (DateTimeComponent.cpp:163-175, guarded on
+    // `backgroundColor` exactly as ES-DE guards on mClockBgColor) -- see
+    // EsDeBackgroundBox. Five of the ten themes measured for this pass set
+    // its padding, and a clock with a declared backgroundColor previously
+    // drew no box at all, so the time floated over whatever art was behind
+    // it.
+    val background = backgroundBoxOf(element, viewWidth, viewHeight, opacity)
     Text(
         text = formatted,
         color = color.copy(alpha = color.alpha * opacity),
         fontSize = fontSizeSp,
         fontFamily = themeFontFamily(element),
-        modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY),
+        modifier = Modifier
+            .absoluteOffset(x = offsetX, y = offsetY)
+            .esDeBackgroundBox(background),
     )
 }
 
@@ -1118,12 +1411,22 @@ private fun EsDeThemedDateTime(element: EsDeThemeElement, viewWidth: Dp, viewHei
     // Same real DateTimeComponent default (0.035) as EsDeThemedClock.
     val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.035f
     val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * viewHeight.value).dp.toSp() }
+    // Real background box -- `datetime` shares `backgroundColor` and
+    // `backgroundCornerRadius` with `clock` (both are the same real
+    // DateTimeComponent), so the same helper applies. Its own third real
+    // property, `backgroundMargins`, is NOT part of that group and is
+    // deliberately left unimplemented: none of the ten themes measured for
+    // this pass declares it, and it is not the same (leading, trailing)
+    // pair the clock's own padding properties are.
+    val background = backgroundBoxOf(element, viewWidth, viewHeight, opacity)
     Text(
         text = formatted,
         color = color.copy(alpha = color.alpha * opacity),
         fontSize = fontSizeSp,
         fontFamily = themeFontFamily(element),
-        modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY),
+        modifier = Modifier
+            .absoluteOffset(x = offsetX, y = offsetY)
+            .esDeBackgroundBox(background),
     )
 }
 
@@ -1313,11 +1616,13 @@ private fun EsDeThemedBadges(element: EsDeThemeElement, viewWidth: Dp, viewHeigh
  *
  * Polled every 3s (matching [EsDeThemedClock]'s own live-tick pattern) --
  * real device status genuinely changes over time, unlike per-game data.
- * Icons are plain unicode glyphs, not real ES-DE's own bundled Qt-resource
- * SVGs (same real licensing/IP reason [EsDeThemedBadges] documents) and
- * not a theme's own `customIcon` override either (real ES-DE's
- * per-entry-type `icon_wifi`/`icon_cellular`/etc. attribute-prefix scheme
- * isn't replicated here -- a real, separate, smaller gap).
+ * Icons come from the theme's own real `customIcon` declarations when it
+ * ships them (real ES-DE's per-entry-type `icon_wifi`/`icon_cellular`/
+ * `icon_battery_*`/`icon_bluetooth` attribute scheme, four of the ten
+ * themes measured for this pass ship a full set), falling back to plain
+ * unicode glyphs otherwise -- real ES-DE's OWN defaults are bundled
+ * Qt-resource SVGs droidtop has no copy of, the same real licensing/IP
+ * reason [EsDeThemedBadges] documents.
  */
 @Composable
 private fun EsDeThemedSystemStatus(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp) {
@@ -1359,22 +1664,80 @@ private fun EsDeThemedSystemStatus(element: EsDeThemeElement, viewWidth: Dp, vie
     val heightDp = (heightFraction * viewHeight.value).dp
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, height = heightDp)
 
-    val parts = buildList {
-        if (showAll || entries.contains("wifi")) { if (wifiConnected) add("📶") }
-        if (showAll || entries.contains("cellular")) { if (cellularConnected) add("📱") }
+    // Real `customIcon` (SystemStatusComponent.cpp:310-330): an
+    // attribute-keyed PATH per status icon, whose real attribute values
+    // are literally "icon_wifi"/"icon_cellular"/"icon_battery_charging"/
+    // "icon_battery_low"/"icon_battery_medium"/"icon_battery_high"/
+    // "icon_battery_full"/"icon_bluetooth" -- so the parser's own
+    // attribute-keyed storage key (see ES_DE_PROPERTY_ATTRIBUTE_MAP) is
+    // "customIcon_icon_wifi" and so on. Real ES-DE's own defaults are
+    // bundled Qt-resource SVGs droidtop has no copy of (the same real
+    // licensing reason EsDeThemedBadges documents), so a theme's own icons
+    // are the ONLY real art available here -- without this the four
+    // measured themes that ship a full status-icon set still rendered
+    // unicode glyphs.
+    fun customIcon(name: String): String? =
+        element.valueOrNull<EsDeThemeValue.Path>("customIcon_icon_$name")?.resolved?.takeIf { File(it).exists() }
+
+    // Real battery-level bands, transcribed from
+    // SystemStatusComponent.cpp:88-97: charging wins outright, then
+    // 0-25 low, 26-60 medium, 61-90 high, anything else full.
+    fun batteryIconName(): String = when {
+        batteryCharging -> "battery_charging"
+        (batteryPercent ?: 0) <= 25 -> "battery_low"
+        (batteryPercent ?: 0) <= 60 -> "battery_medium"
+        (batteryPercent ?: 0) <= 90 -> "battery_high"
+        else -> "battery_full"
+    }
+
+    // Each real entry is either the theme's own icon file or the unicode
+    // fallback glyph droidtop has always used.
+    val parts = buildList<kotlin.Pair<String?, String>> {
+        if (showAll || entries.contains("wifi")) { if (wifiConnected) add(customIcon("wifi") to "📶") }
+        if (showAll || entries.contains("cellular")) { if (cellularConnected) add(customIcon("cellular") to "📱") }
         if (showAll || entries.contains("battery")) {
-            batteryPercent?.let { add((if (batteryCharging) "⚡" else "🔋") + "$it%") }
+            batteryPercent?.let {
+                add(customIcon(batteryIconName()) to ((if (batteryCharging) "⚡" else "🔋") + "$it%"))
+            }
         }
     }
     if (parts.isEmpty()) return
 
-    Row(modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY)) {
-        Text(
-            text = parts.joinToString("  "),
-            color = color.copy(alpha = color.alpha * opacity),
-            fontSize = with(LocalDensity.current) { heightDp.toSp() },
-            fontFamily = themeFontFamily(element),
-        )
+    // Real `entrySpacing` (SystemStatusComponent.cpp:304-308) -- a
+    // fraction of screen WIDTH, the same axis real ES-DE uses for the help
+    // bar's own entrySpacing.
+    val entrySpacing = (element.valueOrNull<EsDeThemeValue.FloatValue>("entrySpacing")?.value ?: 0.005f) * viewWidth.value
+    val background = backgroundBoxOf(element, viewWidth, viewHeight, opacity)
+    Row(
+        modifier = Modifier
+            .absoluteOffset(x = offsetX, y = offsetY)
+            .esDeBackgroundBox(background),
+        horizontalArrangement = Arrangement.spacedBy(entrySpacing.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        parts.forEach { (iconPath, glyph) ->
+            if (iconPath != null) {
+                AsyncImage(
+                    model = iconPath,
+                    contentDescription = null,
+                    // Real SystemStatusComponent.cpp:100/:107 -- every icon
+                    // gets the element's own `color` as a colorSHIFT and is
+                    // resized to the element's own height with its aspect
+                    // ratio preserved (setResize(0, mSize.y)).
+                    colorFilter = ColorFilter.tint(color, BlendMode.Modulate),
+                    alpha = opacity,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.height(heightDp),
+                )
+            } else {
+                Text(
+                    text = glyph,
+                    color = color.copy(alpha = color.alpha * opacity),
+                    fontSize = with(LocalDensity.current) { heightDp.toSp() },
+                    fontFamily = themeFontFamily(element),
+                )
+            }
+        }
     }
 }
 
@@ -1419,9 +1782,12 @@ private fun EsDeThemedGamelistInfo(element: EsDeThemeElement, viewWidth: Dp, vie
  * Real `rating` rendering -- [LibraryEntry.rating] (0.0-1.0, the same
  * real convention real ES-DE's own scrapers already normalize to, see
  * that field's own doc comment) drives a real 5-star row. Real ES-DE's
- * own `RatingComponent` renders actual `filledPath`/`unfilledPath` star
- * images when a theme declares them; falls back to a plain unicode star
- * string otherwise -- an honest simplification for the common case, not a
+ * own RatingComponent geometry. When the theme declares `filledPath`/`unfilledPath`
+ * this now renders real ES-DE's own CONTINUOUS clip geometry (a 0.7
+ * rating really is three and a half stars) and honors `overlay` and
+ * `interpolation` -- see the geometry citations inline. Falls back to a
+ * plain unicode star string when the theme ships no star art, which can
+ * only show whole stars; that fallback is an honest simplification, not a
  * full per-theme custom-star-shape renderer.
  */
 @Composable
@@ -1434,19 +1800,67 @@ private fun EsDeThemedRating(element: EsDeThemeElement, viewWidth: Dp, viewHeigh
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
     val filledPath = element.valueOrNull<EsDeThemeValue.Path>("filledPath")?.resolved
     val unfilledPath = element.valueOrNull<EsDeThemeValue.Path>("unfilledPath")?.resolved
-    val filledStars = kotlin.math.round(rating * 5).toInt().coerceIn(0, 5)
+    val filterQuality = esDeFilterQuality(element) ?: FilterQuality.Low
 
     if (filledPath != null && unfilledPath != null) {
-        Row(modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY).graphicsLayer { alpha = opacity }) {
-            repeat(5) { i ->
-                AsyncImage(
-                    model = if (i < filledStars) filledPath else unfilledPath,
-                    contentDescription = null,
-                    modifier = Modifier.size(height),
+        // Real RatingComponent geometry (RatingComponent.cpp:79-83 and the
+        // identical block at :160-163): the icons are ONE tiled image row
+        // spanning the element's whole width, and the rating clips the
+        // filled row at round(width * value) -- a CONTINUOUS clip, so a
+        // 0.7 rating really does render three and a half stars. droidtop
+        // previously rounded to whole stars, which showed the wrong count
+        // for most real scraped ratings.
+        //
+        // Real `overlay` (RatingComponent.cpp:294-295, default true at
+        // :24): with overlay ON the unfilled row is drawn full width and
+        // the filled row painted over it; with overlay OFF the unfilled
+        // row is ALSO clipped, to start exactly where the filled row ends
+        // (RatingComponent.cpp:81-82), so the two abut instead of
+        // overlapping. That matters for semi-transparent icon art, where
+        // overlapping doubles the alpha.
+        val overlay = element.valueOrNull<EsDeThemeValue.Bool>("overlay")?.value ?: true
+        val filledWidth = width * rating.coerceIn(0f, 1f)
+        Box(
+            modifier = Modifier
+                .absoluteOffset(x = offsetX, y = offsetY)
+                .size(width = width, height = height)
+                .graphicsLayer { alpha = opacity },
+        ) {
+            Box(
+                modifier = Modifier
+                    .absoluteOffset(x = if (overlay) 0.dp else filledWidth)
+                    .size(width = if (overlay) width else width - filledWidth, height = height)
+                    .clipToBounds(),
+            ) {
+                EsDeRatingIconRow(
+                    path = unfilledPath,
+                    rowWidth = width,
+                    height = height,
+                    // The unfilled row is always drawn from the row's own
+                    // left edge; when it is clipped it is the BOX that
+                    // moves, not the icons inside it.
+                    shiftX = if (overlay) 0.dp else -filledWidth,
+                    filterQuality = filterQuality,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(width = filledWidth, height = height)
+                    .clipToBounds(),
+            ) {
+                EsDeRatingIconRow(
+                    path = filledPath,
+                    rowWidth = width,
+                    height = height,
+                    shiftX = 0.dp,
+                    filterQuality = filterQuality,
                 )
             }
         }
     } else {
+        // No theme-supplied star art: the same honest unicode fallback as
+        // before, which can only show whole stars.
+        val filledStars = kotlin.math.round(rating * 5).toInt().coerceIn(0, 5)
         val color = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color.White
         Text(
             text = "★".repeat(filledStars) + "☆".repeat(5 - filledStars),
@@ -1458,14 +1872,61 @@ private fun EsDeThemedRating(element: EsDeThemeElement, viewWidth: Dp, viewHeigh
 }
 
 /**
+ * One full-width row of five identical rating icons -- real ES-DE tiles a
+ * single icon texture NUM_RATING_STARS times across the element
+ * (RatingComponent.cpp's own mIconFilled/mIconUnfilled are tiled images
+ * the width of the whole component), which is what makes the fractional
+ * clip above land inside a star rather than between two.
+ */
+@Composable
+private fun EsDeRatingIconRow(
+    path: String,
+    rowWidth: Dp,
+    height: Dp,
+    shiftX: Dp,
+    filterQuality: FilterQuality,
+) {
+    Row(
+        modifier = Modifier
+            .absoluteOffset(x = shiftX)
+            // requiredSize, not size: this row is deliberately wider than
+            // the clipping Box it sits inside, and plain size() would be
+            // clamped by that Box's constraints -- which is exactly the
+            // clip the fractional geometry depends on.
+            .requiredSize(width = rowWidth, height = height),
+    ) {
+        repeat(5) {
+            AsyncImage(
+                model = path,
+                contentDescription = null,
+                filterQuality = filterQuality,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.requiredSize(width = rowWidth / 5, height = height),
+            )
+        }
+    }
+}
+
+/**
  * Real, theme-styled button-hint bar -- reads the theme's own real
  * `<helpsystem>` pos/origin/textColor/iconColor/fontSize/entrySpacing/
  * backgroundColor/opacity (see EsDeTheme.kt's schema), applied to
  * whichever [hints] the caller says are currently valid for this screen.
- * `fontPath`/`customButtonIcon` (real per-theme font/icon assets) aren't
- * applied yet -- real fonts/glyph icons are separate, later work; the
- * button pill + label shape below matches droidtop's own pre-existing
- * (now themed instead of hardcoded-black-and-white) button-hint look.
+ * Also real and applied: `backgroundHorizontalPadding`/
+ * `backgroundVerticalPadding`/`backgroundCornerRadius` (see
+ * [EsDeBackgroundBox]), `iconTextSpacing` and `entryRelativeScale`.
+ *
+ * Honestly still unimplemented, and NOT faked: `customButtonIcon` (real
+ * per-theme glyph art for each button, which would replace the platform
+ * button LABEL this draws -- a separate piece of work), and the whole
+ * `*Dimmed` family (`posDimmed`/`originDimmed`/`textColorDimmed`/
+ * `iconColorDimmed`/`fontSizeDimmed`/`opacityDimmed`/`entrySpacingDimmed`/
+ * `iconTextSpacingDimmed`). Real ES-DE switches to those only while its
+ * own menu overlay is dimming the background
+ * (HelpComponent.cpp:76-80, `mWindow->isBackgroundDimmed()`); droidtop
+ * renders no such overlay at all -- `scope=menu` help declarations are
+ * skipped outright, see [EsDeThemedView] -- so there is no real state to
+ * key them off, and implementing them would mean inventing one.
  */
 @Composable
 private fun EsDeThemedHelpSystem(
@@ -1483,7 +1944,6 @@ private fun EsDeThemedHelpSystem(
     val defaultHelpColor = Color(0xFF777777)
     val textColor = element.valueOrNull<EsDeThemeValue.Color>("textColor")?.let { colorOf(it) } ?: defaultHelpColor
     val iconColor = element.valueOrNull<EsDeThemeValue.Color>("iconColor")?.let { colorOf(it) } ?: defaultHelpColor
-    val backgroundColor = element.valueOrNull<EsDeThemeValue.Color>("backgroundColor")?.let { colorOf(it) }
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
     // Real default: HelpComponent constructs with FONT_SIZE_SMALL (0.035),
     // not 0.025 -- confirmed against real ES-DE source (Font.h/HelpComponent.h).
@@ -1496,11 +1956,33 @@ private fun EsDeThemedHelpSystem(
     // default is 0.00833, not 0.02 (droidtop's own earlier guess was
     // ~2.4x too large).
     val entrySpacing = (element.valueOrNull<EsDeThemeValue.FloatValue>("entrySpacing")?.value ?: 0.00833f) * viewWidth.value
+    // Real `iconTextSpacing` (HelpComponent.cpp:277-278) -- the gap
+    // between one entry's own button glyph and its label, clamped to
+    // 0..0.04 and, like entrySpacing, a fraction of screen WIDTH
+    // (HelpComponent.cpp:687). Real default 0.00416
+    // (HelpComponent.cpp:47); droidtop previously hardcoded 6dp.
+    val iconTextSpacing = (element.valueOrNull<EsDeThemeValue.FloatValue>("iconTextSpacing")?.value ?: 0.00416f)
+        .coerceIn(0f, 0.04f) * viewWidth.value
+    // Real `entryRelativeScale` (HelpComponent.cpp:182-183), clamped to
+    // 0.2..3.0. Real ES-DE only ever applies it to SHRINK the label font
+    // (HelpComponent.cpp:194-200, all three branches gated on < 1.0) --
+    // above 1.0 the font is left alone and the ICON is what changes,
+    // divided by the scale so it grows relative to the text
+    // (HelpComponent.cpp:664-667). Both halves are reproduced here; a
+    // value of exactly 1.0 is a no-op either way.
+    val entryRelativeScale = (element.valueOrNull<EsDeThemeValue.FloatValue>("entryRelativeScale")?.value ?: 1f)
+        .coerceIn(0.2f, 3.0f)
+    val labelFontSizeSp = if (entryRelativeScale < 1f) fontSizeSp * entryRelativeScale else fontSizeSp
+    val iconFontSizeSp = if (entryRelativeScale < 1f) fontSizeSp else fontSizeSp / entryRelativeScale
+    // Real background box -- same group, same geometry, same source as
+    // clock/systemstatus (HelpComponent.cpp:133-180). droidtop previously
+    // drew backgroundColor as a bare, padding-less fill.
+    val background = backgroundBoxOf(element, viewWidth, viewHeight, opacity)
 
     Row(
         modifier = Modifier
             .absoluteOffset(x = offsetX, y = offsetY)
-            .let { if (backgroundColor != null) it.background(backgroundColor.copy(alpha = backgroundColor.alpha * opacity)) else it }
+            .esDeBackgroundBox(background)
             .graphicsLayer { alpha = opacity },
         horizontalArrangement = Arrangement.spacedBy(entrySpacing.dp),
     ) {
@@ -1515,9 +1997,12 @@ private fun EsDeThemedHelpSystem(
             // background were the same color, rendering as a blank,
             // illegible circle on every real device screenshot.
             val fontFamily = themeFontFamily(element)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(GamepadKeyMap.labelFor(action), color = iconColor, fontSize = fontSizeSp, fontFamily = fontFamily)
-                Text(label, color = textColor, fontSize = fontSizeSp, fontFamily = fontFamily)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(iconTextSpacing.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(GamepadKeyMap.labelFor(action), color = iconColor, fontSize = iconFontSizeSp, fontFamily = fontFamily)
+                Text(label, color = textColor, fontSize = labelFontSizeSp, fontFamily = fontFamily)
             }
         }
     }
@@ -1637,3 +2122,152 @@ internal fun themeFontFamily(element: EsDeThemeElement): FontFamily? {
         FontFamily(Font(File(path)))
     }
 }
+
+
+/**
+ * Real ES-DE `interpolation` (`image`/`video`/`rating`/`badges`) and the
+ * `imageInterpolation` spelling of the identical real property on
+ * `carousel`/`grid`: "nearest" turns texture filtering off, "linear"
+ * turns it on. Transcribed from ImageComponent.cpp:590-598 (and the
+ * character-for-character identical blocks at VideoComponent.cpp:270-284
+ * and RatingComponent.cpp:248-256) -- exactly two accepted literals, any
+ * other value logged and ignored.
+ *
+ * One honest, deliberate divergence rather than a silent one: real
+ * ES-DE's flag drives `setLinearMagnify` (VideoFFmpegComponent.cpp:1459
+ * and the equivalent TextureResource call for images), which is the
+ * MAGNIFICATION filter only -- minification stays filtered/mipmapped.
+ * Compose's [FilterQuality] is a single knob covering both, so "nearest"
+ * here also unfilters images that are scaled DOWN. That is why this
+ * returns null (keep Compose's own filtered default) when a theme
+ * declares nothing at all, instead of returning FilterQuality.None to
+ * match real ES-DE's `mLinearInterpolation {false}` member default
+ * (ImageComponent.cpp:43): pushing the real default through the wrong
+ * knob would unfilter every downscaled image in every theme, a bigger
+ * error than not applying an unset default. The same reasoning leaves
+ * ImageComponent.cpp:582-588's own "arbitrary rotation implies linear"
+ * rule out -- it only ever turns filtering ON, which is already the
+ * Compose default here.
+ */
+internal fun esDeFilterQuality(element: EsDeThemeElement, property: String = "interpolation"): FilterQuality? =
+    when (element.valueOrNull<EsDeThemeValue.Str>(property)?.value) {
+        "nearest" -> FilterQuality.None
+        "linear" -> FilterQuality.Low
+        else -> null
+    }
+
+/**
+ * Real ES-DE background-box group -- `backgroundColor`,
+ * `backgroundHorizontalPadding`, `backgroundVerticalPadding` and
+ * `backgroundCornerRadius`, parsed identically by the three element types
+ * that own them: `clock` (DateTimeComponent.cpp:294-313), `systemstatus`
+ * (SystemStatusComponent.cpp:233-283) and `helpsystem`
+ * (HelpComponent.cpp:133-180).
+ *
+ * Real geometry, transcribed from DateTimeComponent.cpp:163-175: the box
+ * is drawn at (-horizontalPadding.x, -verticalPadding.x) relative to
+ * the element's own already-resolved position, sized
+ * size.x + horizontalPadding.x + horizontalPadding.y by
+ * size.y + verticalPadding.x + verticalPadding.y. So each padding pair
+ * is (LEADING, TRAILING) on its own axis -- NOT a width/height pair, the
+ * obvious wrong reading. Both components of `backgroundHorizontalPadding`
+ * scale against screen WIDTH and both components of
+ * `backgroundVerticalPadding` against screen HEIGHT
+ * (DateTimeComponent.cpp:297-307), each clamped to 0..1;
+ * `backgroundCornerRadius` is clamped to 0..0.5 and scales against screen
+ * WIDTH (DateTimeComponent.cpp:310-313) -- the same width-axis exception
+ * already confirmed for image `cornerRadius` and help-bar `entrySpacing`.
+ *
+ * `backgroundColorEnd`/`backgroundGradientType` are deliberately left
+ * out: they are the same positional-gradient shape as the
+ * `image*ColorEnd` family, which a Compose ColorFilter cannot express
+ * (it needs a real shader), so implementing only the flat-color half is
+ * the honest subset.
+ */
+private data class EsDeBackgroundBox(
+    val color: Color?,
+    val padStart: Dp,
+    val padEnd: Dp,
+    val padTop: Dp,
+    val padBottom: Dp,
+    val cornerRadius: Dp,
+)
+
+private fun backgroundBoxOf(
+    element: EsDeThemeElement,
+    viewWidth: Dp,
+    viewHeight: Dp,
+    opacity: Float,
+): EsDeBackgroundBox {
+    val raw = element.valueOrNull<EsDeThemeValue.Color>("backgroundColor")?.let { colorOf(it) }
+    val color = raw?.copy(alpha = raw.alpha * opacity)
+    val h = element.valueOrNull<EsDeThemeValue.Pair>("backgroundHorizontalPadding")
+    val v = element.valueOrNull<EsDeThemeValue.Pair>("backgroundVerticalPadding")
+    val radius = (element.valueOrNull<EsDeThemeValue.FloatValue>("backgroundCornerRadius")?.value ?: 0f)
+        .coerceIn(0f, 0.5f)
+    return EsDeBackgroundBox(
+        color = color,
+        padStart = viewWidth * (h?.x ?: 0f).coerceIn(0f, 1f),
+        padEnd = viewWidth * (h?.y ?: 0f).coerceIn(0f, 1f),
+        padTop = viewHeight * (v?.x ?: 0f).coerceIn(0f, 1f),
+        padBottom = viewHeight * (v?.y ?: 0f).coerceIn(0f, 1f),
+        cornerRadius = (radius * viewWidth.value).dp,
+    )
+}
+
+/**
+ * Applies an [EsDeBackgroundBox] so the WRAPPED CONTENT still lands at
+ * the element's own resolved position: the box itself shifts up/left by
+ * the leading pads and then pads the content back down/right by the same
+ * amounts, reproducing real ES-DE's translate(-padding.x, -padding.y)
+ * followed by a rect of size + leading + trailing
+ * (DateTimeComponent.cpp:163-175). A no-op when the theme declares no
+ * `backgroundColor` -- real ES-DE's own guard is exactly that
+ * (mClockBgColor != 0x00000000, DateTimeComponent.cpp:163).
+ */
+private fun Modifier.esDeBackgroundBox(box: EsDeBackgroundBox): Modifier {
+    if (box.color == null) return this
+    return this
+        .absoluteOffset(x = -box.padStart, y = -box.padTop)
+        .let { if (box.cornerRadius > 0.dp) it.clip(RoundedCornerShape(box.cornerRadius)) else it }
+        .background(box.color)
+        .padding(start = box.padStart, end = box.padEnd, top = box.padTop, bottom = box.padBottom)
+}
+
+/**
+ * Real ES-DE `scrollFadeIn` (`image` and `video`,
+ * ImageComponent.cpp:764-765 / VideoComponent.cpp:448-449, consumed by
+ * GamelistView.cpp:896-911): when the gamelist cursor lands on a new
+ * game, the element fades from FADE_IN_START_OPACITY (0.5) up to full
+ * over FADE_IN_TIME (325 ms) -- both real constants from
+ * GamelistView.cpp:17-18. Keyed on the selected entry's own identity, so
+ * it re-runs on each real selection change and not on every
+ * recomposition.
+ */
+@Composable
+private fun esDeScrollFadeInAlpha(element: EsDeThemeElement, key: Any?): Float {
+    if (element.valueOrNull<EsDeThemeValue.Bool>("scrollFadeIn")?.value != true) return 1f
+    var target by remember(key) { mutableStateOf(0.5f) }
+    LaunchedEffect(key) { target = 1f }
+    val alpha by animateFloatAsState(targetValue = target, animationSpec = tween(325), label = "scrollFadeIn")
+    return alpha
+}
+
+/**
+ * Real ES-DE `metadataElement` (ImageComponent.cpp:739-740,
+ * TextComponent.cpp:471-472, VideoComponent.cpp:234-235): an element
+ * flagged this way is hidden whenever the game's metadata fields are
+ * being hidden -- GamelistView.cpp:697-704 sets `hideMetaDataFields` from
+ * the entry's own real `hidemetadata` metadata flag, then hides every
+ * flagged element. droidtop models exactly that flag
+ * ([LibraryEntry.hideMetadata], user-editable in GameMetadataEditor), so
+ * this is a real binding, not an approximation.
+ *
+ * Real ES-DE's SECOND trigger for the same flag -- browsing INTO a
+ * grouped custom collection while the cursor is scrolling
+ * (GamelistView.cpp:691-695) -- has no droidtop equivalent: its
+ * collections are membership flags over a flat scan, never a nested
+ * gamelist you enter, so that half is deliberately not reproduced.
+ */
+private fun esDeHiddenByMetadataFlag(element: EsDeThemeElement, entry: LibraryEntry?): Boolean =
+    element.valueOrNull<EsDeThemeValue.Bool>("metadataElement")?.value == true && entry?.hideMetadata == true
