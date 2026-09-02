@@ -2,26 +2,22 @@ package dev.droidtop.shell.gamepad.theme
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.absoluteOffset
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,12 +26,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -59,16 +55,23 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.library.theme.EsDeCarouselPlacement
 import dev.droidtop.library.theme.EsDeCarouselType
+import dev.droidtop.library.theme.EsDeGridConfig
+import dev.droidtop.library.theme.EsDeGridLayout
 import dev.droidtop.library.theme.EsDeLetterCase
 import dev.droidtop.library.theme.EsDePrimaryAlignment
+import dev.droidtop.library.theme.EsDeSelectorLayer
 import dev.droidtop.library.theme.EsDeTextListConfig
 import dev.droidtop.library.theme.EsDeThemeElement
 import dev.droidtop.library.theme.EsDeThemeValue
 import dev.droidtop.library.theme.applyTo
 import dev.droidtop.library.theme.esDeCarouselConfig
+import dev.droidtop.library.theme.esDeGridConfig
+import dev.droidtop.library.theme.esDeGridItemCenter
+import dev.droidtop.library.theme.esDeGridScrollRow
 import dev.droidtop.library.theme.esDeIndicatorPrefix
 import dev.droidtop.library.theme.esDeTextListConfig
 import dev.droidtop.library.theme.layoutEsDeCarousel
+import dev.droidtop.library.theme.layoutEsDeGrid
 import dev.droidtop.library.theme.layoutEsDeTextList
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
@@ -79,16 +82,17 @@ import dev.droidtop.shell.gamepad.input.GamepadKeyMap
  * list and a per-system game list (real, wired in
  * `GamepadShell.kt`'s `GamesSection` for themes with a real gamelist
  * list widget -- e.g. Art Book Next's own `<textlist>`/`<grid>`) reuse
- * the same real theme-driven renderers. [count] is null for a GAME item
- * (a real game has no "N items" concept the way a system GROUP does) --
- * [EsDeListTile] only renders that line when it's non-null.
+ * the same real theme-driven renderers. Deliberately carries no per-item
+ * chrome of its own -- no count line, no accent color -- because a real
+ * ES-DE list widget draws an item as its own artwork (or its name as
+ * text) plus whatever background/selector layers the THEME asked for,
+ * and anything droidtop adds on top of that occupies a surface the theme
+ * was meant to own.
  */
 data class EsDeListItem(
     val key: String,
     val label: String,
-    val count: Int?,
     val logoPath: String?,
-    val accentColor: Color?,
     val onSelect: () -> Unit,
     // Real ES-DE textlist `indicators`: a favorite gets a leading marker
     // before its name (GamelistBase.cpp:916-926). Always false for a
@@ -482,11 +486,12 @@ private fun Modifier.reflectionFalloff(falloff: Float): Modifier {
  * Real ES-DE carousel item rendering (`CarouselComponent::addEntry`/
  * `updateEntry`) -- an item is EITHER its own image (a real system logo/
  * marquee) OR a text-label fallback, never both, and never wrapped in a
- * card/border/background box the way droidtop's own generic
- * [EsDeListTile] (still used by the grid, which has a real, different
- * per-item chrome model) does. Real default text colors are black text on
- * a fully transparent background -- not white-on-a-dark-rounded-rect,
- * which was a fabricated droidtop-only look with no real ES-DE basis.
+ * card/border/background box -- droidtop used to draw one here, and the
+ * grid used to draw its own; both are gone, because a real ES-DE list
+ * widget's only per-item chrome is the background/selector layers the
+ * THEME asks for. Real default text colors are black text on a fully
+ * transparent background, not white-on-a-dark-rounded-rect, which was a
+ * fabricated droidtop-only look with no real ES-DE basis.
  */
 @Composable
 private fun EsDeCarouselItem(
@@ -598,101 +603,6 @@ private fun esDeLetterCaseOf(value: String?): EsDeLetterCase = when (value) {
     "lowercase" -> EsDeLetterCase.LOWERCASE
     "capitalize" -> EsDeLetterCase.CAPITALIZE
     else -> EsDeLetterCase.NONE
-}
-
-/**
- * `LazyVerticalGrid`'s own scroll-to-keep-cursor-visible behavior is
- * actually the right architecture here, unlike the carousel's real model
- * (see [EsDeCarousel]'s own doc comment) -- ES-DE's real GridComponent
- * (GridComponent.h's own `calculateLayout`/`input`) genuinely scrolls
- * whole rows as the cursor moves, the same real interaction a
- * `LazyVerticalGrid` already gives for free.
- *
- * Column count is now real ES-DE math (`calculateLayout`'s own greedy
- * fit-as-many-as-fit loop: `width = margin*2; while (true) { width +=
- * itemSize.x; if (columns != 0) width += itemSpacing.x; if (width >
- * containerWidth) break; ++columns }`), not `GridCells.Adaptive` (a
- * Compose heuristic that doesn't reserve the same real margin ES-DE
- * applies around scaled-up items -- see [margin] below). `itemSpacing`
- * was hardcoded (16dp) before this pass; the focused item's scale-up is
- * ES-DE's own real default `itemScale` (1.05, `GridComponent`'s
- * constructor default).
- */
-@Composable
-private fun EsDeGrid(
-    element: EsDeThemeElement,
-    items: List<EsDeListItem>,
-    firstItemFocus: FocusRequester?,
-    modifier: Modifier,
-    screenWidth: Dp,
-    screenHeight: Dp,
-) {
-    val textColor = element.valueOrNull<EsDeThemeValue.Color>("textColor")?.let { colorOf(it) } ?: Color.White
-    val uppercase = element.valueOrNull<EsDeThemeValue.Str>("letterCase")?.value == "uppercase"
-    val unfocusedOpacity = element.valueOrNull<EsDeThemeValue.FloatValue>("unfocusedItemOpacity")?.value ?: 1f
-    val unfocusedSaturation = element.valueOrNull<EsDeThemeValue.FloatValue>("unfocusedItemSaturation")?.value ?: 1f
-    // Real ES-DE convention: itemSize/itemSpacing fractions are of the
-    // THEMED area (see EsDeSystemListView's own screenWidth/screenHeight
-    // doc comment), not a fixed 1920x1080 reference resolution.
-    val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
-    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * screenHeight.value).dp.toSp() }
-    val tileFontFamily = themeFontFamily(element)
-    val itemSizeFraction = element.valueOrNull<EsDeThemeValue.Pair>("itemSize")
-    val itemWidth = itemSizeFraction?.let { (it.x * screenWidth.value).dp } ?: 160.dp
-    val itemSpacingFraction = element.valueOrNull<EsDeThemeValue.Pair>("itemSpacing")
-    val itemSpacingX = itemSpacingFraction?.let { (it.x * screenWidth.value).dp } ?: 16.dp
-    val itemSpacingY = itemSpacingFraction?.let { (it.y * screenHeight.value).dp } ?: 16.dp
-    val itemScale = (element.valueOrNull<EsDeThemeValue.FloatValue>("itemScale")?.value ?: 1.05f).coerceIn(0.5f, 3f)
-    // Real formula (calculateLayout, scaleInwards not modeled/read here so
-    // treated as false, ES-DE's own default): margin only reserved when
-    // itemScale >= 1 (items scale up and need room to grow without
-    // overlapping their neighbors); items that scale down need none.
-    val margin = if (itemScale >= 1f) (itemWidth * (itemScale - 1f)) / 2f else 0.dp
-
-    var focusedIndex by remember { mutableStateOf(0) }
-
-    BoxWithConstraints(modifier = modifier) {
-        val density = LocalDensity.current
-        val containerWidthPx = with(density) { maxWidth.toPx() }
-        val itemWidthPx = with(density) { itemWidth.toPx() }
-        val itemSpacingXPx = with(density) { itemSpacingX.toPx() }
-        val marginPx = with(density) { margin.toPx() }
-
-        var columns = 0
-        var widthPx = marginPx * 2f
-        while (true) {
-            widthPx += itemWidthPx
-            if (columns != 0) widthPx += itemSpacingXPx
-            if (widthPx > containerWidthPx) break
-            columns++
-        }
-        if (columns == 0) columns = 1
-
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(columns),
-            horizontalArrangement = Arrangement.spacedBy(itemSpacingX),
-            verticalArrangement = Arrangement.spacedBy(itemSpacingY),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = margin),
-        ) {
-            gridItemsIndexed(items, key = { _, item -> item.key }) { index, item ->
-                val scale = if (index == focusedIndex) itemScale else 1f
-                EsDeListTile(
-                    item = item,
-                    width = itemWidth,
-                    height = itemWidth * 0.75f,
-                    textColor = textColor,
-                    uppercase = uppercase,
-                    fontSize = fontSizeSp,
-                    fontFamily = tileFontFamily,
-                    unfocusedOpacity = unfocusedOpacity,
-                    unfocusedSaturation = unfocusedSaturation,
-                    modifier = (if (index == 0 && firstItemFocus != null) Modifier.focusRequester(firstItemFocus) else Modifier)
-                        .graphicsLayer { scaleX = scale; scaleY = scale }
-                        .onFocusChanged { if (it.isFocused) focusedIndex = index },
-                )
-            }
-        }
-    }
 }
 
 /**
@@ -947,79 +857,343 @@ private fun EsDeTextListRow(
     }
 }
 
+/**
+ * Real ES-DE `<grid>` rendering -- a port of
+ * `GridComponent<T>::calculateLayout()`/`render()`, with the arithmetic
+ * living in [layoutEsDeGrid]/[esDeGridConfig]/[esDeGridItemCenter]/
+ * [esDeGridScrollRow] (runtime-common's own `EsDeGridLayout.kt`) so it
+ * can be unit tested off-device.
+ *
+ * This replaces a `LazyVerticalGrid` of individually-focusable tiles.
+ * Two things made that model unable to express the element's real
+ * schema. First, the tile itself was invented: a dark rounded card with
+ * an accent border and an "N items" line, none of which exists in ES-DE
+ * -- and it occupied exactly the surface a theme's own real
+ * `backgroundColor`/`backgroundImage` and `selectorColor`/`selectorImage`
+ * layers are supposed to own. Second, the item spacing was a hardcoded
+ * 16dp, where real ES-DE AUTO-CALCULATES spacing from `itemScale` when a
+ * theme doesn't declare it. A grid entry in real ES-DE is up to three
+ * stacked layers -- a background, the item image or its name as text,
+ * and the selector, which the theme places above, between or below them
+ * via `selectorLayer` -- and that is what this now draws, in that real
+ * order.
+ *
+ * The item count that used to appear on each tile is gone with the card,
+ * and no information is lost: real ES-DE's own mechanism for it is a
+ * `systemdata` text element the theme places where it wants, which
+ * droidtop already renders.
+ *
+ * Honestly still unimplemented, and NOT faked: `imageType` (the same
+ * "LibraryEntry carries one already-resolved artwork" blocker as the
+ * carousel), the `imageColorEnd`/`imageGradientType`/
+ * `imageSelectedColorEnd`/`imageSelectedGradientType` positional
+ * gradients, `imageCropPos`/`imageInterpolation`,
+ * `textBackgroundCornerRadius`, the four `textHorizontalScroll*`
+ * properties, and `fadeAbovePrimary`. Real ES-DE's own easing between
+ * scroll rows and between item scales is not ported either -- the
+ * resting positions are real, the motion between them is a plain Compose
+ * animation.
+ */
 @Composable
-private fun EsDeListTile(
-    item: EsDeListItem,
-    width: androidx.compose.ui.unit.Dp,
-    height: androidx.compose.ui.unit.Dp,
-    textColor: Color,
-    uppercase: Boolean,
-    fontSize: androidx.compose.ui.unit.TextUnit,
-    fontFamily: androidx.compose.ui.text.font.FontFamily?,
-    unfocusedOpacity: Float,
-    unfocusedSaturation: Float,
+private fun EsDeGrid(
+    element: EsDeThemeElement,
+    items: List<EsDeListItem>,
+    firstItemFocus: FocusRequester?,
     modifier: Modifier,
+    screenWidth: Dp,
+    screenHeight: Dp,
 ) {
-    var focused by remember { mutableStateOf(false) }
-    val accent = item.accentColor
-    Column(
-        modifier = modifier
-            .size(width = width, height = height)
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            // Same real touch-input fix as EsDeTextListRow above.
-            .clickable(onClick = item.onSelect)
-            .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp &&
-                    GamepadKeyMap.actionFor(event.key) == GamepadAction.A
-                ) {
-                    item.onSelect()
-                    true
-                } else {
-                    false
-                }
-            }
-            .graphicsLayer {
-                if (!focused) {
-                    alpha = unfocusedOpacity
-                    // Real, simple desaturation approximation -- Compose has
-                    // no cheap built-in saturation filter on a plain
-                    // graphicsLayer, and a full ColorMatrix ColorFilter
-                    // can't be expressed here without a Canvas-level draw
-                    // override; unfocusedItemSaturation < 1 is still
-                    // honored via reduced alpha rather than silently
-                    // ignored, a real (if imperfect) approximation.
-                    if (unfocusedSaturation < 1f) alpha *= 0.85f
-                }
-            }
-            .border(
-                width = if (focused) 4.dp else 1.dp,
-                color = if (focused) (accent ?: Color.White) else Color.DarkGray,
-                shape = RoundedCornerShape(12.dp),
-            )
-            .background(if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A), RoundedCornerShape(12.dp))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Bottom,
-    ) {
-        if (item.logoPath != null) {
-            AsyncImage(
-                model = item.logoPath,
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxWidth().weight(1f).padding(bottom = 8.dp),
-            )
+    val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
+    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * screenHeight.value).dp.toSp() }
+    val tileFontFamily = themeFontFamily(element)
+    val imageFit = when (element.valueOrNull<EsDeThemeValue.Str>("imageFit")?.value) {
+        "fill" -> ContentScale.FillBounds
+        "cover" -> ContentScale.Crop
+        else -> ContentScale.Fit
+    }
+    val config = remember(element, screenWidth, screenHeight) {
+        esDeGridConfig(element, screenWidth.value, screenHeight.value)
+    }
+
+    var cursor by remember { mutableStateOf(0) }
+
+    BoxWithConstraints(modifier = modifier.clipToBounds()) {
+        val layout = remember(config, maxWidth, maxHeight) {
+            layoutEsDeGrid(config, maxWidth.value, maxHeight.value)
         }
-        Text(
-            if (uppercase) item.label.uppercase() else item.label,
-            color = textColor,
-            fontSize = fontSize,
-            fontFamily = fontFamily,
-            maxLines = 1,
+
+        val scrollRow = esDeGridScrollRow(layout, cursor)
+        val animatedScrollRow by animateFloatAsState(
+            targetValue = scrollRow,
+            animationSpec = if (config.instantRowTransitions) snap() else tween(durationMillis = 250),
+            label = "esDeGridScrollRow",
         )
-        item.count?.let {
-            Text("$it items", color = textColor.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
+        val scrollOffset = (config.itemSizeY + config.itemSpacingY) * animatedScrollRow
+
+        // Real render window (GridComponent.h:692-728): whole rows only,
+        // starting one row above the first visible one so a partially
+        // scrolled row still draws.
+        val visibleRows = kotlin.math.ceil(layout.visibleRows).toInt()
+        val firstRow = kotlin.math.max(0, kotlin.math.ceil(animatedScrollRow).toInt() - 1)
+        val startIndex = firstRow * layout.columns
+        val endIndex = kotlin.math.min(items.size, startIndex + layout.columns * (visibleRows + 2))
+        // Real draw order: every other entry first, the cursor's entry
+        // last, so a scaled-up selected item is never overlapped by its
+        // own neighbours.
+        val drawOrder = (startIndex until endIndex).filter { it != cursor } +
+            listOfNotNull(cursor.takeIf { it in startIndex until endIndex })
+
+        // Real `GridComponent::input`: left/right step one entry, up/down
+        // step a whole row. The GRID owns the cursor and the keys -- items
+        // are render output with no focus identity of their own, the same
+        // real architecture as the carousel and the textlist. This sits on
+        // an inner full-size box rather than the outer one because the
+        // column count it steps by is only known once the grid has been
+        // measured.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (firstItemFocus != null) Modifier.focusRequester(firstItemFocus) else Modifier)
+                .focusable()
+                .onKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
+                    fun step(delta: Int): Boolean {
+                        if (items.isEmpty()) return true
+                        cursor = (cursor + delta).coerceIn(0, items.size - 1)
+                        return true
+                    }
+                    when (GamepadKeyMap.actionFor(event.key)) {
+                        GamepadAction.A -> {
+                            items.getOrNull(cursor)?.onSelect?.invoke()
+                            true
+                        }
+                        GamepadAction.LEFT -> step(-1)
+                        GamepadAction.RIGHT -> step(1)
+                        GamepadAction.UP -> step(-layout.columns)
+                        GamepadAction.DOWN -> step(layout.columns)
+                        else -> false
+                    }
+                },
+        ) {
+            for (index in drawOrder) {
+                val item = items.getOrNull(index) ?: continue
+                EsDeGridEntry(
+                    item = item,
+                    config = config,
+                    layout = layout,
+                    index = index,
+                    scrollOffset = scrollOffset,
+                    selected = index == cursor,
+                    fontSize = fontSizeSp,
+                    fontFamily = tileFontFamily,
+                    imageContentScale = imageFit,
+                    onSelect = {
+                        cursor = index
+                        item.onSelect()
+                    },
+                )
+            }
         }
     }
+}
+
+/**
+ * One grid entry: its real layers, drawn in real ES-DE's own order
+ * (`GridComponent::render`'s per-entry block) -- the selector when
+ * `selectorLayer` is `bottom`, then the background, then the selector
+ * when it is `middle`, then the item itself, then the selector when it
+ * is `top` (the real default).
+ */
+@Composable
+private fun EsDeGridEntry(
+    item: EsDeListItem,
+    config: EsDeGridConfig,
+    layout: EsDeGridLayout,
+    index: Int,
+    scrollOffset: Float,
+    selected: Boolean,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    fontFamily: androidx.compose.ui.text.font.FontFamily?,
+    imageContentScale: ContentScale,
+    onSelect: () -> Unit,
+) {
+    val center = esDeGridItemCenter(config, layout, index)
+    val centerX = center.first
+    val centerY = center.second - scrollOffset
+    val scale by animateFloatAsState(
+        targetValue = if (selected) config.itemScale else 1f,
+        animationSpec = if (config.instantItemTransitions) snap() else tween(durationMillis = 250),
+        label = "esDeGridItemScale",
+    )
+    val opacity = if (selected) 1f else config.unfocusedItemOpacity
+    val saturation = if (selected) config.imageSaturation else (config.unfocusedItemSaturation ?: config.imageSaturation)
+    val dimming = if (selected) 1f else config.unfocusedItemDimming
+
+    // Real `scaleInwards` (GridComponent.h:834-856): an item on an edge
+    // grows toward the middle of the grid instead of off it, which is
+    // exactly a shifted scale origin.
+    var originX = 0.5f
+    var originY = 0.5f
+    if (config.scaleInwards && scale != 1f) {
+        if (index < layout.columns) originY = 0f
+        if (index % layout.columns == 0) originX = 0f
+        if (index % layout.columns == layout.columns - 1) originX = 1f
+    }
+
+    if (config.selectorLayer == EsDeSelectorLayer.BOTTOM && selected) {
+        EsDeGridSelector(config, centerX, centerY, scale, originX, originY, opacity)
+    }
+
+    // Real background layer: an image when the theme gives one (color
+    // shifted by backgroundColor if it gives that too), otherwise a rect
+    // -- and NOTHING at all when the theme declares neither, which is
+    // real ES-DE's own mHasBackgroundColor behavior and the reason this
+    // element must not carry a built-in card of its own.
+    if (config.backgroundImage != null) {
+        AsyncImage(
+            model = config.backgroundImage,
+            contentDescription = null,
+            contentScale = ContentScale.FillBounds,
+            colorFilter = config.backgroundColor?.let {
+                esDeImageColorFilter(colorOfPacked(it), saturation, 0f, dimming)
+            },
+            modifier = Modifier
+                .placeGridLayer(centerX, centerY, config, config.backgroundRelativeScale, scale, originX, originY)
+                .graphicsLayer { alpha = opacity },
+        )
+    } else {
+        val backgroundColor = config.backgroundColor
+        if (backgroundColor != null) {
+            Box(
+                modifier = Modifier
+                    .placeGridLayer(centerX, centerY, config, config.backgroundRelativeScale, scale, originX, originY)
+                    .graphicsLayer { alpha = opacity }
+                    .clip(RoundedCornerShape(config.backgroundCornerRadius.dp))
+                    .background(
+                        esDeGradient(backgroundColor, config.backgroundColorEnd, config.backgroundGradientHorizontal),
+                    ),
+            )
+        }
+    }
+
+    if (config.selectorLayer == EsDeSelectorLayer.MIDDLE && selected) {
+        EsDeGridSelector(config, centerX, centerY, scale, originX, originY, opacity)
+    }
+
+    // The item itself -- an image, or its name as text when it has none,
+    // which is real ES-DE's own fallback rather than a placeholder.
+    if (item.logoPath != null) {
+        AsyncImage(
+            model = item.logoPath,
+            contentDescription = null,
+            contentScale = imageContentScale,
+            colorFilter = esDeImageColorFilter(
+                (if (selected) config.imageSelectedColor else config.imageColor)?.let { colorOfPacked(it) },
+                saturation,
+                config.imageBrightness,
+                dimming,
+            ),
+            modifier = Modifier
+                .placeGridLayer(centerX, centerY, config, config.imageRelativeScale, scale, originX, originY)
+                .graphicsLayer { alpha = opacity }
+                .clip(RoundedCornerShape(config.imageCornerRadius.dp))
+                .clickable(onClick = onSelect),
+        )
+    } else {
+        Box(
+            modifier = Modifier
+                .placeGridLayer(centerX, centerY, config, config.textRelativeScale, scale, originX, originY)
+                .graphicsLayer { alpha = opacity }
+                .background(
+                    colorOfPacked(if (selected) config.textSelectedBackgroundColor else config.textBackgroundColor),
+                )
+                .clickable(onClick = onSelect),
+            contentAlignment = androidx.compose.ui.Alignment.Center,
+        ) {
+            Text(
+                config.letterCase.applyTo(item.label),
+                color = colorOfPacked(if (selected) config.textSelectedColor else config.textColor),
+                fontSize = fontSize,
+                fontFamily = fontFamily,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+
+    if (config.selectorLayer == EsDeSelectorLayer.TOP && selected) {
+        EsDeGridSelector(config, centerX, centerY, scale, originX, originY, opacity)
+    }
+}
+
+/**
+ * The grid's real selector layer -- an image when the theme gives one
+ * (color shifted by `selectorColor` if it gives that too), a rounded
+ * gradient rect when it gives only a color, and nothing at all when it
+ * gives neither, which is real ES-DE's own `mHasSelectorColor` gate.
+ */
+@Composable
+private fun EsDeGridSelector(
+    config: EsDeGridConfig,
+    centerX: Float,
+    centerY: Float,
+    scale: Float,
+    originX: Float,
+    originY: Float,
+    opacity: Float,
+) {
+    if (config.selectorImage != null) {
+        AsyncImage(
+            model = config.selectorImage,
+            contentDescription = null,
+            contentScale = ContentScale.FillBounds,
+            colorFilter = config.selectorColor?.let { esDeImageColorFilter(colorOfPacked(it), 1f, 0f, 1f) },
+            modifier = Modifier
+                .placeGridLayer(centerX, centerY, config, config.selectorRelativeScale, scale, originX, originY)
+                .graphicsLayer { alpha = opacity },
+        )
+        return
+    }
+    val selectorColor = config.selectorColor ?: return
+    Box(
+        modifier = Modifier
+            .placeGridLayer(centerX, centerY, config, config.selectorRelativeScale, scale, originX, originY)
+            .graphicsLayer { alpha = opacity }
+            .clip(RoundedCornerShape(config.selectorCornerRadius.dp))
+            .background(esDeGradient(selectorColor, config.selectorColorEnd, config.selectorGradientHorizontal)),
+    )
+}
+
+/**
+ * Places one of a grid entry's layers: a box of `itemSize *
+ * relativeScale` centred on the item's own cell centre, scaled about
+ * [originX]/[originY] -- which is real `calculateOffsetPos`'s own result
+ * expressed the way Compose expresses it.
+ */
+private fun Modifier.placeGridLayer(
+    centerX: Float,
+    centerY: Float,
+    config: EsDeGridConfig,
+    relativeScale: Float,
+    scale: Float,
+    originX: Float,
+    originY: Float,
+): Modifier {
+    val width = config.itemSizeX * relativeScale
+    val height = config.itemSizeY * relativeScale
+    return this
+        .absoluteOffset(x = (centerX - width / 2f).dp, y = (centerY - height / 2f).dp)
+        .size(width = width.dp, height = height.dp)
+        .graphicsLayer {
+            transformOrigin = TransformOrigin(originX, originY)
+            scaleX = scale
+            scaleY = scale
+        }
+}
+
+/** Real two-stop gradient, in whichever direction the element's own `*GradientType` asked for. */
+private fun esDeGradient(start: Long, end: Long, horizontal: Boolean): Brush {
+    val colors = listOf(colorOfPacked(start), colorOfPacked(end))
+    return if (horizontal) Brush.horizontalGradient(colors) else Brush.verticalGradient(colors)
 }
 
 /** Real packed-RRGGBBAA to Compose color, for the layout layer's own color fields (which stay graphics-type-free). */
