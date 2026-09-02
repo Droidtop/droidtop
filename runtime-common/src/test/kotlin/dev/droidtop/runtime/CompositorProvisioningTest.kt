@@ -38,8 +38,24 @@ class CompositorProvisioningTest {
         // this catches the two silently drifting apart (e.g. a catalog
         // entry added for a compositor CompositorProvisioning never
         // learned, or vice versa).
-        assertEquals("apt-get update && apt-get install -y --no-install-recommends sway seatd xwayland", CompositorProvisioning.installCommand("debian", "sway"))
-        assertEquals("apk add --no-cache sway seatd xwayland", CompositorProvisioning.installCommand("alpine", "sway"))
-        assertEquals("apk add --no-cache labwc seatd", CompositorProvisioning.installCommand("alpine", "labwc"))
+        //
+        // The trailing terminal package comes from ContainerTerminal rather
+        // than being spelled out again: provisioning installs it and
+        // ContainerTerminal launches it, and one constant naming both is
+        // what stops a primary container provisioning one terminal and
+        // trying to run another (docs/SPEC.md 3d).
+        val terminal = ContainerTerminal.PACKAGE
+        assertEquals(
+            "apt-get update && apt-get install -y --no-install-recommends sway seatd xwayland " + terminal,
+            CompositorProvisioning.installCommand("debian", "sway"),
+        )
+        assertEquals(
+            "apk add --no-cache sway seatd xwayland " + terminal,
+            CompositorProvisioning.installCommand("alpine", "sway"),
+        )
+        assertEquals(
+            "apk add --no-cache labwc seatd " + terminal,
+            CompositorProvisioning.installCommand("alpine", "labwc"),
+        )
     }
 }

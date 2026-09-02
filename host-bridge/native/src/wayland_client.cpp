@@ -8,7 +8,11 @@
 
 #include <cerrno>
 #include <cstring>
+#include <fcntl.h>
+#include <mutex>
 #include <pthread.h>
+#include <signal.h>
+#include <string>
 #include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -20,6 +24,7 @@
 #include "wlr-screencopy-unstable-v1-client-protocol.h"
 #include "wlr-virtual-pointer-unstable-v1-client-protocol.h"
 #include "virtual-keyboard-unstable-v1-client-protocol.h"
+#include "ext-data-control-v1-client-protocol.h"
 
 #define LOG_TAG "hostbridge/wl"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -41,6 +46,12 @@ struct WaylandGlobals {
     zwlr_screencopy_manager_v1* screencopy_manager = nullptr;
     zwlr_virtual_pointer_manager_v1* virtual_pointer_manager = nullptr;
     zwp_virtual_keyboard_manager_v1* virtual_keyboard_manager = nullptr;
+
+    // Clipboard. NOT required at connect() time, unlike the five above: a
+    // compositor without it still gives a usable desktop, just one whose
+    // selection doesn't cross into Android. See ClipboardState below and
+    // ../README.md for why this protocol rather than wl_data_device.
+    ext_data_control_manager_v1* data_control_manager = nullptr;
 
     // MVP: track only the first wl_output seen — matches the current
     // single-merged-desktop default (DisplayOutput.kt / SPEC.md §4). A real
@@ -85,6 +96,58 @@ struct OutputCapture {
     bool running = false;
 };
 
+/**
+ * Live clipboard state for one connection, over ext-data-control-v1.
+ *
+ * Why this protocol and not wl_data_device: wl_data_device only delivers a
+ * selection to the client that currently holds keyboard focus on one of its
+ * own surfaces. host-bridge has NO surface at all — it is a screencopy +
+ * virtual-input client, deliberately (see this file's header comment and
+ * HostBridge.kt) — so wl_data_device is structurally unavailable to it, not
+ * merely inconvenient. ext-data-control-v1 exists for exactly this case: a
+ * privileged client that observes and sets the selection without focus,
+ * which is the clipboard-manager role.
+ *
+ * Threading: `mutex` guards everything a non-dispatch thread can touch.
+ * offerClipboardText() runs on whatever thread Android's clipboard listener
+ * fired on; the source/offer callbacks run on the dispatch thread; the
+ * actual pipe reads and writes run on short-lived detached workers so that
+ * neither a slow container-side reader nor a large payload can stall the
+ * dispatch loop (which also drives every screencopy frame).
+ */
+struct ClipboardState {
+    struct wl_display* display = nullptr;
+    ext_data_control_manager_v1* manager = nullptr;
+    ext_data_control_device_v1* device = nullptr;
+
+    std::mutex mutex;
+
+    /** What our source hands out when the compositor asks for it. */
+    std::string offeredText;
+
+    /**
+     * The source backing our current claim on the selection. A source may
+     * only be passed to set_selection once (ext_data_control_device_v1's
+     * `used_source` error), so every push creates a fresh one and the
+     * previous is destroyed after the new claim lands.
+     */
+    ext_data_control_source_v1* source = nullptr;
+
+    /**
+     * The offer named by the most recent `selection` event. Deliberately
+     * NOT destroyed as soon as receive() is issued: the transfer is still
+     * being serviced at that point. It is destroyed when the next selection
+     * replaces it, and in disconnect().
+     */
+    ext_data_control_offer_v1* currentOffer = nullptr;
+
+    ClipboardTextCallback callback = nullptr;
+    void* callbackUserData = nullptr;
+
+    /** Set by the device's `finished` event — the compositor tore it down. */
+    bool finished = false;
+};
+
 namespace {
 
 // ---- registry ----
@@ -116,6 +179,14 @@ void registry_global(void* data, wl_registry* registry, uint32_t name,
     } else if (std::strcmp(interface, zwp_virtual_keyboard_manager_v1_interface.name) == 0) {
         globals->virtual_keyboard_manager = static_cast<zwp_virtual_keyboard_manager_v1*>(
             wl_registry_bind(registry, name, &zwp_virtual_keyboard_manager_v1_interface, version));
+    } else if (std::strcmp(interface, ext_data_control_manager_v1_interface.name) == 0) {
+        // Pinned to version 1 rather than `version`: vendor/sway creates
+        // this global with version 1 (sway/server.c's
+        // wlr_ext_data_control_manager_v1_create(display, 1)), and binding
+        // above what the compositor offers is a protocol error, not a
+        // graceful degradation.
+        globals->data_control_manager = static_cast<ext_data_control_manager_v1*>(
+            wl_registry_bind(registry, name, &ext_data_control_manager_v1_interface, 1));
     }
 }
 
@@ -313,6 +384,264 @@ void startNextCapture(OutputCapture* cap) {
     zwlr_screencopy_frame_v1_add_listener(cap->frame, &kFrameListener, cap);
 }
 
+// ---- clipboard (ext-data-control-v1) ----
+
+// Offered in descending preference order; the same UTF-8 bytes are written
+// for all of them. The X11-era names (UTF8_STRING/STRING/TEXT) are here
+// because Xwayland-hosted applications — which is most Wine software, the
+// whole point of the primary container — ask for those and nothing else.
+constexpr const char* kOfferedTextMimes[] = {
+    "text/plain;charset=utf-8",
+    "text/plain",
+    "UTF8_STRING",
+    "STRING",
+    "TEXT",
+};
+
+/** Higher is better; -1 means "not text, ignore this offer". */
+int textMimeRank(const char* mime) {
+    if (std::strcmp(mime, "text/plain;charset=utf-8") == 0) return 4;
+    if (std::strcmp(mime, "UTF8_STRING") == 0) return 3;
+    if (std::strcmp(mime, "text/plain") == 0) return 2;
+    if (std::strcmp(mime, "STRING") == 0) return 1;
+    if (std::strcmp(mime, "TEXT") == 0) return 0;
+    return -1;
+}
+
+/** Per-offer scratch: the best text MIME type seen on it so far. */
+struct OfferMimes {
+    int rank = -1;
+    std::string mime;
+};
+
+void offer_offer(void* data, ext_data_control_offer_v1* /*offer*/, const char* mimeType) {
+    auto* info = static_cast<OfferMimes*>(data);
+    int rank = textMimeRank(mimeType);
+    if (rank > info->rank) {
+        info->rank = rank;
+        info->mime = mimeType;
+    }
+}
+
+constexpr ext_data_control_offer_v1_listener kOfferListener = {
+    .offer = offer_offer,
+};
+
+/** Destroys an offer along with the OfferMimes allocated for it. */
+void destroyOffer(ext_data_control_offer_v1* offer) {
+    if (!offer) return;
+    delete static_cast<OfferMimes*>(ext_data_control_offer_v1_get_user_data(offer));
+    ext_data_control_offer_v1_destroy(offer);
+}
+
+/**
+ * Reads one selection transfer to completion and hands the text to the
+ * registered sink. Runs detached, and deliberately captures the callback and
+ * the fd rather than the ClipboardState pointer: disconnect() can free that
+ * state while a transfer is still draining, and a worker that never touches
+ * it after being spawned cannot dangle.
+ */
+struct ReceiveJob {
+    int fd = -1;
+    ClipboardTextCallback callback = nullptr;
+    void* callbackUserData = nullptr;
+};
+
+void* clipboardReceiveThread(void* arg) {
+    auto* job = static_cast<ReceiveJob*>(arg);
+
+    std::string text;
+    char buffer[4096];
+    bool overLimit = false;
+    for (;;) {
+        ssize_t n = read(job->fd, buffer, sizeof(buffer));
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            LOGW("clipboard read from container failed: %s", strerror(errno));
+            overLimit = true; // treat a partial read as unusable, not as truncated text
+            break;
+        }
+        if (n == 0) break;
+        if (text.size() + static_cast<size_t>(n) > WaylandClient::kMaxClipboardBytes) {
+            LOGW("container selection exceeds %zu bytes — dropped rather than truncated",
+                 WaylandClient::kMaxClipboardBytes);
+            overLimit = true;
+            break;
+        }
+        text.append(buffer, static_cast<size_t>(n));
+    }
+    close(job->fd);
+
+    if (!overLimit && job->callback && !text.empty()) {
+        job->callback(job->callbackUserData, text.data(), text.size());
+    }
+
+    delete job;
+    return nullptr;
+}
+
+/**
+ * Writes our offered text into the fd the compositor handed us. Detached and
+ * self-contained for the same reason as the read side, plus one of its own:
+ * a container-side paste target that opens the pipe and then stalls would
+ * otherwise block the dispatch thread indefinitely.
+ */
+struct SendJob {
+    int fd = -1;
+    std::string text;
+};
+
+void* clipboardSendThread(void* arg) {
+    auto* job = static_cast<SendJob*>(arg);
+
+    // A paste target that closes its end early raises SIGPIPE on this
+    // thread, whose default disposition kills the whole process. Blocking it
+    // here turns that into a plain EPIPE from write(). Thread-directed and
+    // thread-local, so this never changes the app's process-wide handling.
+    sigset_t blocked;
+    sigemptyset(&blocked);
+    sigaddset(&blocked, SIGPIPE);
+    pthread_sigmask(SIG_BLOCK, &blocked, nullptr);
+
+    const char* cursor = job->text.data();
+    size_t remaining = job->text.size();
+    while (remaining > 0) {
+        ssize_t n = write(job->fd, cursor, remaining);
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            LOGW("clipboard write to container failed: %s", strerror(errno));
+            break;
+        }
+        cursor += n;
+        remaining -= static_cast<size_t>(n);
+    }
+    close(job->fd);
+
+    delete job;
+    return nullptr;
+}
+
+void spawnDetached(void* (*entry)(void*), void* arg) {
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    pthread_t thread;
+    if (pthread_create(&thread, &attr, entry, arg) != 0) {
+        LOGE("pthread_create for a clipboard transfer failed: %s", strerror(errno));
+    }
+    pthread_attr_destroy(&attr);
+}
+
+void source_send(void* data, ext_data_control_source_v1* /*source*/, const char* /*mimeType*/,
+                  int32_t fd) {
+    auto* clip = static_cast<ClipboardState*>(data);
+    auto* job = new SendJob();
+    job->fd = fd;
+    {
+        std::lock_guard<std::mutex> lock(clip->mutex);
+        job->text = clip->offeredText;
+    }
+    // Every MIME type we offer carries the same UTF-8 bytes, so which one
+    // was asked for doesn't change what gets written.
+    spawnDetached(clipboardSendThread, job);
+}
+
+void source_cancelled(void* data, ext_data_control_source_v1* source) {
+    auto* clip = static_cast<ClipboardState*>(data);
+    std::lock_guard<std::mutex> lock(clip->mutex);
+    if (clip->source == source) {
+        clip->source = nullptr;
+    }
+    // Cancelled means something else took the selection; the source is dead
+    // either way and the protocol expects us to destroy it.
+    ext_data_control_source_v1_destroy(source);
+}
+
+constexpr ext_data_control_source_v1_listener kSourceListener = {
+    .send = source_send,
+    .cancelled = source_cancelled,
+};
+
+void device_data_offer(void* /*data*/, ext_data_control_device_v1* /*device*/,
+                        ext_data_control_offer_v1* offer) {
+    // The offer's MIME list arrives as a burst of `offer` events after this
+    // one and before the `selection` that names it, so all this does is
+    // attach somewhere to collect them.
+    ext_data_control_offer_v1_add_listener(offer, &kOfferListener, new OfferMimes());
+}
+
+void device_selection(void* data, ext_data_control_device_v1* /*device*/,
+                       ext_data_control_offer_v1* offer) {
+    auto* clip = static_cast<ClipboardState*>(data);
+
+    destroyOffer(clip->currentOffer);
+    clip->currentOffer = offer;
+
+    // A null offer means the selection was cleared. Deliberately NOT
+    // mirrored onto Android: wiping what the user has on their phone's
+    // clipboard because a container application exited is destructive, and
+    // nothing about "the container has no selection" implies they wanted
+    // that.
+    if (!offer) return;
+
+    auto* info = static_cast<OfferMimes*>(ext_data_control_offer_v1_get_user_data(offer));
+    if (!info || info->rank < 0) {
+        return; // an image or a file list — this bridge is text-only, by design
+    }
+
+    ClipboardTextCallback callback;
+    void* callbackUserData;
+    {
+        std::lock_guard<std::mutex> lock(clip->mutex);
+        callback = clip->callback;
+        callbackUserData = clip->callbackUserData;
+    }
+    if (!callback) return;
+
+    int fds[2];
+    if (pipe2(fds, O_CLOEXEC) != 0) {
+        LOGE("pipe2 for a clipboard transfer failed: %s", strerror(errno));
+        return;
+    }
+    ext_data_control_offer_v1_receive(offer, info->mime.c_str(), fds[1]);
+    close(fds[1]);
+    // The compositor only starts the transfer once it processes the request
+    // above, and this callback runs between dispatches, so nothing would
+    // flush it before the reader below started waiting.
+    wl_display_flush(clip->display);
+
+    auto* job = new ReceiveJob();
+    job->fd = fds[0];
+    job->callback = callback;
+    job->callbackUserData = callbackUserData;
+    spawnDetached(clipboardReceiveThread, job);
+}
+
+void device_finished(void* data, ext_data_control_device_v1* device) {
+    auto* clip = static_cast<ClipboardState*>(data);
+    LOGW("ext_data_control device finished — clipboard bridge is down for this connection");
+    clip->finished = true;
+    if (clip->device == device) {
+        clip->device = nullptr;
+    }
+    ext_data_control_device_v1_destroy(device);
+}
+
+void device_primary_selection(void* /*data*/, ext_data_control_device_v1* /*device*/,
+                               ext_data_control_offer_v1* offer) {
+    // X11/Wayland's middle-click primary selection has no Android
+    // counterpart at all, so it is not bridged. The offer still has to be
+    // destroyed — the compositor created it for us either way.
+    destroyOffer(offer);
+}
+
+constexpr ext_data_control_device_v1_listener kDeviceListener = {
+    .data_offer = device_data_offer,
+    .selection = device_selection,
+    .finished = device_finished,
+    .primary_selection = device_primary_selection,
+};
+
 } // namespace
 
 // ---- WaylandClient ----
@@ -436,6 +765,24 @@ bool WaylandClient::connect(const char* socketPath) {
         LOGE("ASharedMemory_create failed for keymap");
     }
 
+    // Clipboard. Non-fatal when absent, unlike the globals checked above:
+    // the desktop is still usable without a selection bridge.
+    if (!clipboard_) clipboard_ = new ClipboardState();
+    clipboard_->display = display_;
+    clipboard_->manager = globals_->data_control_manager;
+    if (clipboard_->manager) {
+        clipboard_->device = ext_data_control_manager_v1_get_data_device(
+            clipboard_->manager, globals_->seat);
+        ext_data_control_device_v1_add_listener(clipboard_->device, &kDeviceListener, clipboard_);
+        // Flushes the device creation and pulls in whatever selection the
+        // compositor is ALREADY holding, so a container-side copy that
+        // happened before this connection still reaches Android.
+        wl_display_roundtrip(display_);
+    } else {
+        LOGW("compositor advertised no ext_data_control_manager_v1 — clipboard will not "
+             "cross between Android and the container (is vendor/sway built with it?)");
+    }
+
     LOGI("connected to primary container compositor at %s", socketPath);
 
     startDispatchThread();
@@ -445,6 +792,28 @@ bool WaylandClient::connect(const char* socketPath) {
 void WaylandClient::disconnect() {
     stopPresenting();
     stopDispatchThread();
+
+    // After the dispatch thread is down, so no callback can be running
+    // against this state while it's being torn down. In-flight transfer
+    // workers are unaffected on purpose: they hold only an fd and a
+    // callback, never this pointer (see ReceiveJob/SendJob).
+    if (clipboard_) {
+        {
+            std::lock_guard<std::mutex> lock(clipboard_->mutex);
+            if (clipboard_->source) {
+                ext_data_control_source_v1_destroy(clipboard_->source);
+                clipboard_->source = nullptr;
+            }
+        }
+        destroyOffer(clipboard_->currentOffer);
+        clipboard_->currentOffer = nullptr;
+        if (clipboard_->device) {
+            ext_data_control_device_v1_destroy(clipboard_->device);
+            clipboard_->device = nullptr;
+        }
+        delete clipboard_;
+        clipboard_ = nullptr;
+    }
 
     if (globals_) {
         if (globals_->virtual_pointer) zwlr_virtual_pointer_v1_destroy(globals_->virtual_pointer);
@@ -539,6 +908,47 @@ void WaylandClient::injectKey(uint32_t evdevKeyCode, bool pressed) {
     if (!globals_ || !globals_->virtual_keyboard) return;
     zwp_virtual_keyboard_v1_key(globals_->virtual_keyboard, 0, evdevKeyCode,
                                  pressed ? WL_KEYBOARD_KEY_STATE_PRESSED : WL_KEYBOARD_KEY_STATE_RELEASED);
+}
+
+void WaylandClient::setClipboardListener(ClipboardTextCallback callback, void* userData) {
+    if (!clipboard_) clipboard_ = new ClipboardState();
+    std::lock_guard<std::mutex> lock(clipboard_->mutex);
+    clipboard_->callback = callback;
+    clipboard_->callbackUserData = userData;
+}
+
+bool WaylandClient::offerClipboardText(const char* utf8Text, size_t length) {
+    if (!utf8Text) return false;
+    if (!clipboard_ || !clipboard_->manager || !clipboard_->device || clipboard_->finished) {
+        return false;
+    }
+
+    if (length > kMaxClipboardBytes) {
+        LOGW("refusing to push %zu bytes to the container selection (limit %zu)",
+             length, kMaxClipboardBytes);
+        return false;
+    }
+
+    std::lock_guard<std::mutex> lock(clipboard_->mutex);
+    clipboard_->offeredText.assign(utf8Text, length);
+
+    auto* source = ext_data_control_manager_v1_create_data_source(clipboard_->manager);
+    ext_data_control_source_v1_add_listener(source, &kSourceListener, clipboard_);
+    for (const char* mime : kOfferedTextMimes) {
+        ext_data_control_source_v1_offer(source, mime);
+    }
+    ext_data_control_device_v1_set_selection(clipboard_->device, source);
+
+    // Replaced only after the new claim is on the wire: destroying the old
+    // source first would briefly clear the container's selection.
+    ext_data_control_source_v1* previous = clipboard_->source;
+    clipboard_->source = source;
+    if (previous) {
+        ext_data_control_source_v1_destroy(previous);
+    }
+
+    wl_display_flush(display_);
+    return true;
 }
 
 } // namespace hostbridge
