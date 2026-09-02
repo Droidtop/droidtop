@@ -1285,6 +1285,45 @@ could reach on internal storage before it was stopped. gamenative's
 exists, and it is what the cleanup uses now. **Never point a
 walk-and-delete at a Wine prefix.**
 
+### Destructive-operation audit (2026-09-02, after the incident)
+
+Every recursive removal on the branch, checked for the same defect
+class -- a delete that can leave the tree it was pointed at:
+
+- **Wine-prefix cleanup** (`DroidtopPcGameRuntime.provision`): now goes
+  through droidtop's own `SafeDelete.deleteWithin(imageFs.rootDir, ...)`
+  rather than trusting a helper to refuse -- it proves the target is
+  inside the ImageFs (parent canonicalized first, so a symlinked
+  ancestor can't redirect it) and walks with `Files.walkFileTree`
+  without `FOLLOW_LINKS`, which cannot enter a symlink. A refusal
+  aborts provisioning, deleting nothing. Regression-tested against the
+  incident's exact shape (`SafeDeleteTest`).
+- **`DroidSpacesRuntime.destroy` / `CraneRootfsPuller` stale-rootfs
+  wipe**: both previously hazardous. `destroy` used Kotlin's
+  `deleteRecursively` on a Linux rootfs -- a tree full of symlinks,
+  root-owned so the app-side walk couldn't even work, while the walk
+  itself could still follow a rootfs symlink into shared storage. The
+  puller used a bare root `rm -rf`, which never follows symlinks but
+  DOES descend into a live mount -- and droidspaces bind-mounts the
+  app-storage dir into every rootfs, with leaked instances confirmed
+  to keep those mounts alive. Both now go through `RootfsDelete`:
+  root `rm -rf`, refused while `/proc/mounts` shows anything mounted
+  under the canonicalized path.
+- **Archive extraction** (`TarCompressorUtils.extract`, gamenative
+  fork `4ac3f2a8`): entry names are network input and were joined to
+  the destination unchecked. Extraction now refuses any entry whose
+  canonicalized parent is outside the destination (covers `../`
+  traversal and writes routed through a symlink an earlier entry
+  planted) and unlinks a symlink sitting where a regular file is about
+  to be written. Archives keep their legitimate internal symlinks.
+- **Safe by construction, left as they are**: `GameNativeMigration`
+  staging (flat files droidtop itself writes into its own cache),
+  `FileImageCache.clear` (flat `.tar`s in cache), `ThemeAssets`
+  (APK-asset extraction -- assets cannot be symlinks),
+  `BackupHelper` (entry names whitelisted to exact known filenames,
+  staging dirs hold only droidtop-written flat files), and test-only
+  temp dirs.
+
 Remaining: repeat provisioning through container creation on hardware,
 then one Windows launch. Presentation is separate and unstarted -- the
 engine runs Wine against a headless X server, and nothing composites its
