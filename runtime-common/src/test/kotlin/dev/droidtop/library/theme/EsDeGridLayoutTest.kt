@@ -1,6 +1,7 @@
 package dev.droidtop.library.theme
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -247,5 +248,114 @@ class EsDeGridLayoutTest {
         )
         assertEquals(20f, config.backgroundCornerRadius, 0.001f)
         assertEquals(1000f, config.selectorCornerRadius, 0.001f)
+    }
+
+    /**
+     * GridComponent.h:1395-1398 -- `textBackgroundCornerRadius` clamps to
+     * 0..0.5, then scales by itemScale (only when scaling UP) and by
+     * screen WIDTH, the same rule as every other radius on this element.
+     * 0.05 * 1.5 * 1000 = 75.
+     */
+    @Test
+    fun `textBackgroundCornerRadius uses the same scale rule as the other radii`() {
+        val config = esDeGridConfig(
+            element(
+                "itemScale" to EsDeThemeValue.FloatValue(1.5f),
+                "textBackgroundCornerRadius" to EsDeThemeValue.FloatValue(0.05f),
+            ),
+            1000f,
+            500f,
+        )
+        assertEquals(75f, config.textBackgroundCornerRadius, 0.001f)
+
+        // Over the 0.5 clamp, and with itemScale below 1 so the scale
+        // factor is pinned at 1: 0.5 * 1 * 1000 = 500.
+        val clamped = esDeGridConfig(
+            element(
+                "itemScale" to EsDeThemeValue.FloatValue(0.8f),
+                "textBackgroundCornerRadius" to EsDeThemeValue.FloatValue(0.9f),
+            ),
+            1000f,
+            500f,
+        )
+        assertEquals(500f, clamped.textBackgroundCornerRadius, 0.001f)
+
+        // Real default is 0 (GridComponent.h:273).
+        assertEquals(0f, esDeGridConfig(element(), 1000f, 500f).textBackgroundCornerRadius, 0.001f)
+    }
+
+    /**
+     * GridComponent.h:1321-1370 -- the image color chain is NOT
+     * per-property constants. `imageColor` also sets `imageColorEnd`; the
+     * selected pair starts out as the unselected pair; and
+     * `imageSelectedColor` in turn sets `imageSelectedColorEnd`.
+     */
+    @Test
+    fun `image color end falls back through the real chain`() {
+        val onlyColor = esDeGridConfig(
+            element("imageColor" to EsDeThemeValue.Color(0xAABBCCFFL)),
+            1000f,
+            1000f,
+        )
+        // End equals start -> no gradient, which is how ES-DE itself
+        // tests for one (GridComponent.h:336).
+        assertEquals(0xAABBCCFFL, onlyColor.imageColor)
+        assertEquals(0xAABBCCFFL, onlyColor.imageColorEnd)
+        assertEquals(0xAABBCCFFL, onlyColor.imageSelectedColor)
+        assertEquals(0xAABBCCFFL, onlyColor.imageSelectedColorEnd)
+
+        val gradient = esDeGridConfig(
+            element(
+                "imageColor" to EsDeThemeValue.Color(0xAABBCCFFL),
+                "imageColorEnd" to EsDeThemeValue.Color(0x112233FFL),
+            ),
+            1000f,
+            1000f,
+        )
+        assertEquals(0x112233FFL, gradient.imageColorEnd)
+        // The selected pair inherits BOTH ends, not just the start.
+        assertEquals(0xAABBCCFFL, gradient.imageSelectedColor)
+        assertEquals(0x112233FFL, gradient.imageSelectedColorEnd)
+
+        // A declared imageSelectedColor collapses the selected gradient.
+        val selectedFlat = esDeGridConfig(
+            element(
+                "imageColor" to EsDeThemeValue.Color(0xAABBCCFFL),
+                "imageColorEnd" to EsDeThemeValue.Color(0x112233FFL),
+                "imageSelectedColor" to EsDeThemeValue.Color(0x445566FFL),
+            ),
+            1000f,
+            1000f,
+        )
+        assertEquals(0x445566FFL, selectedFlat.imageSelectedColor)
+        assertEquals(0x445566FFL, selectedFlat.imageSelectedColorEnd)
+    }
+
+    /**
+     * GridComponent.h:1328-1341 and :1356-1370 -- both gradient axes
+     * default to horizontal, independently: the selected one does NOT
+     * inherit `imageGradientType`, and an invalid value falls back to
+     * horizontal rather than failing.
+     */
+    @Test
+    fun `gradient axes are independent and default to horizontal`() {
+        val defaults = esDeGridConfig(element(), 1000f, 1000f)
+        assertTrue(defaults.imageGradientHorizontal)
+        assertTrue(defaults.imageSelectedGradientHorizontal)
+
+        val vertical = esDeGridConfig(
+            element("imageGradientType" to EsDeThemeValue.Str("vertical")),
+            1000f,
+            1000f,
+        )
+        assertFalse(vertical.imageGradientHorizontal)
+        assertTrue(vertical.imageSelectedGradientHorizontal)
+
+        val nonsense = esDeGridConfig(
+            element("imageGradientType" to EsDeThemeValue.Str("diagonal")),
+            1000f,
+            1000f,
+        )
+        assertTrue(nonsense.imageGradientHorizontal)
     }
 }
