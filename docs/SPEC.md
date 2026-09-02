@@ -457,13 +457,38 @@ the `ContainerRuntime` interface that already exists (§3):
   inspectable and disable-able per container), bind-mounts (Android
   shared storage in/out), autostart-with-session.
 - **A real terminal into any container** — a computer the user can't
-  open a shell on isn't a computer. One terminal-emulator surface in
-  droidtop (Compose-hosted), attached to `exec` in a chosen container
-  (root backend: `droidspaces exec`-equivalent; noroot: proot exec).
-  Which terminal-view implementation to adopt/fork is an open technical
-  choice (Termux's terminal-view and Jackpal's Android-Terminal-Emulator
-  are the two real prior-art candidates; license and embedding fit not
-  yet compared) — the requirement itself is settled.
+  open a shell on isn't a computer. **Decided and built 2026-09-02, the
+  other way round from this section's original sketch**: droidtop does
+  NOT host a Compose terminal view of its own, and neither Termux's
+  terminal-view nor Jackpal's Android-Terminal-Emulator is forked in.
+  The terminal is a real terminal application (`foot`) running *inside*
+  the container, provisioned alongside the compositor and launched
+  through the `exec` this section already named, appearing as an ordinary
+  window on the shared desktop. See `runtime-common`'s
+  `ContainerTerminal` for the argument in full; in short:
+
+  - `ContainerRuntime.exec` is run-to-completion and returns captured
+    output. An Android-side terminal view needs a pty and a live stream,
+    so it would begin by widening `ContainerRuntime` with a streaming
+    primitive every backend then owes — including the one that is still
+    `TODO()`. The in-container terminal needs nothing new from that
+    interface at all.
+  - Above the pty it would still need a VT parser and renderer. A real
+    terminal already exists in every distro's package repository.
+  - §6a's whole justification for forking a keyboard in is that a
+    terminal needs Ctrl/Alt/Esc/Tab/arrows/function keys. Those already
+    reach the container through `:input-seat` → `:host-bridge`'s virtual
+    keyboard; an Android-side view would use none of that path.
+  - It is what distrobox — and BoxBuddy/DistroShelf over it, §7c — do.
+
+  The cost, stated rather than hidden: a terminal that lives in the
+  compositor is unreachable when the compositor is not running, which is
+  when a shell would help most for debugging. No second non-interactive
+  path is built to cover that, deliberately; a container that will not
+  boot is this section's container-manager problem, not the terminal's.
+  Today it opens on the PRIMARY container only — siblings share the
+  Wayland socket but are not compositor-provisioned, so per-container
+  terminal provisioning is what makes "any container" literally true.
 - The desktop session's PRIMARY container is listed like everything else
   but guarded (can't be deleted while it's the active desktop).
 
@@ -980,8 +1005,8 @@ Measured by what droidtop's own code actually touches.
 | Audio | §2 | **configured, unverified** — droidspaces' own `enable_pulseaudio=1`; never confirmed on device |
 | Keyboard/mouse injection | §6 | **built, unproven live** — host-bridge's virtual-pointer/virtual-keyboard injection, and (since §6b) the desktop surface that feeds it. Between the assessment above and §6b the primitive existed but nothing called it: `InputSeat` was constructed only by its own unit test, so the presented desktop was a video feed with no way to click it |
 | External display | §4 | **built** |
-| **Terminal into a container** | §4b | **NOT BUILT** — zero files. §4b's own words: "a computer the user can't open a shell on isn't a computer" |
-| **Clipboard host↔container** | — | **NOT BUILT**, and **not in the spec at all** until now. Crostini treats this as core |
+| **Terminal into a container** | §4b, §3d | **built 2026-09-02, unproven live** — `ContainerTerminal` + a Taskbar entry, provisioned by `CompositorProvisioning` and launched through the existing `exec`. An in-container terminal, not an Android terminal view — §3d carries the argument. PRIMARY container only so far |
+| **Clipboard host↔container** | §6c | **built 2026-09-02, unproven live** — `ext-data-control-v1` in `:host-bridge`'s native client, `ClipboardBridge`/`ClipboardSync` on the Android side, both directions. Was not in the spec at all before; §6c is now where it lives |
 | **USB peripherals** | §4b | **NOT BUILT** — zero files |
 | **Printing** | §4b | **NOT BUILT** — zero files |
 | **VPN for the whole device** | §4a | **NOT BUILT** — zero files, despite a fully designed section |
@@ -991,17 +1016,26 @@ Measured by what droidtop's own code actually touches.
 
 ### What actually makes a user reach for a real computer today
 
-In rough order of how often it would bite:
+In rough order of how often it would bite. The first two were closed on
+2026-09-02 (§3d, §6c) and are struck through rather than deleted, because
+neither has been seen working on hardware and this section's value is that
+it does not overclaim:
 
-1. **No terminal.** Anything shell-shaped is impossible.
-2. **No clipboard bridge.** Text cannot move between Android and the
-   container, which is constant friction rather than an occasional need.
-   This is the biggest gap the spec did not already name.
+1. ~~**No terminal.**~~ Built. Not yet run against a live compositor.
+2. ~~**No clipboard bridge.**~~ Built, both directions. Not yet run
+   against a live compositor.
 3. **No USB.** No flash drives, no serial adapters, no scanners.
 4. **No printing.**
 5. **No VPN**, despite §4a being fully designed.
 6. **Nothing at all without root**, which is a coverage problem rather
    than a capability one, and the largest single body of unwritten work.
+   Both of the two items just closed sit on top of it: the terminal runs
+   through `ContainerRuntime.exec`, which is `TODO()` in `ProotRuntime`,
+   and the clipboard needs a running compositor, which the no-root path
+   cannot start. Neither adds any *new* root dependency — the clipboard
+   client needs none at all, and the terminal uses the `exec` that was
+   already there — but neither serves an unrooted device until that path
+   is real.
 
 ### Correction to the record
 
@@ -1315,6 +1349,67 @@ Known gaps, stated rather than guessed at: no long-press-to-right-click on the
 touchscreen (a hold threshold is not worth inventing without a device to tune
 it on), and the second-screen trackpad surface of §6 is still unbuilt — the
 router already has the relative-motion path it will use.
+
+## 6c. Clipboard bridge, host↔container (built 2026-09-02)
+
+Text copied in Android pastes in the container, and text copied in the
+container pastes in Android. §4e ranked this second behind the terminal;
+in practice it bites more often, because it is friction on ordinary work
+rather than an occasional need — which is also why Crostini treats
+clipboard forwarding as core rather than polish (§4e).
+
+**The Wayland seam is `ext-data-control-v1`**, bound by `:host-bridge`'s
+native client next to the screencopy and virtual-input protocols it
+already speaks.
+
+- `wl_data_device` — the ordinary clipboard protocol — is not merely
+  inconvenient here, it is *unavailable*: it only delivers a selection to
+  the client holding keyboard focus on one of its own surfaces, and
+  host-bridge has no surface at all. It is a screencopy + virtual-input
+  client by design (§2), so it can never hold focus.
+- `ext-data-control-v1` exists for exactly this: a privileged client that
+  observes and sets a seat's selection without focus — the
+  clipboard-manager role.
+- It is the stabilised successor to `wlr-data-control-unstable-v1`.
+  `vendor/sway` creates **both** globals unconditionally
+  (`sway/server.c`), so the ext one is always present in the compositor
+  droidtop itself provisions and no runtime fallback to the deprecated
+  zwlr one is carried. One protocol, one code path.
+
+**Neither direction polls.** Android reports changes through
+`OnPrimaryClipChangedListener`; the compositor reports them through the
+protocol's own `selection` event. The single non-event read is one read
+on regaining window focus, which exists because of the restriction below,
+not as a disguised timer.
+
+**What happens when Android refuses a read.** From Android 10, only the
+focused app or the owner of the current input method may read the
+clipboard — everyone else gets null, silently, and from Android 12 a
+successful read shows the user a toast. droidtop satisfies the second
+clause by shipping its own IME (§6a); that was already stated there as a
+real benefit of the fork, and this is the thing that consumes it. A
+refused read is skipped and logged, explicitly **not** treated as "the
+clipboard was cleared" and pushed to the container as an empty selection.
+The container→Android direction has no such gate: `setPrimaryClip` is not
+focus-restricted. The bridge is owned by `MainActivity` rather than by
+`DesktopSessionService` for the same reason — window focus is an Activity
+fact and a Service has none to report.
+
+**Scope, and what is deliberately not bridged.** Text only. A null
+selection from the container is not mirrored: wiping the user's phone
+clipboard because a container application exited is destructive, and
+nothing about "the container has no selection" implies they wanted it.
+The middle-click primary selection is not bridged either — Android has no
+counterpart to bridge it to. Both directions cap at 1 MiB and drop rather
+than truncate, so nothing silently lies about what was copied.
+
+**Echo suppression is one object, not two flags.** Pushing to the
+container makes the compositor announce "a new selection"; setting
+Android's clipboard fires droidtop's own change listener. Both directions
+run through the same `ClipboardSync`, and because they share its one
+piece of state, each direction's echo is recognised as already-synced
+text and dropped. That is the whole loop-prevention mechanism and it
+lives in exactly one place, under unit test.
 
 ## 6a. Keyboard ownership (directed 2026-09-01)
 
@@ -3032,7 +3127,8 @@ and dependency rationale; each module also has its own README. Summary:
 
 ```
 app                    → depends on everything; owns DesktopSessionService + MainActivity
-host-bridge             → native Wayland client + JNI; frame passthrough + input injection
+host-bridge             → native Wayland client + JNI; frame passthrough, input injection,
+                          and the host<->container clipboard bridge (§6c)
 runtime-common          → shared types (Container, DisplayOutput, RootfsImage); no deps
 runtime-windows         → Wine/Box64 (fork: vendor/gamenative), no display code of its own
 runtime-linux-root      → DroidSpaces fork (vendor/droidspaces), namespaces/cgroups, needs root

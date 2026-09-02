@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 // Thin C++ wrapper around a wl_display connection to the primary container's
@@ -21,6 +22,25 @@ namespace hostbridge {
 
 struct WaylandGlobals;
 struct OutputCapture;
+struct ClipboardState;
+
+/**
+ * Called on a hostbridge-owned worker thread (NOT the Wayland dispatch
+ * thread) whenever the container's selection changes and its text has been
+ * read off the transfer pipe. `utf8Text` is `length` bytes of real UTF-8,
+ * valid only for the duration of the call.
+ *
+ * Length-explicit, and bytes rather than a C string, on purpose: this text
+ * crosses into Java, and JNI's NewStringUTF/GetStringUTFChars speak MODIFIED
+ * UTF-8, which disagrees with real UTF-8 on every supplementary-plane
+ * character — i.e. on emoji, which people copy constantly. hostbridge_jni.cpp
+ * therefore moves a byte[] across and lets Kotlin do the decoding.
+ *
+ * Deliberately a plain function pointer + opaque user data rather than a
+ * std::function: the only implementation is hostbridge_jni.cpp's JNI
+ * trampoline, and this keeps the header free of <functional>.
+ */
+using ClipboardTextCallback = void (*)(void* userData, const char* utf8Text, size_t length);
 
 class WaylandClient {
 public:
@@ -63,6 +83,28 @@ public:
     void injectPointerAxis(double horizontal, double vertical);
     void injectKey(uint32_t evdevKeyCode, bool pressed);
 
+    // ---- Clipboard, over ext-data-control-v1 ----
+    //
+    // Registers the sink for container -> Android text. Must be set before
+    // connect() to be sure of catching the selection the compositor already
+    // holds; setting it later only catches subsequent changes. Passing
+    // nullptr detaches.
+    void setClipboardListener(ClipboardTextCallback callback, void* userData);
+
+    // Android -> container: claims the container seat's selection with
+    // `length` bytes of UTF-8 as a text/plain payload. Returns false if the
+    // compositor never advertised ext_data_control_manager_v1 (so nothing was
+    // claimed), or if the text exceeds kMaxClipboardBytes. Safe to call from
+    // any thread, for the same libwayland reason as the injection methods
+    // above.
+    bool offerClipboardText(const char* utf8Text, size_t length);
+
+    // Both directions refuse payloads above this. A clipboard bridge is for
+    // text a person copied, not a transport: an unbounded payload here would
+    // be copied through a pipe, a JNI string and an Android ClipData, and a
+    // runaway one would be invisible to the user who triggered it.
+    static constexpr size_t kMaxClipboardBytes = 1u << 20; // 1 MiB
+
     // Public only so the free-function pthread trampoline in
     // wayland_client.cpp (pthread_create needs a plain function pointer,
     // not a bound member function) can call it — not part of the intended
@@ -75,6 +117,7 @@ private:
     struct wl_registry* registry_ = nullptr;
     WaylandGlobals* globals_ = nullptr;
     OutputCapture* capture_ = nullptr;
+    ClipboardState* clipboard_ = nullptr;
 
     void* dispatchThreadHandle_ = nullptr; // pthread_t, opaque here to avoid pulling <pthread.h> into the header
     bool dispatchThreadRunning_ = false;
