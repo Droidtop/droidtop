@@ -33,16 +33,16 @@ package dev.droidtop.library.scraper
 internal object ScreenScraperDevCredentials {
 
     private val KEY = intArrayOf(
-        213, 233, 175, 99, 13, 53, 72, 115, 164, 9, 151, 79, 170, 233, 44, 117, 66, 39, 183,
-        224, 99, 31, 165, 245
+        110, 108, 52, 5, 101, 8, 106, 210, 22, 58, 95, 1, 247, 120, 181, 113, 226, 164, 26, 56,
+        123, 201, 224, 107
     )
 
     private val DEV_ID = intArrayOf(
-        134, 128, 195, 10, 110, 90, 38, 18, 209, 125, 248, 34, 203, 157, 67, 27
+        61, 5, 88, 108, 6, 103, 4, 179, 99, 78, 48, 108, 150, 12, 218, 31
     )
 
     private val DEV_PASSWORD = intArrayOf(
-        128, 166, 206, 90, 111, 96, 125, 7, 192, 109, 243
+        59, 35, 85, 60, 7, 93, 95, 166, 114, 94, 40, 101
     )
 
     val devId: String get() = unscramble(DEV_ID)
