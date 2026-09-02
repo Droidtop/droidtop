@@ -2492,8 +2492,7 @@ cursor for per-system theme reloading, which only the carousel did
 before.
 
 Still open after this, in rough order of how much a real theme notices:
-`text`'s `container*` scrolling-container family (which is what long
-scraped game descriptions actually need), the `textHorizontalScroll*` family shared by carousel, grid and
+the `textHorizontalScroll*` family shared by carousel, grid and
 textlist, `helpsystem`'s dimmed-state and entry-layout properties
 (13/31), and the `rotationOrigin`/`stationary` pair that recurs across
 nearly every element type.
@@ -2560,7 +2559,7 @@ surface exposes no texture-filter knob.
 The measurement also re-prioritised what is left. `imageType` was
 confirmed as the single most-used unrendered property in the schema
 (video 10/10, image 8, grid 4, carousel 3); it is now implemented, see
-below. `text`'s `container*` family is second (8/7/5/3/3). Deliberately still not implemented, with reasons:
+below. `text`'s `container*` family is second (8/7/5/3/3/0); it is now implemented too, see below. Deliberately still not implemented, with reasons:
 `badges`' `controllerSize`/`controllerPos`/`folderLinkSize`/
 `folderLinkPos` family (8/7/5/4) needs overlay icon art droidtop does not
 have; `helpsystem`'s whole `*Dimmed` family (4/4/2/2/2/2) fires only
@@ -2635,6 +2634,78 @@ deriving expected values by hand from the C++) and by reading real ES-DE
 source. A screenshot diff against a theme that sets `imageType` on its
 gamelist carousel or grid, on a library with more than one media type
 scraped, is what would confirm the wiring end to end.
+
+**`text`'s `container*` family (2026-09-02)**: the second most-used
+unrendered property family is now implemented. Re-measured across the
+same ten themes: `container` 8, `containerStartDelay` 7,
+`containerScrollSpeed` 5, `containerType` 3, `containerVerticalSnap` 3,
+`containerResetDelay` 3, `containerScrollGap` 0. Every use of
+`containerType` in the ten is `horizontal`. Before this, a scraped game
+description longer than its box was simply cut off, because a Compose
+`Text` clips at its constraints -- that implicit truncation is what this
+replaces, and there is only one text path now, not two.
+
+The family is two unrelated implementations wearing one name, and real
+ES-DE picks between them at GamelistView.cpp:293-305: a `containerType`
+of `horizontal` is NOT wrapped in a scrollable container at all, it turns
+the `TextComponent` itself into a marquee. `container` defaults to true
+for `metadata=description` and false otherwise, needs a horizontal
+`size`, and `containerType` is honoured only when the theme wrote
+`container` itself.
+
+The VERTICAL container (`ScrollableContainer.cpp`) waits
+`containerStartDelay` (default 4.5 s), then moves the text up exactly one
+pixel per interval, stops one pixel past the bottom, holds for
+`containerResetDelay` (default 7 s), then jumps to the top and fades the
+text in over a hard-coded 300 ms during which the start delay is re-armed
+-- so the period is delay + travel + reset + 300. The delay is measured
+from the last reset, which is the cursor moving to another game
+(GamelistView.cpp:914-919), not from when the view appeared. Text that
+fits its container never moves at all.
+
+Speed is the part that does not survive a naive port. It is not a
+velocity: it is milliseconds per ONE PIXEL, computed as
+`clamp(contentWidth / (fontSize * 1.3), 10, 40) * (4.0 /
+containerScrollSpeed) / resolutionModifier`, then scaled again by
+`rows/8` for containers under eight rows tall. `resolutionModifier` is
+`min(screenWidth, screenHeight) / 1080` (Renderer.cpp:188-191, :307-310),
+so the interval is secretly resolution-dependent by design; droidtop
+passes its real viewport pixels, which is what keeps a theme covering the
+same fraction of the screen per second on a handheld as on a desktop.
+`containerScrollSpeed` divides into ES-DE's 4.0 constant, so it is a
+multiplier on the auto-calculated base and larger is faster.
+`containerVerticalSnap` (default true) reduces only the CLIP height to a
+whole number of rows, never the element's declared size.
+
+The HORIZONTAL marquee (`TextComponent::update`) is unrelated: it
+converts line breaks to spaces, lays the text out on one line, and after
+`containerStartDelay` (default 1.5 s here, not 4.5) runs continuously
+with no pause at the end, a second copy looping in behind the first once
+a `containerScrollGap`-wide hole opens. Its speed is
+`Font::getSizeReference() * 0.247 * containerScrollSpeed` pixels per
+second, where the size reference is the summed advance of the 26 Latin
+capitals at that font size -- so it is already relative to the font, and
+needs no resolution term at all. The gap is a fixed distance: the speed
+multiplier cancels out of ES-DE's own expression for it.
+
+Nothing was left out of the family. All seven members are implemented,
+`containerScrollGap` included even though none of the ten themes sets it.
+The timing and geometry are pure Kotlin in `runtime-common/.../
+EsDeTextContainer.kt`, free of Compose and Android, in the same shape as
+`EsDeVideoLayout.kt`; the drawing is a `Canvas` so the frame clock moves
+the text without recomposing, and the frame loop only runs while
+something is actually scrolling. One deviation from the C++ is recorded
+at the site: an interval that truncates to zero is raised to one, because
+real ES-DE's `while (accumulator >= 0)` loop would spin forever on it.
+
+**Nothing in this pass was checked on a real screen** -- the device
+remained off-limits. Verification is by unit test
+(`EsDeTextContainerTest`, every expected value derived by hand from the
+C++ formulas) and by reading real ES-DE's source. What wants a real
+screenshot diff once the device is available: whether the apparent
+scroll rate of a description panel matches ES-DE's on the same theme at
+this device's resolution, the vertical snap and leading-inset clip at the
+top and bottom edges, and the marquee's gap on decaffe's own system view.
 
 **Five-theme on-device review + fixes (2026-08-30, later same day)**:
 the theme downloader ran end-to-end for the first time — three real
