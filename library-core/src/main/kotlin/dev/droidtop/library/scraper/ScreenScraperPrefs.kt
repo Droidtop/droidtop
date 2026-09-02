@@ -21,11 +21,25 @@ object ScreenScraperPrefs {
     private const val KEY_USER_ID = "droidtop_screenscraper_ssid"
     private const val KEY_USER_PASSWORD = "droidtop_screenscraper_sspassword"
 
+    /**
+     * droidtop's own application credentials, unless the user has deliberately
+     * overridden them.
+     *
+     * ScreenScraper's devid/devpassword identify the calling application rather
+     * than the person using it, so shipping droidtop's own pair is the point of
+     * having one: without it every install shares the anonymous rate limit. An
+     * explicitly stored value still wins, for anyone running their own registered
+     * pair. This is separate from ssid/sspassword, which stay the user's own.
+     */
     fun devId(context: Context): String =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_DEV_ID, "") ?: ""
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_DEV_ID, "")
+            ?.takeIf { it.isNotBlank() }
+            ?: ScreenScraperDevCredentials.devId
 
     fun devPassword(context: Context): String =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_DEV_PASSWORD, "") ?: ""
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_DEV_PASSWORD, "")
+            ?.takeIf { it.isNotBlank() }
+            ?: ScreenScraperDevCredentials.devPassword
 
     fun userId(context: Context): String =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_USER_ID, "") ?: ""
