@@ -96,6 +96,26 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
+import androidx.compose.foundation.Canvas
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.TextUnit
+import dev.droidtop.library.theme.EsDeTextContainerSpec
+import dev.droidtop.library.theme.EsDeTextContainerType
+import dev.droidtop.library.theme.esDeHorizontalReturnLengthPx
+import dev.droidtop.library.theme.esDeHorizontalScrollSpeedPxPerSec
+import dev.droidtop.library.theme.esDeHorizontalScrollState
+import dev.droidtop.library.theme.esDeTextContainerSpec
+import dev.droidtop.library.theme.esDeVerticalContainerClipInset
+import dev.droidtop.library.theme.esDeVerticalContainerHeight
+import dev.droidtop.library.theme.esDeVerticalMaxScrollPx
+import dev.droidtop.library.theme.esDeVerticalScrollIntervalMs
+import dev.droidtop.library.theme.esDeVerticalScrollState
 
 /**
  * Real ES-DE `pos`/`size`/`fontSize`/etc. fractions are of the "screen"
@@ -830,7 +850,53 @@ private fun EsDeThemedText(
         else -> Alignment.TopStart
     }
 
-    if (hasSize) {
+    // Real ES-DE `text` scrolling container, the `container*` family.
+    // Eight of the ten themes measured for this pass put their game
+    // description in one, and without it a description longer than its
+    // box was simply clipped mid-sentence -- Compose's own `Text` cuts
+    // off at its constraints, which is exactly the static truncated
+    // block this replaces. `hasWidth` is real ES-DE's own precondition:
+    // a container with no horizontal size is an error there and the
+    // property is ignored (TextComponent.cpp:516-521).
+    val sizeValue = element.valueOrNull<EsDeThemeValue.Pair>("size")
+    val containerSpec = esDeTextContainerSpec(
+        container = element.valueOrNull<EsDeThemeValue.Bool>("container")?.value,
+        metadata = metadata,
+        hasWidth = sizeValue != null && sizeValue.x > 0f,
+        containerType = element.valueOrNull<EsDeThemeValue.Str>("containerType")?.value,
+        verticalSnap = element.valueOrNull<EsDeThemeValue.Bool>("containerVerticalSnap")?.value,
+        scrollSpeed = element.valueOrNull<EsDeThemeValue.FloatValue>("containerScrollSpeed")?.value,
+        startDelay = element.valueOrNull<EsDeThemeValue.FloatValue>("containerStartDelay")?.value,
+        resetDelay = element.valueOrNull<EsDeThemeValue.FloatValue>("containerResetDelay")?.value,
+        scrollGap = element.valueOrNull<EsDeThemeValue.FloatValue>("containerScrollGap")?.value,
+    )
+
+    if (containerSpec != null) {
+        EsDeTextScrollContainer(
+            spec = containerSpec,
+            text = text,
+            // GamelistView.cpp:914-919 -- every container and every
+            // scrolling text is reset when the cursor moves to another
+            // game, so the start delay is measured from the selection
+            // change and not from when the view appeared.
+            resetKey = selectedGame?.id,
+            width = width,
+            height = height,
+            offsetX = offsetX,
+            offsetY = offsetY,
+            viewWidth = viewWidth,
+            viewHeight = viewHeight,
+            color = color,
+            backgroundColor = backgroundColor,
+            opacity = opacity,
+            fontSizeDp = fontSizeDp,
+            fontSizeSp = fontSizeSp,
+            fontFamily = themeFontFamily(element),
+            lineSpacing = lineSpacing,
+            textAlign = textAlign,
+            verticalAlignment = element.valueOrNull<EsDeThemeValue.Str>("verticalAlignment")?.value,
+        )
+    } else if (hasSize) {
         Box(
             modifier = Modifier
                 .absoluteOffset(x = offsetX, y = offsetY)
@@ -2319,3 +2385,241 @@ private fun esDeScrollFadeInAlpha(element: EsDeThemeElement, key: Any?): Float {
  */
 private fun esDeHiddenByMetadataFlag(element: EsDeThemeElement, entry: LibraryEntry?): Boolean =
     element.valueOrNull<EsDeThemeValue.Bool>("metadataElement")?.value == true && entry?.hideMetadata == true
+
+/**
+ * Real ES-DE's `text` scrolling container, the `container*` family.
+ *
+ * Real ES-DE has two entirely separate implementations behind this one
+ * family, and which one applies is decided exactly the way
+ * GamelistView.cpp:293-305 decides it: a `containerType` of `horizontal`
+ * is NOT wrapped in a `ScrollableContainer` at all, it turns the
+ * `TextComponent` itself into a marquee. The timing and geometry for both
+ * live in `EsDeTextContainer.kt` as plain maths with no Compose in them,
+ * so they can be checked against the C++ formulas in a unit test; what is
+ * left here is only the drawing.
+ *
+ * Both types draw through a `Canvas` rather than a `Text`, because the
+ * scroll position is read inside the draw lambda: the frame clock then
+ * moves the text without recomposing anything, and the container clip
+ * (`ScrollableContainer::render`) is expressible directly.
+ */
+@Composable
+private fun EsDeTextScrollContainer(
+    spec: EsDeTextContainerSpec,
+    text: String,
+    resetKey: Any?,
+    width: Dp,
+    height: Dp,
+    offsetX: Dp,
+    offsetY: Dp,
+    viewWidth: Dp,
+    viewHeight: Dp,
+    color: Color,
+    backgroundColor: Color?,
+    opacity: Float,
+    fontSizeDp: Dp,
+    fontSizeSp: TextUnit,
+    fontFamily: FontFamily?,
+    lineSpacing: Float,
+    textAlign: TextAlign,
+    verticalAlignment: String?,
+) {
+    val density = LocalDensity.current
+    val measurer = rememberTextMeasurer()
+    val widthPx = with(density) { width.toPx() }
+    val heightPx = with(density) { height.toPx() }
+    val fontSizePx = with(density) { fontSizeDp.toPx() }
+
+    val horizontal = spec.type == EsDeTextContainerType.HORIZONTAL
+    // THEMES.md:3094 -- the horizontal container converts every line
+    // break in the text to a space, since it lays everything out on a
+    // single line (TextComponent.cpp:536 sets `mAutoCalcExtent = {1, 0}`).
+    val laidOutText = if (horizontal) text.replace(Regex("\\s*[\\r\\n]+\\s*"), " ") else text
+
+    val style = TextStyle(
+        color = color,
+        fontSize = fontSizeSp,
+        fontFamily = fontFamily,
+        lineHeight = fontSizeSp * lineSpacing,
+        textAlign = if (horizontal) TextAlign.Start else textAlign,
+    )
+
+    val layout = remember(laidOutText, style, widthPx, horizontal) {
+        if (horizontal) {
+            measurer.measure(laidOutText, style, softWrap = false, maxLines = 1)
+        } else {
+            // GamelistView.cpp:315-316 -- inside a vertical container the
+            // text child is given the container's own width and a free
+            // height, so it wraps to the box and grows downwards.
+            measurer.measure(
+                laidOutText,
+                style,
+                constraints = Constraints(minWidth = widthPx.toInt(), maxWidth = widthPx.toInt()),
+            )
+        }
+    }
+
+    val textAlpha = remember { mutableFloatStateOf(1f) }
+    val scrollFirst = remember { mutableFloatStateOf(0f) }
+    val scrollSecond = remember { mutableFloatStateOf(0f) }
+
+    val background = backgroundColor?.let { it.copy(alpha = it.alpha * opacity) }
+    val boxModifier = Modifier
+        .absoluteOffset(x = offsetX, y = offsetY)
+        .size(width = width, height = height)
+        .let { if (background != null) it.background(background) else it }
+
+    if (horizontal) {
+        // TextComponent.cpp:700 -- the marquee's speed comes from the
+        // font's own "size reference", which is the summed horizontal
+        // advance of the 26 Latin capitals at this font size
+        // (Font.cpp:517-546). Measuring that exact string here IS that
+        // quantity, which is also why the marquee needs no separate
+        // resolution scaling the way the vertical container does: it is
+        // already relative to the font, which is itself a fraction of the
+        // screen.
+        val sizeReferencePx = remember(style) {
+            measurer.measure("ABCDEFGHIJKLMNOPQRSTUVWXYZ", style, softWrap = false).size.width.toFloat()
+        }
+        val textWidthPx = layout.size.width.toFloat()
+        val speedPxPerSec = esDeHorizontalScrollSpeedPxPerSec(sizeReferencePx, spec.scrollSpeed)
+        val returnLengthPx = esDeHorizontalReturnLengthPx(sizeReferencePx, spec.scrollGap)
+        val scrolls = textWidthPx > widthPx && speedPxPerSec > 0f
+
+        // TextComponent.cpp:241-247 -- text that fits is aligned inside
+        // the element instead of scrolling.
+        val restOffsetX = if (scrolls) 0f else when (textAlign) {
+            TextAlign.Center -> ((widthPx - textWidthPx) / 2f).coerceAtLeast(0f)
+            TextAlign.End -> (widthPx - textWidthPx).coerceAtLeast(0f)
+            else -> 0f
+        }
+        val offsetYPx = when (verticalAlignment) {
+            "center" -> (heightPx - layout.size.height) / 2f
+            "bottom" -> heightPx - layout.size.height
+            else -> 0f
+        }
+
+        EsDeContainerScrollClock(
+            enabled = scrolls,
+            resetKey = listOf(resetKey, laidOutText, spec),
+        ) { elapsedMs ->
+            val state = esDeHorizontalScrollState(
+                elapsedMs = elapsedMs,
+                textWidthPx = textWidthPx,
+                boxWidthPx = widthPx,
+                speedPxPerSec = speedPxPerSec,
+                returnLengthPx = returnLengthPx,
+                startDelayMs = spec.startDelayMs,
+            )
+            scrollFirst.floatValue = state.firstOffsetPx
+            scrollSecond.floatValue = state.secondOffsetPx
+        }
+
+        Canvas(boxModifier.clipToBounds()) {
+            drawText(
+                layout,
+                color = color,
+                alpha = color.alpha * opacity,
+                topLeft = Offset(restOffsetX - scrollFirst.floatValue, offsetYPx),
+            )
+            // TextComponent.cpp:376-384 -- the looped second copy, drawn
+            // only once it has actually entered the element.
+            if (scrollSecond.floatValue < 0f) {
+                drawText(
+                    layout,
+                    color = color,
+                    alpha = color.alpha * opacity,
+                    topLeft = Offset(-scrollSecond.floatValue, offsetYPx),
+                )
+            }
+        }
+        return
+    }
+
+    // Vertical container -- ScrollableContainer.cpp.
+    // ScrollableContainer.cpp:148-149 wants `maxGlyphHeight * lineSpacing`,
+    // i.e. the baseline-to-baseline pitch of the laid out text. Compose
+    // gives that as the paragraph's height over its line count.
+    val combinedHeightPx =
+        if (layout.lineCount > 0) layout.size.height.toFloat() / layout.lineCount else 0f
+    val adjustedHeightPx = esDeVerticalContainerHeight(heightPx, combinedHeightPx, spec.verticalSnap)
+    val clipInsetPx = esDeVerticalContainerClipInset(combinedHeightPx, lineSpacing)
+    // Renderer.cpp:188-191 and :307-310 -- orientation is decided by
+    // aspect and the modifier is taken from the SHORT screen axis in
+    // either case, so it reduces to min(w, h) / 1080. Passing droidtop's
+    // real viewport pixels is what keeps a theme scrolling at the same
+    // fraction of the screen per second here as it does on a desktop.
+    val resolutionModifier = with(density) { minOf(viewWidth.toPx(), viewHeight.toPx()) / 1080f }
+    val intervalMs = esDeVerticalScrollIntervalMs(
+        contentWidthPx = widthPx,
+        fontSizePx = fontSizePx,
+        scrollSpeed = spec.scrollSpeed,
+        resolutionModifier = resolutionModifier,
+        adjustedHeightPx = adjustedHeightPx,
+        combinedHeightPx = combinedHeightPx,
+    )
+    val maxScrollPx = esDeVerticalMaxScrollPx(layout.size.height.toFloat(), adjustedHeightPx)
+
+    EsDeContainerScrollClock(
+        enabled = maxScrollPx > 0 && intervalMs > 0,
+        resetKey = listOf(resetKey, laidOutText, spec, intervalMs, maxScrollPx),
+    ) { elapsedMs ->
+        val state = esDeVerticalScrollState(
+            elapsedMs = elapsedMs,
+            startDelayMs = spec.startDelayMs,
+            resetDelayMs = spec.resetDelayMs,
+            intervalMs = intervalMs,
+            maxScrollPx = maxScrollPx,
+        )
+        scrollFirst.floatValue = state.scrollPx
+        textAlpha.floatValue = state.opacity
+    }
+
+    Canvas(boxModifier) {
+        // ScrollableContainer.cpp:260-268 -- the clip is the element's
+        // width by the SNAPPED height, with the top edge pushed down by
+        // the leading inset while the bottom edge stays where it was.
+        clipRect(left = 0f, top = clipInsetPx, right = size.width, bottom = adjustedHeightPx) {
+            drawText(
+                layout,
+                color = color,
+                alpha = color.alpha * opacity * textAlpha.floatValue,
+                topLeft = Offset(0f, -scrollFirst.floatValue),
+            )
+        }
+    }
+}
+
+/**
+ * Drives one container's elapsed-time clock. Real ES-DE feeds every
+ * component a per-frame delta and each container keeps its own
+ * accumulator (ScrollableContainer.cpp:204, TextComponent.cpp:732); this
+ * is the same clock, restarted whenever [resetKey] changes -- which is
+ * real ES-DE resetting every container and every scrolling text when the
+ * cursor moves to another game (GamelistView.cpp:914-919).
+ *
+ * The frame loop only exists while there is actually something to
+ * scroll. Text that fits its container must not move at all
+ * (ScrollableContainer.cpp:207, TextComponent.cpp:724), and there is then
+ * no reason to hold a frame callback open for it either.
+ */
+@Composable
+private fun EsDeContainerScrollClock(
+    enabled: Boolean,
+    resetKey: Any?,
+    onElapsed: (Float) -> Unit,
+) {
+    LaunchedEffect(enabled, resetKey) {
+        onElapsed(0f)
+        if (!enabled) return@LaunchedEffect
+        var elapsedMs = 0f
+        var previousNanos = withInfiniteAnimationFrameNanos { it }
+        while (true) {
+            withInfiniteAnimationFrameNanos { nanos ->
+                elapsedMs += (nanos - previousNanos) / 1_000_000f
+                previousNanos = nanos
+                onElapsed(elapsedMs)
+            }
+        }
+    }
+}
