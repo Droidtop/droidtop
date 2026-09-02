@@ -347,7 +347,8 @@ object GameLaunchStrategyResolver {
     private val LINUX_LAUNCHER_EXTENSIONS = setOf("x86_64", "x86")
 }
 
-private fun GameEngine.toLibraryEntryKind(): LibraryEntryKind = when (this) {
+/** The [LibraryEntryKind] an engine's games appear under. Internal rather than private: the PC/engine scraper resolves an entry's engine back out of its kind to name its `downloaded_media` folder. */
+internal fun GameEngine.toLibraryEntryKind(): LibraryEntryKind = when (this) {
     GameEngine.RENPY -> LibraryEntryKind.RENPY
     GameEngine.RPG_MAKER_MV -> LibraryEntryKind.RPG_MAKER_MV
     GameEngine.RPG_MAKER_MZ -> LibraryEntryKind.RPG_MAKER_MZ
@@ -405,6 +406,11 @@ class EngineGameProvider(
 
     override suspend fun scan(): List<LibraryEntry> {
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
+        // .withScrapedMetadata is what makes a scrape of an engine game
+        // visible at all: the scraper writes a game_metadata row keyed by
+        // the entry id, and without this merge the next scan rebuilt the
+        // entry straight from the filesystem and dropped every scraped
+        // field on the floor.
         return (GamesRoots.current(context) + extraRoots()).distinct().flatMap { root ->
             GameEngineDetector.scan(
                 root,
@@ -419,7 +425,7 @@ class EngineGameProvider(
                     artworkUri = EsDeArtwork.resolve(root, detected.engine.esDeSystemName(), detected.displayFolder.name),
                 )
             }
-        }
+        }.withScrapedMetadata(dev.droidtop.library.consoles.RomDatabase.get(context).romDao())
     }
 
     /** [gameRoot] to [detectedEngine] -- see [GameEngineDetector.scan]'s own doc comment for why [gameRoot] isn't always [entry]'s own [LibraryEntry.id] folder. */

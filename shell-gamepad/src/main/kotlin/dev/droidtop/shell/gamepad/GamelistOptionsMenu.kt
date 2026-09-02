@@ -22,6 +22,7 @@ import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.consoles.SystemOverridePrefs
 import dev.droidtop.library.scraper.importGamelistXml
+import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.library.scraper.scrapeSystemArtwork
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
@@ -106,6 +107,9 @@ object GamelistSortPrefs {
     }
 }
 
+/** The one label for the PC/engine scrape action, shared by the list that offers it and the handler that runs it. */
+private const val SCRAPE_PC_GAMES = "Scrape PC & engine games"
+
 /**
  * The in-gamelist options overlay (the ES-DE GuiGamelistOptions
  * PATTERN: sort, scrape, and library actions right where the user is,
@@ -164,6 +168,12 @@ internal fun GamelistOptionsMenu(
                 add("Scrape this system")
                 add("Import gamelist.xml")
             }
+            // Offered wherever PC or engine games are actually on
+            // screen, which is the same "act on what you are looking
+            // at" placement every other action here uses. Those groups
+            // have no console systemId, so the action above never
+            // covered them and there was no way to scrape them at all.
+            if (games.any { it.isPcOrEngineGame }) add(SCRAPE_PC_GAMES)
         }
         add("Close")
     }
@@ -285,6 +295,20 @@ internal fun GamelistOptionsMenu(
                         }
                     }
                     status = results.joinToString("\n")
+                    busy = false
+                    onScraped()
+                }
+            }
+            SCRAPE_PC_GAMES -> {
+                if (busy) return
+                busy = true
+                val pcGames = games.filter { it.isPcOrEngineGame }
+                scope.launch {
+                    status = withContext(Dispatchers.IO) {
+                        dev.droidtop.library.scraper.PcScraper.scrape(context, pcGames) { done, total ->
+                            status = "Scraping PC & engine games: $done/$total"
+                        }
+                    }
                     busy = false
                     onScraped()
                 }
