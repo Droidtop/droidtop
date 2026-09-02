@@ -202,15 +202,66 @@ object GameEngineDetector {
     ): List<DetectedGame> =
         (root.listFiles() ?: emptyArray())
             .filter { it.isDirectory && resolveSystem(it.name, systemsById) == null }
-            .mapNotNull { top ->
-                override(top)?.let { return@mapNotNull DetectedGame(top, top, it) }
-                detect(top, defs)?.let { DetectedGame(top, top, it) }
-                    ?: (top.listFiles() ?: emptyArray())
-                        .asSequence()
-                        .filter { it.isDirectory }
-                        .mapNotNull { nested -> detect(nested, defs)?.let { DetectedGame(top, nested, it) } }
-                        .firstOrNull()
-            }
+            .mapNotNull { top -> detectGame(top, defs, override) }
+
+    /**
+     * Is this ONE folder a game, and if so which engine and where are its
+     * markers -- the single-folder half of [scan], extracted so that
+     * everything asking "is this folder an engine game" asks the same
+     * question. Three places did their own slightly different version of
+     * it before: [scan]'s loop, [EngineGameProvider.resolveEntry]'s
+     * re-detect, and (as of the store/engine ownership rule) the PC
+     * provider's suppression check.
+     *
+     * The nested search is deliberately name-ordered rather than in
+     * [File.listFiles] order, which is filesystem-defined and can differ
+     * between scans: a wrapper folder containing two detectable
+     * subfolders must resolve to the same [DetectedGame] every time.
+     */
+    fun detectGame(
+        folder: File,
+        defs: List<EngineDef>,
+        override: (File) -> GameEngine? = { null },
+    ): DetectedGame? {
+        override(folder)?.let { return DetectedGame(folder, folder, it) }
+        detect(folder, defs)?.let { return DetectedGame(folder, folder, it) }
+        return (folder.listFiles() ?: emptyArray())
+            .asSequence()
+            .filter { it.isDirectory }
+            .sortedBy { it.name }
+            .mapNotNull { nested -> detect(nested, defs)?.let { DetectedGame(folder, nested, it) } }
+            .firstOrNull()
+    }
+
+    /**
+     * THE store/engine ownership rule, in one place (docs/SPEC.md §7g).
+     *
+     * A store-installed game that engine detection recognises belongs to
+     * [EngineGameProvider], and the PC provider must not return a second
+     * entry for it: the engine entry routes to enginehost, which runs a
+     * Ren'Py or RPG Maker game natively, while the `pc` entry consults no
+     * engine detection at all and goes straight to Wine plus CPU
+     * translation -- strictly worse where both exist, and on this target
+     * currently non-functional (§5b). A store game this returns false for
+     * is a genuine Windows title and keeps its `pc` entry and its Wine
+     * route.
+     *
+     * Decided from the FOLDER, by both providers, so the answer does not
+     * depend on which provider scanned first (they do not even scan
+     * together -- the handheld shell runs Games and Apps as two
+     * independent scans) and does not change between scans.
+     *
+     * What the suppressed entry knew is not lost: the same install
+     * directory is handed to [EngineGameProvider] as a
+     * [dev.droidtop.library.StoreInstall], and
+     * [dev.droidtop.library.withStoreInstall] folds its [PcInfo] and
+     * store art onto the surviving engine entry.
+     */
+    fun engineOwnsInstall(
+        installDir: File,
+        defs: List<EngineDef>,
+        override: (File) -> GameEngine? = { null },
+    ): Boolean = detectGame(installDir, defs, override) != null
 }
 
 /**
@@ -395,23 +446,41 @@ internal fun GameEngine.toLibraryEntryKind(): LibraryEntryKind = when (this) {
 class EngineGameProvider(
     private val context: Context,
     // Extra scan roots beyond the user's own games folders: the app
-    // layer passes store install directories (Steam's steamapps/common
+    // layer passes store library directories (Steam's steamapps/common
     // dirs) so a store-installed engine game flows through the SAME
     // detection, grouping, and launch-strategy resolution as any other
     // engine game, enginehost included. A supplier because the set is
     // live: the install location can change between scans.
     private val extraRoots: () -> List<File> = { emptyList() },
+    // The store's own facts about the games installed under those roots:
+    // source, store id, size, install path, compatibility, cover art.
+    // Separate from [extraRoots] because it answers a different question.
+    // extraRoots says WHERE to look, and a Steam library folder holds
+    // games no store row knows about too; this says what a store knows
+    // about a folder once detection has claimed it. Without it,
+    // suppressing the duplicate `pc` entry (see
+    // [GameEngineDetector.engineOwnsInstall]) would silently delete every
+    // store-side fact about the game.
+    private val storeInstalls: () -> List<StoreInstall> = { emptyList() },
 ) : LibraryProvider {
     override val kinds: Set<LibraryEntryKind> = GameEngine.entries.map { it.toLibraryEntryKind() }.toSet()
 
     override suspend fun scan(): List<LibraryEntry> {
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
+        val installs = storeInstalls()
+        val installsByDir = installs.byInstallDir()
+        // A store game's install directory is a CHILD of the root
+        // detection walks, so its parent is the root: the same
+        // relationship PcLibrary.knownInstallRoots already produces, kept
+        // here so this provider works from a bare list of installs too.
+        val roots = (GamesRoots.current(context) + extraRoots() + installs.mapNotNull { it.installDir.parentFile })
+            .distinctBy { it.absolutePath }
         // .withScrapedMetadata is what makes a scrape of an engine game
         // visible at all: the scraper writes a game_metadata row keyed by
         // the entry id, and without this merge the next scan rebuilt the
         // entry straight from the filesystem and dropped every scraped
         // field on the floor.
-        return (GamesRoots.current(context) + extraRoots()).distinct().flatMap { root ->
+        return roots.flatMap { root ->
             GameEngineDetector.scan(
                 root,
                 systemsById,
@@ -423,9 +492,21 @@ class EngineGameProvider(
                     title = detected.displayFolder.name,
                     kind = detected.engine.toLibraryEntryKind(),
                     artworkUri = EsDeArtwork.resolve(root, detected.engine.esDeSystemName(), detected.displayFolder.name),
-                )
+                ).withStoreInstall(installsByDir.forFolder(detected.displayFolder))
             }
-        }.withScrapedMetadata(dev.droidtop.library.consoles.RomDatabase.get(context).romDao())
+        }
+            // Roots can overlap now that store installs contribute their
+            // own parents; the same folder reached from two roots is
+            // still one game.
+            .distinctBy { it.id }
+            .withScrapedMetadata(
+                dev.droidtop.library.consoles.RomDatabase.get(context).romDao(),
+                // A game scraped BEFORE this rule existed has its metadata
+                // row under the `pc` entry's store id. That entry no
+                // longer exists, so without this fallback the scrape would
+                // look like it had been thrown away.
+                alsoUnderId = { it.pcInfo?.storeId },
+            )
     }
 
     /** [gameRoot] to [detectedEngine] -- see [GameEngineDetector.scan]'s own doc comment for why [gameRoot] isn't always [entry]'s own [LibraryEntry.id] folder. */
@@ -436,18 +517,15 @@ class EngineGameProvider(
         // Re-detect rather than caching gameRoot on LibraryEntry -- cheap
         // (a handful of listFiles() calls), and keeps LibraryEntry's shape
         // shared/uniform across every provider rather than growing an
-        // engine-games-only field.
-        val defs = EnginesDatabase.defs(context)
-        EngineOverridePrefs.engineFor(context, displayFolder.absolutePath)?.let {
-            return ResolvedEntry(displayFolder, it)
-        }
-        val gameRoot = GameEngineDetector.detect(displayFolder, defs)?.let { displayFolder }
-            ?: (displayFolder.listFiles() ?: emptyArray())
-                .firstOrNull { it.isDirectory && GameEngineDetector.detect(it, defs) != null }
-            ?: displayFolder
-        val engine = GameEngineDetector.detect(gameRoot, defs)
-            ?: error("Couldn't re-detect an engine for ${gameRoot.absolutePath}")
-        return ResolvedEntry(gameRoot, engine)
+        // engine-games-only field. Through GameEngineDetector.detectGame,
+        // the same call scan() itself uses, so a launch can never resolve
+        // a different folder than the scan that listed the entry did.
+        val detected = GameEngineDetector.detectGame(
+            displayFolder,
+            EnginesDatabase.defs(context),
+            override = { folder -> EngineOverridePrefs.engineFor(context, folder.absolutePath) },
+        ) ?: error("Couldn't re-detect an engine for ${displayFolder.absolutePath}")
+        return ResolvedEntry(detected.gameRoot, detected.engine)
     }
 
     /**

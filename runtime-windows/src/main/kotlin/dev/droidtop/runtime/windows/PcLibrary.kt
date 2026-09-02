@@ -14,6 +14,9 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
+import dev.droidtop.library.PcCompatibility
+import dev.droidtop.library.PcInfo
+import dev.droidtop.library.StoreInstall
 import java.io.File
 
 /**
@@ -124,26 +127,16 @@ object PcLibrary {
                 }.getOrDefault(emptyList()),
             )
         }.sortedBy { it.title.lowercase() }
-            // Recording the roots here, in the one place every source's
-            // install directories are already known, is what keeps
-            // [knownInstallRoots] answerable synchronously. It used to be
-            // a separate `installRoots(context)` entry point that nothing
-            // ever called, so the store half of that list stayed empty
-            // forever and only Steam's own paths reached engine detection.
-            .also { games -> storeInstallRoots = games.toInstallRoots() }
+            // Recording the installs here, in the one place every
+            // source's install directories are already known, is what
+            // keeps [knownInstalls]/[knownInstallRoots] answerable
+            // synchronously. It used to be a separate
+            // `installRoots(context)` entry point that nothing ever
+            // called, so the store half of that list stayed empty forever
+            // and only Steam's own paths reached engine detection.
+            .also { games -> storeInstalls = games.mapNotNull { it.toStoreInstall() } }
     }
 
-    /**
-     * The PARENT of each game's install directory, not the directory
-     * itself. Engine detection reads a root's children as candidate game
-     * folders (see `GameEngineDetector.scan`), so handing it a game's own
-     * folder points it one level too deep and it finds nothing there.
-     * Steam's paths already arrive as library roots, which is why a
-     * Steam-installed Ren'Py game was detected and a GOG one would not
-     * have been even once this list was populated.
-     */
-    private fun List<Game>.toInstallRoots(): List<String> =
-        mapNotNull { it.installDir?.parentFile?.absolutePath }.distinct()
 
     /** Only what is actually on this device — what the library grid shows. */
     suspend fun installedGames(context: Context): List<Game> = allGames(context).filter { it.installed }
@@ -167,14 +160,34 @@ object PcLibrary {
      * is the right trade against stalling every scan.
      */
     fun knownInstallRoots(): List<File> {
-        val steam = runCatching { SteamService.allInstallPaths }.getOrDefault(emptyList())
-        return (steam + storeInstallRoots).map(::File)
+        val steam = runCatching { SteamService.allInstallPaths }.getOrDefault(emptyList()).map(::File)
+        // The PARENT of each game's install directory, not the directory
+        // itself. Engine detection reads a root's children as candidate
+        // game folders (see `GameEngineDetector.scan`), so handing it a
+        // game's own folder points it one level too deep and it finds
+        // nothing there. Steam's own paths already arrive as library
+        // roots, which is why a Steam-installed Ren'Py game was detected
+        // and a GOG one would not have been even once this was populated.
+        val storeRoots = storeInstalls.mapNotNull { it.installDir.parentFile }
+        return (steam + storeRoots)
             .filter { it.isDirectory }
             .distinctBy { it.absolutePath }
     }
 
+    /**
+     * The installs behind [knownInstallRoots], with the store's own facts
+     * attached. Engine detection takes these so that a store-installed
+     * engine game keeps its source, size, compatibility and cover art
+     * after its duplicate `pc` entry is suppressed.
+     *
+     * Same one-scan-behind caveat as [knownInstallRoots], and for the
+     * same reason: it must answer without blocking a scan thread on four
+     * Room queries.
+     */
+    fun knownInstalls(): List<StoreInstall> = storeInstalls.filter { it.installDir.isDirectory }
+
     @Volatile
-    private var storeInstallRoots: List<String> = emptyList()
+    private var storeInstalls: List<StoreInstall> = emptyList()
 
     /**
      * Cached community compatibility only — no network call. Scanning a
@@ -274,4 +287,50 @@ object PcLibrary {
             compatibility = compatibilityFor(name),
         )
     }
+}
+
+/**
+ * This game as the shape engine detection consumes, or null when it
+ * is not actually installed anywhere on this device.
+ *
+ * Detection needs the directory; the rest of it is what keeps the
+ * game's store-side information alive once the engine entry claims
+ * that directory and the `pc` entry is suppressed (see
+ * `GameEngineDetector.engineOwnsInstall`).
+ */
+fun PcLibrary.Game.toStoreInstall(): StoreInstall? = installDir?.let { dir ->
+    StoreInstall(installDir = dir, pcInfo = toPcInfo(), artworkUri = artUrl)
+}
+
+/**
+ * The store-side facts a [dev.droidtop.library.LibraryEntry] carries.
+ *
+ * Built here rather than in `PcGameProvider` because both an entry it
+ * returns itself and a [StoreInstall] handed to engine detection need
+ * exactly the same values; two mappings would be two chances for a
+ * merged entry to disagree with the one it replaced.
+ */
+fun PcLibrary.Game.toPcInfo(): PcInfo = PcInfo(
+    source = source.displayName(),
+    storeId = id,
+    installed = installed,
+    sizeBytes = sizeBytes,
+    installPath = installPath,
+    compatibility = compatibility?.let {
+        PcCompatibility(
+            averageRating = it.averageRating,
+            playableReports = it.playableReports,
+            gpuPlayableReports = it.gpuPlayableReports,
+            hasBeenTried = it.hasBeenTried,
+            reportedNotWorking = it.reportedNotWorking,
+        )
+    },
+)
+
+fun PcLibrary.Source.displayName(): String = when (this) {
+    PcLibrary.Source.STEAM -> "Steam"
+    PcLibrary.Source.GOG -> "GOG"
+    PcLibrary.Source.EPIC -> "Epic"
+    PcLibrary.Source.AMAZON -> "Amazon"
+    PcLibrary.Source.FOLDER -> "Folder"
 }
