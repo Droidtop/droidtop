@@ -492,6 +492,14 @@ class EngineGameProvider(
                     title = detected.displayFolder.name,
                     kind = detected.engine.toLibraryEntryKind(),
                     artworkUri = EsDeArtwork.resolve(root, detected.engine.esDeSystemName(), detected.displayFolder.name),
+                    // Same three arguments the resolve() above already
+                    // takes -- carried instead of re-derived. See
+                    // GameMediaLocator.
+                    mediaLocator = GameMediaLocator(
+                        root.absolutePath,
+                        detected.engine.esDeSystemName(),
+                        detected.displayFolder.name,
+                    ),
                 ).withStoreInstall(installsByDir.forFolder(detected.displayFolder))
             }
         }

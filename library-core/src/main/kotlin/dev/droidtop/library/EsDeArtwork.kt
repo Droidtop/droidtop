@@ -44,10 +44,50 @@ import java.io.File
  * custom system in their own es_systems.xml, ES-DE supports this per its
  * "Game system customizations" docs, not assumed to already exist).
  */
+/**
+ * Where one game's scraped media LIVES, as three strings -- not what it
+ * has. This is the whole data-model answer to `<imageType>`.
+ *
+ * The problem it solves: a [LibraryEntry] carried exactly one
+ * already-resolved `artworkUri`, so every themed element showed the same
+ * picture no matter which media type the theme asked for. The obvious fix
+ * -- resolving every media type per game at scan time -- is the wrong one
+ * on this target: a library of hundreds of ROMs would pay ten folders
+ * times three extensions times two candidate roots of `stat` per entry,
+ * per scan, to answer a question almost every element never asks.
+ *
+ * So the entry carries the COORDINATES instead. Building one is free at
+ * every scan site: the games root, system id and base name are all
+ * already in hand there (they are the same three arguments
+ * [EsDeArtwork.resolve] is being called with anyway), and constructing it
+ * touches the filesystem zero times. The lookup then happens where the
+ * question is actually asked -- in a theme element that declared an
+ * `imageType`, for the handful of games currently on screen, memoised by
+ * the renderer for as long as that element is composed. That is also what
+ * real ES-DE does: GridComponent.h:490-522 resolves an entry's image path
+ * lazily inside its render window and caches it on the entry, and is
+ * capped at two image types precisely because the cost is per-entry
+ * filesystem work.
+ *
+ * Null for a game with no ES-DE media layout behind it at all (a native
+ * Android app, a store PC game whose art is a remote URL). Those keep
+ * working exactly as before through [LibraryEntry.artworkUri].
+ */
+data class GameMediaLocator(
+    /** The folder directly containing the per-system game folders, as [EsDeArtwork.resolve] means it. */
+    val gamesRoot: String,
+    val system: String,
+    val baseName: String,
+)
+
 object EsDeArtwork {
     private val MEDIA_TYPES_BY_PRIORITY =
         listOf("miximages", "covers", "screenshots", "titlescreens", "marquees", "physicalmedia", "fanart")
-    private val EXTENSIONS = listOf("png", "jpg", "jpeg")
+    // Real ES-DE's own list is png/jpg/webp (FileData.h:161
+    // `sImageExtensions`). `webp` was missing here, so a library scraped
+    // by real ES-DE with WebP output resolved nothing at all; `jpeg` is
+    // droidtop's own extra tolerance for hand-placed media and stays.
+    private val EXTENSIONS = listOf("png", "jpg", "webp", "jpeg")
 
     /**
      * Real ES-DE `<imageType>` values (singular, as a theme writes them --
@@ -66,7 +106,26 @@ object EsDeArtwork {
         "marquee" to "marquees",
         "physicalmedia" to "physicalmedia",
         "fanart" to "fanart",
+        // Completed against real ES-DE's own FileData.cpp accessors
+        // (get3DBoxPath -> "3dboxes" at FileData.cpp:381-385,
+        // getBackCoverPath -> "backcovers" at FileData.cpp:387-391), which
+        // this map was previously missing -- a theme asking for either got
+        // silently skipped rather than resolved.
+        "3dbox" to "3dboxes",
+        "backcover" to "backcovers",
     )
+
+    /**
+     * Real ES-DE's `image` PSEUDO-TYPE. `image` is the one <imageType>
+     * value that names no folder at all: FileData::getImagePath()
+     * (FileData.cpp:360-379) is itself a fallback chain, trying miximage
+     * first, then screenshot, then title screen, then cover. It is
+     * therefore expanded here rather than looked up, and it is why the
+     * carousel and grid -- which resolve a folder per type directly and
+     * have no such accessor -- do not accept `image` at all.
+     */
+    private val IMAGE_PSEUDO_TYPE_CHAIN =
+        listOf("miximages", "screenshots", "titlescreens", "covers")
 
     /**
      * [gamesRoot] is the folder directly containing the per-system ROM/game
@@ -135,6 +194,63 @@ object EsDeArtwork {
                 for (ext in EXTENSIONS) {
                     val candidate = File(mediaRoot, "$system/$mediaType/$romBaseName.$ext")
                     if (candidate.isFile) return candidate.absolutePath
+                }
+            }
+        }
+        return null
+    }
+
+    /**
+     * Resolves one element's own parsed `<imageType>` list against one
+     * game's media, the way real ES-DE's GamelistView::setGameImage does
+     * (GamelistView.cpp:1255-1330): walk the theme's OWN declared order,
+     * take the FIRST type that actually has a file on disk, and stop.
+     *
+     * Three things about this are load-bearing and are not what the
+     * property name suggests:
+     *
+     *  * The fallback order is the THEME's order, not a fixed preference
+     *    of ES-DE's. `marquee,cover` and `cover,marquee` are different
+     *    requests and neither is "the" priority.
+     *  * When NOTHING in the list resolves, real ES-DE calls
+     *    `comp->setImage("")` -- the element shows its own `<default>`
+     *    image if it declared one, and otherwise shows nothing. It
+     *    specifically does NOT silently substitute the box art. Callers
+     *    get null here and must honour that, not paper over it.
+     *  * `image` expands to a chain of its own, see
+     *    [IMAGE_PSEUDO_TYPE_CHAIN].
+     *
+     * `none` is not handled here -- it is not a media lookup at all but a
+     * per-element instruction (draw the game's name as text in a
+     * carousel/grid, suppress the static image in a video element), so it
+     * belongs to the caller. Present-but-unrecognised types simply do not
+     * match, matching [resolve]'s existing behaviour.
+     *
+     * Cost: this is the same stat-only walk [resolve] already does, but
+     * bounded by what the theme asked for -- at most one folder per
+     * declared type, times [EXTENSIONS], times the two candidate media
+     * roots. It is deliberately NOT called during a library scan; see
+     * [GameMediaLocator].
+     */
+    fun resolveImageTypes(locator: GameMediaLocator, imageTypes: List<String>): String? {
+        if (imageTypes.isEmpty()) return null
+        val gamesRoot = File(locator.gamesRoot)
+        val candidateMediaRoots = listOf(
+            File(gamesRoot.parentFile ?: gamesRoot, "ES-DE/downloaded_media"),
+            File(gamesRoot, "downloaded_media"),
+        )
+        for (imageType in imageTypes) {
+            val folders = when (val type = imageType.trim().lowercase()) {
+                "image" -> IMAGE_PSEUDO_TYPE_CHAIN
+                else -> listOfNotNull(IMAGE_TYPE_TO_FOLDER[type])
+            }
+            for (folder in folders) {
+                for (mediaRoot in candidateMediaRoots) {
+                    for (ext in EXTENSIONS) {
+                        val candidate =
+                            File(mediaRoot, "${locator.system}/$folder/${locator.baseName}.$ext")
+                        if (candidate.isFile) return candidate.absolutePath
+                    }
                 }
             }
         }

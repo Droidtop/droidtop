@@ -2445,12 +2445,8 @@ every favorite. droidtop emits U+2605 BLACK STAR instead -- same
 behavior, a codepoint platform font fallback actually covers. The
 `ascii` mode is exact.
 
-Deliberately NOT implemented, rather than approximated: `imageType` for
-both carousel and grid (which scraped media type a gamelist item shows
-per game -- `LibraryEntry` carries one already-resolved `artworkUri` and
-no per-type media map, so this is a library-core data-model change, not a
-renderer one, and it is the single largest remaining item in this area);
-the `imageColorEnd`/`imageGradientType`/`imageSelectedColorEnd`/
+Deliberately NOT implemented, rather than approximated: the
+`imageColorEnd`/`imageGradientType`/`imageSelectedColorEnd`/
 `imageSelectedGradientType` gradient color-shifts (a POSITIONAL gradient
 modulated over an image, which a Compose `ColorFilter` cannot express --
 it needs a shader); all four `textHorizontalScroll*` properties on every
@@ -2497,9 +2493,7 @@ before.
 
 Still open after this, in rough order of how much a real theme notices:
 `text`'s `container*` scrolling-container family (which is what long
-scraped game descriptions actually need), `imageType` across
-carousel/grid/image (one library-core data-model change unblocks all
-three), the `textHorizontalScroll*` family shared by carousel, grid and
+scraped game descriptions actually need), the `textHorizontalScroll*` family shared by carousel, grid and
 textlist, `helpsystem`'s dimmed-state and entry-layout properties
 (13/31), and the `rotationOrigin`/`stationary` pair that recurs across
 nearly every element type.
@@ -2563,11 +2557,10 @@ would degrade every downscaled image in every theme. And a `video`
 element's `interpolation` reaches only its static image; ExoPlayer's
 surface exposes no texture-filter knob.
 
-The measurement also re-prioritised what is left. `imageType` is now
+The measurement also re-prioritised what is left. `imageType` was
 confirmed as the single most-used unrendered property in the schema
-(video 10/10, image 8, grid 4, carousel 3) and stays blocked on the same
-one library-core data-model change. `text`'s `container*` family is
-second (8/7/5/3/3). Deliberately still not implemented, with reasons:
+(video 10/10, image 8, grid 4, carousel 3); it is now implemented, see
+below. `text`'s `container*` family is second (8/7/5/3/3). Deliberately still not implemented, with reasons:
 `badges`' `controllerSize`/`controllerPos`/`folderLinkSize`/
 `folderLinkPos` family (8/7/5/4) needs overlay icon art droidtop does not
 have; `helpsystem`'s whole `*Dimmed` family (4/4/2/2/2/2) fires only
@@ -2581,6 +2574,67 @@ reading real ES-DE's source. The video pillarbox/black-frame geometry,
 tiled backgrounds, the fractional rating clip and the clock/systemstatus
 background boxes all want a real screenshot diff against each theme's own
 bundled reference render once the device is available again.
+
+**`imageType` (2026-09-02)**: the most-used unrendered property is now
+implemented, for `video`, `image`, `grid` and `carousel`. It was never a
+rendering problem. `imageType` selects WHICH scraped media a themed
+element shows -- a theme routinely wants the marquee in one element, the
+box art in another, a screenshot in a third -- and a `LibraryEntry`
+carried one already-resolved `artworkUri`, so there was nothing to
+choose between.
+
+What real ES-DE does, read from source rather than inferred:
+`GamelistView::setGameImage` (GamelistView.cpp:1255-1330) walks the
+THEME's own declared order and takes the first type that has a file on
+disk. The order is the theme's, not a fixed preference of ES-DE's:
+`marquee,cover` and `cover,marquee` are different requests. When nothing
+in the list resolves it calls `setImage("")` -- the element shows its own
+`<default>` if it declared one and otherwise shows nothing; it does not
+substitute the box art. One value, `image`, names no folder at all: it is
+`FileData::getImagePath` (FileData.cpp:360-379), itself a chain of
+miximage, then screenshot, then title screen, then cover. `carousel` and
+`grid` are a genuinely different case (CarouselComponent.h:1367-1409,
+GridComponent.h:988-1029): at most TWO entries, real ES-DE truncating the
+rest for performance, no `image` pseudo-type, and `none` meaning "draw
+the game's name as text". Every invalid case -- an unsupported value, a
+duplicate -- clears the whole list rather than dropping one entry.
+
+The data-model change is `LibraryEntry.mediaLocator`: the games root,
+system id and base name, as three strings. Not a resolved per-type media
+map -- resolving ten media types for every entry at scan time would cost
+a library of hundreds of ROMs ten folders times four extensions times two
+candidate media roots of `stat` per game, per scan, to answer a question
+most elements never ask. Constructing a locator touches the filesystem
+zero times and every scan site already had all three strings in hand, so
+**the scan-time cost of this change is nil**. The lookup happens where
+the question is asked -- in an element that declared an `imageType`, for
+the games currently on screen, memoised by the renderer for as long as
+that element is composed. Real ES-DE resolves lazily inside its own
+render window for the same reason, and caps the primary elements at two
+types because of it. Entries with no ES-DE media layout behind them
+(native Android apps, store PC games with remote art) carry no locator
+and keep using `artworkUri` exactly as before.
+
+One deliberate divergence, documented in the code at each site: when the
+theme's declared types resolve to nothing, droidtop falls back to the
+entry's single `artworkUri` before falling back to the element's
+`<default>`. Real ES-DE goes straight to `<default>`. droidtop's own
+scraper writes covers and little else, so a strict port would blank a
+fully scraped library the moment a theme asked for a marquee. `none` is
+exempt from that fallback, because there the theme did not fail to find
+media -- it asked for text. Also fixed on the way past: the media-type
+map was missing `3dbox` -> `3dboxes` and `backcover` -> `backcovers`
+(FileData.cpp:381-391), and the extension walk was missing `webp`
+(FileData.h:161), so real ES-DE WebP output resolved nothing at all.
+
+**Nothing in this pass was checked on a real screen** -- the device
+remained off-limits. Verification is by unit test
+(`EsDeImageTypesTest` for the parse and validation rules,
+`EsDeArtworkImageTypeTest` for the resolution and fallback order, both
+deriving expected values by hand from the C++) and by reading real ES-DE
+source. A screenshot diff against a theme that sets `imageType` on its
+gamelist carousel or grid, on a library with more than one media type
+scraped, is what would confirm the wiring end to end.
 
 **Five-theme on-device review + fixes (2026-08-30, later same day)**:
 the theme downloader ran end-to-end for the first time — three real
