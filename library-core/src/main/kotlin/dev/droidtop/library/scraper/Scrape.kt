@@ -25,7 +25,13 @@ suspend fun scrapeSystemArtwork(
     onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
 ): String = withContext(Dispatchers.IO) {
     val gamesRoot = folder.parentFile ?: folder
-    val romFiles = folder.walkTopDown().filter { it.isFile && it.extension.lowercase() in system.extensions }.toList()
+    // One walk, shared with the library scan -- see RomScanWalk for why
+    // a DLC/update directory is not twelve games.
+    val romScan = dev.droidtop.library.consoles.RomScanWalk.walk(folder, system.extensions)
+    val romFiles = romScan.files
+    romScan.skipped.forEach { (directory, reason) ->
+        android.util.Log.i("droidtop.Scraper", "Not scraping ${directory.name}: $reason")
+    }
     val dao = RomDatabase.get(context).romDao()
     val metadataRows = dao.getGameMetadata(romFiles.map { it.absolutePath })
     val existingMetadataIds = metadataRows.map { it.id }.toSet()
@@ -85,11 +91,21 @@ suspend fun scrapeSystemArtwork(
 
     var found = 0
     var failed = 0
+    var refused = 0
+    var consecutiveRefusals = 0
+    var lastRefusal: ScreenScraperLookup.Refused? = null
+    var attempted = 0
     var hashMatched = 0
     var thumbnailed = 0
     var miximaged = 0
     targets.forEachIndexed { index, romFile ->
+        // A run that the server is refusing outright makes no progress,
+        // and 46 refusals paced ~11s apart cost the user most of a night
+        // to learn nothing. Stop once the refusals are plainly not about
+        // any individual game, and report what the server said.
+        if (consecutiveRefusals >= REFUSAL_ABORT_THRESHOLD) return@forEachIndexed
         onProgress(index, targets.size)
+        attempted++
         try {
             // Real ES-DE automatic mode: hash the file (up to its own
             // 384 MiB default cap) and search WITH the digest — hash
@@ -99,7 +115,7 @@ suspend fun scrapeSystemArtwork(
             val localMd5 = if (screenScraperSystemId != null) {
                 dev.droidtop.library.scraper.RomHash.md5OrNull(romFile)
             } else null
-            val screenScraperResult = screenScraperSystemId?.let {
+            val screenScraperLookup = screenScraperSystemId?.let {
                 ScreenScraperClient.findMetadata(
                     systemeId = it.toString(),
                     romName = romFile.name,
@@ -111,6 +127,18 @@ suspend fun scrapeSystemArtwork(
                     md5 = localMd5.orEmpty(),
                 )
             }
+            // The whole point of ScreenScraperLookup: a refusal is the
+            // server's problem, a NoMatch is a fact about the library,
+            // and only the second one may ever be counted as "no match".
+            when (screenScraperLookup) {
+                is ScreenScraperLookup.Refused -> {
+                    refused++
+                    consecutiveRefusals++
+                    lastRefusal = screenScraperLookup
+                }
+                else -> consecutiveRefusals = 0
+            }
+            val screenScraperResult = (screenScraperLookup as? ScreenScraperLookup.Found)?.game
             val confidence = when {
                 screenScraperResult == null -> null
                 localMd5 != null && screenScraperResult.romMd5 == localMd5 -> {
@@ -249,13 +277,86 @@ suspend fun scrapeSystemArtwork(
             android.util.Log.e("droidtop.Scraper", "Failed to scrape ${romFile.name}", t)
         }
     }
+    formatScrapeSummary(
+        systemName = system.displayName,
+        targeted = targets.size,
+        attempted = attempted,
+        found = found,
+        hashMatched = hashMatched,
+        thumbnailed = thumbnailed,
+        miximaged = miximaged,
+        failed = failed,
+        refused = refused,
+        lastRefusal = lastRefusal,
+    )
+}
+
+/**
+ * How many refusals in a row end the pass. One refusal can be about one
+ * request; several in a row cannot be, and every further request is just
+ * more time spent to be told the same thing.
+ */
+private const val REFUSAL_ABORT_THRESHOLD = 5
+
+/**
+ * The sentence the user actually reads after a scrape, kept pure and out
+ * of [scrapeSystemArtwork] so the counting can be tested directly.
+ *
+ * The rule this enforces, and the reason this function exists at all: a
+ * game is only reported as "no match" when the scraper asked and was told
+ * the database does not have it. Requests the server refused, requests
+ * that threw, and requests never sent because the pass gave up are each
+ * reported as themselves. Before this, all four collapsed into "no
+ * match", and 46 HTTP 403s were shown to the user as 46 games missing
+ * from ScreenScraper -- a claim about their library that was entirely
+ * false.
+ */
+internal fun formatScrapeSummary(
+    systemName: String,
+    targeted: Int,
+    attempted: Int,
+    found: Int,
+    hashMatched: Int,
+    thumbnailed: Int,
+    miximaged: Int,
+    failed: Int,
+    refused: Int,
+    lastRefusal: ScreenScraperLookup.Refused?,
+): String {
+    // A pass that was refused everything it asked for is an outage, not a
+    // result, and reading it as one is the whole bug. Say so first.
+    if (refused > 0 && found == 0 && refused == attempted) {
+        return "$systemName: ScreenScraper refused every request " +
+            describeRefusal(refused, attempted, lastRefusal) +
+            " Nothing was scraped, and this says nothing about whether your games are in the database."
+    }
     // hashMatched is the ES-DE "perfect match" count -- file digest
     // identical to ScreenScraper's own dump digest. The remainder of
     // $found matched by name search only, which is worth the user
     // knowing: right most of the time, verified never.
-    "${system.displayName}: found $found ($hashMatched verified by file hash, " +
-        "$thumbnailed boxarts from libretro thumbnails, $miximaged miximages composed), no match for " +
-        "${targets.size - found - failed}, $failed failed (of ${targets.size} targeted)."
+    val noMatch = attempted - found - failed - refused
+    return buildString {
+        append("$systemName: found $found ($hashMatched verified by file hash, ")
+        append("$thumbnailed boxarts from libretro thumbnails, $miximaged miximages composed), ")
+        append("no match for $noMatch, $failed failed")
+        if (refused > 0) append(", $refused refused by the server")
+        append(" (of $targeted targeted")
+        if (attempted < targeted) append(", $attempted asked for before giving up")
+        append(").")
+        if (refused > 0) append(describeRefusal(refused, attempted, lastRefusal))
+    }
+}
+
+/**
+ * The server's own explanation, surfaced on screen rather than left in
+ * logcat -- it is the only thing that tells a user whether to fix their
+ * credentials, wait for an application approval, or come back tomorrow.
+ */
+private fun describeRefusal(refused: Int, attempted: Int, lastRefusal: ScreenScraperLookup.Refused?): String {
+    if (lastRefusal == null) return ""
+    val reason = lastRefusal.reason
+        ?: "the server sent no explanation with it -- check logcat, tag droidtop.Scraper, for the full request context"
+    return " ($refused of $attempted refused; HTTP ${lastRefusal.httpStatus}: $reason)."
 }
 
 /**

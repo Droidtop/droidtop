@@ -40,6 +40,49 @@ data class ScreenScraperGameMetadata(
 )
 
 /**
+ * The three real, distinct outcomes of one `jeuInfos.php` lookup.
+ *
+ * This type exists because of a specific lie. [ScreenScraperClient.findMetadata]
+ * used to return a nullable [ScreenScraperGameMetadata], so a server that
+ * refused to talk to droidtop at all and a game ScreenScraper has genuinely
+ * never heard of arrived at the caller as the same `null`. On 2026-09-01 an
+ * overnight pass over 46 ROMs across 11 systems got HTTP 403 on all 46
+ * requests, and the user was told "no match for 46, 0 failed" -- a statement
+ * about their library when the truth was a total API outage. A refusal is not
+ * a miss, and the type system is where that has to be settled: every caller
+ * is now forced to handle the two separately.
+ *
+ * A fourth outcome, a transport failure (no route, DNS, timeout, TLS), is
+ * deliberately NOT modelled here. Those still throw out of [ScreenScraperClient.findMetadata],
+ * and the scrape loop already counts thrown exceptions as "failed", which is
+ * a third honest bucket rather than a silent one.
+ */
+sealed interface ScreenScraperLookup {
+
+    /** The server answered, and had this game. */
+    data class Found(val game: ScreenScraperGameMetadata) : ScreenScraperLookup
+
+    /**
+     * The server answered normally (HTTP 200) and its response carried no
+     * `<jeu>`: ScreenScraper really does not have this ROM. This is the only
+     * outcome that says anything at all about the user's library.
+     */
+    data object NoMatch : ScreenScraperLookup
+
+    /**
+     * The server refused the request outright -- credentials rejected,
+     * application not authorised, client version obsolete, quota exhausted,
+     * maintenance. [reason] is ScreenScraper's own explanation, read from the
+     * error body of the non-200 response, credential-redacted and bounded
+     * (see [ScreenScraperClient.summarizeErrorBody]); it is null only when the
+     * server sent no body at all.
+     *
+     * Nothing about a refusal is evidence about the game that was asked for.
+     */
+    data class Refused(val httpStatus: Int, val reason: String?) : ScreenScraperLookup
+}
+
+/**
  * Real ScreenScraper.fr client -- ES-DE's own actual default scraper, and
  * the strongest real match quality for ROMs specifically (checksum-based
  * lookup, not just filename search). Confirmed real API shape via
@@ -71,6 +114,14 @@ data class ScreenScraperGameMetadata(
  * shipped XOR-scrambled in [ScreenScraperDevCredentials] the way ES-DE ships
  * its own. That pair is what lets the client reach the API rather than a
  * quota tier -- the scraping limit is a property of the user's own account.
+ *
+ * **If everything comes back HTTP 403, read [refusalHint] before touching
+ * anything in here.** A whole-library pass on 2026-09-01 was refused 46
+ * times out of 46 with those credentials verified present and correct; the
+ * two candidate causes -- an application pair still awaiting manual
+ * approval, and `softname` needing to match the registered application
+ * name -- are written down there, because only the person who registered
+ * the application can decide between them.
  */
 object ScreenScraperClient {
 
@@ -121,12 +172,18 @@ object ScreenScraperClient {
         region: String = "wor",
         language: String = "en",
         md5: String = "",
-    ): ScreenScraperGameMetadata? {
+    ): ScreenScraperLookup {
         val url = URL(
             "https://www.screenscraper.fr/api2/jeuInfos.php?" +
                 "devid=${URLEncoder.encode(devId, "UTF-8")}" +
                 "&devpassword=${URLEncoder.encode(devPassword, "UTF-8")}" +
-                "&softname=droidtop" +
+                // Deliberately NOT changed while chasing the 2026-09-01
+                // 403s: see this object's own doc comment and
+                // [refusalHint]. ScreenScraper matches softname against
+                // the registered application name, and only the person
+                // who registered the application knows what they
+                // registered it as.
+                "&softname=$SOFTNAME" +
                 "&ssid=${URLEncoder.encode(userId, "UTF-8")}" +
                 "&sspassword=${URLEncoder.encode(userPassword, "UTF-8")}" +
                 "&output=xml" +
@@ -140,18 +197,27 @@ object ScreenScraperClient {
                 (if (md5.isNotBlank()) "&md5=$md5&romtaille=$romSizeBytes" else ""),
         )
         val connection = (url.openConnection() as HttpURLConnection).apply { requestMethod = "GET" }
-        if (connection.responseCode != 200) {
-            // The API refuses outright (no/bad dev credentials, quota,
-            // maintenance). Without this line every refusal used to be
-            // indistinguishable from a genuine no-match -- a real
-            // on-device debugging trap (2026-08-31: an entire pass read
-            // "no match" when the server was rejecting every request).
+        val status = connection.responseCode
+        if (status != 200) {
+            // The API refused outright. Read the server's OWN reason out
+            // of the error body: ScreenScraper answers a non-200 with a
+            // short human-readable explanation (bad developer
+            // credentials, application not authorised, obsolete client
+            // version, quota exceeded), and that sentence is the entire
+            // answer to "why did this fail". It used to be dropped on the
+            // floor, which is what turned the 2026-09-01 outage into an
+            // overnight investigation instead of one log line.
+            val body = readBoundedErrorBody(connection)
+            val reason = summarizeErrorBody(body, listOf(devPassword, userPassword, devId, userId))
             android.util.Log.w(
                 "droidtop.Scraper",
-                "ScreenScraper HTTP ${connection.responseCode} for $romName " +
-                    "(dev credentials ${if (devId.isBlank()) "MISSING" else "present"})",
+                "ScreenScraper refused $romName: HTTP $status" +
+                    (reason?.let { " -- server said: $it" } ?: " (server sent no error body)") +
+                    " [dev credentials ${if (devId.isBlank()) "MISSING" else "present"}," +
+                    " user account ${if (userId.isBlank()) "not set" else "set"}]",
             )
-            return null
+            refusalHint(status)?.let { android.util.Log.w("droidtop.Scraper", it) }
+            return ScreenScraperLookup.Refused(status, reason)
         }
         val xmlText = connection.inputStream.bufferedReader().readText()
         val parsed = parseGameXml(xmlText, region.lowercase(), language.lowercase())
@@ -161,8 +227,93 @@ object ScreenScraperClient {
                 "ScreenScraper: no game in response for $romName: " +
                     xmlText.take(160).replace('\n', ' '),
             )
+            return ScreenScraperLookup.NoMatch
         }
-        return parsed
+        return ScreenScraperLookup.Found(parsed)
+    }
+
+    /** The application name this client identifies itself with (`softname`). See [refusalHint]. */
+    const val SOFTNAME: String = "droidtop"
+
+    /**
+     * How much of a non-200 body is read at all. ScreenScraper's real
+     * refusal bodies are one short sentence; anything longer is either an
+     * HTML error page from an intermediary or something that has no
+     * business being pulled into a phone's memory, so the stream is read
+     * to this bound and then abandoned rather than consumed whole.
+     */
+    private const val ERROR_BODY_MAX_CHARS = 512
+
+    private fun readBoundedErrorBody(connection: HttpURLConnection): String = try {
+        connection.errorStream?.bufferedReader()?.use { reader ->
+            val buffer = CharArray(ERROR_BODY_MAX_CHARS)
+            var filled = 0
+            while (filled < ERROR_BODY_MAX_CHARS) {
+                val read = reader.read(buffer, filled, ERROR_BODY_MAX_CHARS - filled)
+                if (read < 0) break
+                filled += read
+            }
+            String(buffer, 0, filled)
+        }.orEmpty()
+    } catch (t: Throwable) {
+        ""
+    }
+
+    /**
+     * Turns a raw refusal body into one loggable line: every non-blank
+     * credential the request carried blanked out FIRST, then any markup
+     * an intermediary wrapped it in stripped, then collapsed to a single
+     * bounded line. Nothing here can echo a password into logcat, however
+     * the server chooses to phrase its complaint.
+     *
+     * Pure, and split out of [findMetadata] precisely so the refusal path
+     * is testable without a network.
+     */
+    internal fun summarizeErrorBody(raw: String, secrets: List<String>): String? {
+        if (raw.isBlank()) return null
+        var text = raw
+        // Longest first, so a credential that contains another as a
+        // substring still redacts fully.
+        secrets.filter { it.isNotBlank() }.sortedByDescending { it.length }.forEach {
+            text = text.replace(it, "[redacted]")
+        }
+        text = text.replace(Regex("<[^>]*>"), " ").replace(Regex("\\s+"), " ").trim()
+        if (text.isBlank()) return null
+        return if (text.length > 200) text.take(200).trimEnd() + "..." else text
+    }
+
+    /**
+     * The one refusal status worth annotating, annotated only with what
+     * is actually known rather than a guessed status-code table.
+     *
+     * 2026-09-01, on the user's own hardware: 46 of 46 requests across 11
+     * systems came back HTTP 403. droidtop's registered developer
+     * credentials were present and correct (verified in the installed
+     * APK, verified to descramble to clean ASCII) and the personal
+     * ssid/sspassword were configured; requests were paced ~11s apart, so
+     * this was not a rate limit, and 403 is not ScreenScraper's quota
+     * code. Two candidate causes, neither of which this code may decide
+     * on its own:
+     *
+     *  1. A freshly registered ScreenScraper application pair is approved
+     *     by hand and is not necessarily live the moment it is issued.
+     *  2. ScreenScraper expects `softname` to match the *registered
+     *     application name*. This client sends [SOFTNAME]. If the
+     *     application was registered under a different name that is a
+     *     one-word fix -- but only the person who registered it knows
+     *     that name, so it is surfaced here rather than changed
+     *     speculatively.
+     *
+     * The server's own error body (see [summarizeErrorBody]) is the
+     * authority; this hint only tells a reader where to look.
+     */
+    internal fun refusalHint(status: Int): String? = if (status == 403) {
+        "ScreenScraper HTTP 403 with credentials present usually means the registered application " +
+            "is not (yet) authorised: a newly registered devid/devpassword pair is approved manually " +
+            "and may not be live yet, and softname=\"" + SOFTNAME + "\" must match the registered " +
+            "application name. Check both on screenscraper.fr before assuming the credentials are wrong."
+    } else {
+        null
     }
 
     /**
@@ -296,15 +447,4 @@ object ScreenScraperClient {
         }
         return sb.toString().trim()
     }
-
-    /** Convenience wrapper for callers that only need the cover URL. */
-    fun findCoverUrl(
-        systemeId: String,
-        romName: String,
-        romSizeBytes: Long,
-        devId: String = "",
-        devPassword: String = "",
-        userId: String = "",
-        userPassword: String = "",
-    ): String? = findMetadata(systemeId, romName, romSizeBytes, devId, devPassword, userId, userPassword)?.coverUrl
 }
