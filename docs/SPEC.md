@@ -2705,12 +2705,50 @@ did not. `SteamAccess.installRoots()` was a third, uncalled copy of the
 Steam half and is gone; `PcLibrary.knownInstallRoots()` is the one
 mechanism.
 
-Still open, and visible to the user: a store-installed engine game is
-returned by `EngineGameProvider` *and* by `PcGameProvider`, so it appears
-twice, and the two entries route differently — the engine entry to
-enginehost, the `pc` entry straight to `GameExecutableResolver` and then
-Wine, with no engine detection consulted. Deduplicating those two
-providers against each other is the remaining half of this.
+### One entry per game: who owns a store-installed engine game (fixed 2026-09-02)
+
+A store-installed engine game was returned by `EngineGameProvider` *and*
+by `PcGameProvider`, so it appeared twice and the two copies routed
+differently — the engine entry to enginehost, the `pc` entry straight to
+`GameExecutableResolver` and then Wine, with no engine detection
+consulted at all.
+
+**The rule: if engine detection recognises a store game's install
+directory, the engine entry owns that game and the `pc` entry is
+suppressed.** A Ren'Py game runs natively on enginehost; running its
+Windows build under Wine plus CPU translation is strictly worse where
+both exist, and is the route that does not work on this target today
+(§5b). A store game detection does *not* claim is a genuine Windows
+title and keeps its `pc` entry and its Wine route — suppression is
+per-folder, never general.
+
+The rule is decided from the FOLDER, by `GameEngineDetector.engineOwnsInstall`,
+which both providers call. Not from whichever provider returned first:
+the two are never even in the same scan (the handheld shell runs Games
+and Apps as two independent `scanKinds` calls, and `WINE_PROFILE` is an
+Apps kind while every engine kind is a Games kind), so a
+`Library`-level dedup pass would never have seen both. Folder-decided
+also means the same library deduplicates the same way on every scan
+rather than depending on discovery order.
+
+Suppression alone would throw away everything the `pc` entry knew, so
+`PcLibrary` hands engine detection its installs as `StoreInstall`s —
+install directory plus `PcInfo` plus store art — and the surviving
+engine entry absorbs them: source, **store id**, installed state, size,
+install path, community compatibility, and the store cover when the
+folder has no ES-DE artwork of its own. The store id is what lets
+`withScrapedMetadata` also read back a `game_metadata` row scraped
+while the game was still a separate `pc` entry. Identity and routing
+stay the engine entry's: its id (the folder), its title, its kind, and
+a null `systemId` rather than `"pc"`, so it keeps grouping under its
+engine's system.
+
+`GameEngineDetector.detectGame` is the single-folder half of `scan`,
+extracted so the scan loop, `EngineGameProvider.resolveEntry` and the PC
+provider's ownership check all ask the same question of a folder instead
+of three slightly different ones; its nested-folder search is
+name-ordered rather than in `listFiles()` order so a wrapper folder
+resolves identically every scan.
 
 ### Dead weight to remove
 

@@ -179,6 +179,13 @@ class MainActivity : AppCompatActivity() {
                     // resolution as one sitting in a games folder (docs/SPEC.md
                     // section 7g).
                     extraRoots = { dev.droidtop.runtime.windows.PcLibrary.knownInstallRoots() },
+                    // The store's own facts about those installs. Engine
+                    // detection owns a store game whose folder it
+                    // recognises and PcGameProvider stops returning a
+                    // second entry for it (docs/SPEC.md section 7g); this
+                    // is what stops that from also losing the game's
+                    // store, size, compatibility and cover art.
+                    storeInstalls = { dev.droidtop.runtime.windows.PcLibrary.knownInstalls() },
                 ),
                 // Same roots as EngineGameProvider -- a folder can hold
                 // real console ROMs (<root>/<systemId>/<romFile>), engine
