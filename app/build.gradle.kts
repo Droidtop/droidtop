@@ -88,6 +88,20 @@ android {
         }
     }
 
+    packaging {
+        jniLibs {
+            // The vendored gamenative runtime does not just dlopen its
+            // native libraries, it hands their paths to other processes:
+            // BionicProgramLauncherComponent LD_PRELOADs libevshim.so out
+            // of ApplicationInfo.nativeLibraryDir, and that directory is
+            // empty unless the libraries are extracted at install time.
+            // AGP's default (uncompressed, mapped straight out of the
+            // APK) is the better default for a normal app and the wrong
+            // one here -- upstream sets exactly this for the same reason.
+            useLegacyPackaging = true
+        }
+    }
+
     buildFeatures {
         compose = true
     }
