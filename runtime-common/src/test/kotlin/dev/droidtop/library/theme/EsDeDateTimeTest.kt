@@ -45,10 +45,12 @@ class EsDeDateTimeTest {
         assertEquals(82800L, ES_DE_EPOCH_GUARD_SECONDS)
         val justInside = esDeDateTimeDisplay(82_799L, 1_700_000_000L, displayRelative = true, defaultValue = null)
         assertEquals(EsDeDateTimeDisplay.Literal("never"), justInside)
-        // One second later it is a real timestamp: now - 82800 = 100
-        // seconds, so the seconds branch.
+        // One second later it is a real timestamp. The span is then 100
+        // seconds, which Utils::Time::Duration decomposes into 1 minute
+        // and 40 seconds -- so the MINUTES branch, not the seconds one:
+        // the units are a decomposition, never a total (TimeUtil.cpp:73-80).
         val justOutside = esDeDateTimeDisplay(82_800L, 82_900L, displayRelative = true, defaultValue = null)
-        assertEquals(EsDeDateTimeDisplay.Literal("100 seconds ago"), justOutside)
+        assertEquals(EsDeDateTimeDisplay.Literal("1 minute ago"), justOutside)
     }
 
     /** DateTimeComponent.cpp:94-97 -- defaultValue overrides "never" too. */
