@@ -60,6 +60,7 @@ import dev.droidtop.library.GameLaunchStrategy
 import dev.droidtop.library.LaunchStrategyOverridePrefs
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.consoles.PlatformsDatabase
 import dev.droidtop.library.displayName
@@ -736,6 +737,10 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
     var chosenStrategy by remember(entry) { mutableStateOf(LaunchStrategyOverridePrefs.get(context, entry.id)) }
     LaunchedEffect(entry) { strategies = library.availableLaunchStrategies(entry) }
     val isRomEntry = entry.kind == LibraryEntryKind.CONSOLE_ROM
+    // A PC or engine game scrapes too, just from the sources that
+    // actually index PC titles (see PcScraper) -- the same actions, in
+    // the same place, rather than a second scraping UI somewhere else.
+    val isPcGame = entry.isPcOrEngineGame
 
     if (editingMetadata) {
         GameMetadataEditor(
@@ -849,7 +854,7 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
             // Real ConsoleRomProvider-specific concept -- same honest
             // "not applicable" gating Library.toggleFavorite/
             // saveMetadata already use for a non-ROM entry.
-            if (isRomEntry) {
+            if (isRomEntry || isPcGame) {
                 ActionChip("Choose match", highlighted = false, onClick = { pickingMatch = true })
             }
             if (media.size > 1) {
@@ -880,6 +885,21 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
                                         onlyRom = romFile,
                                     )
                                 }
+                                scrapeStatus = null
+                            }
+                        }
+                    },
+                )
+            }
+            if (isPcGame) {
+                ActionChip(
+                    scrapeStatus?.let { "Scraping…" } ?: "Scrape",
+                    highlighted = false,
+                    onClick = {
+                        if (scrapeStatus == null) {
+                            scrapeStatus = "Scraping ${entry.title}…"
+                            detailScope.launch {
+                                scrapeResult = dev.droidtop.library.scraper.PcScraper.scrape(context, listOf(entry))
                                 scrapeStatus = null
                             }
                         }

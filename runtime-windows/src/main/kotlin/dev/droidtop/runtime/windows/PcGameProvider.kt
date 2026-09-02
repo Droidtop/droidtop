@@ -10,6 +10,7 @@ import dev.droidtop.library.PcInfo
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
+import dev.droidtop.library.withScrapedMetadata
 import dev.droidtop.runtime.PrimaryContainerSession
 import java.io.File
 
@@ -79,7 +80,14 @@ class PcGameProvider(
             .filterNot { shortcut -> installDirs.any { shortcut.path.startsWith(it) } }
             .map { it.toLibraryEntry() }
 
-        return storeEntries + shortcutEntries
+        // The same scraped-metadata merge every other provider applies
+        // (see withScrapedMetadata): a PC game's scraped description and
+        // cover live in a game_metadata row keyed by this entry's id,
+        // and nothing else can carry them back here -- a store row's id
+        // is a store id, not a file under a games root, so there is no
+        // downloaded_media lookup to fall back on.
+        return (storeEntries + shortcutEntries)
+            .withScrapedMetadata(dev.droidtop.library.consoles.RomDatabase.get(context).romDao())
     }
 
     private fun PcLibrary.Game.toLibraryEntry(): LibraryEntry = LibraryEntry(
