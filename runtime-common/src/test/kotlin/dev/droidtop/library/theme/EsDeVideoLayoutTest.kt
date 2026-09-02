@@ -147,4 +147,110 @@ class EsDeVideoLayoutTest {
         assertEquals(400f, frame.frameWidth, 0.001f)
         assertEquals(300f, frame.frameHeight, 0.001f)
     }
+
+    /**
+     * VideoComponent.cpp:161-166 -- `imageMaxSize` sizes the STATIC image
+     * and nothing else. 0.5 x 0.25 of a 1000x800 view is 500 x 200, and
+     * the verb is FIT because that is what `setImageMaxSize` means.
+     */
+    @Test
+    fun `imageMaxSize sizes the static image independently of the video`() {
+        val area = esDeVideoStaticImageArea(
+            imageSize = null,
+            imageMaxSize = EsDeThemeValue.Pair(0.5f, 0.25f),
+            imageCropSize = null,
+            videoSize = null,
+            videoMaxSize = EsDeThemeValue.Pair(0.9f, 0.9f),
+            videoCropSize = null,
+            areaWidth = 1000f,
+            areaHeight = 800f,
+        )
+        assertEquals(500f, area.width, 0.001f)
+        assertEquals(200f, area.height, 0.001f)
+        assertEquals(EsDeImageFit.FIT, area.fit)
+    }
+
+    /**
+     * VideoComponent.cpp:144-177 -- the image group is if/else-if, so
+     * `imageSize` wins outright over `imageMaxSize` and brings the
+     * STRETCH verb with it.
+     */
+    @Test
+    fun `imageSize takes precedence over imageMaxSize and stretches`() {
+        val area = esDeVideoStaticImageArea(
+            imageSize = EsDeThemeValue.Pair(0.4f, 0.4f),
+            imageMaxSize = EsDeThemeValue.Pair(0.9f, 0.9f),
+            imageCropSize = EsDeThemeValue.Pair(0.8f, 0.8f),
+            videoSize = null, videoMaxSize = null, videoCropSize = null,
+            areaWidth = 1000f, areaHeight = 1000f,
+        )
+        assertEquals(400f, area.width, 0.001f)
+        assertEquals(400f, area.height, 0.001f)
+        assertEquals(EsDeImageFit.STRETCH, area.fit)
+    }
+
+    /**
+     * VideoFFmpegComponent.cpp:66-98 -- with nothing in the image group,
+     * the static image inherits the video's box AND its verb, which is why
+     * a `cropSize`-only video crops its poster too.
+     */
+    @Test
+    fun `the static image inherits the video box when it declares none`() {
+        val cropped = esDeVideoStaticImageArea(
+            imageSize = null, imageMaxSize = null, imageCropSize = null,
+            videoSize = null, videoMaxSize = null,
+            videoCropSize = EsDeThemeValue.Pair(0.3f, 0.6f),
+            areaWidth = 1000f, areaHeight = 500f,
+        )
+        assertEquals(300f, cropped.width, 0.001f)
+        assertEquals(300f, cropped.height, 0.001f)
+        assertEquals(EsDeImageFit.CROP, cropped.fit)
+
+        val stretched = esDeVideoStaticImageArea(
+            imageSize = null, imageMaxSize = null, imageCropSize = null,
+            videoSize = EsDeThemeValue.Pair(0.5f, 0.5f),
+            videoMaxSize = EsDeThemeValue.Pair(0.9f, 0.9f),
+            videoCropSize = null,
+            areaWidth = 1000f, areaHeight = 1000f,
+        )
+        assertEquals(EsDeImageFit.STRETCH, stretched.fit)
+        assertEquals(500f, stretched.width, 0.001f)
+    }
+
+    /**
+     * VideoComponent.cpp:147-165 -- the clamps. A `size` axis of exactly
+     * zero is left alone (it means "derive from the other axis"), a
+     * fully-zero `imageSize` is corrected to 0.01, and a `maxSize` axis is
+     * clamped unconditionally to 0.01..2.0.
+     */
+    @Test
+    fun `real clamps are applied per axis`() {
+        val zeroed = esDeVideoStaticImageArea(
+            imageSize = EsDeThemeValue.Pair(0f, 0f),
+            imageMaxSize = null, imageCropSize = null,
+            videoSize = null, videoMaxSize = null, videoCropSize = null,
+            areaWidth = 1000f, areaHeight = 1000f,
+        )
+        assertEquals(10f, zeroed.width, 0.001f)
+        assertEquals(10f, zeroed.height, 0.001f)
+
+        val oneAxis = esDeVideoStaticImageArea(
+            imageSize = EsDeThemeValue.Pair(0.5f, 0f),
+            imageMaxSize = null, imageCropSize = null,
+            videoSize = null, videoMaxSize = null, videoCropSize = null,
+            areaWidth = 1000f, areaHeight = 1000f,
+        )
+        assertEquals(500f, oneAxis.width, 0.001f)
+        assertEquals(0f, oneAxis.height, 0.001f)
+
+        val overMax = esDeVideoStaticImageArea(
+            imageSize = null,
+            imageMaxSize = EsDeThemeValue.Pair(5f, 0.001f),
+            imageCropSize = null,
+            videoSize = null, videoMaxSize = null, videoCropSize = null,
+            areaWidth = 1000f, areaHeight = 1000f,
+        )
+        assertEquals(2000f, overMax.width, 0.001f)
+        assertEquals(10f, overMax.height, 0.001f)
+    }
 }
