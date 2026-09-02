@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * The user-populatable widgets/info surface for the display the Handheld
@@ -153,7 +154,7 @@ class CompanionActivity : AppCompatActivity() {
 
 /** Persisted companion widget layout — same shared-prefs convention as every other settings concern. */
 object CompanionWidgetPrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_WIDGET_IDS = "droidtop_companion_widget_ids"
 
     fun widgetIds(context: android.content.Context): List<Int> =

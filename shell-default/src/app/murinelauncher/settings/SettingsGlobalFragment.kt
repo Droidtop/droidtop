@@ -18,6 +18,7 @@ import dev.droidtop.shell.standard.HomeRolePrefs
 import dev.droidtop.shell.standard.ModePrefs
 import org.json.JSONObject
 import java.io.BufferedReader
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * Real droidtop-wide preferences: config that affects the whole app, or is
@@ -56,7 +57,7 @@ public final class SettingsGlobalFragment : AbstractSettingsFragment() {
         // separate, larger state a plain JSON file can't safely round-trip
         // (folder grants in particular need re-consent, not a silent
         // restore) -- a real, deferred gap, not silently pretended away.
-        private const val PREFS_NAME = "com.android.launcher3.prefs"
+        private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     }
 
     // Real ActivityResultLaunchers, registered as class-level properties

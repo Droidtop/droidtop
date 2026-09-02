@@ -1,6 +1,7 @@
 package dev.droidtop.library
 
 import android.content.Context
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * Explicit folder-to-engine assignment, overriding rule-based detection
@@ -13,7 +14,7 @@ import android.content.Context
  * versions.
  */
 object EngineOverridePrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_PREFIX = "droidtop_engine_override_"
 
     fun get(context: Context, folderPath: String): String? =

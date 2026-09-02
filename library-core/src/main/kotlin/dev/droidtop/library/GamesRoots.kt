@@ -2,10 +2,11 @@ package dev.droidtop.library
 
 import android.content.Context
 import java.io.File
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * Real, current ROM/game root folders -- reads the same
- * "com.android.launcher3.prefs" SharedPreferences key `:app`'s own
+ * LAUNCHER_PREFS_FILE_NAME SharedPreferences key `:app`'s own
  * `GamesRootPrefs` (dev.droidtop.app.OnboardingPrefs) writes, by literal
  * name rather than a compile-time dependency -- :library-core can't
  * depend on :app (:app depends on it), same established pattern
@@ -20,7 +21,7 @@ import java.io.File
  * until the whole app restarted.
  */
 object GamesRoots {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_GAMES_ROOT_PATHS = "droidtop_games_root_paths"
 
     /** Same real fallback MainActivity's own onCreate used to apply itself: an app-private default for a fresh install that hasn't been through onboarding (or has zero roots configured) yet. */

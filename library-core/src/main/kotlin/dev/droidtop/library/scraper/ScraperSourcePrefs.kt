@@ -1,6 +1,7 @@
 package dev.droidtop.library.scraper
 
 import android.content.Context
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 enum class ScraperSource { SCREENSCRAPER, THEGAMESDB, LIBRETRO }
 
@@ -20,7 +21,7 @@ enum class ScraperSource { SCREENSCRAPER, THEGAMESDB, LIBRETRO }
  * the scraper to 'screenscraper' in this case").
  */
 object ScraperSourcePrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_SOURCE = "droidtop_rom_scraper_source"
 
     fun get(context: Context): ScraperSource {
