@@ -20,6 +20,14 @@
          it transitively. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- In-app self-update (see app/.../update/AppSelfUpdate.kt): opening a
+         PackageInstaller session for droidtop's own APK needs the
+         install-unknown-apps grant; the second permission lets Android 12+
+         skip the confirmation dialog only when the system itself judges
+         droidtop eligible (its own installer of record). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+
     <!-- Real wifi/cellular connectivity check for Handheld's own
          systemstatus theme element (EsDeThemeRenderer.kt). -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -218,5 +226,10 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+        <!-- PackageInstaller reports the self-update verdict here. -->
+        <receiver
+            android:name="dev.droidtop.app.update.AppUpdateStatusReceiver"
+            android:exported="false" />
+
     </application>
 </manifest>

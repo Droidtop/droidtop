@@ -43,7 +43,11 @@ android {
         applicationId = "dev.droidtop.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
+        // The CI run number (VERSION_REVISION): a plain monotonic integer,
+        // so Android itself refuses downgrades and AppSelfUpdate can answer
+        // "is this newer" numerically against the published release-info.
+        // Local builds without the env var stay at 1.
+        versionCode = versionRevision.toIntOrNull()?.coerceAtLeast(1) ?: 1
         versionName = "0.1.0-dev-$versionRevision"
         // arm64-v8a (real hardware, e.g. Retroid Pocket 5) + x86_64
         // (emulators/x86 devices), matching host-bridge/runtime-remote-
