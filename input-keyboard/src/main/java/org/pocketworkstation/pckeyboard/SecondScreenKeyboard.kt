@@ -3,6 +3,7 @@ package org.pocketworkstation.pckeyboard
 import android.content.Context
 import android.view.LayoutInflater
 import android.view.KeyEvent
+import android.view.inputmethod.InputConnection
 
 /**
  * droidtop's persistent second-screen keyboard (docs/SPEC.md sections 4,
@@ -106,13 +107,26 @@ object SecondScreenKeyboard {
     }
 
     /**
-     * Whether the Android route currently has anywhere to type. Both halves
-     * are real preconditions: an IME that is installed but not selected is
-     * never bound, and a bound IME with no focused editor has a null
-     * `InputConnection`.
+     * Whether droidtop's own IME is running at all -- which it only is
+     * when the user has selected it, because an unselected input method is
+     * never bound.
+     *
+     * Exposed here rather than by widening `LatinIME.sInstance`, which is
+     * package-private in the forked upstream source and should stay that
+     * way: `:app` needs the answer, not the field.
      */
-    fun androidTargetAvailable(): Boolean =
-        LatinIME.sInstance?.currentInputConnection != null
+    val imeRunning: Boolean get() = LatinIME.sInstance != null
+
+    /**
+     * Where the Android route types, or null when there is nowhere. Both
+     * ways of being null are real preconditions: an IME that is installed
+     * but not selected is never bound, and a bound IME with no focused
+     * editor has no `InputConnection`.
+     */
+    val androidTarget: InputConnection? get() = LatinIME.sInstance?.currentInputConnection
+
+    /** Whether the Android route currently has anywhere to type. */
+    fun androidTargetAvailable(): Boolean = androidTarget != null
 
     /**
      * A real [LatinKeyboardView], inflated from the fork's own themed
