@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TransformOrigin
@@ -203,7 +204,8 @@ fun EsDeSystemListView(
  * gradient applied as a color shift over an image, which a Compose
  * `ColorFilter` cannot express -- it needs a shader), `textRelativeScale`/
  * `textBackgroundCornerRadius`, and the four `textHorizontalScroll*`
- * properties.
+ * properties. `imageInterpolation` IS now honored (see
+ * esDeFilterQuality).
  */
 @Composable
 private fun EsDeCarousel(
@@ -224,6 +226,13 @@ private fun EsDeCarousel(
     val textSelectedColor = element?.valueOrNull<EsDeThemeValue.Color>("textSelectedColor")?.let { colorOf(it) } ?: textColor
     val textSelectedBackgroundColor = element?.valueOrNull<EsDeThemeValue.Color>("textSelectedBackgroundColor")?.let { colorOf(it) } ?: textBackgroundColor
     val letterCase = esDeLetterCaseOf(element?.valueOrNull<EsDeThemeValue.Str>("letterCase")?.value)
+    // Real `imageInterpolation` (CarouselComponent.h's own applyTheme,
+    // the same two "nearest"/"linear" literals as every other element's
+    // `interpolation`) -- see esDeFilterQuality for the one honest
+    // divergence from real ES-DE's magnify-only filter flag. Four of the
+    // ten themes measured for this pass set it on their carousel, all of
+    // them to keep pixel-art system logos crisp.
+    val imageFilterQuality = element?.let { esDeFilterQuality(it, "imageInterpolation") } ?: FilterQuality.Low
     // Real carousel-wide background bar (CarouselComponent::render's own
     // single drawRect call, behind every item) -- real default 0xFFFFFFD8
     // (translucent white), confirmed against the real constructor default.
@@ -382,6 +391,7 @@ private fun EsDeCarousel(
                     imageBrightness = config.imageBrightness,
                     dimming = placement.dimming,
                     imageContentScale = imageFit,
+                    imageFilterQuality = imageFilterQuality,
                     modifier = Modifier
                         .placeCarouselItem(placement, itemWidth, itemHeight)
                         // Applied OUTSIDE the mirror below, deliberately:
@@ -423,6 +433,7 @@ private fun EsDeCarousel(
                 imageBrightness = config.imageBrightness,
                 dimming = placement.dimming,
                 imageContentScale = imageFit,
+                imageFilterQuality = imageFilterQuality,
                 modifier = Modifier
                     .placeCarouselItem(placement, itemWidth, itemHeight)
                     .graphicsLayer { alpha = placement.opacity },
@@ -512,6 +523,7 @@ private fun EsDeCarouselItem(
     imageBrightness: Float,
     dimming: Float,
     imageContentScale: ContentScale,
+    imageFilterQuality: FilterQuality,
     modifier: Modifier,
 ) {
     // No focusable()/onKeyEvent here: the carousel CONTAINER owns focus
@@ -528,6 +540,7 @@ private fun EsDeCarouselItem(
             model = item.logoPath,
             contentDescription = null,
             contentScale = imageContentScale,
+            filterQuality = imageFilterQuality,
             colorFilter = esDeImageColorFilter(shift, imageSaturation, imageBrightness, dimming),
             modifier = baseModifier,
         )
@@ -559,7 +572,7 @@ private fun EsDeCarouselItem(
  * REPLACED rather than modulated an image's color, and an
  * "unfocusedItemSaturation lowers alpha by 15%" alpha hack.
  */
-private fun esDeImageColorFilter(
+internal fun esDeImageColorFilter(
     shift: Color?,
     saturation: Float,
     brightness: Float,
@@ -887,7 +900,7 @@ private fun EsDeTextListRow(
  * "LibraryEntry carries one already-resolved artwork" blocker as the
  * carousel), the `imageColorEnd`/`imageGradientType`/
  * `imageSelectedColorEnd`/`imageSelectedGradientType` positional
- * gradients, `imageCropPos`/`imageInterpolation`,
+ * gradients, `imageCropPos`,
  * `textBackgroundCornerRadius`, the four `textHorizontalScroll*`
  * properties, and `fadeAbovePrimary`. Real ES-DE's own easing between
  * scroll rows and between item scales is not ported either -- the
@@ -906,6 +919,9 @@ private fun EsDeGrid(
     val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
     val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * screenHeight.value).dp.toSp() }
     val tileFontFamily = themeFontFamily(element)
+    // Real `imageInterpolation` -- same real property, same two literals
+    // as the carousel's; see esDeFilterQuality.
+    val imageFilterQuality = esDeFilterQuality(element, "imageInterpolation") ?: FilterQuality.Low
     val imageFit = when (element.valueOrNull<EsDeThemeValue.Str>("imageFit")?.value) {
         "fill" -> ContentScale.FillBounds
         "cover" -> ContentScale.Crop
@@ -987,6 +1003,7 @@ private fun EsDeGrid(
                     fontSize = fontSizeSp,
                     fontFamily = tileFontFamily,
                     imageContentScale = imageFit,
+                    imageFilterQuality = imageFilterQuality,
                     onSelect = {
                         cursor = index
                         item.onSelect()
@@ -1012,6 +1029,7 @@ private fun EsDeGridEntry(
     index: Int,
     scrollOffset: Float,
     selected: Boolean,
+    imageFilterQuality: FilterQuality,
     fontSize: androidx.compose.ui.unit.TextUnit,
     fontFamily: androidx.compose.ui.text.font.FontFamily?,
     imageContentScale: ContentScale,
@@ -1087,6 +1105,7 @@ private fun EsDeGridEntry(
             model = item.logoPath,
             contentDescription = null,
             contentScale = imageContentScale,
+            filterQuality = imageFilterQuality,
             colorFilter = esDeImageColorFilter(
                 (if (selected) config.imageSelectedColor else config.imageColor)?.let { colorOfPacked(it) },
                 saturation,
