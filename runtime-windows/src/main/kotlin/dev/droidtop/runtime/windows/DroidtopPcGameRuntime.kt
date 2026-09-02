@@ -73,10 +73,28 @@ class DroidtopPcGameRuntime(
             .getOrElse { return@withContext PcProvisionResult(false, it.message ?: "couldn't open container storage") }
 
         val existing = manager.containers.firstOrNull()
+
+        // What this device's Wine environment should be, stated before
+        // any of it exists. A container object is the only way gamenative
+        // expresses that -- its installer and its launch dependencies
+        // both read the wine version and the variant off one -- so an
+        // unsaved instance carries the answer through the steps that run
+        // before there is anything on disk to save.
+        //
+        // Those two fields are deliberately not left to the defaults.
+        // `Container.DEFAULT_VARIANT` reads `DefaultVersion.VARIANT`,
+        // which is `glibc` at class-load time and only becomes bionic
+        // once gamenative's own startup code has mutated the static -- so
+        // an environment built from the defaults would provision the
+        // glibc rootfs, whose execution model is proot, which does not
+        // exist on arm64 (docs/SPEC.md 5b).
+        val wanted = existing ?: Container(CONTAINER_ID).apply {
+            containerVariant = Container.BIONIC
+            wineVersion = WINE_VERSION
+        }
         // A container made before droidtop asked for bionic by name is a
-        // glibc one, and glibc means proot, which does not exist on
-        // arm64. Repointing it is the repair; deleting the user's prefix
-        // and starting again is not.
+        // glibc one. Repointing it is the repair; deleting the user's
+        // prefix and starting again is not.
         if (existing != null && existing.containerVariant != Container.BIONIC) {
             onStatus("Switching the Windows environment to the no-root runtime…")
             existing.containerVariant = Container.BIONIC
@@ -84,45 +102,24 @@ class DroidtopPcGameRuntime(
             runCatching { existing.saveData() }
         }
 
-        onStatus("Creating the Windows environment…")
-        // A minimal config on purpose. Container fills in every field it
-        // owns and loadData only reads keys that are present, so the
-        // defaults apply for everything not named here -- which is why
-        // upstream's 1400-line Steam-coupled ContainerUtils
-        // (deliberately not forked) is not needed to create one.
+        // Wine first, and the order is not arbitrary. Creating a
+        // container copies Wine's own DLLs out of the installed build
+        // into the new prefix (ContainerManager.extractCommonDlls), so a
+        // container created before Wine exists dies on a null directory
+        // listing -- confirmed on hardware, where it surfaced as "Setup
+        // failed: Attempt to get length of null array". Upstream never
+        // hits it because its system files are installed at startup and
+        // its containers are created later; droidtop does both here, so
+        // it has to do them in that order.
         //
-        // The two keys that are NOT left to the defaults are the two the
-        // no-root path depends on. `Container.DEFAULT_VARIANT` reads
-        // `DefaultVersion.VARIANT`, which is `glibc` at class-load time
-        // and only becomes bionic once gamenative's own startup code has
-        // mutated the static -- so a container created from the defaults
-        // here would provision the glibc rootfs, whose execution model is
-        // proot, which does not exist on arm64 (5b). droidtop asks for
-        // bionic by name instead of relying on that mutation order.
-        val data = JSONObject().apply {
-            put("name", CONTAINER_NAME)
-            put("containerVariant", Container.BIONIC)
-            put("wineVersion", WINE_VERSION)
-            put("drives", drivesFor(gamesRoots))
-        }
-        val container = existing ?: runCatching { manager.createContainer(CONTAINER_ID, data) }
-            .getOrElse { return@withContext PcProvisionResult(false, it.message ?: "container creation threw") }
-            ?: return@withContext PcProvisionResult(
-                false,
-                "couldn't create the container (the Wine base files may have failed to download)",
-            )
-
-        // Wine itself, before the rootfs: the installer symlinks
-        // `opt/<wineVersion>` into the shared Proton store and skips that
-        // symlink entirely when the store is still empty, so the download
-        // has to have happened first. This is gamenative's own launch
-        // dependency set (BionicDefaultProtonDependency and friends),
-        // used rather than reimplemented -- it is what knows which
-        // archive a given wine version needs and where it unpacks to.
+        // This is gamenative's own launch dependency set
+        // (BionicDefaultProtonDependency and friends), used rather than
+        // reimplemented: it is what knows which archive a given wine
+        // version needs and where it unpacks to.
         val dependencies = runCatching {
             LaunchDependencies().ensureLaunchDependencies(
                 context = context,
-                container = container,
+                container = wanted,
                 gameSource = GameSource.CUSTOM_GAME,
                 gameId = 0,
                 setLoadingMessage = { message -> onStatus(message) },
@@ -148,9 +145,9 @@ class DroidtopPcGameRuntime(
         val imageFs = ImageFs.find(context)
         val needsImage = !imageFs.isValid ||
             imageFs.version < ImageFsInstaller.LATEST_VERSION ||
-            imageFs.variant != container.containerVariant
+            imageFs.variant != wanted.containerVariant
         if (needsImage) {
-            val archiveName = if (container.containerVariant == Container.GLIBC) {
+            val archiveName = if (wanted.containerVariant == Container.GLIBC) {
                 "imagefs_gamenative.txz"
             } else {
                 "imagefs_bionic.txz"
@@ -178,11 +175,14 @@ class DroidtopPcGameRuntime(
             }
         }
 
-        // installIfNeededFuture reads the wine version and variant off the
-        // container, so one has to exist already.
+        // installIfNeededFuture reads the wine version and variant off
+        // the container it is handed, which is why it takes the wanted
+        // one rather than a created one. It also links opt/<wineVersion>
+        // into the shared Proton store and skips that link when the store
+        // is still empty, so it has to run after the step above.
         onStatus("Installing Windows system files…")
         val installed = runCatching {
-            ImageFsInstaller.installIfNeededFuture(context, context.assets, container) { percent ->
+            ImageFsInstaller.installIfNeededFuture(context, context.assets, wanted) { percent ->
                 onStatus("Installing Windows system files… $percent%")
             }.get()
         }.getOrElse { return@withContext PcProvisionResult(false, it.message ?: "system file install threw") }
@@ -190,6 +190,45 @@ class DroidtopPcGameRuntime(
         if (installed != true) {
             return@withContext PcProvisionResult(false, "the Windows system files failed to install")
         }
+
+        // Only now: the prefix is stamped out of the Wine build that is
+        // by this point actually on disk.
+        onStatus("Creating the Windows environment…")
+        // A minimal config on purpose. Container fills in every field it
+        // owns and loadData only reads keys that are present, so the
+        // defaults apply for everything not named here -- which is why
+        // upstream's 1400-line Steam-coupled ContainerUtils (deliberately
+        // not forked) is not needed to create one.
+        // A previous attempt that died part-way leaves the directory
+        // behind, and createContainer refuses to touch one that already
+        // exists (its mkdirs returns false, and it returns null), so
+        // without this a single failure would make every retry fail too.
+        // Nothing in it is the user's: no container is registered, so
+        // nothing has ever been launched in it.
+        if (existing == null) {
+            val halfMade = File(imageFs.rootDir, "home/${ImageFs.USER}-$CONTAINER_ID")
+            if (halfMade.isDirectory) {
+                onStatus("Clearing an unfinished setup…")
+                halfMade.deleteRecursively()
+            }
+        }
+
+        val container = existing ?: runCatching {
+            manager.createContainer(
+                CONTAINER_ID,
+                JSONObject().apply {
+                    put("name", CONTAINER_NAME)
+                    put("containerVariant", Container.BIONIC)
+                    put("wineVersion", WINE_VERSION)
+                    put("drives", drivesFor(gamesRoots))
+                },
+            )
+        }
+            .getOrElse { return@withContext PcProvisionResult(false, it.message ?: "container creation threw") }
+            ?: return@withContext PcProvisionResult(
+                false,
+                "couldn't create the Wine prefix (the container pattern may have failed to download)",
+            )
 
         // Last: this points the environment's own "xuser" home at this
         // container, and anything reading container-relative paths

@@ -150,18 +150,6 @@ object AppSettingsCatalogs {
                         subtitle = "Engine-game runtimes, like an emulator's core list; its own settings and save storage",
                         registryId = SCREEN_ENGINEHOST,
                     ),
-                    // The Windows-games screen was registered but nothing
-                    // linked to it, so the one place that sets Wine up was
-                    // unreachable -- while every "isn't set up yet" message
-                    // in the launch path tells the user to go there. It
-                    // belongs beside Enginehost: both answer "what runs a
-                    // game that is not a ROM".
-                    NestedScreenItem(
-                        id = "console_systems_windows",
-                        title = "Windows games",
-                        subtitle = "The Wine environment Windows games run inside, and the folders it can reach",
-                        registryId = SCREEN_WINDOWS_GAMES,
-                    ),
                     AsyncActionItem(
                         id = "console_systems_orphans_find",
                         title = "Find orphaned media",
