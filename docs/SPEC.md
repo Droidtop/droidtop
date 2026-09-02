@@ -832,8 +832,11 @@ What "the addon is the better screen" concretely means in each mode:
   upper/main screen — and the built-in screen becomes the
   widgets/ambient-info surface (FocusCompanion/PresencePanel tenants,
   §7e), the inverse of a phone-style "companion on the accessory"
-  model. Desktop mode is exempt: it deliberately keeps the lower screen
-  as its input surface (keyboard/trackpad, above). Additionally,
+  model. Desktop mode relocates the same way as of 2026-09-02 (its
+  output renders on the addon/external panel, the built-in panel keeps
+  the input surface role — §4c, external screen priority); it stays
+  exempt only from per-launch GAME display targeting, since its windows
+  are the compositor's job. Additionally,
   **launch-display targeting is a launcher-wide capability**: every
   launch (console ROM players via `ActivityOptions.setLaunchDisplayId`,
   engine/native/Wine launches alike) targets a configured display,

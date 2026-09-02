@@ -10,8 +10,11 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * as every other settings concern, written by :shell-default's settings
  * rows and read here.
  *
- * Desktop mode deliberately ignores all of this: its lower screen is an
- * input surface (§4), not a shell/widgets target.
+ * Desktop mode honors [shellTarget] like Handheld does (the desktop
+ * renders on the addon/external panel by default, and the built-in panel
+ * becomes its input surface — docs/SPEC.md §4c, external screen
+ * priority) but deliberately ignores [gameLaunchTarget]: its windows are
+ * the compositor's job (§4), not per-launch display targets.
  */
 object DisplayRolePrefs {
     private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
