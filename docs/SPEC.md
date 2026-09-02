@@ -1234,9 +1234,10 @@ express "run this command in this environment"; what is not adequate is
 the assumption at the call site that the environment IS a droidspaces
 primary container.
 
-Remaining work, in order: package the vendored `jniLibs` so the native
-payload exists; give the Wine launch a backend-neutral entry point with
-no `PrimaryContainerSession` requirement; then prove provisioning and one
+Packaging the vendored `jniLibs` (both `src/main` and `src/modern`, the
+same split upstream applies to its Java sources) is done. Remaining, in
+order: give the Wine launch a backend-neutral entry point with no
+`PrimaryContainerSession` requirement; then prove provisioning and one
 launch on hardware before porting anything further.
 
 ## 6. Input
