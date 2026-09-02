@@ -312,7 +312,7 @@ object GameLaunchStrategyResolver {
         // contents. Unrelated to Kirikiroid2 above, a real independent
         // third-party interpreter rather than an official Linux build of
         // the engine.
-        if (engine != GameEngine.KIRIKIRI && hasLinuxLibraryBuild(folder)) strategies += GameLaunchStrategy.LINUX_CONTAINER
+        if (engine != GameEngine.KIRIKIRI && hasLinuxBuild(folder)) strategies += GameLaunchStrategy.LINUX_CONTAINER
         if (preferredOrder == null) return strategies
         // Reorder by the database's declared priority; anything available
         // but undeclared keeps its place after the declared ones.
@@ -322,9 +322,29 @@ object GameLaunchStrategyResolver {
     private fun hasWindowsExecutable(folder: File): Boolean =
         folder.listFiles()?.any { it.isFile && it.extension.lowercase() == "exe" } == true
 
-    /** Ren'Py's own `lib/<prefix>linux-<arch>` convention (the same folder-naming rule the user's Pythia project inspects) is the one real, checkable Linux-build signal available here — not assumed present just because the engine generally supports it. */
-    private fun hasLinuxLibraryBuild(folder: File): Boolean =
-        File(folder, "lib").listFiles()?.any { it.isDirectory && it.name.contains("linux") } == true
+    /**
+     * Real, checkable evidence that this folder contains a native Linux
+     * build -- never assumed present just because an engine generally
+     * supports Linux. Two independent shapes, both engine-agnostic:
+     *
+     * - `lib/<prefix>linux-<arch>/` -- Ren'Py's own interpreter layout
+     *   (the same folder-naming rule the user's Pythia project inspects).
+     *   This was the only shape checked before, which silently excluded
+     *   every build that ships a bare ELF and no `lib/` at all.
+     * - A `<GameName>.x86_64` / `<GameName>.x86` file in the root -- the
+     *   conventional extension for a Linux ELF launcher. This is the
+     *   same file [GameExecutableResolver.linuxExecutable] then has to
+     *   run, so the two stay in step: offering LINUX_CONTAINER for a
+     *   folder whose launcher the resolver cannot name would just move
+     *   the failure later.
+     */
+    private fun hasLinuxBuild(folder: File): Boolean {
+        val entries = folder.listFiles() ?: return false
+        if (entries.any { it.isFile && it.extension.lowercase() in LINUX_LAUNCHER_EXTENSIONS }) return true
+        return File(folder, "lib").listFiles()?.any { it.isDirectory && it.name.contains("linux") } == true
+    }
+
+    private val LINUX_LAUNCHER_EXTENSIONS = setOf("x86_64", "x86")
 }
 
 private fun GameEngine.toLibraryEntryKind(): LibraryEntryKind = when (this) {
