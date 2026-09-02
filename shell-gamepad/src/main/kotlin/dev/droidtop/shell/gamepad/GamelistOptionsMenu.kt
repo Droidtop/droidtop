@@ -142,6 +142,13 @@ internal fun GamelistOptionsMenu(
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
     var filter by remember { mutableStateOf(GamelistFilterPrefs.get(context, groupKey)) }
+    // Per-system launch-screen default (docs/SPEC.md section 4c: "Select
+    // which display to open ROMs from this tab" / "Tune individual
+    // platforms"). A per-game choice still wins over this; cycling back
+    // to "Ask" clears it.
+    var systemLaunchScreen by remember {
+        mutableStateOf(systemId?.let { dev.droidtop.library.LaunchScreenMemory.systemChoice(context, it) })
+    }
     // The letter list replaces the action list in place: a menu that
     // pushes a second dialog on a handheld is a menu you get lost in.
     var pickingLetter by remember { mutableStateOf(false) }
@@ -166,6 +173,7 @@ internal fun GamelistOptionsMenu(
                 add("Random game")
             }
             if (systemId != null) {
+                add("Launch screen: " + (systemLaunchScreen?.label ?: "Ask"))
                 add("Scrape this system")
                 add("Import gamelist.xml")
             }
@@ -263,6 +271,15 @@ internal fun GamelistOptionsMenu(
             "Show: ${filter.label}" -> {
                 filter = GamelistFilterPrefs.cycle(context, groupKey)
                 onSortChanged()
+            }
+            "Launch screen: " + (systemLaunchScreen?.label ?: "Ask") -> {
+                val next = when (systemLaunchScreen) {
+                    null -> dev.droidtop.library.LaunchScreen.BUILT_IN
+                    dev.droidtop.library.LaunchScreen.BUILT_IN -> dev.droidtop.library.LaunchScreen.SECOND
+                    dev.droidtop.library.LaunchScreen.SECOND -> null
+                }
+                systemLaunchScreen = next
+                systemId?.let { dev.droidtop.library.LaunchScreenMemory.setSystemChoice(context, it, next) }
             }
             "Jump to letter" -> {
                 pickingLetter = true

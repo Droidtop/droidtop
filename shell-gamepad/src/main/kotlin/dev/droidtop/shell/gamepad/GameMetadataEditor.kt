@@ -172,6 +172,31 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
             }
 
             item { SectionLabel("Library management") }
+            item {
+                // Which screen this game launches on (docs/SPEC.md
+                // section 4c: per-game override, clearable). This is
+                // droidtop's own launcher preference, not gamelist
+                // metadata, so it writes immediately rather than waiting
+                // for Save -- Cancel must not silently revert a display
+                // choice, and "Delete preferred Screen" (here, cycling
+                // back to Ask) is a first-class action.
+                val context = androidx.compose.ui.platform.LocalContext.current
+                var launchScreen by remember(entry.id) {
+                    mutableStateOf(dev.droidtop.library.LaunchScreenMemory.gameChoice(context, entry.id))
+                }
+                MetadataPickerRow(
+                    "Launch screen",
+                    launchScreen?.label ?: "Ask every time",
+                ) {
+                    val next = when (launchScreen) {
+                        null -> dev.droidtop.library.LaunchScreen.BUILT_IN
+                        dev.droidtop.library.LaunchScreen.BUILT_IN -> dev.droidtop.library.LaunchScreen.SECOND
+                        dev.droidtop.library.LaunchScreen.SECOND -> null
+                    }
+                    launchScreen = next
+                    dev.droidtop.library.LaunchScreenMemory.setGameChoice(context, entry.id, next)
+                }
+            }
             item { MetadataToggleRow("Hidden", current.hidden) { loaded = current.copy(hidden = it) } }
             item { MetadataToggleRow("Exclude from game counter", current.noGameCount) { loaded = current.copy(noGameCount = it) } }
             item { MetadataToggleRow("Exclude from multi-scrape", current.noMultiScrape) { loaded = current.copy(noMultiScrape = it) } }
