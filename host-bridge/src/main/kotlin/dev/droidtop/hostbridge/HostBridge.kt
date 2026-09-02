@@ -1,6 +1,7 @@
 package dev.droidtop.hostbridge
 
 import android.view.Surface
+import androidx.annotation.Keep
 import dev.droidtop.runtime.DisplayOutput
 
 /**
@@ -14,6 +15,9 @@ import dev.droidtop.runtime.DisplayOutput
  *     presents them on an Android [Surface] — one per [DisplayOutput].
  *  3. Forwards normalized input from :input-seat in as virtual
  *     pointer/keyboard events.
+ *  4. Bridges the seat's clipboard selection both ways over
+ *     ext-data-control-v1 (see [ClipboardBridge] for the Android-side
+ *     policy, and the native client for why that protocol).
  */
 class HostBridge : HostBridgeInput {
     private var connected = false
@@ -73,6 +77,38 @@ class HostBridge : HostBridgeInput {
         nativeInjectKey(evdevKeyCode, pressed)
     }
 
+    // ---- Clipboard, driven by ClipboardBridge ----
+
+    /**
+     * Called when text is copied INSIDE the container. Invoked on a native
+     * transfer thread, not the main thread — [ClipboardBridge] is what posts
+     * it somewhere useful. Volatile because the native side reads it from
+     * that thread while the Activity sets it from the main one.
+     */
+    @Volatile
+    var containerClipboardListener: ((String) -> Unit)? = null
+
+    /**
+     * Claims the container seat's selection. Returns false if the
+     * compositor never advertised ext_data_control_manager_v1, or if the
+     * text is over the native side's 1 MiB limit.
+     */
+    fun offerClipboardText(text: String): Boolean =
+        nativeOfferClipboardText(text.toByteArray(Charsets.UTF_8))
+
+    /**
+     * Called from JNI (hostbridge_jni.cpp's clipboardTrampoline). A
+     * ByteArray rather than a String because JNI's NewStringUTF speaks
+     * modified UTF-8, which mangles anything outside the BMP — emoji, in
+     * practice. [Keep] because nothing in Kotlin calls this, so R8 would
+     * otherwise be free to rename or remove it.
+     */
+    @Keep
+    @Suppress("unused")
+    private fun onContainerClipboardText(utf8: ByteArray) {
+        containerClipboardListener?.invoke(String(utf8, Charsets.UTF_8))
+    }
+
     private external fun nativeConnect(waylandSocketPath: String): Boolean
     private external fun nativeDisconnect()
     private external fun nativePresentOutput(surface: Surface): Boolean
@@ -82,6 +118,7 @@ class HostBridge : HostBridgeInput {
     private external fun nativeInjectPointerButton(linuxButtonCode: Int, pressed: Boolean)
     private external fun nativeInjectPointerAxis(horizontal: Double, vertical: Double)
     private external fun nativeInjectKey(evdevKeyCode: Int, pressed: Boolean)
+    private external fun nativeOfferClipboardText(utf8: ByteArray): Boolean
 
     companion object {
         init {

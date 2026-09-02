@@ -4,23 +4,29 @@ project(hostbridge)
 # host-bridge is a Wayland CLIENT of the primary container's compositor — it
 # does not build or link wlroots/sway (those run inside the container,
 # cross-compiled separately for the container's userland, not for Android).
-# It links against wayland-client itself and generates C bindings for three
+# It links against wayland-client itself and generates C bindings for four
 # non-core protocols via wayland-scanner:
 #
 #   - wlr-screencopy-unstable-v1   (vendor/wlroots/protocol)   — frame capture
 #   - wlr-virtual-pointer-unstable-v1 (vendor/wlroots/protocol) — pointer injection
 #   - virtual-keyboard-unstable-v1  (vendor/wlroots/protocol)   — keyboard injection
+#   - ext-data-control-v1 (vendor/wayland-protocols/staging)    — clipboard
 #
-# (all three live under vendor/wlroots/protocol, not vendor/wayland-protocols
-# — confirmed against the actual repo layout, corrected after the first real
-# build attempt referenced the wrong path)
+# The first three live under vendor/wlroots/protocol, not
+# vendor/wayland-protocols — confirmed against the actual repo layout,
+# corrected after the first real build attempt referenced the wrong path.
 #
-# wayland-scanner is a HOST build tool (codegen only, runs at build time on
-# the machine building this, not on-device) — it does not need to be built
-# for Android. libwayland-client itself DOES need to be cross-compiled for
-# Android and made available to this CMake project; see README.md, that
-# hasn't been set up in this environment (no NDK/meson/ninja available here
-# — see host-bridge/README.md's "Status" section for what's verified vs not).
+# ext-data-control-v1 is the one deliberate exception to that path, and it
+# really does live under vendor/wayland-protocols/staging: it is a
+# wayland-protocols staging protocol rather than a wlroots-private one. It
+# is the stabilised successor to wlr-data-control-unstable-v1 (which
+# vendor/wlroots still carries, and still implements, but which upstream
+# has superseded). vendor/sway creates BOTH globals unconditionally —
+# sway/server.c calls wlr_data_control_manager_v1_create() and
+# wlr_ext_data_control_manager_v1_create() side by side — so the ext one is
+# always present in the compositor droidtop itself provisions, and no
+# runtime fallback to the deprecated zwlr one is carried here. See
+# ../README.md for why data-control rather than wl_data_device at all.
 
 find_program(WAYLAND_SCANNER_EXECUTABLE wayland-scanner)
 if(NOT WAYLAND_SCANNER_EXECUTABLE)
@@ -37,6 +43,7 @@ set(HOSTBRIDGE_PROTOCOLS
     "wlr-screencopy-unstable-v1;${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/wlroots/protocol/wlr-screencopy-unstable-v1.xml"
     "wlr-virtual-pointer-unstable-v1;${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/wlroots/protocol/wlr-virtual-pointer-unstable-v1.xml"
     "virtual-keyboard-unstable-v1;${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/wlroots/protocol/virtual-keyboard-unstable-v1.xml"
+    "ext-data-control-v1;${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/wayland-protocols/staging/ext-data-control/ext-data-control-v1.xml"
 )
 
 set(GENERATED_SOURCES "")

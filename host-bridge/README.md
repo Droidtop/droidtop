@@ -52,8 +52,11 @@ it is not the same as confirmed-working. Treat the implementation below as
   `zwlr_screencopy_manager_v1`, `zwlr_virtual_pointer_manager_v1`, and
   `zwp_virtual_keyboard_manager_v1`. Fails loudly if any of the five
   required globals (compositor/seat/screencopy/vptr/vkbd) is missing.
-  Starts a background dispatch thread (`wl_display_dispatch` loop) so
-  screencopy's async frame-ready callbacks actually get delivered.
+  `ext_data_control_manager_v1` is bound too but is deliberately NOT
+  required — a compositor without it still gives a usable desktop, just
+  one whose clipboard does not cross. Starts a background dispatch thread
+  (`wl_display_dispatch` loop) so screencopy's async frame-ready callbacks
+  actually get delivered.
 - **Frame capture** (`presentPrimaryOutput` → `startNextCapture` and the
   `frame_*` callbacks) — a continuous capture loop: request a frame via
   `zwlr_screencopy_manager_v1_capture_output`, wait for the compositor's
@@ -66,6 +69,24 @@ it is not the same as confirmed-working. Treat the implementation below as
   giving up.
 - **Virtual pointer** — relative motion, absolute motion, button, and axis
   (scroll) requests, each followed by the required `frame()` call.
+- **Clipboard, both directions** (`ext-data-control-v1`) — the compositor's
+  `selection` event is read off a pipe on a worker thread and handed up to
+  `HostBridge.onContainerClipboardText`; `offerClipboardText` claims the
+  seat's selection with a fresh `ext_data_control_source_v1` and serves it
+  from another worker. **Why this protocol and not `wl_data_device`:** the
+  ordinary clipboard protocol only delivers a selection to the client
+  holding keyboard focus on one of its own surfaces, and this module has no
+  surface at all — it is a screencopy + virtual-input client by design. So
+  `wl_data_device` is structurally unavailable here, not merely awkward.
+  `ext-data-control-v1` exists for exactly this case (a privileged client
+  observing and setting the selection without focus) and is the stabilised
+  successor to `wlr-data-control-unstable-v1`; `vendor/sway` creates both
+  globals unconditionally, so only the ext one is implemented — there is no
+  runtime fallback to carry. Text MIME types only; 1 MiB cap, dropping
+  rather than truncating; the primary (middle-click) selection is not
+  bridged, since Android has no counterpart. Android-side policy — when a
+  clipboard read is even permitted — lives in `ClipboardBridge` /
+  `ClipboardSync`, and in `docs/SPEC.md` §6c.
 - **Virtual keyboard** — key press/release requests. The protocol requires a
   valid XKB keymap be set before *any* key event is accepted; rather than
   cross-compiling `libxkbcommon` for Android just to generate one,
@@ -92,6 +113,8 @@ it is not the same as confirmed-working. Treat the implementation below as
 - **No output-removal handling.** If the primary container's compositor
   restarts or the output disappears mid-session, nothing currently notices
   or recovers.
+- **Clipboard is text only.** Images and file lists on the container's
+  selection are ignored rather than converted; the same applies in reverse.
 
 See [docs/SPEC.md](../docs/SPEC.md) §11 for the broader open risks (sway
 headless-backend performance, Wine's Wayland driver maturity, etc.) that
