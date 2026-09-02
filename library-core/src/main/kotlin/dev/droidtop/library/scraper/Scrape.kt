@@ -368,8 +368,8 @@ suspend fun applyManualMatch(
     "Matched ${entry.title} to ${metadata.name ?: "that entry"}."
 }
 
-/** Downloads [imageUrl] straight to [destination], creating parent directories as needed -- a plain generic helper, not tied to any one scraper source. */
-private fun downloadImage(imageUrl: String, destination: File) {
+/** Downloads [imageUrl] straight to [destination], creating parent directories as needed -- a plain generic helper, not tied to any one scraper source, and the single one in this package (the PC/engine scrape in PcScrape.kt shares it rather than carrying a second copy). */
+internal fun downloadImage(imageUrl: String, destination: File) {
     destination.parentFile?.mkdirs()
     val connection = (java.net.URL(imageUrl).openConnection() as java.net.HttpURLConnection)
     if (connection.responseCode != 200) {

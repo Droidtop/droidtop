@@ -22,6 +22,7 @@ import dev.droidtop.library.integrations.IntegrationCapability
 import dev.droidtop.library.integrations.IntegrationPlaceholders
 import dev.droidtop.library.integrations.IntegrationStore
 import dev.droidtop.library.consoles.resolvePlayer
+import dev.droidtop.library.scraper.ScraperPrefs
 import dev.droidtop.library.scraper.ScraperSource
 import dev.droidtop.library.scraper.ScraperSourcePrefs
 import dev.droidtop.library.scraper.ScreenScraperPrefs
@@ -1016,6 +1017,25 @@ object AppSettingsCatalogs {
                             current = ScraperSourcePrefs.get(context).name,
                             onSelect = { ctx, value -> ScraperSourcePrefs.set(ctx, ScraperSource.valueOf(value)) },
                         ),
+                        // PC and engine games are scraped from a
+                        // different set of sources than console ROMs,
+                        // because none of the ROM scrapers indexes "a
+                        // Ren'Py build in a folder" at all -- same
+                        // one-source-at-a-time model, different list.
+                        ChoiceItem(
+                            id = "pc_scraper_source_choice",
+                            title = "PC & engine game source",
+                            options = dev.droidtop.library.scraper.PcScraperSource.entries.map {
+                                ChoiceOption(it.name, it.label)
+                            },
+                            current = dev.droidtop.library.scraper.PcScraperSourcePrefs.get(context).name,
+                            onSelect = { ctx, value ->
+                                dev.droidtop.library.scraper.PcScraperSourcePrefs.set(
+                                    ctx,
+                                    dev.droidtop.library.scraper.PcScraperSource.valueOf(value),
+                                )
+                            },
+                        ),
                     ),
                 ),
                 CatalogGroup(
@@ -1123,6 +1143,32 @@ object AppSettingsCatalogs {
                             subtitle = "Free at thegamesdb.net -- required before TheGamesDB can scrape at all",
                             value = TheGamesDbPrefs.apiKey(context),
                             onChange = { c, v -> TheGamesDbPrefs.set(c, v.trim()) },
+                        ),
+                    ),
+                ),
+                CatalogGroup(
+                    id = "scraper_igdb",
+                    title = "IGDB (PC & engine games)",
+                    items = listOf(
+                        // The user's own credentials, never droidtop's:
+                        // IGDB authenticates through a free, self-service
+                        // Twitch developer application, and the ID and
+                        // secret belong to whoever created it. droidtop
+                        // ships none and never fills these in.
+                        TextInputItem(
+                            id = "igdb_client_id",
+                            title = "Client ID",
+                            subtitle = "Create an application at dev.twitch.tv/console -- free, instant, no approval queue",
+                            value = ScraperPrefs.clientId(context),
+                            onChange = { c, v -> ScraperPrefs.set(c, v.trim(), ScraperPrefs.clientSecret(c)) },
+                        ),
+                        TextInputItem(
+                            id = "igdb_client_secret",
+                            title = "Client Secret",
+                            subtitle = "From the same Twitch application; stays on this device",
+                            value = ScraperPrefs.clientSecret(context),
+                            secret = true,
+                            onChange = { c, v -> ScraperPrefs.set(c, ScraperPrefs.clientId(c), v.trim()) },
                         ),
                     ),
                 ),

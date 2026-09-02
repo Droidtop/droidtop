@@ -115,4 +115,36 @@ class GameLaunchStrategyResolverTest {
         )
         assertFalse(GameLaunchStrategy.ENGINEHOST in strategies)
     }
+
+    @Test
+    fun `a bare dot-x86_64 ELF launcher adds LINUX_CONTAINER with no lib folder at all`() {
+        // The other real Linux-build shape, and the one this resolver used
+        // to miss: a game whose native Linux build is a single ELF
+        // launcher beside its data, with no `lib/<prefix>linux-<arch>`
+        // interpreter tree for the old check to find. A Godot Linux
+        // export is exactly this (`Game.x86_64` + `Game.pck`), and it was
+        // silently falling through to Wine despite shipping a native
+        // build.
+        File(tmp.root, "Game.x86_64").createNewFile()
+        File(tmp.root, "Game.pck").createNewFile()
+
+        val strategies = GameLaunchStrategyResolver.resolve(GameEngine.GODOT, tmp.root)
+
+        assertEquals(listOf(GameLaunchStrategy.LINUX_CONTAINER), strategies)
+        assertFalse(File(tmp.root, "lib").exists())
+    }
+
+    @Test
+    fun `a 32-bit dot-x86 launcher counts too`() {
+        File(tmp.root, "Game.x86").createNewFile()
+        assertTrue(GameLaunchStrategy.LINUX_CONTAINER in GameLaunchStrategyResolver.resolve(GameEngine.GODOT, tmp.root))
+    }
+
+    @Test
+    fun `a Windows-only folder still offers no LINUX_CONTAINER`() {
+        File(tmp.root, "Game.exe").createNewFile()
+        File(tmp.root, "Game.pck").createNewFile()
+        val strategies = GameLaunchStrategyResolver.resolve(GameEngine.GODOT, tmp.root)
+        assertEquals(listOf(GameLaunchStrategy.WINE_PREFIX), strategies)
+    }
 }

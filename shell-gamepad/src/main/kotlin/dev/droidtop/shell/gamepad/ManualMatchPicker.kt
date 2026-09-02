@@ -22,7 +22,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
+import dev.droidtop.library.scraper.PcMatch
+import dev.droidtop.library.scraper.PcScraper
 import dev.droidtop.library.scraper.TheGamesDbClient
 import dev.droidtop.library.scraper.TheGamesDbPrefs
 import dev.droidtop.library.scraper.TheGamesDbSystemIds
@@ -41,6 +44,15 @@ import kotlinx.coroutines.withContext
  * that is what the API returned first. Ranking by title similarity
  * helps and still cannot know which of five plausible rows is the game
  * on this card. A person looking at the list knows immediately.
+ *
+ * One picker for both libraries, not two: a ROM's candidates come from
+ * TheGamesDB by platform id, a PC or engine game's from the PC scraper
+ * source (Lutris or IGDB) by cleaned folder name, and past that the job
+ * is identical -- show real names, let a person choose, write only what
+ * they chose. For a PC or engine game the picker is doing more than
+ * correcting a bad guess: the automatic pass deliberately applies
+ * nothing it is not certain of, so this is the normal way those games
+ * get their metadata at all.
  */
 @Composable
 internal fun ManualMatchPicker(
@@ -49,12 +61,25 @@ internal fun ManualMatchPicker(
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
-    var candidates by remember(entry) { mutableStateOf<List<TheGamesDbClient.Candidate>?>(null) }
+    var candidates by remember(entry) { mutableStateOf<List<MatchCandidate>?>(null) }
     var status by remember(entry) { mutableStateOf<String?>(null) }
     var focusIndex by remember(entry) { mutableIntStateOf(0) }
     var applying by remember(entry) { mutableStateOf(false) }
 
     LaunchedEffect(entry) {
+        if (entry.isPcOrEngineGame) {
+            // The credential-shaped failures land in Unavailable: its
+            // message names the setting to fill in, so an unconfigured
+            // IGDB reads as an instruction rather than an empty list.
+            when (val found = PcScraper.candidates(context, entry)) {
+                is PcScraper.Candidates.Unavailable -> {
+                    status = found.message
+                    candidates = emptyList()
+                }
+                is PcScraper.Candidates.Found -> candidates = found.matches.map { MatchCandidate.Pc(it) }
+            }
+            return@LaunchedEffect
+        }
         val apiKey = TheGamesDbPrefs.apiKey(context)
         if (apiKey.isBlank()) {
             status = "TheGamesDB needs its API key before a search can run."
@@ -74,11 +99,11 @@ internal fun ManualMatchPicker(
                 TheGamesDbClient.searchCandidates(apiKey, tgdbId, java.io.File(entry.id).nameWithoutExtension)
             }.getOrDefault(emptyList())
         }
-        candidates = found
+        candidates = found.map { MatchCandidate.Rom(it) }
         if (found.isEmpty()) status = "No candidates came back for this name."
     }
 
-    fun apply(candidate: TheGamesDbClient.Candidate) {
+    fun apply(candidate: MatchCandidate) {
         if (applying) return
         applying = true
         status = "Applying ${candidate.name}..."
@@ -130,7 +155,7 @@ internal fun ManualMatchPicker(
                 else -> candidates!!.forEachIndexed { index, candidate ->
                     MenuRow(
                         title = candidate.name,
-                        subtitle = candidate.releaseYear?.let { "Released $it" },
+                        subtitle = candidate.subtitle,
                         selected = index == focusIndex,
                         onClick = {
                             focusIndex = index
@@ -149,11 +174,37 @@ internal fun ManualMatchPicker(
     LaunchedEffect(applying) {
         if (!applying) return@LaunchedEffect
         val candidate = candidates?.getOrNull(focusIndex) ?: return@LaunchedEffect
-        val applied = withContext(Dispatchers.IO) {
-            dev.droidtop.library.scraper.applyManualMatch(context, entry, candidate.id)
+        val applied = when (candidate) {
+            is MatchCandidate.Rom -> withContext(Dispatchers.IO) {
+                dev.droidtop.library.scraper.applyManualMatch(context, entry, candidate.candidate.id)
+            }
+            is MatchCandidate.Pc -> PcScraper.apply(context, entry, candidate.match)
         }
         applying = false
         onApplied(applied)
         onDismiss()
+    }
+}
+
+/**
+ * One row in the picker, whichever library it came from. The picker
+ * shows [name] and [subtitle] and hands the whole candidate back to the
+ * source that produced it, rather than an id to look up again -- nothing
+ * can be re-matched to a different row between being shown and being
+ * applied.
+ */
+internal sealed interface MatchCandidate {
+    val name: String
+    val subtitle: String?
+
+    data class Rom(val candidate: TheGamesDbClient.Candidate) : MatchCandidate {
+        override val name: String get() = candidate.name
+        override val subtitle: String? get() = candidate.releaseYear?.let { "Released $it" }
+    }
+
+    data class Pc(val match: PcMatch) : MatchCandidate {
+        override val name: String get() = match.name
+        override val subtitle: String
+            get() = listOfNotNull(match.year?.let { "Released $it" }, match.sourceLabel).joinToString(" from ")
     }
 }
