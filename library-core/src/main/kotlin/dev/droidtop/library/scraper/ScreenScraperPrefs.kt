@@ -21,11 +21,25 @@ object ScreenScraperPrefs {
     private const val KEY_USER_ID = "droidtop_screenscraper_ssid"
     private const val KEY_USER_PASSWORD = "droidtop_screenscraper_sspassword"
 
+    /**
+     * droidtop's own application credentials, unless the user has deliberately
+     * overridden them.
+     *
+     * ScreenScraper's devid/devpassword identify the calling application rather
+     * than the person using it, and are what let a client reach the API at all.
+     * They are not a quota tier: the scraping limit belongs to the user's own
+     * account (ssid/sspassword), which stays theirs. An explicitly stored value
+     * still wins, for anyone running their own registered pair.
+     */
     fun devId(context: Context): String =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_DEV_ID, "") ?: ""
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_DEV_ID, "")
+            ?.takeIf { it.isNotBlank() }
+            ?: ScreenScraperDevCredentials.devId
 
     fun devPassword(context: Context): String =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_DEV_PASSWORD, "") ?: ""
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_DEV_PASSWORD, "")
+            ?.takeIf { it.isNotBlank() }
+            ?: ScreenScraperDevCredentials.devPassword
 
     fun userId(context: Context): String =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_USER_ID, "") ?: ""
