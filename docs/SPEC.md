@@ -1506,9 +1506,10 @@ localhost. See `pc-helper/README.md`.
 
 ## 7b. Onboarding, import, and configuration
 
-Not implemented yet — design only, but two real, concrete mechanisms
-already exist to build on rather than invent from scratch (confirmed by
-reading actual code/formats, not assumed):
+The onboarding flow itself is real and built (see below). Import and
+launcher-sync are still design only, but two real, concrete mechanisms
+already exist to build them on rather than invent from scratch (confirmed
+by reading actual code/formats, not assumed):
 
 - **Importing from another Android home-screen launcher** has a real AOSP
   mechanism already sitting in `:shell-default`'s forked source:
@@ -2486,15 +2487,24 @@ runtime-linux-noroot    → proot-based, ported from vendor/gamenative's own
                           DefaultProotContainerBackend (see §3), no root required
 input-seat              → unified seat; depends on host-bridge
 library-core            → Playnite-style unified library/metadata; depends on runtime-common
+display                 → secondary-display behavior for every mode, in one place (the
+                          single SECONDARY_HOME activity + mode registry, §4c); depends
+                          only on runtime-common
 shell-default           → "Standard" shell: forked-in Murine Launcher (real AOSP
                           Launcher3-derived UI, not from-scratch); depends on
-                          library-core, host-bridge
+                          runtime-common
 shell-desktop           → "Desktop" shell's Android-side half (§2a): cross-container
                           task manager + frame passthrough, NOT the taskbar/app
                           launcher (that's container-side); depends on library-core,
                           host-bridge, runtime-common
 shell-gamepad           → "Handheld" shell: optional gamepad console UI, multiple
-                          selectable paradigms — see §7; depends on library-core
+                          selectable paradigms — see §7; depends on library-core.
+                          The best-developed module in the repo (~8,000 lines)
+input-keyboard          → second-screen persistent keyboard (§4/§6), forked from
+                          Hacker's Keyboard; shipping (~17,600 lines) as a real
+                          Android IME, surfaced in :app's onboarding; the
+                          second-screen/:input-seat integration it was forked in
+                          for is still TODO
 
 runtime-remote-stream   → DELETED (2026-09-01). Never in settings.gradle.kts,
                           zero sources. Streaming is windowcast's alone — see §7a.
