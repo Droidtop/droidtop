@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Environment
 import android.provider.DocumentsContract
 import java.io.File
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * Persists what [OnboardingActivity] collects, in the same shared prefs
@@ -14,7 +15,7 @@ import java.io.File
  * why that dependency doesn't exist).
  */
 object GamesRootPrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_ONBOARDING_COMPLETE = "droidtop_onboarding_complete"
     // A Set, not a single value -- games/ROMs aren't necessarily all in one
     // folder (an SD card folder plus an internal one, say), and per

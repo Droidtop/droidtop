@@ -1,6 +1,7 @@
 package dev.droidtop.app
 
 import android.content.Context
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * The user's chosen PRIMARY-catalog entry id (`known-image-repositories.json`),
@@ -11,7 +12,7 @@ import android.content.Context
  * pref (`GamesRootPrefs`, `ModePrefs`) already uses.
  */
 object DesktopSetupPrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_PRIMARY_IMAGE_ID = "droidtop_desktop_primary_image_id"
 
     fun preferredPrimaryImageId(context: Context): String? =

@@ -4,6 +4,7 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * User-defined [Player.AmStart] entries, one list per console system --
@@ -21,7 +22,7 @@ import java.util.UUID
  * serializer for one small prefs blob.
  */
 object CustomPlayerPrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_PREFIX = "droidtop_custom_players_"
 
     fun getForSystem(context: Context, systemId: String): List<Player.AmStart> {

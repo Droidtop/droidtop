@@ -46,6 +46,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * "Desktop style" shell: a taskbar + start menu wrapped around the primary
@@ -330,11 +331,10 @@ private fun SystemTray() {
  * settings screen (SettingsDesktopFragment / murine_prefs_desktop.xml). No
  * compile-time dependency on :shell-default -- see :shell-gamepad's
  * equivalent HandheldPrefs for the same reasoning -- so this reads the
- * shared "com.android.launcher3.prefs" SharedPreferences file by its
- * literal name instead.
+ * shared [LAUNCHER_PREFS_FILE_NAME] SharedPreferences file instead.
  */
 private object DesktopPrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_TASKBAR_TOP = "pref_desktop_taskbar_top"
 
     fun taskbarAtTop(context: Context): Boolean =

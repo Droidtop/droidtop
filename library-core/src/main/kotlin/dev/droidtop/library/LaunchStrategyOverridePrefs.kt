@@ -1,6 +1,7 @@
 package dev.droidtop.library
 
 import android.content.Context
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * User's explicit choice of which [GameLaunchStrategy] runs a given
@@ -16,7 +17,7 @@ import android.content.Context
  * PlayerPicker for ROMs.
  */
 object LaunchStrategyOverridePrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_PREFIX = "droidtop_launch_strategy_override_"
 
     fun get(context: Context, entryId: String): String? =

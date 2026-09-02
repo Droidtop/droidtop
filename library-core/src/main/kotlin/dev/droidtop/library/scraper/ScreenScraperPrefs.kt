@@ -1,6 +1,7 @@
 package dev.droidtop.library.scraper
 
 import android.content.Context
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * ScreenScraper credentials. The USERNAME/PASSWORD pair is the user's
@@ -14,7 +15,7 @@ import android.content.Context
  * 2026-08-31, replacing the retired debug-credentials file).
  */
 object ScreenScraperPrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_DEV_ID = "droidtop_screenscraper_devid"
     private const val KEY_DEV_PASSWORD = "droidtop_screenscraper_devpassword"
     private const val KEY_USER_ID = "droidtop_screenscraper_ssid"

@@ -77,6 +77,7 @@ import dev.droidtop.shell.gamepad.theme.ThemePrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * Full-screen, controller-first library shell — the "handheld style" UI.
@@ -643,12 +644,11 @@ fun GamepadShell(
  * settings screen (SettingsHandheldFragment / murine_prefs_handheld.xml).
  * No compile-time dependency on :shell-default from here -- it and
  * :shell-gamepad are separate library modules wired together only by :app
- * -- so this reads the same SharedPreferences file
- * ("com.android.launcher3.prefs", com.android.launcher3.LauncherFiles.
- * SHARED_PREFERENCES_KEY) by its literal name instead.
+ * -- so this reads the same shared SharedPreferences file
+ * ([LAUNCHER_PREFS_FILE_NAME]) instead.
  */
 private object HandheldPrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_DEFAULT_SECTION = "pref_handheld_default_section"
     private const val KEY_SHOW_HINTS = "pref_handheld_show_hints"
     private const val KEY_APPS_GRID_COLUMNS = "pref_handheld_apps_grid_columns"

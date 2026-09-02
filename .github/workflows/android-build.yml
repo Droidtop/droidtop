@@ -271,13 +271,22 @@ jobs:
       # blocking that on a unit test would trade something real for a
       # convention. The signal is what matters here, not the gate.
       - name: Run unit tests
+        # All five modules that actually have a src/test tree (library-core,
+        # runtime-common, shell-gamepad, input-seat, runtime-windows), not
+        # just library-core — that narrower scope meant roughly 30% of this
+        # repo's test methods had never once run in CI.
         if: always()
-        run: ./gradlew :library-core:testDebugUnitTest --stacktrace
+        run: ./gradlew :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :runtime-windows:testDebugUnitTest --stacktrace
 
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: unit-test-reports
-          path: library-core/build/reports/tests/
+          path: |
+            library-core/build/reports/tests/
+            runtime-common/build/reports/tests/
+            shell-gamepad/build/reports/tests/
+            input-seat/build/reports/tests/
+            runtime-windows/build/reports/tests/
           if-no-files-found: ignore
