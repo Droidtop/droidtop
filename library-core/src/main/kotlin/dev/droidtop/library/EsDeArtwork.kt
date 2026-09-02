@@ -3,6 +3,42 @@ package dev.droidtop.library
 import java.io.File
 
 /**
+ * Where one game's scraped media LIVES, as three strings -- not what it
+ * has. This is the whole data-model answer to `<imageType>`.
+ *
+ * The problem it solves: a [LibraryEntry] carried exactly one
+ * already-resolved `artworkUri`, so every themed element showed the same
+ * picture no matter which media type the theme asked for. The obvious fix
+ * -- resolving every media type per game at scan time -- is the wrong one
+ * on this target: a library of hundreds of ROMs would pay ten folders
+ * times three extensions times two candidate roots of `stat` per entry,
+ * per scan, to answer a question almost every element never asks.
+ *
+ * So the entry carries the COORDINATES instead. Building one is free at
+ * every scan site: the games root, system id and base name are all
+ * already in hand there (they are the same three arguments
+ * [EsDeArtwork.resolve] is being called with anyway), and constructing it
+ * touches the filesystem zero times. The lookup then happens where the
+ * question is actually asked -- in a theme element that declared an
+ * `imageType`, for the handful of games currently on screen, memoised by
+ * the renderer for as long as that element is composed. That is also what
+ * real ES-DE does: GridComponent.h:490-522 resolves an entry's image path
+ * lazily inside its render window and caches it on the entry, and is
+ * capped at two image types precisely because the cost is per-entry
+ * filesystem work.
+ *
+ * Null for a game with no ES-DE media layout behind it at all (a native
+ * Android app, a store PC game whose art is a remote URL). Those keep
+ * working exactly as before through [LibraryEntry.artworkUri].
+ */
+data class GameMediaLocator(
+    /** The folder directly containing the per-system game folders, as [EsDeArtwork.resolve] means it. */
+    val gamesRoot: String,
+    val system: String,
+    val baseName: String,
+)
+
+/**
  * Resolves game artwork the same way ES-DE's own gamelist scraper stores
  * it, so a games root that's already been scraped by ES-DE (or populated
  * by hand in the same layout) works as droidtop's artwork backend with no
@@ -44,42 +80,6 @@ import java.io.File
  * custom system in their own es_systems.xml, ES-DE supports this per its
  * "Game system customizations" docs, not assumed to already exist).
  */
-/**
- * Where one game's scraped media LIVES, as three strings -- not what it
- * has. This is the whole data-model answer to `<imageType>`.
- *
- * The problem it solves: a [LibraryEntry] carried exactly one
- * already-resolved `artworkUri`, so every themed element showed the same
- * picture no matter which media type the theme asked for. The obvious fix
- * -- resolving every media type per game at scan time -- is the wrong one
- * on this target: a library of hundreds of ROMs would pay ten folders
- * times three extensions times two candidate roots of `stat` per entry,
- * per scan, to answer a question almost every element never asks.
- *
- * So the entry carries the COORDINATES instead. Building one is free at
- * every scan site: the games root, system id and base name are all
- * already in hand there (they are the same three arguments
- * [EsDeArtwork.resolve] is being called with anyway), and constructing it
- * touches the filesystem zero times. The lookup then happens where the
- * question is actually asked -- in a theme element that declared an
- * `imageType`, for the handful of games currently on screen, memoised by
- * the renderer for as long as that element is composed. That is also what
- * real ES-DE does: GridComponent.h:490-522 resolves an entry's image path
- * lazily inside its render window and caches it on the entry, and is
- * capped at two image types precisely because the cost is per-entry
- * filesystem work.
- *
- * Null for a game with no ES-DE media layout behind it at all (a native
- * Android app, a store PC game whose art is a remote URL). Those keep
- * working exactly as before through [LibraryEntry.artworkUri].
- */
-data class GameMediaLocator(
-    /** The folder directly containing the per-system game folders, as [EsDeArtwork.resolve] means it. */
-    val gamesRoot: String,
-    val system: String,
-    val baseName: String,
-)
-
 object EsDeArtwork {
     private val MEDIA_TYPES_BY_PRIORITY =
         listOf("miximages", "covers", "screenshots", "titlescreens", "marquees", "physicalmedia", "fanart")
@@ -128,12 +128,6 @@ object EsDeArtwork {
         listOf("miximages", "screenshots", "titlescreens", "covers")
 
     /**
-     * [gamesRoot] is the folder directly containing the per-system ROM/game
-     * folders (e.g. `.../Roms`, the parent of `.../Roms/nes`). Checks the
-     * sibling `ES-DE/downloaded_media` layout first, then a direct
-     * `downloaded_media` under [gamesRoot] itself.
-     */
-    /**
      * Every scraped image for a game, in display order, labelled for a
      * viewer. [resolve] answers "the single best one and stop", which is
      * right for a theme element and useless for browsing what was
@@ -168,6 +162,12 @@ object EsDeArtwork {
         return found
     }
 
+    /**
+     * [gamesRoot] is the folder directly containing the per-system ROM/game
+     * folders (e.g. `.../Roms`, the parent of `.../Roms/nes`). Checks the
+     * sibling `ES-DE/downloaded_media` layout first, then a direct
+     * `downloaded_media` under [gamesRoot] itself.
+     */
     fun resolve(gamesRoot: File, system: String, romBaseName: String): String? =
         resolve(gamesRoot, system, romBaseName, MEDIA_TYPES_BY_PRIORITY.mapNotNull { folder ->
             IMAGE_TYPE_TO_FOLDER.entries.firstOrNull { it.value == folder }?.key
