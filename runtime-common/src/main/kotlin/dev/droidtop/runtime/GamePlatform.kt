@@ -56,7 +56,7 @@ fun selectBestDepot(options: List<GameDepotOption>): GameDepotOption? {
 
 /**
  * Launches a native Linux game binary directly inside a container — no
- * Wine, no [dev.droidtop.runtime.windows.WineSession] — the strictly-
+ * Wine, no [dev.droidtop.runtime.windows.WineEngine] — the strictly-
  * better path §5a describes for when [selectBestDepot] picks a
  * [GameDepotPlatform.LINUX] depot. If the binary is x86/x86-64 (the common
  * case per [GameDepotOption.cpuArchKnown]'s own doc), translation is

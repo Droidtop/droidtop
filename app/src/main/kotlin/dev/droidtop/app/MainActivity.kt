@@ -194,27 +194,28 @@ class MainActivity : AppCompatActivity() {
                 ConsoleRomProvider(applicationContext),
                 // Real discovery (com.winlator.container.ContainerManager's
                 // own shortcut scan), themed as ES-DE's "pc" system like
-                // any other. primarySession is a supplier, not a value,
-                // because DesktopSessionService may still be Connecting (or
-                // not started at all) at this point -- see PcGameProvider's
-                // own doc comment.
-                PcGameProvider(applicationContext) {
-                    (DesktopSessionService.state.value as? DesktopSessionState.Connected)
-                        ?.let { PrimaryContainerSession(it.runtime, it.container) }
-                },
+                // any other. It launches through the WineEngine seam, so
+                // it needs no desktop session and no root.
+                PcGameProvider(applicationContext),
             ),
             playHistory = RoomPlayHistoryStore(applicationContext),
         )
 
         // Fills library-core's PcGameRuntime seam, which is what makes the
         // WINE_PREFIX / LINUX_CONTAINER launch strategies real rather than
-        // error() stubs. Same live-session supplier PcGameProvider takes,
-        // for the same reason: the desktop session may still be connecting.
+        // error() stubs. The session supplier is only for the native-Linux
+        // half, which genuinely needs a Linux rootfs to run in; Windows
+        // games go through the WineEngine seam and need neither it nor
+        // root. It stays a supplier because DesktopSessionService may
+        // still be connecting when this runs.
         dev.droidtop.library.PcGameRuntimeRegistry.runtime =
-            dev.droidtop.runtime.windows.DroidtopPcGameRuntime(applicationContext) {
-            (DesktopSessionService.state.value as? DesktopSessionState.Connected)
-                ?.let { PrimaryContainerSession(it.runtime, it.container) }
-        }
+            dev.droidtop.runtime.windows.DroidtopPcGameRuntime(
+                context = applicationContext,
+                primarySession = {
+                    (DesktopSessionService.state.value as? DesktopSessionState.Connected)
+                        ?.let { PrimaryContainerSession(it.runtime, it.container) }
+                },
+            )
         refreshModeIfUndecided()
 
         observeSecondScreen()

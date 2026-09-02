@@ -282,7 +282,15 @@ class DroidSpacesRuntime(
 
         File(configsDir, "${container.id}.config").delete()
         File(configsDir, "${container.id}.env").delete()
-        File(container.rootfsPath).deleteRecursively()
+        // Root-owned tree, symlinks inside, possible live bind mounts
+        // over it: exactly the job RootfsDelete exists for. A refusal
+        // (something still mounted) must fail the destroy loudly --
+        // "destroyed" with the rootfs still present would be a lie, and
+        // deleting anyway was the shape of the 2026-09-02 data loss.
+        val removed = RootfsDelete.delete(container.rootfsPath)
+        check(removed.succeeded) {
+            "couldn't remove the rootfs for '${container.id}': ${removed.stderr.ifBlank { removed.stdout }}"
+        }
     }
 
     /**
