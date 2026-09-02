@@ -1234,11 +1234,61 @@ express "run this command in this environment"; what is not adequate is
 the assumption at the call site that the environment IS a droidspaces
 primary container.
 
-Packaging the vendored `jniLibs` (both `src/main` and `src/modern`, the
-same split upstream applies to its Java sources) is done. Remaining, in
-order: give the Wine launch a backend-neutral entry point with no
-`PrimaryContainerSession` requirement; then prove provisioning and one
-launch on hardware before porting anything further.
+### What the hardware said (2026-09-02)
+
+The seam exists: `WineEngine`, with `BionicWineEngine` behind it, and no
+launch site asks for a `PrimaryContainerSession` any more.
+`WineSession`/`WineLaunchEnvironment` are gone -- they existed only to
+run Wine through `ContainerRuntime.exec`, and the hand-transcribed guest
+environment is superseded by the vendored launcher component's own.
+
+Packaging was not one omission but three, each fatal on its own and each
+found by the next one failing on the device:
+
+- the vendored `jniLibs` (fixed previously);
+- the modern flavor's **assets**. `MODERN_ANDROID` makes every guest
+  process `LD_PRELOAD` `libredirect-bionic-wx.so`, which
+  `ImageFsInstaller` copies out of `src/modern/assets` -- a source dir
+  nothing referenced;
+- `useLegacyPackaging` for `jniLibs`. The runtime hands native library
+  *paths* to processes it starts (`libevshim.so` out of
+  `ApplicationInfo.nativeLibraryDir`), and without extraction at install
+  time that directory is empty. Confirmed on the device: 35 libraries in
+  the APK, `lib/arm64` empty.
+
+Provisioning also could not have worked as written, for two reasons
+beyond the missing natives:
+
+- it created the container from `Container.DEFAULT_VARIANT`, which reads
+  `DefaultVersion.VARIANT` -- `glibc` at class-load time. droidtop now
+  names bionic and a bionic wine version explicitly;
+- **order**. Creating a container copies Wine's own DLLs into the new
+  prefix, so Wine has to be installed first; and gamenative's proton
+  launch dependency downloads through `SteamService.downloadFile`, which
+  dereferences a service droidtop never starts. droidtop fetches the
+  archive with the instance-free downloader and lets the dependency do
+  the rest.
+
+**Milestone 1 is met.** On build 388 the ImageFs rootfs installs for the
+first time: 175MB base system downloaded and extracted to a 947MB rootfs
+with `bin`/`etc`/`lib`/`usr`/`opt`, `opt/proton-9.0-x86_64` symlinked
+into a 358MB shared Proton store. Before this it had never once
+completed.
+
+**Milestone 2 is not.** The run ended in a destructive bug of droidtop's
+own making, recorded here so it is never repeated: a half-finished
+container directory was cleaned up with Kotlin's `deleteRecursively`,
+which follows symlinked directories. A Wine prefix contains
+`dosdevices/z: -> /`. The walk left the prefix, and emptied what it
+could reach on internal storage before it was stopped. gamenative's
+`FileUtils.delete` refuses to descend into a symlink -- that is why it
+exists, and it is what the cleanup uses now. **Never point a
+walk-and-delete at a Wine prefix.**
+
+Remaining: repeat provisioning through container creation on hardware,
+then one Windows launch. Presentation is separate and unstarted -- the
+engine runs Wine against a headless X server, and nothing composites its
+output into droidtop's own surface yet.
 
 ## 6. Input
 
