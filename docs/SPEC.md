@@ -668,8 +668,91 @@ Three things droidtop should copy:
 3. **Say it in the user's terms**: top/bottom and internal/external, not
    display ids.
 
-This supersedes the `ShellTarget`/`GameLaunchTarget` enums as the design
-target; they stay until the replacement lands so nothing regresses.
+**BUILT (2026-09-02), as the launch-screen memory model.** The three
+lessons above are now code, layered over (not replacing) the
+`ShellTarget`/`GameLaunchTarget` enums, which remain the global
+fallback:
+
+- `LaunchScreenMemory` (library-core) stores relative `LaunchScreen`
+  choices (`BUILT_IN`/`SECOND` — roles, never display ids) at two
+  levels: per game and per system. Resolution priority, pure and
+  unit-tested (`LaunchScreenResolution`): **per-game > per-system >
+  ask > global target.** A remembered SECOND with no second display
+  attached degrades to the default display — a preference never fails
+  a launch.
+- The chooser dialog carries iiSU's own row vocabulary: a plain
+  "launch here" pair for this one launch, then an **"Always"** pair
+  that remembers for this game. Asking is still the first-launch
+  default; a remembered answer is the steady state, so the question is
+  asked once per game, not every time.
+- Clearing is first-class ("Delete preferred Screen"): the game's
+  metadata editor has a Launch screen row (Ask / Built-in / Add-on,
+  writes immediately — a display choice is a launcher preference, not
+  gamelist metadata), and the gamelist options menu has the per-system
+  equivalent ("Tune individual platforms").
+- Game identity reaches `LaunchDisplay` through
+  `LaunchDisplay.launchContext`, published by `Library.launch` around
+  the provider call — the ONE launch path — rather than threading the
+  entry through every provider signature. Launches with no game
+  identity (opening Kirikiroid2's own UI) simply have no memory and no
+  "Always" rows.
+
+### Mirroring, root-caused and fixed (2026-09-02)
+
+The "launching apps mirrors them" report is Android's own fallback: a
+secondary display whose window stack is EMPTY mirrors the default
+display (already confirmed live above, §4 "Display reinit"). droidtop
+had two ways to leave the addon empty and relied on a third party to
+fill it:
+
+- the platform only places the `SECONDARY_HOME` idle surface while
+  droidtop holds the HOME role AND the display is one Android
+  decorates — neither is guaranteed on the addon; and
+- the live companion `Presentation` dies with the shell's `onStop`,
+  which is exactly what a game launch causes.
+
+Fix: **droidtop covers vacated displays itself.**
+`LaunchDisplay.coverVacatedDisplays` runs BEFORE every launch dispatch
+and explicitly starts `:display`'s `SecondaryDisplayActivity` (with
+`setLaunchDisplayId`) on every secondary display the launch would
+otherwise leave empty — not the launch's own target, not the display
+the shell renders on, not a parked display; the qualifying set is pure
+and unit-tested (`DualScreenOrchestration.displaysNeedingIdleCover`).
+Ordering matters: the cover starts first so the game's window lands
+last and keeps input focus. `MainActivity.onStop` does the same
+best-effort cover for the display its dying Presentation vacates (the
+user pressed HOME / switched apps case).
+
+### Relocation can be refused; droidtop now concedes (2026-09-02)
+
+Moving the shell to the addon is a `startActivity` the platform may
+refuse (some presentation-category displays reject activity launches).
+The cooldown only stopped the retry LOOP — it never concluded
+anything, so a refusing addon left the shell built-in and the addon
+EMPTY, i.e. mirroring, indefinitely. Now: after
+`MAX_RELOCATION_ATTEMPTS` (2) whole cooldown windows without the shell
+verifiably on the addon — or immediately on a synchronous
+`SecurityException` — orchestration falls back to shell-on-built-in
+with the live companion covering the addon. Either way the addon shows
+a droidtop surface, never a mirror.
+
+### External screen priority, per mode (2026-09-02)
+
+What "the addon is the better screen" concretely means in each mode:
+
+- **Handheld**: the shell itself moves to the addon (the existing
+  SECOND_WHEN_PRESENT default), the built-in panel gets the companion.
+- **Desktop**: same relocation, same default — the desktop renders on
+  the addon/external and the built-in panel becomes the input surface
+  (trackpad + keyboard, §6c) via the same role preference. This
+  replaces the earlier "Desktop is exempt" stance: exempt from GAME
+  launch targeting it remains (windows are the compositor's job), but
+  not from wanting the bigger/better panel as its output — a lapdock
+  monitor is the canonical case.
+- **Standard**: unchanged — Launcher3's own secondary-display handling.
+- The launch chooser lists the ADD-ON row first in both arrangements,
+  so the default-highlighted choice is the better screen
+  (`DualScreenOrchestration.chooserCandidates`, unit-tested).
 
 ## 4. Display
 
@@ -942,6 +1025,22 @@ Top to bottom, each layer earning its space:
 - **Never a placeholder.** An idle companion shows something real or
   shows the ground. A wordmark on a black rectangle is the bug this
   section exists to close.
+
+### Continue-playing rail (built 2026-09-02)
+
+The companion's one interactive element: a tap-to-launch row of the
+most recently played games (`CompanionRecents`, on every companion
+host). The lower panel is a touchscreen the user's thumbs already rest
+near, and "tap the game I was playing yesterday" is the most common
+launcher action — so it is one tap deep there, not only behind gamepad
+navigation on the other screen. Data is the same
+`CompanionState.libraryEntries` feed the idle rotation uses (the
+companion never runs its own scan); a tap goes through
+`CompanionState.onLaunchEntry`, installed by MainActivity and backed by
+the ordinary `Library.launch` path — launch-screen memory, play
+history and error handling included, never a second launch mechanism.
+While no shell is alive to launch through, a tap does nothing rather
+than half-launching outside that path.
 
 ## 4e. General-compute parity: status ledger (assessed 2026-09-01)
 
