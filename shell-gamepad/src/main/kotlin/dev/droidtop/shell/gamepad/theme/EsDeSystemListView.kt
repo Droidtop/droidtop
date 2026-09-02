@@ -8,6 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.absoluteOffset
@@ -16,11 +17,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -31,14 +30,22 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -50,8 +57,19 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import dev.droidtop.library.theme.EsDeCarouselPlacement
+import dev.droidtop.library.theme.EsDeCarouselType
+import dev.droidtop.library.theme.EsDeLetterCase
+import dev.droidtop.library.theme.EsDePrimaryAlignment
+import dev.droidtop.library.theme.EsDeTextListConfig
 import dev.droidtop.library.theme.EsDeThemeElement
 import dev.droidtop.library.theme.EsDeThemeValue
+import dev.droidtop.library.theme.applyTo
+import dev.droidtop.library.theme.esDeCarouselConfig
+import dev.droidtop.library.theme.esDeIndicatorPrefix
+import dev.droidtop.library.theme.esDeTextListConfig
+import dev.droidtop.library.theme.layoutEsDeCarousel
+import dev.droidtop.library.theme.layoutEsDeTextList
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 
@@ -72,6 +90,23 @@ data class EsDeListItem(
     val logoPath: String?,
     val accentColor: Color?,
     val onSelect: () -> Unit,
+    // Real ES-DE textlist `indicators`: a favorite gets a leading marker
+    // before its name (GamelistBase.cpp:916-926). Always false for a
+    // system-list item -- real ES-DE has no favorite concept for systems
+    // either.
+    val favorite: Boolean = false,
+    // Real `TextListEntryType::SECONDARY`, which is what selects the
+    // `secondaryColor`/`selectedSecondaryColor`/
+    // `selectedSecondaryBackgroundColor` half of a textlist's real color
+    // scheme. In real ES-DE exactly one thing is secondary: a FOLDER
+    // entry in a gamelist (GamelistBase.cpp:955-958; system-view entries
+    // are unconditionally PRIMARY, SystemView.cpp:888). droidtop's ROM
+    // scan is flat and produces no folder entries at all yet, so nothing
+    // sets this today -- the same standing gap the `folder` badge slot
+    // documents. It is modeled rather than omitted because the color
+    // rule that reads it is real, and half-implementing that rule would
+    // silently paint folders in the wrong color the day folders land.
+    val isSecondary: Boolean = false,
 )
 
 /**
@@ -104,13 +139,17 @@ fun EsDeSystemListView(
     val resolvedWidth = themedArea?.width ?: configuration.screenWidthDp.dp
     val resolvedHeight = themedArea?.height ?: configuration.screenHeightDp.dp
     when (element?.type) {
-        // Grid/textlist don't get onFocusedIndexChanged wired through --
-        // real per-system theme reloading (what that callback drives) only
-        // matters for the "system" view's own primary list; a per-game
-        // grid/textlist browsing one already-selected system's games has
-        // no equivalent "which system's metadata" question to answer.
+        // The grid doesn't get onFocusedIndexChanged wired through -- it
+        // still delegates its cursor to LazyVerticalGrid's own focus
+        // traversal and has no single cursor of its own to report.
         "grid" -> EsDeGrid(element, items, firstItemFocus, modifier, resolvedWidth, resolvedHeight)
-        "textlist" -> EsDeTextList(element, items, firstItemFocus, modifier, resolvedHeight)
+        // textlist DOES get onFocusedIndexChanged now: it owns its own
+        // cursor (real TextListComponent architecture, see EsDeTextList),
+        // so a theme whose system view is a textlist rather than a
+        // carousel gets the same real per-system theme reloading.
+        "textlist" -> EsDeTextList(
+            element, items, firstItemFocus, modifier, onFocusedIndexChanged, resolvedWidth, resolvedHeight,
+        )
         // "carousel", or no theme-declared element at all -- carousel is
         // ES-DE's own real default shape and the one droidtop already
         // shipped, so it's the honest fallback rather than an arbitrary one.
@@ -119,37 +158,48 @@ fun EsDeSystemListView(
 }
 
 /**
- * Real ES-DE carousel positioning/scale/opacity math -- a clean-room port
- * of the horizontal-type formulas in ES-DE's own CarouselComponent.h
- * (`render()`), not a guess. This replaces a real bug: the previous
- * implementation was a plain `LazyRow`, which ignores the theme's real
- * `pos`/`size` entirely (fixed by [EsDeThemedListElement] positioning
- * this whole composable) AND lays items out via normal list scrolling
- * rather than ES-DE's actual model -- a fixed set of items, each
- * individually positioned at `index * itemSpacing + xOffBase`, where
- * `itemSpacing` is derived from the carousel's own real width and
- * `maxItemCount` (confirmed real formula: `((carouselWidth - itemWidth *
- * maxItemCount) / maxItemCount) + itemWidth`). A `LazyRow` showing only
- * one item for an `itemSize="1 1"` carousel (Art Book Next's real
- * full-screen "hero" carousel style, confirmed by reading its own
- * theme.xml) was a direct, confirmed symptom of this gap -- the real
- * formula above naturally handles that same case without a special case,
- * since `itemSpacing` there equals the carousel's own full width.
+ * Real ES-DE carousel rendering. All FOUR real carousel types --
+ * `horizontal`, `vertical`, `horizontalWheel`, `verticalWheel` -- now
+ * render with their own real geometry; before this pass droidtop
+ * implemented only `horizontal` and silently drew every wheel- or
+ * vertical-typed theme with horizontal geometry.
  *
- * `camOffset` is now real, continuous, eased animation too -- ported
- * directly from `CarouselComponent::onCursorChanged`'s own real
+ * The geometry itself lives in [layoutEsDeCarousel]
+ * (runtime-common's own `EsDeCarouselLayout.kt`), a literal, unit-tested
+ * port of real `CarouselComponent<T>::render()`; this composable is only
+ * the drawing half -- it asks where each item goes and paints it. That
+ * split is deliberate: the maths is the part that can be verified
+ * against the real source without a device, and it is where the
+ * previously-unimplemented properties live (`type`, `itemStacking`,
+ * `itemsBeforeCenter`/`itemsAfterCenter`, `itemRotation`/
+ * `itemRotationOrigin`/`itemAxisHorizontal`/`itemAxisRotation`,
+ * `itemHorizontalAlignment`/`itemVerticalAlignment`,
+ * `wheelHorizontalAlignment`/`wheelVerticalAlignment`,
+ * `horizontalOffset`/`verticalOffset`, `itemLinearScale`/
+ * `itemLinearSpacing`, `selectedItemOffset`, `itemDiagonalOffset`).
+ *
+ * `camOffset` is real, continuous, eased animation -- ported directly
+ * from `CarouselComponent::onCursorChanged`'s own real
  * `LambdaAnimation`: ease-out-quad (`t = 1 - (1-t)^2`), duration 400ms by
  * default, scaled down (`clamp(distance * 1.5 * 400, 200, 400)`) when the
- * animation restarts mid-flight at a fractional distance (e.g. a rapid
- * double-press) rather than a full one-item step. Not ported: ES-DE's
- * real wraparound "shortest path" logic for a circular/looping carousel
- * (`onCursorChanged`'s `posMax` handling) -- droidtop's system list isn't
- * circular, so a direct `animateTo` is the correct real behavior here,
- * not a missing feature.
+ * animation restarts mid-flight at a fractional distance rather than a
+ * full one-item step. `itemTransitions="instant"` skips the animation
+ * entirely, which is exactly what real ES-DE's own
+ * `mInstantItemTransitions` does. Not ported: ES-DE's real wraparound
+ * "shortest path" logic for a looping carousel (`onCursorChanged`'s
+ * `posMax` handling) -- droidtop's list isn't circular in its animation,
+ * so a direct `animateTo` is the correct real behavior here.
  *
- * Real, honestly-deferred gaps: `itemStacking`/wheel carousel types
- * (`verticalWheel`/`horizontalWheel`)/reflections are real ES-DE features
- * not ported here at all. Genuinely separate, scoped follow-up work.
+ * Honestly still unimplemented here, and NOT faked: `imageType` (which
+ * scraped media type a gamelist carousel shows per game -- droidtop's
+ * `LibraryEntry` carries one already-resolved `artworkUri` and no
+ * per-type media map, so honoring it needs a library-core data-model
+ * change, not a renderer one), `imageColorEnd`/`imageGradientType`/
+ * `imageSelectedColorEnd`/`imageSelectedGradientType` (a POSITIONAL
+ * gradient applied as a color shift over an image, which a Compose
+ * `ColorFilter` cannot express -- it needs a shader), `textRelativeScale`/
+ * `textBackgroundCornerRadius`, and the four `textHorizontalScroll*`
+ * properties.
  */
 @Composable
 private fun EsDeCarousel(
@@ -169,54 +219,38 @@ private fun EsDeCarousel(
     val textBackgroundColor = element?.valueOrNull<EsDeThemeValue.Color>("textBackgroundColor")?.let { colorOf(it) } ?: Color.Transparent
     val textSelectedColor = element?.valueOrNull<EsDeThemeValue.Color>("textSelectedColor")?.let { colorOf(it) } ?: textColor
     val textSelectedBackgroundColor = element?.valueOrNull<EsDeThemeValue.Color>("textSelectedBackgroundColor")?.let { colorOf(it) } ?: textBackgroundColor
-    val uppercase = element?.valueOrNull<EsDeThemeValue.Str>("letterCase")?.value == "uppercase"
-    val unfocusedOpacity = element?.valueOrNull<EsDeThemeValue.FloatValue>("unfocusedItemOpacity")?.value ?: 1f
-    val unfocusedSaturation = element?.valueOrNull<EsDeThemeValue.FloatValue>("unfocusedItemSaturation")?.value ?: 1f
+    val letterCase = esDeLetterCaseOf(element?.valueOrNull<EsDeThemeValue.Str>("letterCase")?.value)
     // Real carousel-wide background bar (CarouselComponent::render's own
     // single drawRect call, behind every item) -- real default 0xFFFFFFD8
     // (translucent white), confirmed against the real constructor default.
     val carouselColor = element?.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color(0xFF, 0xFF, 0xFF, 0xD8)
     val carouselColorEnd = element?.valueOrNull<EsDeThemeValue.Color>("colorEnd")?.let { colorOf(it) } ?: carouselColor
-    val colorGradientHorizontal = element?.valueOrNull<EsDeThemeValue.Bool>("colorGradientHorizontal")?.value ?: true
+    // Real `gradientType` (CarouselComponent.h:1414-1429), which is what
+    // the schema actually calls this -- the previous code read a
+    // `colorGradientHorizontal` property that exists nowhere in real
+    // ES-DE's schema, so a theme could never influence it at all.
+    val colorGradientHorizontal =
+        element?.valueOrNull<EsDeThemeValue.Str>("gradientType")?.value != "vertical"
     // Real, confirmed bug this fixes: the text-fallback item renderer
     // never read this element's own real `fontSize` at all, silently
     // defaulting to Compose's ~14sp Text() default -- on a real device
-    // this rendered carousel item labels ("NINTENDO 3DS" etc.) as
-    // "practically invisible" tiny text, confirmed via a direct on-device
-    // screenshot diffed against the bundled theme's own reference
-    // sys.png. Real ES-DE's own default (`Font::getFromTheme`'s fallback,
-    // `FONT_SIZE_LARGE_FIXED`) is a fixed absolute size, not a screen-
-    // height fraction -- but every real theme (decaffe included) declares
-    // its own real `fontSize`, so the 0.045f fallback here only matters
-    // for a theme that genuinely omits it, matching the same default
-    // already used by EsDeThemedText/EsDeTextList elsewhere in this file.
+    // this rendered carousel item labels as "practically invisible" tiny
+    // text, confirmed via a direct on-device screenshot diffed against
+    // the bundled theme's own reference sys.png. Real ES-DE's own default
+    // (`Font::getFromTheme`'s fallback, `FONT_SIZE_LARGE_FIXED`) is a
+    // fixed absolute size, not a screen-height fraction -- but every real
+    // theme declares its own real `fontSize`, so the 0.045f fallback here
+    // only matters for a theme that genuinely omits it.
     val fontSizeFraction = element?.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
     val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * screenHeight.value).dp.toSp() }
     val itemFontFamily = element?.let { themeFontFamily(it) }
-    // itemSize is a fraction of the real ES-DE "screen" -- confirmed
-    // directly against CarouselComponent.h's own theme-property parsing:
-    // `mItemSize = itemSize * vec2(getScreenWidth(), getScreenHeight())`
-    // -- i.e. the THEMED AREA (screenWidth/screenHeight, see
-    // LocalEsDeThemedAreaSize's own doc comment), NOT the carousel's own
-    // box (a real, confirmed bug an earlier pass introduced: using this
-    // carousel's own measured maxWidth/maxHeight instead made a carousel
-    // that's only e.g. 13% of the screen tall compute item HEIGHT at 13%
-    // of its correct real size -- items rendered squished/tiny, the same
-    // failure mode as the missing-fontSize bug this same pass also fixed,
-    // just for size instead of text). `itemSpacingPx`/`xOffBasePx` below
-    // correctly keep using the carousel's OWN measured width -- that part
-    // matches real ES-DE too (`mSize.x`, the carousel's own real size, in
-    // the exact same real spacing formula: `((mSize.x - (mItemSize.x *
-    // mMaxItemCount)) / mMaxItemCount) + mItemSize.x`).
-    // Real CarouselComponent item-image properties (its own mImageColorShift/
-    // mImageSaturation, applied per item in addEntry -- see that real
-    // source): `imageColor` is a color SHIFT (multiply, same real modulate
-    // semantics as ImageComponent::setColorShift), `imageSelectedColor`
-    // replaces it for the focused item, `imageSaturation` is a real
-    // desaturation. Art Book Next's hero carousel declares all three.
+    // Real CarouselComponent item-image properties (its own
+    // mImageColorShift/mImageSaturation/mImageBrightness, applied per item
+    // -- see that real source): `imageColor` is a color SHIFT (multiply,
+    // the same real modulate semantics as ImageComponent::setColorShift),
+    // `imageSelectedColor` replaces it for the focused item.
     val imageColor = element?.valueOrNull<EsDeThemeValue.Color>("imageColor")?.let { colorOf(it) }
     val imageSelectedColor = element?.valueOrNull<EsDeThemeValue.Color>("imageSelectedColor")?.let { colorOf(it) } ?: imageColor
-    val imageSaturation = (element?.valueOrNull<EsDeThemeValue.FloatValue>("imageSaturation")?.value ?: 1f).coerceIn(0f, 1f)
     // Real `imageFit` (CarouselComponent.h:1515-1534): contain (default) /
     // fill / cover map onto exactly Compose's Fit / FillBounds / Crop.
     val imageFit = when (element?.valueOrNull<EsDeThemeValue.Str>("imageFit")?.value) {
@@ -224,25 +258,27 @@ private fun EsDeCarousel(
         "cover" -> ContentScale.Crop
         else -> ContentScale.Fit
     }
-    // Real `selectedItemMargins` (CarouselComponent.h:1458-1465 parse:
-    // NORMALIZED_PAIR clamped to +-1, scaled by screen WIDTH for a
-    // horizontal carousel; :945-963 render: items left of the cursor shift
-    // by -x, items right of it by +y, ramped by |distance| inside one
-    // item's travel) -- extra breathing room around the selected item.
-    val selectedItemMargins = element?.valueOrNull<EsDeThemeValue.Pair>("selectedItemMargins")
-        ?.let { EsDeThemeValue.Pair(it.x.coerceIn(-1f, 1f), it.y.coerceIn(-1f, 1f)) }
-    val itemSizeFraction = element?.valueOrNull<EsDeThemeValue.Pair>("itemSize")
-    // Real ES-DE defaults (CarouselComponent's own constructor): 3.0 and 1.2.
-    val maxItemCount = (element?.valueOrNull<EsDeThemeValue.FloatValue>("maxItemCount")?.value ?: 3f).coerceIn(0.5f, 30f)
-    val itemScale = (element?.valueOrNull<EsDeThemeValue.FloatValue>("itemScale")?.value ?: 1.2f).coerceIn(0.2f, 3f)
+
+    // Every real layout-affecting property, resolved against the themed
+    // area exactly as real ES-DE resolves them against its screen. Dp is
+    // used as the unit throughout (rather than raw pixels) because every
+    // one of these is a proportion of that same area, so the density
+    // conversion cancels out.
+    val config = remember(element, screenWidth, screenHeight) {
+        esDeCarouselConfig(element, screenWidth.value, screenHeight.value)
+    }
 
     var focusedIndex by remember { mutableStateOf(0) }
+    var positiveDirection by remember { mutableStateOf(false) }
     val camOffset = remember { Animatable(0f) }
-    val density = LocalDensity.current
 
-    LaunchedEffect(focusedIndex) {
+    LaunchedEffect(focusedIndex, config.instantItemTransitions) {
         val startPos = camOffset.value
         val target = focusedIndex.toFloat()
+        if (config.instantItemTransitions) {
+            camOffset.snapTo(target)
+            return@LaunchedEffect
+        }
         val distance = kotlin.math.abs(target - startPos)
         // Real formula (CarouselComponent::onCursorChanged): full 400ms
         // for a whole-item step; scaled down when restarting mid-flight.
@@ -262,14 +298,23 @@ private fun EsDeCarousel(
 
     // Real ES-DE input architecture: the CAROUSEL is the focus/input
     // target (`CarouselComponent::input` -> `List::listInput`), items are
-    // render entries with no input identity of their own. The previous
-    // per-item `focusable()` + `FocusManager.moveFocus` approach never
-    // actually traversed between absolutely-positioned siblings on-device
-    // (confirmed live: focus landed on item 0 and every D-pad key was
-    // swallowed by a failed moveFocus -- the carousel LOOKED fine but
-    // never moved). Container-level state stepping is the real model, and
-    // wraparound (`% size`) is real CarouselComponent behavior too -- its
-    // list is circular.
+    // render entries with no input identity of their own. Which axis
+    // moves the cursor is real, type-dependent behavior
+    // (CarouselComponent.h:588-622): the vertical types step on UP/DOWN,
+    // the horizontal ones on LEFT/RIGHT. Before this pass a vertical
+    // carousel could not be navigated at all. The cross-axis keys are
+    // consumed as no-ops so a stray press cannot escape the carousel and
+    // land Compose focus on droidtop's own chrome, after which every
+    // arrow key would move the wrong surface.
+    val verticalType = config.type == EsDeCarouselType.VERTICAL || config.type == EsDeCarouselType.VERTICAL_WHEEL
+    fun step(delta: Int): Boolean {
+        if (items.isEmpty()) return true
+        positiveDirection = delta > 0
+        focusedIndex = (focusedIndex + delta + items.size) % items.size
+        onFocusedIndexChanged(focusedIndex)
+        return true
+    }
+
     BoxWithConstraints(
         modifier = (if (firstItemFocus != null) modifier.focusRequester(firstItemFocus) else modifier)
             .focusable()
@@ -280,27 +325,10 @@ private fun EsDeCarousel(
                         items.getOrNull(focusedIndex)?.onSelect?.invoke()
                         true
                     }
-                    GamepadAction.LEFT -> {
-                        if (items.isNotEmpty()) {
-                            focusedIndex = (focusedIndex - 1 + items.size) % items.size
-                            onFocusedIndexChanged(focusedIndex)
-                        }
-                        true
-                    }
-                    GamepadAction.RIGHT -> {
-                        if (items.isNotEmpty()) {
-                            focusedIndex = (focusedIndex + 1) % items.size
-                            onFocusedIndexChanged(focusedIndex)
-                        }
-                        true
-                    }
-                    // Consumed as no-ops for a horizontal carousel: real
-                    // ES-DE's system view has no other focus surface, so
-                    // stray UP/DOWN must not bubble out and land Compose
-                    // focus on droidtop's own header chrome (after which
-                    // every arrow key moves the wrong surface). Section
-                    // switching stays on its real dedicated action (L).
-                    GamepadAction.UP, GamepadAction.DOWN -> true
+                    GamepadAction.LEFT -> if (verticalType) true else step(-1)
+                    GamepadAction.RIGHT -> if (verticalType) true else step(1)
+                    GamepadAction.UP -> if (verticalType) step(-1) else true
+                    GamepadAction.DOWN -> if (verticalType) step(1) else true
                     else -> false
                 }
             }
@@ -312,73 +340,142 @@ private fun EsDeCarousel(
                 },
             ),
     ) {
-        val carouselWidthPx = with(density) { maxWidth.toPx() }
-        val carouselHeightPx = with(density) { maxHeight.toPx() }
-        val screenWidthPx = with(density) { screenWidth.toPx() }
-        val screenHeightPx = with(density) { screenHeight.toPx() }
-        // Real px, against the themed area's own real size (see this
-        // function's own itemSizeFraction comment for why that's
-        // `screenWidthPx`/`screenHeightPx`, not this carousel's own box).
-        val itemWidthPx = itemSizeFraction?.let { it.x * screenWidthPx } ?: with(density) { 200.dp.toPx() }
-        val itemHeightPx = itemSizeFraction?.let { it.y * screenHeightPx } ?: with(density) { 140.dp.toPx() }
-        val itemWidth = with(density) { itemWidthPx.toDp() }
-        val itemHeight = with(density) { itemHeightPx.toDp() }
-        val itemSpacingPx = ((carouselWidthPx - itemWidthPx * maxItemCount) / maxItemCount) + itemWidthPx
-        val xOffBasePx = (carouselWidthPx - itemWidthPx) / 2f - camOffset.value * itemSpacingPx
-        val yOffPx = (carouselHeightPx - itemHeightPx) / 2f
+        val itemWidth = config.itemSizeX.dp
+        val itemHeight = config.itemSizeY.dp
+        val placements = layoutEsDeCarousel(
+            config = config,
+            sizeX = maxWidth.value,
+            sizeY = maxHeight.value,
+            camOffset = camOffset.value,
+            entryCount = items.size,
+            positiveDirection = positiveDirection,
+        )
 
-        items.forEachIndexed { index, item ->
-            val distance = index - camOffset.value
-            val absDistance = kotlin.math.abs(distance)
-            // Real formula, ported as-is: itemScale >= 1 scales UP toward
-            // the focused item; itemScale < 1 scales DOWN away from it.
-            val rawScale = if (itemScale >= 1f) {
-                (1f + (itemScale - 1f) * (1f - absDistance)).coerceIn(1f, itemScale) / itemScale
-            } else {
-                (1f + (1f - itemScale) * (absDistance - 1f)).coerceIn(itemScale, 1f)
+        // Real `reflections` (CarouselComponent.h:1271-1305): a mirrored
+        // copy of the item drawn directly beneath it, at
+        // `reflectionsOpacity`, fading out over `size.y / reflectionsFalloff`.
+        // Drawn before the items themselves so an item always wins over a
+        // neighbor's reflection.
+        if (config.reflections) {
+            placements.forEach { placement ->
+                val item = items.getOrNull(placement.index) ?: return@forEach
+                if (item.logoPath == null) return@forEach
+                EsDeCarouselItem(
+                    item = item,
+                    width = itemWidth,
+                    height = itemHeight,
+                    isFocused = placement.index == focusedIndex,
+                    textColor = textColor,
+                    textBackgroundColor = textBackgroundColor,
+                    textSelectedColor = textSelectedColor,
+                    textSelectedBackgroundColor = textSelectedBackgroundColor,
+                    letterCase = letterCase,
+                    fontSize = fontSizeSp,
+                    fontFamily = itemFontFamily,
+                    imageColorShift = imageColor,
+                    imageSelectedColorShift = imageSelectedColor,
+                    imageSaturation = placement.saturation ?: config.imageSaturation,
+                    imageBrightness = config.imageBrightness,
+                    dimming = placement.dimming,
+                    imageContentScale = imageFit,
+                    modifier = Modifier
+                        .placeCarouselItem(placement, itemWidth, itemHeight)
+                        // Applied OUTSIDE the mirror below, deliberately:
+                        // real ES-DE flips the texture, not the geometry,
+                        // so the falloff still fades downward on screen.
+                        .reflectionFalloff(config.reflectionsFalloff)
+                        .graphicsLayer {
+                            // Mirrored, then dropped by exactly one item
+                            // height so it sits directly beneath -- real
+                            // ES-DE's own reflection translation. The
+                            // item scale in that translation comes for
+                            // free from the placement transform this
+                            // sits inside.
+                            alpha = placement.opacity * config.reflectionsOpacity
+                            scaleY = -1f
+                            translationY = size.height
+                        },
+                )
             }
-            val opacity = when {
-                distance == 0f || unfocusedOpacity == 1f -> 1f
-                absDistance >= 1f -> unfocusedOpacity
-                else -> unfocusedOpacity + ((1f - unfocusedOpacity) - (1f - unfocusedOpacity) * absDistance)
-            }
-            // Real selectedItemMargins application (see the parse comment
-            // above): full margin beyond one item of distance, ramped
-            // linearly by |distance| within it.
-            val marginFactor = if (absDistance < 1f) absDistance else 1f
-            val selectedMarginPx = when {
-                selectedItemMargins == null -> 0f
-                distance < 0f -> -selectedItemMargins.x * screenWidthPx * marginFactor
-                distance > 0f -> selectedItemMargins.y * screenWidthPx * marginFactor
-                else -> 0f
-            }
-            val xDp = with(density) { (index * itemSpacingPx + xOffBasePx + selectedMarginPx).toDp() }
-            val yDp = with(density) { yOffPx.toDp() }
+        }
 
+        placements.forEach { placement ->
+            val item = items.getOrNull(placement.index) ?: return@forEach
             EsDeCarouselItem(
                 item = item,
                 width = itemWidth,
                 height = itemHeight,
-                isFocused = index == focusedIndex,
+                isFocused = placement.index == focusedIndex,
                 textColor = textColor,
                 textBackgroundColor = textBackgroundColor,
                 textSelectedColor = textSelectedColor,
                 textSelectedBackgroundColor = textSelectedBackgroundColor,
-                uppercase = uppercase,
+                letterCase = letterCase,
                 fontSize = fontSizeSp,
                 fontFamily = itemFontFamily,
-                unfocusedOpacity = unfocusedOpacity,
-                unfocusedSaturation = unfocusedSaturation,
                 imageColorShift = imageColor,
                 imageSelectedColorShift = imageSelectedColor,
-                imageSaturation = imageSaturation,
+                imageSaturation = placement.saturation ?: config.imageSaturation,
+                imageBrightness = config.imageBrightness,
+                dimming = placement.dimming,
                 imageContentScale = imageFit,
                 modifier = Modifier
-                    .absoluteOffset(x = xDp, y = yDp)
-                    .graphicsLayer { scaleX = rawScale; scaleY = rawScale; alpha = opacity },
+                    .placeCarouselItem(placement, itemWidth, itemHeight)
+                    .graphicsLayer { alpha = placement.opacity },
             )
         }
     }
+}
+
+/**
+ * Places one item exactly where [layoutEsDeCarousel] said it goes: the
+ * placement's anchor is the point real ES-DE translates to, and the
+ * item's own origin fraction (set from `itemHorizontalAlignment`/
+ * `itemVerticalAlignment`, real CarouselComponent.h:404-419) is both the
+ * part of the item that sits on that anchor AND the point its scale and
+ * rotation act around -- which is exactly Compose's `transformOrigin`.
+ */
+private fun Modifier.placeCarouselItem(
+    placement: EsDeCarouselPlacement,
+    width: Dp,
+    height: Dp,
+): Modifier = this
+    .absoluteOffset(
+        x = (placement.anchorX - placement.originFractionX * width.value).dp,
+        y = (placement.anchorY - placement.originFractionY * height.value).dp,
+    )
+    .size(width = width, height = height)
+    .graphicsLayer {
+        transformOrigin = TransformOrigin(placement.originFractionX, placement.originFractionY)
+        scaleX = placement.scale
+        scaleY = placement.scale
+        rotationZ = placement.rotationDegrees
+    }
+
+/**
+ * Real reflections falloff, ported from ES-DE's own core.glsl fragment
+ * shader (`sampledColor.argb *= mix(0.0, 1.0, reflectionsFalloff -
+ * position.y) / reflectionsFalloff`, where the uniform is the item's own
+ * height divided by the theme's `reflectionsFalloff`): a linear fade to
+ * fully transparent a `1 / reflectionsFalloff` fraction of the way down
+ * the mirrored copy. A falloff of zero disables it, same as the shader's
+ * own guard.
+ */
+private fun Modifier.reflectionFalloff(falloff: Float): Modifier {
+    if (falloff <= 0f) return this
+    return this
+        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithContent {
+            drawContent()
+            drawRect(
+                brush = Brush.verticalGradient(
+                    0f to Color.Black,
+                    (1f / falloff).coerceIn(0.01f, 1f) to Color.Transparent,
+                    1f to Color.Transparent,
+                ),
+                blendMode = BlendMode.DstIn,
+            )
+        }
 }
 
 /**
@@ -401,66 +498,37 @@ private fun EsDeCarouselItem(
     textBackgroundColor: Color,
     textSelectedColor: Color,
     textSelectedBackgroundColor: Color,
-    uppercase: Boolean,
+    letterCase: EsDeLetterCase,
     fontSize: androidx.compose.ui.unit.TextUnit,
     fontFamily: androidx.compose.ui.text.font.FontFamily?,
-    unfocusedOpacity: Float,
-    unfocusedSaturation: Float,
     imageColorShift: Color?,
     imageSelectedColorShift: Color?,
     imageSaturation: Float,
+    imageBrightness: Float,
+    dimming: Float,
     imageContentScale: ContentScale,
     modifier: Modifier,
 ) {
     // No focusable()/onKeyEvent here: the carousel CONTAINER owns focus
     // and key handling (real CarouselComponent::input architecture -- see
-    // EsDeCarousel's own comment; the per-item moveFocus approach this
-    // replaces never actually traversed on-device). clickable stays: touch
-    // taps a specific item directly, same as before.
+    // EsDeCarousel's own comment). clickable stays: touch taps a specific
+    // item directly.
     val baseModifier = modifier
         .size(width = width, height = height)
         .clickable(onClick = item.onSelect)
 
     if (item.logoPath != null) {
-        // Real ES-DE image treatment, replacing an earlier fake "dim
-        // slightly when desaturated" alpha hack: the carousel-declared
-        // `imageSaturation` (times the real `unfocusedItemSaturation` for
-        // an unfocused item) as an actual saturation ColorMatrix, with the
-        // `imageColor`/`imageSelectedColor` color SHIFT (multiply --
-        // ImageComponent::setColorShift's real modulate semantics) folded
-        // into the same matrix as a per-channel scale.
         val shift = if (isFocused) imageSelectedColorShift else imageColorShift
-        val effectiveSaturation = if (isFocused) imageSaturation else imageSaturation * unfocusedSaturation
-        val colorFilter = when {
-            effectiveSaturation < 1f -> {
-                val matrix = ColorMatrix().apply { setToSaturation(effectiveSaturation) }
-                if (shift != null && shift != Color.White) {
-                    matrix.timesAssign(
-                        ColorMatrix(
-                            floatArrayOf(
-                                shift.red, 0f, 0f, 0f, 0f,
-                                0f, shift.green, 0f, 0f, 0f,
-                                0f, 0f, shift.blue, 0f, 0f,
-                                0f, 0f, 0f, shift.alpha, 0f,
-                            ),
-                        ),
-                    )
-                }
-                ColorFilter.colorMatrix(matrix)
-            }
-            shift != null && shift != Color.White -> ColorFilter.tint(shift, BlendMode.Modulate)
-            else -> null
-        }
         AsyncImage(
             model = item.logoPath,
             contentDescription = null,
             contentScale = imageContentScale,
-            colorFilter = colorFilter,
+            colorFilter = esDeImageColorFilter(shift, imageSaturation, imageBrightness, dimming),
             modifier = baseModifier,
         )
     } else {
         Text(
-            if (uppercase) item.label.uppercase() else item.label,
+            letterCase.applyTo(item.label),
             color = if (isFocused) textSelectedColor else textColor,
             fontSize = fontSize,
             fontFamily = fontFamily,
@@ -470,6 +538,66 @@ private fun EsDeCarouselItem(
                 .wrapContentHeight(),
         )
     }
+}
+
+/**
+ * Real ES-DE image color pipeline, in its own real order -- read
+ * straight off ES-DE's own `core.glsl` fragment shader, which applies
+ * brightness (`rgb += 0.3 * brightness`), then saturation (luma-weighted
+ * 0.299/0.587/0.114 mix), then the color shift as a MULTIPLY, then
+ * dimming as a further multiply. Folded into one `ColorMatrix` here
+ * because Compose applies a single filter per draw; the brightness
+ * offset survives the saturation step unchanged (saturation maps a grey
+ * vector to itself), so it only needs scaling by the shift and dimming.
+ *
+ * Replaces a pair of earlier approximations: a `ColorFilter.tint` that
+ * REPLACED rather than modulated an image's color, and an
+ * "unfocusedItemSaturation lowers alpha by 15%" alpha hack.
+ */
+private fun esDeImageColorFilter(
+    shift: Color?,
+    saturation: Float,
+    brightness: Float,
+    dimming: Float,
+): ColorFilter? {
+    val shiftR = shift?.red ?: 1f
+    val shiftG = shift?.green ?: 1f
+    val shiftB = shift?.blue ?: 1f
+    val shiftA = shift?.alpha ?: 1f
+    if (saturation == 1f && brightness == 0f && dimming == 1f &&
+        shiftR == 1f && shiftG == 1f && shiftB == 1f && shiftA == 1f
+    ) {
+        return null
+    }
+    val kR = shiftR * dimming
+    val kG = shiftG * dimming
+    val kB = shiftB * dimming
+    val lumaR = 0.299f
+    val lumaG = 0.587f
+    val lumaB = 0.114f
+    val s = saturation
+    val inv = 1f - s
+    // ColorMatrix offsets are on a 0-255 scale in Compose, the same as
+    // Android's own ColorMatrix.
+    val offset = 0.3f * brightness * 255f
+    return ColorFilter.colorMatrix(
+        ColorMatrix(
+            floatArrayOf(
+                kR * (s + inv * lumaR), kR * inv * lumaG, kR * inv * lumaB, 0f, offset * kR,
+                kG * inv * lumaR, kG * (s + inv * lumaG), kG * inv * lumaB, 0f, offset * kG,
+                kB * inv * lumaR, kB * inv * lumaG, kB * (s + inv * lumaB), 0f, offset * kB,
+                0f, 0f, 0f, shiftA, 0f,
+            ),
+        ),
+    )
+}
+
+/** Real `letterCase` parsing, shared by every list widget (real ES-DE's own four values). */
+private fun esDeLetterCaseOf(value: String?): EsDeLetterCase = when (value) {
+    "uppercase" -> EsDeLetterCase.UPPERCASE
+    "lowercase" -> EsDeLetterCase.LOWERCASE
+    "capitalize" -> EsDeLetterCase.CAPITALIZE
+    else -> EsDeLetterCase.NONE
 }
 
 /**
@@ -568,55 +696,172 @@ private fun EsDeGrid(
 }
 
 /**
- * Daijishō/ES-DE's real "textlist" shape -- a plain vertical list of
- * names, no artwork, matching a live Daijishō screenshot examined this
- * session (its own "List view" toggle).
+ * Real ES-DE `<textlist>` rendering -- a port of
+ * `TextListComponent<T>::render()`, with the arithmetic living in
+ * [layoutEsDeTextList]/[esDeTextListConfig] (runtime-common's own
+ * `EsDeTextListLayout.kt`) so it can be unit tested off-device.
  *
- * Row height is real ES-DE math now, not an arbitrary fixed gap:
- * `TextListComponent::render`'s own `entrySize = mFont->getSize() *
- * mLineSpacing` is the actual per-row height ES-DE uses to decide how
- * many rows fit on screen -- `fontSize` (a fraction of screen height,
- * same real convention as every other ES-DE size property) and
- * `lineSpacing` (real default 1.5, clamped 0.5-3.0 by the real parser)
- * are both already-parsed real theme properties that were simply unread
- * before this pass, replaced by a hardcoded `MaterialTheme.typography`
- * size and a flat 4.dp gap.
+ * This replaces a `LazyColumn` of individually-focusable rows, which was
+ * the wrong model in a way that made most of the element's real schema
+ * unimplementable: real ES-DE draws a FIXED window of rows (its own
+ * `startEntry`/`screenCount` arithmetic) with ONE selector bar
+ * positioned at `(cursor - startEntry) * entrySize + selectorVerticalOffset`,
+ * not a scrolling list where the highlight is a per-row background. With
+ * the real model in place, the real selector (`selectorWidth`/
+ * `selectorHeight`/`selectorHorizontalOffset`/`selectorVerticalOffset`/
+ * `selectorColor`/`selectorColorEnd`/`selectorGradientType`/
+ * `selectorImagePath`), the real primary/secondary and selected/
+ * selected-secondary color pairs, the real selected-row background
+ * (`selectedBackgroundColor`/`selectedSecondaryBackgroundColor`/
+ * `selectedBackgroundMargins`/`selectedBackgroundCornerRadius`), the real
+ * `horizontalMargin`, the full real `letterCase` set and the real
+ * `indicators` prefix all render.
+ *
+ * Also a real behavioral correction: droidtop hardcoded a 48dp
+ * horizontal row padding that exists nowhere in ES-DE. The real property
+ * is `horizontalMargin`, and its real default is zero.
+ *
+ * Honestly still unimplemented, and NOT faked: the four
+ * `textHorizontalScroll*` properties (real ES-DE scrolls a too-long row
+ * horizontally rather than clipping it), `selectorImageTile` (a tiled
+ * selector image needs a repeating image shader), `collectionIndicators`
+ * (real ES-DE only shows those while a custom collection is being edited
+ * IN the list, a mode droidtop has no equivalent of -- its collection
+ * editor is a separate screen), and `fadeAbovePrimary`.
  */
 @Composable
-private fun EsDeTextList(element: EsDeThemeElement, items: List<EsDeListItem>, firstItemFocus: FocusRequester?, modifier: Modifier, screenHeight: Dp) {
-    val primaryColor = element.valueOrNull<EsDeThemeValue.Color>("primaryColor")?.let { colorOf(it) } ?: Color.White
-    val selectedColor = element.valueOrNull<EsDeThemeValue.Color>("selectedColor")?.let { colorOf(it) } ?: primaryColor
-    val uppercase = element.valueOrNull<EsDeThemeValue.Str>("letterCase")?.value == "uppercase"
-    // Real ES-DE default (TextListComponent's own constructor): 0x333333FF.
-    // A real, distinct property from selectedColor (the text's own color)
-    // -- this is the highlight bar drawn BEHIND the selected row, not
-    // read at all before this pass (a plain alpha-primaryColor guess
-    // stood in for it).
-    val selectorColor = element.valueOrNull<EsDeThemeValue.Color>("selectorColor")?.let { colorOf(it) }
-        ?: Color(0x33, 0x33, 0x33, 0xFF)
-    // Real ES-DE default font size for a textlist (its own theme docs).
-    // Fraction of the THEMED area (see EsDeSystemListView's own
-    // screenWidth/screenHeight doc comment), not a fixed 1080 reference.
+private fun EsDeTextList(
+    element: EsDeThemeElement,
+    items: List<EsDeListItem>,
+    firstItemFocus: FocusRequester?,
+    modifier: Modifier,
+    onFocusedIndexChanged: (Int) -> Unit,
+    screenWidth: Dp,
+    screenHeight: Dp,
+) {
+    // Real ES-DE default font size for a textlist. Fraction of the THEMED
+    // area (see EsDeSystemListView's own screenWidth/screenHeight doc
+    // comment), not a fixed 1080 reference.
     val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
-    val lineSpacing = (element.valueOrNull<EsDeThemeValue.FloatValue>("lineSpacing")?.value ?: 1.5f).coerceIn(0.5f, 3f)
-    val fontSizeDp = (fontSizeFraction * screenHeight.value).dp
-    val fontSizeSp = with(LocalDensity.current) { fontSizeDp.toSp() }
-    // Real formula (TextListComponent::render): entrySize = fontSize * lineSpacing.
-    val rowHeight = fontSizeDp * lineSpacing
+    val fontSizeDp = fontSizeFraction * screenHeight.value
+    val fontSizeSp = with(LocalDensity.current) { fontSizeDp.dp.toSp() }
     val rowFontFamily = themeFontFamily(element)
 
-    LazyColumn(modifier = modifier) {
-        itemsIndexed(items, key = { _, item -> item.key }) { index, item ->
+    var cursor by remember { mutableStateOf(0) }
+
+    // Real `TextListComponent::input` -> `List::listInput`: the LIST owns
+    // the cursor and the keys, rows are render output. Real ES-DE builds
+    // its textlist with `ListLoopType::LIST_PAUSE_AT_END`, so unlike the
+    // system carousel it deliberately does NOT wrap around.
+    fun step(delta: Int): Boolean {
+        if (items.isEmpty()) return true
+        cursor = (cursor + delta).coerceIn(0, items.size - 1)
+        onFocusedIndexChanged(cursor)
+        return true
+    }
+
+    BoxWithConstraints(
+        modifier = (if (firstItemFocus != null) modifier.focusRequester(firstItemFocus) else modifier)
+            .focusable()
+            .clipToBounds()
+            .onKeyEvent { event ->
+                if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
+                when (GamepadKeyMap.actionFor(event.key)) {
+                    GamepadAction.A -> {
+                        items.getOrNull(cursor)?.onSelect?.invoke()
+                        true
+                    }
+                    GamepadAction.UP -> step(-1)
+                    GamepadAction.DOWN -> step(1)
+                    // Consumed so a stray horizontal press can't escape
+                    // the list and move Compose focus onto another
+                    // surface -- same reasoning as the carousel's own
+                    // cross-axis handling.
+                    GamepadAction.LEFT, GamepadAction.RIGHT -> true
+                    else -> false
+                }
+            },
+    ) {
+        val listWidth = maxWidth.value
+        val listHeight = maxHeight.value
+        val config = remember(element, listWidth, listHeight, screenWidth, screenHeight, fontSizeDp) {
+            esDeTextListConfig(
+                element = element,
+                width = listWidth,
+                height = listHeight,
+                screenWidth = screenWidth.value,
+                screenHeight = screenHeight.value,
+                fontSize = fontSizeDp,
+            )
+        }
+        val window = layoutEsDeTextList(config, listHeight, cursor, items.size)
+
+        // Real draw order (TextListComponent.h:331-345): the selector bar
+        // first, every row on top of it.
+        if (items.isNotEmpty() && window.startEntry < window.listCutoff) {
+            val selectorModifier = Modifier
+                .absoluteOffset(x = window.selectorX.dp, y = window.selectorY.dp)
+                .size(width = config.selectorWidth.dp, height = config.selectorHeight.dp)
+            if (config.selectorImagePath != null) {
+                AsyncImage(
+                    model = config.selectorImagePath,
+                    contentDescription = null,
+                    contentScale = ContentScale.FillBounds,
+                    // Real `mSelectorImage.setColorShift(mSelectorColor)`
+                    // -- a MULTIPLY over the image, not a replacement.
+                    colorFilter = esDeImageColorFilter(
+                        shift = colorOfPacked(config.selectorColor),
+                        saturation = 1f,
+                        brightness = 0f,
+                        dimming = 1f,
+                    ),
+                    modifier = selectorModifier,
+                )
+            } else {
+                val start = colorOfPacked(config.selectorColor)
+                val end = colorOfPacked(config.selectorColorEnd)
+                Box(
+                    modifier = selectorModifier.background(
+                        if (config.selectorColorGradientHorizontal) {
+                            Brush.horizontalGradient(listOf(start, end))
+                        } else {
+                            Brush.verticalGradient(listOf(start, end))
+                        },
+                    ),
+                )
+            }
+        }
+
+        for (index in window.visibleIndices) {
+            val item = items.getOrNull(index) ?: continue
+            val selected = index == cursor
+            // Real color selection (TextListComponent.h:373-384): the
+            // primary/secondary pair is chosen by ENTRY TYPE, then the
+            // selected variant of that pair by the cursor.
+            val color = when {
+                item.isSecondary && selected -> config.selectedSecondaryColor
+                item.isSecondary -> config.secondaryColor
+                selected -> config.selectedColor
+                else -> config.primaryColor
+            }
+            val backgroundColor = when {
+                !selected -> 0L
+                item.isSecondary -> config.selectedSecondaryBackgroundColor
+                else -> config.selectedBackgroundColor
+            }
             EsDeTextListRow(
                 item = item,
-                primaryColor = primaryColor,
-                selectedColor = selectedColor,
-                selectorColor = selectorColor,
-                uppercase = uppercase,
+                config = config,
+                color = colorOfPacked(color),
+                backgroundColor = colorOfPacked(backgroundColor),
                 fontSize = fontSizeSp,
                 fontFamily = rowFontFamily,
-                rowHeight = rowHeight,
-                modifier = if (index == 0 && firstItemFocus != null) Modifier.focusRequester(firstItemFocus) else Modifier,
+                y = window.rowY(index).dp,
+                onSelect = {
+                    cursor = index
+                    onFocusedIndexChanged(index)
+                    item.onSelect()
+                },
             )
         }
     }
@@ -625,53 +870,81 @@ private fun EsDeTextList(element: EsDeThemeElement, items: List<EsDeListItem>, f
 @Composable
 private fun EsDeTextListRow(
     item: EsDeListItem,
-    primaryColor: Color,
-    selectedColor: Color,
-    selectorColor: Color,
-    uppercase: Boolean,
+    config: EsDeTextListConfig,
+    color: Color,
+    backgroundColor: Color,
     fontSize: androidx.compose.ui.unit.TextUnit,
     fontFamily: androidx.compose.ui.text.font.FontFamily?,
-    rowHeight: androidx.compose.ui.unit.Dp,
-    modifier: Modifier,
+    y: Dp,
+    onSelect: () -> Unit,
 ) {
-    var focused by remember { mutableStateOf(false) }
-    Text(
-        if (uppercase) item.label.uppercase() else item.label,
-        color = if (focused) selectedColor else primaryColor,
-        fontSize = fontSize,
-        fontFamily = fontFamily,
-        // Real ES-DE TextListComponent rows are strictly single-line --
-        // a long title clips (or horizontally scrolls, its
-        // `textHorizontalScrolling` feature, not built here yet), never
-        // wraps. Real, confirmed-live bug this fixes: without maxLines,
-        // long real titles wrapped to two lines inside a one-line-tall
-        // row, painting over the next row -- every gamelist under Art
-        // Book Next rendered as illegibly overlapping text on a real
-        // device.
-        maxLines = 1,
-        overflow = androidx.compose.ui.text.style.TextOverflow.Clip,
-        modifier = modifier
-            .fillMaxWidth()
-            .height(rowHeight)
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            // Real touch-input fix, reported directly: nothing in Handheld
-            // mode responded to taps -- .focusable() alone only covers
-            // real D-pad/gamepad focus+key input, never touch.
-            .clickable(onClick = item.onSelect)
-            .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp &&
-                    GamepadKeyMap.actionFor(event.key) == GamepadAction.A
-                ) {
-                    item.onSelect()
-                    true
-                } else {
-                    false
-                }
-            }
-            .background(if (focused) selectorColor else Color.Transparent)
-            .padding(horizontal = 48.dp),
+    // Real name construction (GamelistBase.cpp:896-949): the indicator
+    // prefix goes on first, and letterCase is applied to the whole
+    // resulting string afterwards -- not the other way round.
+    val label = config.letterCase.applyTo(
+        esDeIndicatorPrefix(config.indicators, item.favorite) + item.label,
     )
+    val marginStart = config.selectedBackgroundMarginsX
+    val marginEnd = config.selectedBackgroundMarginsY
+    val selectorHorizontalOffset = config.selectorHorizontalOffset
+    val selectorHeight = config.selectorHeight
+    val cornerRadius = config.selectedBackgroundCornerRadius
+    val verticalOffset = config.selectorVerticalOffset
+    val drawBackground = backgroundColor.alpha > 0f
+
+    Box(
+        modifier = Modifier
+            .absoluteOffset(y = y)
+            .fillMaxWidth()
+            .height(config.entrySize.dp)
+            .padding(horizontal = config.horizontalMargin.dp),
+        contentAlignment = when (config.alignment) {
+            EsDePrimaryAlignment.LEFT -> androidx.compose.ui.Alignment.CenterStart
+            EsDePrimaryAlignment.CENTER -> androidx.compose.ui.Alignment.Center
+            EsDePrimaryAlignment.RIGHT -> androidx.compose.ui.Alignment.CenterEnd
+        },
+    ) {
+        Text(
+            label,
+            color = color,
+            fontSize = fontSize,
+            fontFamily = fontFamily,
+            // Real ES-DE TextListComponent rows are strictly single-line
+            // -- a long title clips (or horizontally scrolls, its
+            // `textHorizontalScrolling` feature, not built here yet),
+            // never wraps. Real, confirmed-live bug this fixes: without
+            // maxLines, long real titles wrapped to two lines inside a
+            // one-line-tall row, painting over the next row.
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Clip,
+            modifier = Modifier
+                // Real selected-row background (TextListComponent.h:
+                // 421-444): a rect exactly as wide as the row's own TEXT
+                // plus its margins -- which is why this is drawn behind
+                // the measured text node rather than as a row-wide
+                // background -- offset by the selector's own horizontal
+                // offset and drawn at the selector's height.
+                .drawBehind {
+                    if (!drawBackground) return@drawBehind
+                    drawRoundRect(
+                        color = backgroundColor,
+                        topLeft = Offset(
+                            (selectorHorizontalOffset - marginStart).dp.toPx(),
+                            verticalOffset.dp.toPx(),
+                        ),
+                        size = Size(
+                            size.width + (marginStart + marginEnd).dp.toPx(),
+                            selectorHeight.dp.toPx(),
+                        ),
+                        cornerRadius = CornerRadius(cornerRadius.dp.toPx()),
+                    )
+                }
+                // Real touch-input fix, reported directly: nothing in
+                // Handheld mode responded to taps -- the list's own
+                // container-level key handling only covers D-pad/gamepad.
+                .clickable(onClick = onSelect),
+        )
+    }
 }
 
 @Composable
@@ -749,3 +1022,5 @@ private fun EsDeListTile(
     }
 }
 
+/** Real packed-RRGGBBAA to Compose color, for the layout layer's own color fields (which stay graphics-type-free). */
+private fun colorOfPacked(packed: Long): Color = colorOf(EsDeThemeValue.Color(packed))
