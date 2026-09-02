@@ -24,6 +24,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -38,6 +39,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.droidtop.hostbridge.HostBridge
+import dev.droidtop.input.DesktopInputRouter
+import dev.droidtop.input.InputSeat
+import dev.droidtop.input.PointerTransform
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.runtime.DisplayOutput
@@ -63,8 +67,12 @@ import java.util.Locale
  * real chrome — taskbar, start menu, launching library entries all work
  * right now — with an honest "no desktop session" placeholder standing in
  * for the live output, rather than faking a connection that doesn't exist.
- * Once DesktopSessionService is real, wiring a live HostBridge/DisplayOutput
- * through to this composable is the only change needed here.
+ * The surface is an input surface as well as an output one: it drives a
+ * [dev.droidtop.input.DesktopInputRouter] over a single
+ * [dev.droidtop.input.InputSeat], which is what makes the presented
+ * desktop clickable rather than a video feed. See that class for the
+ * per-source decisions; the coordinate transform is built in
+ * `surfaceChanged` below, where the surface's real size is known.
  *
  * [sessionMessage] carries a human-readable description of the underlying
  * [dev.droidtop.app.DesktopSessionState] (Connecting/Failed/Idle) — this
@@ -119,23 +127,52 @@ private fun BoxScope.DesktopViewport(
     if (hostBridge != null && primaryOutput != null) {
         var presentFailed by remember { mutableStateOf(false) }
 
+        // One seat per live HostBridge, and one router driving it. Both are
+        // keyed on hostBridge so a session that goes away and comes back
+        // does not leave the old connection's held buttons behind.
+        val seat = remember(hostBridge) { InputSeat(hostBridge) }
+        val router = remember(hostBridge) { DesktopInputRouter().also { it.seat = seat } }
+
+        // The router is inert with no seat, so tearing the session down is
+        // just clearing it -- and clearing it releases whatever the
+        // container still thinks is held.
+        DisposableEffect(router) {
+            onDispose { router.seat = null }
+        }
+
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
                 SurfaceView(ctx).apply {
+                    router.attachTo(this)
                     holder.addCallback(object : SurfaceHolder.Callback {
                         override fun surfaceCreated(holder: SurfaceHolder) {
                             presentFailed = !hostBridge.presentOutput(primaryOutput, holder.surface)
                         }
 
+                        // The only place the input transform can be built
+                        // honestly: width/height here are the surface's real
+                        // size, which is not the panel size (the taskbar
+                        // takes 48dp) and not necessarily the output size
+                        // either. Rebuilt on every change, so a rotation or
+                        // a lapdock resize cannot leave a stale scale behind.
                         override fun surfaceChanged(
                             holder: SurfaceHolder,
                             format: Int,
                             width: Int,
                             height: Int,
-                        ) = Unit
+                        ) {
+                            router.transform = PointerTransform(
+                                viewWidth = width,
+                                viewHeight = height,
+                                outputWidth = primaryOutput.widthPx,
+                                outputHeight = primaryOutput.heightPx,
+                            )
+                        }
 
                         override fun surfaceDestroyed(holder: SurfaceHolder) {
+                            router.transform = null
+                            router.releaseHeldInput()
                             hostBridge.stopPresenting()
                         }
                     })
