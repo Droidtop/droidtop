@@ -79,7 +79,10 @@ class CraneRootfsPuller(private val context: Context) : RootfsPuller {
         val digestMarker = "$destinationPath/.droidtop-image-digest"
         val existing = RootProcess.run("cat", digestMarker)
         if (existing.succeeded && existing.stdout.trim() == digest) return
-        RootProcess.run("rm", "-rf", destinationPath)
+        val wiped = RootfsDelete.delete(destinationPath)
+        check(wiped.succeeded) {
+            "refusing to reuse or wipe the stale rootfs at $destinationPath: ${wiped.stderr.ifBlank { wiped.stdout }}"
+        }
 
         val mkdirResult = RootProcess.run("mkdir", "-p", destinationPath)
         check(mkdirResult.succeeded) { "mkdir -p $destinationPath failed: ${mkdirResult.stderr}" }
