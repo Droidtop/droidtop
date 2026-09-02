@@ -90,6 +90,15 @@ android {
             // redirect.tzst, and the box86_64/fexcore/wowbox64 translator
             // payloads.
             assets.srcDir("../vendor/gamenative/app/src/main/assets")
+            // The modern flavor's own two assets, for the same reason
+            // its jniLibs are packaged below: MODERN_ANDROID is the only
+            // value that can work above targetSdk 28, and on that path
+            // ImageFsInstaller copies libredirect-bionic-wx.so out of
+            // the assets into the rootfs, where every guest process then
+            // LD_PRELOADs it (BuildConfig.PRELOAD_BIONIC_SO). Without
+            // this source dir that copy silently finds nothing and every
+            // Wine launch preloads a file that does not exist.
+            assets.srcDir("../vendor/gamenative/app/src/modern/assets")
             // The native half of the same tree. Without this the module
             // compiled 830 Java/Kotlin files whose entire reason to exist
             // is calling into libwinlator.so, libpatchelf.so and the
