@@ -2065,6 +2065,41 @@ GitHub-refresh + validate-before-replace:
   `xp`/`vx`, detected via their real archive/project/Game.ini RGSS
   signatures). The unit tests parse the SHIPPED seed file, so registry
   edits that break detection fail CI before they ship.
+
+  **v5 — one detection authority for droidtop AND enginehost (decided
+  2026-09-02).** droidtop and enginehost briefly carried two independent
+  engine detectors, extended separately, that could classify the same
+  folder differently (library says one thing, launch does another). The
+  resolution: `engines-database.json` is the single classification
+  authority for both apps. enginehost bundles the same file as its seed
+  and refreshes it from the same droidtop-platforms URL, evaluating the
+  same rows with the same semantics (rules OR, conditions AND, file
+  order is the sole precedence), so scan-time and launch-time
+  classification agree by construction and a detection fix ships once,
+  as data, to both. The alternative — droidtop asking enginehost at scan
+  time — was rejected: droidtop classifies hundreds of folders per scan
+  and must work with enginehost absent, and detection also drives
+  non-enginehost routes (Wine/Linux/Kirikiroid2, the §7g store-ownership
+  rule, Unreal/Unity). A compiled shared module across the two repos was
+  rejected too (two release cadences, separate CI): the DATA is the
+  shared module; each app keeps a thin interpreter of the documented
+  format, and both test suites parse the same shipped seed file. Three
+  consequences: (1) rows an app's id map doesn't know are skipped by
+  that app — `rpgmaker-mvmz` and `flash-swf` are enginehost-only by
+  design (plain `.swf` stays droidtop's players-database path);
+  (2) enginehost's richer per-engine parsing (RGSS version out of
+  `Game.ini`, `RPGMAKER_VERSION`, Ren'Py's `vc_version.py`, GDPC/SWF
+  headers) is ENRICHMENT, run after classification and keyed on the
+  classified family — it prefills version/execFile/evidence and can
+  never change which engine a folder is; (3) where one engine id spans
+  multiple rows (`cmvs`/`cmvs-ps3`/`cmvs-ps2`), the FIRST row is the
+  canonical launch row (`EnginesDatabase.defFor`), so the generic
+  context-null row is listed first and the context-refining rows after
+  it. New in v5, every marker taken from one the two detectors had
+  already verified, none invented: `anyFileExtensionDeep` (depth-capped
+  subtree extension search, for the compiled-Ren'Py fallback),
+  `startup.tjs`, corroborated `RPG_RT.ldb`+(`exe`|`lmt`),
+  `project.godot`, `.cst`, `.ps3`/`.ps2`, and `data01000.arc`.
 - `bios-database.json` — §7e4's firmware registry.
 
 One user action refreshes all four ("Update platform databases" in the
