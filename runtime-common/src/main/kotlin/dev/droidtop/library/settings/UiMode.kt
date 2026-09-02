@@ -30,7 +30,7 @@ enum class UiMode(val label: String) {
 }
 
 object UiModePrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY = "droidtop_ui_mode"
 
     fun get(context: Context): UiMode {

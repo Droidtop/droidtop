@@ -134,10 +134,10 @@ object HandheldSettingsCatalog {
                             ChoiceOption("AFTER_5", "After 5 minutes"),
                             ChoiceOption("AFTER_10", "After 10 minutes"),
                         ),
-                        current = context.getSharedPreferences("com.android.launcher3.prefs", Context.MODE_PRIVATE)
+                        current = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
                             .getString("droidtop_screensaver_mode", null) ?: "OFF",
                         onSelect = { ctx, value ->
-                            ctx.getSharedPreferences("com.android.launcher3.prefs", Context.MODE_PRIVATE)
+                            ctx.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
                                 .edit().putString("droidtop_screensaver_mode", value).apply()
                         },
                     ),

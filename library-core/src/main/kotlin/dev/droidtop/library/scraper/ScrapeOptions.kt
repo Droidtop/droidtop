@@ -1,6 +1,7 @@
 package dev.droidtop.library.scraper
 
 import android.content.Context
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * ES-DE-style scraper options (per direction: the scrape flow prompts
@@ -19,7 +20,7 @@ enum class ScrapeFilter(val label: String) {
 }
 
 object ScrapeOptionsPrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_FILTER = "droidtop_scrape_filter"
     private const val KEY_CONTENT_METADATA = "droidtop_scrape_content_metadata"
     private const val KEY_CONTENT_ARTWORK = "droidtop_scrape_content_artwork"

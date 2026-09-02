@@ -29,6 +29,7 @@ import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * Per-gamelist sort order, persisted per group (the pattern is real
@@ -64,7 +65,7 @@ enum class GamelistFilter(val label: String) {
 }
 
 object GamelistFilterPrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_PREFIX = "droidtop_gamelist_filter_"
 
     fun get(context: Context, groupKey: String): GamelistFilter {
@@ -82,7 +83,7 @@ object GamelistFilterPrefs {
 }
 
 object GamelistSortPrefs {
-    private const val PREFS_NAME = "com.android.launcher3.prefs"
+    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_PREFIX = "droidtop_gamelist_sort_"
 
     fun get(context: Context, groupKey: String): GamelistSort {
