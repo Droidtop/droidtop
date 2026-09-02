@@ -209,10 +209,13 @@ class MainActivity : AppCompatActivity() {
         // root. It stays a supplier because DesktopSessionService may
         // still be connecting when this runs.
         dev.droidtop.library.PcGameRuntimeRegistry.runtime =
-            dev.droidtop.runtime.windows.DroidtopPcGameRuntime(applicationContext) {
-            (DesktopSessionService.state.value as? DesktopSessionState.Connected)
-                ?.let { PrimaryContainerSession(it.runtime, it.container) }
-        }
+            dev.droidtop.runtime.windows.DroidtopPcGameRuntime(
+                context = applicationContext,
+                primarySession = {
+                    (DesktopSessionService.state.value as? DesktopSessionState.Connected)
+                        ?.let { PrimaryContainerSession(it.runtime, it.container) }
+                },
+            )
         refreshModeIfUndecided()
 
         observeSecondScreen()
