@@ -64,6 +64,12 @@ import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.consoles.PlatformsDatabase
 import dev.droidtop.library.displayName
+import dev.droidtop.library.integrations.Integration
+import dev.droidtop.library.integrations.IntegrationCapability
+import dev.droidtop.library.integrations.IntegrationStore
+import dev.droidtop.library.integrations.OpenWithTarget
+import dev.droidtop.library.integrations.openWithChipLabel
+import dev.droidtop.library.integrations.openWithTargetsFor
 import dev.droidtop.library.displayName as launchStrategyDisplayName
 import dev.droidtop.library.theme.SystemThemeColors
 import dev.droidtop.library.theme.ThemeAssets
@@ -728,6 +734,23 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
     }
     var editingCollections by remember { mutableStateOf(false) }
 
+    // The user's own "open with" hooks (docs/SPEC.md section 12), paired
+    // with the real files on this entry droidtop itself cannot open.
+    // Resolved off the main thread: this reads filesDir and asks the
+    // PackageManager whether each declared target app is installed.
+    val openWithTargets = remember(entry) { openWithTargetsFor(entry) }
+    var openWith by remember(entry) { mutableStateOf<List<Integration>>(emptyList()) }
+    var integrationError by remember(entry) { mutableStateOf<String?>(null) }
+    LaunchedEffect(entry, openWithTargets) {
+        openWith = if (openWithTargets.isEmpty()) {
+            emptyList()
+        } else {
+            withContext(Dispatchers.IO) {
+                IntegrationStore.available(context, IntegrationCapability.OPEN_WITH)
+            }
+        }
+    }
+
     // Which launch backends this particular game can actually use right
     // now -- enginehost's native runtime, Wine, a Linux container. Loaded
     // off the main thread because resolving them re-reads the game folder
@@ -860,6 +883,32 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
             if (media.size > 1) {
                 ActionChip("View media (${media.size})", highlighted = false, onClick = { viewingMedia = true })
             }
+            // One chip per (hook, openable file). Never a substitution and
+            // never a silent pick: droidtop has no manual reader and no
+            // full video player of its own, so these open a door rather
+            // than taking over a behaviour, and if the user declared two
+            // hooks they both appear and the user chooses -- droidtop does
+            // not rank them.
+            openWith.forEach { integration ->
+                openWithTargets.forEach { target ->
+                    ActionChip(
+                        openWithChipLabel(integration, target, openWithTargets.size),
+                        highlighted = false,
+                        onClick = {
+                            integrationError = runCatching {
+                                IntegrationStore.run(
+                                    context = context,
+                                    integration = integration,
+                                    systemId = entry.systemId,
+                                    file = target.file,
+                                )
+                            }.exceptionOrNull()?.let { failure ->
+                                "${integration.label} failed: ${failure.message ?: failure::class.java.simpleName}"
+                            }
+                        },
+                    )
+                }
+            }
             if (isRomEntry) {
                 ActionChip("Edit metadata", highlighted = false, onClick = { editingMetadata = true })
                 ActionChip("Collections", highlighted = false, onClick = { editingCollections = true })
@@ -910,6 +959,12 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
         }
         (scrapeStatus ?: scrapeResult)?.let {
             Text(it, color = Color.Gray, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+        }
+        // An integration drives another app's own real Activity, so it can
+        // fail for reasons droidtop cannot see coming (the template names a
+        // component that app no longer exports). Shown, not swallowed.
+        integrationError?.let {
+            Text(it, color = Color(0xFFFF8A80), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
         }
         // Only shown when there's an actual choice to make -- a single
         // available strategy (or none) has nothing for a picker to offer.

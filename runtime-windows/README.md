@@ -10,22 +10,30 @@ equally first-class entry types alongside native APKs and Linux containers.
 
 ## What changes vs. upstream
 
-Upstream Winlator/GameNative instantiate an isolated Android SurfaceView
-XServer per container. We remove that entirely: a `WineSession` here is just
-a Wine process pointed at whatever container's Wayland socket it's supposed
-to render into (primary, for the merged desktop; a sibling, if it's been
-popped out to its own display — see `runtime-common`'s `WindowPlacement`).
+Execution is upstream's own bionic model, kept rather than replaced: above
+`targetSdk 28` Android refuses to `exec()` an extracted binary, so the guest
+runs through `/system/bin/linker64` against the ImageFs root in app storage,
+with no proot and no Linux container. That is why a Windows game needs no
+root here — see `WineEngine`'s own doc comment and docs/SPEC.md §5b.
+
+What is *not* kept is upstream's presentation layer: an Android SurfaceView
+XServer per container. droidtop composes through `:host-bridge`. Upstream's
+X server components are still started, headless, because Wine's X11 driver
+has to connect to something; nothing renders their output yet, and wiring a
+renderer to droidtop's own surface is separate, named work.
 
 **Open risk, confirm before relying on this:** Wine's native Wayland driver
 needs to be solid enough to use directly. If not, fall back to Xwayland
-running inside the same container as a compatibility shim — still no custom
-Android-side XServer either way.
+running inside the same container as a compatibility shim.
 
 ## Status
 
-`WineSession.launch` is still a bare `wine <executable>` invocation (no
-Box64/FEXCore wrapper selection, no DXVK/VKD3D env setup) — see that
-class's own doc comment for exactly what's real vs. stubbed.
+`WineEngine` is the backend-neutral entry point for running Windows
+software; `BionicWineEngine` is the one implementation, and it needs no
+root, so handheld and desktop mode use the same engine and the same prefix.
+It drives gamenative's own `BionicProgramLauncherComponent`, so the real
+box64/FEXCore environment and translator extraction come with it rather
+than being re-derived here.
 
 **The real `com.winlator` runtime is forked in wholesale as of this
 session** (`src/main/java/com/winlator/`, 247 files, unmodified,
@@ -64,12 +72,12 @@ that none of it is needed for the runtime half this module wants today.
 A much larger, separate fork pass once droidtop wants gamenative's own
 Steam-library UI specifically.
 
-**`runtime-windows` compiles cleanly as of this session** (confirmed via
-CI, not just locally) — the full wholesale `com.winlator` fork plus the
-shims above. **Not wired up yet, by design**: the fork exists as real,
-compiling source, not yet called from `WineSession` or any droidtop
-shell. Bringing the code in and actually using it are deliberately
-separate steps.
+**`runtime-windows` compiles cleanly** (confirmed via CI, not just
+locally), and the fork is wired up rather than merely compiling: the
+provisioning path drives upstream's `ContainerManager`/`ImageFsInstaller`/
+launch-dependency machinery, and `BionicWineEngine` drives its guest
+launcher. The native half of the vendored tree ships too — both `jniLibs`
+roots are packaged, without which none of the above could run.
 
 This module's Android `namespace` is `app.gamenative` (not droidtop's
 usual `dev.droidtop.*`) specifically so the forked tree's own real
