@@ -1,6 +1,7 @@
 package dev.droidtop.library
 
 import android.util.Log
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -153,6 +154,20 @@ data class LibraryEntry(
 data class PcInfo(
     /** Display name of where it came from: "Steam", "GOG", "Epic", "Amazon", "Folder". */
     val source: String,
+    /**
+     * The id the PC provider identifies this game by ("steam:440"),
+     * carried on the entry rather than being the entry's own
+     * [LibraryEntry.id].
+     *
+     * Why it exists: when engine detection claims a store-installed
+     * game the entry that survives is the ENGINE one, keyed by the
+     * game's folder (see [StoreInstall]). The store's own identity is
+     * still real and still needed -- it is how a previous scrape of the
+     * PC entry is found again, and the only stable handle back to the
+     * store row -- so it travels with the surviving entry instead of
+     * disappearing with the suppressed one.
+     */
+    val storeId: String? = null,
     val installed: Boolean,
     /** On-disk size when installed, download size when not, 0 when unknown. */
     val sizeBytes: Long = 0,
@@ -192,6 +207,97 @@ data class PcCompatibility(
         }
         else -> "Tried, no playable reports"
     }
+}
+
+/**
+ * A game some PC store says is installed, at a real directory on this
+ * device — the handful of facts engine detection needs in order to keep
+ * a store game's store-side information when it claims that folder.
+ *
+ * The one ownership rule (docs/SPEC.md §7g): **if engine detection
+ * recognises a store game's install directory, the engine entry owns
+ * that game and the `pc` entry is suppressed.** A Ren'Py game runs
+ * natively on enginehost; running its Windows build under Wine plus CPU
+ * translation is strictly worse, and is the route that does not work on
+ * this target today at all. The rule is evaluated from the FOLDER, by
+ * both providers, using the same [GameEngineDetector.engineOwnsInstall]
+ * call — never from whichever provider happened to return first, so the
+ * same library deduplicates identically on every scan.
+ *
+ * Suppression alone would throw away everything the `pc` entry knew, so
+ * this type is what carries that across: source, store id, installed
+ * state, size, install path, community compatibility, and the store's
+ * cover art. See [dev.droidtop.library.LibraryEntry.withStoreInstall].
+ */
+data class StoreInstall(
+    val installDir: File,
+    val pcInfo: PcInfo,
+    /** The store's own cover/icon URL, used only when the folder has no ES-DE artwork. */
+    val artworkUri: String? = null,
+)
+
+/**
+ * The path key [StoreInstall]s and detected game folders are matched on.
+ *
+ * [File.absolutePath] rather than [File.getCanonicalPath]: canonicalising
+ * touches the filesystem (symlink resolution) once per candidate folder,
+ * which a scan over a real SD card cannot afford, and both sides of this
+ * comparison already come from the same kind of absolute path. Trailing
+ * separators are dropped because a store row's `installPath` may carry
+ * one and a scanned directory never does.
+ */
+internal fun String.asInstallKey(): String? =
+    takeIf { it.isNotBlank() }?.let { File(it).absolutePath.trimEnd(File.separatorChar) }
+
+/**
+ * [StoreInstall]s keyed by install directory, with ties broken
+ * deterministically.
+ *
+ * Two store rows CAN name the same directory — the same game owned on
+ * two stores, or a folder scan that also sees a store install. Taking
+ * "whichever came first" would make the library depend on DAO iteration
+ * order, which is exactly the kind of discovery-order non-determinism
+ * that has bitten this project before, so the winner is the lowest
+ * [PcInfo.storeId] and the result is the same on every scan.
+ */
+internal fun List<StoreInstall>.byInstallDir(): Map<String, StoreInstall> {
+    val byDir = HashMap<String, StoreInstall>()
+    for (install in this) {
+        val key = install.installDir.absolutePath.asInstallKey() ?: continue
+        val existing = byDir[key]
+        if (existing == null || install.tieBreakKey() < existing.tieBreakKey()) byDir[key] = install
+    }
+    return byDir
+}
+
+private fun StoreInstall.tieBreakKey(): String = pcInfo.storeId ?: pcInfo.source
+
+/** The [StoreInstall] a detected game folder belongs to, if any store claims it. */
+internal fun Map<String, StoreInstall>.forFolder(folder: File): StoreInstall? =
+    folder.absolutePath.asInstallKey()?.let { this[it] }
+
+/**
+ * Folds a suppressed `pc` entry's information into the engine entry that
+ * claimed the same folder. Returns the entry untouched when [install] is
+ * null, which is the normal case: a game in the user's own games folder
+ * has no store behind it and must be unaffected by any of this.
+ *
+ * Identity and routing stay the engine entry's own — [LibraryEntry.id],
+ * [LibraryEntry.title] and [LibraryEntry.kind] are what send this game
+ * to enginehost, and [LibraryEntry.systemId] stays null rather than
+ * becoming `"pc"` so the entry keeps grouping under its engine's system
+ * rather than under the Wine-launched PC one. Everything that was only
+ * ever known store-side comes across.
+ */
+internal fun LibraryEntry.withStoreInstall(install: StoreInstall?): LibraryEntry {
+    if (install == null) return this
+    return copy(
+        pcInfo = pcInfo ?: install.pcInfo,
+        // Local ES-DE media wins over a store CDN URL, same precedence
+        // withScrapedMetadata already applies: what is on disk is the
+        // live truth, the remote URL is the fallback.
+        artworkUri = artworkUri ?: install.artworkUri,
+    )
 }
 
 enum class LibraryEntryKind {

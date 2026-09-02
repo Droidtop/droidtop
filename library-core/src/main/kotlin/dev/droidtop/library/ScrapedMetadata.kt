@@ -22,12 +22,31 @@ import java.io.File
  * under a games root (a store install, a Wine shortcut) and so have no
  * layout lookup at all.
  */
-suspend fun List<LibraryEntry>.withScrapedMetadata(dao: RomDao): List<LibraryEntry> {
+suspend fun List<LibraryEntry>.withScrapedMetadata(
+    dao: RomDao,
+    /**
+     * A second, lower-priority id to look a row up under when the entry's
+     * own id has none.
+     *
+     * The one real caller is [EngineGameProvider]: a store-installed
+     * engine game is now a single engine entry keyed by its folder (see
+     * [GameEngineDetector.engineOwnsInstall]), but a scrape made while it
+     * was still a separate `pc` entry wrote its row under the store id.
+     * Reading that row back is what makes "the surviving entry keeps what
+     * the suppressed one had" true for scraped metadata as well as for
+     * [PcInfo]. Defaults to nothing, so no other provider changes
+     * behaviour.
+     */
+    alsoUnderId: (LibraryEntry) -> String? = { null },
+): List<LibraryEntry> {
     if (isEmpty()) return this
-    val metadataById = dao.getGameMetadata(map { it.id }).associateBy { it.id }
+    val ids = flatMap { listOfNotNull(it.id, alsoUnderId(it)) }.distinct()
+    val metadataById = dao.getGameMetadata(ids).associateBy { it.id }
     if (metadataById.isEmpty()) return this
     return map { entry ->
-        val meta = metadataById[entry.id] ?: return@map entry
+        val meta = metadataById[entry.id]
+            ?: alsoUnderId(entry)?.let { metadataById[it] }
+            ?: return@map entry
         entry.copy(
             artworkUri = entry.artworkUri ?: meta.artworkPath?.takeIf { File(it).isFile },
             videoUri = entry.videoUri ?: meta.videoPath?.takeIf { File(it).isFile },

@@ -3,8 +3,10 @@ package dev.droidtop.runtime.windows
 import android.content.Context
 import com.winlator.container.ContainerManager
 import com.winlator.container.Shortcut
+import dev.droidtop.library.EngineOverridePrefs
+import dev.droidtop.library.EnginesDatabase
+import dev.droidtop.library.GameEngineDetector
 import dev.droidtop.library.GameExecutableResolver
-import dev.droidtop.library.PcCompatibility
 import dev.droidtop.library.PcGameRuntimeRegistry
 import dev.droidtop.library.PcInfo
 import dev.droidtop.library.LibraryEntry
@@ -69,11 +71,40 @@ class PcGameProvider(
      * up by hand. A store game that also has a shortcut would otherwise
      * appear twice, so shortcuts pointing inside a known install
      * directory are dropped in favour of the richer store row.
+     *
+     * The same "one entry per game, whatever found it" rule applies
+     * across providers, not just within this one: a store game whose
+     * install directory engine detection recognises belongs to
+     * [dev.droidtop.library.EngineGameProvider] and is not returned here
+     * at all. See [dev.droidtop.library.GameEngineDetector.engineOwnsInstall].
      */
     override suspend fun scan(): List<LibraryEntry> {
-        val storeGames = runCatching { PcLibrary.allGames(context) }.getOrDefault(emptyList())
+        val allStoreGames = runCatching { PcLibrary.allGames(context) }.getOrDefault(emptyList())
+        // The store/engine ownership rule (docs/SPEC.md 7g), asked of the
+        // folder rather than of whichever provider ran first: a store
+        // game whose install directory engine detection recognises is
+        // EngineGameProvider's, and returning a second entry for it here
+        // is the duplicate the user actually saw -- one copy routed to
+        // enginehost, the other straight past engine detection to Wine.
+        // The engine entry is the one that survives because enginehost
+        // runs a Ren'Py or RPG Maker game natively, and because it is the
+        // route that works on this target at all (5b). Nothing is lost
+        // with the entry: PcLibrary hands the same install directories to
+        // EngineGameProvider as StoreInstalls, which fold this entry's
+        // PcInfo and store art onto the surviving one.
+        val engineDefs = runCatching { EnginesDatabase.defs(context) }.getOrDefault(emptyList())
+        val storeGames = allStoreGames.filterNot { game ->
+            val dir = game.installDir ?: return@filterNot false
+            GameEngineDetector.engineOwnsInstall(dir, engineDefs) { folder ->
+                EngineOverridePrefs.engineFor(context, folder.absolutePath)
+            }
+        }
         val storeEntries = storeGames.map { it.toLibraryEntry() }
-        val installDirs = storeGames.mapNotNull { it.installPath?.takeIf(String::isNotBlank) }
+        // Shortcut suppression below still measures against EVERY store
+        // game's install directory, engine-owned ones included: a Wine
+        // shortcut pointing inside a Ren'Py game's folder is the same
+        // duplicate by another route.
+        val installDirs = allStoreGames.mapNotNull { it.installPath?.takeIf(String::isNotBlank) }
 
         val shortcutEntries = runCatching { ContainerManager(context).loadShortcuts() }
             .getOrDefault(emptyList())
@@ -98,30 +129,10 @@ class PcGameProvider(
         // Store art is a remote URL; a scanned folder's is a local file.
         // Both are just a URI to the renderer.
         artworkUri = artUrl,
-        pcInfo = PcInfo(
-            source = source.displayName(),
-            installed = installed,
-            sizeBytes = sizeBytes,
-            installPath = installPath,
-            compatibility = compatibility?.let {
-                PcCompatibility(
-                    averageRating = it.averageRating,
-                    playableReports = it.playableReports,
-                    gpuPlayableReports = it.gpuPlayableReports,
-                    hasBeenTried = it.hasBeenTried,
-                    reportedNotWorking = it.reportedNotWorking,
-                )
-            },
-        ),
+        // One mapping of a store row's facts, shared with the
+        // StoreInstall engine detection consumes -- see PcLibrary.toPcInfo.
+        pcInfo = toPcInfo(),
     )
-
-    private fun PcLibrary.Source.displayName(): String = when (this) {
-        PcLibrary.Source.STEAM -> "Steam"
-        PcLibrary.Source.GOG -> "GOG"
-        PcLibrary.Source.EPIC -> "Epic"
-        PcLibrary.Source.AMAZON -> "Amazon"
-        PcLibrary.Source.FOLDER -> "Folder"
-    }
 
     private fun Shortcut.toLibraryEntry(): LibraryEntry = LibraryEntry(
         id = file.absolutePath,
