@@ -2836,7 +2836,10 @@ have; `helpsystem`'s whole `*Dimmed` family (4/4/2/2/2/2) fires only
 while ES-DE's own menu overlay dims the background, and droidtop renders
 no such overlay, so implementing it would mean inventing the state;
 `gameselector`'s `selection` (3); `grid`'s `textBackgroundCornerRadius`
-(1); and `datetime`'s `displayRelative` (1). **Nothing in this pass was
+(1); and `datetime`'s `displayRelative` (1). (All of those are
+implemented as of 2026-09-02 — see "Closing the used set" below; the
+badges reason held, the helpsystem one turned out to rest on a false
+premise about droidtop's own menus.) **Nothing in this pass was
 checked on a real screen** -- the device was off-limits, so verification
 is by unit test (`EsDeVideoLayoutTest`, `EsDeTileSizeTest`) and by
 reading real ES-DE's source. The video pillarbox/black-frame geometry,
@@ -2976,6 +2979,141 @@ screenshot diff once the device is available: whether the apparent
 scroll rate of a description panel matches ES-DE's on the same theme at
 this device's resolution, the vertical snap and leading-inset clip at the
 top and bottom edges, and the marquee's gap on decaffe's own system view.
+
+**Closing the used set (2026-09-02)**: every remaining unrendered
+property from the ten-theme measurement above is implemented, all ported
+from cited real ES-DE source. The one member of that set deliberately
+still left is `helpsystem`'s `originDimmed`, for the reason recorded at
+the end of this entry; the count is otherwise closed. (This is stated as
+"the measured set minus one" rather than as a fresh N-of-282 figure
+because the measurement itself was not re-run in this pass -- the ten
+clones it read are not on this machine any more, and quoting a recomputed
+number without recomputing it would be worse than not quoting one.)
+
+- `gameselector`'s `selection`, all three real modes
+  (`GameSelectorComponent::refreshGames`, GameSelectorComponent.h:51-129,
+  plus `FileData::updateLastPlayedList`/`updateMostPlayedList`,
+  FileData.cpp:906-940). `lastplayed`/`mostplayed` sort descending and
+  skip never-played/never-launched games, which
+  `LibraryEntry.lastPlayedEpochMs`/`playCount` already carried. Three
+  real bugs went with it: `GameSelector`'s own doc comment claimed ES-DE
+  has `similar` and `sameSystem` modes, which exist nowhere in its source
+  and were invented; `allowDuplicates` defaulted to true where real ES-DE
+  defaults to false, so an unset theme got a mosaic allowed to repeat one
+  game; and a `gameCount` larger than the library padded with repeats
+  rather than stopping, which is what ES-DE's own retry loop does
+  (GameSelectorComponent.h:72-74). `gameCount` is now clamped 1..30 as
+  well (:168).
+- `datetime`'s `displayRelative`, ported as pure Kotlin in
+  `runtime-common/.../EsDeDateTime.kt` from
+  `DateTimeComponent::getDisplayString` (DateTimeComponent.cpp:86-135)
+  and `Utils::Time::Duration` (TimeUtil.cpp:73-80): the coarsest non-zero
+  unit wins, and there is a real 82800-second guard because a stored
+  epoch 0 read back through a local timezone is not zero. `lastplayed` is
+  bound too (it turns `displayRelative` on implicitly,
+  DateTimeComponent.cpp:368-369, and the property overrides that in both
+  directions) — the earlier "not modeled yet" note was stale, the field
+  existed. ES-DE's real "unknown"/"never" defaults now show where a value
+  is absent instead of nothing.
+- `carousel`/`grid`'s `imageColorEnd`/`imageGradientType`/
+  `imageSelectedColorEnd`/`imageSelectedGradientType`, and `image`'s own
+  `colorEnd` when it is declared without a `gradientType`. These were
+  left before as needing a shader. They do not: ES-DE puts the start
+  color on two of the quad's corners and the end color on the other two
+  (`ImageComponent::updateColors`, ImageComponent.cpp:935-947) and
+  `core.glsl:147-152` multiplies the interpolated vertex color into the
+  sampled texel, which is exactly a linear-gradient fill in
+  `BlendMode.Modulate` over the drawn image. The flat shift drops out of
+  the `ColorMatrix` when a gradient is active so the color is not applied
+  twice. The fallback chain is ES-DE's own and is not per-property
+  constants: `imageColor` also sets the end color, the selected pair
+  starts as the unselected pair, `imageSelectedColor` in turn sets
+  `imageSelectedColorEnd`, and the two gradient axes default to
+  horizontal independently.
+- `defaultImage` on `carousel`/`grid`, so the primary-element fallback
+  chain no longer ends at the pre-resolved artwork
+  (`CarouselComponent::onDemandTextureLoad`, CarouselComponent.h:578-579;
+  SystemView.cpp:615-618/:868). This is the answer to droidtop's most
+  common real gap — a system whose `${system.theme}` logo the theme does
+  not ship now draws the theme's declared default rather than falling
+  through to text.
+- `grid`'s `textBackgroundCornerRadius` (GridComponent.h:394,
+  :1395-1398), which rounds the fallback TEXT item's background box, not
+  the entry's background layer.
+- `video`'s `audio`, `iterationCount` + `onIterationsDone`, and
+  `imageMaxSize`. `iterationCount` (VideoComponent.cpp:237-238) was
+  ignored entirely — every themed video looped forever regardless — and
+  `onIterationsDone` is meaningless without it: at the count real ES-DE
+  renders nothing at all, or the static image
+  (VideoFFmpegComponent.cpp:200-203). `imageMaxSize` exposed a bigger
+  miss: a `video` element has TWO independent size groups, and droidtop
+  read only the video's. The static-image group and its inheritance rule
+  (`VideoFFmpegComponent::setResize`/`setMaxSize`/`setCroppedSize` forward
+  to the static image only when the image group is unset,
+  VideoFFmpegComponent.cpp:66-98) are now pure Kotlin in
+  `EsDeVideoLayout.kt`. `audio` (VideoComponent.cpp:254-255, real default
+  true) is honoured for real rather than kept unconditionally muted; the
+  reason it was muted — no "is this view actually visible" signal — is
+  fixed rather than worked around, by tying playback to the host
+  activity's real lifecycle.
+- `badges`' `controllerPos`/`controllerSize`/`folderLinkPos`/
+  `folderLinkSize`. The placement is ported from
+  `FlexboxComponent::calculateLayout` (FlexboxComponent.cpp:222-231) and
+  unit-tested. The ART is theme-supplied only: ES-DE's own defaults are
+  the 36 `:/graphics/controllers/*.svg` files and
+  `badge_folderlink_overlay.svg`, Qt resources compiled into its binary,
+  the same assets droidtop already declines to redistribute for the base
+  badges and the systemstatus icons. A theme CAN ship them —
+  `customControllerIcon`/`customFolderLinkIcon` are real schema
+  properties droidtop already parses — and when it does not, no overlay
+  is drawn, which is real ES-DE's own behaviour for an overlay with no
+  texture (FlexboxComponent.cpp:222) rather than a droidtop shortcut. No
+  glyph stand-in here: the base badge already is a controller glyph, and
+  stacking a second one would be invented art, not missing art.
+- `helpsystem`'s `*Dimmed` family. The earlier pass left this because
+  droidtop rendered no menu overlay to trigger it, and inventing the
+  trigger would have been worse than the gap. That premise turned out to
+  be wrong: droidtop's in-context options menu is a Compose `Dialog`
+  drawn OVER the themed view with a scrim, so the help bar really is on
+  screen behind a dimmed background — which is exactly what real ES-DE's
+  `Window::isBackgroundDimmed` means ("the GUI stack has more than one
+  entry", Window.cpp:513-516). The trigger is now threaded through as
+  `EsDeThemedView(backgroundDimmed = …)` and every dimmed variant falls
+  back to its undimmed counterpart when unset, ES-DE's own rule
+  (HelpComponent.cpp:97-294). `opacityDimmed`'s real clamp is 0.2..1.0,
+  not 0..1 — ES-DE will not let a theme hide the help bar behind a menu.
+
+Deliberately still not implemented, with reasons: `helpsystem`'s
+`originDimmed`, because plain `origin` is unimplemented on that element
+too — the help bar is a wrapping Row whose width is not measured before
+placement, so there is nothing to offset an origin against, and doing one
+without the other would be worse than neither. `carousel`'s
+`textRelativeScale`, the `textHorizontalScroll*` family, `selectorImageTile`,
+`collectionIndicators`, `fadeAbovePrimary` and `grid`'s `imageCropPos` are
+unchanged from the previous pass's own recorded reasons.
+
+Two pieces of duplication were consolidated on the way past. The six
+identical local `float()`/`bool()`/`str()`/`path()`/`pair()`/`color()`
+helpers redeclared inside `esDeCarouselConfig`, `esDeGridConfig` and
+`esDeTextListConfig` are now one set of extension functions on
+`EsDeThemeElement?` next to `valueOrNull` in `EsDeTheme.kt`; and
+`EsDeArtwork` rebuilt its two-candidate `downloaded_media` root list
+identically at five call sites, which is now one private helper.
+
+**Nothing in this pass was checked on a real screen** — the device
+remained off-limits, and nothing was seen on a display at any point.
+Verification is by unit test (`EsDeDateTimeTest`, `EsDeBadgeOverlayTest`,
+`GameSelectorTest`, plus new cases in `EsDeVideoLayoutTest` and
+`EsDeGridLayoutTest`, every expected value derived by hand from the cited
+C++) and by reading real ES-DE's source. What wants a real screenshot
+diff against each theme's own bundled reference render once the device is
+available: the positional image gradients on a theme that sets
+`imageColorEnd` (Modulate is the right operation on paper, but whether
+Compose's gradient endpoints land on the same corners as ES-DE's quad
+vertices is a pixel question), the badge overlay placement on a theme
+that ships its own controller icons, the helpsystem dimmed variants with
+the options menu open over a themed gamelist, and `defaultImage` on a
+system carousel where several systems have no logo art.
 
 **Five-theme on-device review + fixes (2026-08-30, later same day)**:
 the theme downloader ran end-to-end for the first time — three real

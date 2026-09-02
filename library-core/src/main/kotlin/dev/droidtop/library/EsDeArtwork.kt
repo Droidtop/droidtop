@@ -128,6 +128,18 @@ object EsDeArtwork {
         listOf("miximages", "screenshots", "titlescreens", "covers")
 
     /**
+     * The two real `downloaded_media` roots droidtop searches, in order:
+     * the sibling `ES-DE/downloaded_media` layout real ES-DE itself
+     * writes, then a `downloaded_media` directly under [gamesRoot]. Every
+     * lookup in this object walks exactly this pair, so it is built once
+     * here rather than re-declared identically at each site.
+     */
+    private fun candidateMediaRoots(gamesRoot: File): List<File> = listOf(
+        File(gamesRoot.parentFile ?: gamesRoot, "ES-DE/downloaded_media"),
+        File(gamesRoot, "downloaded_media"),
+    )
+
+    /**
      * Every scraped image for a game, in display order, labelled for a
      * viewer. [resolve] answers "the single best one and stop", which is
      * right for a theme element and useless for browsing what was
@@ -143,13 +155,10 @@ object EsDeArtwork {
             "physicalmedia" to "Physical media",
             "fanart" to "Fan art",
         )
-        val candidateMediaRoots = listOf(
-            File(gamesRoot.parentFile ?: gamesRoot, "ES-DE/downloaded_media"),
-            File(gamesRoot, "downloaded_media"),
-        )
+        val mediaRoots = candidateMediaRoots(gamesRoot)
         val found = mutableListOf<Pair<String, String>>()
         for (mediaType in MEDIA_TYPES_BY_PRIORITY) {
-            for (mediaRoot in candidateMediaRoots) {
+            for (mediaRoot in mediaRoots) {
                 val hit = EXTENSIONS.asSequence()
                     .map { ext -> File(File(File(mediaRoot, system), mediaType), "$romBaseName.$ext") }
                     .firstOrNull { it.isFile }
@@ -185,11 +194,8 @@ object EsDeArtwork {
     fun resolve(gamesRoot: File, system: String, romBaseName: String, imageTypes: List<String>): String? {
         val folders = imageTypes.mapNotNull { IMAGE_TYPE_TO_FOLDER[it.trim().lowercase()] }
             .ifEmpty { MEDIA_TYPES_BY_PRIORITY }
-        val candidateMediaRoots = listOf(
-            File(gamesRoot.parentFile ?: gamesRoot, "ES-DE/downloaded_media"),
-            File(gamesRoot, "downloaded_media"),
-        )
-        for (mediaRoot in candidateMediaRoots) {
+        val mediaRoots = candidateMediaRoots(gamesRoot)
+        for (mediaRoot in mediaRoots) {
             for (mediaType in folders) {
                 for (ext in EXTENSIONS) {
                     val candidate = File(mediaRoot, "$system/$mediaType/$romBaseName.$ext")
@@ -235,17 +241,14 @@ object EsDeArtwork {
     fun resolveImageTypes(locator: GameMediaLocator, imageTypes: List<String>): String? {
         if (imageTypes.isEmpty()) return null
         val gamesRoot = File(locator.gamesRoot)
-        val candidateMediaRoots = listOf(
-            File(gamesRoot.parentFile ?: gamesRoot, "ES-DE/downloaded_media"),
-            File(gamesRoot, "downloaded_media"),
-        )
+        val mediaRoots = candidateMediaRoots(gamesRoot)
         for (imageType in imageTypes) {
             val folders = when (val type = imageType.trim().lowercase()) {
                 "image" -> IMAGE_PSEUDO_TYPE_CHAIN
                 else -> listOfNotNull(IMAGE_TYPE_TO_FOLDER[type])
             }
             for (folder in folders) {
-                for (mediaRoot in candidateMediaRoots) {
+                for (mediaRoot in mediaRoots) {
                     for (ext in EXTENSIONS) {
                         val candidate =
                             File(mediaRoot, "${locator.system}/$folder/${locator.baseName}.$ext")
@@ -268,11 +271,8 @@ object EsDeArtwork {
      * as [resolve].
      */
     fun resolveManual(gamesRoot: File, system: String, romBaseName: String): String? {
-        val candidateMediaRoots = listOf(
-            File(gamesRoot.parentFile ?: gamesRoot, "ES-DE/downloaded_media"),
-            File(gamesRoot, "downloaded_media"),
-        )
-        for (mediaRoot in candidateMediaRoots) {
+        val mediaRoots = candidateMediaRoots(gamesRoot)
+        for (mediaRoot in mediaRoots) {
             val candidate = File(mediaRoot, "$system/manuals/$romBaseName.pdf")
             if (candidate.isFile) return candidate.absolutePath
         }
@@ -290,11 +290,8 @@ object EsDeArtwork {
      * file here the same way [resolve]'s own PNG/JPG fallback list works.
      */
     fun resolveVideo(gamesRoot: File, system: String, romBaseName: String): String? {
-        val candidateMediaRoots = listOf(
-            File(gamesRoot.parentFile ?: gamesRoot, "ES-DE/downloaded_media"),
-            File(gamesRoot, "downloaded_media"),
-        )
-        for (mediaRoot in candidateMediaRoots) {
+        val mediaRoots = candidateMediaRoots(gamesRoot)
+        for (mediaRoot in mediaRoots) {
             for (ext in VIDEO_EXTENSIONS) {
                 val candidate = File(mediaRoot, "$system/videos/$romBaseName.$ext")
                 if (candidate.isFile) return candidate.absolutePath

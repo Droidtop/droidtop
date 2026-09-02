@@ -42,7 +42,20 @@ data class EsDeGridConfig(
     val imageBrightness: Float = 0f,
     val imageSaturation: Float = 1f,
     val imageColor: Long? = null,
+    /**
+     * Real `imageColorEnd` (GridComponent.h:1325-1326): the far end of the
+     * POSITIONAL color-shift gradient multiplied over an item's image.
+     * Equal to [imageColor] when the theme sets no gradient, which is how
+     * real ES-DE detects "no gradient" too (GridComponent.h:336).
+     */
+    val imageColorEnd: Long? = null,
+    /** Real `imageGradientType` (GridComponent.h:1328-1341), real default horizontal. */
+    val imageGradientHorizontal: Boolean = true,
     val imageSelectedColor: Long? = null,
+    /** Real `imageSelectedColorEnd` (GridComponent.h:1352-1355). */
+    val imageSelectedColorEnd: Long? = null,
+    /** Real `imageSelectedGradientType` (GridComponent.h:1356-1370), real default horizontal and NOT inherited from `imageGradientType`. */
+    val imageSelectedGradientHorizontal: Boolean = true,
     val backgroundRelativeScale: Float = 1f,
     val backgroundCornerRadius: Float = 0f,
     val backgroundColor: Long? = null,
@@ -64,6 +77,14 @@ data class EsDeGridConfig(
     val textBackgroundColor: Long = 0xFFFFFF00L,
     val textSelectedColor: Long = 0x000000FFL,
     val textSelectedBackgroundColor: Long = 0xFFFFFF00L,
+    /**
+     * Real `textBackgroundCornerRadius` (GridComponent.h:1395-1398),
+     * already resolved to pixels. Rounds the TEXT item's own background
+     * box -- the fallback item drawn in place of an image
+     * (GridComponent.h:386-397) -- not the entry's background layer, which
+     * has its own `backgroundCornerRadius`.
+     */
+    val textBackgroundCornerRadius: Float = 0f,
     val letterCase: EsDeLetterCase = EsDeLetterCase.NONE,
     val instantItemTransitions: Boolean = false,
     val instantRowTransitions: Boolean = false,
@@ -88,19 +109,12 @@ fun esDeGridConfig(
     screenWidth: Float,
     screenHeight: Float,
 ): EsDeGridConfig {
-    fun float(name: String): Float? = element?.valueOrNull<EsDeThemeValue.FloatValue>(name)?.value
-    fun bool(name: String): Boolean? = element?.valueOrNull<EsDeThemeValue.Bool>(name)?.value
-    fun str(name: String): String? = element?.valueOrNull<EsDeThemeValue.Str>(name)?.value
-    fun path(name: String): String? = element?.valueOrNull<EsDeThemeValue.Path>(name)?.resolved
-    fun pair(name: String): EsDeThemeValue.Pair? = element?.valueOrNull<EsDeThemeValue.Pair>(name)
-    fun color(name: String): Long? = element?.valueOrNull<EsDeThemeValue.Color>(name)?.argbLikeRgba
-
     // GridComponent.h:1034-1053 -- real constructor default is 0.15 x
     // 0.25 of the screen, and either axis may be -1, meaning "square,
     // sized from the other axis".
     var itemSizeX = 0.15f * screenWidth
     var itemSizeY = 0.25f * screenHeight
-    val declaredItemSize = pair("itemSize")
+    val declaredItemSize = element.pairOrNull("itemSize")
     if (declaredItemSize != null && !(declaredItemSize.x == -1f && declaredItemSize.y == -1f)) {
         if (declaredItemSize.x == -1f) {
             itemSizeY = declaredItemSize.y.coerceIn(0.05f, 1f) * screenHeight
@@ -116,10 +130,10 @@ fun esDeGridConfig(
 
     // GridComponent.h:1055-1056 -- note the grid's own clamp is 0.5-2.0,
     // NOT the carousel's 0.2-3.0.
-    val itemScale = float("itemScale")?.coerceIn(0.5f, 2f) ?: 1.05f
+    val itemScale = element.floatOrNull("itemScale")?.coerceIn(0.5f, 2f) ?: 1.05f
     // GridComponent.h:1061-1062 -- scaleInwards only takes effect when
     // items actually scale up.
-    val scaleInwards = itemScale > 1f && (bool("scaleInwards") ?: false)
+    val scaleInwards = itemScale > 1f && (element.boolOrNull("scaleInwards") ?: false)
 
     // GridComponent.h:1288-1315 -- when the theme declares no itemSpacing
     // at all, it is CALCULATED so scaled items don't overlap; it does not
@@ -127,7 +141,7 @@ fun esDeGridConfig(
     // pixel value as the other axis".
     var itemSpacingX: Float
     var itemSpacingY: Float
-    val declaredSpacing = pair("itemSpacing")
+    val declaredSpacing = element.pairOrNull("itemSpacing")
     if (declaredSpacing != null) {
         if (declaredSpacing.x == -1f && declaredSpacing.y == -1f) {
             itemSpacingX = 0f
@@ -154,10 +168,10 @@ fun esDeGridConfig(
     // element is a fraction of screen WIDTH, additionally scaled by
     // itemScale when items scale up.
     val radiusScale = (if (itemScale >= 1f) itemScale else 1f) * screenWidth
-    fun cornerRadius(name: String): Float = (float(name)?.coerceIn(0f, 0.5f) ?: 0f) * radiusScale
+    fun cornerRadius(name: String): Float = (element.floatOrNull(name)?.coerceIn(0f, 0.5f) ?: 0f) * radiusScale
 
-    val backgroundColor = color("backgroundColor")
-    val selectorColor = color("selectorColor")
+    val backgroundColor = element.colorOrNull("backgroundColor")
+    val selectorColor = element.colorOrNull("selectorColor")
 
     return EsDeGridConfig(
         itemSizeX = itemSizeX,
@@ -166,53 +180,69 @@ fun esDeGridConfig(
         itemSpacingX = itemSpacingX,
         itemSpacingY = itemSpacingY,
         scaleInwards = scaleInwards,
-        fractionalRows = bool("fractionalRows") ?: false,
+        fractionalRows = element.boolOrNull("fractionalRows") ?: false,
         // GridComponent.h:1058-1059/1102-1104/1132-1133 -- all three
         // relative scales share the same 0.2-1.0 clamp.
-        imageRelativeScale = float("imageRelativeScale")?.coerceIn(0.2f, 1f) ?: 1f,
+        imageRelativeScale = element.floatOrNull("imageRelativeScale")?.coerceIn(0.2f, 1f) ?: 1f,
         imageCornerRadius = cornerRadius("imageCornerRadius"),
-        imageBrightness = float("imageBrightness")?.coerceIn(-2f, 2f) ?: 0f,
-        imageSaturation = float("imageSaturation")?.coerceIn(0f, 1f) ?: 1f,
-        imageColor = color("imageColor"),
-        imageSelectedColor = color("imageSelectedColor") ?: color("imageColor"),
-        backgroundRelativeScale = float("backgroundRelativeScale")?.coerceIn(0.2f, 1f) ?: 1f,
+        imageBrightness = element.floatOrNull("imageBrightness")?.coerceIn(-2f, 2f) ?: 0f,
+        imageSaturation = element.floatOrNull("imageSaturation")?.coerceIn(0f, 1f) ?: 1f,
+        // GridComponent.h:1321-1370, whose fallback chain is not "each
+        // property independently defaults to a constant": `imageColor`
+        // sets `imageColorEnd` too, `imageSelectedColor`/`-End` start out
+        // as the unselected pair, and `imageSelectedColor` in turn sets
+        // `imageSelectedColorEnd`.
+        imageColor = element.colorOrNull("imageColor"),
+        imageColorEnd = element.colorOrNull("imageColorEnd") ?: element.colorOrNull("imageColor"),
+        imageGradientHorizontal = element.strOrNull("imageGradientType") != "vertical",
+        imageSelectedColor = element.colorOrNull("imageSelectedColor") ?: element.colorOrNull("imageColor"),
+        imageSelectedColorEnd = element.colorOrNull("imageSelectedColorEnd")
+            ?: element.colorOrNull("imageSelectedColor")
+            ?: element.colorOrNull("imageColorEnd")
+            ?: element.colorOrNull("imageColor"),
+        imageSelectedGradientHorizontal = element.strOrNull("imageSelectedGradientType") != "vertical",
+        backgroundRelativeScale = element.floatOrNull("backgroundRelativeScale")?.coerceIn(0.2f, 1f) ?: 1f,
         backgroundCornerRadius = cornerRadius("backgroundCornerRadius"),
         backgroundColor = backgroundColor,
-        backgroundColorEnd = color("backgroundColorEnd") ?: backgroundColor ?: 0xFFFFFFFFL,
-        backgroundGradientHorizontal = str("backgroundGradientType") != "vertical",
-        backgroundImage = path("backgroundImage"),
-        selectorRelativeScale = float("selectorRelativeScale")?.coerceIn(0.2f, 1f) ?: 1f,
+        backgroundColorEnd = element.colorOrNull("backgroundColorEnd") ?: backgroundColor ?: 0xFFFFFFFFL,
+        backgroundGradientHorizontal = element.strOrNull("backgroundGradientType") != "vertical",
+        backgroundImage = element.pathOrNull("backgroundImage"),
+        selectorRelativeScale = element.floatOrNull("selectorRelativeScale")?.coerceIn(0.2f, 1f) ?: 1f,
         selectorCornerRadius = cornerRadius("selectorCornerRadius"),
         selectorColor = selectorColor,
-        selectorColorEnd = color("selectorColorEnd") ?: selectorColor ?: 0xFFFFFFFFL,
-        selectorGradientHorizontal = str("selectorGradientType") != "vertical",
-        selectorImage = path("selectorImage"),
+        selectorColorEnd = element.colorOrNull("selectorColorEnd") ?: selectorColor ?: 0xFFFFFFFFL,
+        selectorGradientHorizontal = element.strOrNull("selectorGradientType") != "vertical",
+        selectorImage = element.pathOrNull("selectorImage"),
         // GridComponent.h:1236-1254 -- an unrecognized value warns and
         // falls back to top.
-        selectorLayer = when (str("selectorLayer")) {
+        selectorLayer = when (element.strOrNull("selectorLayer")) {
             "middle" -> EsDeSelectorLayer.MIDDLE
             "bottom" -> EsDeSelectorLayer.BOTTOM
             else -> EsDeSelectorLayer.TOP
         },
         // GridComponent.h:1378-1388 -- the grid's own unfocusedItemOpacity
         // default is 1.0, unlike the carousel's 0.5.
-        unfocusedItemOpacity = float("unfocusedItemOpacity")?.coerceIn(0.1f, 1f) ?: 1f,
-        unfocusedItemSaturation = float("unfocusedItemSaturation")?.coerceIn(0f, 1f),
-        unfocusedItemDimming = float("unfocusedItemDimming")?.coerceIn(0f, 1f) ?: 1f,
-        textRelativeScale = float("textRelativeScale")?.coerceIn(0.2f, 1f) ?: 1f,
-        textColor = color("textColor") ?: 0x000000FFL,
-        textBackgroundColor = color("textBackgroundColor") ?: 0xFFFFFF00L,
-        textSelectedColor = color("textSelectedColor") ?: color("textColor") ?: 0x000000FFL,
+        unfocusedItemOpacity = element.floatOrNull("unfocusedItemOpacity")?.coerceIn(0.1f, 1f) ?: 1f,
+        unfocusedItemSaturation = element.floatOrNull("unfocusedItemSaturation")?.coerceIn(0f, 1f),
+        unfocusedItemDimming = element.floatOrNull("unfocusedItemDimming")?.coerceIn(0f, 1f) ?: 1f,
+        textRelativeScale = element.floatOrNull("textRelativeScale")?.coerceIn(0.2f, 1f) ?: 1f,
+        textColor = element.colorOrNull("textColor") ?: 0x000000FFL,
+        textBackgroundColor = element.colorOrNull("textBackgroundColor") ?: 0xFFFFFF00L,
+        textSelectedColor = element.colorOrNull("textSelectedColor") ?: element.colorOrNull("textColor") ?: 0x000000FFL,
         textSelectedBackgroundColor =
-            color("textSelectedBackgroundColor") ?: color("textBackgroundColor") ?: 0xFFFFFF00L,
-        letterCase = when (str("letterCase")) {
+            element.colorOrNull("textSelectedBackgroundColor") ?: element.colorOrNull("textBackgroundColor") ?: 0xFFFFFF00L,
+        // GridComponent.h:1395-1398 -- same 0..0.5 clamp and same
+        // itemScale-then-screen-WIDTH scaling as every other radius on
+        // this element, which is what `cornerRadius` above already is.
+        textBackgroundCornerRadius = cornerRadius("textBackgroundCornerRadius"),
+        letterCase = when (element.strOrNull("letterCase")) {
             "uppercase" -> EsDeLetterCase.UPPERCASE
             "lowercase" -> EsDeLetterCase.LOWERCASE
             "capitalize" -> EsDeLetterCase.CAPITALIZE
             else -> EsDeLetterCase.NONE
         },
-        instantItemTransitions = str("itemTransitions") == "instant",
-        instantRowTransitions = str("rowTransitions") == "instant",
+        instantItemTransitions = element.strOrNull("itemTransitions") == "instant",
+        instantRowTransitions = element.strOrNull("rowTransitions") == "instant",
     )
 }
 
