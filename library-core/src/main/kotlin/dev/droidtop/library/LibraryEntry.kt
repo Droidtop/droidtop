@@ -608,7 +608,18 @@ class Library(
      */
     suspend fun launch(entry: LibraryEntry) {
         withContext(Dispatchers.IO) {
-            providers.first { entry.kind in it.kinds }.launch(entry)
+            // Which game this launch is for, published for the duration of
+            // the provider call so LaunchDisplay can apply and record the
+            // remembered launch screen (docs/SPEC.md section 4c) without
+            // every provider signature carrying the entry through.
+            // LaunchDisplay.start captures it synchronously even when the
+            // chooser dialog defers the actual dispatch.
+            LaunchDisplay.launchContext = LaunchContext(entry.id, entry.systemId)
+            try {
+                providers.first { entry.kind in it.kinds }.launch(entry)
+            } finally {
+                LaunchDisplay.launchContext = null
+            }
             playHistory.recordPlay(entry.id, System.currentTimeMillis())
         }
     }

@@ -338,12 +338,12 @@ jobs:
       - name: Run unit tests
         # Every module that actually has a src/test tree (library-core,
         # runtime-common, shell-gamepad, input-seat, runtime-windows,
-        # host-bridge), not just library-core — that narrower scope meant
-        # roughly 30% of this repo's test methods had never once run in CI.
-        # Add the module here the moment it grows its first test; a test
-        # nothing runs is not a test.
+        # input-keyboard and host-bridge), not just library-core — that
+        # narrower scope meant roughly 30% of this repo's test methods had
+        # never once run in CI. Add the module here the moment it grows its
+        # first test; a test nothing runs is not a test.
         if: always()
-        run: ./gradlew :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :runtime-windows:testDebugUnitTest :host-bridge:testDebugUnitTest --stacktrace
+        run: ./gradlew :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :runtime-windows:testDebugUnitTest :input-keyboard:testDebugUnitTest :host-bridge:testDebugUnitTest --stacktrace
 
       - name: Upload test reports
         if: always()
@@ -356,5 +356,6 @@ jobs:
             shell-gamepad/build/reports/tests/
             input-seat/build/reports/tests/
             runtime-windows/build/reports/tests/
+            input-keyboard/build/reports/tests/
             host-bridge/build/reports/tests/
           if-no-files-found: ignore

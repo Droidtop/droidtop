@@ -40,7 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.droidtop.hostbridge.HostBridge
 import dev.droidtop.input.DesktopInputRouter
-import dev.droidtop.input.InputSeat
+import dev.droidtop.input.InputSeats
 import dev.droidtop.input.PointerTransform
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
@@ -188,7 +188,13 @@ private fun BoxScope.DesktopViewport(
         // One seat per live HostBridge, and one router driving it. Both are
         // keyed on hostBridge so a session that goes away and comes back
         // does not leave the old connection's held buttons behind.
-        val seat = remember(hostBridge) { InputSeat(hostBridge) }
+        //
+        // The seat comes from InputSeats rather than being constructed
+        // here, because this surface is no longer the only thing driving
+        // it: the second-screen trackpad and keyboard (docs/SPEC.md 6c)
+        // reach the same container, and two seats over one bridge would
+        // break the single normalized seat :input-seat exists to be.
+        val seat = remember(hostBridge) { InputSeats.of(hostBridge) }
         val router = remember(hostBridge) { DesktopInputRouter().also { it.seat = seat } }
 
         // The router is inert with no seat, so tearing the session down is
