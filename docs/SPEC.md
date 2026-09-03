@@ -3855,15 +3855,22 @@ versionName, apkName, apkSha256, commit -- published by the same workflow
 run that built the APK. Enginehost mirrors this exactly (its
 `codex/engine-bundles` line publishes the same shape of rolling release).
 
-**Update check (droidtop and enginehost APKs).** At most once a day, at
-process start, the app downloads that one small file unauthenticated and
-compares versionCode. Privacy is the design constraint, not an afterthought:
-nothing about the device, settings, or library is sent -- GitHub sees an IP
-address fetching a public release asset, which is the floor for fetching
-anything at all. Offline or failed checks are silent and simply retried
-after the next interval. Settings > Software updates has the off switch
-("Check for updates once a day"), and off means zero automatic update
-traffic. A manual "Check now" lives on the same screen.
+**Update check (droidtop and enginehost APKs).** On a schedule the user
+sets -- never, every day, every week or every month (day is the default)
+-- at process start, the app downloads that one small file unauthenticated
+and compares versionCode. Privacy is the design constraint, not an
+afterthought: nothing about the device, settings, or library is sent --
+GitHub sees an IP address fetching a public release asset, which is the
+floor for fetching anything at all. Offline or failed checks are silent and
+simply retried after the next interval; an "only on unmetered networks"
+option skips the scheduled check on mobile data. Settings > Software
+updates holds the schedule, that option, when the last check ran, and a
+manual "Check now"; "never" means zero automatic update traffic. Updates
+are never forced: the check only reports, and installing is always the
+user's tap (enginehost's plugin bundles can additionally be installed
+automatically by a separate, default-off switch). In enginehost the same
+pass also refreshes the plugin catalogs and the engine detection rules, so
+"Check now" there is the whole pass.
 
 **Self-update (both APKs) -- what is honestly possible.** A normally
 installed app cannot silently replace itself. What it can do, and what is
