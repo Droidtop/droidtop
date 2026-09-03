@@ -180,6 +180,8 @@ object HandheldSettingsCatalog {
                 )
                 add(displayShellTargetItem(context))
                 add(displayGameLaunchTargetItem(context))
+                add(secondScreenRoleItem(context, MODE_HANDHELD))
+                add(secondScreenRoleItem(context, MODE_DESKTOP))
                 // Detection can only guess which physical panel is which --
                 // Android exposes no position signal -- so the correction
                 // is an action, right here in the Quick Menu's System tab,
@@ -520,6 +522,39 @@ object HandheldSettingsCatalog {
             CatalogPrefs.prefs(ctx).edit().putString(ID_DISPLAY_GAME_LAUNCH_TARGET, value).apply()
         },
     )
+
+    /**
+     * What the second screen is FOR, per mode (docs/SPEC.md 4 and 6c).
+     *
+     * Per mode rather than once, because the modes genuinely differ:
+     * Desktop's lower screen is an input surface by design, while Handheld
+     * moves the shell to the addon and leaves the built-in panel as the
+     * ambient widgets surface. Both are the user's to change, which is
+     * what section 4 means by the input role being toggleable.
+     *
+     * Written as raw keys read by `:app`'s `SecondScreenInputPrefs`, the
+     * same seam `pref_display_shell_target` already uses: this module must
+     * not depend on `:app`.
+     */
+    private fun secondScreenRoleItem(context: Context, mode: String): ChoiceItem {
+        val id = "pref_second_screen_role_$mode"
+        val default = if (mode == MODE_DESKTOP) "INPUT" else "COMPANION"
+        return ChoiceItem(
+            id = id,
+            title = if (mode == MODE_DESKTOP) "Second screen in Desktop mode" else "Second screen in Handheld mode",
+            options = listOf(
+                ChoiceOption("COMPANION", "Widgets and game info"),
+                ChoiceOption("INPUT", "Keyboard and trackpad"),
+            ),
+            current = CatalogPrefs.prefs(context).getString(id, default),
+            onSelect = { ctx, value ->
+                CatalogPrefs.prefs(ctx).edit().putString(id, value).apply()
+            },
+        )
+    }
+
+    private const val MODE_HANDHELD = "HANDHELD"
+    private const val MODE_DESKTOP = "DESKTOP"
 
     private fun themeItem(context: Context): ChoiceItem {
         val themeNames = ThemeAssets.discoverThemes(context).map { it.name }

@@ -1154,6 +1154,19 @@ public class LatinIME extends InputMethodService implements
 
     @Override
     public boolean onEvaluateInputViewShown() {
+        // droidtop patch (not upstream Hacker's Keyboard): while droidtop's
+        // second-screen keyboard is up, this IME must NOT also put a
+        // keyboard over the primary display. That is the whole point of
+        // the second screen (docs/SPEC.md 4/6c), and this is the
+        // platform's own mechanism for it -- the same answer
+        // super.onEvaluateInputViewShown() gives when a hardware keyboard
+        // is attached, which is exactly the situation the user has
+        // arranged. Keystrokes still arrive: the second-screen surface
+        // drives this service's OnKeyboardActionListener directly, and the
+        // InputConnection does not depend on the soft view being shown.
+        if (SecondScreenKeyboard.INSTANCE.getAttached()) {
+            return false;
+        }
     	boolean parent = super.onEvaluateInputViewShown();
     	boolean wanted = mForceKeyboardOn || parent;
     	//Log.i(TAG, "OnEvaluateInputViewShown, parent=" + parent + " + " wanted=" + wanted);
