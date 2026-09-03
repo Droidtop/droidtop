@@ -720,22 +720,40 @@ object AppSettingsCatalogs {
                     id = "updates_droidtop",
                     title = null,
                     items = listOf(
-                        ToggleItem(
-                            id = "updates_check_daily",
-                            title = "Check for updates once a day",
+                        ChoiceItem(
+                            id = "updates_frequency",
+                            title = "Check for updates",
                             subtitle = "Downloads one small release-description file from droidtop's GitHub releases; " +
-                                "nothing about this device or your library is sent, and turning this off stops " +
-                                "all automatic update traffic",
-                            current = update.checkDaily(context),
-                            onToggle = { ctx, value -> update.setCheckDaily(ctx, value) },
+                                "nothing about this device or your library is sent. \"Never\" stops all " +
+                                "automatic update traffic; you can still check by hand below",
+                            options = dev.droidtop.app.update.AppSelfUpdate.Frequency.entries
+                                .map { ChoiceOption(it.name, it.label) },
+                            current = update.frequency(context).name,
+                            onSelect = { ctx, value ->
+                                update.setFrequency(ctx, dev.droidtop.app.update.AppSelfUpdate.Frequency.valueOf(value))
+                            },
+                        ),
+                        ToggleItem(
+                            id = "updates_unmetered_only",
+                            title = "Only on Wi-Fi and other unmetered networks",
+                            subtitle = "Skips the scheduled check while on mobile data or a metered connection",
+                            current = update.unmeteredOnly(context),
+                            onToggle = { ctx, value -> update.setUnmeteredOnly(ctx, value) },
                         ),
                         AsyncActionItem(
                             id = "updates_check_now",
                             title = "Check for a droidtop update",
                             subtitle = "Installed: ${update.installedVersionName(context)} " +
-                                "(build ${update.installedVersionCode(context)})",
+                                "(build ${update.installedVersionCode(context)}). " +
+                                (update.lastAttempt(context)?.let { last ->
+                                    "Last checked " + android.text.format.DateUtils.getRelativeDateTimeString(
+                                        context, last, android.text.format.DateUtils.MINUTE_IN_MILLIS,
+                                        android.text.format.DateUtils.WEEK_IN_MILLIS, 0,
+                                    )
+                                } ?: "Not checked yet"),
                             run = { ctx, onStatus ->
                                 onStatus("Checking...")
+                                update.noteAttempt(ctx)
                                 val info = withContext(Dispatchers.IO) { update.fetch() }
                                 if (info.versionCode > update.installedVersionCode(ctx)) {
                                     "${info.versionName} (build ${info.versionCode}) is available -- " +
