@@ -617,6 +617,7 @@ class EngineGameProvider(
                     EnginesDatabase.enginehostTargetFor(context, engine)
                         ?: error("engines-database has no enginehost mapping for $engine"),
                     resolveEngineVersion(context, gameRoot, engine),
+                    title = entry.title,
                 )
             }
             GameLaunchStrategy.KIRIKIROID2 -> Kirikiroid2.open(context)
