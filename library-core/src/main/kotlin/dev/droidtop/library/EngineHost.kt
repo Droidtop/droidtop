@@ -25,7 +25,10 @@ import java.io.File
  * `engineVersion` are both required fields in whichever config actually
  * gets used, strictly enforced (`EngineConfigReader.parse` throws if
  * either is missing/blank — confirmed by reading enginehost's own
- * source, not assumed).
+ * source, not assumed). An optional `title` names the game on
+ * enginehost's launch screen; droidtop always sends the library title
+ * inline, and because the folder wins at every key, a folder that names
+ * itself keeps its own name.
  */
 object EngineHost {
 
@@ -169,10 +172,14 @@ object EngineHost {
         gameFolder: File,
         target: EnginehostTarget,
         engineVersion: String?,
+        title: String? = null,
     ) {
         check(isInstalled(context)) { "enginehost ($PACKAGE_NAME) isn't installed" }
         val hasOwnConfig = File(gameFolder, "enginehost.json").isFile
         val intent = launchIntent().apply {
+            // The one inline field that is always worth sending: the folder
+            // wins at every key, so this only ever fills a gap.
+            title?.takeIf { it.isNotBlank() }?.let { putExtra("config", JSONObject().put("title", it).toString()) }
             // A filesystem path, not a content:// URI -- enginehost holds
             // its own storage permission and the contract is explicit
             // that the caller does not grant its UID by passing a URI.
@@ -186,6 +193,7 @@ object EngineHost {
                         "config",
                         target.copy(engineContext = remembered.engineContext)
                             .toConfigJson(remembered.engineVersion)
+                            .withTitle(title)
                             .toString(),
                     )
                     if (remembered.engineContext != null) putExtra("autoinstallPlugin", true)
@@ -215,7 +223,7 @@ object EngineHost {
                             if (!wroteFolder) {
                                 EnginehostManualChoicePrefs.set(context, gameFolder, choice)
                             }
-                            launch(context, gameFolder, target, chosen.engineVersion)
+                            launch(context, gameFolder, target, chosen.engineVersion, title)
                         }
                         return
                     }
@@ -232,7 +240,7 @@ object EngineHost {
                     LaunchDisplay.start(context, configureIntent(gameFolder, target))
                     return
                 }
-                putExtra("config", target.toConfigJson(effectiveVersion).toString())
+                putExtra("config", target.toConfigJson(effectiveVersion).withTitle(title).toString())
                 // Confident = we know the exact compatibility line AND the
                 // exact version. A family whose context droidtop cannot
                 // yet determine (RPG Maker 2000 vs 2003, CMVS ps2 vs ps3)
@@ -243,6 +251,10 @@ object EngineHost {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         LaunchDisplay.start(context, intent)
+    }
+
+    private fun JSONObject.withTitle(title: String?): JSONObject = apply {
+        title?.takeIf { it.isNotBlank() }?.let { put("title", it) }
     }
 }
 
