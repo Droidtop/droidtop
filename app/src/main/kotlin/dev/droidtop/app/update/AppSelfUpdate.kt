@@ -37,10 +37,19 @@ object AppSelfUpdate {
     private const val RELEASE_INFO_URL = "$RELEASES/release-info.json"
     private const val PREFS = "app_update_check"
     private const val KEY_CHECK_DAILY = "updates_check_daily"
+    private const val KEY_FREQUENCY = "updates_frequency"
+    private const val KEY_UNMETERED_ONLY = "updates_unmetered_only"
     private const val KEY_LAST_ATTEMPT = "last_attempt_ms"
     private const val KEY_SEEN_CODE = "newest_seen_version_code"
     private const val KEY_SEEN_NAME = "newest_seen_version_name"
-    private const val INTERVAL_MS = 24L * 60 * 60 * 1000
+
+    /** How often the background probe may run. [OFF] means only when asked. */
+    enum class Frequency(val intervalMs: Long, val label: String) {
+        OFF(Long.MAX_VALUE, "Never"),
+        DAILY(24L * 60 * 60 * 1000, "Every day"),
+        WEEKLY(7 * 24L * 60 * 60 * 1000, "Every week"),
+        MONTHLY(30 * 24L * 60 * 60 * 1000, "Every month"),
+    }
 
     data class Info(val versionCode: Long, val versionName: String, val apkName: String, val apkSha256: String) {
         val apkUrl: String get() = "$RELEASES/$apkName"
@@ -54,10 +63,22 @@ object AppSelfUpdate {
     fun installedVersionName(context: Context): String =
         context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
 
-    fun checkDaily(context: Context): Boolean = prefs(context).getBoolean(KEY_CHECK_DAILY, true)
+    fun frequency(context: Context): Frequency =
+        prefs(context).getString(KEY_FREQUENCY, null)?.let { name -> Frequency.entries.firstOrNull { it.name == name } }
+            // Before there was a frequency there was one daily switch; honour what it said.
+            ?: if (prefs(context).getBoolean(KEY_CHECK_DAILY, true)) Frequency.DAILY else Frequency.OFF
 
-    fun setCheckDaily(context: Context, value: Boolean) =
-        prefs(context).edit().putBoolean(KEY_CHECK_DAILY, value).apply()
+    fun setFrequency(context: Context, value: Frequency) =
+        prefs(context).edit().putString(KEY_FREQUENCY, value.name).remove(KEY_CHECK_DAILY).apply()
+
+    /** Skip the probe on metered connections (mobile data, tethering). */
+    fun unmeteredOnly(context: Context): Boolean = prefs(context).getBoolean(KEY_UNMETERED_ONLY, false)
+
+    fun setUnmeteredOnly(context: Context, value: Boolean) =
+        prefs(context).edit().putBoolean(KEY_UNMETERED_ONLY, value).apply()
+
+    /** When the probe last ran, as epoch milliseconds, or null if it never has. */
+    fun lastAttempt(context: Context): Long? = prefs(context).getLong(KEY_LAST_ATTEMPT, 0L).takeIf { it > 0 }
 
     /** The newest build a check has seen, when newer than what is running. */
     fun newerSeenVersionName(context: Context): String? {
@@ -66,15 +87,18 @@ object AppSelfUpdate {
     }
 
     /**
-     * The at-most-daily background probe, called at process start (from
-     * SettingsCatalogInitProvider). One small download when due and enabled;
-     * otherwise nothing. Never throws, never blocks the caller.
+     * The scheduled background probe, called at process start (from
+     * SettingsCatalogInitProvider). One small download when due, enabled and
+     * allowed on the current network; otherwise nothing. Never throws, never
+     * blocks the caller.
      */
     fun maybeCheck(context: Context) {
         val application = context.applicationContext
-        if (!checkDaily(application)) return
+        val frequency = frequency(application)
+        if (frequency == Frequency.OFF) return
         val now = System.currentTimeMillis()
-        if (now - prefs(application).getLong(KEY_LAST_ATTEMPT, 0L) < INTERVAL_MS) return
+        if (now - prefs(application).getLong(KEY_LAST_ATTEMPT, 0L) < frequency.intervalMs) return
+        if (unmeteredOnly(application) && isMetered(application)) return
         prefs(application).edit().putLong(KEY_LAST_ATTEMPT, now).apply()
         Thread {
             runCatching { fetch() }.onSuccess { info ->
@@ -84,6 +108,14 @@ object AppSelfUpdate {
                     .apply()
             }
         }.start()
+    }
+
+    private fun isMetered(context: Context): Boolean =
+        context.getSystemService(android.net.ConnectivityManager::class.java)?.isActiveNetworkMetered ?: false
+
+    /** Records that a check ran now; the manual check calls this so "last checked" stays truthful. */
+    fun noteAttempt(context: Context) {
+        prefs(context.applicationContext).edit().putLong(KEY_LAST_ATTEMPT, System.currentTimeMillis()).apply()
     }
 
     /** Fetches what the rolling release currently is. Throws on any failure. */
