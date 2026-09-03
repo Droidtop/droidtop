@@ -263,20 +263,21 @@ fun GamepadShell(
     // builds against do not expose; a real CI failure, not a guess).
     var selectDownCount by remember { mutableStateOf(0) }
     var displayChoice by remember {
-        mutableStateOf<Pair<List<dev.droidtop.library.LaunchDisplayOption>, (Int?) -> Unit>?>(null)
+        mutableStateOf<DisplayChoiceRequest?>(null)
     }
     androidx.compose.runtime.DisposableEffect(Unit) {
-        dev.droidtop.library.LaunchDisplay.chooser = { options, onChosen ->
-            displayChoice = options to onChosen
+        dev.droidtop.library.LaunchDisplay.chooser = { options, canRemember, onChosen ->
+            displayChoice = DisplayChoiceRequest(options, canRemember, onChosen)
         }
         onDispose { dev.droidtop.library.LaunchDisplay.chooser = null }
     }
-    displayChoice?.let { (options, onChosen) ->
+    displayChoice?.let { request ->
         LaunchDisplayChooserDialog(
-            options = options,
-            onPick = { displayId ->
+            options = request.options,
+            canRemember = request.canRemember,
+            onPick = { option, rememberChoice ->
                 displayChoice = null
-                onChosen(displayId)
+                request.onChosen(option, rememberChoice)
             },
             onCancel = { displayChoice = null },
         )
@@ -2444,3 +2445,11 @@ private fun GameCard(
         }
     }
 }
+
+
+/** One pending "launch on which screen?" question, as handed to [LaunchDisplayChooserDialog]. */
+private data class DisplayChoiceRequest(
+    val options: List<dev.droidtop.library.LaunchDisplayOption>,
+    val canRemember: Boolean,
+    val onChosen: (dev.droidtop.library.LaunchDisplayOption, Boolean) -> Unit,
+)

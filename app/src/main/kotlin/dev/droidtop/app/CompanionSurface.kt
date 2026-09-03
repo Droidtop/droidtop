@@ -68,6 +68,9 @@ fun CompanionSurface(
             // always-on screen: live notifications with tap-to-open and
             // per-item dismiss, no controller needed.
             CompanionNotifications()
+            // Continue-playing rail: tap a recent game to launch it,
+            // through the one real launch path -- see CompanionRecents.
+            CompanionRecents()
             widgetIds.forEach { widgetId ->
                 val info = widgetManager.getAppWidgetInfo(widgetId)
                 if (info != null) {
