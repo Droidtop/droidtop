@@ -244,20 +244,25 @@ class GameEngineDetectorTest {
     }
 
     @Test
-    fun `every registry row with rules maps to a compiled engine`() {
-        // A row this app cannot resolve is legal (future database), but
-        // the SHIPPED seed and this app must agree completely -- except
-        // the rows the seed itself declares enginehost-only (v5: the
-        // database is the shared classification authority for BOTH apps,
-        // and some classifications only exist on enginehost's side).
-        val enginehostOnly = setOf("rpgmaker-mvmz", "flash-swf")
+    fun `every compiled engine has a row in the shipped seed, and every row has rules`() {
+        // The direction of this check flipped when the seed became the
+        // WHOLE platform registry rather than a hand-picked subset of it
+        // (2026-09-10). Rows droidtop cannot map are now normal and
+        // expected -- enginehost-only classifications, and families with a
+        // detection rule but no droidtop launch route yet -- and asserting
+        // every row maps would mean the platform repo could not add one
+        // without breaking this app's build. What must still hold, and is
+        // what actually catches a typo or a rename, is the other
+        // direction: every engine compiled into this app is reachable,
+        // because a GameEngine with no row can never be detected.
         org.junit.Assert.assertTrue(defs.isNotEmpty())
+        val mapped = defs.mapNotNull { it.engine }.toSet()
+        org.junit.Assert.assertEquals(
+            "compiled engines with no row in the shipped registry",
+            emptySet<GameEngine>(),
+            GameEngine.entries.toSet() - mapped,
+        )
         defs.forEach { def ->
-            if (def.id in enginehostOnly) {
-                org.junit.Assert.assertNull("row ${def.id} must stay enginehost-only", def.engine)
-            } else {
-                org.junit.Assert.assertNotNull("seed row ${def.id} has no compiled engine", def.engine)
-            }
             org.junit.Assert.assertTrue("seed row ${def.id} has no detection rules", def.detect.isNotEmpty())
         }
     }
