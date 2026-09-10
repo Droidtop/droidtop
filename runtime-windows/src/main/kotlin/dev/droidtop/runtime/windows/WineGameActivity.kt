@@ -10,8 +10,9 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.Gravity
 import android.widget.FrameLayout
-import android.widget.Toast
+import android.widget.TextView
 import com.winlator.container.Container
 import com.winlator.container.ContainerManager
 import com.winlator.inputcontrols.TouchMouse
@@ -25,6 +26,7 @@ import com.winlator.xserver.ScreenInfo
 import com.winlator.xserver.XServer
 import java.io.File
 import java.util.concurrent.Executors
+import timber.log.Timber
 import app.gamenative.PrefManager as GameNativePrefManager
 import com.winlator.PrefManager as WinlatorPrefManager
 
@@ -67,7 +69,7 @@ class WineGameActivity : Activity() {
     private var touchMouse: TouchMouse? = null
     private var keyboard: Keyboard? = null
     private var winHandler: WinHandler? = null
-    private var finishing = false
+    private var failed = false
 
     private val startupExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "droidtop-wine-start")
@@ -91,7 +93,7 @@ class WineGameActivity : Activity() {
             runCatching { ContainerManager(this).getContainerById(id) }.getOrNull()
         }
         if (target.isNullOrBlank() || prefix == null || workingDir == null) {
-            failAndFinish("the Windows launch was missing its prefix or its target")
+            showFailure("the Windows launch was missing its prefix or its target")
             return
         }
 
@@ -145,7 +147,7 @@ class WineGameActivity : Activity() {
             runCatching { session.start(::onGuestTerminated) }
                 .onFailure { failure ->
                     runOnUiThread {
-                        failAndFinish(failure.message ?: "the Wine environment failed to start")
+                        showFailure(failure.message ?: "the Wine environment failed to start")
                     }
                 }
         }
@@ -155,8 +157,8 @@ class WineGameActivity : Activity() {
         val detail = session?.output().orEmpty()
         runOnUiThread {
             if (status != 0) {
-                failAndFinish(
-                    if (detail.isBlank()) "wine exited $status" else "wine exited $status: ${detail.takeLast(TOAST_DETAIL_CHARS)}",
+                showFailure(
+                    if (detail.isBlank()) "wine exited $status" else "wine exited $status: ${detail.takeLast(FAILURE_DETAIL_CHARS)}",
                 )
             } else {
                 finish()
@@ -164,11 +166,35 @@ class WineGameActivity : Activity() {
         }
     }
 
-    private fun failAndFinish(message: String) {
-        if (finishing) return
-        finishing = true
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
-        finish()
+    /**
+     * Shows why the game is not running, and stays up until the person
+     * dismisses it.
+     *
+     * Deliberately its own view rather than a toast or a snackbar: the
+     * vendored tree poisons `android.widget.Toast` outright, and its
+     * `SnackbarManager` publishes into a Compose host that this screen
+     * does not have -- a message sent there would be dropped silently,
+     * which is the one thing a failure report must not do. A launch that
+     * fails after the shell has already handed off is only visible here,
+     * so it is shown here, and finishing immediately would take it away
+     * before it could be read.
+     */
+    private fun showFailure(message: String) {
+        if (failed) return
+        failed = true
+        Timber.e("Wine launch failed: %s", message)
+        session?.stop()
+        session = null
+        setContentView(
+            TextView(this).apply {
+                text = "This Windows game did not start." + "\n" + "\n" +
+                    message + "\n" + "\n" + "Press Back to return."
+                gravity = Gravity.CENTER
+                setBackgroundColor(Color.BLACK)
+                setTextColor(Color.WHITE)
+                setPadding(FAILURE_PADDING_PX, FAILURE_PADDING_PX, FAILURE_PADDING_PX, FAILURE_PADDING_PX)
+            },
+        )
     }
 
     // ---- input -------------------------------------------------------
@@ -177,6 +203,10 @@ class WineGameActivity : Activity() {
     // XInput state; anything left is a keyboard key for the X server.
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (failed) {
+            if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) finish()
+            return true
+        }
         if (winHandler?.onKeyEvent(event) == true) return true
         if (keyboard?.onKeyEvent(event) == true) return true
         // Only a back press nothing else wanted ends the session. The
@@ -238,7 +268,8 @@ class WineGameActivity : Activity() {
         private const val EXTRA_CONTAINER_ID = "dev.droidtop.wine.CONTAINER_ID"
         private const val EXTRA_TARGET = "dev.droidtop.wine.TARGET"
         private const val EXTRA_WORKING_DIR = "dev.droidtop.wine.WORKING_DIR"
-        private const val TOAST_DETAIL_CHARS = 400
+        private const val FAILURE_DETAIL_CHARS = 1200
+        private const val FAILURE_PADDING_PX = 48
 
         /**
          * The intent a launch dispatches. Deliberately carries ids and
