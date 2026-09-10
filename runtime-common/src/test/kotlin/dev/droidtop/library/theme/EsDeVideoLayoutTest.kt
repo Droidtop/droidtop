@@ -346,4 +346,22 @@ class EsDeVideoLayoutTest {
         )
         assertEquals(0f, oneAxis.height, 0.001f)
     }
+
+    /**
+     * VideoComponent.cpp:179-211 -- the PLAYING surface has the same
+     * first-match chain. decaffe's own `<video name="screen2">` declares
+     * only `cropSize` 0.58 x 0.77, which is the case that used to fall
+     * through to a 0.2 x 0.2 box on the console.
+     */
+    @Test
+    fun `a video cropSize sizes the playing surface`() {
+        val area = esDeVideoArea(
+            videoSize = null, videoMaxSize = null,
+            videoCropSize = EsDeThemeValue.Pair(0.58f, 0.77f),
+            areaWidth = 1920f, areaHeight = 844f,
+        )
+        assertEquals(1113.6f, area.width, 0.01f)
+        assertEquals(649.88f, area.height, 0.01f)
+        assertEquals(EsDeImageFit.CROP, area.fit)
+    }
 }

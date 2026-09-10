@@ -102,6 +102,7 @@ import dev.droidtop.library.theme.uintOrNull
 import dev.droidtop.library.theme.EsDeImageFit
 import dev.droidtop.library.theme.esDeVideoFrame
 import dev.droidtop.library.theme.esDeImageArea
+import dev.droidtop.library.theme.esDeVideoArea
 import dev.droidtop.library.theme.esDeVideoStaticImageArea
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
@@ -1132,7 +1133,22 @@ private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         return
     }
 
-    val (width, height) = sizeOf(element, viewWidth, viewHeight)
+    // The playing surface's own real size group -- `size` / `maxSize` /
+    // `cropSize` as one first-match chain with its own verb
+    // (VideoComponent.cpp:179-211), see
+    // [dev.droidtop.library.theme.esDeVideoArea]. The generic element
+    // helper this used to call reads only `size`/`maxSize`, so decaffe's
+    // own `cropSize`-only system-view preview fell through to a 0.2 x 0.2
+    // box instead of filling its declared 0.58 x 0.77 one.
+    val videoArea = esDeVideoArea(
+        videoSize = element.pairOrNull("size"),
+        videoMaxSize = element.pairOrNull("maxSize"),
+        videoCropSize = element.pairOrNull("cropSize"),
+        areaWidth = viewWidth.value,
+        areaHeight = viewHeight.value,
+    )
+    val width = videoArea.width.dp
+    val height = videoArea.height.dp
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
     // Real `videoCornerRadius` (VideoComponent.cpp:291-293) -- the PLAYING
     // surface's own radius. `imageCornerRadius` (VideoComponent.cpp:287-
