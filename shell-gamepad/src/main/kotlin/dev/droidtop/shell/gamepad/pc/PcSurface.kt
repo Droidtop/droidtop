@@ -1,0 +1,262 @@
+package dev.droidtop.shell.gamepad.pc
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.unit.dp
+import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.LibraryEntryKind
+import dev.droidtop.library.displayName
+import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.GamepadKeyMap
+
+/** ES-DE's own system id for the PC category -- the card this surface opens from. */
+internal const val PC_SYSTEM_ID = "pc"
+
+/**
+ * droidtop's own PC surface — the whole of docs/SPEC.md §7i's "Library"
+ * view, and the one thing in Handheld mode the ES-DE theme does not draw.
+ *
+ * **One list of games.** Directed 2026-09-10: "Engine games were ALWAYS
+ * going to be under PC. No need for filters and stuff, though they're a
+ * nice to have. PC is a list of games, and each game is run according to
+ * its configuration." So the grid is every PC and engine game together —
+ * Steam, GOG, Epic, Amazon, a folder the user pointed droidtop at, and a
+ * detected Ren'Py or RPG Maker game — with source and engine demoted to
+ * chips over that one list rather than promoted into separate screens.
+ *
+ * The filter chips cost nothing extra because every value they filter on
+ * is already on the entry (source and install state from `PcInfo`, engine
+ * from the entry's kind). Runner state is deliberately NOT a chip: it
+ * costs a filesystem walk and a provider query per game, which is fine on
+ * one open detail screen and not fine across a whole grid.
+ *
+ * Full-bleed on purpose. No 420 dp centred column (directed 2026-09-10):
+ * the grid spans the screen with the same 48 dp gutters the rest of the
+ * shell uses.
+ */
+@Composable
+internal fun PcSurface(
+    entries: List<LibraryEntry>,
+    onOpen: (LibraryEntry) -> Unit,
+    onFocusedEntryChanged: (LibraryEntry?) -> Unit,
+) {
+    var sort by remember { mutableStateOf(PcSort.NAME) }
+    var sources by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var engines by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var installedOnly by remember { mutableStateOf(false) }
+    val firstCard = remember { FocusRequester() }
+
+    val allSources = remember(entries) { entries.map { it.sourceLabel() }.distinct().sorted() }
+    val allEngines = remember(entries) { entries.mapNotNull { it.engineLabel() }.distinct().sorted() }
+
+    val shown = remember(entries, sort, sources, engines, installedOnly) {
+        entries
+            .filter { sources.isEmpty() || it.sourceLabel() in sources }
+            .filter { engines.isEmpty() || it.engineLabel() in engines }
+            .filter { !installedOnly || it.pcInfo?.installed != false }
+            .sortedWith(sort.comparator)
+    }
+
+    LaunchedEffect(shown.isNotEmpty()) {
+        if (shown.isNotEmpty()) runCatching { firstCard.requestFocus() }
+    }
+
+    val focusManager = LocalFocusManager.current
+    // Back is deliberately NOT handled here: the shell already owns
+    // leaving a drilled-in group, on both the key route and Android's
+    // back dispatcher, and it plays the theme's own back sound doing it.
+    // A second handler would be a second mechanism for one job.
+    Column(modifier = Modifier.fillMaxSize()) {
+        PcHeader(total = entries.size, shown = shown.size, entries = entries)
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            // Sort is one chip that cycles rather than a menu: it is a
+            // single-choice setting with four values, and a menu for that
+            // is a screen the pad has to walk into and back out of.
+            PcChip("Sort: ${sort.label}", selected = false, onClick = { sort = sort.next() })
+            PcChip("Installed", selected = installedOnly, onClick = { installedOnly = !installedOnly })
+            allSources.forEach { source ->
+                PcChip(source, selected = source in sources, onClick = { sources = sources.toggle(source) })
+            }
+            allEngines.forEach { engine ->
+                PcChip(engine, selected = engine in engines, onClick = { engines = engines.toggle(engine) })
+            }
+        }
+
+        Box(modifier = Modifier.fillMaxSize().weight(1f)) {
+            if (shown.isEmpty()) {
+                Text(
+                    if (entries.isEmpty()) {
+                        "No PC games yet. Add a games folder or sign in to a store from Settings."
+                    } else {
+                        "Nothing matches these filters."
+                    },
+                    color = Color.Gray,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.align(Alignment.Center).padding(48.dp),
+                )
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 220.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 48.dp)
+                        // Compose moves focus in a grid for nobody: the
+                        // same explicit d-pad handling the shell's other
+                        // grid already needs, and for the same reason.
+                        .onKeyEvent { event ->
+                            if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
+                            when (GamepadKeyMap.actionFor(event.key)) {
+                                GamepadAction.UP -> focusManager.moveFocus(FocusDirection.Up)
+                                GamepadAction.DOWN -> focusManager.moveFocus(FocusDirection.Down)
+                                GamepadAction.LEFT -> focusManager.moveFocus(FocusDirection.Left)
+                                GamepadAction.RIGHT -> focusManager.moveFocus(FocusDirection.Right)
+                                else -> false
+                            }
+                        },
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                ) {
+                    itemsIndexed(shown, key = { _, entry -> entry.id }) { index, entry ->
+                        PcGameCard(
+                            entry = entry,
+                            modifier = if (index == 0) Modifier.focusRequester(firstCard) else Modifier,
+                            onOpen = { onOpen(entry) },
+                            onFocused = { onFocusedEntryChanged(entry) },
+                        )
+                    }
+                }
+            }
+        }
+
+        // The surface draws its own legend rather than borrowing the
+        // shell's: A opens a game here instead of launching it, because a
+        // PC game's runner may need setup first and the detail screen is
+        // where that is said.
+        PcHints()
+    }
+}
+
+/** Plain facts, not a verdict: how much is here and how much of it is on this device. */
+@Composable
+private fun PcHeader(total: Int, shown: Int, entries: List<LibraryEntry>) {
+    val installed = entries.count { it.pcInfo?.installed != false }
+    val engineGames = entries.count { it.kind != LibraryEntryKind.WINE_PROFILE }
+    Column(modifier = Modifier.fillMaxWidth().padding(start = 48.dp, end = 48.dp, top = 20.dp, bottom = 4.dp)) {
+        Text("PC", color = Color.White, style = MaterialTheme.typography.headlineMedium)
+        Text(
+            buildString {
+                append(if (shown == total) "$total games" else "$shown of $total games")
+                append(", $installed installed")
+                if (engineGames > 0) append(", $engineGames with a detected engine")
+            },
+            color = Color.Gray,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
+@Composable
+private fun PcHints() {
+    Row(
+        modifier = Modifier.fillMaxWidth().background(Color(0xFF111111)).padding(horizontal = 48.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(28.dp),
+    ) {
+        listOf("A" to "Open", "B" to "Back", "D-pad" to "Move").forEach { (button, label) ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    button,
+                    color = Color.Black,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier
+                        .background(Color.White, RoundedCornerShape(50))
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+                Text(label, color = Color.LightGray, style = MaterialTheme.typography.labelMedium)
+            }
+        }
+    }
+}
+
+/** Multi-select chip: focusable for the pad, clickable for touch, same as everything else in this shell. */
+@Composable
+internal fun PcChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    Text(
+        label,
+        color = if (selected) Color.Black else Color.White,
+        style = MaterialTheme.typography.labelMedium,
+        modifier = Modifier
+            .onFocusChanged { focused = it.isFocused }
+            .focusable()
+            .clickable(onClick = onClick)
+            .onKeyEvent { event ->
+                if (event.type == KeyEventType.KeyUp && GamepadKeyMap.actionFor(event.key) == GamepadAction.A) {
+                    onClick()
+                    true
+                } else {
+                    false
+                }
+            }
+            .background(
+                if (selected) Color.White else if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A),
+                RoundedCornerShape(50),
+            )
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+    )
+}
+
+/** Sorts the one list; never a filter, and never reordered by anything the user did not ask for. */
+internal enum class PcSort(val label: String, val comparator: Comparator<LibraryEntry>) {
+    NAME("Name", compareBy<LibraryEntry> { it.title.lowercase() }),
+    LAST_PLAYED("Last played", compareByDescending<LibraryEntry> { it.lastPlayedEpochMs ?: 0L }.thenBy { it.title.lowercase() }),
+    PLAYTIME("Playtime", compareByDescending<LibraryEntry> { it.playtimeSeconds }.thenBy { it.title.lowercase() }),
+    SIZE("Size", compareByDescending<LibraryEntry> { it.pcInfo?.sizeBytes ?: 0L }.thenBy { it.title.lowercase() }),
+    ;
+
+    fun next(): PcSort = PcSort.entries[(ordinal + 1) % PcSort.entries.size]
+}
+
+private fun <T> Set<T>.toggle(value: T): Set<T> = if (value in this) this - value else this + value
+
+/** Where this game came from. A store row says so itself; anything else is a folder droidtop found. */
+internal fun LibraryEntry.sourceLabel(): String = pcInfo?.source ?: "Folder"
+
+/** The detected engine, or null for a PC entry that has none — a Steam game is still a game. */
+internal fun LibraryEntry.engineLabel(): String? =
+    if (kind == LibraryEntryKind.WINE_PROFILE) null else kind.displayName()

@@ -56,11 +56,12 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.library.settings.HandheldSettingsCatalog
 import dev.droidtop.library.EngineGameProvider
-import dev.droidtop.library.GameLaunchStrategy
-import dev.droidtop.library.LaunchStrategyOverridePrefs
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.scraper.isPcOrEngineGame
+import dev.droidtop.shell.gamepad.pc.PC_SYSTEM_ID
+import dev.droidtop.shell.gamepad.pc.PcGameDetail
+import dev.droidtop.shell.gamepad.pc.PcSurface
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.consoles.PlatformsDatabase
 import dev.droidtop.library.displayName
@@ -70,7 +71,6 @@ import dev.droidtop.library.integrations.IntegrationStore
 import dev.droidtop.library.integrations.OpenWithTarget
 import dev.droidtop.library.integrations.openWithChipLabel
 import dev.droidtop.library.integrations.openWithTargetsFor
-import dev.droidtop.library.displayName as launchStrategyDisplayName
 import dev.droidtop.library.theme.SystemThemeColors
 import dev.droidtop.library.theme.ThemeAssets
 import dev.droidtop.library.theme.primaryListElement
@@ -584,6 +584,17 @@ fun GamepadShell(
                 // "empty" even though it's a plain static list with nothing
                 // to wait for. detailEntry is also section-independent, so
                 // it stays checked before the loading gate too.
+                // A PC or engine game gets the PC surface's own detail
+                // screen (docs/SPEC.md 7i): runner availability, the
+                // per-game override and the actions that go with them are
+                // not a console ROM's concerns, and putting both on one
+                // screen is what made the old one grow two personalities.
+                entry != null && entry.isPcOrEngineGame -> PcGameDetail(
+                    entry = entry,
+                    library = library,
+                    onLaunch = { onLaunch(entry); detailEntry = null },
+                    onClose = { detailEntry = null },
+                )
                 entry != null -> EntryDetailScreen(
                     entry = entry,
                     library = library,
@@ -752,19 +763,12 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
         }
     }
 
-    // Which launch backends this particular game can actually use right
-    // now -- enginehost's native runtime, Wine, a Linux container. Loaded
-    // off the main thread because resolving them re-reads the game folder
-    // (see Library.availableLaunchStrategies). Empty for anything that
-    // isn't an engine game, which is what hides the chip below.
-    var strategies by remember(entry) { mutableStateOf<List<GameLaunchStrategy>>(emptyList()) }
-    var chosenStrategy by remember(entry) { mutableStateOf(LaunchStrategyOverridePrefs.get(context, entry.id)) }
-    LaunchedEffect(entry) { strategies = library.availableLaunchStrategies(entry) }
+    // Console ROMs and native apps only: a PC or engine game never
+    // reaches this screen any more (see the PC branch at the call site),
+    // so the launch-strategy picker, the PC scrape action and the PC
+    // "choose match" branch that used to live here moved wholesale to
+    // PcGameDetail rather than being duplicated across two screens.
     val isRomEntry = entry.kind == LibraryEntryKind.CONSOLE_ROM
-    // A PC or engine game scrapes too, just from the sources that
-    // actually index PC titles (see PcScraper) -- the same actions, in
-    // the same place, rather than a second scraping UI somewhere else.
-    val isPcGame = entry.isPcOrEngineGame
 
     if (editingMetadata) {
         GameMetadataEditor(
@@ -790,35 +794,6 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
             entry = entry,
             library = library,
             onDismiss = { editingCollections = false },
-        )
-        return
-    }
-
-    // Real choice, not a silent default -- enginehost/Kirikiroid2/Wine/a
-    // Linux container are all genuinely available strategies for an
-    // engine-detected game depending on what's installed and what the
-    // folder actually ships (see GameLaunchStrategyResolver); this picker
-    // is what makes that a real, user-visible option instead of something
-    // only settable by hand-editing LaunchStrategyOverridePrefs. Bumped to
-    // force re-reading the override after a pick.
-    var pickingStrategy by remember { mutableStateOf(false) }
-    // Derived from `strategies` above, which resolves off the main thread
-    // and tolerates a game folder that vanished after the scan. An earlier
-    // version of this screen resolved its own copy synchronously here,
-    // which both duplicated the control below and did filesystem work on
-    // the main thread.
-    val currentStrategy = strategies.firstOrNull { it.name == chosenStrategy } ?: strategies.firstOrNull()
-
-    if (pickingStrategy) {
-        LaunchStrategyPicker(
-            strategies = strategies,
-            current = currentStrategy,
-            onPick = { strategy ->
-                LaunchStrategyOverridePrefs.set(context, entry.id, strategy)
-                chosenStrategy = strategy.name
-                pickingStrategy = false
-            },
-            onDismiss = { pickingStrategy = false },
         )
         return
     }
@@ -878,7 +853,7 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
             // Real ConsoleRomProvider-specific concept -- same honest
             // "not applicable" gating Library.toggleFavorite/
             // saveMetadata already use for a non-ROM entry.
-            if (isRomEntry || isPcGame) {
+            if (isRomEntry) {
                 ActionChip("Choose match", highlighted = false, onClick = { pickingMatch = true })
             }
             if (media.size > 1) {
@@ -941,21 +916,6 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
                     },
                 )
             }
-            if (isPcGame) {
-                ActionChip(
-                    scrapeStatus?.let { "Scraping…" } ?: "Scrape",
-                    highlighted = false,
-                    onClick = {
-                        if (scrapeStatus == null) {
-                            scrapeStatus = "Scraping ${entry.title}…"
-                            detailScope.launch {
-                                scrapeResult = dev.droidtop.library.scraper.PcScraper.scrape(context, listOf(entry))
-                                scrapeStatus = null
-                            }
-                        }
-                    },
-                )
-            }
             ActionChip("Back", highlighted = false, onClick = onClose)
         }
         (scrapeStatus ?: scrapeResult)?.let {
@@ -966,65 +926,6 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
         // component that app no longer exports). Shown, not swallowed.
         integrationError?.let {
             Text(it, color = Color(0xFFFF8A80), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
-        }
-        // Only shown when there's an actual choice to make -- a single
-        // available strategy (or none) has nothing for a picker to offer.
-        if (strategies.size > 1 && currentStrategy != null) {
-            Text("Launch via", color = Color.Gray, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
-            ActionChip(currentStrategy.launchStrategyDisplayName(), highlighted = false, onClick = { pickingStrategy = true })
-        }
-    }
-}
-
-/** Real per-entry choice among [GameLaunchStrategy]s -- same shape as ConsoleSystemsActivity's PlayerPicker for ROMs, just local to shell-gamepad since that one lives in :app. */
-@Composable
-private fun LaunchStrategyPicker(
-    strategies: List<GameLaunchStrategy>,
-    current: GameLaunchStrategy?,
-    onPick: (GameLaunchStrategy) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .padding(48.dp)
-            .onKeyEvent { event ->
-                val action = GamepadKeyMap.actionFor(event.key)
-                if (event.type == KeyEventType.KeyUp && (action == GamepadAction.BACK || action == GamepadAction.B)) {
-                    onDismiss()
-                    true
-                } else {
-                    false
-                }
-            },
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text("Launch via", color = Color.White, style = MaterialTheme.typography.headlineSmall)
-        strategies.forEach { strategy ->
-            var focused by remember(strategy) { mutableStateOf(false) }
-            Text(
-                strategy.launchStrategyDisplayName() + if (strategy == current) " (current)" else "",
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .onFocusChanged { focused = it.isFocused }
-                    .focusable()
-                    .clickable { onPick(strategy) }
-                    .onKeyEvent { event ->
-                        if (event.type == KeyEventType.KeyUp &&
-                            GamepadKeyMap.actionFor(event.key) == GamepadAction.A
-                        ) {
-                            onPick(strategy)
-                            true
-                        } else {
-                            false
-                        }
-                    }
-                    .background(if (focused) Color(0xFF2A2A2A) else Color.Transparent, RoundedCornerShape(8.dp))
-                    .padding(12.dp),
-            )
         }
     }
 }
@@ -1590,7 +1491,12 @@ private fun GamesSection(
             // hand-built grid (the fallback for "no active theme" / "theme
             // has no real gamelist view at all") has no theme-drawn hints
             // of its own, so ButtonHintFooter keeps drawing that case.
-            onThemeHandlesHints(hasThemedGamelist && gamelistHasHelpSystem)
+            onThemeHandlesHints(
+                // The PC surface draws its own hint row, so the shell's
+                // footer would be a second copy of the same legend.
+                (selectedGroup as? GameGroup.System)?.systemId == PC_SYSTEM_ID ||
+                    (hasThemedGamelist && gamelistHasHelpSystem),
+            )
         }
     }
 
@@ -1616,6 +1522,13 @@ private fun GamesSection(
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
                 val group = selectedGroup
+                // The PC surface is droidtop's own screen with its own
+                // focus: the themed-gamelist fallbacks below drive an
+                // index into a list it does not show, so they stop at
+                // its edge. Back and the shoulders still mean what they
+                // mean everywhere else.
+                val themed = hasThemedGamelist &&
+                    (group as? GameGroup.System)?.systemId != PC_SYSTEM_ID
                 val action = GamepadKeyMap.actionFor(event.key)
                 when {
                     (action == GamepadAction.BACK || action == GamepadAction.B) && group != null -> {
@@ -1682,7 +1595,7 @@ private fun GamesSection(
                     // sibling-system convention above already owns
                     // Left/Right regardless, so there's no conflict either
                     // way.
-                    action == GamepadAction.UP && group != null && hasThemedGamelist && !gamelistHasListWidget && systemGamesForGroup.isNotEmpty() -> {
+                    action == GamepadAction.UP && group != null && themed && !gamelistHasListWidget && systemGamesForGroup.isNotEmpty() -> {
                         // Real ES-DE scroll sound -- per-game movement
                         // inside a gamelist plays SCROLLSOUND (GamelistBase.
                         // cpp:133/174/182 and every primary component when
@@ -1691,23 +1604,23 @@ private fun GamesSection(
                         focusedGameIndex = (focusedGameIndex - 1 + systemGamesForGroup.size) % systemGamesForGroup.size
                         true
                     }
-                    action == GamepadAction.DOWN && group != null && hasThemedGamelist && !gamelistHasListWidget && systemGamesForGroup.isNotEmpty() -> {
+                    action == GamepadAction.DOWN && group != null && themed && !gamelistHasListWidget && systemGamesForGroup.isNotEmpty() -> {
                         EsDeNavigationSounds.play("scroll")
                         focusedGameIndex = (focusedGameIndex + 1) % systemGamesForGroup.size
                         true
                     }
-                    action == GamepadAction.A && group != null && hasThemedGamelist && !gamelistHasListWidget -> {
+                    action == GamepadAction.A && group != null && themed && !gamelistHasListWidget -> {
                         systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onLaunch(it) } != null
                     }
                     // Y/Info applies regardless of widget presence -- a
                     // real, useful action either way, not specific to the
                     // headless case.
-                    action == GamepadAction.Y && group != null && hasThemedGamelist -> {
+                    action == GamepadAction.Y && group != null && themed -> {
                         systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onShowDetail(it) } != null
                     }
                     // X/favorite-toggle applies regardless of widget
                     // presence, same reasoning as Y/Info above.
-                    action == GamepadAction.X && group != null && hasThemedGamelist -> {
+                    action == GamepadAction.X && group != null && themed -> {
                         systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onToggleFavorite(it) } != null
                     }
                     else -> false
@@ -1935,6 +1848,17 @@ private fun GamesSection(
                     }
                 }
             }
+        } else if (group is GameGroup.System && group.systemId == PC_SYSTEM_ID) {
+            // The one category the theme does not draw past its own card
+            // (docs/SPEC.md 7i). The system view, the pc art and the
+            // transition into here all stay the theme's; everything
+            // inside is droidtop's, because ES-DE's element schema has no
+            // element type for a runner, a prefix or a store login.
+            PcSurface(
+                entries = entries.filter { it.isPcOrEngineGame },
+                onOpen = onShowDetail,
+                onFocusedEntryChanged = onFocusedEntryChanged,
+            )
         } else if (hasThemedGamelist && gamelistView != null) {
             // Real, unified theme-driven gamelist render -- ONE call into
             // the same generic EsDeThemedView/EsDeSystemListView
