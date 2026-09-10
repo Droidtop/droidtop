@@ -72,6 +72,65 @@ object PcRunnerOptions {
         )
     }
 
+    /**
+     * Performs the one named action a [RunnerState.NEEDS_SETUP] row asks
+     * for, and returns null on success or a line to show on failure.
+     *
+     * Here rather than in the surface because every one of these is a
+     * conversation with something library-core already owns the contract
+     * for -- enginehost's configure intent, the PC runtime's provision
+     * step, a store page for an app droidtop does not bundle. droidtop
+     * never side-loads a plugin itself (docs/SPEC.md 7d): it asks
+     * enginehost to.
+     */
+    suspend fun runAction(
+        context: Context,
+        entry: LibraryEntry,
+        action: RunnerAction,
+        onStatus: (String) -> Unit = {},
+    ): String? = when (action) {
+        RunnerAction.INSTALL_ENGINEHOST -> openStorePage(context, EngineHost.PACKAGE_NAME)
+        RunnerAction.INSTALL_KIRIKIROID2 -> openStorePage(context, Kirikiroid2.PACKAGE_NAME)
+        RunnerAction.INSTALL_ENGINEHOST_PLUGIN, RunnerAction.CHOOSE_ENGINE_VERSION -> configureWithEnginehost(context, entry)
+        RunnerAction.SET_UP_WINDOWS_GAMES -> {
+            val runtime = PcGameRuntimeRegistry.runtime
+            if (runtime == null) {
+                "droidtop's PC runtime isn't registered in this process."
+            } else {
+                val result = runtime.provision(GamesRoots.current(context), onStatus)
+                if (result.succeeded) null else result.detail
+            }
+        }
+    }
+
+    private fun openStorePage(context: Context, packageName: String): String? = try {
+        context.startActivity(
+            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=$packageName"))
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+        null
+    } catch (t: Throwable) {
+        "No app store on this device could open $packageName."
+    }
+
+    private fun configureWithEnginehost(context: Context, entry: LibraryEntry): String? {
+        val folder = gameFolderFor(entry) ?: return "This game has no folder on this device yet."
+        val detected = runCatching {
+            GameEngineDetector.detectGame(
+                folder,
+                EnginesDatabase.defs(context),
+                override = { candidate -> EngineOverridePrefs.engineFor(context, candidate.absolutePath) },
+            )
+        }.getOrNull() ?: return "droidtop can't tell which engine this game uses."
+        val target = EnginesDatabase.enginehostTargetFor(context, detected.engine)
+        return try {
+            context.startActivity(EngineHost.configureIntent(detected.gameRoot, target))
+            null
+        } catch (t: Throwable) {
+            "enginehost didn't accept the configure request: ${t.message}"
+        }
+    }
+
     /** [RunnerAvailability.resolve] over [forEntry], with the user's stored override applied. */
     fun resolvedFor(context: Context, entry: LibraryEntry, options: List<RunnerOption>): ResolvedRunner? =
         RunnerAvailability.resolve(
