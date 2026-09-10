@@ -15,7 +15,7 @@ class GameEngineDetectorTest {
     // file the app bundles, so a registry edit that breaks detection
     // fails here before it ships.
     private val defs = EngineRegistryParser.parse(
-        File("src/main/assets/engines-database.json").readText(),
+        SeedAssets.read("engines-database.json"),
     )
 
     private fun touch(vararg segments: String) {

@@ -2,8 +2,6 @@ package dev.droidtop.library.consoles
 
 import android.content.Context
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import org.json.JSONObject
 
 /**
@@ -87,24 +85,13 @@ object PlatformsDatabase {
     }
 
     /** Same validate-before-replace atomic-write contract as [PlayersDatabaseUpdater]. Returns the platform count. */
-    fun update(context: Context, url: String = PlatformDatabaseSource.urlFor(context, DB_FILE_NAME)): Int {
-        val connection = URL(url).openConnection() as HttpURLConnection
-        connection.connectTimeout = 15_000
-        connection.readTimeout = 30_000
-        val text = try {
-            check(connection.responseCode == 200) { "HTTP ${connection.responseCode} from $url" }
-            connection.inputStream.bufferedReader().use { it.readText() }
-        } finally {
-            connection.disconnect()
-        }
-        val count = parse(text).size
+    fun update(context: Context, url: String = PlatformDatabaseSource.urlFor(context, DB_FILE_NAME)): Int =
+        install(context, PlatformDatabaseTransport.get(url))
 
-        val dest = File(context.filesDir, DB_FILE_NAME)
-        val temp = File(context.filesDir, "$DB_FILE_NAME.downloading")
-        temp.writeText(text)
-        check(temp.renameTo(dest) || run { dest.delete(); temp.renameTo(dest) }) {
-            "Couldn't move the downloaded platforms database into place"
-        }
+    /** Validates [text] and only then replaces the current copy; see [EnginesDatabase.install]. */
+    fun install(context: Context, text: String): Int {
+        val count = parse(text).size
+        PlatformDatabaseTransport.replace(context, DB_FILE_NAME, text)
         invalidate()
         return count
     }
