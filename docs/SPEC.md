@@ -3661,6 +3661,172 @@ resolves identically every scan.
 8. Give `runtime-linux-noroot` a real no-root backend (§5b for why
    that is not simply a `DefaultProotContainerBackend` port).
 
+## 7i. The PC surface — "a PC in a box", not an ES-DE system (directed 2026-09-10)
+
+The user's framing: "we explicitly want THAT category to break from the
+ESDE theme, because of how much infrastructure we have to build. It needs
+to be a PC in a box, like droidtop, controlling detection, runners, and
+etc based on availability."
+
+In Handheld mode every console system is rendered by the ES-DE theme
+engine (§7f) and one category is not: **PC**. The `pc` card stays in the
+theme's own carousel, drawn from the theme's own `pc` art, and opening it
+enters droidtop's own full-screen surface instead of a themed gamelist.
+Design pass and build plan:
+`/root/coordination/research/pc-in-a-box/README.md`.
+
+### Scope
+
+The surface owns every game that is not a console ROM and not a native
+Android app: store games (Steam, GOG, Epic, Amazon), Windows and Linux
+games in a folder, and engine games (Ren'Py, RPG Maker, KiriKiri and the
+rest of the engines database). It owns their discovery, their detection
+results, the choice of what runs them, their install and prefix state,
+their per-game overrides, and their metadata actions.
+
+It does not own console ROMs, native Android apps, or anything in the
+theme's system view other than the `pc` card itself.
+
+### The model
+
+**Entries.** One `LibraryEntry` per game, exactly as §7g requires — no
+second model and no per-source screen. Source is a filter, never a
+category. A folder-scanned game and a store game are the same object with
+different `PcInfo`.
+
+**Runners.** A runner is the named thing that runs a game, and it is
+first-class vocabulary the user sees, not an implementation detail. There
+are four: Wine (via the vendored gamenative engine, never root — the
+`sealed` `WineEngine` makes that structural, §5b), a native Linux process
+inside a container (§3), an enginehost plugin for the game's engine (§7d),
+and Kirikiroid2. Kirikiroid2's row must state its real limitation — it
+opens the app, not the game — wherever it is offered.
+
+**Availability.** Every runner, for every game, is in exactly one of four
+states, and the last two are different things:
+
+- **Ready** — it can run this game now.
+- **Needs setup** — possible on this device, one named action away. The
+  row shows the action ("Install the Ren'Py plugin", "Set up Windows
+  games", "Sign in to GOG"), never a failure.
+- **Not on this device** — the requirement cannot be met by anything
+  droidtop can do here. Shown, dimmed, with its one-line reason. Never
+  silently absent: a user who does not know an option exists cannot decide
+  about it.
+- **Not for this game** — the game itself does not offer it (no `.exe`, so
+  no Wine; not a KiriKiri game, so no Kirikiroid2). Hidden behind a "why
+  not" expansion, because a column of "no" rows buries the real choice.
+
+Availability is computed from real per-device and per-folder facts, never
+from a table keyed on engine alone: a Windows executable in the folder, a
+Linux build in the folder, a valid ImageFS and an existing prefix, whether
+a root shell answers, whether enginehost is installed and can read the
+folder, and which plugin bundles its capabilities provider reports.
+Enginehost's bundle list stays **advisory** (§7d): droidtop annotates with
+it and never gates a launch enginehost would otherwise resolve.
+
+**Resolution order: availability first, the database's priority second.**
+The engines database's `strategies` list only ranks what is already
+available. The resolved runner and the reason it won are stated on the
+game ("enginehost — default for Ren'Py"), which is what turns that
+priority from an invisible constant into something the user can see.
+
+**Overrides.** Per-game runner choice is an override over that stated
+default, editable where the game is and clearable back to the default.
+This is the Daijishō default-with-priority model §7g already commits to,
+now applied to PC entries as well as engine ones.
+
+**Honesty about what cannot run yet.** A runner whose machinery exists but
+whose output the user cannot see is **Needs setup with the real reason**,
+not Ready. Concretely: until the Wine renderer is attached (§5b), the Wine
+row says the renderer is not wired in this build. A Play button that is
+known in advance to produce nothing is worse than an honest row, and the
+surface may not ship one.
+
+**Root never gates a Handheld game.** Native Linux inside a container
+needs root today and is therefore "not on this device" on an unrooted
+console. It is never the only route offered for a game that has another;
+where it genuinely is the only one, the game says so with the reason
+instead of offering a launch that cannot work. Root remains desktop-only.
+
+### Views
+
+**Entry point.** The theme's `pc` system card, using the theme's own `pc`
+art and the theme's own transition. B returns to the carousel with focus
+on that card. Nothing else in the system view changes.
+
+**Library.** One grid over one list, with a header line of plain facts.
+Filters are one multi-select chip row — source, install state, engine,
+runner state, compatibility — never separate screens. ES-DE's two-menu
+split is held (§7f): Start opens droidtop's settings catalog, Back opens
+the in-context options menu for what is focused, and hold-A duplicates
+that menu for touch.
+
+**Game detail.** In order: identity; a **Runs with** row carrying the
+resolved runner, its reason, and the picker; a primary button that is
+Play when the runner is Ready and *is the setup action* when it is not;
+install and storage actions for store games; prefix and graphics; saves;
+controls; engine settings; metadata, scrape, collections and hide; and
+compatibility.
+
+**Compatibility is evidence, never a verdict and never a gate.** It is
+other people's results on other hardware. It is shown factually, it may be
+filtered on by the user's own act, and it may never hide an entry, reorder
+the library, or block a download (directed 2026-09-01).
+
+**First run.** An empty PC library offers three concrete repairs — sign in
+to stores, add a games folder, set up Windows games — never an empty grid.
+All three are optional, skippable, and reachable again from the surface's
+options menu.
+
+### Relationship to the theme engine
+
+The theme owns the system view, the `pc` card, its art, its layout and its
+transition out. It owns nothing past that card, for three structural
+reasons: ES-DE's element schema has no element type for runner state,
+install state, prefix configuration or store authentication; its gamelist
+models "a game and its metadata" rather than "a game, four runners and an
+override"; and the screens droidtop reuses here are Compose, so theming
+them would mean rewriting them.
+
+Because every real theme already ships `pc` art, this needs no theme patch
+— which is also why droidtop's engine buckets already theme as `pc` today.
+Engine games fold into this one PC entry, with engine as a filter inside
+it, rather than appearing as invented per-engine systems in the carousel.
+
+Breaking from the theme carries an obligation: droidtop's own chrome —
+this surface, the Quick Menu, the settings catalog and the adopted
+gamenative dialogs — takes its colour and type from one droidtop palette,
+not four separate looks.
+
+### Relationship to the Quick Menu
+
+The surface is a shell screen, so the Handheld Quick Menu (§7f) opens over
+it unchanged. In-game is a separate surface and gets no new mechanism: an
+enginehost game's in-game menu is enginehost's own, a Wine game's is
+gamenative's own menu over its renderer, adopted rather than rewritten and
+taught the same contract. The PC surface never invents a third in-game
+overlay.
+
+### Relationship to enginehost
+
+droidtop routes; enginehost resolves. droidtop reads enginehost's
+capabilities provider to say what is installed, asks enginehost to install
+a missing plugin through enginehost's own configure intent, and links to
+enginehost's own per-engine controller and save screens rather than
+modelling them again. droidtop never side-loads a plugin itself and never
+reimplements an engine's input model.
+
+### Reuse, not reimplementation
+
+`:runtime-windows` already compiles the whole vendored gamenative tree
+(§9), so the store logins, install and download flows, container
+configuration dialogs, compatibility badge and folder-game scanner are
+present in the APK and need entry points, not ports (§7c's "increment 2").
+What droidtop adds on top is what gamenative has no concept of at all:
+engine games, enginehost routing, availability across four runners, the
+per-game override, and the carousel entry point.
+
 ## 8. Licensing
 
 `vendor/gamenative` and `vendor/droidspaces` are GPL-3.0. Winlator itself
