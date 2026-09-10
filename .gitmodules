@@ -22,3 +22,6 @@
 [submodule "vendor/libffi"]
 	path = vendor/libffi
 	url = https://github.com/libffi/libffi.git
+[submodule "vendor/droidtop-platforms"]
+	path = vendor/droidtop-platforms
+	url = https://github.com/Droidtop/droidtop-platforms.git

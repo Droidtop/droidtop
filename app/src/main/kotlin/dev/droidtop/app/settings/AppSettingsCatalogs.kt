@@ -11,8 +11,9 @@ import dev.droidtop.library.consoles.ConsoleSystemsDatabase
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.consoles.CustomPlayerPrefs
 import dev.droidtop.library.consoles.PlayerOverridePrefs
+import dev.droidtop.library.consoles.PlatformDatabaseSnapshot
 import dev.droidtop.library.consoles.PlatformDatabaseSource
-import dev.droidtop.library.consoles.PlayersDatabaseUpdater
+import dev.droidtop.library.consoles.PlatformDatabases
 import dev.droidtop.library.consoles.SystemOverridePrefs
 import dev.droidtop.library.consoles.BiosDatabase
 import dev.droidtop.library.consoles.KnownPlayers
@@ -207,20 +208,18 @@ object AppSettingsCatalogs {
                     AsyncActionItem(
                         id = "console_systems_update_players",
                         title = "Update platform databases",
-                        subtitle = "Refresh players, platforms, engine routing, and BIOS registry from droidtop-platforms on GitHub",
+                        subtitle = "Refresh players, platforms, engine routing, and BIOS registry from " +
+                            "droidtop-platforms on GitHub. This build was seeded from " +
+                            (PlatformDatabaseSnapshot.shortCommit(context)
+                                ?.let { "snapshot $it" } ?: "an unrecorded snapshot") +
+                            "; the same refresh also runs on the update schedule",
                         run = { ctx, onStatus ->
-                            onStatus("Updating players...")
-                            val players = PlayersDatabaseUpdater.update(ctx)
-                            onStatus("Updating platforms...")
-                            val platforms = dev.droidtop.library.consoles.PlatformsDatabase.update(ctx)
-                            onStatus("Updating engine routing...")
-                            val engines = dev.droidtop.library.EnginesDatabase.update(ctx)
-                            onStatus("Updating BIOS registry...")
-                            val bios = BiosDatabase.update(ctx)
-                            "Updated: $players players, $platforms platforms, $engines engines, $bios BIOS systems"
+                            withContext(Dispatchers.IO) {
+                                PlatformDatabases.refresh(ctx, onStatus)
+                            }
                         },
                     ),
-                    // One source for all four databases (see
+                    // One source for the whole database tree (see
                     // PlatformDatabaseSource). Editable because these URLs
                     // ship compiled into the app and raw.githubusercontent
                     // does not reliably redirect after a repository move --
@@ -229,7 +228,7 @@ object AppSettingsCatalogs {
                     TextInputItem(
                         id = "console_systems_db_source",
                         title = "Platform database source",
-                        subtitle = "Base URL the four databases are fetched from; blank restores the default",
+                        subtitle = "Base URL the database index and its files are fetched from; blank restores the default",
                         value = PlatformDatabaseSource.baseUrl(context)
                             .takeIf { it != PlatformDatabaseSource.DEFAULT_BASE_URL }
                             .orEmpty(),

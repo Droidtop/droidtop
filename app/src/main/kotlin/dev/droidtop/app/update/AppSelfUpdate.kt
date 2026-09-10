@@ -87,9 +87,10 @@ object AppSelfUpdate {
     }
 
     /**
-     * The scheduled background probe, called at process start (from
-     * SettingsCatalogInitProvider). One small download when due, enabled and
-     * allowed on the current network; otherwise nothing. Never throws, never
+     * The scheduled background pass, called at process start (from
+     * SettingsCatalogInitProvider). When it is due, enabled and allowed on
+     * the current network it asks what the newest build is and brings the
+     * platform databases up to date; otherwise nothing. Never throws, never
      * blocks the caller.
      */
     fun maybeCheck(context: Context) {
@@ -101,6 +102,15 @@ object AppSelfUpdate {
         if (unmeteredOnly(application) && isMetered(application)) return
         prefs(application).edit().putLong(KEY_LAST_ATTEMPT, now).apply()
         Thread {
+            // The platform databases ride along on the same pass, the way
+            // enginehost's engine detection rules ride along on its plugin
+            // check: they are the part of droidtop that changes faster than
+            // the app, and a person whose new emulator or engine is missing
+            // has no way to know a fix was published. The index-driven
+            // refresh downloads one small document when nothing changed,
+            // and validate-before-replace means a bad download changes
+            // nothing. The manual button in Settings runs the same call.
+            runCatching { dev.droidtop.library.consoles.PlatformDatabases.refresh(application) }
             runCatching { fetch() }.onSuccess { info ->
                 prefs(application).edit()
                     .putLong(KEY_SEEN_CODE, info.versionCode)

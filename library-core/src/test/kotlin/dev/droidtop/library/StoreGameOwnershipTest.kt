@@ -30,7 +30,7 @@ class StoreGameOwnershipTest {
     // The REAL shipped seed registry, same as GameEngineDetectorTest:
     // a registry edit that stops recognising Ren'Py would fail here too.
     private val defs = EngineRegistryParser.parse(
-        File("src/main/assets/engines-database.json").readText(),
+        SeedAssets.read("engines-database.json"),
     )
 
     private fun dir(vararg segments: String): File =

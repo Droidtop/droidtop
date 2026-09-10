@@ -2,9 +2,8 @@ package dev.droidtop.library
 
 import android.content.Context
 import dev.droidtop.library.consoles.PlatformDatabaseSource
+import dev.droidtop.library.consoles.PlatformDatabaseTransport
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 
 /**
  * The engine REGISTRY, data-driven from the droidtop-platforms
@@ -66,28 +65,23 @@ object EnginesDatabase {
     }
 
     /** Same validate-before-replace atomic-write contract as [dev.droidtop.library.consoles.PlayersDatabaseUpdater]. Returns the engine count. */
-    fun update(context: Context, url: String = PlatformDatabaseSource.urlFor(context, DB_FILE_NAME)): Int {
-        val connection = URL(url).openConnection() as HttpURLConnection
-        connection.connectTimeout = 15_000
-        connection.readTimeout = 30_000
-        val text = try {
-            check(connection.responseCode == 200) { "HTTP ${connection.responseCode} from $url" }
-            connection.inputStream.bufferedReader().use { it.readText() }
-        } finally {
-            connection.disconnect()
-        }
+    fun update(context: Context, url: String = PlatformDatabaseSource.urlFor(context, DB_FILE_NAME)): Int =
+        install(context, PlatformDatabaseTransport.get(url))
+
+    /**
+     * Validates [text] as a real registry and, only then, replaces the
+     * current copy with it. Public because the index-driven refresh
+     * ([dev.droidtop.library.consoles.PlatformDatabaseIndex]) composes this
+     * file out of per-engine files rather than downloading it whole -- the
+     * validation and the atomic replace have to be the same either way.
+     */
+    fun install(context: Context, text: String): Int {
         val parsed = EngineRegistryParser.parse(text)
         check(parsed.isNotEmpty()) { "Engines database has no engines" }
         check(parsed.any { it.detect.isNotEmpty() }) {
             "Engines database carries no detection rules (legacy v3 file?) -- refusing to replace the seed"
         }
-
-        val dest = File(context.filesDir, DB_FILE_NAME)
-        val temp = File(context.filesDir, "$DB_FILE_NAME.downloading")
-        temp.writeText(text)
-        check(temp.renameTo(dest) || run { dest.delete(); temp.renameTo(dest) }) {
-            "Couldn't move the downloaded engines database into place"
-        }
+        PlatformDatabaseTransport.replace(context, DB_FILE_NAME, text)
         invalidate()
         return parsed.size
     }
