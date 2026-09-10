@@ -5,8 +5,14 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * User's explicit choice of which [GameLaunchStrategy] runs a given
- * engine-game entry, overriding [EngineGameProvider.launch]'s own
- * priority-order default -- same real pattern as
+ * entry, overriding the availability model's own stated default.
+ *
+ * **Any PC entry**, not only an engine-detected one (docs/SPEC.md 7i): a
+ * Steam or folder game is the same object in the same list, with the same
+ * four runners resolved for it, so it gets the same override. Nothing in
+ * the storage was ever engine-specific -- it is keyed by
+ * [LibraryEntry.id], which every provider supplies -- only the resolution
+ * that read it was, and [PcRunnerOptions] now runs for every entry -- same real pattern as
  * [dev.droidtop.library.consoles.PlayerOverridePrefs] for ROMs (a game can
  * have several real candidate launch paths, same idea as Daijishō's
  * `PlatformEntity.playerIdList`/`defaultPlayerId` this whole session keeps
