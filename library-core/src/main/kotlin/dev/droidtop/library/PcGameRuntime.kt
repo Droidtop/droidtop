@@ -61,6 +61,17 @@ interface PcGameRuntime {
     val isProvisioned: Boolean
 
     /**
+     * Whether a container runtime that can really exec a native Linux
+     * binary is live right now.
+     *
+     * Separate from [isAvailable], which is true as soon as a Wine prefix
+     * exists: a Windows game needs no container and no root, a native
+     * Linux build needs both. Conflating them made the PC surface tell a
+     * user with a Wine prefix that a Linux-only game was ready to run.
+     */
+    val isLinuxContainerAvailable: Boolean
+
+    /**
      * Creates the Wine container and installs the Windows environment
      * into it, reporting progress through [onStatus].
      *
