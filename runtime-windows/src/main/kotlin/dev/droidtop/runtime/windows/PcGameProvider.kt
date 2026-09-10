@@ -175,9 +175,16 @@ class PcGameProvider(
         val runtime = PcGameRuntimeRegistry.runtime
             ?: error("Can't launch ${entry.title}: no PC runtime is registered in this build.")
 
+        // "PC is a list of games, and each game is run according to its
+        // configuration" (directed 2026-09-10): a store or folder game
+        // honours the same per-game runner override an engine game does,
+        // rather than the override applying to half the library.
+        val override = dev.droidtop.library.LaunchStrategyOverridePrefs.get(context, entry.id)
         // A native Linux build beats Wine plus CPU translation whenever
-        // one exists (docs/SPEC.md 5a), so it is checked first.
+        // one exists (docs/SPEC.md 5a), so it is what wins when the user
+        // has expressed no preference.
         val linux = GameExecutableResolver.linuxExecutable(gameRoot)
+            ?.takeIf { override != dev.droidtop.library.GameLaunchStrategy.WINE_PREFIX.name }
         val result = if (linux != null) {
             runtime.launchLinux(linux, gameRoot)
         } else {
