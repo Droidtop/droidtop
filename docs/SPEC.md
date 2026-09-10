@@ -912,10 +912,26 @@ What "the addon is the better screen" concretely means in each mode:
   repeatCount — no timers; short-press Select keeps its meaning; chords
   rejected as undiscoverable; remappable later via the GamepadAction
   layer). **Entirely controller-driven, per direction**: L1/R1 tabs,
-  D-pad focus, A open, X dismiss, Y clear-all, B close, with the hint
-  row stating exactly that. The System tab renders the settings
-  catalog's own System group through the same CatalogNavigator the
-  Settings section uses — a view, never a copy. Notifications need the
+  D-pad focus, A act, X dismiss, Y clear-all, B close, with the hint
+  row stating exactly that. The System tab is Android's QUICK-SETTINGS
+  shape, not a settings list (directed 2026-09-10, against droidtop's
+  older habit of a single centred narrow column): a status header
+  (clock, battery and level, network state, the connected controller's
+  name), brightness and media volume as sliders, then a grid of large
+  tiles — two columns, three when the sheet is wide enough. A toggle is
+  a lit or dim tile, a choice shows its current value and cycles on A
+  (a long option list opens the catalog's own picker screen), an action
+  is a tile, a nested screen opens in the sheet, and the display-role
+  rows (shell display, game launch display, swap screens) are tiles
+  too. The sheet stays a right-edge, full-height sheet, widened to what
+  the grid needs instead of a fixed 420 dp column. What it renders is
+  unchanged: the settings catalog's own System group plus those display
+  rows, through the same catalog items and the same write paths the
+  Settings section uses — a view, never a copy, so a System setting
+  added to the catalog appears here as a tile with no edit to the menu,
+  and an item the tile view has no glyph for still gets a real tile.
+  Tile glyphs are drawn in the shell (droidtop ships no icon
+  dependency). Notifications need the
   notification-access grant (NotificationListenerService in `:app`
   feeding `runtime-common`'s NotificationsStore); until granted the tab
   offers the grant, never a silently empty list. Honest limitation:
@@ -1405,10 +1421,54 @@ class -- a delete that can leave the tree it was pointed at:
   staging dirs hold only droidtop-written flat files), and test-only
   temp dirs.
 
+### Presentation and input: gamenative's renderer, on droidtop's launch display
+
+A Wine guest does not draw Wayland surfaces, so it cannot be presented
+the way desktop mode presents a container: it draws into an X server.
+gamenative already has the whole Android side of that -- `XServerView`
+(Vulkan/SurfaceFlinger) and `XServerViewGL` (the VirGL passthrough
+path), the `VortekRendererComponent`/`VirGLRendererComponent` guests
+talk to, `WinHandler` for XInput, `TouchpadView` and the X keyboard for
+pointer and keys -- and the native libraries behind them
+(`libvulkan_renderer.so`, `libvortekrenderer.so`, `libwinlator.so`) have
+always been packaged by `:runtime-windows`. droidtop consumes that path
+rather than writing a renderer; the alternative is a second renderer for
+a window system that already has one.
+
+Where it lives is droidtop's decision, and it is an **Activity**
+(`WineGameActivity`). Handheld launches are placed on the configured
+launch-target display through `LaunchDisplay`, which means
+`ActivityOptions.setLaunchDisplayId` -- so the picture has to be
+something Android can place on a display, which a surface inside the
+shell's own window is not. That also keeps the Wine path identical in
+shape to every other launch droidtop makes: build an intent, hand it to
+`LaunchDisplay`, and let the started thing own its own lifetime.
+
+The launch entry is unchanged. `PcGameRuntime`/`WineEngine` are still
+the seam, so library entries, the prefix store and the strategy resolver
+know nothing about any of this; the engine's `launch` now returns when
+the game has been handed off rather than when it exits, because the
+running game's lifetime belongs to the Activity presenting it.
+
+The environment the guest runs in is one object with a lifetime
+(`WineXSession`): the X server socket, the audio server, the GPU
+renderer component and the guest launcher, all gamenative's own
+components, chosen from the prefix's own fields. Audio follows
+gamenative exactly -- PulseAudio by default, ALSA where the prefix says
+so, each with the environment variable pointing at the socket its own
+component binds. Two components are deliberately not started:
+`SteamClientComponent` (droidtop is not a Steam client on this path) and
+`WineRequestComponent` (it hands guest URL requests to an Epic OAuth
+activity droidtop keeps out of its merged manifest).
+
+Desktop mode is **out of scope here**. There a Windows program should
+appear as a window among others inside the container's sway compositor,
+which is a different presentation problem with a different answer;
+nothing in this path assumes it and nothing in it should be stretched to
+cover it.
+
 Remaining: repeat provisioning through container creation on hardware,
-then one Windows launch. Presentation is separate and unstarted -- the
-engine runs Wine against a headless X server, and nothing composites its
-output into droidtop's own surface yet.
+then one Windows launch that is seen and played.
 
 ## 6. Input
 
