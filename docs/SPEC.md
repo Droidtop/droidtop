@@ -2409,7 +2409,8 @@ GitHub-refresh + validate-before-replace:
   types dirExists/fileExists/anyFileNameContains/anyFileExtension/
   anyFileNameIn/dirNamePrefixCount/fileHeadRegex, plus `builtin` naming
   a code probe for byte-magic checks JSON can't express — Godot's GDPC
-  trailer, Unity's depth-limited player search, Twine's html scan),
+  trailer, Unity's depth-limited player search, the HTML row's
+  root-page probe),
   `strategies` (launch priority, as before — availability stays code so
   a bad download can never make an unlaunchable strategy launch), and
   `enginehost` (the family/context/extras/versionSelectorFallback
