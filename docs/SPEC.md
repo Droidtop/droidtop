@@ -1070,87 +1070,6 @@ history and error handling included, never a second launch mechanism.
 While no shell is alive to launch through, a tap does nothing rather
 than half-launching outside that path.
 
-## 4e. General-compute parity: status ledger (assessed 2026-09-01)
-
-§1 and §4b already set the goal and the test — *"if the user ever has to
-think 'I'll need to pull out my computer for that,' it's a failing."*
-This section measures against it rather than restating it.
-
-### What prior art says parity requires
-
-**ChromeOS Crostini** is the closest shipping analogue to droidtop's
-architecture (containers, integrated rather than isolated), and its
-integration list is effectively the checklist: bidirectional file sharing
-surfaced in the host's own file manager; **clipboard forwarding** between
-container and host, which its Sommelier Wayland proxy handles alongside
-input and window events; audio in/out; OpenGL; USB passthrough (still
-only partial even there, after years); printing. Notably Crostini treats
-clipboard and file sharing as core, not polish — they are what make two
-environments feel like one machine.
-
-**Samsung DeX** is the instructive failure. Its ceiling is not the
-hardware, it is that *every app is the same mobile app, stretched*:
-reviewers consistently land on stripped-down Office, phone-shaped Slack
-and Teams, and photo editors that cannot do the job. This validates
-droidtop's core architectural bet — running real desktop software through
-containers and Wine, rather than enlarging Android apps, is the only
-route to the standing test. It also warns about the second-order problem
-DeX has: capping concurrent apps and losing window arrangements makes a
-desktop stop feeling like one.
-
-### Ledger
-
-Measured by what droidtop's own code actually touches.
-
-| Capability | Spec | Status |
-|---|---|---|
-| Container lifecycle (root) | §3 | **built** — `DroidSpacesRuntime` implements create/start/stop/list/exec/destroy |
-| Container manager UI | §4b | **built** — `ContainersActivity` over `listContainers` |
-| Bind-mounted Android storage | §3 | **built** — `hostStorageToContainerPath`, whole app-storage dir mounted |
-| Audio | §2 | **configured, unverified** — droidspaces' own `enable_pulseaudio=1`; never confirmed on device |
-| Second-screen trackpad + keyboard | §4/§6c | **built, unproven live** — `TrackpadGestureEngine`/`TrackpadView` plus the forked keyboard, hosted on the addon display. The gesture model, acceleration curve, millimetre scale, focus stepper and key translation are unit-tested; everything downstream of a real finger on a real second panel is not |
-| Keyboard/mouse injection | §6 | **built, unproven live** — host-bridge's virtual-pointer/virtual-keyboard injection, and (since §6b) the desktop surface that feeds it. Between the assessment above and §6b the primitive existed but nothing called it: `InputSeat` was constructed only by its own unit test, so the presented desktop was a video feed with no way to click it |
-| External display | §4 | **built** |
-| **Terminal into a container** | §4b, §3d | **built 2026-09-02, unproven live** — `ContainerTerminal` + a Taskbar entry, provisioned by `CompositorProvisioning` and launched through the existing `exec`. An in-container terminal, not an Android terminal view — §3d carries the argument. PRIMARY container only so far |
-| **Clipboard host↔container** | §6c | **built 2026-09-02, unproven live** — `ext-data-control-v1` in `:host-bridge`'s native client, `ClipboardBridge`/`ClipboardSync` on the Android side, both directions. Was not in the spec at all before; §6c is now where it lives |
-| **USB peripherals** | §4b | **NOT BUILT** — zero files |
-| **Printing** | §4b | **NOT BUILT** — zero files |
-| **VPN for the whole device** | §4a | **NOT BUILT** — zero files, despite a fully designed section |
-| GPU acceleration | §3c | **barely touched** — one file references it |
-| Non-root path | §3 | **NOT BUILT** — `ProotRuntime` is 7 `TODO()`s, so an unrooted device has no desktop at all |
-| Desktop session end-to-end | §10 | **unproven** — real code, never run against live hardware |
-
-### What actually makes a user reach for a real computer today
-
-In rough order of how often it would bite. The first two were closed on
-2026-09-02 (§3d, §6c) and are struck through rather than deleted, because
-neither has been seen working on hardware and this section's value is that
-it does not overclaim:
-
-1. ~~**No terminal.**~~ Built. Not yet run against a live compositor.
-2. ~~**No clipboard bridge.**~~ Built, both directions. Not yet run
-   against a live compositor.
-3. **No USB.** No flash drives, no serial adapters, no scanners.
-4. **No printing.**
-5. **No VPN**, despite §4a being fully designed.
-6. **Nothing at all without root**, which is a coverage problem rather
-   than a capability one, and the largest single body of unwritten work.
-   Both of the two items just closed sit on top of it: the terminal runs
-   through `ContainerRuntime.exec`, which is `TODO()` in `ProotRuntime`,
-   and the clipboard needs a running compositor, which the no-root path
-   cannot start. Neither adds any *new* root dependency — the clipboard
-   client needs none at all, and the terminal uses the `exec` that was
-   already there — but neither serves an unrooted device until that path
-   is real.
-
-### Correction to the record
-
-Six doc comments describing unfinished work outlived the work itself and
-were repeatedly read back as gaps (fixed 2026-09-01). The lesson for this
-ledger: status claims belong in ONE place that is checked against code,
-which is what this section is. Prefer measuring what the code touches
-over trusting a comment about intent.
-
 ## 5. Windows compatibility — no real virtualization
 
 Confirmed via research, treat as settled: genuine hardware-accelerated x86
@@ -1701,10 +1620,9 @@ be read and changed rather than tuned by hand.
 ## 6c. Clipboard bridge, host↔container (built 2026-09-02)
 
 Text copied in Android pastes in the container, and text copied in the
-container pastes in Android. §4e ranked this second behind the terminal;
-in practice it bites more often, because it is friction on ordinary work
-rather than an occasional need — which is also why Crostini treats
-clipboard forwarding as core rather than polish (§4e).
+container pastes in Android. Clipboard forwarding is friction on ordinary
+work rather than an occasional need, which is also why Crostini treats it
+as core rather than polish.
 
 **The Wayland seam is `ext-data-control-v1`**, bound by `:host-bridge`'s
 native client next to the screencopy and virtual-input protocols it
