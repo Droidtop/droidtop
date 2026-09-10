@@ -272,3 +272,37 @@ fun esDeImageArea(
     // as [esDeVideoStaticImageArea]'s own final branch.
     return EsDeStaticImageArea(0.2f * areaWidth, 0.2f * areaHeight, EsDeImageFit.FIT)
 }
+
+/**
+ * Real `VideoComponent::applyTheme` sizing for the PLAYING surface
+ * (VideoComponent.cpp:179-211) -- the video group's own first-match chain,
+ * `size` -> `maxSize` -> `cropSize`, each with its own verb, and the
+ * video's own clamps (0.01..2.0 per axis, a fully-zero `size` corrected to
+ * 0.01, only axes greater than zero clamped).
+ *
+ * This is the same shape [esDeVideoStaticImageArea] already reads for the
+ * poster; it is separated out because droidtop's renderer sized the
+ * playing surface through the generic element helper instead, which knows
+ * only `size`/`maxSize` and falls back to 0.2 x 0.2. decaffe's own system
+ * -view preview (`<video name="screen2">`, `cropSize` 0.58 x 0.77 and no
+ * `size`/`maxSize` at all) therefore drew at a fifth of the view in each
+ * axis instead of filling its box -- confirmed by diffing the console's
+ * own capture against an official Linux ES-DE render of the same theme
+ * (reference/es-de-render/run.sh).
+ */
+fun esDeVideoArea(
+    videoSize: EsDeThemeValue.Pair?,
+    videoMaxSize: EsDeThemeValue.Pair?,
+    videoCropSize: EsDeThemeValue.Pair?,
+    areaWidth: Float,
+    areaHeight: Float,
+): EsDeStaticImageArea = esDeVideoStaticImageArea(
+    imageSize = null,
+    imageMaxSize = null,
+    imageCropSize = null,
+    videoSize = videoSize,
+    videoMaxSize = videoMaxSize,
+    videoCropSize = videoCropSize,
+    areaWidth = areaWidth,
+    areaHeight = areaHeight,
+)
