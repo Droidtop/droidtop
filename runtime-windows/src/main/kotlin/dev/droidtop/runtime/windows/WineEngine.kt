@@ -3,25 +3,12 @@ package dev.droidtop.runtime.windows
 import android.content.Context
 import com.winlator.container.Container
 import com.winlator.contents.ContentsManager
-import com.winlator.core.Callback
-import com.winlator.core.ProcessHelper
 import com.winlator.core.WineInfo
-import com.winlator.core.envvars.EnvVars
-import com.winlator.xconnector.UnixSocketConfig
 import com.winlator.xenvironment.ImageFs
-import com.winlator.xenvironment.XEnvironment
-import com.winlator.xenvironment.components.BionicProgramLauncherComponent
-import com.winlator.xenvironment.components.NetworkInfoUpdateComponent
-import com.winlator.xenvironment.components.SysVSharedMemoryComponent
-import com.winlator.xenvironment.components.XServerComponent
-import com.winlator.xserver.ScreenInfo
-import com.winlator.xserver.XServer
+import dev.droidtop.library.LaunchDisplay
 import dev.droidtop.library.PcLaunchResult
 import java.io.File
-import java.util.ArrayDeque
-import kotlin.coroutines.resume
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 
 /**
@@ -60,13 +47,20 @@ sealed interface WineEngine {
     fun readiness(prefix: Container): WineEngineReadiness
 
     /**
-     * Runs [target] under Wine in [prefix], with [workingDir] as the
-     * process working directory, and suspends until it exits.
+     * Starts [target] under Wine in [prefix], with [workingDir] as the
+     * process working directory.
      *
      * [target] is whatever `wine` itself should be handed: the Unix path
      * of an executable on a mapped drive, or the Windows path a
      * `.desktop` shortcut already stores. Both are things Wine resolves;
      * neither is something this engine should try to convert.
+     *
+     * Returns once the game has been HANDED OFF, not once it has exited.
+     * The result answers "did this launch start", which is the question
+     * every caller actually asks (each one `check`s it and reports the
+     * detail to the user); the running game's own lifetime belongs to
+     * the Activity that presents it, the same way every other droidtop
+     * launch works.
      */
     suspend fun launch(prefix: Container, target: String, workingDir: File): PcLaunchResult
 }
@@ -84,26 +78,20 @@ sealed interface WineEngineReadiness {
  * `:runtime-windows` compiles the vendored tree with
  * `MODERN_ANDROID = true`, because Android refuses to `exec()` extracted
  * binaries above `targetSdk 28`. On that path gamenative runs the guest
- * with a plain [ProcessHelper] exec against the [ImageFs] root, loaded
+ * with a plain `ProcessHelper` exec against the [ImageFs] root, loaded
  * through `/system/bin/linker64` -- no proot, and no Linux container.
  * proot is the *glibc* variant's mechanism, and upstream deleted the
  * arm64 `libproot.so`, so there is no arm64 proot to port to; that whole
  * line of enquiry is a dead end, and the no-root path does not need one.
  *
  * Everything below this seam is gamenative's own machinery, deliberately
- * used rather than re-derived: [BionicProgramLauncherComponent] builds
- * the real guest environment (the box64/FEXCore sets, the `LD_PRELOAD`
- * of the sysvshm and W^X redirect shims, the wine PATH), extracts the
- * translator payload for the box64 version the prefix is configured for,
- * and starts the process. droidtop supplies only what is genuinely its
- * own: which prefix, which executable, and where the output goes.
- *
- * Display: the X server components below are real and accept Wine's
- * connection, but nothing presents their output yet -- droidtop composes
- * through `:host-bridge`, not through gamenative's Android SurfaceView
- * renderer. A game therefore reaches Wine and runs without a picture.
- * Wiring a renderer to droidtop's own surface is separate, named work
- * that this seam cannot decide on its own.
+ * used rather than re-derived. This class now owns only the two things
+ * that are genuinely droidtop's: whether an environment exists to launch
+ * into, and where the picture goes. The environment itself -- X server,
+ * audio server, GPU renderer component, guest launcher -- is
+ * [WineXSession], and the picture is [WineGameActivity], which is started
+ * through [LaunchDisplay] so a handheld launch lands on the configured
+ * launch-target display like every other launch droidtop makes.
  */
 class BionicWineEngine(private val context: Context) : WineEngine {
 
@@ -128,107 +116,22 @@ class BionicWineEngine(private val context: Context) : WineEngine {
         prefix: Container,
         target: String,
         workingDir: File,
-    ): PcLaunchResult = withContext(Dispatchers.IO) {
-        (readiness(prefix) as? WineEngineReadiness.Missing)?.let {
-            return@withContext PcLaunchResult(false, it.reason)
-        }
-
-        val imageFs = ImageFs.find(context)
-        val contentsManager = ContentsManager(context).apply { syncContents() }
-        val wineInfo = WineInfo.fromIdentifier(context, contentsManager, prefix.wineVersion)
-        // getWinePath() defaults to <rootfs>/opt/wine; a proton build
-        // lives at opt/<version>, so point ImageFs at the one this prefix
-        // is configured for before anything reads it (upstream does
-        // exactly this in its own pre-launch phase).
-        wineInfo.path?.takeIf { it.isNotEmpty() }?.let { imageFs.setWinePath(it) }
-
-        val environment = XEnvironment(context, imageFs)
-        val rootPath = imageFs.rootDir.path
-        // A real X server, because Wine's X11 driver has to connect to
-        // something for the process to get past window-system init. It is
-        // headless on purpose (see this class' own doc comment): no
-        // renderer is attached, so nothing is presented yet.
-        val xServer = XServer(ScreenInfo(prefix.screenSize), false)
-        environment.addComponent(
-            SysVSharedMemoryComponent(
-                xServer,
-                UnixSocketConfig.createSocket(rootPath, UnixSocketConfig.SYSVSHM_SERVER_PATH),
-            ),
+    ): PcLaunchResult {
+        // Readiness reads the contents store off disk, so it does not run
+        // on whatever thread the caller happens to be on.
+        val missing = withContext(Dispatchers.IO) { readiness(prefix) as? WineEngineReadiness.Missing }
+        if (missing != null) return PcLaunchResult(false, missing.reason)
+        // Dispatched on the caller's own context, exactly like every
+        // other provider's launch (EngineHost, Kirikiroid2, the console
+        // players): LaunchDisplay is the one place that decides which
+        // screen a launch lands on, and it is the same call for all of
+        // them.
+        return runCatching {
+            LaunchDisplay.start(context, WineGameActivity.intent(context, prefix, target, workingDir))
+        }.fold(
+            onSuccess = { PcLaunchResult(true, "ok") },
+            onFailure = { PcLaunchResult(false, it.message ?: "couldn't start the Windows game screen") },
         )
-        environment.addComponent(
-            XServerComponent(xServer, UnixSocketConfig.createSocket(rootPath, UnixSocketConfig.XSERVER_PATH)),
-        )
-        environment.addComponent(NetworkInfoUpdateComponent())
-
-        val launcher = BionicProgramLauncherComponent(
-            contentsManager,
-            contentsManager.getProfileByEntryName(prefix.wineVersion),
-        ).apply {
-            setContainer(prefix)
-            setWineInfo(wineInfo)
-            isWoW64Mode = prefix.isWoW64Mode
-            box64Preset = prefix.box64Preset
-            // Every mapped drive, so a game on an SD card is reachable
-            // from inside the prefix rather than only from Android.
-            bindingPaths = prefix.drivesIterator().map { it[1] }.toTypedArray()
-            envVars = EnvVars().apply {
-                putAll(prefix.envVars)
-                // droidtop owns where the prefix lives: this container's
-                // own directory, not whatever `home/xuser` happens to
-                // point at, so the same game keeps the same prefix no
-                // matter which container was activated last.
-                put("WINEPREFIX", File(prefix.rootDir, ".wine").absolutePath)
-                put("WINEDEBUG", "-all")
-            }
-            setWorkingDir(workingDir.takeIf { it.isDirectory } ?: imageFs.rootDir)
-            // Spaces are escaped rather than quoted: ProcessHelper's own
-            // splitCommand keeps the quote characters inside the argument
-            // it produces, which would hand Wine a path that does not
-            // exist, but it treats a backslash-space pair as a literal
-            // space.
-            guestExecutable = "wine " + target.replace(" ", "\\ ")
-        }
-        environment.addComponent(launcher)
-
-        // The tail of whatever Wine and box64 printed. A launch that
-        // fails is only useful if the caller can say what it said.
-        val tail = ArrayDeque<String>()
-        val collector = Callback<String> { line ->
-            synchronized(tail) {
-                tail.addLast(line)
-                while (tail.size > OUTPUT_TAIL_LINES) tail.removeFirst()
-            }
-        }
-        ProcessHelper.addDebugCallback(collector)
-
-        // Set only when the environment itself refused to start, so the
-        // failure names that rather than an exit code that never happened.
-        var startFailure: String? = null
-
-        try {
-            val status = suspendCancellableCoroutine { continuation ->
-                launcher.setTerminationCallback { code -> continuation.resume(code ?: EXEC_FAILED) }
-                continuation.invokeOnCancellation { runCatching { environment.stopEnvironmentComponents() } }
-                val started = runCatching { environment.startEnvironmentComponents() }
-                if (started.isFailure && continuation.isActive) {
-                    startFailure = started.exceptionOrNull()?.message ?: "the Wine environment failed to start"
-                    continuation.resume(EXEC_FAILED)
-                }
-            }
-            val output = synchronized(tail) { tail.joinToString("\n") }
-            PcLaunchResult(
-                succeeded = status == 0,
-                detail = when {
-                    status == 0 -> "ok"
-                    startFailure != null -> startFailure
-                    output.isBlank() -> "wine exited $status with no output"
-                    else -> "wine exited $status: $output"
-                }.toString(),
-            )
-        } finally {
-            ProcessHelper.removeDebugCallback(collector)
-            runCatching { environment.stopEnvironmentComponents() }
-        }
     }
 
     /**
@@ -243,10 +146,5 @@ class BionicWineEngine(private val context: Context) : WineEngine {
         val root = info?.path?.takeIf { it.isNotEmpty() }
             ?: return File(imageFs.rootDir, "opt/wine/bin/wine")
         return File(root, "bin/wine")
-    }
-
-    private companion object {
-        const val OUTPUT_TAIL_LINES = 40
-        const val EXEC_FAILED = -1
     }
 }
