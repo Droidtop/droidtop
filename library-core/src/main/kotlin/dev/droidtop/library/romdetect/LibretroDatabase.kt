@@ -14,8 +14,8 @@ import androidx.room.RoomDatabase
 /**
  * Real, forked wholesale (unmodified schema/queries, only package changed)
  * from Lemuroid's own `lemuroid-metadata-libretro-db` module
- * (github.com/Swordfish90/Lemuroid, GPL-3.0 -- already vendored in full at
- * vendor/lemuroid, see that module's own real `LibretroDBMetadataProvider`
+ * (github.com/Swordfish90/Lemuroid, GPL-3.0 -- see that module's own real
+ * `LibretroDBMetadataProvider`
  * for the real, prioritized cascade this was ported from: CRC32 -> embedded
  * serial -> filename -> path+filename -> unique-extension -> known-system
  * -> path+extension). Only the CRC32/serial/filename lookups are ported
@@ -25,8 +25,8 @@ import androidx.room.RoomDatabase
  * slow without real performance tuning this pass didn't have room for.
  * Filename lookup needs no file read at all (a single indexed query
  * against [libretro-db.sqlite] -- the same real, ~13MB community database
- * Lemuroid itself ships, already vendored in this repo, just never bundled
- * as droidtop's own asset before now) and [SerialScanner]'s own embedded-
+ * Lemuroid itself ships, bundled here as droidtop's own asset) and
+ * [SerialScanner]'s own embedded-
  * serial detection already reads the file's own real header for the
  * disc-based systems it covers -- both real, cheap signals, unlike a full
  * CRC32 pass.

@@ -7,9 +7,6 @@
 [submodule "vendor/wlroots"]
 	path = vendor/wlroots
 	url = https://gitlab.freedesktop.org/wlroots/wlroots.git
-[submodule "vendor/winlator-upstream"]
-	path = vendor/winlator-upstream
-	url = https://github.com/brunodev85/winlator.git
 [submodule "vendor/sway"]
 	path = vendor/sway
 	url = https://github.com/swaywm/sway.git
@@ -25,6 +22,3 @@
 [submodule "vendor/libffi"]
 	path = vendor/libffi
 	url = https://github.com/libffi/libffi.git
-[submodule "vendor/lemuroid"]
-	path = vendor/lemuroid
-	url = https://github.com/Swordfish90/Lemuroid.git

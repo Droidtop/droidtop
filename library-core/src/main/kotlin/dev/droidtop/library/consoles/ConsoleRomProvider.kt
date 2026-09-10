@@ -469,12 +469,13 @@ class ConsoleRomProvider(
         // folder+extension-based, no content/filename lookup at all --
         // SystemData::populateFolder's own real source, and EmuDeck's own
         // real roms/<system>/ layout, which uses the same ES-DE-derived
-        // ids). A real Android ROM manager (Lemuroid, already vendored in
-        // this repo) does this properly: a prioritized cascade -- embedded
+        // ids). A real Android ROM manager (Lemuroid, whose detection
+        // code is forked in under romdetect/) does this properly: a
+        // prioritized cascade -- embedded
         // disc serial/magic number first (SerialScanner, cheap,
         // header-only read, for the disc-image extensions it covers), then
         // a filename lookup against Lemuroid's own real, ~13MB community
-        // ROM database (libretro-db.sqlite, already vendored, now bundled
+        // ROM database (libretro-db.sqlite, bundled
         // as droidtop's own asset -- a single fast indexed query, no file
         // content read at all), before falling back to trusting the
         // folder. Full CRC32 hashing (Lemuroid's own strongest,

@@ -43,7 +43,6 @@ docs/                    SPEC.md and design decisions
 | Path | Upstream | License | Role |
 |---|---|---|---|
 | `vendor/gamenative` | [utkarshdalal/GameNative](https://github.com/utkarshdalal/GameNative) | GPL-3.0 | Wine/Box64 runtime fork base |
-| `vendor/winlator-upstream` | [brunodev85/winlator](https://github.com/brunodev85/winlator) | LGPL-2.1 | Reference/diff only |
 | `vendor/droidspaces` | [ravindu644/Droidspaces-OSS](https://github.com/ravindu644/Droidspaces-OSS) | GPL-3.0 | Rooted Linux container fork base |
 | `vendor/sway` | [swaywm/sway](https://github.com/swaywm/sway) | MIT | In-container desktop compositor |
 | `vendor/wlroots` | [wlroots](https://gitlab.freedesktop.org/wlroots/wlroots) | MIT | Protocol XML defs only (not built for Android) |
