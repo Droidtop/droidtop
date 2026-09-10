@@ -101,6 +101,7 @@ import dev.droidtop.library.theme.strOrNull
 import dev.droidtop.library.theme.uintOrNull
 import dev.droidtop.library.theme.EsDeImageFit
 import dev.droidtop.library.theme.esDeVideoFrame
+import dev.droidtop.library.theme.esDeImageArea
 import dev.droidtop.library.theme.esDeVideoStaticImageArea
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
@@ -413,7 +414,22 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     val selected = gameSelection.getOrNull(0)
     // Real `metadataElement` -- see esDeHiddenByMetadataFlag's own doc comment.
     if (esDeHiddenByMetadataFlag(element, selected)) return
-    val (width, height) = sizeOf(element, viewWidth, viewHeight)
+    // Real ImageComponent size group -- `size` / `maxSize` / `cropSize` as
+    // one first-match chain, each with its OWN scaling verb. See
+    // [dev.droidtop.library.theme.esDeImageArea]; the previous `sizeOf`
+    // call here read only the first two and always drew with
+    // ContentScale.Fit, so a full-screen `<size>1 1</size>` background
+    // rendered as a centred square and a `cropSize`-only element fell
+    // through to the 0.2 x 0.2 default box.
+    val imageArea = esDeImageArea(
+        size = element.pairOrNull("size"),
+        maxSize = element.pairOrNull("maxSize"),
+        cropSize = element.pairOrNull("cropSize"),
+        areaWidth = viewWidth.value,
+        areaHeight = viewHeight.value,
+    )
+    val width = imageArea.width.dp
+    val height = imageArea.height.dp
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
     // Real `scrollFadeIn` -- multiplies into the element's own real
     // opacity rather than replacing it, matching real ES-DE's own
@@ -566,15 +582,6 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     val rotation = element.valueOrNull<EsDeThemeValue.FloatValue>("rotation")?.value ?: 0f
     val flipHorizontal = element.valueOrNull<EsDeThemeValue.Bool>("flipHorizontal")?.value ?: false
     val flipVertical = element.valueOrNull<EsDeThemeValue.Bool>("flipVertical")?.value ?: false
-    // Real cropSize property (game1..game9's own mosaic tiles all declare
-    // one): real ES-DE crops the source image to a specific sub-rectangle
-    // before display. This renderer doesn't decode the source image's own
-    // intrinsic size, so an exact sub-rectangle crop isn't implemented --
-    // ContentScale.Crop (fill the given box, cropping equally from the
-    // overflowing dimension) is an honest approximation, not a precise
-    // match, same "no intrinsic-size decode" limitation sizeOf's own doc
-    // comment already notes for maxSize.
-    val hasCropSize = element.valueOrNull<EsDeThemeValue.Pair>("cropSize") != null
     val placement = Modifier
         .absoluteOffset(x = offsetX, y = offsetY)
         .size(width = width, height = height)
@@ -653,7 +660,17 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         colorFilter = imageColorFilter,
         alpha = opacity,
         filterQuality = filterQuality,
-        contentScale = if (hasCropSize) ContentScale.Crop else ContentScale.Fit,
+        // The verb the element's own size group chose, not a fixed one
+        // (ImageComponent.cpp:528-557 and `resize()`): STRETCH for an
+        // exact `size`, FIT for `maxSize`, CROP for `cropSize`. `cropSize`
+        // stays an honest approximation of ES-DE's own sub-rectangle crop
+        // -- Compose's Crop fills the box and trims the overflowing axis
+        // symmetrically, and this renderer decodes no `cropPos`.
+        contentScale = when (imageArea.fit) {
+            EsDeImageFit.STRETCH -> ContentScale.FillBounds
+            EsDeImageFit.FIT -> ContentScale.Fit
+            EsDeImageFit.CROP -> ContentScale.Crop
+        },
         modifier = placement,
     )
 }
