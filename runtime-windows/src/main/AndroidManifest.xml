@@ -23,6 +23,26 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <!-- Where a Windows game is seen and played. The renderer has to
+             live in an Activity because handheld launches are placed on the
+             configured launch-target display with setLaunchDisplayId, the
+             way every other droidtop launch is; a surface inside the shell
+             could only appear where the shell already is.
+
+             Its own task affinity, plus NEW_TASK + CLEAR_TOP on the intent,
+             so a second launch replaces the running game instead of leaving
+             two X servers contending for the same sockets. configChanges
+             covers everything a game screen should survive without being
+             torn down and rebuilt around a live X server. -->
+        <activity
+            android:name="dev.droidtop.runtime.windows.WineGameActivity"
+            android:exported="false"
+            android:taskAffinity=":wine"
+            android:resizeableActivity="true"
+            android:screenOrientation="userLandscape"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density|layoutDirection"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+
         <receiver
             android:name="app.gamenative.service.NotificationActionReceiver"
             android:exported="false" />
