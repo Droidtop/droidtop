@@ -199,3 +199,76 @@ fun esDeVideoStaticImageArea(
     // does here too rather than inventing a second convention.
     return EsDeStaticImageArea(0.2f * areaWidth, 0.2f * areaHeight, EsDeImageFit.FIT)
 }
+
+/**
+ * Real `ImageComponent::applyTheme` sizing (ImageComponent.cpp:528-557)
+ * and the resize rules it selects (ImageComponent.cpp:`resize()`).
+ *
+ * An `image` element carries ONE size group read as a first-match chain in
+ * this exact order -- `if / else if / else if`, never a merge:
+ *
+ *  - `size`     -> `setResize` (:542): `mTargetIsMax=false`,
+ *                  `mTargetIsCrop=false`. With both axes set, `resize()`
+ *                  STRETCHES the texture to exactly that box ("If both
+ *                  axes are set we just stretch or squash"). With only one
+ *                  axis set the other is derived from the source's aspect.
+ *  - `maxSize`  -> `setMaxSize` (:548): fit inside the box, aspect kept.
+ *  - `cropSize` -> `setCroppedSize` (:556): scale to COVER the box by the
+ *                  larger of the two ratios, then crop the overflow.
+ *
+ * The clamps are ES-DE's own: a fully-zero `size` is corrected to 0.001
+ * with a warning (:531-537) and each axis is clamped to 0.001..3.0, while
+ * `maxSize`/`cropSize` clamp both axes unconditionally to the same range.
+ *
+ * droidtop previously collapsed the whole group into "size, else maxSize,
+ * else 0.2 x 0.2" and always drew with `ContentScale.Fit`, so the two
+ * verbs that are NOT fit rendered wrong: decaffe's own full-screen
+ * backgrounds (`backart2`/`backart3`, `<size>1 1</size>` over an 8x8
+ * solid-colour PNG) came out as a centred square of the view's short axis
+ * instead of covering the screen, and every `cropSize`-only element fell
+ * through to the 0.2 default box. Both confirmed by diffing the console's
+ * own captures against an official Linux ES-DE render of the same theme
+ * (reference/es-de-render/run.sh).
+ *
+ * Returns the box in the same [EsDeStaticImageArea] shape the video group
+ * already uses -- one type for "how big, and scaled how", not two.
+ */
+fun esDeImageArea(
+    size: EsDeThemeValue.Pair?,
+    maxSize: EsDeThemeValue.Pair?,
+    cropSize: EsDeThemeValue.Pair?,
+    areaWidth: Float,
+    areaHeight: Float,
+): EsDeStaticImageArea {
+    if (size != null) {
+        // ImageComponent.cpp:531-541 -- a fully-zero size is a theme
+        // mistake ES-DE corrects rather than honours, and only axes
+        // greater than zero are clamped (a zero axis means "derive this
+        // one from the source's aspect ratio").
+        val corrected = if (size.x == 0f && size.y == 0f) EsDeThemeValue.Pair(0.001f, 0.001f) else size
+        val x = if (corrected.x > 0f) corrected.x.coerceIn(0.001f, 3f) else corrected.x
+        val y = if (corrected.y > 0f) corrected.y.coerceIn(0.001f, 3f) else corrected.y
+        return EsDeStaticImageArea(x * areaWidth, y * areaHeight, EsDeImageFit.STRETCH)
+    }
+    if (maxSize != null) {
+        return EsDeStaticImageArea(
+            maxSize.x.coerceIn(0.001f, 3f) * areaWidth,
+            maxSize.y.coerceIn(0.001f, 3f) * areaHeight,
+            EsDeImageFit.FIT,
+        )
+    }
+    if (cropSize != null) {
+        return EsDeStaticImageArea(
+            cropSize.x.coerceIn(0.001f, 3f) * areaWidth,
+            cropSize.y.coerceIn(0.001f, 3f) * areaHeight,
+            EsDeImageFit.CROP,
+        )
+    }
+    // Nothing declared. Real ES-DE leaves the component at whatever size
+    // it inherited, which for a themed element is the source texture's own
+    // size; droidtop has no intrinsic-size decode at this layer, so the
+    // renderer's own long-standing 0.2 x 0.2 stand-in is kept rather than
+    // a second convention being invented -- same choice, and same reason,
+    // as [esDeVideoStaticImageArea]'s own final branch.
+    return EsDeStaticImageArea(0.2f * areaWidth, 0.2f * areaHeight, EsDeImageFit.FIT)
+}

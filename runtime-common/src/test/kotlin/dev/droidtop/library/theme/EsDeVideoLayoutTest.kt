@@ -253,4 +253,97 @@ class EsDeVideoLayoutTest {
         assertEquals(2000f, overMax.width, 0.001f)
         assertEquals(10f, overMax.height, 0.001f)
     }
+
+    /**
+     * ImageComponent.cpp:530-542 plus `resize()`'s own "If both axes are
+     * set we just stretch or squash" branch. decaffe's own full-screen
+     * backgrounds are `<size>1 1</size>` over an 8x8 solid-colour PNG, so
+     * anything but STRETCH renders them as a square of the view's short
+     * axis -- which is exactly what the console showed before this.
+     */
+    @Test
+    fun `an image size stretches to exactly the declared box`() {
+        val area = esDeImageArea(
+            size = EsDeThemeValue.Pair(1f, 1f),
+            maxSize = null, cropSize = null,
+            areaWidth = 1920f, areaHeight = 844f,
+        )
+        assertEquals(1920f, area.width, 0.001f)
+        assertEquals(844f, area.height, 0.001f)
+        assertEquals(EsDeImageFit.STRETCH, area.fit)
+    }
+
+    /** ImageComponent.cpp:544-548 -- maxSize fits, aspect preserved. */
+    @Test
+    fun `an image maxSize fits inside its box`() {
+        val area = esDeImageArea(
+            size = null,
+            maxSize = EsDeThemeValue.Pair(0.5f, 0.77f),
+            cropSize = null,
+            areaWidth = 1920f, areaHeight = 1000f,
+        )
+        assertEquals(960f, area.width, 0.001f)
+        assertEquals(770f, area.height, 0.001f)
+        assertEquals(EsDeImageFit.FIT, area.fit)
+    }
+
+    /**
+     * ImageComponent.cpp:550-556 -- cropSize is a real box of its own, not
+     * a decoration on top of one. decaffe's own mosaic tiles declare only
+     * cropSize, so reading just size/maxSize left them at the renderer's
+     * 0.2 x 0.2 stand-in.
+     */
+    @Test
+    fun `an image cropSize sizes the box and crops`() {
+        val area = esDeImageArea(
+            size = null, maxSize = null,
+            cropSize = EsDeThemeValue.Pair(0.25f, 0.3333333f),
+            areaWidth = 1920f, areaHeight = 1080f,
+        )
+        assertEquals(480f, area.width, 0.001f)
+        assertEquals(360f, area.height, 0.01f)
+        assertEquals(EsDeImageFit.CROP, area.fit)
+    }
+
+    /**
+     * ImageComponent.cpp:528-557 is `if / else if / else if`: the first
+     * declared property wins outright and the others are never read.
+     */
+    @Test
+    fun `the image size group is a first-match chain`() {
+        val area = esDeImageArea(
+            size = EsDeThemeValue.Pair(0.4f, 0.4f),
+            maxSize = EsDeThemeValue.Pair(0.9f, 0.9f),
+            cropSize = EsDeThemeValue.Pair(0.1f, 0.1f),
+            areaWidth = 1000f, areaHeight = 1000f,
+        )
+        assertEquals(400f, area.width, 0.001f)
+        assertEquals(EsDeImageFit.STRETCH, area.fit)
+    }
+
+    /** ImageComponent.cpp:531-541 -- zero corrected to 0.001, axes clamped to 3.0. */
+    @Test
+    fun `image size clamps match ES-DE`() {
+        val zero = esDeImageArea(
+            size = EsDeThemeValue.Pair(0f, 0f), maxSize = null, cropSize = null,
+            areaWidth = 1000f, areaHeight = 1000f,
+        )
+        assertEquals(1f, zero.width, 0.001f)
+        assertEquals(1f, zero.height, 0.001f)
+
+        val huge = esDeImageArea(
+            size = EsDeThemeValue.Pair(5f, 0.5f), maxSize = null, cropSize = null,
+            areaWidth = 1000f, areaHeight = 1000f,
+        )
+        assertEquals(3000f, huge.width, 0.001f)
+        assertEquals(500f, huge.height, 0.001f)
+
+        // A zero axis is left alone -- ES-DE derives it from the source's
+        // aspect ratio rather than clamping it up to the minimum.
+        val oneAxis = esDeImageArea(
+            size = EsDeThemeValue.Pair(0.5f, 0f), maxSize = null, cropSize = null,
+            areaWidth = 1000f, areaHeight = 1000f,
+        )
+        assertEquals(0f, oneAxis.height, 0.001f)
+    }
 }
