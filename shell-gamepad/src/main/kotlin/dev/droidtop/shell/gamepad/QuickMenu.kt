@@ -3,7 +3,7 @@ package dev.droidtop.shell.gamepad
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,8 +36,6 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import dev.droidtop.library.settings.CatalogScreen
-import dev.droidtop.library.settings.HandheldSettingsCatalog
 import dev.droidtop.runtime.systemstatus.NotificationsStore
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
@@ -57,9 +55,13 @@ import dev.droidtop.shell.gamepad.input.GamepadKeyMap
  *
  * ENTIRELY controller-driven, per direction: L1/R1 switch tabs, D-pad
  * moves, A opens, X dismisses, Y clears all, B closes. The System tab
- * is the settings catalog's own System group rendered through the same
- * [CatalogNavigator] the Settings section uses — one mechanism, not a
- * second quick-settings implementation.
+ * is Android's quick-settings shape (status header, brightness and
+ * volume sliders, a grid of large tiles -- see [QuickSettingsPanel]),
+ * and it is still a VIEW of the settings catalog's own System group,
+ * never a second quick-settings implementation with its own values: the
+ * tiles carry the catalog's items and every press goes back to the
+ * item's own write path. The sheet is sized by what that grid needs, on
+ * the right edge, full height.
  *
  * A Compose [Dialog] on purpose: its window owns input while open, so
  * modality costs no key-event fencing in the shell underneath.
@@ -72,11 +74,16 @@ internal fun QuickMenu(onDismiss: () -> Unit) {
     ) {
         var tab by remember { mutableStateOf(QuickTab.NOTIFICATIONS) }
 
-        Box(modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            // Wide enough for a real tile grid (two columns always, three
+            // when the screen has room), capped so the sheet stays a
+            // sheet -- the shell behind it must remain visible, which is
+            // the whole point of a quick menu over a settings screen.
+            val sheetWidth = (maxWidth * 0.62f).coerceIn(480.dp, 760.dp).coerceAtMost(maxWidth)
             Surface(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .width(420.dp)
+                    .width(sheetWidth)
                     .align(Alignment.CenterEnd)
                     // Preview, not plain onKeyEvent: the System tab's
                     // CatalogNavigator holds focus and handles its own
@@ -135,7 +142,7 @@ internal fun QuickMenu(onDismiss: () -> Unit) {
                     Spacer(Modifier.padding(4.dp))
                     when (tab) {
                         QuickTab.NOTIFICATIONS -> NotificationsTab(onDismiss)
-                        QuickTab.SYSTEM -> SystemTab(onDismiss)
+                        QuickTab.SYSTEM -> QuickSettingsPanel(sheetWidth.value.toInt(), onDismiss)
                     }
                 }
             }
@@ -149,24 +156,6 @@ private enum class QuickTab(val label: String) {
 
     fun next() = entries[(ordinal + 1) % entries.size]
     fun previous() = entries[(ordinal - 1 + entries.size) % entries.size]
-}
-
-@Composable
-private fun SystemTab(onDismiss: () -> Unit) {
-    // The settings catalog's own System group, through the same
-    // navigator the Settings section uses. Filtering by group id keeps
-    // this a VIEW of that group, never a copy that drifts.
-    val root = remember {
-        CatalogScreen(
-            id = "quick_system",
-            title = "System",
-            groups = { ctx ->
-                HandheldSettingsCatalog.groups(ctx)
-                    .filter { it.id == HandheldSettingsCatalog.GROUP_SYSTEM }
-            },
-        )
-    }
-    CatalogNavigator(root = root, onExit = onDismiss)
 }
 
 @Composable

@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -154,27 +155,7 @@ fun CatalogNavigator(
     }
 
     fun adjust(item: CatalogItem, direction: Int) {
-        when (item) {
-            is ChoiceItem -> {
-                if (item.options.isEmpty()) return
-                val index = item.options.indexOfFirst { it.value == item.current }
-                val next = item.options[(index + direction + item.options.size) % item.options.size]
-                item.onSelect(context, next.value)
-                refresh()
-            }
-            is SliderItem -> {
-                val next = (item.current + direction).coerceIn(item.min, item.max)
-                if (next != item.current) {
-                    item.onChange(context, next)
-                    refresh()
-                }
-            }
-            is ToggleItem -> {
-                item.onToggle(context, !item.current)
-                refresh()
-            }
-            else -> {}
-        }
+        if (adjustCatalogItem(context, item, direction)) refresh()
     }
 
     fun activate(item: CatalogItem) {
@@ -244,7 +225,7 @@ fun CatalogNavigator(
     }
     val choiceItem = pickingChoice
     if (choiceItem != null) {
-        ChoicePickerScreen(
+        CatalogChoicePicker(
             item = choiceItem,
             onPick = { value ->
                 choiceItem.onSelect(context, value)
@@ -360,6 +341,42 @@ internal fun SettingsCatalogView(
     )
 }
 
+/**
+ * Apply a value change to a catalog item -- the ONE definition of what a
+ * Left/Right (or a tile press that cycles) means: choices wrap through
+ * their options, sliders step within their range and clamp, toggles
+ * flip. Returns whether anything actually changed, so a surface knows
+ * whether to rebuild. Shared by the settings list and the Quick Menu's
+ * tile grid ([QuickSettingsPanel]) rather than written once per surface.
+ */
+internal fun adjustCatalogItem(context: Context, item: CatalogItem, direction: Int): Boolean = when (item) {
+    is ChoiceItem -> {
+        if (item.options.isEmpty()) {
+            false
+        } else {
+            val index = item.options.indexOfFirst { it.value == item.current }
+            val size = item.options.size
+            val next = item.options[((index + direction) % size + size) % size]
+            item.onSelect(context, next.value)
+            true
+        }
+    }
+    is SliderItem -> {
+        val next = (item.current + direction).coerceIn(item.min, item.max)
+        if (next == item.current) {
+            false
+        } else {
+            item.onChange(context, next)
+            true
+        }
+    }
+    is ToggleItem -> {
+        item.onToggle(context, !item.current)
+        true
+    }
+    else -> false
+}
+
 private data class CatalogRow(val item: CatalogItem, val headerAbove: String?)
 
 @Composable
@@ -401,7 +418,7 @@ private fun CatalogRowView(
 
 /** Full-screen option list for large [ChoiceItem]s (system pickers etc.). */
 @Composable
-private fun ChoicePickerScreen(
+internal fun CatalogChoicePicker(
     item: ChoiceItem,
     onPick: (String) -> Unit,
     onDismiss: () -> Unit,
