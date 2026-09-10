@@ -2400,14 +2400,54 @@ the same `PresencePanel`.
 ## 7e2. Data-driven player/platform database (directed 2026-08-30)
 
 Standalone-emulator launch definitions (the non-RetroArch emulators) are
-DATA, not code: `players-database.json` — a bundled seed asset in
-library-core plus a separately-updatable copy refreshed, user-driven,
-from the droidtop-platforms repository on GitHub
-(`bi0shacker001/droidtop-platforms`). `KnownPlayers` loads
-filesDir-copy-if-valid, else the seed; `PlayersDatabaseUpdater` fetches
-with parse-validation before replacing anything. The previous state —
+DATA, not code: `players-database.json` — refreshed from the
+droidtop-platforms repository on GitHub. `KnownPlayers` loads
+filesDir-copy-if-valid, else the bundled seed; every refresh
+parse-validates before replacing anything. The previous state —
 117 presets as generated Kotlin — required an app release to add an
 emulator; now the database grows independently.
+
+**The bundled databases are a SNAPSHOT of droidtop-platforms, not a copy
+of it** (directed 2026-09-10: "the bundled engine database shouldn't
+MATCH the platform repo, it should literally be a snapshot of it, with a
+built-in updater"). Hand-copied seed assets had drifted days apart from
+the repository they claimed to mirror, with nothing in the app saying
+how old they were. Instead: droidtop-platforms is a submodule at
+`vendor/droidtop-platforms` pinned to one commit, a Gradle task
+(`platformDatabaseSeed`) copies that commit's databases into generated
+assets at build time, and the commit is written beside them and shown on
+the settings row. Nothing about the seed is checked in — a build ships
+one identifiable state of the platform repo, and the tests parse the
+same generated files the APK ships. Enginehost takes its
+`engines-database.json` seed the same way from its own pin, and shows
+its snapshot on the version row.
+
+**The repository is a TREE with an index** (directed 2026-09-10: "the
+platform repo should have a BUNCH of jsons. One per engine, different
+revision ones, hardware ones, etc"). droidtop-platforms holds one file
+per thing — `engines/<id>.json`, `platforms/<id>.json`,
+`players/<id>.json`, `bios/<systemId>.json`, `hardware/<device>.json`,
+`controllers/<vendor>-<product>.json` — plus `index.json`: schema
+version, and every file with its sha256 and its collection. Each
+collection directory carries `_order.json`, because for engines the file
+order IS detection precedence and that is an editorial decision, not a
+directory listing. The repo's generator validates the tree and composes
+the monolithic documents into `legacy/`, and for now also at the
+repository root, where released builds already fetch them; those root
+copies are deprecated and go when no supported build fetches them.
+
+**Refresh** fetches `index.json`, compares each entry's sha256 against
+the per-file cache under `filesDir/platform-db/`, downloads only what
+changed, composes the monolithic documents the parsers read, and hands
+each to its database's own validate-then-atomically-replace
+(`PlatformDatabaseIndex` → `EnginesDatabase.install` and friends). A
+one-engine fix costs a few hundred bytes; a check with nothing new costs
+one request; a composed document that does not parse changes nothing. A
+source that publishes no index falls back to the four whole files, which
+is what a fork or an older commit serves. This runs on the update
+schedule (§ Software updates) as well as from the manual "Update
+platform databases" button — the same call, so the two cannot diverge —
+and in enginehost inside `PluginUpdateCheck`'s existing pass.
 
 **Generation, not hand-maintenance**: the platform-db repo's generator
 builds the console entries programmatically from other frontends' own
@@ -2447,8 +2487,9 @@ configuration surface.
 ## 7e2b. Launch resolution FROM the platforms database (directed 2026-08-31)
 
 Extends §7e2 to the whole launch pipeline: droidtop-platforms is the
-authority for launch data, four databases, each bundled-seed +
-GitHub-refresh + validate-before-replace:
+authority for launch data. Four documents are composed out of its tree
+(§7e2), each build-time-snapshot seed + index-driven refresh +
+validate-before-replace:
 
 - `players-database.json` — per-system emulator launch presets
   (`KnownPlayers`), as before.
@@ -2493,8 +2534,8 @@ GitHub-refresh + validate-before-replace:
   engine detectors, extended separately, that could classify the same
   folder differently (library says one thing, launch does another). The
   resolution: `engines-database.json` is the single classification
-  authority for both apps. enginehost bundles the same file as its seed
-  and refreshes it from the same droidtop-platforms URL, evaluating the
+  authority for both apps. enginehost seeds from its own pin of the same
+  repository and refreshes from the same index, evaluating the
   same rows with the same semantics (rules OR, conditions AND, file
   order is the sole precedence), so scan-time and launch-time
   classification agree by construction and a detection fix ships once,
