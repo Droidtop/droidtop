@@ -363,8 +363,8 @@ object GameLaunchStrategyResolver {
         // JVM tests, which model real readable game folders, stay
         // unchanged.
         engineHostCanReachFolder: Boolean = true,
-        // Database-declared priority (EnginesDatabase, docs/SPEC.md §7e2):
-        // AVAILABILITY stays this function's own real checks below -- the
+        // Database-declared priority (EnginesDatabase, docs/SPEC.md 7e2):
+        // AVAILABILITY stays [RunnerAvailability]'s own real checks -- the
         // order only decides which available strategy wins. Null keeps the
         // historical append order (and the pure-JVM unit tests untouched).
         preferredOrder: List<GameLaunchStrategy>? = null,
@@ -373,32 +373,63 @@ object GameLaunchStrategyResolver {
         // registry-covered engines, stay unchanged (same convention as
         // engineHostCanReachFolder above).
         enginehostSupported: Boolean = true,
-    ): List<GameLaunchStrategy> {
-        val strategies = mutableListOf<GameLaunchStrategy>()
+    ): List<GameLaunchStrategy> = RunnerAvailability.evaluate(
+        facts(
+            engine = engine,
+            folder = folder,
+            kirikiroid2Installed = kirikiroid2Installed,
+            engineHostInstalled = engineHostInstalled,
+            engineHostEngineVersionKnown = engineHostEngineVersion != null,
+            engineHostCanReachFolder = engineHostCanReachFolder,
+            preferredOrder = preferredOrder,
+            enginehostSupported = enginehostSupported,
+        ),
+    ).filter { it.state == RunnerState.READY }.map { it.strategy }
+
+    /**
+     * The folder half of [RunnerFacts] -- the one place a game folder is
+     * read for "does this offer Windows / Linux at all", shared by the
+     * launch path above and by the PC surface's availability rows, so the
+     * two can never disagree about the same folder.
+     *
+     * The device-side parameters are left at their [RunnerFacts] defaults
+     * unless a caller passes them; see that class for why "not measured"
+     * is an honest answer rather than a guess.
+     */
+    fun facts(
+        engine: GameEngine?,
+        folder: File,
+        kirikiroid2Installed: Boolean = false,
+        engineHostInstalled: Boolean = false,
+        engineHostEngineVersionKnown: Boolean = false,
+        engineHostCanReachFolder: Boolean = true,
+        enginehostSupported: Boolean = true,
+        enginehostBundleCovers: Boolean? = null,
+        windowsEnvironmentReady: Boolean = true,
+        wineRendererWired: Boolean = true,
+        linuxContainerAvailable: Boolean = true,
+        x86TranslationRegistered: Boolean = true,
+        preferredOrder: List<GameLaunchStrategy>? = null,
+    ): RunnerFacts = RunnerFacts(
+        engine = engine,
+        hasWindowsExecutable = hasWindowsExecutable(folder),
+        hasLinuxBuild = hasLinuxBuild(folder),
+        enginehostSupported = enginehostSupported,
+        enginehostInstalled = engineHostInstalled,
+        enginehostCanReachFolder = engineHostCanReachFolder,
         // Only offered when there's an actual engineVersion to launch
         // with -- a folder with no enginehost.json of its own and no
         // per-folder override set isn't a real available option yet, see
         // resolveEngineVersion's own doc comment.
-        if (engineHostInstalled && engineHostCanReachFolder && enginehostSupported &&
-            (File(folder, "enginehost.json").isFile || engineHostEngineVersion != null)
-        ) {
-            strategies += GameLaunchStrategy.ENGINEHOST
-        }
-        if (kirikiroid2Installed && engine == GameEngine.KIRIKIRI) strategies += GameLaunchStrategy.KIRIKIROID2
-        if (hasWindowsExecutable(folder)) strategies += GameLaunchStrategy.WINE_PREFIX
-        // Kirikiri (the original commercial engine) is Windows-native with
-        // no official Linux port of the *engine itself* (confirmed, not
-        // assumed) -- LINUX_CONTAINER (running a game's own Linux export
-        // inside a container) is never offered for it regardless of folder
-        // contents. Unrelated to Kirikiroid2 above, a real independent
-        // third-party interpreter rather than an official Linux build of
-        // the engine.
-        if (engine != GameEngine.KIRIKIRI && hasLinuxBuild(folder)) strategies += GameLaunchStrategy.LINUX_CONTAINER
-        if (preferredOrder == null) return strategies
-        // Reorder by the database's declared priority; anything available
-        // but undeclared keeps its place after the declared ones.
-        return preferredOrder.filter { it in strategies } + strategies.filterNot { it in preferredOrder }
-    }
+        enginehostEngineVersionKnown = engineHostEngineVersionKnown || File(folder, "enginehost.json").isFile,
+        enginehostBundleCovers = enginehostBundleCovers,
+        kirikiroid2Installed = kirikiroid2Installed,
+        windowsEnvironmentReady = windowsEnvironmentReady,
+        wineRendererWired = wineRendererWired,
+        linuxContainerAvailable = linuxContainerAvailable,
+        x86TranslationRegistered = x86TranslationRegistered,
+        preferredOrder = preferredOrder.orEmpty(),
+    )
 
     private fun hasWindowsExecutable(folder: File): Boolean =
         folder.listFiles()?.any { it.isFile && it.extension.lowercase() == "exe" } == true

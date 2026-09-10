@@ -69,6 +69,13 @@ class DroidtopPcGameRuntime(
     override val isProvisioned: Boolean
         get() = runCatching { ContainerManager(context).containers.isNotEmpty() }.getOrDefault(false)
 
+    // The primary container session IS the Linux runtime: launchLinux
+    // runs inside it and nothing else can. Root-only today, which is
+    // exactly why the PC surface shows a Linux row as "not on this
+    // device" rather than offering a launch that cannot work.
+    override val isLinuxContainerAvailable: Boolean
+        get() = primarySession() != null
+
     override suspend fun provision(
         gamesRoots: List<File>,
         onStatus: (String) -> Unit,
