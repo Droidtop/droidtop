@@ -3755,12 +3755,20 @@ instead of offering a launch that cannot work. Root remains desktop-only.
 art and the theme's own transition. B returns to the carousel with focus
 on that card. Nothing else in the system view changes.
 
-**Library.** One grid over one list, with a header line of plain facts.
-Filters are one multi-select chip row — source, install state, engine,
-runner state, compatibility — never separate screens. ES-DE's two-menu
-split is held (§7f): Start opens droidtop's settings catalog, Back opens
-the in-context options menu for what is focused, and hold-A duplicates
-that menu for touch.
+**Library.** One grid over one list, with a header line of plain facts,
+full-bleed rather than a centred column. Filters are one multi-select
+chip row — source, install state and engine — plus a sort that cycles in
+place, never separate screens. Those three are free: every value is
+already on the entry. **Runner state is deliberately not a chip.**
+Working it out means a filesystem walk and a provider query per game,
+which is right for one open game and wrong for a whole grid, so it is
+stated where it is needed rather than filtered on where it is not.
+
+A game's actions live on the game's own screen, opened with A, rather
+than in a separate in-context menu over the grid: there is exactly one
+place to look for what can be done with a game. B returns to the
+carousel, the shell's own back route in both its forms, and the surface
+draws its own hint row because the theme is not drawing one here.
 
 **Game detail.** In order: identity; a **Runs with** row carrying the
 resolved runner, its reason, and the picker; a primary button that is
