@@ -591,7 +591,7 @@ internal fun QuickGlyphIcon(glyph: QuickGlyph, tint: Color, modifier: Modifier =
 }
 
 /** Gamepads Android currently reports, minus the virtual/uinput ones. */
-private fun connectedControllerNames(): List<String> = InputDevice.getDeviceIds().mapNotNull { id ->
+private fun connectedControllerNames(): List<String> = InputDevice.getDeviceIds().toList().mapNotNull { id ->
     val device = InputDevice.getDevice(id) ?: return@mapNotNull null
     val sources = device.sources
     val isPad = sources and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD ||
