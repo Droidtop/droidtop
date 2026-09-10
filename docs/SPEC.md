@@ -3536,10 +3536,12 @@ resolves identically every scan.
   binary exists in the vendor tree to port to. The class still needs
   filling in for Linux containers generally; it is not what stands
   between droidtop and a Windows game.
-- **`vendor/lemuroid`** is a reference checkout, not a build input: its
-  detection code was copied into `library-core/.../romdetect/`. Legitimate,
-  but it should be documented as reference-only so nobody assumes a
-  dependency exists.
+- **Lemuroid** is no longer a submodule: nothing built from it, and its
+  detection code lives forked-in at `library-core/.../romdetect/` (four
+  files) with its community ROM database bundled as
+  `library-core/src/main/assets/libretro-db.sqlite`. The attribution and the
+  GPL-3.0 notice are in `NOTICE.md`; extending the detector means editing
+  those files, not chasing an upstream checkout.
 
 ### Order of work
 
@@ -3552,15 +3554,18 @@ resolves identically every scan.
 4. Per-platform launch settings + in-context per-game override.
 5. Playtime/last-played from `LibraryPlayHistoryDao`.
 6. Cloud saves across the four stores.
-7. Delete the dead streaming module and submodules.
+7. Delete the dead streaming module. (The `winlator-upstream` and
+   `lemuroid` submodules are gone; nothing consumed either.)
 8. Give `runtime-linux-noroot` a real no-root backend (§5b for why
    that is not simply a `DefaultProotContainerBackend` port).
 
 ## 8. Licensing
 
-`vendor/gamenative` and `vendor/droidspaces` are GPL-3.0.
-`vendor/winlator-upstream` (kept only as a diff reference) is
-LGPL-2.1. `vendor/sway`, `vendor/wlroots` (protocol definitions only — not
+`vendor/gamenative` and `vendor/droidspaces` are GPL-3.0. Winlator itself
+is LGPL-2.1 and reaches droidtop only through `vendor/gamenative`'s
+`com.winlator` tree; Lemuroid is GPL-3.0 and reaches it only through the
+four forked-in `romdetect` files and the bundled `libretro-db.sqlite`.
+Neither is vendored as a submodule. `vendor/sway`, `vendor/wlroots` (protocol definitions only — not
 compiled for Android, see `:host-bridge`), and `vendor/wayland`/`vendor/
 wayland-protocols` (same — codegen/headers only) are MIT. `vendor/
 go-containerregistry` is Apache-2.0. `shell-default`'s fork source (Murine

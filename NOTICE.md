@@ -7,8 +7,18 @@ This project is distributed under the GNU General Public License v3.0 (see
 
 - **GameNative** — `vendor/gamenative`, https://github.com/utkarshdalal/GameNative — GPL-3.0.
   `runtime-windows` is forked from its `com.winlator` runtime tree.
-- **Winlator** — `vendor/winlator-upstream`, https://github.com/brunodev85/winlator — LGPL-2.1.
-  Kept as an upstream reference only; not directly built into this project.
+- **Winlator** — https://github.com/brunodev85/winlator — LGPL-2.1.
+  The upstream of GameNative's `com.winlator` runtime tree, and so of
+  `runtime-windows`. Not vendored in this repository (the reference checkout
+  was removed); no Winlator source is built here except by way of
+  `vendor/gamenative`.
+- **Lemuroid** — https://github.com/Swordfish90/Lemuroid — GPL-3.0.
+  Four detection files were forked in (unmodified logic, package lines
+  changed) as `library-core/src/main/kotlin/dev/droidtop/library/romdetect/`
+  `SystemID.kt`, `MagicNumber.kt`, `RomDetectUtils.kt`, `SerialScanner.kt`,
+  and its community ROM database ships as
+  `library-core/src/main/assets/libretro-db.sqlite`. Not vendored as a
+  submodule; those files and that asset are the whole of what droidtop uses.
 - **DroidSpaces** — `vendor/droidspaces`, https://github.com/ravindu644/Droidspaces-OSS — GPL-3.0.
   `runtime-linux-root` is forked from this.
 - **sway** — `vendor/sway`, https://github.com/swaywm/sway — MIT.
