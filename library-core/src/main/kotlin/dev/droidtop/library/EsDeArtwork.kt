@@ -322,7 +322,7 @@ fun GameEngine.esDeSystemName(): String = when (this) {
     GameEngine.CMVS -> "cmvs"
     GameEngine.FLASH_AIR -> "flash_air"
     GameEngine.GODOT -> "godot"
-    GameEngine.TWINE -> "twine"
+    GameEngine.HTML -> "html"
     GameEngine.UNREAL -> "unreal"
     GameEngine.UNITY -> "unity"
 }

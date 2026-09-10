@@ -131,10 +131,29 @@ class GameEngineDetectorTest {
         // flash-swf: plain .swf stays droidtop's players-database path.
         touch("movie.swf")
         assertNull(GameEngineDetector.detect(tmp.root, defs))
-        // rpgmaker-mvmz: droidtop has no MV-or-MZ engine to map it to.
+    }
+
+    @Test
+    fun `an ambiguous mvmz export falls through to the last row, html`() {
+        // rpgmaker-mvmz is enginehost-only -- droidtop has no MV-or-MZ
+        // engine to map that row to, so it is skipped -- and what the
+        // export really is from droidtop's side is a page in the root.
         touch("js", "main.js")
         touch("index.html")
-        assertNull(GameEngineDetector.detect(tmp.root, defs))
+        assertEquals(GameEngine.HTML, GameEngineDetector.detect(tmp.root, defs))
+    }
+
+    @Test
+    fun `detects an html game from a page in the root, no markers needed`() {
+        touch("A Story.html")
+        assertEquals(GameEngine.HTML, GameEngineDetector.detect(tmp.root, defs))
+    }
+
+    @Test
+    fun `a godot web export is godot, not html - the html row is last`() {
+        touch("index.html")
+        touch("game.pck")
+        assertEquals(GameEngine.GODOT, GameEngineDetector.detect(tmp.root, defs))
     }
 
     @Test

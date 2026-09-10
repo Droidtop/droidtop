@@ -11,7 +11,7 @@ import java.io.RandomAccessFile
 enum class GameEngine {
     RENPY, RPG_MAKER_MV, RPG_MAKER_MZ, RPG_MAKER_VX_ACE, RPG_MAKER_VX, RPG_MAKER_XP,
     RPG_MAKER_2000_2003, KIRIKIRI,
-    AUGUST, BURIKO, CATSYSTEM2, CMVS, FLASH_AIR, GODOT, TWINE, UNREAL, UNITY,
+    AUGUST, BURIKO, CATSYSTEM2, CMVS, FLASH_AIR, GODOT, HTML, UNREAL, UNITY,
 }
 
 /**
@@ -43,10 +43,15 @@ enum class GameEngine {
  *   loose-`.pck` check alone can't see, verified against a real install.
  *   Only ever reads the last 12 bytes of a candidate file, not the whole
  *   thing, so this stays cheap against multi-gigabyte executables.
- * - Twine/HTML: an `.html` file in the game root whose first 512KB
- *   contains `<tw-storydata`, `twinejs`, `SugarCube`, or `Harlowe` — a
- *   real gap Pythia closed after finding real games with no matching
- *   engine plugin at all.
+ * - HTML: any `.html`/`.htm` file directly in the game root. Twine
+ *   stories are the case Pythia closed this gap for, but the database
+ *   row is `html`, not `twine`, and its own note says so: the row is
+ *   ordered LAST precisely because Godot and Unity web exports also ship
+ *   an `index.html` and are classified by their richer signatures first,
+ *   so nothing narrower than "there is a page here" is needed. Which
+ *   HTML dialect a game is stays a version question, not a detection
+ *   one — [EngineVersionDetector] still reads `tw-storydata`'s
+ *   `creator-version` and reports a version only for real Twine exports.
  * - Unreal Engine: an `Engine/Binaries` directory.
  * - Unity: `UnityPlayer.dll`/`.so`/`.dylib` present up to 3 folders deep —
  *   Pythia's own real fix for a Linux export (`.so` instead of `.dll`) and
@@ -96,7 +101,7 @@ object GameEngineDetector {
 
     private fun builtinProbe(name: String, folder: File): Boolean = when (name) {
         "godot" -> isGodot(folder)
-        "twine" -> isTwine(folder)
+        "html" -> isHtml(folder)
         "unity" -> isUnity(folder)
         // An unknown builtin fails its rule rather than matching: a
         // newer database referencing a probe this app doesn't ship must
@@ -136,21 +141,11 @@ object GameEngineDetector {
         }
     }
 
-    private const val TWINE_READ_WINDOW = 512 * 1024
-    private val TWINE_MARKERS = listOf("<tw-storydata", "twinejs", "SugarCube", "Harlowe").map { it.toByteArray(Charsets.US_ASCII) }
+    private val HTML_EXTENSIONS = setOf("html", "htm")
 
-    private fun isTwine(folder: File): Boolean =
-        folder.listFiles()?.filter { it.isFile && it.extension.lowercase() == "html" }
-            ?.any { looksLikeTwineExport(it) } == true
-
-    private fun looksLikeTwineExport(file: File): Boolean {
-        val chunk = try {
-            file.inputStream().use { it.readNBytes(TWINE_READ_WINDOW) }
-        } catch (e: java.io.IOException) {
-            return false
-        }
-        return TWINE_MARKERS.any { marker -> chunk.indexOfSubsequence(marker) >= 0 }
-    }
+    /** No file is read: the row's own evidence is that a page exists in the root. */
+    private fun isHtml(folder: File): Boolean =
+        folder.listFiles()?.any { it.isFile && it.extension.lowercase() in HTML_EXTENSIONS } == true
 
     private fun ByteArray.indexOfSubsequence(needle: ByteArray): Int {
         if (needle.isEmpty() || needle.size > size) return -1
@@ -449,7 +444,7 @@ internal fun GameEngine.toLibraryEntryKind(): LibraryEntryKind = when (this) {
     GameEngine.CMVS -> LibraryEntryKind.CMVS
     GameEngine.FLASH_AIR -> LibraryEntryKind.FLASH_AIR
     GameEngine.GODOT -> LibraryEntryKind.GODOT
-    GameEngine.TWINE -> LibraryEntryKind.TWINE
+    GameEngine.HTML -> LibraryEntryKind.HTML
     GameEngine.UNREAL -> LibraryEntryKind.UNREAL
     GameEngine.UNITY -> LibraryEntryKind.UNITY
 }

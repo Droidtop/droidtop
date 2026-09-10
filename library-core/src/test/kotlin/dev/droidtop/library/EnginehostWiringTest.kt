@@ -54,15 +54,15 @@ class EnginehostWiringTest {
         assertFalse(EnginehostCapabilities.seriesCovers("8.2.1", "8.2"))
     }
 
-    // ---- Twine -----------------------------------------------------------
+    // ---- HTML / Twine -----------------------------------------------------
 
     @Test
-    fun `twine version comes from tw-storydata creator-version`() {
+    fun `html engine version comes from tw-storydata creator-version`() {
         val root = dir()
         File(root, "Routes of Life.html").writeText(
             "<html><body><tw-storydata name=\"Routes\" creator=\"Twine\" creator-version=\"2.7.1\" format=\"SugarCube\">"
         )
-        val detected = EngineVersionDetector.detect(GameEngine.TWINE, root)
+        val detected = EngineVersionDetector.detect(GameEngine.HTML, root)
         assertEquals("2.7.1", detected?.version)
     }
 
@@ -70,7 +70,7 @@ class EnginehostWiringTest {
     fun `an html without tw-storydata is not called twine-versioned`() {
         val root = dir()
         File(root, "readme.html").writeText("<html><body>hello</body></html>")
-        assertNull(EngineVersionDetector.detect(GameEngine.TWINE, root))
+        assertNull(EngineVersionDetector.detect(GameEngine.HTML, root))
     }
 
     // ---- SWF -------------------------------------------------------------

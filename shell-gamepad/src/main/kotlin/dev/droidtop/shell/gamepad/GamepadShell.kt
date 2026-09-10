@@ -1135,7 +1135,7 @@ private val APP_KINDS = setOf(
  * system. THE COMPLEMENT on purpose: this used to be a hand-kept list
  * of four engine kinds, which silently dropped every OTHER engine
  * (KiriKiri, RM2000/2003, Buriko, CatSystem2, CMVS, Flash, Godot,
- * Twine, ...) from both sections — a new engine kind now lands in
+ * HTML, ...) from both sections — a new engine kind now lands in
  * Games automatically instead of nowhere.
  */
 private val GAME_KINDS = LibraryEntryKind.entries.toSet() - APP_KINDS
