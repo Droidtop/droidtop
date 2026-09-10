@@ -177,12 +177,15 @@ class WineGameActivity : Activity() {
     // XInput state; anything left is a keyboard key for the X server.
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (winHandler?.onKeyEvent(event) == true) return true
+        if (keyboard?.onKeyEvent(event) == true) return true
+        // Only a back press nothing else wanted ends the session. The
+        // order matters: several pads report their B button as
+        // KEYCODE_BACK, and quitting the game on B would be unusable.
         if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
             finish()
             return true
         }
-        if (winHandler?.onKeyEvent(event) == true) return true
-        if (keyboard?.onKeyEvent(event) == true) return true
         return super.dispatchKeyEvent(event)
     }
 
