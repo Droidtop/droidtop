@@ -13,7 +13,7 @@ import org.json.JSONObject
  * other, the conditions inside one rule AND together, and the first
  * engine in FILE ORDER with a matching rule wins. Byte-magic probes
  * JSON cannot express (Godot's GDPC trailer, Unity's depth-limited
- * player search, Twine's html-head scan) stay code, referenced by name
+ * player search, the HTML root-page probe) stay code, referenced by name
  * through [DetectCondition.Builtin] -- the database still decides
  * whether and where they apply.
  */
@@ -96,7 +96,10 @@ object EngineRegistryParser {
         "cmvs-ps3" to GameEngine.CMVS,
         "cmvs-ps2" to GameEngine.CMVS,
         "flash-air" to GameEngine.FLASH_AIR,
-        "twine" to GameEngine.TWINE,
+        "html" to GameEngine.HTML,
+        // The same row's pre-rename id, so an older database (or a
+        // user's pinned copy) still resolves to the same engine.
+        "twine" to GameEngine.HTML,
         "godot" to GameEngine.GODOT,
         // Late compiled-files fallback row (v5) -- same engine, looser
         // evidence, deliberately ordered after every richer signature.

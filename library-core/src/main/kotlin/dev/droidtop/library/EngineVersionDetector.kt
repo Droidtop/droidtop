@@ -44,7 +44,7 @@ object EngineVersionDetector {
         GameEngine.RPG_MAKER_XP -> detectRgss(gameRoot)
         GameEngine.RPG_MAKER_MV -> detectRpgMakerJs(gameRoot, "rpg_core.js")
         GameEngine.RPG_MAKER_MZ -> detectRpgMakerJs(gameRoot, "rmmz_core.js")
-        GameEngine.TWINE -> detectTwine(gameRoot)
+        GameEngine.HTML -> detectTwine(gameRoot)
         GameEngine.FLASH_AIR -> detectSwf(gameRoot)
         // Deliberately absent, each per enginehost's own guidance
         // (coordination responses 2026-08-31): RPG Maker 2000/2003 needs
@@ -202,8 +202,11 @@ object EngineVersionDetector {
      * First 8KB only: every file read here identifies itself in its first
      * handful of lines, and a real game's log.txt grows without bound.
      */
-    // ---- Twine -----------------------------------------------------------
+    // ---- Twine (the HTML engine's one versioned dialect) ------------------
     //
+    // Only a real Twine export has a version to report; every other HTML
+    // game detected as GameEngine.HTML returns null here, which is what
+    // detectTwine's own tw-storydata filter already does.
     // Enginehost's guidance: tw-storydata's creator-version attribute,
     // "usable when numeric". The export is a single HTML file with the
     // <tw-storydata ...> element near the top; format attribute noted

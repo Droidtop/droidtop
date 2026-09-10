@@ -387,7 +387,7 @@ enum class LibraryEntryKind {
     CMVS,
     FLASH_AIR,
     GODOT,
-    TWINE,
+    HTML,
     UNREAL,
     UNITY,
 
@@ -414,7 +414,7 @@ fun LibraryEntryKind.displayName(): String = when (this) {
     LibraryEntryKind.REMOTE_STREAM -> "Remote PC"
     LibraryEntryKind.RENPY, LibraryEntryKind.KIRIKIRI,
     LibraryEntryKind.AUGUST, LibraryEntryKind.BURIKO, LibraryEntryKind.CATSYSTEM2,
-    LibraryEntryKind.CMVS, LibraryEntryKind.FLASH_AIR, LibraryEntryKind.TWINE,
+    LibraryEntryKind.CMVS, LibraryEntryKind.FLASH_AIR,
     -> "Visual Novels"
     LibraryEntryKind.RPG_MAKER_MV, LibraryEntryKind.RPG_MAKER_MZ, LibraryEntryKind.RPG_MAKER_VX_ACE,
     LibraryEntryKind.RPG_MAKER_VX, LibraryEntryKind.RPG_MAKER_XP,
@@ -424,7 +424,12 @@ fun LibraryEntryKind.displayName(): String = when (this) {
     // Not visual-novel-shaped — general game engines, kept as their own
     // section rather than folded into "Visual Novels" where they'd be a
     // real mismatch.
-    LibraryEntryKind.GODOT, LibraryEntryKind.UNREAL, LibraryEntryKind.UNITY -> "PC Games"
+    // HTML moved here with the database's twine -> html rename: the row
+    // now matches any game whose root holds a page, not Twine stories
+    // alone, so "Visual Novels" would be wrong for most of what it catches.
+    LibraryEntryKind.GODOT, LibraryEntryKind.UNREAL, LibraryEntryKind.UNITY,
+    LibraryEntryKind.HTML,
+    -> "PC Games"
 }
 
 /**
