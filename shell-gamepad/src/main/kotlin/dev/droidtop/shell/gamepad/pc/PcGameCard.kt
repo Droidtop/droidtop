@@ -1,0 +1,116 @@
+package dev.droidtop.shell.gamepad.pc
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
+import dev.droidtop.library.LibraryEntry
+import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.GamepadKeyMap
+
+/**
+ * One game in the PC grid, whatever found it.
+ *
+ * A opens the game rather than launching it: a PC game's runner may be a
+ * named setup action away, and the detail screen is where that is said.
+ * A card that launched straight into a black screen would be the exact
+ * dishonesty §7i exists to remove.
+ *
+ * The card carries the game's source, its install state and its
+ * compatibility line when reports exist. Compatibility is evidence, never
+ * a verdict and never a gate (directed 2026-09-01): it is shown and it
+ * changes nothing about ordering or availability.
+ */
+@Composable
+internal fun PcGameCard(
+    entry: LibraryEntry,
+    modifier: Modifier = Modifier,
+    onOpen: () -> Unit,
+    onFocused: () -> Unit = {},
+) {
+    var focused by remember { mutableStateOf(false) }
+    val pc = entry.pcInfo
+    Box(
+        modifier = modifier
+            .size(width = 220.dp, height = 260.dp)
+            .onFocusChanged {
+                focused = it.isFocused
+                if (it.isFocused) onFocused()
+            }
+            .focusable()
+            .clickable(onClick = onOpen)
+            .onKeyEvent { event ->
+                if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
+                if (GamepadKeyMap.actionFor(event.key) == GamepadAction.A) {
+                    onOpen()
+                    true
+                } else {
+                    false
+                }
+            }
+            .border(
+                width = if (focused) 4.dp else 1.dp,
+                color = if (focused) Color.White else Color.DarkGray,
+                shape = RoundedCornerShape(12.dp),
+            )
+            .background(if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A), RoundedCornerShape(12.dp)),
+    ) {
+        if (entry.artworkUri != null) {
+            AsyncImage(
+                model = entry.artworkUri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomStart)
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000))))
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(entry.title, color = Color.White, style = MaterialTheme.typography.titleMedium)
+            Text(
+                buildString {
+                    append(entry.sourceLabel())
+                    entry.engineLabel()?.let { append(" - ").append(it) }
+                    if (pc?.installed == false) append(" - not installed")
+                },
+                color = Color.LightGray,
+                style = MaterialTheme.typography.labelSmall,
+            )
+            pc?.compatibility?.takeIf { it.hasBeenTried }?.let {
+                Text(it.summary(), color = Color(0xFFB0BEC5), style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+}
