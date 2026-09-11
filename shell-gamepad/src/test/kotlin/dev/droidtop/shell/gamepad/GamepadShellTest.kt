@@ -40,6 +40,41 @@ class GamepadShellTest {
     }
 
     @Test
+    fun `an engine game with no systemId belongs to the PC group`() {
+        assertEquals(GameGroupForTest.PC, groupOf(entry("renpy", LibraryEntryKind.RENPY)))
+        assertEquals(GameGroupForTest.PC, groupOf(entry("rm", LibraryEntryKind.RPG_MAKER_MV)))
+        assertEquals(GameGroupForTest.PC, groupOf(entry("kiri", LibraryEntryKind.KIRIKIRI)))
+    }
+
+    @Test
+    fun `a store or Wine title belongs to the PC group too`() {
+        assertEquals(
+            GameGroupForTest.PC,
+            groupOf(entry("steam", LibraryEntryKind.WINE_PROFILE).copy(systemId = "pc")),
+        )
+        assertEquals(GameGroupForTest.PC, groupOf(entry("wine", LibraryEntryKind.WINE_PROFILE)))
+    }
+
+    @Test
+    fun `a real console system keeps its own card`() {
+        assertEquals(
+            GameGroupForTest.system("n3ds"),
+            groupOf(entry("kid icarus", LibraryEntryKind.CONSOLE_ROM).copy(systemId = "n3ds")),
+        )
+    }
+
+    @Test
+    fun `ROM files in a folder named pc do not claim a second PC card`() {
+        // The bug this replaces: a games-root folder literally named `pc`
+        // made ConsoleRomProvider tag plain ROMs with systemId "pc", which
+        // became a rival "PC" card -- it reported its own game count and
+        // opened a surface that filtered every one of them back out.
+        val rom = entry("dosgame", LibraryEntryKind.CONSOLE_ROM).copy(systemId = "pc")
+
+        assertEquals(GameGroupForTest.PC, groupOf(rom))
+    }
+
+    @Test
     fun `empty entries produce no sections`() {
         assertEquals(emptyList<Any>(), buildAppSections(emptyList()))
     }
@@ -56,4 +91,18 @@ class GamepadShellTest {
 
         assertEquals(listOf("apple", "Mango", "Zebra"), sections.single().entries.map { it.title })
     }
+
+    /**
+     * The grouping answer as a plain value: GameGroup itself is private to
+     * GamepadShell.kt (it carries Compose-side theming), so the test reads
+     * the one thing it is asserting about -- which card an entry lands on.
+     */
+    private data class GameGroupForTest(val key: String) {
+        companion object {
+            val PC = GameGroupForTest("system:pc")
+            fun system(id: String) = GameGroupForTest("system:$id")
+        }
+    }
+
+    private fun groupOf(entry: LibraryEntry) = GameGroupForTest(gameGroupKey(entry))
 }
