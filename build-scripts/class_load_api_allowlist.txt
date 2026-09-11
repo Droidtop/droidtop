@@ -1,0 +1,93 @@
+# Classes whose OWN load is already behind a version check.
+#
+# check_class_load_api.py fails the build when a class in one of this
+# repo's packages names a framework type newer than minSdk in a position
+# the runtime resolves at class-load time. A class listed here still does
+# that, and is still correct, because nothing can reach it below the API
+# its types need: it is instantiated only inside a Build.VERSION branch, or
+# behind a component the platform never activates. Each line says which.
+#
+# Adding a line is a claim about reachability, so it needs the guard's
+# file and line. If the guard is not there, this is the wrong fix: hold the
+# newer type in a class of its own, the way
+# com.android.launcher3.util.PredictiveBackAdapter and
+# dev.droidtop.shell.gamepad.theme.EsDeVideoRenderEffect do.
+
+# --- API-gated by an explicit Build.VERSION branch at the only call site ---
+
+# The launcher's predictive-back adapter itself: the one class naming
+# android.window's API-34 interfaces, registered only from
+# Launcher.registerBackDispatcher() under Utilities.ATLEAST_U.
+com.android.launcher3.util.PredictiveBackAdapter
+
+# RenderEffect (API 31) for the ES-DE video surface, called only from the
+# SDK_INT >= S branch in EsDeThemeRenderer.kt's video `update` block.
+dev.droidtop.shell.gamepad.theme.EsDeVideoRenderEffect
+
+# WindowInsetsAnimation.Callback (API 30). Instantiated under
+# Utilities.ATLEAST_R in Folder.java:324 and WorkUtilityView.java:137.
+com.android.launcher3.anim.KeyboardInsetAnimationCallback
+
+# The IME-listener anonymous class in Launcher.onResume, inside
+# `if (Utilities.ATLEAST_R)` at Launcher.java:1264.
+com.android.launcher3.Launcher$4
+
+# BaseActivity's plain OnBackInvokedCallback lambda (API 33), created
+# inside `if (Utilities.ATLEAST_T)` in registerBackDispatcher().
+com.android.launcher3.BaseActivity
+
+# WallpaperManager.OnColorsChangedListener (API 27) as a lambda, created
+# inside `if (Utilities.ATLEAST_S)` in WallpaperColorHints's init block.
+com.android.launcher3.util.WallpaperColorHints
+
+# ViewTreeObserver.OnWindowVisibilityChangeListener (API 34) as a lambda,
+# created inside `if (Utilities.ATLEAST_V)` in BaseContext.kt:92.
+com.android.launcher3.util.BaseContext
+
+# The O_MR1 wallpaper-colours implementation, chosen by
+# WallpaperManagerCompat.getInstance only under Utilities.ATLEAST_O_MR1
+# (and inside a try/catch for the same reason).
+com.android.launcher3.compat.WallpaperManagerCompatVOMR1
+
+# RenderEffect/RenderNode (API 31/29) for the double-shadow icon, built
+# only from DoubleShadowBubbleTextView's `SDK_INT >= S` branch at :78.
+com.android.launcher3.views.DoubleShadowIconDrawable
+
+# ValueAnimator.DurationScaleChangeListener (API 33) as a lambda, created
+# inside `if (Build.VERSION.SDK_INT >= 33)` in AnimationHandler.java:126.
+# Vendored androidx source (shell-default/androidx-lib), upstream's own
+# version split, kept as upstream wrote it.
+androidx.dynamicanimation.animation.AnimationHandler
+
+# --- Unreachable below their API for a structural reason ---
+
+# SurfaceControlViewHost (API 30). Reached only through the
+# METHOD_GET_PREVIEW ContentProvider call in GridCustomizationsProxy,
+# which is the system wallpaper picker's grid-preview surface: a caller
+# that does not exist below API 31, and one whose failure is caught.
+com.android.launcher3.graphics.PreviewSurfaceRenderer
+
+# android.graphics.Insets (API 29) in the test-only information handler,
+# behind TestInformationProvider -- declared android:enabled="false" in
+# shell-default/src/main/AndroidManifest.xml:323, so the platform never
+# instantiates it on a normal build.
+com.android.launcher3.testing.TestInformationHandler
+
+# android.os.VibrationAttributes (API 30) in MSDL's own properties type.
+# The launcher only ever calls MSDLPlayerWrapper.playToken(token), which
+# passes null; nothing in droidtop constructs DynamicVibrationScale, so
+# neither class is loaded.
+com.google.android.msdl.domain.InteractionProperties
+
+# SurfaceControl / TaskInfo (API 29) in AOSP's wm-shell shared library.
+# shell-default vendors the whole wm_shared tree because parts of it are
+# compiled against, but these classes belong to the recents/PIP/split
+# surfaces droidtop's shell does not use, and nothing outside wm_shared
+# references them (checked by grep across every module). They are dead
+# weight rather than a crash: no code path loads them.
+com.android.wm.shell.shared.handles.RegionSamplingHelper
+com.android.wm.shell.shared.pip.PipContentOverlay
+com.android.wm.shell.shared.CounterRotator
+com.android.wm.shell.shared.GroupedTaskInfo
+com.android.wm.shell.shared.TransactionPool
+com.android.wm.shell.shared.TransitionUtil
