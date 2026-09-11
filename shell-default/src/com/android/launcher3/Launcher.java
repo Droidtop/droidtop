@@ -466,12 +466,12 @@ public class Launcher extends StatefulActivity<LauncherState>
         // isTaskRoot() is safe to call this early (the task token is
         // attached before onCreate runs). Only *recorded* here, not acted
         // on -- see onStart for why. See dev.droidtop.shell.standard.
-        // ModePrefs's own doc comment for the follow-up this closes out
+        // Modes's own doc comment for the follow-up this closes out
         // (auto-redirect was deliberately deferred, then asked for
         // explicitly).
         if (savedInstanceState == null && isTaskRoot()) {
-            String lastMode = dev.droidtop.shell.standard.ModePrefs.lastMode(this);
-            if (!dev.droidtop.shell.standard.BackButtonMenu.MODE_STANDARD.equals(lastMode)) {
+            String lastMode = dev.droidtop.library.settings.Modes.lastMode(this);
+            if (!dev.droidtop.library.settings.Mode.LAUNCHER.getId().equals(lastMode)) {
                 mDroidtopPendingModeRedirect = lastMode;
             }
         }
@@ -1790,8 +1790,8 @@ public class Launcher extends StatefulActivity<LauncherState>
             long nowMs = android.os.SystemClock.elapsedRealtime();
             boolean doubleTap = nowMs - sDroidtopLastHomePressMs < 600;
             sDroidtopLastHomePressMs = nowMs;
-            String droidtopLastMode = dev.droidtop.shell.standard.ModePrefs.lastMode(this);
-            if (!dev.droidtop.shell.standard.BackButtonMenu.MODE_STANDARD.equals(droidtopLastMode)) {
+            String droidtopLastMode = dev.droidtop.library.settings.Modes.lastMode(this);
+            if (!dev.droidtop.library.settings.Mode.LAUNCHER.getId().equals(droidtopLastMode)) {
                 Intent redirect = new Intent(Intent.ACTION_MAIN);
                 redirect.setClassName(getPackageName(), "dev.droidtop.app.MainActivity");
                 redirect.putExtra(dev.droidtop.shell.standard.BackButtonMenu.EXTRA_MODE, droidtopLastMode);

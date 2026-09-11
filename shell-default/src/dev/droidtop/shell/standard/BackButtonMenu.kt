@@ -5,6 +5,8 @@ import android.app.AlertDialog
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import dev.droidtop.library.settings.Mode
+import dev.droidtop.library.settings.Modes
 
 /**
  * droidtop's shell switcher — Android, Desktop, Gaming, or Settings.
@@ -29,16 +31,13 @@ object BackButtonMenu {
     private const val STANDARD_LAUNCHER_ACTIVITY = "com.android.launcher3.Launcher"
     private const val ALTERNATIVE_LAUNCHER_ACTIVITY = "dev.droidtop.shell.standard.AlternativeLauncherActivity"
     const val EXTRA_MODE = "dev.droidtop.app.EXTRA_MODE"
-    const val MODE_DESKTOP = "desktop"
-    const val MODE_GAMING = "gaming"
-    const val MODE_STANDARD = "standard"
 
     // Real, deep-link-only extras used by SettingsGamingFragment (same
     // module as this object) to reach :app's MainActivity/GamepadShell,
     // which itself depends on :shell-default and reads these back off this
     // same object -- the established real pattern for sharing an Intent
     // contract across the one-way :app -> shells dependency edge, matching
-    // EXTRA_MODE/MODE_GAMING above rather than a second, duplicated copy
+    // EXTRA_MODE above rather than a second, duplicated copy
     // of the same string literals.
     const val EXTRA_GAMING_START_SECTION = "dev.droidtop.app.EXTRA_GAMING_START_SECTION"
     const val EXTRA_GAMING_RESCAN = "dev.droidtop.app.EXTRA_GAMING_RESCAN"
@@ -81,12 +80,12 @@ object BackButtonMenu {
         val items = buildList {
             if (homeImplementation != HomeRolePrefs.HomeImplementation.NONE) add("Android")
             // Real, user-configurable per-mode enable/disable (Global
-            // settings, see ModePrefs.isModeEnabled's own doc comment) --
+            // settings, see Modes's own doc comment) --
             // a disabled mode's own entry is hidden entirely, not shown
             // greyed out, matching how "Android" above is already hidden
             // (not disabled-looking) when droidtop holds no HOME role.
-            if (ModePrefs.isModeEnabled(activity, MODE_DESKTOP)) add("Desktop")
-            if (ModePrefs.isModeEnabled(activity, MODE_GAMING)) add("Gaming")
+            if (Modes.isEnabled(Mode.DESKTOP)) add(Mode.DESKTOP.label)
+            if (Modes.isEnabled(Mode.GAMING)) add(Mode.GAMING.label)
             add("Settings")
         }
         // DroidtopDialog: the same dark chrome palette as DroidtopTheme
@@ -97,8 +96,8 @@ object BackButtonMenu {
             .setItems(items.toTypedArray()) { _, which ->
                 when (items[which]) {
                     "Android" -> launchHomeImplementation(activity, homeImplementation)
-                    "Desktop" -> launchAppMode(activity, MODE_DESKTOP)
-                    "Gaming" -> launchAppMode(activity, MODE_GAMING)
+                    Mode.DESKTOP.label -> launchAppMode(activity, Mode.DESKTOP)
+                    Mode.GAMING.label -> launchAppMode(activity, Mode.GAMING)
                     "Settings" -> launchSettings(activity)
                 }
             }
@@ -111,7 +110,7 @@ object BackButtonMenu {
             HomeRolePrefs.HomeImplementation.ALTERNATIVE -> ALTERNATIVE_LAUNCHER_ACTIVITY
             HomeRolePrefs.HomeImplementation.NONE -> return
         }
-        ModePrefs.setLastMode(activity, MODE_STANDARD)
+        Modes.setLastMode(activity, Mode.LAUNCHER)
         val intent = Intent(Intent.ACTION_MAIN).apply {
             component = ComponentName(activity.packageName, activityName)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -119,11 +118,11 @@ object BackButtonMenu {
         activity.startActivity(intent)
     }
 
-    private fun launchAppMode(activity: Activity, mode: String) {
-        ModePrefs.setLastMode(activity, mode)
+    private fun launchAppMode(activity: Activity, mode: Mode) {
+        Modes.setLastMode(activity, mode)
         val intent = Intent(Intent.ACTION_MAIN).apply {
             setClassName(activity.packageName, APP_MAIN_ACTIVITY)
-            putExtra(EXTRA_MODE, mode)
+            putExtra(EXTRA_MODE, mode.id)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         activity.startActivity(intent)

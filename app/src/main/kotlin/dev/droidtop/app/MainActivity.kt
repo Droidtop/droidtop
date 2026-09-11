@@ -13,21 +13,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
 import dev.droidtop.hostbridge.ClipboardBridge
-import dev.droidtop.library.EngineGameProvider
 import dev.droidtop.library.Library
-import dev.droidtop.library.NativeAppProvider
-import dev.droidtop.library.RoomPlayHistoryStore
-import dev.droidtop.library.consoles.ConsoleRomProvider
+import dev.droidtop.library.settings.Mode
+import dev.droidtop.library.settings.Modes
 import dev.droidtop.runtime.ContainerTerminal
 import dev.droidtop.runtime.DisplayOutputKind
 import dev.droidtop.runtime.DisplayOutputRepository
-import dev.droidtop.runtime.PrimaryContainerSession
-import dev.droidtop.runtime.windows.PcGameProvider
 import dev.droidtop.shell.desktop.DesktopSessionMessage
 import dev.droidtop.shell.desktop.DesktopShell
 import dev.droidtop.shell.gamepad.GamepadShell
 import dev.droidtop.shell.standard.BackButtonMenu
-import dev.droidtop.shell.standard.ModePrefs
 import dev.droidtop.shell.standard.OnboardingGate
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -68,7 +63,7 @@ import kotlinx.coroutines.launch
 class MainActivity : AppCompatActivity() {
 
     private lateinit var library: Library
-    private var mode by mutableStateOf<String?>(null)
+    private var mode by mutableStateOf<Mode?>(null)
 
     // Real bug this avoids: MainActivity is android:launchMode="singleTask",
     // so a deep-link Intent from SettingsGamingFragment (FLAG_ACTIVITY_
@@ -191,58 +186,11 @@ class MainActivity : AppCompatActivity() {
         // not just one.
         OnboardingGate.launchIfNeeded(this)
 
-        // Real roots are read fresh by each provider on every scan (see
-        // GamesRoots.current's own doc comment) -- not resolved once here
-        // and frozen, since that would silently ignore any root added or
-        // removed at runtime via the "ROM folders" Settings screen.
-        library = Library(
-            listOf(
-                NativeAppProvider(applicationContext),
-                EngineGameProvider(
-                    applicationContext,
-                    // Every store's install directories, not just Steam's, so a
-                    // Ren'Py or RPG Maker game installed from GOG/Epic/Amazon
-                    // flows through the same engine detection and launch
-                    // resolution as one sitting in a games folder (docs/SPEC.md
-                    // section 7g).
-                    extraRoots = { dev.droidtop.runtime.windows.PcLibrary.knownInstallRoots() },
-                    // The store's own facts about those installs. Engine
-                    // detection owns a store game whose folder it
-                    // recognises and PcGameProvider stops returning a
-                    // second entry for it (docs/SPEC.md section 7g); this
-                    // is what stops that from also losing the game's
-                    // store, size, compatibility and cover art.
-                    storeInstalls = { dev.droidtop.runtime.windows.PcLibrary.knownInstalls() },
-                ),
-                // Same roots as EngineGameProvider -- a folder can hold
-                // real console ROMs (<root>/<systemId>/<romFile>), engine
-                // games (<root>/<gameFolder>/...), or both; each provider
-                // only ever matches what's actually its own shape.
-                ConsoleRomProvider(applicationContext),
-                // Real discovery (com.winlator.container.ContainerManager's
-                // own shortcut scan), themed as ES-DE's "pc" system like
-                // any other. It launches through the WineEngine seam, so
-                // it needs no desktop session and no root.
-                PcGameProvider(applicationContext),
-            ),
-            playHistory = RoomPlayHistoryStore(applicationContext),
-        )
+        // One library per process, built by the shared core rather than
+        // here: launch resolution must work with Gaming and Desktop both
+        // off, and this Activity does not run then (LibraryCore).
+        library = LibraryCore.library(applicationContext)
 
-        // Fills library-core's PcGameRuntime seam, which is what makes the
-        // WINE_PREFIX / LINUX_CONTAINER launch strategies real rather than
-        // error() stubs. The session supplier is only for the native-Linux
-        // half, which genuinely needs a Linux rootfs to run in; Windows
-        // games go through the WineEngine seam and need neither it nor
-        // root. It stays a supplier because DesktopSessionService may
-        // still be connecting when this runs.
-        dev.droidtop.library.PcGameRuntimeRegistry.runtime =
-            dev.droidtop.runtime.windows.DroidtopPcGameRuntime(
-                context = applicationContext,
-                primarySession = {
-                    (DesktopSessionService.state.value as? DesktopSessionState.Connected)
-                        ?.let { PrimaryContainerSession(it.runtime, it.container) }
-                },
-            )
         refreshModeIfUndecided()
 
         // Tap-to-launch from the companion surface (its recent-games
@@ -269,7 +217,7 @@ class MainActivity : AppCompatActivity() {
             // ES-DE theme instead and simply don't read these tokens.
             dev.droidtop.app.ui.DroidtopTheme {
             when (mode) {
-                BackButtonMenu.MODE_GAMING -> GamepadShell(
+                Mode.GAMING -> GamepadShell(
                     library = library,
                     onFocusedEntryChanged = { CompanionState.focusedEntry.value = it },
                     // The companion's idle rotation draws from this
@@ -283,7 +231,7 @@ class MainActivity : AppCompatActivity() {
                     triggerRescan = gamingTriggerRescan,
                     triggerBrowseThemes = gamingTriggerBrowseThemes,
                 )
-                else -> {
+                Mode.DESKTOP -> {
                     val sessionState by DesktopSessionService.state.collectAsState()
                     val connected = sessionState as? DesktopSessionState.Connected
                     DesktopShell(
@@ -312,6 +260,11 @@ class MainActivity : AppCompatActivity() {
                         },
                     )
                 }
+                // Nothing to render: both app-hosted modes are off, and
+                // refreshModeIfUndecided has already handed back to the
+                // launcher. Deliberately blank rather than falling through
+                // to Desktop, which is what this branch used to do.
+                Mode.LAUNCHER, null -> Unit
             }
             }
         }
@@ -322,9 +275,7 @@ class MainActivity : AppCompatActivity() {
         setIntent(intent)
         applyGamingDeepLink(intent)
         mode = resolveMode(intent)
-        if (mode != BackButtonMenu.MODE_GAMING) {
-            startForegroundService(Intent(this, DesktopSessionService::class.java))
-        }
+        startDesktopSessionIfDesktop()
         // Display reinit on every re-entry (a HOME press routes here via
         // Launcher.onNewIntent's forwarding, carrying EXTRA_DISPLAY_REINIT).
         // An EXPLICIT shell entry (BackButtonMenu's Gaming item, no
@@ -332,7 +283,7 @@ class MainActivity : AppCompatActivity() {
         // the home-press reinit deliberately does NOT -- "fix my screens"
         // must never cover a running game (see LaunchDisplay.parkedDisplayId).
         if (!intent.getBooleanExtra(BackButtonMenu.EXTRA_DISPLAY_REINIT, false) &&
-            mode == BackButtonMenu.MODE_GAMING
+            mode == Mode.GAMING
         ) {
             dev.droidtop.library.LaunchDisplay.parkedDisplayId = null
         }
@@ -352,7 +303,7 @@ class MainActivity : AppCompatActivity() {
      * resolved exactly once, in `onCreate`, and never re-checked. When
      * `OnboardingGate.launchIfNeeded` (called just above, in `onCreate`)
      * pushes `OnboardingActivity` on top of this same task *before*
-     * onboarding has actually set `ModePrefs.lastMode` to anything real,
+     * onboarding has actually set the last mode to anything real,
      * [resolveMode] has nothing to resolve to yet and returns `null` --
      * which the `when(mode)` below's `else` branch silently treats as
      * Desktop. That's the correct behavior for "genuinely undecided," but
@@ -386,34 +337,46 @@ class MainActivity : AppCompatActivity() {
     private fun refreshModeIfUndecided() {
         if (mode != null) return
         mode = resolveMode(intent)
-        if (mode != BackButtonMenu.MODE_GAMING) {
-            startForegroundService(Intent(this, DesktopSessionService::class.java))
-        }
+        startDesktopSessionIfDesktop()
+    }
+
+    /**
+     * The desktop session is Desktop mode's, and only Desktop mode's. It
+     * used to start for every mode that was not Gaming -- including the
+     * "undecided" null, which meant a device with Desktop switched off
+     * still started a foreground service for a session that could never
+     * connect.
+     */
+    private fun startDesktopSessionIfDesktop() {
+        if (mode != Mode.DESKTOP) return
+        startForegroundService(Intent(this, DesktopSessionService::class.java))
     }
 
     /**
      * Prefers an explicit [BackButtonMenu.EXTRA_MODE] (a real user choice,
      * from [BackButtonMenu] or Launcher's own cold-boot redirect — see the
      * "droidtop patch" in `Launcher.onCreate`); then a real, user-set
-     * [ModePrefs.defaultMode] (Global settings' own "Default mode" picker),
+     * [Modes.defaultMode] (Global settings' own "Default mode" picker),
      * if one is set and its mode is still enabled — a disabled mode can't
      * silently become the resolved mode just because it's still saved as
-     * the default; falls back to [ModePrefs]'s last app-hosted mode when
+     * the default; falls back to [Modes]'s last app-hosted mode when
      * neither applies, so this Activity resumes correctly even if launched
      * by something that didn't set the extra. Persists whatever mode is
      * resolved as a safety net — every known real caller already does this
      * before launching, but a null write here would be wrong (it would
      * forget the real last mode).
      */
-    private fun resolveMode(intent: Intent): String? {
-        val explicit = intent.getStringExtra(BackButtonMenu.EXTRA_MODE)
-        val default = ModePrefs.defaultMode(this)?.takeIf {
-            (it == BackButtonMenu.MODE_GAMING || it == BackButtonMenu.MODE_DESKTOP) && ModePrefs.isModeEnabled(this, it)
+    private fun resolveMode(intent: Intent): Mode? {
+        val resolved = Modes.resolveAppMode(this, intent.getStringExtra(BackButtonMenu.EXTRA_MODE))
+        if (resolved != null) {
+            Modes.setLastMode(this, resolved)
+        } else if (!isFinishing) {
+            // Neither app-hosted mode is enabled, so there is nothing for
+            // this Activity to be. Hand back to the launcher rather than
+            // show an empty window.
+            Modes.setLastMode(this, Mode.LAUNCHER)
+            finish()
         }
-        val resolved = explicit ?: default ?: ModePrefs.lastMode(this).takeIf {
-            it == BackButtonMenu.MODE_GAMING || it == BackButtonMenu.MODE_DESKTOP
-        }
-        if (resolved != null) ModePrefs.setLastMode(this, resolved)
         return resolved
     }
 
@@ -569,8 +532,8 @@ class MainActivity : AppCompatActivity() {
                     return@collectLatest
                 }
                 val second = outputs.firstOrNull { it.kind == DisplayOutputKind.SECOND_SCREEN }
-                val gaming = mode == BackButtonMenu.MODE_GAMING
-                val desktop = mode == BackButtonMenu.MODE_DESKTOP
+                val gaming = mode == Mode.GAMING
+                val desktop = mode == Mode.DESKTOP
                 // Always current, whatever the mode: LaunchDisplay resolves
                 // a remembered "add-on screen" choice through this.
                 dev.droidtop.library.LaunchDisplay.secondDisplayId = second?.androidDisplayId
@@ -598,7 +561,7 @@ class MainActivity : AppCompatActivity() {
                 // treats it as the main output, not an afterthought (per
                 // direction; docs/SPEC.md section 4). Standard stays with
                 // the platform's own Launcher3 secondary-display handling.
-                val wantShellOnSecond = (handheld || desktop) && secondAvailable && if (hasSavedAssignment) {
+                val wantShellOnSecond = (gaming || desktop) && secondAvailable && if (hasSavedAssignment) {
                     assignedUpper?.androidDisplayId == second!!.androidDisplayId
                 } else {
                     DisplayRolePrefs.shellTarget(this@MainActivity) == DisplayRolePrefs.ShellTarget.SECOND_WHEN_PRESENT
@@ -614,7 +577,7 @@ class MainActivity : AppCompatActivity() {
                     dev.droidtop.runtime.DualScreenOrchestration.relocationHasFailed(relocationAttempts)
                 val shellOnSecond = wantShellOnSecond && !relocationGaveUp
 
-                val launchTarget = if (handheld && second != null) DisplayRolePrefs.gameLaunchTarget(this@MainActivity) else null
+                val launchTarget = if (gaming && second != null) DisplayRolePrefs.gameLaunchTarget(this@MainActivity) else null
                 dev.droidtop.library.LaunchDisplay.targetDisplayId = when (launchTarget) {
                     null, DisplayRolePrefs.GameLaunchTarget.ASK, DisplayRolePrefs.GameLaunchTarget.BUILT_IN -> null
                     DisplayRolePrefs.GameLaunchTarget.FOLLOW_SHELL ->
@@ -656,7 +619,7 @@ class MainActivity : AppCompatActivity() {
                 // stays underneath as the idle surface for when droidtop
                 // is not foreground; this window sits above it while it is.
                 //
-                // No longer gated on `handheld`: Desktop mode wants this
+                // No longer gated on `gaming`: Desktop mode wants this
                 // window too, because that is where its second-screen
                 // keyboard and trackpad live (docs/SPEC.md 4, 6c), and the
                 // live window is the one that exists whether or not

@@ -2,7 +2,6 @@ package dev.droidtop.display
 
 import android.content.Context
 import androidx.compose.runtime.Composable
-import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * The one place droidtop decides what the secondary screen shows.
@@ -59,24 +58,16 @@ object SecondaryDisplayContent {
     internal fun handoffFor(mode: Mode): ((Context) -> Boolean)? = handoffs[mode]
 
     /**
-     * The active mode, read from the same preference `ModePrefs` writes.
-     *
-     * Deliberately read by key rather than by depending on
-     * `:shell-default`: this module must stay usable by every shell, and
-     * one of them owning the type the others read would recreate exactly
-     * the coupling this consolidation removes. The key and file are
-     * droidtop's established settings convention.
+     * The active mode, from the one place that owns mode state
+     * ([dev.droidtop.library.settings.Modes]). This module keeps its own
+     * [Mode] enum because what a secondary screen draws is its own
+     * concern -- but it no longer reads the preference by key behind
+     * Modes' back, which was a second mechanism for one job.
      */
-    fun currentMode(context: Context): Mode {
-        val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(KEY_LAST_MODE, null)
-        return when (raw) {
-            "gaming" -> Mode.GAMING
-            "desktop" -> Mode.DESKTOP
+    fun currentMode(context: Context): Mode =
+        when (dev.droidtop.library.settings.Modes.lastMode(context)) {
+            dev.droidtop.library.settings.Mode.GAMING.id -> Mode.GAMING
+            dev.droidtop.library.settings.Mode.DESKTOP.id -> Mode.DESKTOP
             else -> Mode.STANDARD
         }
-    }
-
-    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
-    private const val KEY_LAST_MODE = "droidtop_last_mode"
 }

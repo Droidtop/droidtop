@@ -143,6 +143,25 @@
             android:exported="true" />
 
         <!--
+          Launching one library entry with no mode attached: how the
+          Launcher (and adb, for checking it) reaches the shared launch
+          resolution while Gaming is off. Exported so the launcher's own
+          shortcut path and `am start` can reach it; it carries no
+          permission-worthy capability of its own, and resolves only ids
+          that droidtop's own scan produced.
+        -->
+        <activity
+            android:name="dev.droidtop.app.GameLaunchActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="dev.droidtop.app.action.LAUNCH_GAME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!--
           Explicit folder-to-console-system assignment. Started by
           :shell-gamepad's SettingsSection via explicit component name, same
           pattern as the SettingsActivity launches elsewhere.

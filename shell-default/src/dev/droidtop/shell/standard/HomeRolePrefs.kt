@@ -25,7 +25,7 @@ object HomeRolePrefs {
     private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_ALTERNATIVE_TARGET = "droidtop_alternative_launcher_target"
 
-    private const val STANDARD_ACTIVITY = "com.android.launcher3.Launcher"
+    private const val STANDARD_ACTIVITY = dev.droidtop.library.settings.Modes.LAUNCHER_ACTIVITY
     private const val ALTERNATIVE_ACTIVITY = "dev.droidtop.shell.standard.AlternativeLauncherActivity"
 
     enum class HomeImplementation { STANDARD, ALTERNATIVE, NONE }

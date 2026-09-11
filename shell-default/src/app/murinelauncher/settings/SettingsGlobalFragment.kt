@@ -15,7 +15,8 @@ import com.android.launcher3.R
 import com.android.launcher3.util.DisplayController
 import dev.droidtop.shell.standard.BackButtonMenu
 import dev.droidtop.shell.standard.HomeRolePrefs
-import dev.droidtop.shell.standard.ModePrefs
+import dev.droidtop.library.settings.Mode
+import dev.droidtop.library.settings.Modes
 import org.json.JSONObject
 import java.io.BufferedReader
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
@@ -101,10 +102,10 @@ public final class SettingsGlobalFragment : AbstractSettingsFragment() {
             PREF_ENABLE_DESKTOP, PREF_ENABLE_GAMING -> {
                 if (preference is SwitchPreferenceCompat) {
                     val context = requireContext()
-                    val mode = if (preference.key == PREF_ENABLE_DESKTOP) BackButtonMenu.MODE_DESKTOP else BackButtonMenu.MODE_GAMING
-                    preference.isChecked = ModePrefs.isModeEnabled(context, mode)
+                    val mode = if (preference.key == PREF_ENABLE_DESKTOP) Mode.DESKTOP else Mode.GAMING
+                    preference.isChecked = Modes.isEnabledInStorage(context, mode)
                     preference.setOnPreferenceChangeListener { _, newValue ->
-                        ModePrefs.setModeEnabled(context, mode, newValue as Boolean)
+                        Modes.setEnabled(context, mode, newValue as Boolean)
                         true
                     }
                 }
@@ -114,8 +115,8 @@ public final class SettingsGlobalFragment : AbstractSettingsFragment() {
                     val context = requireContext()
                     refreshDefaultModeChoices(preference, context)
                     preference.setOnPreferenceChangeListener { pref, newValue ->
-                        val mode = (newValue as String).takeIf { it.isNotEmpty() }
-                        ModePrefs.setDefaultMode(context, mode)
+                        val mode = Mode.byId((newValue as String).takeIf { it.isNotEmpty() })
+                        Modes.setDefaultMode(context, mode)
                         (pref as ListPreference).summary = pref.entries.getOrNull(pref.findIndexOfValue(newValue))
                         true
                     }
@@ -167,12 +168,12 @@ public final class SettingsGlobalFragment : AbstractSettingsFragment() {
     private fun refreshDefaultModeChoices(preference: ListPreference, context: Context) {
         val choices = buildList {
             add("" to "(none — use whichever was used last)")
-            if (ModePrefs.isModeEnabled(context, BackButtonMenu.MODE_DESKTOP)) add(BackButtonMenu.MODE_DESKTOP to "Desktop")
-            if (ModePrefs.isModeEnabled(context, BackButtonMenu.MODE_GAMING)) add(BackButtonMenu.MODE_GAMING to "Gaming")
+            if (Modes.isEnabledInStorage(context, Mode.DESKTOP)) add(Mode.DESKTOP.id to Mode.DESKTOP.label)
+            if (Modes.isEnabledInStorage(context, Mode.GAMING)) add(Mode.GAMING.id to Mode.GAMING.label)
         }
         preference.entryValues = choices.map { it.first }.toTypedArray()
         preference.entries = choices.map { it.second }.toTypedArray()
-        val current = ModePrefs.defaultMode(context)?.takeIf { mode -> choices.any { it.first == mode } } ?: ""
+        val current = Modes.defaultMode(context)?.takeIf { mode -> choices.any { it.first == mode } } ?: ""
         preference.value = current
         preference.summary = choices.firstOrNull { it.first == current }?.second
     }
