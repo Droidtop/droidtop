@@ -2727,14 +2727,26 @@ internal fun esDeFilterQuality(element: EsDeThemeElement, property: String = "in
  * WIDTH (DateTimeComponent.cpp:310-313) -- the same width-axis exception
  * already confirmed for image `cornerRadius` and help-bar `entrySpacing`.
  *
- * `backgroundColorEnd`/`backgroundGradientType` are deliberately left
- * out: they are the same positional-gradient shape as the
- * `image*ColorEnd` family, which a Compose ColorFilter cannot express
- * (it needs a real shader), so implementing only the flat-color half is
- * the honest subset.
+ * `backgroundColorEnd` and `backgroundGradientType` are the SECOND stop
+ * of that same rect and the axis it runs along. Unlike the
+ * `image*ColorEnd` family -- which gradient-shifts a sampled TEXTURE and
+ * so genuinely needs a shader -- this one is a two-stop gradient fill of
+ * a plain rectangle, which is exactly what a Compose `Brush` is, so
+ * there is nothing here to approximate. Real semantics, identical in all
+ * three components (DateTimeComponent.cpp:258-275,
+ * HelpComponent.cpp:136-152, SystemStatusComponent.cpp:236-252): when
+ * `backgroundColorEnd` is absent it defaults to `backgroundColor` (i.e. a
+ * flat fill, which is why the flat case stays pixel-identical), and
+ * `backgroundGradientType` accepts exactly "horizontal" (the real
+ * default, and what an invalid value falls back to after a warning) or
+ * "vertical". The rect is drawn start-to-end along that axis
+ * (Renderer::drawRect's own `horizontalGradient` argument,
+ * DateTimeComponent.cpp:172).
  */
 private data class EsDeBackgroundBox(
     val color: Color?,
+    val colorEnd: Color?,
+    val gradientHorizontal: Boolean,
     val padStart: Dp,
     val padEnd: Dp,
     val padTop: Dp,
@@ -2750,12 +2762,23 @@ private fun backgroundBoxOf(
 ): EsDeBackgroundBox {
     val raw = element.valueOrNull<EsDeThemeValue.Color>("backgroundColor")?.let { colorOf(it) }
     val color = raw?.copy(alpha = raw.alpha * opacity)
+    // Real default: `backgroundColorEnd` absent means "same as
+    // backgroundColor", which degenerates to the flat fill -- never a
+    // transparent second stop (DateTimeComponent.cpp:258-261).
+    val rawEnd = element.valueOrNull<EsDeThemeValue.Color>("backgroundColorEnd")?.let { colorOf(it) } ?: raw
+    val colorEnd = rawEnd?.copy(alpha = rawEnd.alpha * opacity)
+    // Real default and real invalid-value fallback are both "horizontal"
+    // (DateTimeComponent.cpp:263-275).
+    val gradientHorizontal =
+        element.valueOrNull<EsDeThemeValue.Str>("backgroundGradientType")?.value != "vertical"
     val h = element.valueOrNull<EsDeThemeValue.Pair>("backgroundHorizontalPadding")
     val v = element.valueOrNull<EsDeThemeValue.Pair>("backgroundVerticalPadding")
     val radius = (element.valueOrNull<EsDeThemeValue.FloatValue>("backgroundCornerRadius")?.value ?: 0f)
         .coerceIn(0f, 0.5f)
     return EsDeBackgroundBox(
         color = color,
+        colorEnd = colorEnd,
+        gradientHorizontal = gradientHorizontal,
         padStart = viewWidth * (h?.x ?: 0f).coerceIn(0f, 1f),
         padEnd = viewWidth * (h?.y ?: 0f).coerceIn(0f, 1f),
         padTop = viewHeight * (v?.x ?: 0f).coerceIn(0f, 1f),
@@ -2776,10 +2799,19 @@ private fun backgroundBoxOf(
  */
 private fun Modifier.esDeBackgroundBox(box: EsDeBackgroundBox): Modifier {
     if (box.color == null) return this
+    val end = box.colorEnd ?: box.color
     return this
         .absoluteOffset(x = -box.padStart, y = -box.padTop)
         .let { if (box.cornerRadius > 0.dp) it.clip(RoundedCornerShape(box.cornerRadius)) else it }
-        .background(box.color)
+        .let {
+            if (end == box.color) {
+                it.background(box.color)
+            } else if (box.gradientHorizontal) {
+                it.background(Brush.horizontalGradient(listOf(box.color, end)))
+            } else {
+                it.background(Brush.verticalGradient(listOf(box.color, end)))
+            }
+        }
         .padding(start = box.padStart, end = box.padEnd, top = box.padTop, bottom = box.padBottom)
 }
 
