@@ -77,7 +77,6 @@ import dev.droidtop.library.theme.SystemThemeColors
 import dev.droidtop.library.theme.EsDeCollectionKind
 import dev.droidtop.library.theme.ThemeAssets
 import dev.droidtop.library.theme.EsDeTransitionAnimation
-import dev.droidtop.library.theme.EsDeViewTransition
 import dev.droidtop.library.theme.primaryListElement
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
@@ -85,6 +84,8 @@ import dev.droidtop.shell.gamepad.theme.EsDeListItem
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import dev.droidtop.shell.gamepad.theme.EsDeSystemListView
 import dev.droidtop.shell.gamepad.theme.EsDeThemedView
+import dev.droidtop.shell.gamepad.theme.esDeTransitionContext
+import dev.droidtop.shell.gamepad.theme.esDeTransitionKind
 import dev.droidtop.shell.gamepad.theme.esDeViewTransition
 import dev.droidtop.shell.gamepad.theme.ThemePrefs
 import kotlinx.coroutines.Dispatchers
@@ -1723,6 +1724,19 @@ private fun GamesSection(
         // boolean: the outgoing content has to keep rendering the group it
         // was showing while it leaves.
         val esDeTransitions = remember(ThemePrefs.version) { ThemeAssets.activeTransitions(context) }
+        // Which of ES-DE's six transitions the move currently on screen
+        // is, which is what both of the transition-time element
+        // behaviours turn on. The pair of endpoints is plain bookkeeping,
+        // not state: it is read in the same composition that changes it
+        // and never needs to trigger one of its own.
+        val groupHistory = remember { EsDeGroupHistory() }
+        if (groupHistory.current !== selectedGroup) {
+            groupHistory.previous = groupHistory.current
+            groupHistory.current = selectedGroup
+        }
+        val transitionKind = esDeTransitionKind(groupHistory.previous, groupHistory.current)
+        val transitionAnimation = esDeTransitions[transitionKind] ?: EsDeTransitionAnimation.INSTANT
+        val transitionTowardsGamelist = groupHistory.previous == null && groupHistory.current != null
         androidx.compose.animation.AnimatedContent(
             targetState = selectedGroup,
             // Both views are full-screen; without this the animated
@@ -1731,12 +1745,7 @@ private fun GamesSection(
             modifier = Modifier.fillMaxSize(),
             transitionSpec = {
                 val towardsGamelist = initialState == null && targetState != null
-                val kind = when {
-                    initialState == null && targetState == null -> EsDeViewTransition.SYSTEM_TO_SYSTEM
-                    towardsGamelist -> EsDeViewTransition.SYSTEM_TO_GAMELIST
-                    initialState != null && targetState == null -> EsDeViewTransition.GAMELIST_TO_SYSTEM
-                    else -> EsDeViewTransition.GAMELIST_TO_GAMELIST
-                }
+                val kind = esDeTransitionKind(initialState, targetState)
                 esDeViewTransition(
                     esDeTransitions[kind] ?: EsDeTransitionAnimation.INSTANT,
                     towardsGamelist = towardsGamelist,
@@ -1744,6 +1753,14 @@ private fun GamesSection(
             },
             label = "ES-DE view transition",
         ) { group ->
+            // One context for every themed element below: what this copy
+            // of the view is doing right now. See EsDeTransitionContext.
+            val esDeTransition = esDeTransitionContext(
+                kind = transitionKind,
+                animation = transitionAnimation,
+                towardsGamelist = transitionTowardsGamelist,
+                outgoing = group !== selectedGroup,
+            )
             if (group == null) {
                 val continuePlaying = entries.filter { it.lastPlayedEpochMs != null }.sortedByDescending { it.lastPlayedEpochMs }
                 // NOTE: the focus request for this screen now lives INSIDE the
@@ -1940,6 +1957,7 @@ private fun GamesSection(
                                 // helpsystem *Dimmed variants apply while it
                                 // is open. See EsDeThemedHelpSystem.
                                 backgroundDimmed = gamelistOptionsOpen,
+                                transition = esDeTransition,
                             )
                             // NO droidtop chrome over a themed screen: the
                             // "Continue Playing" overlay sat directly on top of
@@ -2044,6 +2062,7 @@ private fun GamesSection(
                     backgroundDimmed = gamelistOptionsOpen,
                     gamelist = true,
                     collectionGamelist = inCollectionGamelist,
+                    transition = esDeTransition,
                 )
             } else {
                 val allGames = entries.filter { it.gameGroup() == group }
@@ -2533,3 +2552,15 @@ private data class DisplayChoiceRequest(
     val canRemember: Boolean,
     val onChosen: (dev.droidtop.library.LaunchDisplayOption, Boolean) -> Unit,
 )
+
+/**
+ * The two endpoints of the view change currently on screen, so the
+ * transition kind can be named the way ES-DE names it
+ * (ThemeData.cpp:46-52). Deliberately not Compose state: it is written
+ * and read within one composition, and making it observable would only
+ * cause a second one.
+ */
+private class EsDeGroupHistory {
+    var previous: GameGroup? = null
+    var current: GameGroup? = null
+}
