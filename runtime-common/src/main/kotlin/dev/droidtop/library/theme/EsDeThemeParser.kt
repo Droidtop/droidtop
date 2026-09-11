@@ -337,6 +337,7 @@ object EsDeThemeParser {
         screenAspectRatio: Float? = null,
         deviceLocale: String? = null,
         systemFullName: String? = null,
+        collectionKind: EsDeCollectionKind = EsDeCollectionKind.NONE,
         // The THEME ROOT directory -- where capabilities.xml really lives.
         // Real, confirmed-live bug this parameter fixes: a collection's
         // subfolder theme.xml (Art Book Next's custom-collections/
@@ -381,6 +382,7 @@ object EsDeThemeParser {
             systemTheme = systemTheme,
             language = resolvedLanguage,
             systemFullName = systemFullName,
+            collectionKind = collectionKind,
         )
     }
 
@@ -427,11 +429,16 @@ object EsDeThemeParser {
         // internal name" vs. "display name" distinction real ES-DE's
         // own `name`/`fullName` split serves, so inventing one wouldn't
         // be real. Not populated: the real
-        // `.autoCollections`/`.customCollections`/`.noCollections`
-        // variant suffixes (a real, further ES-DE feature for
-        // conditional collection-vs-regular-system text -- a genuinely
-        // separate, smaller follow-up, not attempted here).
+        // The `.autoCollections`/`.customCollections`/`.noCollections`
+        // suffixed forms come from the same place now -- see
+        // [collectionKind] below and [EsDeSystemVariables].
         systemFullName: String? = null,
+        // Which of ES-DE's two collection kinds this system is, or NONE
+        // for a real system. Decides which of the three mutually
+        // exclusive `${system.*.<kind>Collections}` variable families
+        // carries a value and which two carry ES-DE's skip flag
+        // (SystemData.cpp:1978-2032).
+        collectionKind: EsDeCollectionKind = EsDeCollectionKind.NONE,
     ): EsDeTheme {
         val axes = listOf(
             VariantAxis("variant", variant),
@@ -441,11 +448,9 @@ object EsDeThemeParser {
             VariantAxis("language", language),
         )
         val variables = mutableMapOf<String, String>()
-        if (systemTheme != null) variables["system.theme"] = systemTheme
-        if (systemFullName != null) {
-            variables["system.name"] = systemFullName
-            variables["system.fullName"] = systemFullName
-        }
+        // Every `${system.*}` variable, suffixed forms included -- see
+        // [EsDeSystemVariables], which is SystemData.cpp:1959-2032 itself.
+        variables.putAll(EsDeSystemVariables.forSystem(systemFullName, systemTheme, collectionKind))
         val views = mutableMapOf<String, MutableMap<String, EsDeThemeElement>>()
         parseDocument(themeFile, axes, variables, views, depth = 0)
         return EsDeTheme(variables, views.mapValues { EsDeThemeView(it.value) })
@@ -683,7 +688,14 @@ object EsDeThemeParser {
                 val attrValue = attributeMapping?.let { (attrName, _) -> parser.getAttributeValue(null, attrName) }
                 val rawText = resolvePlaceholders(readText(parser), variables)
                 val propType = schema[propName]
-                if (propType != null && rawText.isNotBlank()) {
+                // ES-DE's own mutually-exclusive-variable rule
+                // (ThemeData.cpp:2249-2256): a property whose resolved text
+                // is the backspace flag is skipped outright, leaving the
+                // property unset rather than setting it to a stray control
+                // character. This is what makes a theme's
+                // `${system.fullName.noCollections}` text element draw
+                // nothing at all on a collection.
+                if (propType != null && rawText.isNotBlank() && rawText != EsDeSystemVariables.NOT_APPLICABLE) {
                     coerce(propType, rawText, baseDir)?.let { value ->
                         val key = if (attributeMapping != null && attrValue != null) {
                             "${attributeMapping.second}_$attrValue"
