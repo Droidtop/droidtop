@@ -2180,7 +2180,26 @@ private fun EsDeThemedBadges(element: EsDeThemeElement, viewWidth: Dp, viewHeigh
     }
 
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
+    // Real BadgeComponent.cpp:327-352: `badgeIconColor` seeds BOTH stops,
+    // `badgeIconColorEnd` replaces the second one on its own, and
+    // `badgeIconGradientType` picks the axis (default horizontal, any
+    // other literal warned about and treated as horizontal). Both stops
+    // default to 0xFFFFFFFF, which is the no-shift white the glyph path
+    // already used.
     val badgeColor = element.valueOrNull<EsDeThemeValue.Color>("badgeIconColor")?.let { colorOf(it) } ?: Color.White
+    val badgeColorEnd =
+        element.valueOrNull<EsDeThemeValue.Color>("badgeIconColorEnd")?.let { colorOf(it) } ?: badgeColor
+    val badgeGradientHorizontal = element.strOrNull("badgeIconGradientType") != "vertical"
+    // BadgeComponent.cpp:353-380 -- the same three properties again for
+    // the controller OVERLAY, which has its own independent pair.
+    val controllerColor =
+        element.valueOrNull<EsDeThemeValue.Color>("controllerIconColor")?.let { colorOf(it) } ?: Color.White
+    val controllerColorEnd =
+        element.valueOrNull<EsDeThemeValue.Color>("controllerIconColorEnd")?.let { colorOf(it) } ?: controllerColor
+    val controllerGradientHorizontal = element.strOrNull("controllerIconGradientType") != "vertical"
+    // BadgeComponent.cpp:312-325 -- `badges` takes `interpolation` like
+    // every other textured element; the badge path used to ignore it.
+    val filterQuality = esDeFilterQuality(element) ?: FilterQuality.Low
     val density = LocalDensity.current
 
     // One wrapper around the whole flexbox rather than per-cell placement in
@@ -2213,10 +2232,23 @@ private fun EsDeThemedBadges(element: EsDeThemeElement, viewWidth: Dp, viewHeigh
 
         val customIcon = element.valueOrNull<EsDeThemeValue.Path>("badge_$slot")?.resolved
         if (customIcon != null) {
+            val gradient = esDeHasColorGradient(badgeColor, badgeColorEnd)
             AsyncImage(
                 model = customIcon,
                 contentDescription = null,
-                modifier = Modifier.absoluteOffset(x = cellX, y = cellY).size(cellSize).graphicsLayer { alpha = opacity },
+                filterQuality = filterQuality,
+                // A flat shift goes through the ColorFilter; a real
+                // two-stop one goes through the positional Modulate pass,
+                // and then the filter must NOT also multiply the colour in.
+                colorFilter = esDeImageColorFilter(
+                    shift = if (gradient) null else badgeColor,
+                    saturation = 1f,
+                    brightness = 0f,
+                    dimming = 1f,
+                ),
+                modifier = Modifier.absoluteOffset(x = cellX, y = cellY).size(cellSize)
+                    .esDeColorShiftGradient(badgeColor, badgeColorEnd, badgeGradientHorizontal)
+                    .graphicsLayer { alpha = opacity },
             )
         } else {
             Text(
@@ -2265,12 +2297,25 @@ private fun EsDeThemedBadges(element: EsDeThemeElement, viewWidth: Dp, viewHeigh
                 overlayPositionY = pos?.y?.coerceIn(-1f, 2f) ?: 0.5f,
                 overlaySize = element.floatOrNull(sizeProperty)?.coerceIn(0.1f, maxSize) ?: 0.5f,
             )
+            val overlayIsController = slot == "controller"
+            val overlayStart = if (overlayIsController) controllerColor else badgeColor
+            val overlayEnd = if (overlayIsController) controllerColorEnd else badgeColorEnd
+            val overlayHorizontal = if (overlayIsController) controllerGradientHorizontal else badgeGradientHorizontal
+            val overlayGradient = esDeHasColorGradient(overlayStart, overlayEnd)
             AsyncImage(
                 model = overlayIcon,
                 contentDescription = null,
+                filterQuality = filterQuality,
+                colorFilter = esDeImageColorFilter(
+                    shift = if (overlayGradient) null else overlayStart,
+                    saturation = 1f,
+                    brightness = 0f,
+                    dimming = 1f,
+                ),
                 modifier = Modifier
                     .absoluteOffset(x = overlay.x.dp, y = overlay.y.dp)
                     .size(overlay.size.dp)
+                    .esDeColorShiftGradient(overlayStart, overlayEnd, overlayHorizontal)
                     .graphicsLayer { alpha = opacity },
             )
         }
