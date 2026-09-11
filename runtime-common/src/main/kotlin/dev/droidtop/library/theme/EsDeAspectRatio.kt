@@ -86,6 +86,32 @@ object EsDeAspectRatio {
         "1:1" to 1.0f,
     )
 
+    /**
+     * The human label of each ratio: the SECOND half of every
+     * `sSupportedAspectRatios` pair (ThemeData.cpp:66-89), which is what
+     * `ThemeData::getAspectRatioLabel` returns (:1018-1028) and what
+     * ES-DE's own "THEME ASPECT RATIO" menu shows, uppercased
+     * (GuiMenu.cpp:389-393).
+     */
+    val LABELS: Map<String, String> = mapOf(
+        "automatic" to "automatic",
+        "16:9" to "16:9", "16:9_vertical" to "16:9 vertical",
+        "16:10" to "16:10", "16:10_vertical" to "16:10 vertical",
+        "3:2" to "3:2", "3:2_vertical" to "3:2 vertical",
+        "4:3" to "4:3", "4:3_vertical" to "4:3 vertical",
+        "5:3" to "5:3", "5:3_vertical" to "5:3 vertical",
+        "5:4" to "5:4", "5:4_vertical" to "5:4 vertical",
+        "8:7" to "8:7", "8:7_vertical" to "8:7 vertical",
+        "19.5:9" to "19.5:9", "19.5:9_vertical" to "19.5:9 vertical",
+        "20:9" to "20:9", "20:9_vertical" to "20:9 vertical",
+        "21:9" to "21:9", "21:9_vertical" to "21:9 vertical",
+        "32:9" to "32:9", "32:9_vertical" to "32:9 vertical",
+        "1:1" to "1:1",
+    )
+
+    /** ES-DE's own `getAspectRatioLabel` (ThemeData.cpp:1018-1028), invalid name included. */
+    fun labelFor(aspectRatio: String): String = LABELS[aspectRatio] ?: "invalid ratio"
+
     /** A theme declares a vertical variant when any of its ratios is a `_vertical` one. */
     fun hasVerticalVariant(capabilities: List<String>): Boolean =
         capabilities.any { it.endsWith("_vertical") }
