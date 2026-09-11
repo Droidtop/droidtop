@@ -57,6 +57,14 @@ object ProcessRunner {
 
     suspend fun run(command: List<String>, workingDir: File? = null): RootProcessResult =
         withContext(Dispatchers.IO) {
+            // ProcessBuilder.start() indexes the command array before it
+            // validates it, so an empty list is an
+            // ArrayIndexOutOfBoundsException rather than any documented
+            // failure. A caller bug, answered the same way as every other
+            // "it never ran".
+            if (command.isEmpty()) {
+                return@withContext RootProcessResult(NOT_LAUNCHED, "", "no command to run")
+            }
             val process = try {
                 ProcessBuilder(command)
                     .apply { workingDir?.let { directory(it) } }
@@ -64,9 +72,6 @@ object ProcessRunner {
             } catch (e: IOException) {
                 return@withContext notLaunched(command, e)
             } catch (e: SecurityException) {
-                return@withContext notLaunched(command, e)
-            } catch (e: IllegalArgumentException) {
-                // An empty command list; a caller bug, still not a crash.
                 return@withContext notLaunched(command, e)
             }
 
