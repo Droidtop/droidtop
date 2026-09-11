@@ -35,7 +35,7 @@ import kotlinx.coroutines.withContext
  * (docs/SPEC.md settings architecture): turns catalog layout -- groups,
  * order, items, nested [CatalogScreen]s -- into real androidx
  * PreferenceScreens, so a fragment declares no settings of its own; it
- * just chromes the same data Handheld's in-shell renderer chromes in its
+ * just chromes the same data Gaming's in-shell renderer chromes in its
  * own visual language. Nested screens swap the fragment's
  * PreferenceScreen in place (a real back stack this navigator owns, wired
  * into the activity's back dispatcher) -- no per-screen fragment classes,

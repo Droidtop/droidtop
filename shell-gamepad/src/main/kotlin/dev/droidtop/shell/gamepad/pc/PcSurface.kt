@@ -53,14 +53,14 @@ internal const val PC_SYSTEM_ID = "pc"
 /**
  * :app's "Stores and folders" settings screen, by [SettingsScreenRegistry]
  * id because this module cannot depend on :app -- the same way
- * `HandheldSettingsCatalog` names the console-systems and Windows-games
+ * `GamingSettingsCatalog` names the console-systems and Windows-games
  * screens it opens.
  */
 private const val PC_STORES_SCREEN_ID = "pc_stores"
 
 /**
  * droidtop's own PC surface — the whole of docs/SPEC.md §7i's "Library"
- * view, and the one thing in Handheld mode the ES-DE theme does not draw.
+ * view, and the one thing in Gaming mode the ES-DE theme does not draw.
  *
  * **One list of games.** Directed 2026-09-10: "Engine games were ALWAYS
  * going to be under PC. No need for filters and stuff, though they're a

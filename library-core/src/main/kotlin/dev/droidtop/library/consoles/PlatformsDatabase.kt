@@ -49,7 +49,7 @@ object PlatformsDatabase {
      * composition-time consumers of [builtInsOrEmpty] can re-run when
      * the data actually arrives. Real, observed bug this fixes: the
      * warm-up runs on a background thread (SettingsCatalogInitProvider),
-     * the Handheld shell's first composition sorted its system carousel
+     * the Gaming shell's first composition sorted its system carousel
      * against the still-empty cache, every label fell back to the raw
      * system id, and the order froze that way -- "switch" sorted to the
      * very end of the carousel where "Nintendo Switch" belongs among

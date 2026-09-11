@@ -10,7 +10,7 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * Before this module there were two implementations of the same job:
  * `shell-default` carried Launcher3's own `SecondaryDisplayLauncher`
  * registered for `android.intent.category.SECONDARY_HOME`, and the
- * Handheld shell separately pushed a `Presentation` onto the second
+ * Gaming shell separately pushed a `Presentation` onto the second
  * display and relocated itself with `setLaunchDisplayId`. Both wanted the
  * same display, and the platform — which places a `SECONDARY_HOME`
  * activity on secondary displays itself — was a third party to the
@@ -24,7 +24,7 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 object SecondaryDisplayContent {
 
     /** Which shell is currently active; the one input this module's behaviour keys on. */
-    enum class Mode { STANDARD, HANDHELD, DESKTOP }
+    enum class Mode { STANDARD, GAMING, DESKTOP }
 
     /**
      * What a mode draws on the secondary screen. Registered by whoever
@@ -71,7 +71,7 @@ object SecondaryDisplayContent {
         val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(KEY_LAST_MODE, null)
         return when (raw) {
-            "handheld" -> Mode.HANDHELD
+            "gaming" -> Mode.GAMING
             "desktop" -> Mode.DESKTOP
             else -> Mode.STANDARD
         }

@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
 
 /**
- * The Handheld shell's shared menu language, in one place.
+ * The Gaming shell's shared menu language, in one place.
  *
  * Every menu-ish surface in this shell (settings catalogs, the gamelist
  * options overlay, the Quick Menu, the metadata and collection editors,

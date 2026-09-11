@@ -50,7 +50,7 @@ import java.util.Locale
  * `:shell-default`, so the theme engine can't live in `:library-core`
  * without a real circular dependency) so both `:shell-gamepad` (the real,
  * Compose-driven theme renderer) and `:shell-default` (the real, unified
- * Android Preference settings screen -- see `SettingsHandheldFragment`'s
+ * Android Preference settings screen -- see `SettingsGamingFragment`'s
  * own real "Theme"/"Sync theme index" entries) can read/drive the SAME
  * real theme discovery and selection state, rather than one of them
  * re-implementing it a second time. Public (not `internal`) for exactly
@@ -131,7 +131,7 @@ object ThemeAssets {
      * APK and is fetched on demand, but preferring decaffe by name stays
      * correct and stays necessary the moment a second theme is present
      * again -- which a single download now makes true. decaffe is droidtop's
-     * own real, intended default (see docs/SPEC.md's own Handheld section)
+     * own real, intended default (see docs/SPEC.md's own Gaming section)
      * -- prefer it by name when unset, THEN fall back to alphabetically
      * first among whatever remains (still real ES-DE parity for any
      * OTHER/future bundled theme set that doesn't include decaffe at all).
@@ -442,7 +442,7 @@ object ThemeAssets {
         }
         if (markerCurrent()) return themeDir
         // Real, confirmed-live regression this synchronized/atomic shape
-        // fixes: post-install, the first Handheld composition parses the
+        // fixes: post-install, the first Gaming composition parses the
         // theme WHILE extraction is still running (systemLogoPath alone
         // calls loadActiveTheme once per carousel item, concurrently) --
         // unsynchronized callers each saw a stale marker and wiped/

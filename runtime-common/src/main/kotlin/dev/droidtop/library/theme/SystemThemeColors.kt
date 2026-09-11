@@ -18,7 +18,7 @@ import android.util.Log
  * are physically bundled, and not :library-core either -- see this
  * module's own build.gradle.kts for why the whole ES-DE theme engine
  * lives here) so `:app` (ConsoleSystemsActivity), `:shell-gamepad`
- * (GamepadShell), and `:shell-default` (SettingsHandheldFragment) can all
+ * (GamepadShell), and `:shell-default` (SettingsGamingFragment) can all
  * use it -- Android merges every module's `assets/` folder into one flat
  * set in the final APK, so `context.assets.open(...)` finds these files
  * regardless of which module's code is asking, as long as

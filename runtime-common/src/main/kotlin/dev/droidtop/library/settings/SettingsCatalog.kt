@@ -11,7 +11,7 @@ import android.net.Uri
  * settings exist, their grouping and order, their current values, and
  * what changing them does), and every UI surface just chromes it in its
  * own visual context. The Preference-based unified settings screen
- * (:shell-default) and Handheld's own in-shell themed settings section
+ * (:shell-default) and Gaming's own in-shell themed settings section
  * (:shell-gamepad) both render the SAME catalogs -- neither hand-picks
  * its own subset, neither duplicates a write path, and adding a setting
  * to a catalog makes it appear in every surface at once. Per direction,
@@ -153,7 +153,7 @@ class CatalogScreen(
  * Opens a nested [CatalogScreen] in the same surface. Carry the screen
  * [inline] when the owning catalog builds it itself; reference a
  * [SettingsScreenRegistry] id instead when the screen's DATA lives in a
- * module this catalog cannot depend on (e.g. HandheldSettingsCatalog in
+ * module this catalog cannot depend on (e.g. GamingSettingsCatalog in
  * :runtime-common opening the console-systems screen owned by :app).
  * [valueLabel] optionally summarizes current state on the row.
  */

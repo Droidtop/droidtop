@@ -3,7 +3,7 @@
   The ONE holder of android.intent.category.SECONDARY_HOME in droidtop.
 
   shell-default's forked Launcher3 used to declare its own
-  SecondaryDisplayLauncher for this category while the Handheld shell
+  SecondaryDisplayLauncher for this category while the Gaming shell
   pushed a Presentation at the same display by hand. Two claimants plus
   the platform's own placement is the duplication docs/SPEC.md section 4c
   directs us to remove; the active mode now selects what this single

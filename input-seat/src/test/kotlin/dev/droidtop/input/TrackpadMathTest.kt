@@ -6,7 +6,7 @@ import org.junit.Test
 
 /**
  * The trackpad's arithmetic: the acceleration curve, the millimetre scale,
- * and the step quantiser the Handheld shell navigates by. All three are
+ * and the step quantiser the Gaming shell navigates by. All three are
  * things a device can only tell you feel wrong, never why -- so they are
  * pinned here instead.
  */

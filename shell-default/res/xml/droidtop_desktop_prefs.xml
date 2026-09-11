@@ -10,7 +10,7 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- Real, deliberate absence: see droidtop_handheld_prefs.xml's own
+    <!-- Real, deliberate absence: see droidtop_gaming_prefs.xml's own
          matching comment. "Global settings" is a real, persistent
          action-bar item on every SettingsActivity screen (see
          SettingsActivity.java's own onCreateOptionsMenu), not a row
@@ -39,13 +39,13 @@
         android:summary="@string/pref_desktop_containers_desc" />
 
     <!-- Real shortcuts to the other two shells' own settings, matching
-         droidtop_handheld_prefs.xml's own equivalent category. -->
+         droidtop_gaming_prefs.xml's own equivalent category. -->
     <PreferenceCategory android:title="@string/pref_subcategory_other_shells">
         <Preference
-            android:key="pref_desktop_handheld_settings"
-            android:title="@string/pref_category_handheld_title"
-            android:summary="@string/pref_category_handheld_desc"
-            android:fragment="app.murinelauncher.settings.SettingsHandheldFragment" />
+            android:key="pref_desktop_gaming_settings"
+            android:title="@string/pref_category_gaming_title"
+            android:summary="@string/pref_category_gaming_desc"
+            android:fragment="app.murinelauncher.settings.SettingsGamingFragment" />
         <Preference
             android:key="pref_desktop_standard_settings"
             android:title="@string/pref_standard_settings_title"

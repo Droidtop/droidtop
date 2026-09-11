@@ -27,7 +27,7 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * re-running onboarding, backup/restore, the real Android system Settings
  * shortcut) -- NOT Standard's own launcher preferences (General/Icons/
  * Home/Drawer/QSB/Misc, `SettingsRootFragment`), which are a real
- * per-shell settings surface on par with Desktop's and Handheld's own, not
+ * per-shell settings surface on par with Desktop's and Gaming's own, not
  * "global" in this sense. Reached via the real, persistent "Global
  * settings" action-bar item on every SettingsActivity screen (see that
  * class's own onCreateOptionsMenu) -- deliberately does NOT link back out
@@ -41,7 +41,7 @@ public final class SettingsGlobalFragment : AbstractSettingsFragment() {
         const val PREF_HOME_ROLE: String = "pref_global_home_role"
         const val PREF_DEFAULT_MODE: String = "pref_global_default_mode"
         const val PREF_ENABLE_DESKTOP: String = "pref_global_enable_desktop"
-        const val PREF_ENABLE_HANDHELD: String = "pref_global_enable_handheld"
+        const val PREF_ENABLE_GAMING: String = "pref_global_enable_gaming"
         const val PREF_RERUN_ONBOARDING: String = "pref_global_rerun_onboarding"
         const val PREF_BACKUP: String = "pref_global_backup"
         const val PREF_RESTORE: String = "pref_global_restore"
@@ -49,9 +49,9 @@ public final class SettingsGlobalFragment : AbstractSettingsFragment() {
 
         // Real, honest scope: backs up the one real SharedPreferences file
         // every droidtop-specific setting across every shell actually lives
-        // in (HandheldPrefs/ThemePrefs/ModePrefs/HomeRolePrefs/
+        // in (GamingPrefs/ThemePrefs/ModePrefs/HomeRolePrefs/
         // ConsoleSystemOverrides/etc all share it -- see e.g.
-        // SettingsHandheldFragment's own doc comment). Deliberately NOT a
+        // SettingsGamingFragment's own doc comment). Deliberately NOT a
         // full device backup -- RomDatabase's own scan cache, downloaded
         // themes, and GamesRoots' own real folder grants are real,
         // separate, larger state a plain JSON file can't safely round-trip
@@ -98,10 +98,10 @@ public final class SettingsGlobalFragment : AbstractSettingsFragment() {
                     }
                 }
             }
-            PREF_ENABLE_DESKTOP, PREF_ENABLE_HANDHELD -> {
+            PREF_ENABLE_DESKTOP, PREF_ENABLE_GAMING -> {
                 if (preference is SwitchPreferenceCompat) {
                     val context = requireContext()
-                    val mode = if (preference.key == PREF_ENABLE_DESKTOP) BackButtonMenu.MODE_DESKTOP else BackButtonMenu.MODE_HANDHELD
+                    val mode = if (preference.key == PREF_ENABLE_DESKTOP) BackButtonMenu.MODE_DESKTOP else BackButtonMenu.MODE_GAMING
                     preference.isChecked = ModePrefs.isModeEnabled(context, mode)
                     preference.setOnPreferenceChangeListener { _, newValue ->
                         ModePrefs.setModeEnabled(context, mode, newValue as Boolean)
@@ -168,7 +168,7 @@ public final class SettingsGlobalFragment : AbstractSettingsFragment() {
         val choices = buildList {
             add("" to "(none — use whichever was used last)")
             if (ModePrefs.isModeEnabled(context, BackButtonMenu.MODE_DESKTOP)) add(BackButtonMenu.MODE_DESKTOP to "Desktop")
-            if (ModePrefs.isModeEnabled(context, BackButtonMenu.MODE_HANDHELD)) add(BackButtonMenu.MODE_HANDHELD to "Handheld")
+            if (ModePrefs.isModeEnabled(context, BackButtonMenu.MODE_GAMING)) add(BackButtonMenu.MODE_GAMING to "Gaming")
         }
         preference.entryValues = choices.map { it.first }.toTypedArray()
         preference.entries = choices.map { it.second }.toTypedArray()
