@@ -251,7 +251,18 @@ internal fun QuickSettingsPanel(sheetWidthDp: Int, onDismiss: () -> Unit) {
                 )
             }
         }
-        MenuHint("▲▼◄► Move   ◄► Adjust slider   A Act   L1/R1 Tabs   B Close")
+        // The same bar the Notifications tab beside this one uses: on a
+        // touch screen these are the controls, not a legend. L1/R1 is
+        // left out because the tabs above are already tappable.
+        TouchHintBar(
+            hints = listOf(
+                GamepadAction.LEFT to "Lower",
+                GamepadAction.RIGHT to "Raise",
+                GamepadAction.A to "Act",
+                GamepadAction.B to "Close",
+            ),
+            background = Color.Transparent,
+        )
     }
 }
 
