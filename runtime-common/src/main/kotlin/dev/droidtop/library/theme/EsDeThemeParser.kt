@@ -444,7 +444,10 @@ object EsDeThemeParser {
             VariantAxis("variant", variant),
             VariantAxis("colorScheme", colorScheme),
             VariantAxis("fontSize", fontSize),
-            VariantAxis("aspectRatio", aspectRatio),
+            // Empty = the theme declared no aspect ratios, so no
+            // <aspectRatio> block is applied at all -- ES-DE's own
+            // early return in parseAspectRatios (ThemeData.cpp:2036).
+            VariantAxis("aspectRatio", aspectRatio.ifEmpty { null }),
             VariantAxis("language", language),
         )
         val variables = mutableMapOf<String, String>()
