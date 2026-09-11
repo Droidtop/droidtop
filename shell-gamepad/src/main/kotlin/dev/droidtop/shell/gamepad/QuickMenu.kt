@@ -118,8 +118,17 @@ internal fun QuickMenu(onDismiss: () -> Unit) {
                             else -> false
                         }
                     },
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp,
+                // The shell's own overlay surface, not the platform's
+                // colour scheme. Every token this sheet's contents draw
+                // with (MenuTokens: white label text, a 5%-white row
+                // fill) is defined against THIS surface; painting the
+                // sheet with MaterialTheme.colorScheme.surface meant a
+                // device in a light colour state got a white panel with
+                // white-on-white tile labels, the System tab's own
+                // contents rendered illegible by a background the rest
+                // of the shell never uses (emulator rig, 2026-09-10).
+                color = MenuTokens.OverlaySurface,
+                tonalElevation = 0.dp,
             ) {
                 Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -127,8 +136,7 @@ internal fun QuickMenu(onDismiss: () -> Unit) {
                             Text(
                                 t.label,
                                 style = MaterialTheme.typography.titleMedium,
-                                color = if (t == tab) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = if (t == tab) MenuTokens.Accent else MenuTokens.OnSurfaceMuted,
                                 modifier = Modifier.padding(end = 16.dp),
                             )
                         }
@@ -136,7 +144,7 @@ internal fun QuickMenu(onDismiss: () -> Unit) {
                         Text(
                             "L1 / R1",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MenuTokens.Placeholder,
                         )
                     }
                     Spacer(Modifier.padding(4.dp))
@@ -215,13 +223,13 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
             !granted -> Text(
                 "droidtop needs notification access to show these.\n\nPress A to open the grant screen -- it is a one-time system permission.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MenuTokens.OnSurface,
                 modifier = Modifier.padding(vertical = 12.dp),
             )
             items.isEmpty() -> Text(
                 "No notifications.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MenuTokens.OnSurfaceMuted,
                 modifier = Modifier.padding(vertical = 12.dp),
             )
             else -> LazyColumn(
@@ -234,38 +242,34 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(
-                                if (focused) MaterialTheme.colorScheme.primaryContainer
-                                else MaterialTheme.colorScheme.surfaceVariant,
-                            )
+                            .background(if (focused) MenuTokens.SurfaceSelected else MenuTokens.Surface)
                             .padding(10.dp),
                     ) {
                         Row {
                             Text(
                                 item.appLabel,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MenuTokens.OnSurfaceMuted,
                             )
                             Spacer(Modifier.weight(1f))
                             if (!item.clearable) {
                                 Text(
                                     "ongoing",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = MenuTokens.Placeholder,
                                 )
                             }
                         }
                         Text(
                             item.title,
                             style = MaterialTheme.typography.titleSmall,
-                            color = if (focused) MaterialTheme.colorScheme.onPrimaryContainer
-                            else MaterialTheme.colorScheme.onSurface,
+                            color = MenuTokens.OnSurface,
                         )
                         if (item.text.isNotBlank()) {
                             Text(
                                 item.text,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MenuTokens.Value,
                                 maxLines = 2,
                             )
                         }
@@ -276,7 +280,7 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
         Text(
             if (granted) "A Open   X Dismiss   Y Clear all   B Close" else "A Grant access   B Close",
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MenuTokens.Placeholder,
             modifier = Modifier.padding(top = 8.dp),
         )
     }
