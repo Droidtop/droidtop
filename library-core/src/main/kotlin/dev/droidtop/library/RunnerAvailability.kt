@@ -177,7 +177,7 @@ object RunnerAvailability {
             return RunnerOption(
                 strategy,
                 RunnerState.NEEDS_SETUP,
-                "Install the ${facts.engine.pluginLabel()} plugin",
+                "Install the ${facts.engine.displayName()} plugin",
                 RunnerAction.INSTALL_ENGINEHOST_PLUGIN,
             )
         }
@@ -260,41 +260,70 @@ object RunnerAvailability {
      * is genuinely all a game has, rather than nothing: §7i's "where it
      * genuinely is the only one, the game says so with the reason".
      */
-    fun resolve(options: List<RunnerOption>, override: String?, defaultLabel: String? = null): ResolvedRunner? {
+    fun resolve(
+        options: List<RunnerOption>,
+        override: String?,
+        engine: GameEngine? = null,
+        defaultLabel: String? = null,
+    ): ResolvedRunner? {
         val chosen = override?.let { name -> options.firstOrNull { it.strategy.name == name && it.selectable } }
-        if (chosen != null) return ResolvedRunner(chosen, "your choice")
+        if (chosen != null) return resolved(chosen, engine, "your choice")
         val best = options.firstOrNull { it.selectable }
         if (best != null) {
             val alternatives = options.count { it.selectable }
             val reason = when {
                 alternatives <= 1 -> "the only runner for this game"
+                // The engine-qualified name already says which engine, so
+                // the reason says "this engine" instead of repeating it.
+                best.strategy == GameLaunchStrategy.ENGINEHOST && engine != null -> "the default for this engine"
                 defaultLabel != null -> "default for $defaultLabel"
                 else -> "droidtop's default"
             }
-            return ResolvedRunner(best, reason)
+            return resolved(best, engine, reason)
         }
         val dimmed = options.firstOrNull { it.state == RunnerState.NOT_ON_THIS_DEVICE } ?: return null
-        return ResolvedRunner(dimmed, "the only runner this game offers")
+        return resolved(dimmed, engine, "the only runner this game offers")
     }
 
-    /** How an engine is named in "Install the … plugin". */
-    private fun GameEngine.pluginLabel(): String = when (this) {
-        GameEngine.RENPY -> "Ren'Py"
-        GameEngine.KIRIKIRI -> "KiriKiri"
-        GameEngine.RPG_MAKER_MV, GameEngine.RPG_MAKER_MZ, GameEngine.RPG_MAKER_VX_ACE,
-        GameEngine.RPG_MAKER_VX, GameEngine.RPG_MAKER_XP, GameEngine.RPG_MAKER_2000_2003,
-        -> "RPG Maker"
-        GameEngine.AUGUST -> "AUGUST"
-        GameEngine.BURIKO -> "BGI"
-        GameEngine.CATSYSTEM2 -> "CatSystem2"
-        GameEngine.CMVS -> "CMVS"
-        GameEngine.FLASH_AIR -> "Flash/AIR"
-        GameEngine.GODOT -> "Godot"
-        GameEngine.HTML -> "HTML"
-        GameEngine.UNREAL -> "Unreal"
-        GameEngine.UNITY -> "Unity"
-    }
+    private fun resolved(option: RunnerOption, engine: GameEngine?, reason: String) =
+        ResolvedRunner(option, reason, option.strategy.displayName(engine))
 }
 
-/** The resolved "Runs with" row plus the one-line reason it won. */
-data class ResolvedRunner(val option: RunnerOption, val reason: String)
+/**
+ * The name a runner is given where the user reads it, qualified by the
+ * engine when the engine is what it means: enginehost runs a Ren'Py game
+ * through the Ren'Py plugin and an RPG Maker game through another, so the
+ * row reads "enginehost (Ren'Py)" rather than leaving the user to work out
+ * which enginehost this is (docs/SPEC.md 7i: a runner is first-class
+ * vocabulary the user sees, not an implementation detail).
+ */
+fun GameLaunchStrategy.displayName(engine: GameEngine?): String =
+    if (this == GameLaunchStrategy.ENGINEHOST && engine != null) {
+        "${displayName()} (${engine.displayName()})"
+    } else {
+        displayName()
+    }
+
+/** How an engine is named to a person, in ONE place. */
+fun GameEngine.displayName(): String = when (this) {
+    GameEngine.RENPY -> "Ren'Py"
+    GameEngine.KIRIKIRI -> "KiriKiri"
+    GameEngine.RPG_MAKER_MV, GameEngine.RPG_MAKER_MZ, GameEngine.RPG_MAKER_VX_ACE,
+    GameEngine.RPG_MAKER_VX, GameEngine.RPG_MAKER_XP, GameEngine.RPG_MAKER_2000_2003,
+    -> "RPG Maker"
+    GameEngine.AUGUST -> "AUGUST"
+    GameEngine.BURIKO -> "BGI"
+    GameEngine.CATSYSTEM2 -> "CatSystem2"
+    GameEngine.CMVS -> "CMVS"
+    GameEngine.FLASH_AIR -> "Flash/AIR"
+    GameEngine.GODOT -> "Godot"
+    GameEngine.HTML -> "HTML"
+    GameEngine.UNREAL -> "Unreal"
+    GameEngine.UNITY -> "Unity"
+}
+
+/**
+ * The resolved "Runs with" row, the one-line reason it won, and the name
+ * the row shows ([GameLaunchStrategy.displayName] over the game's engine).
+ */
+data class ResolvedRunner(val option: RunnerOption, val reason: String, val label: String)

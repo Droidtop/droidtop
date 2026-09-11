@@ -34,13 +34,19 @@ object PcRunnerOptions {
     }
 
     /**
-     * Every runner's state for [entry], ordered by [RunnerAvailability].
+     * Every runner's state for [entry], ordered by [RunnerAvailability],
+     * with the engine the folder detected as.
+     *
+     * The engine comes back with the options rather than being looked up
+     * again by the caller: it is what names the enginehost row
+     * ("enginehost (Ren'Py)") and what the default's reason is about, and a
+     * second detection pass could answer differently from this one.
      *
      * Touches the filesystem, the package manager and enginehost's
      * capabilities provider, so call it off the main thread.
      */
-    fun forEntry(context: Context, entry: LibraryEntry): List<RunnerOption> {
-        val folder = gameFolderFor(entry) ?: return emptyList()
+    fun forEntry(context: Context, entry: LibraryEntry): PcRunners {
+        val folder = gameFolderFor(entry) ?: return PcRunners(null, emptyList())
         val detected = runCatching {
             GameEngineDetector.detectGame(
                 folder,
@@ -53,7 +59,7 @@ object PcRunnerOptions {
         val target = engine?.let { EnginesDatabase.enginehostTargetFor(context, it) }
         val engineVersion = engine?.let { resolveEngineVersion(context, gameRoot, it) }
         val runtime = PcGameRuntimeRegistry.runtime
-        return RunnerAvailability.evaluate(
+        val options = RunnerAvailability.evaluate(
             GameLaunchStrategyResolver.facts(
                 engine = engine,
                 folder = gameRoot,
@@ -70,6 +76,7 @@ object PcRunnerOptions {
                 preferredOrder = engine?.let { EnginesDatabase.priorityFor(context, it) },
             ),
         )
+        return PcRunners(engine, options)
     }
 
     /**
@@ -132,10 +139,11 @@ object PcRunnerOptions {
     }
 
     /** [RunnerAvailability.resolve] over [forEntry], with the user's stored override applied. */
-    fun resolvedFor(context: Context, entry: LibraryEntry, options: List<RunnerOption>): ResolvedRunner? =
+    fun resolvedFor(context: Context, entry: LibraryEntry, runners: PcRunners): ResolvedRunner? =
         RunnerAvailability.resolve(
-            options,
+            runners.options,
             LaunchStrategyOverridePrefs.get(context, entry.id),
+            engine = runners.engine,
             defaultLabel = entry.kind.takeIf { it != LibraryEntryKind.WINE_PROFILE }?.displayName(),
         )
 
@@ -173,3 +181,6 @@ object PcRunnerOptions {
             ?.any { it.name.contains("fex", ignoreCase = true) || it.name.contains("x86", ignoreCase = true) } == true
     }
 }
+
+/** [PcRunnerOptions.forEntry]'s answer: the runner rows and the engine they were computed for. */
+data class PcRunners(val engine: GameEngine?, val options: List<RunnerOption>)

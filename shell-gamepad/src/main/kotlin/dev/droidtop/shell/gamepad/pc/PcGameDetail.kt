@@ -42,10 +42,9 @@ import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.PcRunnerOptions
+import dev.droidtop.library.PcRunners
 import dev.droidtop.library.ResolvedRunner
-import dev.droidtop.library.RunnerOption
 import dev.droidtop.library.RunnerState
-import dev.droidtop.library.displayName
 import dev.droidtop.library.scraper.PcScraper
 import dev.droidtop.shell.gamepad.CollectionMembershipEditor
 import dev.droidtop.shell.gamepad.ManualMatchPicker
@@ -85,7 +84,7 @@ internal fun PcGameDetail(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var options by remember(entry) { mutableStateOf<List<RunnerOption>>(emptyList()) }
+    var runners by remember(entry) { mutableStateOf(PcRunners(null, emptyList())) }
     var resolved by remember(entry) { mutableStateOf<ResolvedRunner?>(null) }
     var loaded by remember(entry) { mutableStateOf(false) }
     var reloadToken by remember(entry) { mutableStateOf(0) }
@@ -98,10 +97,10 @@ internal fun PcGameDetail(
     LaunchedEffect(entry, reloadToken) {
         loaded = false
         val computed = withContext(Dispatchers.IO) {
-            val list = PcRunnerOptions.forEntry(context, entry)
-            list to PcRunnerOptions.resolvedFor(context, entry, list)
+            val computedRunners = PcRunnerOptions.forEntry(context, entry)
+            computedRunners to PcRunnerOptions.resolvedFor(context, entry, computedRunners)
         }
-        options = computed.first
+        runners = computed.first
         resolved = computed.second
         loaded = true
     }
@@ -119,7 +118,8 @@ internal fun PcGameDetail(
 
     if (picking) {
         RunnerPicker(
-            options = options,
+            options = runners.options,
+            engine = runners.engine,
             current = resolved?.option?.strategy,
             overridden = LaunchStrategyOverridePrefs.get(context, entry.id) != null,
             onPick = { strategy ->
@@ -217,9 +217,9 @@ internal fun PcGameDetail(
                     detail = when {
                         !loaded -> "Working out what can run this…"
                         runner == null -> "Nothing on this device can run this game yet"
-                        else -> "${runner.option.strategy.displayName()} - ${runner.reason}"
+                        else -> "${runner.label} - ${runner.reason}"
                     },
-                    enabled = loaded && options.isNotEmpty(),
+                    enabled = loaded && runners.options.isNotEmpty(),
                     onSelect = { picking = true },
                 )
             }
@@ -237,7 +237,7 @@ internal fun PcGameDetail(
                     },
                     detail = when {
                         !loaded -> ""
-                        isReady -> runner.option.caveat ?: "Starts now on ${runner.option.strategy.displayName()}"
+                        isReady -> runner.option.caveat ?: "Starts now on ${runner.label}"
                         setupAction != null -> "One step, then this becomes Play"
                         else -> runner?.option?.reason ?: "No runner on this device offers this game"
                     },
