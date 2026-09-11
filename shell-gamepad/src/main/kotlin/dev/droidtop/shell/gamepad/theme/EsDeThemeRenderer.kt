@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -556,8 +557,16 @@ fun EsDeThemedView(
         // matching real ES-DE's own last-applied-wins theme application.
         // Rendered after the element loop -- help draws on top, real ES-DE's
         // own draw order for it.
+        // One help bar, and the shell's own button bar is it whenever that
+        // bar is up: on a touch-first window it is the only route to B, Y
+        // and Select, so it is drawn in addition to the theme -- and the
+        // theme's own row was then drawn UNDER it, two bars for the one
+        // thing real ES-DE gives the Window exactly one of (Window.cpp:126,
+        // :884; HelpComponent.cpp:629 draws nothing when help is off).
+        // See [LocalShellOwnsHelpRow].
+        val shellOwnsHelpRow = dev.droidtop.shell.gamepad.LocalShellOwnsHelpRow.current
         val helpElements = view.elements.values.filter {
-            it.type == "helpsystem" && esDeScopeAllows(it, backgroundDimmed) &&
+            it.type == "helpsystem" && !shellOwnsHelpRow && esDeScopeAllows(it, backgroundDimmed) &&
                 (layer == EsDeViewLayer.ALL || layer == EsDeViewLayer.WINDOW)
         }
         if (helpElements.isNotEmpty() && hints.isNotEmpty()) {
@@ -1272,9 +1281,14 @@ private fun EsDeThemedText(
             verticalAlignment = element.valueOrNull<EsDeThemeValue.Str>("verticalAlignment")?.value,
         )
     } else if (hasSize) {
+        // ES-DE's own box-vs-line arithmetic; see [esDeTextBoxFit]. The
+        // origin is anchored on THAT box -- a `size.y` of zero becomes one
+        // line's height there, not a zero-height element to centre on.
+        val fit = esDeTextBoxFit(height, fontSizeDp * lineSpacing)
+        val (boxOffsetX, boxOffsetY) = positionOf(element, viewWidth, viewHeight, width, fit.height)
         Box(
             modifier = Modifier
-                .absoluteOffset(x = offsetX, y = offsetY)
+                .absoluteOffset(x = boxOffsetX, y = boxOffsetY)
                 // Real exception, not an omission: the CONTAINER branch above
                 // takes no rotation at all, because ES-DE applies a container
                 // text's theme with `ALL ^ POSITION ^ ORIGIN ^ Z_INDEX ^ SIZE
@@ -1282,7 +1296,7 @@ private fun EsDeThemedText(
                 // scrollable parent owns its transform.
                 .esDeRotation(element)
                 .esDeBackgroundBox(backgroundMarginsBoxOf(element, viewWidth, opacity))
-                .size(width = width, height = height),
+                .size(width = width, height = fit.height),
             contentAlignment = boxAlignment,
         ) {
             Text(
@@ -1292,7 +1306,8 @@ private fun EsDeThemedText(
                 fontFamily = themeFontFamily(element),
                 lineHeight = fontSizeSp * lineSpacing,
                 textAlign = textAlign,
-                modifier = Modifier.fillMaxWidth(),
+                maxLines = fit.maxLines,
+                modifier = Modifier.fillMaxWidth().esDeTextOverflow(fit),
             )
         }
     } else {
@@ -1378,6 +1393,62 @@ private fun esDeVerticalBoxAlignment(element: EsDeThemeElement): Alignment =
     }
 
 /**
+ * Real ES-DE `TextComponent` vertical fit, ported from
+ * TextComponent.cpp:770-785 (the text cache's own `offsetY`) and
+ * TextComponent.cpp:280-316 (the `verticalAlignment` switch).
+ *
+ * ES-DE decides three separate things by comparing the declared `size.y`
+ * with the font's own line height (`Font::getHeight(lineSpacing)`):
+ *
+ * - `size.y == 0` means ONE LINE: the box becomes the line
+ *   (TextComponent.cpp:771-772), it is not a zero-height box.
+ * - Text is MULTI-LINE only when the box is taller than one line
+ *   (:785, `mSize.y > lineHeight`). A shorter box gets a single line --
+ *   clipped at the box's width, never wrapped into a second row.
+ * - When the LINE is taller than the box, ES-DE centres the line ON the
+ *   box with a NEGATIVE offset, `(mSize.y - lineHeight) / 2` (:777-779),
+ *   so it overflows equally above and below. The `verticalAlignment`
+ *   switch only runs in the opposite case, `mSize.y > textHeight` (:283).
+ *
+ * droidtop laid the text out INSIDE the box instead, so a line taller
+ * than its box was pushed down by the whole difference rather than
+ * centred on it. Slate's vertical gamelist is exactly that shape -- its
+ * metadata labels and values are `0.155 0.02` boxes with a `0.026` font
+ * and the two rows sit `0.023` apart -- and the labels were drawn on top
+ * of the values beneath them ("RELEASED DEVELOPE PUBLISHE" over
+ * "UNKNOWN", portrait capture 2026-09-11). The same arithmetic applies
+ * to every themed text box, which is why this is one helper used by both
+ * text-bearing paths rather than a Slate special case.
+ */
+internal data class EsDeTextBoxFit(
+    /** The box ES-DE lays the text out in; never zero. */
+    val height: Dp,
+    val maxLines: Int,
+    /** True when the line is taller than the box and must overflow it, centred. */
+    val overflows: Boolean,
+)
+
+internal fun esDeTextBoxFit(boxHeight: Dp, lineHeight: Dp): EsDeTextBoxFit {
+    val height = if (boxHeight <= 0.dp) lineHeight else boxHeight
+    val multiLine = height > lineHeight
+    return EsDeTextBoxFit(
+        height = height,
+        maxLines = if (multiLine) Int.MAX_VALUE else 1,
+        overflows = lineHeight > height,
+    )
+}
+
+/**
+ * The Compose half of [esDeTextBoxFit]'s negative `offsetY`: measure the
+ * line at its natural height and centre it on the box, which is what
+ * placing a taller child in a shorter layout node with
+ * `Alignment.CenterVertically` computes -- the same
+ * `(box - line) / 2` ES-DE writes by hand.
+ */
+private fun Modifier.esDeTextOverflow(fit: EsDeTextBoxFit): Modifier =
+    if (fit.overflows) this.wrapContentHeight(Alignment.CenterVertically, unbounded = true) else this
+
+/**
  * One text-bearing element drawn the way real ES-DE's own `TextComponent`
  * draws one: inside the element's OWN box, aligned on both axes.
  *
@@ -1425,7 +1496,11 @@ private fun EsDeAlignedTextBlock(
     val size = element.valueOrNull<EsDeThemeValue.Pair>("size")
     if (size != null) {
         val (width, height) = sizeOf(element, viewWidth, viewHeight)
-        val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
+        // Same ES-DE arithmetic as `text`'s own sized branch; a
+        // `datetime` IS a TextComponent there (DateTimeComponent derives
+        // from it), so Slate's `releasedate` sat in the same overlap.
+        val fit = esDeTextBoxFit(height, with(LocalDensity.current) { fontSizeSp.toDp() } * lineSpacing)
+        val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, fit.height)
         Box(
             // The background box is applied OUTSIDE `size` on purpose: real
             // ES-DE draws the rect at `size + leading + trailing` padding
@@ -1435,7 +1510,7 @@ private fun EsDeAlignedTextBlock(
                 .absoluteOffset(x = offsetX, y = offsetY)
                 .esDeRotation(element)
                 .let { if (background != null) it.esDeBackgroundBox(background) else it }
-                .size(width = width, height = height),
+                .size(width = width, height = fit.height),
             contentAlignment = esDeVerticalBoxAlignment(element),
         ) {
             Text(
@@ -1445,7 +1520,8 @@ private fun EsDeAlignedTextBlock(
                 fontFamily = themeFontFamily(element),
                 lineHeight = fontSizeSp * lineSpacing,
                 textAlign = textAlign,
-                modifier = Modifier.fillMaxWidth(),
+                maxLines = fit.maxLines,
+                modifier = Modifier.fillMaxWidth().esDeTextOverflow(fit),
             )
         }
     } else {

@@ -423,7 +423,14 @@ fun GamepadShell(
     // Real dispatcher-route for closing the detail screen with B/back --
     // same reason as the drill-up BackHandler in GamesSection.
     androidx.activity.compose.BackHandler(enabled = detailEntry != null) { detailEntry = null }
-    androidx.compose.runtime.CompositionLocalProvider(LocalShellWindow provides shellWindow) {
+    // The shell's own button bar is drawn on every touch-first window
+    // where hints are enabled at all (see the ButtonHintFooter call at the
+    // bottom of this Column), and while it is up it IS the help bar -- see
+    // [LocalShellOwnsHelpRow].
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalShellWindow provides shellWindow,
+        LocalShellOwnsHelpRow provides (HandheldPrefs.showHints(context) && shellWindow.touchFirst),
+    ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
