@@ -85,6 +85,8 @@ import com.github.penfeizhou.animation.loader.FileLoader
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.theme.EsDeImageTypes
 import dev.droidtop.library.theme.EsDeLetterCase
+import dev.droidtop.library.theme.EsDeHelpButton
+import dev.droidtop.library.theme.esDeHelpButtonIconKey
 import dev.droidtop.library.theme.esDeEntryLabel
 import dev.droidtop.library.theme.esDeLetterCase
 import dev.droidtop.library.theme.applyTo
@@ -2703,13 +2705,20 @@ private fun EsDeRatingIconRow(
  * rule too (`else mXDimmed = mX` at HelpComponent.cpp:97-294) rather than
  * a separate set of defaults.
  *
- * Honestly still unimplemented, and NOT faked: `customButtonIcon` (real
- * per-theme glyph art for each button, which would replace the platform
- * button LABEL this draws; the art is a per-controller-FAMILY set in
- * ES-DE -- SNES/switch/PS/XBOX variants picked by its own ControllerType
- * setting, HelpComponent.cpp:309-400 -- and droidtop has no such setting
- * to pick one with, so choosing a family here would be a guess), and
- * `originDimmed`
+ * `customButtonIcon` IS implemented: the theme's own button art replaces
+ * the text label this otherwise draws, chosen from the family
+ * [ThemePrefs.controllerFamily] names -- real ES-DE's own
+ * `InputControllerType` setting (HelpComponent.cpp:437), whose real
+ * default is `xbox` (Settings.cpp:246) and which is a SETTING there too,
+ * not a probe of the attached pad. A button the theme ships no art for
+ * keeps the label, which is the same outcome ES-DE reaches by keeping its
+ * own bundled default for that one key (HelpComponent.cpp:453-560, every
+ * assignment an `.empty() ? default : custom`). ES-DE's own bundled art
+ * is Qt-resource SVG compiled into its binary and is not redistributed
+ * here, the same line already drawn for badge and systemstatus icons --
+ * so with no theme art there is a label rather than invented glyphs.
+ *
+ * Honestly still unimplemented, and NOT faked: `originDimmed`
  * -- for the same reason plain `origin` is unimplemented on this element,
  * namely that this help bar is a wrapping Row whose own width is not
  * measured before it is placed, so there is nothing to offset the origin
@@ -2795,6 +2804,12 @@ private fun EsDeThemedHelpSystem(
         else -> EsDeLetterCase.UPPERCASE
     }
     val textFirst = element.strOrNull("entryLayout") == "textFirst"
+    // HelpComponent.cpp:435-560 -- which family's art set this theme's
+    // `customButtonIcon` declarations are read from.
+    // Fully qualified: this package has a ThemePrefs of its own (the
+    // Compose change counter), and the setting lives on the library one.
+    val controllerFamily =
+        dev.droidtop.library.theme.ThemePrefs.controllerFamily(LocalContext.current)
 
     Row(
         modifier = Modifier
@@ -2824,13 +2839,35 @@ private fun EsDeThemedHelpSystem(
                 // real default, "textFirst" swaps the glyph and the label
                 // within every entry. An invalid value warns and keeps the
                 // default.
+                // Real `customButtonIcon`: the parser stores each
+                // declaration under its own `button` attribute
+                // (`customButtonIcon_button_a_XBOX`), and
+                // esDeHelpButtonIconKey is ES-DE's own assignIcons
+                // mapping from a help entry to that attribute value.
+                val buttonArt = esDeHelpButton(action)
+                    ?.let { esDeHelpButtonIconKey(it, controllerFamily) }
+                    ?.let { element.pathOrNull("customButtonIcon_$it") }
+                    ?.takeIf { File(it).isFile }
                 val icon = @Composable {
-                    Text(
-                        GamepadKeyMap.labelFor(action),
-                        color = iconColor,
-                        fontSize = iconFontSizeSp,
-                        fontFamily = fontFamily,
-                    )
+                    if (buttonArt != null) {
+                        // The art is drawn at the icon's own line height,
+                        // which is where ES-DE sizes it from too
+                        // (HelpComponent.cpp:664-667 scales the icon
+                        // against the entry's font size).
+                        AsyncImage(
+                            model = buttonArt,
+                            contentDescription = null,
+                            colorFilter = ColorFilter.tint(iconColor),
+                            modifier = Modifier.size(with(LocalDensity.current) { iconFontSizeSp.toDp() }),
+                        )
+                    } else {
+                        Text(
+                            GamepadKeyMap.labelFor(action),
+                            color = iconColor,
+                            fontSize = iconFontSizeSp,
+                            fontFamily = fontFamily,
+                        )
+                    }
                 }
                 val text = @Composable {
                     Text(
@@ -2876,6 +2913,34 @@ private fun EsDeThemedHelpSystem(
  * anything else passes through as a SimpleDateFormat literal (quoted), the
  * same honest-fallback approach used elsewhere in this renderer.
  */
+/**
+ * droidtop's own [GamepadAction] to the button ES-DE's help bar has art
+ * for. Three actions map onto a COMBINED ES-DE key rather than one of
+ * their own, because ES-DE ships no single-direction left/right art and
+ * no per-stick click art: its own icon map has `left/right`,
+ * `up/down/left/right` and one `thumbstickclick`
+ * (HelpComponent.cpp:461-468). Null for an action ES-DE draws no icon
+ * for at all, which keeps droidtop's own text label.
+ */
+private fun esDeHelpButton(action: GamepadAction): EsDeHelpButton? = when (action) {
+    GamepadAction.A -> EsDeHelpButton.A
+    // droidtop's BACK is the same physical B button its own key map binds
+    // it to (GamepadKeyMap.labelFor draws "B" for both).
+    GamepadAction.B, GamepadAction.BACK -> EsDeHelpButton.B
+    GamepadAction.X -> EsDeHelpButton.X
+    GamepadAction.Y -> EsDeHelpButton.Y
+    GamepadAction.START -> EsDeHelpButton.START
+    GamepadAction.SELECT -> EsDeHelpButton.BACK
+    GamepadAction.UP -> EsDeHelpButton.DPAD_UP
+    GamepadAction.DOWN -> EsDeHelpButton.DPAD_DOWN
+    GamepadAction.LEFT, GamepadAction.RIGHT -> EsDeHelpButton.DPAD_LEFTRIGHT
+    GamepadAction.L -> EsDeHelpButton.SHOULDER_L
+    GamepadAction.R -> EsDeHelpButton.SHOULDER_R
+    GamepadAction.L2 -> EsDeHelpButton.TRIGGER_L
+    GamepadAction.R2 -> EsDeHelpButton.TRIGGER_R
+    GamepadAction.L3, GamepadAction.R3 -> EsDeHelpButton.THUMBSTICK_CLICK
+}
+
 private val STRFTIME_TO_JAVA = listOf(
     "%Y" to "yyyy", "%y" to "yy",
     "%m" to "MM", "%d" to "dd",

@@ -115,4 +115,22 @@ object ThemePrefs {
             .apply()
         changeListeners.forEach { it() }
     }
+
+    // ES-DE's "InputControllerType" setting (Settings.cpp:246, default
+    // "xbox"), which decides which family of button art a theme's
+    // `customButtonIcon` declarations are drawn from
+    // (HelpComponent.cpp:437, :483-560). NOT per theme, unlike the three
+    // above: it describes the pad in the person's hands, so every theme
+    // should honour the same answer.
+    fun controllerFamily(context: Context): EsDeControllerFamily =
+        EsDeControllerFamily.of(
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getString("droidtop_controller_family", null),
+        )
+
+    fun setControllerFamily(context: Context, family: EsDeControllerFamily) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString("droidtop_controller_family", family.id).apply()
+        changeListeners.forEach { it() }
+    }
 }
