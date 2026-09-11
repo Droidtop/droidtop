@@ -38,7 +38,6 @@ import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION
 import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPWIDGET
 import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT
 import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_FOLDER
-import com.android.launcher3.Utilities.EMPTY_PERSON_ARRAY
 import com.android.launcher3.backuprestore.LauncherRestoreEventLogger.RestoreError
 import com.android.launcher3.icons.CacheableShortcutInfo
 import com.android.launcher3.icons.IconCache
@@ -365,7 +364,7 @@ class WorkspaceItemProcessorTest {
                 whenever(isEnabled).thenReturn(true)
                 whenever(disabledMessage).thenReturn("")
                 whenever(disabledReason).thenReturn(0)
-                whenever(persons).thenReturn(EMPTY_PERSON_ARRAY)
+                whenever(persons).thenReturn(emptyArray())
             }
         val shortcutKey = ShortcutKey.fromIntent(mIntent, mockCursor.user)
         mKeyToPinnedShortcutsMap[shortcutKey] = expectedShortcutInfo
@@ -461,7 +460,7 @@ class WorkspaceItemProcessorTest {
                 whenever(isEnabled).thenReturn(true)
                 whenever(disabledMessage).thenReturn("")
                 whenever(disabledReason).thenReturn(0)
-                whenever(persons).thenReturn(EMPTY_PERSON_ARRAY)
+                whenever(persons).thenReturn(emptyArray())
                 whenever(userHandle).thenReturn(mUserHandle)
             }
         doReturn(listOf(si)).whenever(mLauncherApps).getShortcuts(any(), any())
@@ -521,7 +520,7 @@ class WorkspaceItemProcessorTest {
                 whenever(isEnabled).thenReturn(true)
                 whenever(disabledMessage).thenReturn("")
                 whenever(disabledReason).thenReturn(0)
-                whenever(persons).thenReturn(EMPTY_PERSON_ARRAY)
+                whenever(persons).thenReturn(emptyArray())
                 whenever(userHandle).thenReturn(mUserHandle)
             }
         mIconRequestInfos = mutableListOf()
