@@ -340,6 +340,8 @@ private fun EsDeCarousel(
     // ten themes measured for this pass set it on their carousel, all of
     // them to keep pixel-art system logos crisp.
     val imageFilterQuality = element?.let { esDeFilterQuality(it, "imageInterpolation") } ?: FilterQuality.Low
+    val imageCropAlignment =
+        if (element == null) androidx.compose.ui.Alignment.Center else esDeCropAlignment(element, "imageCropPos")
     // Real carousel-wide background bar (CarouselComponent::render's own
     // single drawRect call, behind every item) -- real default 0xFFFFFFD8
     // (translucent white), confirmed against the real constructor default.
@@ -535,6 +537,7 @@ private fun EsDeCarousel(
                     imageBrightness = config.imageBrightness,
                     dimming = placement.dimming,
                     imageContentScale = imageFit,
+                    imageCropAlignment = imageCropAlignment,
                     imageFilterQuality = imageFilterQuality,
                     modifier = Modifier
                         .placeCarouselItem(placement, itemWidth, itemHeight)
@@ -576,6 +579,7 @@ private fun EsDeCarousel(
                 imageBrightness = config.imageBrightness,
                 dimming = placement.dimming,
                 imageContentScale = imageFit,
+                imageCropAlignment = imageCropAlignment,
                 imageFilterQuality = imageFilterQuality,
                 modifier = Modifier
                     .placeCarouselItem(placement, itemWidth, itemHeight)
@@ -703,6 +707,7 @@ private fun EsDeCarouselItem(
     imageBrightness: Float,
     dimming: Float,
     imageContentScale: ContentScale,
+    imageCropAlignment: androidx.compose.ui.Alignment,
     imageFilterQuality: FilterQuality,
     modifier: Modifier,
 ) {
@@ -725,6 +730,9 @@ private fun EsDeCarouselItem(
             model = item.logoPath,
             contentDescription = null,
             contentScale = imageContentScale,
+            // Real `imageCropPos` (CarouselComponent.h:1525, GridComponent.h:1074):
+            // which part of an item image an `imageFit=cover` crop keeps.
+            alignment = imageCropAlignment,
             filterQuality = imageFilterQuality,
             colorFilter = esDeImageColorFilter(
                 if (gradient) null else shift,
@@ -1264,6 +1272,7 @@ private fun EsDeGrid(
         "cover" -> ContentScale.Crop
         else -> ContentScale.Fit
     }
+    val imageCropAlignment = esDeCropAlignment(element, "imageCropPos")
     val config = remember(element, screenWidth, screenHeight) {
         esDeGridConfig(element, screenWidth.value, screenHeight.value)
     }
@@ -1340,6 +1349,7 @@ private fun EsDeGrid(
                     fontSize = fontSizeSp,
                     fontFamily = tileFontFamily,
                     imageContentScale = imageFit,
+                    imageCropAlignment = imageCropAlignment,
                     imageFilterQuality = imageFilterQuality,
                     onSelect = {
                         cursor = index
@@ -1370,6 +1380,7 @@ private fun EsDeGridEntry(
     fontSize: androidx.compose.ui.unit.TextUnit,
     fontFamily: androidx.compose.ui.text.font.FontFamily?,
     imageContentScale: ContentScale,
+    imageCropAlignment: androidx.compose.ui.Alignment,
     onSelect: () -> Unit,
 ) {
     val center = esDeGridItemCenter(config, layout, index)
@@ -1450,6 +1461,9 @@ private fun EsDeGridEntry(
             model = item.logoPath,
             contentDescription = null,
             contentScale = imageContentScale,
+            // Real `imageCropPos` (GridComponent.h:1074) -- the part of the
+            // item image an `imageFit=cover` crop keeps.
+            alignment = imageCropAlignment,
             filterQuality = imageFilterQuality,
             colorFilter = esDeImageColorFilter(
                 if (gradient) null else shift,
