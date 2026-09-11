@@ -352,7 +352,7 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
                     desktopConfigured = configureDesktop,
                     gamingConfigured = configureGaming,
                     onPicked = { mode ->
-                        ModePrefs.setLastMode(context, mode)
+                        dev.droidtop.library.settings.Modes.setLastMode(context, mode)
                         finishOnboarding()
                     },
                 )
@@ -751,7 +751,7 @@ private fun DefaultModeChoiceStep(
     homeImplementation: HomeRolePrefs.HomeImplementation,
     desktopConfigured: Boolean,
     gamingConfigured: Boolean,
-    onPicked: (String) -> Unit,
+    onPicked: (dev.droidtop.library.settings.Mode) -> Unit,
 ) {
     Text("Which should droidtop open into?", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineSmall)
     Text(
@@ -762,13 +762,13 @@ private fun DefaultModeChoiceStep(
     )
     val anyConfigured = homeImplementation != HomeRolePrefs.HomeImplementation.NONE || desktopConfigured || gamingConfigured
     if (homeImplementation != HomeRolePrefs.HomeImplementation.NONE) {
-        Button(onClick = { onPicked(BackButtonMenu.MODE_STANDARD) }) { Text("My home screen") }
+        Button(onClick = { onPicked(dev.droidtop.library.settings.Mode.LAUNCHER) }) { Text("My home screen") }
     }
     if (desktopConfigured) {
-        Button(onClick = { onPicked(BackButtonMenu.MODE_DESKTOP) }) { Text("Desktop") }
+        Button(onClick = { onPicked(dev.droidtop.library.settings.Mode.DESKTOP) }) { Text("Desktop") }
     }
     if (gamingConfigured || !anyConfigured) {
-        Button(onClick = { onPicked(BackButtonMenu.MODE_GAMING) }) {
+        Button(onClick = { onPicked(dev.droidtop.library.settings.Mode.GAMING) }) {
             Text(if (gamingConfigured) "Gaming" else "Gaming (set up later in Settings)")
         }
     }
