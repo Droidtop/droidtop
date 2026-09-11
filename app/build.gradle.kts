@@ -145,18 +145,22 @@ android {
         // work for nothing.
         checkReleaseBuilds = false
         // Scope, one mechanism: a baseline that holds ONLY the findings in
-        // the vendored gamenative tree (vendor/gamenative/..., compiled
-        // into :runtime-windows by srcDir, so lint reports it against this
-        // gate like any other source). That tree is upstream code we sync,
-        // not code we write, and fixing its API-27..30 calls in place
-        // would be rewritten by the next vendor sync; a per-source-set
-        // exclusion would have hidden the whole tree forever instead.
-        // A baseline is the honest middle: the findings recorded in the
-        // file are known and accepted, and ANY new one -- a call the next
-        // sync brings in, or one we add ourselves while porting -- is not
-        // in the file and still fails the build. Everything droidtop
-        // writes, :shell-default included, is deliberately NOT in the
-        // baseline and must be fixed in the code.
+        // trees droidtop vendors rather than writes -- the gamenative tree
+        // (vendor/gamenative/..., compiled into :runtime-windows by
+        // srcDir) and shell-default's vendored AOSP sub-libraries,
+        // :WMShared (shell-default/wm_shared), :msdl
+        // (shell-default/msdllib) and :Shared (shell-default/shared), so
+        // lint reports them against this gate like any other source.
+        // Those trees are upstream code we sync, not code we write, and
+        // fixing their API-27..34 calls in place would be rewritten by the
+        // next vendor sync; a per-source-set exclusion would have hidden
+        // them forever instead. A baseline is the honest middle: the
+        // findings recorded in the file are known and accepted, and ANY
+        // new one -- a call the next sync brings in, or one we add
+        // ourselves while porting -- is not in the file and still fails
+        // the build. Everything droidtop writes -- shell-default/src, the
+        // launcher fork's own sources, included -- is deliberately NOT in
+        // the baseline and must be fixed in the code.
         baseline = file("lint-baseline.xml")
     }
 }

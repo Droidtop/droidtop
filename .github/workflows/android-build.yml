@@ -364,12 +364,14 @@ jobs:
         # this repo per hour, so that is the common case, not a corner.
         #
         # Scope: our own modules are strict -- a NewApi error in anything
-        # droidtop writes, :shell-default included, fails this step. The
-        # ONE exception is the vendored gamenative tree, whose findings
-        # are recorded in app/lint-baseline.xml; see the lint block in
-        # app/build.gradle.kts and SPEC 10b for why a baseline rather
-        # than an exclusion, and note that the baseline still fails any
-        # finding it does not already list.
+        # droidtop writes, shell-default/src (the launcher fork's own
+        # sources) included, fails this step. The exceptions are the trees
+        # droidtop vendors rather than writes -- the gamenative tree and
+        # shell-default's vendored AOSP sub-libraries (:WMShared, :msdl,
+        # :Shared) -- whose findings are recorded in app/lint-baseline.xml;
+        # see the lint block in app/build.gradle.kts and SPEC 10b for why
+        # a baseline rather than an exclusion, and note that the baseline
+        # still fails any finding it does not already list.
         if: ${{ !cancelled() }}
         run: ./gradlew :app:lintDebug --stacktrace
 
