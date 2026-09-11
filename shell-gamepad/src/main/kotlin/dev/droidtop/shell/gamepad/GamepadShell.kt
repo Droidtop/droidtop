@@ -1717,6 +1717,10 @@ private fun GamesSection(
         val esDeTransitions = remember(ThemePrefs.version) { ThemeAssets.activeTransitions(context) }
         androidx.compose.animation.AnimatedContent(
             targetState = selectedGroup,
+            // Both views are full-screen; without this the animated
+            // container would wrap its content instead of owning the
+            // screen a themed full-bleed background needs.
+            modifier = Modifier.fillMaxSize(),
             transitionSpec = {
                 val towardsGamelist = initialState == null && targetState != null
                 val kind = when {
