@@ -258,6 +258,11 @@ fun EsDeThemedView(
     // Read only by `helpsystem`'s own real `*Dimmed` property family; see
     // [EsDeThemedHelpSystem].
     backgroundDimmed: Boolean = false,
+    // Real ES-DE `mGamelistView`: which of the two views this is. It is
+    // not derivable from [view] (an `all`-scoped block parses into both),
+    // and a primary element's whole image chain turns on it -- see
+    // [dev.droidtop.shell.gamepad.theme.esDePrimaryImage].
+    gamelist: Boolean = false,
 ) {
     BoxWithConstraints(modifier = modifier) {
         val viewWidth = maxWidth
@@ -345,6 +350,7 @@ fun EsDeThemedView(
                 // was ever wrong.
                 "carousel", "grid", "textlist" -> EsDeThemedListElement(
                     element, items, firstItemFocus, viewWidth, viewHeight, onFocusedIndexChanged,
+                    gamelist,
                 )
                 // helpsystem is deliberately NOT dispatched per element --
                 // see the singleton merge/render after this loop. Real,
@@ -420,6 +426,7 @@ private fun EsDeThemedListElement(
     viewWidth: Dp,
     viewHeight: Dp,
     onFocusedIndexChanged: (Int) -> Unit,
+    gamelist: Boolean,
 ) {
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
@@ -429,6 +436,7 @@ private fun EsDeThemedListElement(
         firstItemFocus = firstItemFocus,
         modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY).size(width = width, height = height),
         onFocusedIndexChanged = onFocusedIndexChanged,
+        gamelist = gamelist,
     )
 }
 
