@@ -296,6 +296,27 @@ fun EsDeThemedView(
     // is, 0 at rest (SystemView.cpp's own `mFadeOpacity`). Only the
     // system view has one; every other caller leaves it at rest.
     systemFadeOpacity: Float = 0f,
+    // Which slice of the view to draw. ES-DE's system view renders in
+    // three passes -- everything below the primary component's zIndex,
+    // the primary itself, then everything above it (SystemView.cpp:196-208,
+    // the two `renderElements` calls around `mPrimary->render`) -- because
+    // the element layer and the primary move differently during a
+    // system-to-system transition. Every other view is one pass, which is
+    // the default here.
+    layer: EsDeViewLayer = EsDeViewLayer.ALL,
+    // How far this copy of the element layer is pushed from its rest
+    // position, as a fraction of the view along [slideHorizontal]'s axis:
+    // ES-DE's `(i - mCamOffset)` from SystemView.cpp:1624-1637. A lambda,
+    // not a value, so the carousel's own continuous camera offset is read
+    // when the layer is drawn rather than recomposing the whole view every
+    // frame. Null wherever nothing slides, which is every view but the
+    // system view and the system view itself at rest.
+    slide: (() -> Float)? = null,
+    slideHorizontal: Boolean = true,
+    // The primary component's own animated cursor position, published for
+    // the caller that has to translate the element layer by it. See
+    // [EsDeSystemListView]'s parameter of the same name.
+    onCamOffsetChanged: ((Float) -> Unit)? = null,
 ) {
     BoxWithConstraints(modifier = modifier) {
         val viewWidth = maxWidth
@@ -347,6 +368,21 @@ fun EsDeThemedView(
             // -- checked once here rather than duplicated in each
             // per-type renderer below.
             .filter { it.valueOrNull<EsDeThemeValue.Bool>("visible")?.value != false }
+            // SystemView.cpp:1695 and :1720 split the element layer on the
+            // primary's own zIndex, and :196-208 draws the primary between
+            // the two halves.
+            .filter { element ->
+                val windowLevel = element.type in ES_DE_WINDOW_TYPES
+                when (layer) {
+                    EsDeViewLayer.ALL -> true
+                    EsDeViewLayer.WINDOW -> windowLevel
+                    EsDeViewLayer.PRIMARY -> element === primaryElement
+                    EsDeViewLayer.BELOW_PRIMARY ->
+                        !windowLevel && element !== primaryElement && zIndexOf(element) <= primaryZIndex
+                    EsDeViewLayer.ABOVE_PRIMARY ->
+                        !windowLevel && element !== primaryElement && zIndexOf(element) > primaryZIndex
+                }
+            }
             .sortedBy { zIndexOf(it) }.forEach { element ->
             // ES-DE's two transition-time behaviours, both decided per
             // rendered child (GamelistView.cpp:526-562, SystemView.cpp:
@@ -389,7 +425,35 @@ fun EsDeThemedView(
                 } else {
                     Modifier
                 }
-            EsDeElementLayer(stationaryHold, stationary, elementAlpha, elementDim) {
+            // The system-to-system slide, SystemView.cpp:1624-1637: this
+            // system's whole element set is translated by its distance
+            // from the camera and clipped to its own slot, so a neighbour
+            // cannot draw over the system being left. A pinned element is
+            // exempt from both -- ES-DE pops the clip and renders it with
+            // the identity matrix (:1704-1710) -- which is the same
+            // exemption `stationary` already has from the view-to-view
+            // slide above.
+            val slideBy = slide
+            val slideHold: Modifier =
+                if (slideBy != null && !stationary) {
+                    Modifier.fillMaxSize().graphicsLayer {
+                        val displacement = slideBy()
+                        if (slideHorizontal) {
+                            translationX = displacement * size.width
+                        } else {
+                            translationY = displacement * size.height
+                        }
+                        clip = true
+                    }
+                } else {
+                    Modifier
+                }
+            EsDeElementLayer(
+                stationaryHold.then(slideHold),
+                stationary || slide != null,
+                elementAlpha,
+                elementDim,
+            ) {
             when (element.type) {
                 "image" -> EsDeThemedImage(element, viewWidth, viewHeight, gameSelection)
                 "text" ->
@@ -440,7 +504,7 @@ fun EsDeThemedView(
                 // was ever wrong.
                 "carousel", "grid", "textlist" -> EsDeThemedListElement(
                     element, items, firstItemFocus, viewWidth, viewHeight, onFocusedIndexChanged,
-                    gamelist,
+                    gamelist, onCamOffsetChanged,
                 )
                 // helpsystem is deliberately NOT dispatched per element --
                 // see the singleton merge/render after this loop. Real,
@@ -493,7 +557,8 @@ fun EsDeThemedView(
         // Rendered after the element loop -- help draws on top, real ES-DE's
         // own draw order for it.
         val helpElements = view.elements.values.filter {
-            it.type == "helpsystem" && esDeScopeAllows(it, backgroundDimmed)
+            it.type == "helpsystem" && esDeScopeAllows(it, backgroundDimmed) &&
+                (layer == EsDeViewLayer.ALL || layer == EsDeViewLayer.WINDOW)
         }
         if (helpElements.isNotEmpty() && hints.isNotEmpty()) {
             val merged = EsDeThemeElement(
@@ -518,6 +583,7 @@ private fun EsDeThemedListElement(
     viewHeight: Dp,
     onFocusedIndexChanged: (Int) -> Unit,
     gamelist: Boolean,
+    onCamOffsetChanged: ((Float) -> Unit)?,
 ) {
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
@@ -528,6 +594,7 @@ private fun EsDeThemedListElement(
         modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY).size(width = width, height = height),
         onFocusedIndexChanged = onFocusedIndexChanged,
         gamelist = gamelist,
+        onCamOffsetChanged = onCamOffsetChanged,
     )
 }
 
@@ -3982,6 +4049,29 @@ private fun EsDeElementLayer(
 
 /** The three element types that can be a view's primary component (PrimaryComponent.h). */
 private val ES_DE_PRIMARY_TYPES = setOf("carousel", "grid", "textlist")
+
+/**
+ * The passes ES-DE's system view draws in, for a caller that has to move
+ * them independently. Every other view draws in one pass, [ALL].
+ *
+ *  * [BELOW_PRIMARY] and [ABOVE_PRIMARY] are the element layer, split on
+ *    the primary component's own zIndex (SystemView.cpp:196-208, the two
+ *    `renderElements` calls around `mPrimary->render`, and the two
+ *    branches at :1695 and :1720). These are the parts that travel with
+ *    their system.
+ *  * [PRIMARY] is the primary component itself, which never moves with
+ *    them (SystemView.cpp:204).
+ *  * [WINDOW] is the clock, the status bar and the help bar. ES-DE parses
+ *    those per system like everything else but does NOT put them in
+ *    `elements.children` (SystemView.cpp:758-774): it hands the CURSOR's
+ *    copies to the Window (:255, :958), which draws them over the whole
+ *    screen. So they are drawn once, from the focused system, and no
+ *    slide touches them.
+ */
+enum class EsDeViewLayer { ALL, BELOW_PRIMARY, PRIMARY, ABOVE_PRIMARY, WINDOW }
+
+/** The three element types ES-DE hands to the Window rather than rendering in the view. */
+private val ES_DE_WINDOW_TYPES = setOf("clock", "systemstatus", "helpsystem")
 
 /**
  * One tile resampled to the size the theme asked for, with the filter the
