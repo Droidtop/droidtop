@@ -2612,7 +2612,13 @@ private fun EsDeThemedGamelistInfo(element: EsDeThemeElement, viewWidth: Dp, vie
  */
 @Composable
 private fun EsDeThemedRating(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp, gameSelection: List<LibraryEntry>) {
-    val rating = gameSelection.getOrNull(0)?.rating ?: return
+    // Real `gameselectorEntry` (GuiComponent.cpp:407-412): `rating` is a
+    // gameselector-driven element like `image` and `video`, and which
+    // entry of the selector it binds to is the theme's choice. droidtop
+    // read entry 0 unconditionally, so a theme pairing several ratings
+    // with a mosaic of games showed the same stars under every tile.
+    val gameselectorEntry = element.valueOrNull<EsDeThemeValue.UInt>("gameselectorEntry")?.value?.toInt() ?: 0
+    val rating = gameSelection.getOrNull(gameselectorEntry)?.rating ?: return
     val hideIfZero = element.valueOrNull<EsDeThemeValue.Bool>("hideIfZero")?.value ?: false
     if (hideIfZero && rating <= 0f) return
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
