@@ -100,11 +100,16 @@ object AppSelfUpdate {
      */
     fun maybeCheck(context: Context) {
         val application = context.applicationContext
-        val frequency = frequency(application)
-        if (frequency == Frequency.OFF) return
         val now = System.currentTimeMillis()
-        if (now - prefs(application).getLong(KEY_LAST_ATTEMPT, 0L) < frequency.intervalMs) return
-        if (unmeteredOnly(application) && isMetered(application)) return
+        val allowed = mayCheck(
+            forced = false,
+            frequency = frequency(application),
+            lastAttemptMs = prefs(application).getLong(KEY_LAST_ATTEMPT, 0L),
+            nowMs = now,
+            unmeteredOnly = unmeteredOnly(application),
+            metered = isMetered(application),
+        )
+        if (!allowed) return
         prefs(application).edit().putLong(KEY_LAST_ATTEMPT, now).apply()
         Thread {
             // The platform databases ride along on the same pass, the way
@@ -123,6 +128,29 @@ object AppSelfUpdate {
                     .apply()
             }
         }.start()
+    }
+
+    /**
+     * The one gate both update paths ask. The scheduled pass calls it with
+     * forced = false and obeys all three conditions the user set: the
+     * frequency (OFF means no automatic traffic at all), the interval since
+     * the last attempt, and the unmetered-only option. UpdateNow calls it
+     * with forced = true, which is what "bypasses the schedule and any
+     * consent gate" means -- one function, so the bypass cannot drift away
+     * from what it is bypassing.
+     */
+    fun mayCheck(
+        forced: Boolean,
+        frequency: Frequency,
+        lastAttemptMs: Long,
+        nowMs: Long,
+        unmeteredOnly: Boolean,
+        metered: Boolean,
+    ): Boolean {
+        if (forced) return true
+        if (frequency == Frequency.OFF) return false
+        if (nowMs - lastAttemptMs < frequency.intervalMs) return false
+        return !(unmeteredOnly && metered)
     }
 
     private fun isMetered(context: Context): Boolean =
