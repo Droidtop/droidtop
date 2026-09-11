@@ -32,6 +32,7 @@ import android.content.pm.LauncherUserInfo;
 import android.content.pm.ShortcutInfo;
 import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Process;
 import android.os.UserHandle;
 import android.os.UserManager;
@@ -244,6 +245,13 @@ public class ApiWrapper {
      * as HOME app, a toast asking the user to do the latter is shown.
      */
     public void assignDefaultHomeRole(Context context) {
+        // RoleManager is API 29 and this app's minSdk is 26. Below Q there is
+        // no role to request -- the launcher is chosen through the system's
+        // own settings -- so there is nothing to do rather than something
+        // else to do.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return;
+        }
         RoleManager roleManager = context.getSystemService(RoleManager.class);
         assert roleManager != null;
         if (roleManager.isRoleAvailable(RoleManager.ROLE_HOME)
