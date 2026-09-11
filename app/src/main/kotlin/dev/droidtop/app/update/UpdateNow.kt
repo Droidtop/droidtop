@@ -29,25 +29,6 @@ object UpdateNow {
     const val TAG = "DroidtopUpdateNow"
 
     /** The Android shell (what adb runs as) and root. Fixed platform uids. */
-    const val ROOT_UID = 0
-    const val SYSTEM_UID = 1000
-    const val SHELL_UID = 2000
-
-    /**
-     * Who may fire the trigger: adb (shell), root, the platform itself, and
-     * droidtop's own uid. Anything else is ignored.
-     *
-     * The system enforces the same thing ahead of us -- the receiver is
-     * declared with android:permission="android.permission.DUMP", which
-     * only shell, root and system hold -- but that check is invisible in
-     * this code and does not exist on a caller that reaches the receiver
-     * some other way, so the uid is checked here too and the outcome is
-     * logged. [senderUid] is only knowable from API 34 (getSentFromUid);
-     * below that the manifest permission is the whole guard and this
-     * function is handed [ownUid].
-     */
-    fun isTrustedCaller(senderUid: Int, ownUid: Int): Boolean =
-        senderUid == ROOT_UID || senderUid == SYSTEM_UID || senderUid == SHELL_UID || senderUid == ownUid
 
     /** What a forced pass decides, once it knows what is published. */
     enum class Verdict { ALREADY_CURRENT, INSTALL }
