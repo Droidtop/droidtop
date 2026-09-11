@@ -293,6 +293,14 @@ fun CatalogNavigator(
                             setSelected(index)
                             activate(row.item)
                         },
+                        // The touch route to Left/Right. A SliderItem
+                        // does nothing at all on activate (there is no
+                        // "open" for a number), so without this it was
+                        // pad-only in a screen a phone user has to use.
+                        onAdjust = { direction ->
+                            setSelected(index)
+                            adjust(row.item, direction)
+                        },
                     )
                 }
             }
@@ -386,6 +394,7 @@ private fun CatalogRowView(
     confirmArmed: Boolean,
     status: String?,
     onClick: () -> Unit,
+    onAdjust: ((Int) -> Unit)? = null,
 ) {
     val item = row.item
     val context = LocalContext.current
@@ -413,6 +422,7 @@ private fun CatalogRowView(
         danger = confirmArmed,
         accent = (item as? NestedScreenItem)?.accent?.let { Color(it) },
         onClick = onClick,
+        onAdjust = onAdjust,
     )
 }
 
