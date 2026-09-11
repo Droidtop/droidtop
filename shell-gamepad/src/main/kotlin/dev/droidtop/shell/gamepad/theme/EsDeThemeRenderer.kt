@@ -84,6 +84,7 @@ import com.github.penfeizhou.animation.gif.GifDrawable
 import com.github.penfeizhou.animation.loader.FileLoader
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.theme.EsDeImageTypes
+import dev.droidtop.library.theme.EsDeLetterCase
 import dev.droidtop.library.theme.applyTo
 import dev.droidtop.library.theme.BADGE_SLOTS
 import dev.droidtop.library.theme.EsDeThemeElement
@@ -94,6 +95,7 @@ import dev.droidtop.library.theme.esDeBadgeOverlay
 import dev.droidtop.library.theme.EsDeThemeView
 import dev.droidtop.library.theme.esDeDateTimeDisplay
 import dev.droidtop.library.theme.esDeDisplayRelative
+import dev.droidtop.library.theme.esDeScopeAllows
 import dev.droidtop.library.theme.EsDeHorizontalAlignment
 import dev.droidtop.library.theme.EsDeVerticalAlignment
 import dev.droidtop.library.theme.esDeHorizontalAlignment
@@ -317,7 +319,13 @@ fun EsDeThemedView(
                 // Real, live-rendered -- ES-DE's own "clock" type has no
                 // "metadata" property at all (confirmed against its real
                 // schema), unlike "datetime".
-                "clock" -> EsDeThemedClock(element, viewWidth, viewHeight)
+                // Real `scope` (see esDeScopeAllows): clock, systemstatus and
+                // the help bar are the three window-level element types, and a
+                // theme can ask for one only in a view, only over a menu,
+                // everywhere (the default) or nowhere.
+                "clock" -> if (esDeScopeAllows(element, backgroundDimmed)) {
+                    EsDeThemedClock(element, viewWidth, viewHeight)
+                }
                 // Real, now-unblocked: LibraryEntry.releaseDate exists
                 // (see that field's own doc comment -- real per-game
                 // metadata, scraped via ScreenScraper/TheGamesDB), so a
@@ -358,7 +366,9 @@ fun EsDeThemedView(
                 // own doc comment for which of real ES-DE's four real
                 // entry types this covers (wifi/cellular/battery; not
                 // bluetooth).
-                "systemstatus" -> EsDeThemedSystemStatus(element, viewWidth, viewHeight)
+                "systemstatus" -> if (esDeScopeAllows(element, backgroundDimmed)) {
+                    EsDeThemedSystemStatus(element, viewWidth, viewHeight)
+                }
                 // Real, honestly PARTIAL -- see EsDeThemedGamelistInfo's
                 // own doc comment. focusedSystemEntries (not gameSelection)
                 // is the real total-count context this needs -- every game
@@ -371,17 +381,22 @@ fun EsDeThemedView(
         // configured by merging every declared <helpsystem> element (a
         // theme commonly declares several, multi-named/scope-gated -- Art
         // Book Next does) rather than drawn once per declaration.
-        // `scope=menu` styles real ES-DE's own menu overlays, which
-        // droidtop doesn't render at all -- those declarations are
-        // skipped, not merged in (their pos/colors are for a different
-        // surface entirely). Remaining declarations merge in document
-        // order (LinkedHashMap preserves parse order; later wins per
-        // property), matching real ES-DE's own last-applied-wins theme
-        // application. Rendered after the element loop -- help draws on
-        // top, real ES-DE's own draw order for it.
+        // `scope` picks which declarations apply right now, by exactly the
+        // same rule the clock and status bar use (see esDeScopeAllows):
+        // while one of droidtop's own menus is over the view, a `scope=menu`
+        // block is the one that styles the bar and a `scope=view` block is
+        // skipped; with no menu open it is the other way round. `none` never
+        // applies. Previously `menu` blocks were dropped unconditionally and
+        // `none` was treated as "always", so a theme that styles its menu
+        // help bar separately -- Art Book Next does -- got its view styling
+        // over a dimmed menu, and a theme that switched the bar off got it
+        // anyway. Remaining declarations merge in document order
+        // (LinkedHashMap preserves parse order; later wins per property),
+        // matching real ES-DE's own last-applied-wins theme application.
+        // Rendered after the element loop -- help draws on top, real ES-DE's
+        // own draw order for it.
         val helpElements = view.elements.values.filter {
-            it.type == "helpsystem" &&
-                it.valueOrNull<EsDeThemeValue.Str>("scope")?.value != "menu"
+            it.type == "helpsystem" && esDeScopeAllows(it, backgroundDimmed)
         }
         if (helpElements.isNotEmpty() && hints.isNotEmpty()) {
             val merged = EsDeThemeElement(
@@ -2506,7 +2521,11 @@ private fun EsDeRatingIconRow(
  *
  * Honestly still unimplemented, and NOT faked: `customButtonIcon` (real
  * per-theme glyph art for each button, which would replace the platform
- * button LABEL this draws -- a separate piece of work), and `originDimmed`
+ * button LABEL this draws; the art is a per-controller-FAMILY set in
+ * ES-DE -- SNES/switch/PS/XBOX variants picked by its own ControllerType
+ * setting, HelpComponent.cpp:309-400 -- and droidtop has no such setting
+ * to pick one with, so choosing a family here would be a guess), and
+ * `originDimmed`
  * -- for the same reason plain `origin` is unimplemented on this element,
  * namely that this help bar is a wrapping Row whose own width is not
  * measured before it is placed, so there is nothing to offset the origin
@@ -2583,6 +2602,15 @@ private fun EsDeThemedHelpSystem(
     // clock/systemstatus (HelpComponent.cpp:133-180). droidtop previously
     // drew backgroundColor as a bare, padding-less fill.
     val background = backgroundBoxOf(element, viewWidth, viewHeight, opacity)
+    // HelpComponent.cpp:51 and :674-678 -- the help bar's own letterCase
+    // default is UPPERCASE, unlike every other element's NONE.
+    val helpLetterCase = when (element.strOrNull("letterCase")) {
+        "lowercase" -> EsDeLetterCase.LOWERCASE
+        "capitalize" -> EsDeLetterCase.CAPITALIZE
+        "none" -> EsDeLetterCase.NONE
+        else -> EsDeLetterCase.UPPERCASE
+    }
+    val textFirst = element.strOrNull("entryLayout") == "textFirst"
 
     Row(
         modifier = Modifier
@@ -2607,8 +2635,40 @@ private fun EsDeThemedHelpSystem(
                 horizontalArrangement = Arrangement.spacedBy(iconTextSpacing.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(GamepadKeyMap.labelFor(action), color = iconColor, fontSize = iconFontSizeSp, fontFamily = fontFamily)
-                Text(label, color = textColor, fontSize = labelFontSizeSp, fontFamily = fontFamily)
+                // Real `entryLayout` (HelpComponent.cpp:254-268, and the two
+                // grid-building branches at :693-720): "iconFirst" is the
+                // real default, "textFirst" swaps the glyph and the label
+                // within every entry. An invalid value warns and keeps the
+                // default.
+                val icon = @Composable {
+                    Text(
+                        GamepadKeyMap.labelFor(action),
+                        color = iconColor,
+                        fontSize = iconFontSizeSp,
+                        fontFamily = fontFamily,
+                    )
+                }
+                val text = @Composable {
+                    Text(
+                        // Real `letterCase` on the help bar, whose real
+                        // DEFAULT is "uppercase" (HelpComponent.cpp:51), not
+                        // "as written": ES-DE uppercases help labels unless a
+                        // theme asks otherwise, and only three values do
+                        // anything here -- lowercase, capitalize, and the
+                        // uppercase default (:674-678).
+                        helpLetterCase.applyTo(label),
+                        color = textColor,
+                        fontSize = labelFontSizeSp,
+                        fontFamily = fontFamily,
+                    )
+                }
+                if (textFirst) {
+                    text()
+                    icon()
+                } else {
+                    icon()
+                    text()
+                }
             }
         }
     }
