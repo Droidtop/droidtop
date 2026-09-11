@@ -29,8 +29,8 @@ class AlternativeLauncherActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val lastMode = ModePrefs.lastMode(this)
-        if (savedInstanceState == null && isTaskRoot && lastMode != BackButtonMenu.MODE_STANDARD) {
+        val lastMode = dev.droidtop.library.settings.Modes.lastMode(this)
+        if (savedInstanceState == null && isTaskRoot && lastMode != dev.droidtop.library.settings.Mode.LAUNCHER.id) {
             val redirect = Intent(Intent.ACTION_MAIN).apply {
                 setClassName(packageName, "dev.droidtop.app.MainActivity")
                 putExtra(BackButtonMenu.EXTRA_MODE, lastMode)
