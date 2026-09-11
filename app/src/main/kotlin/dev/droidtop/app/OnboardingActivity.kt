@@ -414,6 +414,9 @@ private fun DesktopSetupStep(onContinue: () -> Unit) {
         // `?: repositories.firstOrNull()?.id` here was the UI half of the
         // same auto-pick spec violation the session service had).
         selectedId = DesktopSetupPrefs.preferredPrimaryImageId(context)
+        // The root state is a reported value, not an exception and not a
+        // guess from one failed command (see ContainerRuntimeFactory).
+        val rootAccess = withContext(Dispatchers.IO) { ContainerRuntimeFactory.rootAccess() }
         val result = withContext(Dispatchers.IO) {
             // Same backend selection as the real session, not a second
             // hand-built runtime (see ContainerRuntimeFactory).
@@ -424,7 +427,7 @@ private fun DesktopSetupStep(onContinue: () -> Unit) {
         }
         checkResult = result?.succeeded ?: false
         checkMessage = when {
-            result == null -> "no root access detected (the no-root desktop backend isn't ready yet)"
+            result == null -> rootAccess.description + " (the no-root desktop backend isn't ready yet)"
             result.succeeded -> "Root access looks good."
             else -> result.stderr.ifBlank { result.stdout }
         }
