@@ -25,6 +25,10 @@ import java.io.FileOutputStream
  * The pattern (LauncherApps -> AppInfo -> iconCache.getTitleAndIcon) mirrors
  * shell-default's own SettingsHiddenAppsFragment.loadApps(), a real,
  * already-working use of this exact API inside this same codebase.
+ *
+ * One app never fails the scan: title and icon are resolved per activity
+ * inside their own guard, so a broken icon costs that one entry its
+ * artwork and nothing else.
  */
 class NativeAppProvider(private val context: Context) : LibraryProvider {
     override val kinds = setOf(LibraryEntryKind.NATIVE_ANDROID_APP)
@@ -50,10 +54,25 @@ class NativeAppProvider(private val context: Context) : LibraryProvider {
         // any thread) leave this dispatcher.
         val entries = withContext(Executors.MODEL_EXECUTOR.asCoroutineDispatcher()) {
             activities.map { activityInfo ->
-                val appInfo = AppInfo(context, activityInfo, activityInfo.user)
-                iconCache.getTitleAndIcon(appInfo, activityInfo, CacheLookupFlag.DEFAULT_LOOKUP_FLAG)
-                val bitmap = drawableToBitmap(appInfo.bitmap.newIcon(context))
-                Triple(activityInfo.componentName.packageName, (appInfo.title ?: activityInfo.label).toString(), bitmap)
+                // PER APP, not per scan: one app's icon must never cost
+                // every other app its entry. Under software rendering the
+                // clock's adaptive icon threw "Software rendering doesn't
+                // support hardware bitmaps" out of drawableToBitmap and
+                // the whole Apps list came back empty (emulator rig,
+                // 2026-09-10) -- the same shape of loss an app with a
+                // broken resource would cause on real hardware. An app
+                // whose icon fails is still an app; it lists without one
+                // (writeIconFile's own null-artwork path already renders).
+                val packageName = activityInfo.componentName.packageName
+                val titled = runCatching {
+                    val appInfo = AppInfo(context, activityInfo, activityInfo.user)
+                    iconCache.getTitleAndIcon(appInfo, activityInfo, CacheLookupFlag.DEFAULT_LOOKUP_FLAG)
+                    (appInfo.title ?: activityInfo.label).toString() to drawableToBitmap(appInfo.bitmap.newIcon(context))
+                }.getOrElse { t ->
+                    Log.w("droidtop.NativeAppProvider", "Icon/title failed for $packageName; listing it without an icon", t)
+                    activityInfo.label.toString() to null
+                }
+                Triple(packageName, titled.first, titled.second)
             }
         }
 
@@ -63,13 +82,26 @@ class NativeAppProvider(private val context: Context) : LibraryProvider {
                     id = packageName,
                     title = title,
                     kind = LibraryEntryKind.NATIVE_ANDROID_APP,
-                    artworkUri = writeIconFile(iconDir, packageName, bitmap),
+                    artworkUri = bitmap?.let { writeIconFile(iconDir, packageName, it) },
                 )
             }
             .distinctBy { it.id }
     }
 
+    /**
+     * A drawable as a software bitmap.
+     *
+     * A HARDWARE-config bitmap is copied rather than drawn: a software
+     * Canvas refuses to draw one ("Software rendering doesn't support
+     * hardware bitmaps"), which is the real failure the per-app guard
+     * above was catching. Copying gives the icon back instead of only
+     * surviving its loss.
+     */
     private fun drawableToBitmap(drawable: android.graphics.drawable.Drawable): Bitmap {
+        val source = (drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+        if (source != null && source.config == Bitmap.Config.HARDWARE) {
+            source.copy(Bitmap.Config.ARGB_8888, false)?.let { return it }
+        }
         val width = drawable.intrinsicWidth.coerceAtLeast(1)
         val height = drawable.intrinsicHeight.coerceAtLeast(1)
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
