@@ -907,13 +907,20 @@ What "the addon is the better screen" concretely means in each mode:
   Android handhelds; PS5's control center (bottom pill bar) and the
   Switch HOME-hold sheet are the alternatives considered and passed
   over (bottom bars fight the theme's own helpsystem row; the Switch
-  sheet is single-purpose). Chosen: right-edge sheet, HOLD SELECT to
+  sheet is single-purpose). Chosen: right-edge sheet IN LANDSCAPE and
+  a bottom sheet in portrait (2026-09-11, §7j: the premise is that the
+  shell stays visible behind it, and a full-height right-edge sheet on
+  a tall screen is the whole screen; the bottom sheet also puts the
+  tabs in thumb reach. The tabs are tappable and the sheet has a
+  visible Close, neither of which it had), HOLD SELECT to
   open (the system key-repeat threshold, ~500ms, detected via
   repeatCount — no timers; short-press Select keeps its meaning; chords
   rejected as undiscoverable; remappable later via the GamepadAction
-  layer). **Entirely controller-driven, per direction**: L1/R1 tabs,
+  layer). **Fully controller-driven, per direction**: L1/R1 tabs,
   D-pad focus, A act, X dismiss, Y clear-all, B close, with the hint
-  row stating exactly that. The System tab is Android's QUICK-SETTINGS
+  row stating exactly that --- and, since 2026-09-11, fully reachable
+  by touch as well (§7j): the hint row IS the touch control surface,
+  every hint dispatching the real button press it names. The System tab is Android's QUICK-SETTINGS
   shape, not a settings list (directed 2026-09-10, against droidtop's
   older habit of a single centred narrow column): a status header
   (clock, battery and level, network state, the connected controller's
@@ -3482,6 +3489,48 @@ mechanism (`DebugCredentials` in library-core) for every current and
 future credentialed integration; ScreenScraper and TheGamesDB consume
 it today.
 
+### Aspect ratio, and what a portrait screen gets (2026-09-11)
+
+The aspect-ratio axis follows ES-DE exactly
+(`EsDeAspectRatio`, ported from `ThemeData.cpp`), including the vertical
+variants a theme may ship for a screen held upright:
+
+1. A theme's capability list is its declared `<aspectRatio>` entries,
+   validated against ES-DE's own supported set, de-duplicated, re-emitted
+   in that set's order, with `"automatic"` PREPENDED whenever at least one
+   ratio survived (`ThemeData.cpp:1232-1252`, `:1766-1775`).
+2. The selected ratio is the user's `ThemeAspectRatio` setting when the
+   theme declares it, otherwise the list's `front()` --- which is
+   therefore always `"automatic"`, since no real theme writes that value
+   itself (`ThemeData.cpp:739-746`).
+3. `"automatic"` resolves to the declared ratio numerically closest to
+   the live screen's width/height, seeded with `16:9` and its own
+   difference so a theme whose every ratio is further away still yields
+   `16:9` (`ThemeData.cpp:748-771`). Screen ratio is width/height in BOTH
+   orientations, exactly as ES-DE computes it (`Renderer.cpp:305`); a
+   portrait screen reports a value below 1, which is why the `_vertical`
+   table entries are height/width. Nothing is flipped and nothing is
+   orientation-special.
+
+The fallback for a theme with **no** vertical variant falls straight out
+of (3) rather than being a separate path: on 1080x1920 (0.5625) DEcaffe
+compares 16:9 (1.2152 away), 16:10 (1.0375), 4:3 (0.7708), 19.5:9
+(1.6042) and 21:9 (1.8078), and renders its **4:3** layout --- a real
+landscape layout drawn stretched over a tall screen, since theme
+coordinates are normalised to the screen. It does not letterbox and it
+does not rotate.
+
+That is a property of the theme, not a bug in the engine: no renderer can
+invent the portrait artwork and element positions an author never wrote.
+So the **default** theme on a portrait display is one that ships them.
+Slate (ES-DE's own default, `16:9_vertical` and `4:3_vertical`, bundled
+alongside DEcaffe, CC-BY-NC-SA, see NOTICE.md) is that theme;
+DEcaffe remains the landscape default. The rule applies only when the
+user has chosen nothing, an explicit choice always wins (including
+choosing DEcaffe on a phone), and onboarding says what happened and
+writes the result down as a real choice so a later rotation cannot move
+the theme under the user (`ThemeAssets.defaultThemeFor`).
+
 ## 7g. One library across every source (audit + plan, directed 2026-09-01)
 
 A full audit of droidtop and every vendored repo, against the question
@@ -4489,3 +4538,60 @@ of that walk and could disagree about what a game is; they now share
 Every skipped directory is logged with its reason, so this never loses
 files silently.
 
+
+## 7j. Portrait and touch-first chrome (directed 2026-09-10)
+
+"Most people will be on phones without controllers." droidtop's own
+chrome --- the tab bar, Quick Menu, PC surface, game detail, gamelist
+options, settings, onboarding and the launch chooser --- treats a screen
+held upright with no pad attached as a primary target, not a degraded
+one. Two rules carry the whole design.
+
+**One layout system, no duplicated screens.** `LocalShellWindow` carries
+the live window size class (Android's own compact/medium/expanded
+thresholds) and orientation, and every screen measures itself from it.
+There is no portrait COPY of any screen and no orientation branch beyond
+the handful of places where the shape genuinely differs:
+
+- the screen-edge gutter is one definition (48dp at TV distance, 16dp on
+  a compact screen), not a number repeated at every call site;
+- game cards and the PC grid size from the window rather than the
+  console's 220dp;
+- rows that can outgrow the width scroll instead of clipping (the PC
+  filter chips, the hint bar);
+- a modal panel's fixed width is capped by the window, because the half
+  that falls off a phone's edge is the half with the buttons on it;
+- the **Quick Menu** is a right-edge sheet in landscape and a **bottom
+  sheet** in portrait. Its whole premise is that the shell stays visible
+  behind it, and a full-height right-edge sheet on a tall screen IS the
+  whole screen; the bottom sheet also puts its tabs in thumb reach.
+
+**Touch dispatches the real press; it never re-implements it.** Every
+screen decides what a button MEANS in one `onKeyEvent` block next to the
+state it acts on. A touch affordance therefore sends a genuine key event
+down the focused window (`rememberGamepadTouch`,
+`GamepadKeyMap.keyCodeFor`) and travels that same path, so there is
+exactly one definition of every action and touch cannot drift from the
+pad. Consequences:
+
+- the persistent help bar stops being a legend and becomes the control
+  surface: every hint is tappable (`TouchHintBar`), and it stays on a
+  touch screen even when a theme draws its own help row, because that row
+  is decoration and the bar is the only route to B/Y/Select without a pad;
+- actions that had no on-screen name at all are now named and reachable:
+  Select for gamelist options, Y for the PC surface's stores and folders;
+- **long-press is Y** on a game card or app tile --- the same "act on
+  this one" the pad reaches with a second button;
+- **swipe steps** a themed carousel, textlist or grid
+  (`Modifier.esDeSwipeSteps`). Those widgets own a cursor and move in
+  whole entries rather than scrolling, so no Compose gesture applied to
+  them at all before: a themed view could only be driven by a pad.
+
+The pad keeps everything. Touch affordances are additions; no key route
+was changed or removed, and a pad plugged into a portrait phone behaves
+exactly as it does on the console.
+
+Rigs: the emulator `droidtop-portrait` AVD (1080x1920 at 420dpi = 411 x
+731dp, a real 1080p phone) alongside `droidtop-1080p`, driven by the same
+`run.ps1` with `-Portrait`; and a portrait BlueStacks instance.
+Screenshots of both belong in the evidence for any chrome change.
