@@ -254,6 +254,7 @@ object ThemeAssets {
                 // served after a selection change.
                 colorSchemeOverride = ThemePrefs.colorScheme(context, active.name),
                 variantOverride = ThemePrefs.variant(context, active.name),
+                aspectRatioOverride = ThemePrefs.aspectRatio(context, active.name),
             )
         } catch (t: Exception) {
             Log.e("droidtop.ThemeAssets", "Failed to parse theme '${active.name}'", t)
