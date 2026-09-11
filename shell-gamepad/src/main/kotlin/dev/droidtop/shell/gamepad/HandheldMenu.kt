@@ -91,7 +91,10 @@ object MenuTokens {
 }
 
 /** List padding shared by every full-screen menu list. */
-internal val MenuListPadding = PaddingValues(horizontal = 48.dp, vertical = 12.dp)
+internal val MenuListPadding: PaddingValues
+    @androidx.compose.runtime.Composable
+    @androidx.compose.runtime.ReadOnlyComposable
+    get() = PaddingValues(horizontal = LocalShellWindow.current.edgePadding, vertical = 12.dp)
 
 /** A screen-level menu header: name first, explanation second, both quiet. */
 @Composable

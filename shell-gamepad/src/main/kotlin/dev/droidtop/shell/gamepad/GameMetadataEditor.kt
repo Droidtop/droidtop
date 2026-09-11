@@ -80,7 +80,7 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
     }
 
     val current = loaded ?: run {
-        Column(modifier = Modifier.fillMaxSize().background(Color.Black).padding(48.dp)) {
+        Column(modifier = Modifier.fillMaxSize().background(Color.Black).padding(LocalShellWindow.current.edgePadding)) {
             Text("Loading...", color = Color.White, style = MaterialTheme.typography.titleMedium)
         }
         return
@@ -102,7 +102,7 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .padding(horizontal = 48.dp, vertical = 32.dp)
+            .padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 32.dp)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp && GamepadKeyMap.actionFor(event.key) == GamepadAction.BACK) {
                     onDismiss()
@@ -315,7 +315,7 @@ private fun ControllerPicker(current: String?, onPick: (String?) -> Unit, onDism
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .padding(48.dp)
+            .padding(LocalShellWindow.current.edgePadding)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp && GamepadKeyMap.actionFor(event.key) == GamepadAction.BACK) {
                     onDismiss()

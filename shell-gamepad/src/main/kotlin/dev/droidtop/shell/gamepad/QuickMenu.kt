@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -60,8 +62,17 @@ import dev.droidtop.shell.gamepad.input.GamepadKeyMap
  * and it is still a VIEW of the settings catalog's own System group,
  * never a second quick-settings implementation with its own values: the
  * tiles carry the catalog's items and every press goes back to the
- * item's own write path. The sheet is sized by what that grid needs, on
- * the right edge, full height.
+ * item's own write path.
+ *
+ * WHERE the sheet sits follows the shape of the screen, because the
+ * reason it is an edge sheet is that it must not cover the shell behind
+ * it. On a landscape screen that edge is the right one, the Steam Deck
+ * QAM shape, sized by what the tile grid needs. On a screen held
+ * upright, a full-height right-edge sheet is the whole screen, so it
+ * becomes a BOTTOM sheet instead: full width, sized by its content, the
+ * shell still visible above it and the tabs within thumb reach rather
+ * than at the far top corner. Same sheet, same tabs, same contents,
+ * measured differently.
  *
  * A Compose [Dialog] on purpose: its window owns input while open, so
  * modality costs no key-event fencing in the shell underneath.
@@ -74,17 +85,29 @@ internal fun QuickMenu(onDismiss: () -> Unit) {
     ) {
         var tab by remember { mutableStateOf(QuickTab.NOTIFICATIONS) }
 
+        val window = currentShellWindow()
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             // Wide enough for a real tile grid (two columns always, three
             // when the screen has room), capped so the sheet stays a
             // sheet -- the shell behind it must remain visible, which is
             // the whole point of a quick menu over a settings screen.
-            val sheetWidth = (maxWidth * 0.62f).coerceIn(480.dp, 760.dp).coerceAtMost(maxWidth)
+            val sheetWidth = if (window.portrait) {
+                maxWidth
+            } else {
+                (maxWidth * 0.62f).coerceIn(480.dp, 760.dp).coerceAtMost(maxWidth)
+            }
             Surface(
                 modifier = Modifier
-                    .fillMaxHeight()
-                    .width(sheetWidth)
-                    .align(Alignment.CenterEnd)
+                    .then(
+                        if (window.portrait) {
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = maxHeight * 0.72f)
+                        } else {
+                            Modifier.fillMaxHeight().width(sheetWidth)
+                        },
+                    )
+                    .align(if (window.portrait) Alignment.BottomCenter else Alignment.CenterEnd)
                     // Preview, not plain onKeyEvent: the System tab's
                     // CatalogNavigator holds focus and handles its own
                     // keys, and tab switching must win over it -- a
@@ -130,21 +153,37 @@ internal fun QuickMenu(onDismiss: () -> Unit) {
                 color = MenuTokens.OverlaySurface,
                 tonalElevation = 0.dp,
             ) {
-                Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                Column(
+                    modifier = Modifier
+                        .then(if (window.portrait) Modifier.fillMaxWidth() else Modifier.fillMaxSize())
+                        .padding(16.dp),
+                ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         QuickTab.entries.forEach { t ->
                             Text(
                                 t.label,
                                 style = MaterialTheme.typography.titleMedium,
                                 color = if (t == tab) MenuTokens.Accent else MenuTokens.OnSurfaceMuted,
-                                modifier = Modifier.padding(end = 16.dp),
+                                // The tabs were nameplates: L1/R1 switched
+                                // them and a tap did nothing, so on a phone
+                                // the System tab was unreachable.
+                                modifier = Modifier
+                                    .clickable { tab = t }
+                                    .padding(end = 16.dp, top = 8.dp, bottom = 8.dp),
                             )
                         }
                         Spacer(Modifier.weight(1f))
+                        // Closing is B on a pad and had no touch route at
+                        // all; dismissing by tapping outside is not
+                        // discoverable and is not available at all when the
+                        // sheet is full width.
                         Text(
-                            "L1 / R1",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MenuTokens.Placeholder,
+                            "Close",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MenuTokens.OnSurfaceMuted,
+                            modifier = Modifier
+                                .clickable(onClick = onDismiss)
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
                         )
                     }
                     Spacer(Modifier.padding(4.dp))

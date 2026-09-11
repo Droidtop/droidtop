@@ -93,6 +93,7 @@ import dev.droidtop.library.theme.esDeTextListConfig
 import dev.droidtop.library.theme.layoutEsDeCarousel
 import dev.droidtop.library.theme.layoutEsDeGrid
 import dev.droidtop.library.theme.layoutEsDeTextList
+import dev.droidtop.shell.gamepad.esDeSwipeSteps
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 
@@ -526,6 +527,15 @@ private fun EsDeCarousel(
     BoxWithConstraints(
         modifier = (if (firstItemFocus != null) modifier.focusRequester(firstItemFocus) else modifier)
             .focusable()
+            // Swipe moves the cursor the way the D-pad steps it. These
+            // widgets own their cursor and move in whole entries rather
+            // than scrolling, so Compose's own scroll gestures never
+            // applied to them: before this, a themed system view or
+            // gamelist could only be moved by a pad.
+            .esDeSwipeSteps(
+                horizontal = if (verticalType) 0 else 1,
+                vertical = if (verticalType) 1 else 0,
+            ) { step(it) }
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
                 when (GamepadKeyMap.actionFor(event.key)) {
@@ -1093,6 +1103,7 @@ private fun EsDeTextList(
         modifier = (if (firstItemFocus != null) modifier.focusRequester(firstItemFocus) else modifier)
             .focusable()
             .clipToBounds()
+            .esDeSwipeSteps(vertical = 1) { step(it) }
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
                 when (GamepadKeyMap.actionFor(event.key)) {
@@ -1388,6 +1399,14 @@ private fun EsDeGrid(
                 .fillMaxSize()
                 .then(if (firstItemFocus != null) Modifier.focusRequester(firstItemFocus) else Modifier)
                 .focusable()
+                // A grid takes horizontal drags as columns and vertical
+                // ones as whole rows, the same two meanings its own
+                // Left/Right and Up/Down have.
+                .esDeSwipeSteps(horizontal = 1, vertical = layout.columns) { delta ->
+                    if (items.isNotEmpty()) {
+                        cursor = (cursor + delta).coerceIn(0, items.size - 1)
+                    }
+                }
                 .onKeyEvent { event ->
                     if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
                     fun step(delta: Int): Boolean {

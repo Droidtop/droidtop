@@ -13,6 +13,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -203,7 +205,12 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
         Column(
-            modifier = Modifier.padding(48.dp).fillMaxWidth(),
+            // A 48dp gutter is right at TV distance and eats a seventh
+            // of a phone screen; the shell has one definition of this.
+            modifier = Modifier
+                .padding(dev.droidtop.shell.gamepad.currentShellWindow().edgePadding)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {

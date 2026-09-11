@@ -62,6 +62,34 @@ object GamepadKeyMap {
     fun actionFor(key: Key): GamepadAction? = DEFAULT[key]
 
     /**
+     * The reverse: the Android key code an on-screen touch affordance
+     * dispatches to MEAN this action. Touch does not get its own copy of
+     * what a press does -- it sends the real key event and every existing
+     * `onKeyEvent` handler treats it as the press it is (see
+     * `rememberGamepadTouch`). Derived from [DEFAULT] rather than written
+     * out twice, so a remap that changes one changes both.
+     */
+    fun keyCodeFor(action: GamepadAction): Int = when (action) {
+        GamepadAction.A -> android.view.KeyEvent.KEYCODE_BUTTON_A
+        GamepadAction.B -> android.view.KeyEvent.KEYCODE_BUTTON_B
+        GamepadAction.X -> android.view.KeyEvent.KEYCODE_BUTTON_X
+        GamepadAction.Y -> android.view.KeyEvent.KEYCODE_BUTTON_Y
+        GamepadAction.START -> android.view.KeyEvent.KEYCODE_BUTTON_START
+        GamepadAction.SELECT -> android.view.KeyEvent.KEYCODE_BUTTON_SELECT
+        GamepadAction.UP -> android.view.KeyEvent.KEYCODE_DPAD_UP
+        GamepadAction.DOWN -> android.view.KeyEvent.KEYCODE_DPAD_DOWN
+        GamepadAction.LEFT -> android.view.KeyEvent.KEYCODE_DPAD_LEFT
+        GamepadAction.RIGHT -> android.view.KeyEvent.KEYCODE_DPAD_RIGHT
+        GamepadAction.L -> android.view.KeyEvent.KEYCODE_BUTTON_L1
+        GamepadAction.R -> android.view.KeyEvent.KEYCODE_BUTTON_R1
+        GamepadAction.L2 -> android.view.KeyEvent.KEYCODE_BUTTON_L2
+        GamepadAction.R2 -> android.view.KeyEvent.KEYCODE_BUTTON_R2
+        GamepadAction.L3 -> android.view.KeyEvent.KEYCODE_BUTTON_THUMBL
+        GamepadAction.R3 -> android.view.KeyEvent.KEYCODE_BUTTON_THUMBR
+        GamepadAction.BACK -> android.view.KeyEvent.KEYCODE_BACK
+    }
+
+    /**
      * Real label shown in the (currently still hand-drawn, see
      * `ButtonHintFooter`) help bar for [action] -- matches droidtop's
      * existing on-screen labels ("A", "B", "L/R", "◄/►") exactly, so

@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -40,6 +42,8 @@ import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.displayName
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.shell.gamepad.CatalogNavigator
+import dev.droidtop.shell.gamepad.LocalShellWindow
+import dev.droidtop.shell.gamepad.TouchHintBar
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 
@@ -125,11 +129,18 @@ internal fun PcSurface(
     // leaving a drilled-in group, on both the key route and Android's
     // back dispatcher, and it plays the theme's own back sound doing it.
     // A second handler would be a second mechanism for one job.
+    val window = LocalShellWindow.current
     Column(modifier = Modifier.fillMaxSize()) {
         PcHeader(total = entries.size, shown = shown.size, entries = entries)
 
+        // The filter chips outgrow a phone's width long before they
+        // outgrow the console's, and a chip that runs off the edge is a
+        // filter the user cannot turn off again.
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 4.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = window.edgePadding, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             // Sort is one chip that cycles rather than a menu: it is a
@@ -155,14 +166,14 @@ internal fun PcSurface(
                     },
                     color = Color.Gray,
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.align(Alignment.Center).padding(48.dp),
+                    modifier = Modifier.align(Alignment.Center).padding(LocalShellWindow.current.edgePadding),
                 )
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 220.dp),
+                    columns = GridCells.Adaptive(minSize = window.gridItemMinWidth),
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 48.dp)
+                        .padding(horizontal = window.edgePadding)
                         // Compose moves focus in a grid for nobody: the
                         // same explicit d-pad handling the shell's other
                         // grid already needs, and for the same reason.
@@ -226,29 +237,13 @@ private fun PcHeader(total: Int, shown: Int, entries: List<LibraryEntry>) {
 
 @Composable
 private fun PcHints() {
-    Row(
-        modifier = Modifier.fillMaxWidth().background(Color(0xFF111111)).padding(horizontal = 48.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(28.dp),
-    ) {
-        listOf(
-            "A" to "Open",
-            "B" to "Back",
-            "Y" to "Stores and folders",
-            "D-pad" to "Move",
-        ).forEach { (button, label) ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    button,
-                    color = Color.Black,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier
-                        .background(Color.White, RoundedCornerShape(50))
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
-                )
-                Text(label, color = Color.LightGray, style = MaterialTheme.typography.labelMedium)
-            }
-        }
-    }
+    TouchHintBar(
+        hints = listOf(
+            GamepadAction.A to "Open",
+            GamepadAction.B to "Back",
+            GamepadAction.Y to "Stores and folders",
+        ),
+    )
 }
 
 /** Multi-select chip: focusable for the pad, clickable for touch, same as everything else in this shell. */
