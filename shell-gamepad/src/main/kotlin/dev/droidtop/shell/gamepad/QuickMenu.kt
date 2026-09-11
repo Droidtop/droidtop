@@ -213,6 +213,10 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
     var focusIndex by remember { mutableStateOf(0) }
     val listState = rememberLazyListState()
     val focusRequester = remember { FocusRequester() }
+    // Every action below is defined once, in the key handler. A tap
+    // moves the cursor and sends the real press rather than repeating
+    // any of it.
+    val press = rememberGamepadTouch()
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
     LaunchedEffect(focusIndex, items.size) {
@@ -281,6 +285,14 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            // Without this a notification could only be
+                            // reached with a pad: the rows carried no
+                            // touch route at all, in the one sheet a
+                            // phone user opens most.
+                            .clickable {
+                                focusIndex = index
+                                press(GamepadAction.A)
+                            }
                             .background(if (focused) MenuTokens.SurfaceSelected else MenuTokens.Surface)
                             .padding(10.dp),
                     ) {
@@ -316,10 +328,21 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                 }
             }
         }
-        Text(
-            if (granted) "A Open   X Dismiss   Y Clear all   B Close" else "A Grant access   B Close",
-            style = MaterialTheme.typography.labelSmall,
-            color = MenuTokens.Placeholder,
+        // The legend here named X (dismiss one) and Y (clear all),
+        // neither of which had any touch route. As a hint bar the same
+        // line IS the route, dispatching into this dialog's own window.
+        TouchHintBar(
+            hints = if (granted) {
+                listOf(
+                    GamepadAction.A to "Open",
+                    GamepadAction.X to "Dismiss",
+                    GamepadAction.Y to "Clear all",
+                    GamepadAction.B to "Close",
+                )
+            } else {
+                listOf(GamepadAction.A to "Grant access", GamepadAction.B to "Close")
+            },
+            background = androidx.compose.ui.graphics.Color.Transparent,
             modifier = Modifier.padding(top = 8.dp),
         )
     }
