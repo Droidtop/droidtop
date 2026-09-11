@@ -35,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -87,6 +88,11 @@ import dev.droidtop.shell.gamepad.theme.EsDeListItem
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import dev.droidtop.shell.gamepad.theme.EsDeSystemListView
 import dev.droidtop.shell.gamepad.theme.EsDeThemedView
+import dev.droidtop.shell.gamepad.theme.EsDeSystemElementLayer
+import dev.droidtop.shell.gamepad.theme.EsDeSystemSlot
+import dev.droidtop.shell.gamepad.theme.EsDeViewLayer
+import dev.droidtop.library.theme.EsDeSystemSlide
+import dev.droidtop.library.theme.strOrNull
 import androidx.compose.animation.core.Animatable
 import dev.droidtop.library.theme.EsDeViewTransition
 import dev.droidtop.shell.gamepad.theme.ES_DE_SYSTEM_FADE_MS
@@ -1277,6 +1283,50 @@ private fun GameGroup.esDeCollectionKind(): EsDeCollectionKind = when {
     else -> EsDeCollectionKind.AUTO
 }
 
+/**
+ * One system's own contribution to the system view, for the element layer
+ * that draws several of them at once while they slide past each other.
+ *
+ * A theme is parsed PER SYSTEM -- `${system.theme}` and the rest of the
+ * `${system.*}` family are substituted with that system's own values (see
+ * `ThemeAssets.loadActiveTheme`) -- which is why ES-DE keeps one parsed
+ * element set per system (`mSystemElements`, SystemView.cpp:700-800) rather
+ * than one for the view. The loads are cached, so asking for a neighbour's
+ * theme mid-slide costs a lookup.
+ *
+ * Null when the theme has no system view at all, which is the same
+ * condition the non-sliding path already checks before rendering anything.
+ */
+@Composable
+private fun rememberEsDeSystemSlot(
+    group: GameGroup?,
+    entries: List<LibraryEntry>,
+    countsOnly: Boolean,
+): EsDeSystemSlot? {
+    val context = LocalContext.current
+    val themeFolder = (group as? GameGroup.Collection)?.themeFolder
+    val theme = remember(group?.systemThemeFolder, themeFolder, group?.label, ThemePrefs.version) {
+        ThemeAssets.loadActiveTheme(
+            context,
+            group?.systemThemeFolder,
+            themeFolder,
+            systemFullName = group?.label,
+            collectionKind = group?.esDeCollectionKind() ?: EsDeCollectionKind.NONE,
+        )
+    }
+    val view = theme?.views?.get("system") ?: return null
+    return EsDeSystemSlot(
+        view = view,
+        entries = entries,
+        systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
+            name = group?.label,
+            gameCount = entries.size,
+            favoriteCount = entries.count { it.favorite },
+            countsOnly = countsOnly,
+        ),
+    )
+}
+
 /** Real ES-DE auto-collection ids/theme-folder names, confirmed against `CollectionSystemsManager.cpp`'s own real declaration table -- not guessed. */
 private object AutoCollections {
     const val ALL_GAMES_ID = "all"
@@ -1833,12 +1883,12 @@ private fun GamesSection(
                         // reads. With any other animation the element
                         // layer follows the carousel immediately, as it
                         // always has.
-                        val systemFade = esDeTransitions[EsDeViewTransition.SYSTEM_TO_SYSTEM]
+                        val systemToSystem = esDeTransitions[EsDeViewTransition.SYSTEM_TO_SYSTEM]
                             ?: EsDeTransitionAnimation.INSTANT
                         var elementSystemIndex by remember { mutableStateOf(focusedSystemIndex) }
                         val systemFadeOpacity = remember { Animatable(0f) }
-                        LaunchedEffect(focusedSystemIndex, systemFade) {
-                            if (systemFade != EsDeTransitionAnimation.FADE ||
+                        LaunchedEffect(focusedSystemIndex, systemToSystem) {
+                            if (systemToSystem != EsDeTransitionAnimation.FADE ||
                                 elementSystemIndex == focusedSystemIndex
                             ) {
                                 elementSystemIndex = focusedSystemIndex
@@ -1926,6 +1976,12 @@ private fun GamesSection(
                         // gameselector-driven elements (screen2's game-preview
                         // poster, the game1..game9 mosaic, the metadata-bound
                         // title caption).
+                        // A function of the GROUP, not of the focused one:
+                        // while the element layer slides between systems it
+                        // draws the neighbours too, each bound to its own
+                        // system's games (SystemView.cpp's mSystemElements is
+                        // parsed and fed per system).
+                        //
                         // byGroup only partitions System and Pc groups --
                         // a Collection's members live in collectionGroupMembers
                         // (cross-cutting, see GameGroup.Collection's own doc
@@ -1933,11 +1989,18 @@ private fun GamesSection(
                         // an empty list, which showed up on-device as
                         // "0 games (0 favorites)" in the themed gamecount strip
                         // and an empty game-preview for every collection.
-                        val focusedSystemEntries = when (val focused = orderedGroups.getOrNull(elementSystemIndex)) {
+                        fun entriesOf(entryGroup: GameGroup?): List<LibraryEntry> = when (entryGroup) {
                             null -> emptyList()
-                            is GameGroup.Collection -> collectionGroupMembers[focused].orEmpty()
-                            else -> byGroup[focused].orEmpty()
+                            is GameGroup.Collection -> collectionGroupMembers[entryGroup].orEmpty()
+                            else -> byGroup[entryGroup].orEmpty()
                         }
+                        // Real ES-DE special case (SystemView.cpp's own
+                        // favoriteSystem/recentSystem flags): those two
+                        // auto-collections show a bare game count.
+                        fun countsOnly(entryGroup: GameGroup?): Boolean =
+                            (entryGroup as? GameGroup.Collection)?.id
+                                ?.let { it == AutoCollections.FAVORITES_ID || it == AutoCollections.LAST_PLAYED_ID } == true
+                        val focusedSystemEntries = entriesOf(orderedGroups.getOrNull(elementSystemIndex))
                         // Real hints for THIS exact screen state, matching what
                         // ButtonHintFooter would compute for it (canGoBack=false,
                         // showInfo=true, showSectionSwitch=true, showSystemSwitch=
@@ -1977,45 +2040,119 @@ private fun GamesSection(
                             }
                         }
                         if (systemView != null) {
-                            EsDeThemedView(
-                                view = systemView,
-                                items = items,
-                                firstItemFocus = firstFocus,
-                                modifier = Modifier.fillMaxSize(),
-                                // Real ES-DE systembrowse sound: moving the
-                                // system carousel plays SYSTEMBROWSESOUND
-                                // (CarouselComponent.h:108-110 -- the primary
-                                // component's own scroll plays systembrowse
-                                // when NOT hosted in a gamelist, scroll when it
-                                // is). Guarded on a real index CHANGE: this
-                                // callback also fires for the initial focus
-                                // attach, which is not a browse.
-                                onFocusedIndexChanged = {
-                                    if (it != focusedSystemIndex) EsDeNavigationSounds.play("systembrowse")
-                                    focusedSystemIndex = it
-                                },
-                                focusedSystemEntries = focusedSystemEntries,
-                                hints = systemListHints,
-                                systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
-                                    name = focusedGroupLabel,
-                                    gameCount = focusedSystemEntries.size,
-                                    favoriteCount = focusedSystemEntries.count { it.favorite },
-                                    // Real ES-DE special case (SystemView.cpp's own
-                                    // favoriteSystem/recentSystem flags): those two
-                                    // auto-collections show a bare game count.
-                                    countsOnly = (focusedGroup as? GameGroup.Collection)?.id
-                                        ?.let { it == AutoCollections.FAVORITES_ID || it == AutoCollections.LAST_PLAYED_ID } == true,
-                                ),
-                                // droidtop's own real equivalent of ES-DE's
-                                // Window::isBackgroundDimmed -- the options
-                                // menu is a Compose Dialog drawn over this
-                                // view with a scrim, so the theme's own
-                                // helpsystem *Dimmed variants apply while it
-                                // is open. See EsDeThemedHelpSystem.
-                                backgroundDimmed = gamelistOptionsOpen,
-                                transition = esDeTransition,
-                                systemFadeOpacity = systemFadeOpacity.value,
+                            // Real ES-DE systembrowse sound: moving the
+                            // system carousel plays SYSTEMBROWSESOUND
+                            // (CarouselComponent.h:108-110 -- the primary
+                            // component's own scroll plays systembrowse
+                            // when NOT hosted in a gamelist, scroll when it
+                            // is). Guarded on a real index CHANGE: this
+                            // callback also fires for the initial focus
+                            // attach, which is not a browse.
+                            val onSystemFocused: (Int) -> Unit = {
+                                if (it != focusedSystemIndex) EsDeNavigationSounds.play("systembrowse")
+                                focusedSystemIndex = it
+                            }
+                            val systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
+                                name = focusedGroupLabel,
+                                gameCount = focusedSystemEntries.size,
+                                favoriteCount = focusedSystemEntries.count { it.favorite },
+                                countsOnly = countsOnly(focusedGroup),
                             )
+                            // ES-DE's system-to-system SLIDE
+                            // (SystemView.cpp:1565-1745): the element layer
+                            // does not swap between systems, it travels. Each
+                            // system's elements are drawn at their own
+                            // distance from the carousel's continuous camera
+                            // offset, so the neighbours slide in from the
+                            // sides while the carousel scrolls; the carousel
+                            // itself, and the window-level clock, status bar
+                            // and help bar, stay put (:204, :255). That needs
+                            // the view drawn in separate passes, which is the
+                            // one shape this branch has that the others do
+                            // not.
+                            val slidingSystems = systemToSystem == EsDeTransitionAnimation.SLIDE &&
+                                orderedGroups.size > 1
+                            val camOffset = remember { mutableFloatStateOf(0f) }
+                            val slideHorizontal = remember(listElement) {
+                                EsDeSystemSlide.slidesHorizontally(listElement?.type, listElement.strOrNull("type"))
+                            }
+                            val systemSlot: @Composable (Int) -> EsDeSystemSlot? = { index ->
+                                val slotGroup = orderedGroups.getOrNull(index)
+                                rememberEsDeSystemSlot(
+                                    group = slotGroup,
+                                    entries = entriesOf(slotGroup),
+                                    countsOnly = countsOnly(slotGroup),
+                                )
+                            }
+                            if (slidingSystems) {
+                                EsDeSystemElementLayer(
+                                    layer = EsDeViewLayer.BELOW_PRIMARY,
+                                    camOffset = camOffset,
+                                    systemCount = orderedGroups.size,
+                                    slideHorizontal = slideHorizontal,
+                                    backgroundDimmed = gamelistOptionsOpen,
+                                    transition = esDeTransition,
+                                    slot = systemSlot,
+                                )
+                                EsDeThemedView(
+                                    view = systemView,
+                                    items = items,
+                                    firstItemFocus = firstFocus,
+                                    modifier = Modifier.fillMaxSize(),
+                                    onFocusedIndexChanged = onSystemFocused,
+                                    focusedSystemEntries = focusedSystemEntries,
+                                    systemContext = systemContext,
+                                    backgroundDimmed = gamelistOptionsOpen,
+                                    transition = esDeTransition,
+                                    layer = EsDeViewLayer.PRIMARY,
+                                    onCamOffsetChanged = { camOffset.floatValue = it },
+                                )
+                                EsDeSystemElementLayer(
+                                    layer = EsDeViewLayer.ABOVE_PRIMARY,
+                                    camOffset = camOffset,
+                                    systemCount = orderedGroups.size,
+                                    slideHorizontal = slideHorizontal,
+                                    backgroundDimmed = gamelistOptionsOpen,
+                                    transition = esDeTransition,
+                                    slot = systemSlot,
+                                )
+                                // Drawn last and never moved, which is where
+                                // ES-DE draws them from: the focused system's
+                                // own clock, status bar and help bar are handed
+                                // to the Window (SystemView.cpp:255).
+                                EsDeThemedView(
+                                    view = systemView,
+                                    items = emptyList(),
+                                    firstItemFocus = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    focusedSystemEntries = focusedSystemEntries,
+                                    hints = systemListHints,
+                                    systemContext = systemContext,
+                                    backgroundDimmed = gamelistOptionsOpen,
+                                    transition = esDeTransition,
+                                    layer = EsDeViewLayer.WINDOW,
+                                )
+                            } else {
+                                EsDeThemedView(
+                                    view = systemView,
+                                    items = items,
+                                    firstItemFocus = firstFocus,
+                                    modifier = Modifier.fillMaxSize(),
+                                    onFocusedIndexChanged = onSystemFocused,
+                                    focusedSystemEntries = focusedSystemEntries,
+                                    hints = systemListHints,
+                                    systemContext = systemContext,
+                                    // droidtop's own real equivalent of ES-DE's
+                                    // Window::isBackgroundDimmed -- the options
+                                    // menu is a Compose Dialog drawn over this
+                                    // view with a scrim, so the theme's own
+                                    // helpsystem *Dimmed variants apply while it
+                                    // is open. See EsDeThemedHelpSystem.
+                                    backgroundDimmed = gamelistOptionsOpen,
+                                    transition = esDeTransition,
+                                    systemFadeOpacity = systemFadeOpacity.value,
+                                )
+                            }
                             // NO droidtop chrome over a themed screen: the
                             // "Continue Playing" overlay sat directly on top of
                             // decaffe's own real metadata sidebar (and collided

@@ -26,6 +26,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -237,6 +239,17 @@ fun EsDeSystemListView(
     // rather than systems. It decides both halves of the per-entry image
     // chain; see [esDePrimaryImage].
     gamelist: Boolean = false,
+    // ES-DE's `mCamOffset` (CarouselComponent.h's own animated cursor
+    // position): the continuous, fractional entry the primary component is
+    // currently scrolled to. The system view's element layer is translated
+    // by it (SystemView.cpp:1624-1637), so the whole screen moves in
+    // lockstep with the carousel rather than on an animation of its own --
+    // which is why it is reported out of the widget that owns it instead
+    // of being re-derived. Only the carousel has one: droidtop's grid
+    // delegates its cursor to LazyVerticalGrid's focus traversal and the
+    // textlist steps its cursor instantly, so neither animates between
+    // entries for a layer to follow.
+    onCamOffsetChanged: ((Float) -> Unit)? = null,
 ) {
     // Real ES-DE `fontSize`/`itemSize`/`itemSpacing` etc. are fractions of
     // the THEMED area (see LocalEsDeThemedAreaSize's own doc comment for
@@ -307,7 +320,10 @@ fun EsDeSystemListView(
         // "carousel", or no theme-declared element at all -- carousel is
         // ES-DE's own real default shape and the one droidtop already
         // shipped, so it's the honest fallback rather than an arbitrary one.
-        else -> EsDeCarousel(element, typedItems, firstItemFocus, modifier, onFocusedIndexChanged, resolvedWidth, resolvedHeight)
+        else -> EsDeCarousel(
+            element, typedItems, firstItemFocus, modifier, onFocusedIndexChanged,
+            resolvedWidth, resolvedHeight, onCamOffsetChanged,
+        )
     }
 }
 
@@ -369,6 +385,7 @@ private fun EsDeCarousel(
     onFocusedIndexChanged: (Int) -> Unit = {},
     screenWidth: Dp,
     screenHeight: Dp,
+    onCamOffsetChanged: ((Float) -> Unit)? = null,
 ) {
     // Real default text color/background (CarouselComponent's own real
     // constructor defaults, distinct from a generic "text" element's own
@@ -452,6 +469,18 @@ private fun EsDeCarousel(
     var focusedIndex by remember { mutableStateOf(0) }
     var positiveDirection by remember { mutableStateOf(false) }
     val camOffset = remember { Animatable(0f) }
+
+    // ES-DE's `mCamOffset`, published for whoever composes this carousel
+    // (the system view's own element layer follows it; see
+    // [EsDeSystemListView.onCamOffsetChanged]). Collected from a snapshot
+    // flow so the value leaves this widget without any of its own
+    // recomposition depending on it.
+    val reportCamOffset = rememberUpdatedState(onCamOffsetChanged)
+    LaunchedEffect(Unit) {
+        snapshotFlow { camOffset.value }.collect { offset ->
+            reportCamOffset.value?.invoke(offset)
+        }
+    }
 
     LaunchedEffect(focusedIndex, config.instantItemTransitions) {
         val startPos = camOffset.value
