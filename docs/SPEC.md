@@ -2096,153 +2096,146 @@ something consequential, this needs the same kind of one-time pairing-code
 exchange as Sunshine itself before it can safely listen on anything but
 localhost. See `pc-helper/README.md`.
 
-## 7b. Onboarding, import, and configuration
+## 7b. Onboarding
 
-The onboarding flow itself is real and built (see below). Import and
-launcher-sync are still design only, but two real, concrete mechanisms
-already exist to build them on rather than invent from scratch (confirmed
-by reading actual code/formats, not assumed):
+### What onboarding is for
 
-- **Importing from another Android home-screen launcher** has a real AOSP
-  mechanism already sitting in `:shell-default`'s forked source:
-  `LauncherProvider`, `provider/RestoreDbTask.java`, and `model/
-  DeviceGridState.java` are exactly what stock Android's own device-setup
-  "restore your home screen" flow uses to migrate a previous launcher's
-  workspace layout, and `RestoreDbTask.setPending(context, isManualRestore
-  = true)` confirms a manual-trigger path exists — not exclusively tied to
-  the OS's full Backup & Restore pipeline. Open question, not yet
-  investigated: exactly what has to exist on-device (a real backed-up
-  `launcher.db`, accessible from where) for a *manually*-triggered restore
-  to have anything to restore from — this needs real testing against an
-  actual previous launcher's data, not assumed to just work.
-  (Also relevant: `:app`'s own `android:allowBackup="false"` may need
-  reconsidering if any part of this ends up depending on the OS backup
-  pipeline specifically, as opposed to the manual path.)
-- **Syncing with a gaming-focused launcher's library data** (ES-DE and
-  other emulation frontends) — data-level only, both directions: reading
-  their catalog into droidtop's own `Library` so it stays aware of what's
-  there, and (later) writing back entries droidtop knows about that
-  they don't yet. **droidtop does not do emulation itself and does not
-  run or launch anything on another app's behalf** — this is purely
-  library/metadata sync, the same category as the AOSP launcher-import
-  mechanism above, not an execution or backend relationship. Launching
-  an ES-DE-sourced entry *from* droidtop means handing off to ES-DE (or
-  whatever emulator ES-DE itself would use), not droidtop emulating it.
-  Reads from the user's ROMs/frontend-data folder via the Storage Access
-  Framework (`ACTION_OPEN_DOCUMENT_TREE`, user grants folder access
-  explicitly) — this data lives on shared storage, not another app's
-  private sandbox, so it's actually reachable under scoped storage rules,
-  confirmed via real research rather than assumed possible. Maps into
-  `:library-core`'s `LibraryEntry` model like anything else the library
-  aggregates.
-  - ES-DE and several compatible tools use `gamelist.xml` + per-system
-    JSON platform config — a genuine de-facto-standard in this space, not
-    a one-off format; one importer plausibly covers more than just ES-DE
-    itself.
-  - Other gaming-focused launchers exist with their own platform-ID
-    registries that in some cases explicitly interop with ES-DE metadata
-    as a built-in feature — further confirmation that ES-DE's format
-    really is the common denominator other tools build interop around,
-    not just droidtop's own assumption. Any such registry's exact schema
-    needs real investigation before an importer for it can be built —
-    flagged as an open gap, not assumed settled the way the AOSP/ES-DE
-    mechanisms above are.
-- **Platform/system taxonomy**: `LibraryEntry`'s retro/emulation entries
-  need a canonical platform identifier (`"snes"`, `"psx"`, `"gba"`, ...) to
-  group, filter, and theme by in the Gaming shell — and to have anywhere
-  to map *into* from each importer above. Rather than inventing droidtop's
-  own scheme, adopt **ES-DE's `es_systems.xml` platform-naming
-  convention as the canonical standard**: it's already the mechanism
-  several compatible launchers are built around, and RetroArch/libretro
-  core naming lines up with it closely. Each importer translates its own
-  source format into this canonical set (tools already using ES-DE's own
-  format need little to no translation; anything with its own registry
-  needs an explicit mapping table, not yet built since no such schema is
-  confirmed yet — see above) rather than droidtop carrying several
-  incompatible per-source taxonomies side by side.
-- **Onboarding flow (real, built)** — `app/src/main/kotlin/dev/droidtop/app/OnboardingActivity.kt`.
-  Onboards the *device*, not one mode: a user shouldn't have to visit
-  Settings right after first run just to finish setting up a second mode
-  they also want, since configuring a mode and picking the default are
-  independent questions. Real flow:
-  `WELCOME → HOME_CHOICE → [STANDARD_SETUP | ALTERNATIVE_SETUP] →
-  CONFIGURE_MORE (multi-select: Desktop, Gaming) → [DESKTOP_SETUP] →
-  [STORAGE_PERMISSION/GAMES_FOLDERS] → DEFAULT_MODE_CHOICE`.
-  - **HOME_CHOICE**: how the Android home screen itself should work —
-    droidtop's own Standard launcher, a new **Alternative** mode (see
-    below), or neither (droidtop claims no `CATEGORY_HOME` role at all;
-    its icon just opens `:app`'s `MainActivity` directly like any other
-    app). Every mode-specific setup step below is independently
-    skippable and re-enterable later from Settings — see each Settings
-    fragment's own `PREF_*` entries
-    (`SettingsGamingFragment.PREF_GAME_FOLDERS`,
-    `SettingsDesktopFragment.PREF_ROOT_COMPOSITOR_SETUP`,
-    `SettingsMiscFragment.PREF_DROIDTOP_HOME_SCREEN`), each relaunching
-    `OnboardingActivity` at one step via
-    `EXTRA_START_STEP`, not onboarding-only.
-  - **DESKTOP_SETUP** runs a live root-capability check
-    (`DroidSpacesRuntime.checkSystemRequirements()`) and lets the user
-    pick which catalog entry (distro + compositor) to use, stored via
-    `DesktopSetupPrefs` and honored by
-    `DesktopSessionService.selectPrimaryImage` — closes what used to be
-    "no user-facing compositor-choice setting yet."
-  - **STORAGE_PERMISSION** asks for whichever permission is the real
-    one on this device. From API 30 that is "All files access"
-    (`MANAGE_EXTERNAL_STORAGE`, opened through
-    `ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION`); below it, that
-    settings activity does not exist and the intent throws, so API 26-29
-    gets the legacy `READ_EXTERNAL_STORAGE` runtime prompt instead
-    (declared with `maxSdkVersion="29"`). minSdk is 26 and the older path
-    is a supported one, not a fallback: droidtop's scanner reads games
-    through `java.io.File`, and on API 26-29 the legacy permission is
-    exactly what grants that.
-  - **GAMES_FOLDERS** takes a root two ways, both writing the same
-    `droidtop_games_root_paths` set and scanned identically: the SAF
-    folder picker, and a typed absolute path
-    (`GamesRootPrefs.addGamesRootByPath`, mirrored in Settings > ROM
-    folders as "Add a folder by path"). The typed path is validated at
-    entry against the same question the scanner will ask — absolute,
-    exists, is a directory, and `listFiles()` returns something — so an
-    unreadable path is refused with a reason rather than stored and
-    silently scanning nothing. Why a step that already has a picker also
-    takes a path is §7g, "A root is a place, not a picker result".
-  - **DEFAULT_MODE_CHOICE** calls `ModePrefs.setLastMode` — this is what
-    `com.android.launcher3.Launcher`'s own real cold-boot redirect
-    (`mDroidtopPendingModeRedirect`, already shipping) and
-    `AlternativeLauncherActivity`'s equivalent redirect (see below) both
-    read to send a user straight to their actual default mode instead of
-    always landing on whichever HOME activity is currently active.
-- **"Alternative" mode — droidtop holds HOME, forwards to a different
-  installed launcher.** Real, verified mechanism (not guessed) — confirmed
-  against `farmerbb/Taskbar`'s actual shipping source (`HSLActivity.java`):
-  a second `CATEGORY_HOME` activity
-  (`shell-default`'s `AlternativeLauncherActivity`), disabled by default,
-  mutually exclusive with `com.android.launcher3.Launcher` via
-  `HomeRolePrefs.setActiveHomeImplementation` (`PackageManager.setComponentEnabledSetting`
-  on each, opposite states — never both enabled). On launch it resolves
-  the user's saved target (`HomeRolePrefs.alternativeTarget`, picked from
-  `PackageManager.queryIntentActivities` on `ACTION_MAIN`+`CATEGORY_HOME`,
-  no extra `<queries>` block needed since `shell-default`'s manifest
-  already holds `QUERY_ALL_PACKAGES` for its own app-drawer needs) to an
-  explicit `ComponentName` and forwards via `startActivity`. Falls back to
-  Settings if the saved target is missing/uninstalled rather than looping
-  or crashing. `BackButtonMenu`'s "Android" menu entry resolves to
-  whichever of Standard/Alternative is currently active
-  (`HomeRolePrefs.activeHomeImplementation`), and is hidden entirely when
-  neither is. A separately-considered "Secondary Launcher"/`SECONDARY_HOME`
-  AOSP concept (`com.android.launcher3.secondarydisplay.SecondaryDisplayLauncher`)
-  turned out to be unrelated — that's Launcher3 itself rendering on an
-  *external display*, not forwarding to a different launcher app.
-- **`shell-default`'s Standard shell is already a full-featured Murine
-  Launcher/Launcher3 fork**, not a bare-bones fallback — real settings
-  already exist (`SettingsGeneralFragment`, `SettingsHomeFragment`,
-  `SettingsDrawerFragment`, `SettingsIconPackFragment`,
-  `SettingsIconsFragment`, `SettingsQsbFragment`,
-  `SettingsHiddenAppsFragment`, `SettingsMiscFragment` — backup/restore,
-  default-launcher picker). Onboarding's `STANDARD_SETUP` step points here
-  rather than re-inventing any of it; if the user can't use droidtop's own
-  launcher the way they want, choosing it isn't a real option, so it needs
-  to be genuinely full-featured, not an implicit no-setup-needed fallback.
+droidtop onboards the **device**, not one mode. Configuring a mode and choosing the
+default are independent questions, so a person who wants two modes must not have to
+finish in Settings what first run started. Every step is independently skippable and
+independently re-enterable later from the Settings row that owns it
+(`OnboardingActivity.EXTRA_START_STEP`); re-entering runs that one step and returns.
+
+The flow onboards in this order: how the Android home screen behaves, what else to set
+up, the permissions and folders those choices need, the input and appearance they will be
+used through, and finally which of the things actually configured droidtop opens into.
+
+### The frame every step renders into
+
+Onboarding is one scaffold, not a set of unrelated screens. The scaffold owns:
+
+- **Progress**, always visible: which step this is out of the steps this run will actually
+  present. A person must be able to tell how much is left.
+- **Back**, always available, stepping back through the path actually taken. System Back
+  is the same control. Leaving onboarding is a deliberate act with a confirmation — never
+  one Back press, which today drops to the system home.
+- A **title**, a **body capped to a readable measure** (roughly 72 characters, whatever the
+  window is), a **content slot**, and a **fixed action area**.
+- The action area carries the step's own advance at full weight. A step's Next is never a
+  text link sitting below a louder button that does something smaller.
+- Content is top-aligned and the action area is docked at the bottom in portrait, bottom-right
+  in landscape. Nothing is vertically centred in a tall window.
+- One gutter, the shell's own (`ShellWindow.edgePadding`), one spacing scale, one type scale,
+  one colour source — section 7j. Touch targets meet `minTouchTarget` in every orientation,
+  not only when the window is touch-first.
+- Onboarding is dark, like the shell it hands over to; it does not follow the system
+  light/dark setting into a white first run.
+
+### The one choice component
+
+Every question with mutually exclusive answers — the home-screen choice, the launcher list,
+the distro/compositor list, the theme list, the default mode — is the same selectable row:
+full width, at least 56dp, a leading icon where the thing has one (an app's own icon, a
+theme's thumbnail), a title, one line of supporting text, and a real selected state. Equal
+options are equally weighted; droidtop never renders three equal answers as two filled
+buttons and a link. The component is the shell's existing menu row anatomy
+(section 7j), not a third one invented here.
+
+### The steps
+
+- **Welcome.** Says what droidtop can turn this device into and that every choice is
+  changeable later. Carries droidtop's own mark.
+- **Home screen.** How the home screen behaves when Home is pressed: droidtop's own Standard
+  launcher, Alternative (droidtop holds the HOME role and forwards to a launcher the person
+  already has), or neither, in which case droidtop claims no `CATEGORY_HOME` role and its
+  icon opens `:app` like any other app.
+  - *Standard* points at the Standard shell's own settings rather than re-inventing them,
+    and returns to onboarding afterwards.
+  - *Alternative* lists the installed home activities with their icons and their application
+    labels — never a class name, never a label that names nothing.
+- **Anything else to set up.** Desktop and Gaming, each with a line saying what setting it
+  up involves and what happens if it is left unticked. Leaving both unticked is a valid
+  answer and says so.
+- **Desktop setup.** States the root situation first, as a statement a person can act on: what
+  was found, what it means, and what to do about it — not a backend error string. When the
+  mode cannot run on this device, droidtop says so and does not present a choice underneath
+  that the person cannot use. When it can, the distro-and-compositor list is the one choice
+  component, each entry named and described rather than shown as an id. droidtop never
+  pre-selects an image the person did not choose; Skip is the honest "no choice yet".
+- **Storage.** Skipped outright when the permission is already held. Otherwise the rationale
+  comes **before** the prompt and says what droidtop reads (the game folders you name) and
+  what it does not, per API level:
+  - API 26–29: the platform's own order — already granted, then
+    `shouldShowRequestPermissionRationale`, then the rationale, then the request. On denial,
+    name the feature that is now unavailable, continue, and do not ask again.
+  - API 30+: all-files access is granted on Android's own Settings screen. Say that droidtop
+    cannot grant it, say what to turn on, hand over, and re-check the real state on return
+    rather than trusting a result code.
+  - The skip label describes the consequence, not a motive the person may not hold.
+- **Game folders.** The single name for this concept, everywhere in droidtop. Two routes, both
+  first-class: the system picker, and a typed path for what the picker cannot reach (an
+  emulator's host share, a mount a rooted device adds, a USB drive), validated for real before
+  it is stored. Each added folder is a row showing the path, what the scan found under it, and
+  a way to remove it. The step reports the result of the scan; a folder that yields nothing is
+  a fact the person learns here, not after onboarding.
+- **No games yet.** When nothing is found, droidtop offers concrete repairs rather than an
+  empty library, following ES-DE: choose a different folder, generate the conventional
+  `roms/<system>` plus `bios` layout under ES-DE's own system ids and report what was created,
+  or continue with an empty library. Generating is safe to re-run and never overwrites an
+  existing folder or assignment.
+- **Controller.** Reports the attached pad by name, takes one press to confirm the mapping,
+  and offers the A/B swap as an explicit question rather than a setting to discover. Skippable,
+  and says so.
+- **Appearance.** Themes as the one choice component with a real rendered preview, named by
+  display name — never a directory id, never a theme's own untranslated capability label. On a
+  portrait screen the portrait-capable theme is preselected and the reason is stated as a
+  property of the themes, not as a swap to accept; choosing a landscape-only theme anyway
+  restates what that will look like. The resolved default is written down the first time it
+  resolves, so rotating the device never moves the theme under the person.
+- **Keyboard.** Optional. droidtop cannot set the system input method itself, so it states why
+  a desktop keyboard is needed, hands over to Android's own screens, and reflects what came
+  back. Declining is a real answer, not a nag. A primary action always produces visible
+  feedback, including when the platform screen it opens does not exist on this API level.
+- **Default mode.** Offers only modes whose setup actually produced something usable — the
+  outcome, not the tick-box: Desktop qualifies when an image was chosen and the capability
+  check passed. When exactly one mode qualifies this is a confirmation, not a question with
+  one answer.
+- **What next.** Onboarding ends with a summary: what was set up, what was skipped, and where
+  in Settings each skipped thing lives, then one action into the chosen mode. It does not end
+  by returning to the system home.
+
+### Copy
+
+Sentence case. One dash convention. One name per concept — "game folders" is never also "ROM
+folders". No developer notation in a user-facing string (no `<folder>/<system>/<romFile>`, no
+package or class names, no backend error text). Button labels are the verb of what happens.
+A sentence that describes a consequence belongs where the consequence is chosen.
+
+### Import and library sync (design; separate from the flow above)
+
+Two real mechanisms exist to build import on rather than invent from scratch:
+
+- **Importing another Android launcher's home screen** uses the AOSP mechanism already in
+  `:shell-default`'s forked source — `LauncherProvider`, `provider/RestoreDbTask.java`,
+  `model/DeviceGridState.java`, the same path stock Android's own device-setup restore uses,
+  with `RestoreDbTask.setPending(context, isManualRestore = true)` as the manual trigger. Open
+  question: what must exist on-device for a manually-triggered restore to have anything to
+  restore from. (`:app`'s `android:allowBackup="false"` needs revisiting only if this ends up
+  depending on the OS backup pipeline rather than the manual path.)
+- **Syncing a gaming frontend's library data** is data-level only, both directions: reading
+  their catalog into droidtop's `Library`, and later writing back entries they lack. droidtop
+  does not emulate and does not run anything on another app's behalf; launching an
+  ES-DE-sourced entry means handing off to ES-DE. Reads go through the Storage Access Framework
+  (`ACTION_OPEN_DOCUMENT_TREE`), which reaches shared storage under scoped-storage rules, and
+  map into `:library-core`'s `LibraryEntry` like any other source. `gamelist.xml` plus
+  per-system JSON is the de-facto standard here, so one importer plausibly covers more than
+  ES-DE itself; any other frontend's platform-id registry needs its schema investigated before
+  an importer for it is built.
+- **Platform taxonomy.** Retro entries need a canonical platform identifier to group, filter
+  and theme by. droidtop adopts **ES-DE's `es_systems.xml` naming** as that standard rather
+  than inventing one: several compatible launchers are already built around it and
+  RetroArch/libretro core naming lines up closely. Each importer translates its own format into
+  that set; droidtop does not carry several incompatible per-source taxonomies side by side.
 
 ## 7c. Wine prefix / container configuration UI
 
@@ -4783,3 +4776,43 @@ Rigs: the emulator `droidtop-portrait` AVD (1080x1920 at 420dpi = 411 x
 731dp, a real 1080p phone) alongside `droidtop-1080p`, driven by the same
 `run.ps1` with `-Portrait`; and a portrait BlueStacks instance.
 Screenshots of both belong in the evidence for any chrome change.
+## 7k. The design system: one spacing scale, one type scale, one colour source
+
+droidtop draws two kinds of surface. A **themed view** takes every colour, typeface and
+measurement from the active ES-DE theme (section 7f) and is out of scope here. Everything
+else — onboarding, the shell's chrome and menus, the settings catalog, the Quick Menu, the
+PC surface, the desktop panels — is **droidtop's own chrome**, and all of it obeys one system.
+
+**Spacing.** One responsive source, `ShellWindow`: the screen-edge gutter, the gap between
+top-level tabs, the minimum grid item, the minimum touch target and the maximum modal width
+are all derived from the window's own size class, never repeated as a number at a call site.
+Between the gutter and the glyph there is one step scale, and every padding, gap and inset is
+a step on it. A measurement that is not a step is a defect, not a preference. The minimum
+touch target applies in every orientation and on every input, because a pad-shaped device
+still has a touchscreen; it is not conditional on the window being touch-first.
+
+**Type.** droidtop's chrome has its own type scale, supplied to the theme alongside the colour
+scheme rather than inherited from the platform default, and each role has one documented job:
+what a screen title is, what a row title is, what a row's supporting line is, what a section
+label is, what a value is. Two screens in the same flow do not use different roles for the
+same job. Body text is capped to a readable measure regardless of how wide the window is; a
+full-bleed line on a 1280dp screen is a defect. One line of text that cannot fit is truncated
+with an ellipsis and is reachable in full somewhere.
+
+**Colour.** One source per surface family, and the families are named so a screen cannot pick
+the wrong one. The shell's menu palette is absolute against its own overlay surface, so any
+panel that hosts it is painted from that same palette — a platform scheme underneath a
+hand-picked one is what produced white-on-white. droidtop's chrome outside the shell takes its
+colours from droidtop's own scheme. No screen defines a colour inline. Every text-on-surface
+pair in both palettes is covered by a contrast test, not only the menu palette.
+
+**One anatomy per thing.** One row (title, optional supporting line, optional value, optional
+chevron; a chevron means "this opens", a value means "this is set to", and neither stands in
+for the other). One selectable choice row. One tile. One section label. One empty state. One
+selection idiom — a brightened card — across every droidtop-drawn surface; a focus rectangle
+in one place and a card in another is two answers to one question. One help/hint bar per
+screen, positioned inside the window.
+
+**Copy is part of the system.** Sentence case, one dash convention, one name per concept, verb
+labels on buttons, no developer notation and no backend error strings in a user-facing string.
+
