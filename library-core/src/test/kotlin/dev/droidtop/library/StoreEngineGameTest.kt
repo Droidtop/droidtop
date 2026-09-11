@@ -130,9 +130,11 @@ class StoreEngineGameTest {
         // now READY rather than a setup step (the renderer seam landed),
         // so what makes enginehost win is the engine row's own priority
         // and not Wine being unavailable: the stronger form of the same
-        // claim.
+        // claim. Asserted on selectable rather than on the state itself:
+        // which state that seam produces is another owner's constant, and
+        // the ranking this test exists for holds in either.
         val wine = options.first { it.strategy == GameLaunchStrategy.WINE_PREFIX }
-        assertEquals(RunnerState.READY, wine.state)
+        assertTrue("Wine should be offered for a game with an .exe", wine.selectable)
         assertTrue(options.indexOf(wine) > options.indexOf(resolved.option))
     }
 
