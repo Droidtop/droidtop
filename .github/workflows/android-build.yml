@@ -346,6 +346,14 @@ jobs:
         # the next push has no answer to give, and running the gate there
         # only reports a failure nobody caused. Several pushes land in
         # this repo per hour, so that is the common case, not a corner.
+        #
+        # Scope: our own modules are strict -- a NewApi error in anything
+        # droidtop writes, :shell-default included, fails this step. The
+        # ONE exception is the vendored gamenative tree, whose findings
+        # are recorded in app/lint-baseline.xml; see the lint block in
+        # app/build.gradle.kts and SPEC 10b for why a baseline rather
+        # than an exclusion, and note that the baseline still fails any
+        # finding it does not already list.
         if: ${{ !cancelled() }}
         run: ./gradlew :app:lintDebug --stacktrace
 
@@ -353,8 +361,14 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
+          # The baseline itself goes up too: when it does not exist lint
+          # WRITES it and aborts, and that generated file is how the
+          # committed one is produced (filtered to the vendored tree)
+          # rather than hand-written against a format lint owns.
+          path: |
+            app/build/reports/lint-results-debug.*
+            app/lint-baseline.xml
           name: lint-report
-          path: app/build/reports/lint-results-debug.*
           if-no-files-found: ignore
 
       - name: Run unit tests
