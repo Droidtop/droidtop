@@ -351,7 +351,9 @@ internal fun GamelistOptionsMenu(
 
     Dialog(onDismissRequest = onDismiss) {
         MenuPanel(
-            modifier = Modifier.width(520.dp),
+            // A fixed 520dp panel is wider than a phone, and the part
+            // that falls off the edge is the part with the buttons on it.
+            modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(520.dp)),
             focusLabel = "Gamelist options",
             onKey = { event ->
                 if (event.type != KeyEventType.KeyUp) {
