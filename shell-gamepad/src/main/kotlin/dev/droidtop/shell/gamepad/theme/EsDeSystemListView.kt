@@ -62,6 +62,7 @@ import coil3.compose.AsyncImage
 import dev.droidtop.library.EsDeArtwork
 import dev.droidtop.library.GameMediaLocator
 import dev.droidtop.library.theme.EsDeCarouselConfig
+import dev.droidtop.library.theme.EsDeCollectionKind
 import dev.droidtop.library.theme.EsDeCarouselPlacement
 import dev.droidtop.library.theme.EsDeImageTypes
 import dev.droidtop.library.theme.EsDeCarouselType
@@ -75,12 +76,12 @@ import dev.droidtop.library.theme.EsDeSelectorLayer
 import dev.droidtop.library.theme.EsDeTextListConfig
 import dev.droidtop.library.theme.EsDeThemeElement
 import dev.droidtop.library.theme.EsDeThemeValue
-import dev.droidtop.library.theme.applyTo
 import dev.droidtop.library.theme.colorOrNull
 import dev.droidtop.library.theme.floatOrNull
 import dev.droidtop.library.theme.pathOrNull
 import dev.droidtop.library.theme.strOrNull
 import dev.droidtop.library.theme.esDeCarouselConfig
+import dev.droidtop.library.theme.esDeEntryLabel
 import dev.droidtop.library.theme.esDeGridConfig
 import dev.droidtop.library.theme.esDeGridItemCenter
 import dev.droidtop.library.theme.esDeGridScrollRow
@@ -130,6 +131,22 @@ data class EsDeListItem(
     // rule that reads it is real, and half-implementing that rule would
     // silently paint folders in the wrong color the day folders land.
     val isSecondary: Boolean = false,
+    /**
+     * Which kind of system this entry IS, for the two real per-collection
+     * letter-case properties (see [EsDeCollectionKind]). Only a system-view
+     * entry is ever anything but NONE -- ES-DE picks between the two
+     * properties per system in SystemView.cpp:835-849.
+     */
+    val collectionKind: EsDeCollectionKind = EsDeCollectionKind.NONE,
+    /**
+     * The system this entry's game really comes from, set only while a
+     * COLLECTION's gamelist is being shown -- real ES-DE's
+     * `getSourceFileData()->getSystem()->getName()`, which feeds the
+     * `systemNameSuffix` " [SYSTEM]" label (GamelistBase.cpp:789-806). Null
+     * outside a collection, which is the same condition as ES-DE's own
+     * `isCollection && mSystemNameSuffix` guard.
+     */
+    val sourceSystemName: String? = null,
     // Where this item's game keeps its scraped media, so a carousel or
     // grid that declared an `<imageType>` can resolve THAT type instead of
     // always showing [logoPath]. Null for a system-list item (a system has
@@ -464,6 +481,10 @@ private fun EsDeCarousel(
         } else {
             null
         },
+        letterCaseAutoCollections = config.letterCaseAutoCollections,
+        letterCaseCustomCollections = config.letterCaseCustomCollections,
+        systemNameSuffix = config.systemNameSuffix,
+        letterCaseSystemNameSuffix = config.letterCaseSystemNameSuffix,
     )
 
     val verticalType = config.type == EsDeCarouselType.VERTICAL || config.type == EsDeCarouselType.VERTICAL_WHEEL
@@ -678,6 +699,10 @@ private data class EsDeCarouselItemText(
     val horizontalAlignment: EsDeHorizontalAlign,
     val verticalAlignment: EsDeVerticalAlign,
     val scrolling: EsDeItemLabelScroll?,
+    val letterCaseAutoCollections: EsDeLetterCase,
+    val letterCaseCustomCollections: EsDeLetterCase,
+    val systemNameSuffix: Boolean,
+    val letterCaseSystemNameSuffix: EsDeLetterCase,
 )
 
 /** Real `textHorizontalScroll*` group for an item label (CarouselComponent.h:1798-1814, GridComponent.h:1418-1434). */
@@ -718,6 +743,18 @@ private fun EsDeCarouselItem(
     val baseModifier = modifier
         .size(width = width, height = height)
         .clickable(onClick = item.onSelect)
+    // Real entry-name assembly -- the per-collection letter case and the
+    // system-name suffix, see [esDeEntryLabel].
+    val label = esDeEntryLabel(
+        name = item.label,
+        letterCase = text.letterCase,
+        collectionKind = item.collectionKind,
+        letterCaseAutoCollections = text.letterCaseAutoCollections,
+        letterCaseCustomCollections = text.letterCaseCustomCollections,
+        systemNameSuffix = text.systemNameSuffix,
+        letterCaseSystemNameSuffix = text.letterCaseSystemNameSuffix,
+        sourceSystemName = item.sourceSystemName,
+    )
 
     if (item.logoPath != null) {
         val shift = if (isFocused) imageSelectedColorShift else imageColorShift
@@ -769,7 +806,7 @@ private fun EsDeCarouselItem(
             contentAlignment = esDeItemContentAlignment(text.horizontalAlignment, text.verticalAlignment),
         ) {
             EsDeItemLabel(
-                label = text.letterCase.applyTo(item.label),
+                label = label,
                 color = if (isFocused) text.selectedColor else text.color,
                 width = width * text.relativeScale,
                 height = height * text.relativeScale,
@@ -1146,8 +1183,15 @@ private fun EsDeTextListRow(
     // Real name construction (GamelistBase.cpp:896-949): the indicator
     // prefix goes on first, and letterCase is applied to the whole
     // resulting string afterwards -- not the other way round.
-    val label = config.letterCase.applyTo(
-        esDeIndicatorPrefix(config.indicators, item.favorite) + item.label,
+    val label = esDeEntryLabel(
+        name = esDeIndicatorPrefix(config.indicators, item.favorite) + item.label,
+        letterCase = config.letterCase,
+        collectionKind = item.collectionKind,
+        letterCaseAutoCollections = config.letterCaseAutoCollections,
+        letterCaseCustomCollections = config.letterCaseCustomCollections,
+        systemNameSuffix = config.systemNameSuffix,
+        letterCaseSystemNameSuffix = config.letterCaseSystemNameSuffix,
+        sourceSystemName = item.sourceSystemName,
     )
     val marginStart = config.selectedBackgroundMarginsX
     val marginEnd = config.selectedBackgroundMarginsY
@@ -1500,7 +1544,16 @@ private fun EsDeGridEntry(
             // so `lineSpacing` and the `textHorizontalScroll*` group behave
             // the same in both.
             EsDeItemLabel(
-                label = config.letterCase.applyTo(item.label),
+                label = esDeEntryLabel(
+                    name = item.label,
+                    letterCase = config.letterCase,
+                    collectionKind = item.collectionKind,
+                    letterCaseAutoCollections = config.letterCaseAutoCollections,
+                    letterCaseCustomCollections = config.letterCaseCustomCollections,
+                    systemNameSuffix = config.systemNameSuffix,
+                    letterCaseSystemNameSuffix = config.letterCaseSystemNameSuffix,
+                    sourceSystemName = item.sourceSystemName,
+                ),
                 color = colorOfPacked(if (selected) config.textSelectedColor else config.textColor),
                 width = (config.itemSizeX * config.textRelativeScale * scale).dp,
                 height = (config.itemSizeY * config.textRelativeScale * scale).dp,

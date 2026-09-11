@@ -72,6 +72,7 @@ import dev.droidtop.library.integrations.OpenWithTarget
 import dev.droidtop.library.integrations.openWithChipLabel
 import dev.droidtop.library.integrations.openWithTargetsFor
 import dev.droidtop.library.theme.SystemThemeColors
+import dev.droidtop.library.theme.EsDeCollectionKind
 import dev.droidtop.library.theme.ThemeAssets
 import dev.droidtop.library.theme.primaryListElement
 import dev.droidtop.shell.gamepad.input.GamepadAction
@@ -1220,6 +1221,21 @@ private sealed interface GameGroup {
     }
 }
 
+/**
+ * Which of real ES-DE's two collection KINDS a group is, for the theme
+ * properties that case a collection's own name
+ * (`letterCaseAutoCollections` / `letterCaseCustomCollections`,
+ * SystemView.cpp:835-849). The auto-collections are the three computed ones
+ * -- ES-DE's own `isCollection() && !isCustomCollection()` -- and anything
+ * the user built themselves is custom, which here is exactly the
+ * [GameGroup.Collection] whose theme folder is the custom one.
+ */
+private fun GameGroup.esDeCollectionKind(): EsDeCollectionKind = when {
+    this !is GameGroup.Collection -> EsDeCollectionKind.NONE
+    themeFolder == AutoCollections.CUSTOM_THEME_FOLDER -> EsDeCollectionKind.CUSTOM
+    else -> EsDeCollectionKind.AUTO
+}
+
 /** Real ES-DE auto-collection ids/theme-folder names, confirmed against `CollectionSystemsManager.cpp`'s own real declaration table -- not guessed. */
 private object AutoCollections {
     const val ALL_GAMES_ID = "all"
@@ -1466,7 +1482,10 @@ private fun GamesSection(
     // activates the focused item) -- launching directly on select, since
     // a themed gamelist view has no separate "drill in further" step the
     // way the system list's onSelect (open this system) does.
-    val gamelistWidgetItems = remember(systemGamesForGroup) {
+    // Keyed on the group too: whether a game shows its own system as a
+    // suffix depends on whether the list being shown IS a collection.
+    val inCollectionGamelist = selectedGroup is GameGroup.Collection
+    val gamelistWidgetItems = remember(systemGamesForGroup, inCollectionGamelist) {
         systemGamesForGroup.map { entry ->
             EsDeListItem(
                 key = entry.id,
@@ -1480,6 +1499,14 @@ private fun GamesSection(
                 // Real ES-DE textlist indicators: a favorite game gets a
                 // leading marker before its name in a gamelist.
                 favorite = entry.favorite,
+                // Real `systemNameSuffix`: inside a COLLECTION's gamelist
+                // every game names the system it really comes from
+                // (GamelistBase.cpp:789-806). Outside one this stays null,
+                // which is ES-DE's own `isCollection` guard.
+                // ES-DE appends the SHORT system name here
+                // (getSourceFileData()->getSystem()->getName(), e.g.
+                // "megadrive"), which is what systemId is.
+                sourceSystemName = if (inCollectionGamelist) entry.systemId else null,
             )
         }
     }
@@ -1731,6 +1758,11 @@ private fun GamesSection(
                                 key = entryGroup.key,
                                 label = entryGroup.label,
                                 logoPath = entryGroup.systemThemeFolder?.let { ThemeAssets.systemLogoPath(context, it) },
+                                // Real `letterCaseAutoCollections` /
+                                // `letterCaseCustomCollections`: ES-DE cases a
+                                // collection's own name by which KIND of
+                                // collection it is (SystemView.cpp:835-849).
+                                collectionKind = entryGroup.esDeCollectionKind(),
                                 // Real ES-DE select sound -- entering a
                                 // system from the system view plays
                                 // SELECTSOUND (SystemView.cpp:129).
