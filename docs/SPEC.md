@@ -2186,6 +2186,33 @@ by reading actual code/formats, not assumed):
     `DesktopSetupPrefs` and honored by
     `DesktopSessionService.selectPrimaryImage` — closes what used to be
     "no user-facing compositor-choice setting yet."
+  - **STORAGE_PERMISSION** asks for whichever permission is the real
+    one on this device. From API 30 that is "All files access"
+    (`MANAGE_EXTERNAL_STORAGE`, opened through
+    `ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION`); below it, that
+    settings activity does not exist and the intent throws, so API 26-29
+    gets the legacy `READ_EXTERNAL_STORAGE` runtime prompt instead
+    (declared with `maxSdkVersion="29"`). minSdk is 26 and the older path
+    is a supported one, not a fallback: droidtop's scanner reads games
+    through `java.io.File`, and on API 26-29 the legacy permission is
+    exactly what grants that.
+  - **GAMES_FOLDERS** takes a root two ways, both writing the same
+    `droidtop_games_root_paths` set and scanned identically: the SAF
+    folder picker, and a typed absolute path
+    (`GamesRootPrefs.addGamesRootByPath`, mirrored in Settings > ROM
+    folders as "Add a folder by path"). The typed path is not a
+    convenience — the picker can only offer what Android exposes as a SAF
+    storage volume, and real libraries live outside that set: an
+    emulator's host share (BlueStacks mounts one at
+    `/mnt/windows/BstSharedFolder`, readable but neither a volume nor
+    mirrored under `/sdcard`, which left the Android 9 rig with no way to
+    reach the user's games at all), mounts a rooted device adds itself, a
+    USB disk under `/mnt`, and any tree URI whose volume does not follow
+    the `/storage/<volumeId>` convention `resolveStoragePath` depends on.
+    It is validated at entry against the same question the scanner will
+    ask — absolute, exists, is a directory, and `listFiles()` returns
+    something — so an unreadable path is refused with a reason rather
+    than stored and silently scanning nothing.
   - **DEFAULT_MODE_CHOICE** calls `ModePrefs.setLastMode` — this is what
     `com.android.launcher3.Launcher`'s own real cold-boot redirect
     (`mDroidtopPendingModeRedirect`, already shipping) and
