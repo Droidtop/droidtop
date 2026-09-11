@@ -170,6 +170,42 @@ object GameEngineDetector {
     }
 
     /** How many folders below a games root [scan] looks for games. */
+    /**
+     * Folder names a library scan never descends into and never calls a
+     * game. All of them are bookkeeping a filesystem or a sync tool put
+     * beside the user's files, and every one of them is structurally
+     * indistinguishable from a game folder to the detector: a directory
+     * full of files it has no rule for.
+     *
+     * The rig showed the failure directly -- a Syncthing marker folder
+     * inside a games root was listed in the library as ".STFOLDER [PC]".
+     *
+     * Two rules, deliberately: a leading dot (which is how Syncthing,
+     * Android's own caches and every Unix tool mark "not for you", and
+     * covers .stfolder / .stversions / .stignore / .Trash-1000 /
+     * .thumbnails without naming each) plus the handful of markers that
+     * came from Windows and NEVER carry a dot.
+     */
+    private val NEVER_A_GAME_FOLDER = setOf(
+        "system volume information",
+        "\$recycle.bin",
+        "recycler",
+        "lost+found",
+        "found.000",
+    )
+
+    /**
+     * Whether a scan may look at [dir] at all. One predicate, used by
+     * every place that enumerates subfolders, so a marker folder cannot
+     * be skipped by the walk and still become a game through the nested
+     * search.
+     */
+    fun isScannableFolder(dir: File): Boolean {
+        val name = dir.name
+        if (name.startsWith(".")) return false
+        return name.lowercase() !in NEVER_A_GAME_FOLDER
+    }
+
     const val MAX_SCAN_DEPTH = 4
 
     /**
@@ -256,7 +292,7 @@ object GameEngineDetector {
         systemsById: Map<String, ConsoleSystemDef>,
     ): List<File> =
         (folder.listFiles() ?: emptyArray())
-            .filter { it.isDirectory && resolveSystem(it.name, systemsById) == null }
+            .filter { it.isDirectory && isScannableFolder(it) && resolveSystem(it.name, systemsById) == null }
             .sortedBy { it.name }
 
     /**
@@ -359,7 +395,7 @@ object GameEngineDetector {
         // subfolder than it already proved about this one.
         (folder.listFiles() ?: emptyArray())
             .asSequence()
-            .filter { it.isDirectory }
+            .filter { it.isDirectory && isScannableFolder(it) }
             .sortedBy { it.name }
             .mapNotNull { nested ->
                 detect(nested, defs) { !it.readsUnnamedSubtree }?.let { DetectedGame(folder, nested, it) }
