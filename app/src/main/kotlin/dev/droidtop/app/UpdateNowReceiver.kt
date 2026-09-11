@@ -32,7 +32,7 @@ class UpdateNowReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != UpdateNow.ACTION) return
         val ownUid = Process.myUid()
-        val senderUid = if (Build.VERSION.SDK_INT >= 34) sendingUid else ownUid
+        val senderUid = if (Build.VERSION.SDK_INT >= 34) sentFromUid else ownUid
         if (!UpdateNow.isTrustedCaller(senderUid, ownUid)) {
             Log.w(UpdateNow.TAG, "ignored UPDATE_NOW from uid " + senderUid + " (shell, root or droidtop only)")
             return
