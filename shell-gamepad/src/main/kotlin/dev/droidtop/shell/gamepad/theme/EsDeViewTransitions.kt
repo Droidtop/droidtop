@@ -11,7 +11,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.using
 import dev.droidtop.library.theme.EsDeTransitionAnimation
 
 /**
@@ -47,24 +46,32 @@ fun AnimatedContentTransitionScope<*>.esDeViewTransition(
     towardsGamelist: Boolean,
 ): ContentTransform = when (animation) {
     EsDeTransitionAnimation.INSTANT ->
-        EnterTransition.None togetherWith ExitTransition.None using noSizeAnimation()
+        (EnterTransition.None togetherWith ExitTransition.None).withoutSizeAnimation()
     EsDeTransitionAnimation.FADE ->
-        fadeIn(tween(FADE_DURATION_MS, delayMillis = FADE_DURATION_MS + FADE_WAIT_MS)) togetherWith
-            fadeOut(tween(FADE_DURATION_MS)) using noSizeAnimation()
+        (
+            fadeIn(tween(FADE_DURATION_MS, delayMillis = FADE_DURATION_MS + FADE_WAIT_MS)) togetherWith
+                fadeOut(tween(FADE_DURATION_MS))
+            ).withoutSizeAnimation()
     EsDeTransitionAnimation.SLIDE -> {
         val towards =
             if (towardsGamelist) AnimatedContentTransitionScope.SlideDirection.Down
             else AnimatedContentTransitionScope.SlideDirection.Up
-        slideIntoContainer(towards, tween(SLIDE_DURATION_MS, easing = EaseOutCubic)) togetherWith
-            slideOutOfContainer(towards, tween(SLIDE_DURATION_MS, easing = EaseOutCubic)) using
-            noSizeAnimation()
+        (
+            slideIntoContainer(towards, tween(SLIDE_DURATION_MS, easing = EaseOutCubic)) togetherWith
+                slideOutOfContainer(towards, tween(SLIDE_DURATION_MS, easing = EaseOutCubic))
+            ).withoutSizeAnimation()
     }
 }
 
 /**
  * Both views fill the same screen, so there is no size change to animate
  * -- but the container must still CLIP, or a sliding view would be drawn
- * outside it. Snapping the size keeps the clip without inventing a
- * resize ES-DE has no equivalent of.
+ * outside it. Snapping the size keeps the clip without inventing a resize
+ * ES-DE has no equivalent of.
+ *
+ * Written as a plain assignment rather than Compose's `using` infix, which
+ * is not a top-level function and cannot be imported.
  */
-private fun noSizeAnimation(): SizeTransform = SizeTransform(clip = true) { _, _ -> snap() }
+private fun ContentTransform.withoutSizeAnimation(): ContentTransform = apply {
+    sizeTransform = SizeTransform(clip = true) { _, _ -> snap() }
+}
