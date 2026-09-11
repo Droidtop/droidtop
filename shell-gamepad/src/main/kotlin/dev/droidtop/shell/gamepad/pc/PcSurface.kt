@@ -38,11 +38,21 @@ import androidx.compose.ui.unit.dp
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.displayName
+import dev.droidtop.library.settings.SettingsScreenRegistry
+import dev.droidtop.shell.gamepad.CatalogNavigator
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 
 /** ES-DE's own system id for the PC category -- the card this surface opens from. */
 internal const val PC_SYSTEM_ID = "pc"
+
+/**
+ * :app's "Stores and folders" settings screen, by [SettingsScreenRegistry]
+ * id because this module cannot depend on :app -- the same way
+ * `HandheldSettingsCatalog` names the console-systems and Windows-games
+ * screens it opens.
+ */
+private const val PC_STORES_SCREEN_ID = "pc_stores"
 
 /**
  * droidtop's own PC surface — the whole of docs/SPEC.md §7i's "Library"
@@ -78,6 +88,18 @@ internal fun PcSurface(
     var installedOnly by remember { mutableStateOf(false) }
     val firstCard = remember { FocusRequester() }
 
+    // "Stores and folders": sign in to a store, add a games folder, set up
+    // Windows games, see the downloads queue. It is :app's own settings
+    // catalog screen (7i's first-run repairs and the surface's options
+    // menu are the same four actions, so they are the same rows), rendered
+    // right here by the navigator the shell's settings already use rather
+    // than sending anybody to another screen. Registered at process start
+    // by :app, which this module cannot depend on, hence the id.
+    val storesScreen = remember { SettingsScreenRegistry.get(PC_STORES_SCREEN_ID) }
+    // Nothing in the library is exactly the case those four actions fix,
+    // so an empty surface opens on them instead of on an empty grid.
+    var options by remember(entries.isEmpty()) { mutableStateOf(entries.isEmpty()) }
+
     val allSources = remember(entries) { entries.map { it.sourceLabel() }.distinct().sorted() }
     val allEngines = remember(entries) { entries.mapNotNull { it.engineLabel() }.distinct().sorted() }
 
@@ -91,6 +113,11 @@ internal fun PcSurface(
 
     LaunchedEffect(shown.isNotEmpty()) {
         if (shown.isNotEmpty()) runCatching { firstCard.requestFocus() }
+    }
+
+    if (options && storesScreen != null) {
+        CatalogNavigator(root = storesScreen, onExit = { options = false })
+        return
     }
 
     val focusManager = LocalFocusManager.current
@@ -122,7 +149,7 @@ internal fun PcSurface(
             if (shown.isEmpty()) {
                 Text(
                     if (entries.isEmpty()) {
-                        "No PC games yet. Add a games folder or sign in to a store from Settings."
+                        "No PC games yet. Press Y for stores and folders."
                     } else {
                         "Nothing matches these filters."
                     },
@@ -142,6 +169,12 @@ internal fun PcSurface(
                         .onKeyEvent { event ->
                             if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
                             when (GamepadKeyMap.actionFor(event.key)) {
+                                // The surface's options: where games come
+                                // from, on the surface they came into.
+                                GamepadAction.Y -> {
+                                    if (storesScreen != null) options = true
+                                    storesScreen != null
+                                }
                                 GamepadAction.UP -> focusManager.moveFocus(FocusDirection.Up)
                                 GamepadAction.DOWN -> focusManager.moveFocus(FocusDirection.Down)
                                 GamepadAction.LEFT -> focusManager.moveFocus(FocusDirection.Left)
@@ -197,7 +230,12 @@ private fun PcHints() {
         modifier = Modifier.fillMaxWidth().background(Color(0xFF111111)).padding(horizontal = 48.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(28.dp),
     ) {
-        listOf("A" to "Open", "B" to "Back", "D-pad" to "Move").forEach { (button, label) ->
+        listOf(
+            "A" to "Open",
+            "B" to "Back",
+            "Y" to "Stores and folders",
+            "D-pad" to "Move",
+        ).forEach { (button, label) ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     button,

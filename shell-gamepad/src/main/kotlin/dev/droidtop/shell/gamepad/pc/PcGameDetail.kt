@@ -69,10 +69,14 @@ import kotlinx.coroutines.withContext
  *   ("Set up Windows games", "Install the Ren'Py plugin"). A button known
  *   in advance to produce nothing is worse than an honest one.
  *
- * Actions that belong to build-plan steps 5-7 (store install and
- * download, prefix and graphics configuration) are listed and disabled
- * with the reason rather than omitted, so the shape of the screen does
- * not change under the user when those land.
+ * Store management and prefix configuration are not droidtop's own
+ * screens: :runtime-windows compiles the whole vendored gamenative tree,
+ * so the install lifecycle and the nine-tab container configuration are
+ * already in the APK and these rows open them (through an :app Activity,
+ * since this module cannot depend on :app). A row whose action does not
+ * apply to this game is still listed, disabled, with the reason -- a
+ * folder game has no store to install from, and a game with no Windows
+ * build has no prefix.
  */
 @Composable
 internal fun PcGameDetail(
@@ -160,6 +164,25 @@ internal fun PcGameDetail(
                 context.startActivity(intent)
                 null
             }.getOrElse { "enginehost didn't take that: ${it.message}" }
+        },
+        // Both of these open UI :runtime-windows already compiles from the
+        // vendored gamenative tree, hosted by an :app Activity (build-plan
+        // steps 5 and 7). Started by explicit class name because this
+        // module cannot depend on :app -- the same route every other
+        // cross-module screen here takes.
+        onOpenAppScreen = { className, extras ->
+            status = runCatching {
+                context.startActivity(
+                    android.content.Intent()
+                        .setClassName(context.packageName, className)
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        .apply { extras.forEach { (key, value) -> putExtra(key, value) } },
+                )
+                null
+            }.getOrElse { "droidtop couldn't open that screen: ${it.message}" }
+        },
+        hasWindowsRoute = runners.options.any {
+            it.strategy == GameLaunchStrategy.WINE_PREFIX && it.state != RunnerState.NOT_FOR_THIS_GAME
         },
     )
 
@@ -321,6 +344,8 @@ private fun rememberPcActions(
     onViewMedia: () -> Unit,
     onCollections: () -> Unit,
     onEnginehost: (android.content.Intent) -> Unit,
+    onOpenAppScreen: (className: String, extras: Map<String, String>) -> Unit,
+    hasWindowsRoute: Boolean,
 ): List<PcActionGroup> {
     val isEngineGame = entry.kind != LibraryEntryKind.WINE_PROFILE
     val runsOnEnginehost = runner?.option?.strategy == GameLaunchStrategy.ENGINEHOST
@@ -329,26 +354,57 @@ private fun rememberPcActions(
     return listOf(
         PcActionGroup(
             "Game management",
-            listOf(
+            listOfNotNull(
+                // One row, not three: install, verify, update, DLC and
+                // delete are one screen on the store's side, and that
+                // screen is the store's own (gamenative's AppScreen for
+                // this game's source, with its GameManagerDialog /
+                // EpicGameManagerDialog / AmazonInstallDialog).
                 PcActionRow(
-                    if (entry.pcInfo?.installed == false) "Install" else "Uninstall",
+                    if (entry.pcInfo?.installed == false) "Install" else "Manage install",
                     if (isStoreGame) {
-                        "Store downloads arrive with the store flow (build-plan step 5)"
+                        "Install, verify, update or remove it, and pick which extras come with it"
                     } else {
                         "This game is a folder on this device; droidtop doesn't manage it"
                     },
-                    null,
+                    if (isStoreGame) {
+                        { onOpenAppScreen(PC_STORE_ACTIVITY, mapOf(EXTRA_PC_ENTRY_ID to entry.id)) }
+                    } else {
+                        null
+                    },
                 ),
-                PcActionRow("Verify files", "Arrives with the store flow (build-plan step 5)", null),
+                if (isStoreGame) {
+                    PcActionRow(
+                        "Downloads",
+                        "Everything downloading or waiting, and the storage it is going into",
+                        { onOpenAppScreen(PC_STORE_ACTIVITY, emptyMap()) },
+                    )
+                } else {
+                    null
+                },
             ),
         ),
         PcActionGroup(
             "Prefix and graphics",
             listOf(
                 PcActionRow(
-                    "Windows container settings",
-                    "Arrives with the prefix step (build-plan step 7)",
-                    null,
+                    "Prefix and graphics",
+                    if (hasWindowsRoute) {
+                        "The Windows prefix this game runs in: graphics driver, DXVK, Box64 and FEX, " +
+                            "components, drives and the rest"
+                    } else {
+                        "Only for a game with a Windows build -- this one runs natively"
+                    },
+                    if (hasWindowsRoute) {
+                        {
+                            onOpenAppScreen(
+                                PC_CONTAINER_CONFIG_ACTIVITY,
+                                mapOf(EXTRA_PC_ENTRY_ID to entry.id, EXTRA_PC_TITLE to entry.title),
+                            )
+                        }
+                    } else {
+                        null
+                    },
                 ),
             ),
         ),
@@ -357,7 +413,7 @@ private fun rememberPcActions(
             listOfNotNull(
                 PcActionRow(
                     "Saves",
-                    if (runsOnEnginehost) "Opens enginehost's own save settings" else "Cloud saves arrive with the store flow (build-plan step 5)",
+                    if (runsOnEnginehost) "Opens enginehost's own save settings" else "A Windows game's saves live in its prefix, under Prefix and graphics",
                     if (runsOnEnginehost) ({ onEnginehost(EngineHost.savesSettingsIntent()) }) else null,
                 ),
                 PcActionRow(
@@ -365,7 +421,7 @@ private fun rememberPcActions(
                     if (runsOnEnginehost) {
                         "Opens enginehost's own per-engine controls for this game"
                     } else {
-                        "The Windows container's controller tab arrives with the prefix step (build-plan step 7)"
+                        "A Windows game's controls are its prefix's controller tab, under Prefix and graphics"
                     },
                     if (runsOnEnginehost) ({ onEnginehost(EngineHost.settingsIntent()) }) else null,
                 ),
@@ -393,6 +449,14 @@ private fun rememberPcActions(
 }
 
 private val STORE_PREFIXES = setOf("steam", "gog", "epic", "amazon")
+
+// :app's hosts for the gamenative screens droidtop adopts, by name
+// because this module cannot depend on :app. Kept together so the two
+// sides are one edit apart if a class ever moves.
+private const val PC_STORE_ACTIVITY = "dev.droidtop.app.PcStoreActivity"
+private const val PC_CONTAINER_CONFIG_ACTIVITY = "dev.droidtop.app.PcContainerConfigActivity"
+private const val EXTRA_PC_ENTRY_ID = "dev.droidtop.app.extra.PC_ENTRY_ID"
+private const val EXTRA_PC_TITLE = "dev.droidtop.app.extra.PC_TITLE"
 
 @Composable
 private fun DetailRow(
