@@ -1461,14 +1461,40 @@ component binds. Two components are deliberately not started:
 `WineRequestComponent` (it hands guest URL requests to an Epic OAuth
 activity droidtop keeps out of its merged manifest).
 
+A launch also **prepares the prefix before the guest starts in it**, and
+that is not a detail: the prefix's drive letters are symlinks something
+has to create, the D3D wrapper's DLLs and the Vulkan driver the Vortek
+renderer loads are files something has to put where the guest can find
+them, and which backend Wine itself hands audio to is a registry value
+something has to write. A launch into a prefix none of that has happened
+to reaches a game that cannot see its own folder, cannot create a device
+and cannot make a sound. Every step is gamenative's own function, in
+gamenative's own order (`WinePrefixPreparation`); they are `internal`
+rather than private in the fork for exactly this reason, so droidtop's
+launch and gamenative's run the same code instead of two copies of it.
+Steam- and store-specific steps are deliberately left out.
+
+The Android side reads the **prefix's own fields** wherever gamenative
+does: which surface presents it and in which Vulkan present mode, whether
+the pointer is visible and what a touch means, and which Windows input
+API a pad reaches the game through (`WinHandler`'s preferred input API
+and DirectInput mapping, plus the SDL hints a guest built on SDL reads).
+A pad's B button reaches the game before it can end it: several
+controllers report B as `KEYCODE_BACK`, so the controller bridge and the X
+keyboard see the event first and only an unclaimed back press ends the
+session.
+
 Desktop mode is **out of scope here**. There a Windows program should
 appear as a window among others inside the container's sway compositor,
 which is a different presentation problem with a different answer;
 nothing in this path assumes it and nothing in it should be stretched to
 cover it.
 
-Remaining: repeat provisioning through container creation on hardware,
-then one Windows launch that is seen and played.
+Remaining: one Windows launch on hardware that is seen and played, and
+an in-game menu over a running Windows game -- gamenative's own is a
+Compose radial/quick menu wired through its game screen's state, so it is
+a port rather than a move, and droidtop has no host hotkey of its own on
+this path yet.
 
 ## 6. Input
 
@@ -3738,10 +3764,12 @@ now applied to PC entries as well as engine ones.
 
 **Honesty about what cannot run yet.** A runner whose machinery exists but
 whose output the user cannot see is **Needs setup with the real reason**,
-not Ready. Concretely: until the Wine renderer is attached (§5b), the Wine
-row says the renderer is not wired in this build. A Play button that is
-known in advance to produce nothing is worse than an honest row, and the
-surface may not ship one.
+not Ready. A Play button that is known in advance to produce nothing is
+worse than an honest row, and the surface may not ship one. The Wine row
+was that case until the renderer seam landed (§5b) and is now Ready when
+the environment is provisioned; the rule and its one build-level switch
+stay, because the next backend behind the same seam (FEX/arm64ec) will
+need them again.
 
 **Root never gates a Handheld game.** Native Linux inside a container
 needs root today and is therefore "not on this device" on an unrooted

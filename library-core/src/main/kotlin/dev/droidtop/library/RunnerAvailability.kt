@@ -113,16 +113,22 @@ data class RunnerFacts(
 object RunnerAvailability {
 
     /**
-     * Whether a renderer is attached to the headless X server
-     * `BionicWineEngine` starts (`WineEngine.kt`). While this is false a
-     * Wine launch produces no picture, so the Wine row reads "needs
-     * setup" with that reason rather than offering Play.
+     * Whether a renderer is attached to the X server `BionicWineEngine`
+     * starts (`WineEngine.kt`). While this is false a Wine launch
+     * produces no picture, so the Wine row reads "needs setup" with that
+     * reason rather than offering Play.
      *
-     * One table entry, on purpose: when the renderer seam lands this
-     * constant is what flips (build-plan step 8), not a scattering of
-     * conditions.
+     * True since the seam landed: the launch goes to `WineGameActivity`
+     * on the launch-target display, which presents gamenative's own
+     * `XServerView`/`XServerViewGL` against that server and prepares the
+     * prefix (drives, DX wrapper, Vulkan driver, wine audio driver)
+     * first. It stays a constant rather than becoming a runtime probe
+     * because it is a fact about the BUILD -- whether this APK contains a
+     * presenter at all -- and the device facts that can vary (an
+     * unprovisioned environment, a missing prefix) already have their own
+     * entries above.
      */
-    const val WINE_RENDERER_WIRED = false
+    const val WINE_RENDERER_WIRED = true
 
     /**
      * Every runner's state for one game, ordered: the rows the user can
