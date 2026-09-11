@@ -85,6 +85,11 @@ class MenuTokensContrastTest {
         // label text on a white panel is 1:1.
         val white = Color(0xFFFFFFFF)
         assertTrue(contrast(MenuTokens.OnSurface, white) < 1.5f)
-        assertTrue(contrast(MenuTokens.OnSurfaceMuted, white) < 3f)
+        // 4.5:1, the body-text floor the other tests hold these tokens
+        // to over their own surface. OnSurfaceMuted is 3.10:1 on white,
+        // which clears the large-text floor by a hair and is nowhere
+        // near readable as a row subtitle -- asserting < 3 here was
+        // simply wrong about its own number.
+        assertTrue(contrast(MenuTokens.OnSurfaceMuted, white) < 4.5f)
     }
 }
