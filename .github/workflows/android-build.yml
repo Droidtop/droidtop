@@ -340,7 +340,9 @@ jobs:
         # -- see the lint block in app/build.gradle.kts for why this
         # exists. Runs after the APK so a lint failure never costs the
         # build artifact, the same bargain the unit-test step already
-        # makes.
+        # makes. always(), for the same reason that step has it: a red
+        # step earlier in the job should not hide this one's answer.
+        if: always()
         run: ./gradlew :app:lintDebug --stacktrace
 
       - name: Upload lint report
