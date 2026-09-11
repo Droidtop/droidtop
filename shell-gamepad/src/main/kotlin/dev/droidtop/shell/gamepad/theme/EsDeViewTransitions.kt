@@ -69,9 +69,13 @@ fun AnimatedContentTransitionScope<*>.esDeViewTransition(
  * outside it. Snapping the size keeps the clip without inventing a resize
  * ES-DE has no equivalent of.
  *
- * Written as a plain assignment rather than Compose's `using` infix, which
- * is not a top-level function and cannot be imported.
+ * Built through the public constructor: the property setter is internal and
+ * the `using` infix is not importable in this Compose version.
  */
-private fun ContentTransform.withoutSizeAnimation(): ContentTransform = apply {
-    sizeTransform = SizeTransform(clip = true) { _, _ -> snap() }
+private fun ContentTransform.withoutSizeAnimation(): ContentTransform = ContentTransform(
+    targetContentEnter,
+    initialContentExit,
+    targetContentZIndex,
+    SizeTransform(clip = true) { _, _ -> snap() },
+)
 }
