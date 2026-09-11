@@ -6,6 +6,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -318,6 +320,12 @@ private fun QuickStatusHeader() {
 private fun QuickSliderRow(item: SliderItem, focused: Boolean, onSet: (Int) -> Unit) {
     val span = (item.max - item.min).coerceAtLeast(1)
     val fraction = ((item.current - item.min).toFloat() / span).coerceIn(0f, 1f)
+    var rowWidthPx by remember { mutableStateOf(0) }
+    fun setFromX(x: Float) {
+        if (rowWidthPx <= 0) return
+        val f = (x / rowWidthPx).coerceIn(0f, 1f)
+        onSet(item.min + kotlin.math.round(f * span).toInt())
+    }
     Column(
         Modifier
             .fillMaxWidth()
@@ -325,13 +333,20 @@ private fun QuickSliderRow(item: SliderItem, focused: Boolean, onSet: (Int) -> U
             .clip(MenuTokens.RowShape)
             .background(if (focused) MenuTokens.SurfaceSelected else MenuTokens.Surface)
             .border(2.dp, if (focused) MenuTokens.Accent else Color.Transparent, MenuTokens.RowShape)
-            .clickable {
-                // Touch: a tap steps the slider up, and wraps at the top
-                // -- the same one-press vocabulary the tiles use, since
-                // a drag target this thin is a miss on a handheld.
-                val step = QuickTiles.sliderStep(item)
-                val next = if (item.current + step > item.max) item.min else item.current + step
-                onSet(next)
+            .onSizeChanged { rowWidthPx = it.width }
+            // Touch sets the value where you touch, and follows a
+            // drag -- what a slider does everywhere else. It used to
+            // step up on a tap and WRAP to the minimum at the top,
+            // which on a phone means a stray tap at full brightness
+            // drops the screen to its dimmest. The D-pad keeps its own
+            // stepping; this is the pointer's route to the same write.
+            .pointerInput(item.min, item.max, item.current) {
+                androidx.compose.foundation.gestures.detectHorizontalDragGestures(
+                    onDragStart = { offset -> setFromX(offset.x) },
+                ) { change, _ -> setFromX(change.position.x) }
+            }
+            .pointerInput(item.min, item.max) {
+                androidx.compose.foundation.gestures.detectTapGestures { offset -> setFromX(offset.x) }
             }
             .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
