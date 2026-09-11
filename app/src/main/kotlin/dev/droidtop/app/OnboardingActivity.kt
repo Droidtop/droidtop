@@ -52,7 +52,6 @@ import dev.droidtop.runtime.KnownImageRepository
 import dev.droidtop.runtime.linux.root.DroidSpacesRuntime
 import dev.droidtop.shell.standard.BackButtonMenu
 import dev.droidtop.shell.standard.HomeRolePrefs
-import dev.droidtop.shell.standard.ModePrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

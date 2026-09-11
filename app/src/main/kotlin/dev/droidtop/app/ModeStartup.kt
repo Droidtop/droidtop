@@ -71,14 +71,15 @@ object ModeStartup {
      * so it is not one mode's alone. It is also reached from the PC launch
      * path, which is shared core: a Windows game launched with both modes
      * off still needs the backbone, and gets it here rather than through a
-     * second init path. gamenative's own bootstrap returns immediately if
-     * it has already run, which is what makes calling it from several
-     * places honest rather than a race.
+     * second init path.
+     *
+     * The vendored tree compiles into `:runtime-windows` and only there,
+     * so the call goes through that module's own
+     * [dev.droidtop.runtime.windows.WindowsBackbone] rather than naming an
+     * `app.gamenative` class `:app` cannot see.
      */
     fun ensureGamenative(context: Context) {
-        val app = context.applicationContext as? Application ?: return
-        // Crash handling stays droidtop's own, hence the explicit false.
-        app.gamenative.PluviaApp.bootstrap(app, installCrashHandler = false)
+        dev.droidtop.runtime.windows.WindowsBackbone.ensureStarted(context)
     }
 
     private fun setComponentEnabled(context: Context, className: String, enabled: Boolean) {

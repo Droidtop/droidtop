@@ -9,7 +9,7 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * point. Read by [DesktopSessionService.selectPrimaryImage] -- closes the
  * "no user-facing compositor-choice setting yet" gap that class's own doc
  * comment used to describe. Same shared prefs file every other droidtop
- * pref (`GamesRootPrefs`, `ModePrefs`) already uses.
+ * pref (`GamesRootPrefs`, `Modes`) already uses.
  */
 object DesktopSetupPrefs {
     private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
