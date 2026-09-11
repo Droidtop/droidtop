@@ -55,6 +55,47 @@ class ModesTest {
     }
 
     @Test
+    fun `a disabled mode contributes no piece`() {
+        val launcherOnly = ModeGate.piecesToStart(setOf(Mode.LAUNCHER))
+        assertEquals(
+            setOf(ModePiece.LAUNCHER_SYSTEM_COMPONENTS, ModePiece.LAUNCHER_SECOND_SCREEN),
+            launcherOnly,
+        )
+        assertTrue(ModeGate.piecesToStart(emptySet()).isEmpty())
+    }
+
+    @Test
+    fun `every piece of an enabled mode starts`() {
+        val gaming = ModeGate.piecesToStart(setOf(Mode.GAMING))
+        assertEquals(
+            ModePiece.entries.filter { Mode.GAMING in it.owners }.toSet(),
+            gaming,
+        )
+        assertTrue(ModePiece.GAMING_NOTIFICATION_LISTENER in gaming)
+        assertTrue(ModePiece.GAMING_PLATFORMS_DATABASE in gaming)
+        assertFalse(ModePiece.DESKTOP_SECOND_SCREEN in gaming)
+    }
+
+    @Test
+    fun `a piece two modes own starts for either and stops only when both are off`() {
+        assertTrue(ModePiece.WINDOWS_BACKBONE in ModeGate.piecesToStart(setOf(Mode.GAMING)))
+        assertTrue(ModePiece.WINDOWS_BACKBONE in ModeGate.piecesToStart(setOf(Mode.DESKTOP)))
+        assertFalse(ModePiece.WINDOWS_BACKBONE in ModeGate.piecesToStart(setOf(Mode.LAUNCHER)))
+    }
+
+    @Test
+    fun `every piece is owned by at least one mode`() {
+        assertTrue(ModePiece.entries.all { it.owners.isNotEmpty() })
+        // Nothing mode-specific is left running when every mode is off.
+        assertTrue(ModeGate.piecesToStart(emptySet()).isEmpty())
+        // With all three on, everything listed runs.
+        assertEquals(
+            ModePiece.entries.toSet(),
+            ModeGate.piecesToStart(Mode.entries.toSet()),
+        )
+    }
+
+    @Test
     fun `the migration renames handheld keys and rewrites stored mode ids`() {
         val migration = ModeRenameMigration.migrate(
             mapOf(
