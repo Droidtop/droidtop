@@ -3,8 +3,6 @@ package dev.droidtop.app
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
-import android.os.Process
 import android.util.Log
 import dev.droidtop.app.update.UpdateNow
 
@@ -23,21 +21,20 @@ import dev.droidtop.app.update.UpdateNow
  * The class lives in the application package so the component name in that
  * command line is the short one people can actually type.
  *
- * Guard: the receiver is exported but requires android.permission.DUMP of
- * its sender, which only shell, root and the system hold, and it re-checks
- * the sending uid where Android exposes it (API 34+). Everything else is
- * ignored with a log line.
+ * Guard: the receiver is exported but declares android:permission
+ * "android.permission.DUMP" in the manifest, which only the shell (what adb
+ * runs as), root and the system hold and which no ordinary app can be
+ * granted. That permission check is the whole guard. There is no sender-uid
+ * re-check here on purpose: a BroadcastReceiver cannot learn who sent a
+ * broadcast below API 34, and on API 34+ getSentFromUid() reports a sender
+ * only when that sender opted in through BroadcastOptions.setShareIdentity,
+ * which adb's `am broadcast` never does -- so a uid check would reject the
+ * one caller this receiver exists for.
  */
 class UpdateNowReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != UpdateNow.ACTION) return
-        val ownUid = Process.myUid()
-        val senderUid = if (Build.VERSION.SDK_INT >= 34) sentFromUid else ownUid
-        if (!UpdateNow.isTrustedCaller(senderUid, ownUid)) {
-            Log.w(UpdateNow.TAG, "ignored UPDATE_NOW from uid " + senderUid + " (shell, root or droidtop only)")
-            return
-        }
-        Log.i(UpdateNow.TAG, "UPDATE_NOW from uid " + senderUid + ": checking the release feed now")
+        Log.i(UpdateNow.TAG, "UPDATE_NOW received (sender holds android.permission.DUMP): checking the release feed now")
         val pending = goAsync()
         val application = context.applicationContext
         Thread {

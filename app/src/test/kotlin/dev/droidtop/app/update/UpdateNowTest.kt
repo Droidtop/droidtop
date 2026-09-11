@@ -1,8 +1,6 @@
 package dev.droidtop.app.update
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -11,23 +9,6 @@ import org.junit.Test
  * that holds the scheduled check back.
  */
 class UpdateNowTest {
-    private val droidtopUid = 10123
-
-    @Test
-    fun `shell root system and droidtop itself may fire the trigger`() {
-        assertTrue(UpdateNow.isTrustedCaller(UpdateNow.SHELL_UID, droidtopUid))
-        assertTrue(UpdateNow.isTrustedCaller(UpdateNow.ROOT_UID, droidtopUid))
-        assertTrue(UpdateNow.isTrustedCaller(UpdateNow.SYSTEM_UID, droidtopUid))
-        assertTrue(UpdateNow.isTrustedCaller(droidtopUid, droidtopUid))
-    }
-
-    @Test
-    fun `any other app is ignored`() {
-        assertFalse(UpdateNow.isTrustedCaller(10124, droidtopUid))
-        assertFalse(UpdateNow.isTrustedCaller(10001, droidtopUid))
-        assertFalse(UpdateNow.isTrustedCaller(99999, droidtopUid))
-    }
-
     @Test
     fun `newer published build installs, same or older does not`() {
         assertEquals(UpdateNow.Verdict.INSTALL, UpdateNow.verdict(507, 508))

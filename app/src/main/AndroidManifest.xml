@@ -288,8 +288,9 @@
             adb shell am broadcast -a dev.droidtop.UPDATE_NOW -n dev.droidtop.app/.UpdateNowReceiver
             Exported on purpose, and guarded by a permission only the shell
             (what adb runs as), root and the system hold, so no ordinary app
-            can drive droidtop's installer; the receiver re-checks the
-            sending uid where Android exposes it.
+            can drive droidtop's installer. That permission is the whole
+            guard: a receiver cannot learn the sender's uid for an adb
+            broadcast, so there is no uid re-check.
         -->
         <receiver
             android:name="dev.droidtop.app.UpdateNowReceiver"
