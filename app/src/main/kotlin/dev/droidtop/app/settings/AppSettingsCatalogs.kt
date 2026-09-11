@@ -63,6 +63,7 @@ object AppSettingsCatalogs {
     const val SCREEN_PLATFORMS = "manage_platforms"
     const val SCREEN_INTEGRATIONS = "integrations"
     const val SCREEN_WINDOWS_GAMES = "windows_games"
+    const val SCREEN_PC_STORES = "pc_stores"
     const val SCREEN_ANDROID_SETTINGS = "android_settings"
     const val SCREEN_ENGINEHOST = "enginehost"
     const val SCREEN_UPDATES = "updates"
@@ -82,6 +83,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(platformsScreen())
         SettingsScreenRegistry.register(integrationsScreen())
         SettingsScreenRegistry.register(windowsGamesScreen())
+        SettingsScreenRegistry.register(pcStoresScreen())
         SettingsScreenRegistry.register(androidSettingsScreen())
         SettingsScreenRegistry.register(enginehostScreen())
         SettingsScreenRegistry.register(updatesScreen())
@@ -976,6 +978,134 @@ object AppSettingsCatalogs {
                         )
                     }
                 },
+            ),
+        )
+    }
+
+    // ------------------------------------------------------------------
+    // Stores, folders and downloads: where PC games come FROM.
+    // ------------------------------------------------------------------
+
+    /**
+     * The PC surface's own first-run repairs and store state (docs/SPEC.md
+     * 7i, build-plan step 6): sign in to a store, add a games folder, set
+     * up Windows games, see what is downloading.
+     *
+     * A catalog screen rather than a screen of its own, for two reasons.
+     * It is reachable from both settings surfaces for free, and the
+     * Handheld PC surface renders it in place through the same
+     * CatalogNavigator it already uses, so "the first-run cards" and "the
+     * surface's options menu" are one list of rows instead of two
+     * implementations of the same four actions.
+     *
+     * Every row states the real state it found: a store says whether it is
+     * signed in, and each count is read rather than assumed.
+     */
+    private fun pcStoresScreen() = CatalogScreen(
+        id = SCREEN_PC_STORES,
+        title = "Stores and folders",
+        subtitle = "Where PC games come from: your store accounts, the folders droidtop scans, and what is downloading",
+        groups = { context -> pcStoresGroups(context) },
+    )
+
+    private suspend fun pcStoresGroups(context: Context): List<CatalogGroup> {
+        val steamSignedIn = withContext(Dispatchers.IO) {
+            runCatching { app.gamenative.utils.SteamUtils.hasStoredCredentials() }.getOrDefault(false)
+        }
+        val gogSignedIn = withContext(Dispatchers.IO) {
+            runCatching { app.gamenative.service.gog.GOGService.hasStoredCredentials(context) }.getOrDefault(false)
+        }
+        val epicSignedIn = withContext(Dispatchers.IO) {
+            runCatching { app.gamenative.service.epic.EpicService.hasStoredCredentials(context) }.getOrDefault(false)
+        }
+        val amazonSignedIn = withContext(Dispatchers.IO) {
+            runCatching { app.gamenative.service.amazon.AmazonService.hasStoredCredentials(context) }.getOrDefault(false)
+        }
+        val folders = withContext(Dispatchers.IO) { GamesRootPrefs.gamesRootPaths(context) }
+
+        fun signedIn(yes: Boolean): String = if (yes) "Signed in" else "Not signed in yet"
+
+        return listOf(
+            CatalogGroup(
+                id = "pc_stores_accounts",
+                title = "Store accounts",
+                items = listOf(
+                    ActionItem(
+                        id = "pc_store_steam",
+                        title = "Steam",
+                        subtitle = "${signedIn(steamSignedIn)} - sign in with a QR code or a password, and download your games",
+                        run = { ctx ->
+                            ctx.startActivity(
+                                android.content.Intent(ctx, dev.droidtop.app.SteamLoginActivity::class.java)
+                                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                        },
+                    ),
+                    ActionItem(
+                        id = "pc_store_gog",
+                        title = "GOG",
+                        subtitle = "${signedIn(gogSignedIn)} - signs in on GOG's own page",
+                        run = { ctx ->
+                            ctx.startActivity(
+                                dev.droidtop.app.PcStoreSignInActivity.intent(
+                                    ctx,
+                                    dev.droidtop.app.PcStoreSignInActivity.Store.GOG,
+                                ),
+                            )
+                        },
+                    ),
+                    ActionItem(
+                        id = "pc_store_epic",
+                        title = "Epic Games",
+                        subtitle = "${signedIn(epicSignedIn)} - signs in on Epic's own page",
+                        run = { ctx ->
+                            ctx.startActivity(
+                                dev.droidtop.app.PcStoreSignInActivity.intent(
+                                    ctx,
+                                    dev.droidtop.app.PcStoreSignInActivity.Store.EPIC,
+                                ),
+                            )
+                        },
+                    ),
+                    ActionItem(
+                        id = "pc_store_amazon",
+                        title = "Amazon Games",
+                        subtitle = "${signedIn(amazonSignedIn)} - signs in on Amazon's own page",
+                        run = { ctx ->
+                            ctx.startActivity(
+                                dev.droidtop.app.PcStoreSignInActivity.intent(
+                                    ctx,
+                                    dev.droidtop.app.PcStoreSignInActivity.Store.AMAZON,
+                                ),
+                            )
+                        },
+                    ),
+                ),
+            ),
+            CatalogGroup(
+                id = "pc_stores_folders",
+                title = "Folders and setup",
+                items = listOf(
+                    NestedScreenItem(
+                        id = "pc_stores_game_folders",
+                        title = "Game folders",
+                        subtitle = "The folders droidtop scans for games, Windows and engine games alike",
+                        registryId = SCREEN_ROM_FOLDERS,
+                        valueLabel = { if (folders.isEmpty()) "none yet" else "${folders.size}" },
+                    ),
+                    NestedScreenItem(
+                        id = "pc_stores_windows",
+                        title = "Windows games",
+                        subtitle = "The Wine environment Windows games run inside, and the folders it can reach",
+                        registryId = SCREEN_WINDOWS_GAMES,
+                    ),
+                    ActionItem(
+                        id = "pc_stores_downloads",
+                        title = "Downloads",
+                        subtitle = "What is downloading or waiting, and the storage it is going into",
+                        run = { ctx -> ctx.startActivity(dev.droidtop.app.PcStoreActivity.intent(ctx, entryId = null)) },
+                    ),
+                ),
             ),
         )
     }
