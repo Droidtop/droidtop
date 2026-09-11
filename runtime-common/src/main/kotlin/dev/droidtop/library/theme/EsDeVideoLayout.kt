@@ -306,3 +306,78 @@ fun esDeVideoArea(
     areaWidth = areaWidth,
     areaHeight = areaHeight,
 )
+
+/**
+ * Real `ImageComponent::resize()` (ImageComponent.cpp:775-828) for the two
+ * branches that need the SOURCE image's own intrinsic size, and therefore
+ * could not live in [esDeImageArea] -- which runs before anything is
+ * decoded and only knows the declared box:
+ *
+ * - `maxSize` (:788-801): the element's own size becomes the FITTED size,
+ *   not the declared box. ES-DE's `origin` then anchors that fitted
+ *   picture, so a `maxSize` element with an off-centre origin and a strong
+ *   aspect mismatch sits somewhere droidtop's box-anchored placement does
+ *   not. decaffe's `back`/`back2` edge art (`maxSize` 0.5 x 0.77,
+ *   `origin` 0 0.5) is exactly that case.
+ * - `size` with ONE axis set to zero (:814-821): a zero axis means
+ *   "derive this one from the source's aspect ratio". droidtop multiplied
+ *   the zero through and produced a box of zero height (or width), i.e.
+ *   nothing drawn at all.
+ *
+ * The final clamp (:827-828) is ES-DE's own: at least one pixel, at most
+ * three screens.
+ *
+ * Returns null when the source's intrinsic size is unknown or degenerate,
+ * which is ES-DE's own early return at :777-782 -- the caller keeps the
+ * box [esDeImageArea] gave it.
+ */
+fun esDeImageFittedSize(
+    targetWidthPx: Float,
+    targetHeightPx: Float,
+    sourceWidthPx: Float,
+    sourceHeightPx: Float,
+    fit: EsDeImageFit,
+    screenWidthPx: Float,
+    screenHeightPx: Float,
+): kotlin.Pair<Float, Float>? {
+    if (sourceWidthPx <= 0f || sourceHeightPx <= 0f) return null
+    var width: Float
+    var height: Float
+    when (fit) {
+        EsDeImageFit.FIT -> {
+            if (targetWidthPx <= 0f || targetHeightPx <= 0f) return null
+            width = sourceWidthPx
+            height = sourceHeightPx
+            val scaleX = targetWidthPx / width
+            val scaleY = targetHeightPx / height
+            if (scaleX < scaleY) {
+                width *= scaleX
+                height = kotlin.math.min(height * scaleX, targetHeightPx)
+            } else {
+                height *= scaleY
+                width = kotlin.math.min((height / sourceHeightPx) * sourceWidthPx, targetWidthPx)
+            }
+        }
+        EsDeImageFit.STRETCH -> {
+            // Both axes set: the declared box IS the size, nothing to derive.
+            if (targetWidthPx > 0f && targetHeightPx > 0f) return null
+            if (targetWidthPx <= 0f && targetHeightPx > 0f) {
+                height = targetHeightPx
+                width = (height / sourceHeightPx) * sourceWidthPx
+            } else if (targetWidthPx > 0f) {
+                height = (targetWidthPx / sourceWidthPx) * sourceHeightPx
+                width = (height / sourceHeightPx) * sourceWidthPx
+            } else {
+                // Neither axis set: ES-DE keeps the texture's own size (:811).
+                width = sourceWidthPx
+                height = sourceHeightPx
+            }
+        }
+        // The crop branch (:803-808) oversizes the texture and then trims
+        // it with coverFitCrop(); Compose's ContentScale.Crop over the
+        // declared box is already that result, so the element's own box
+        // stays the declared one here.
+        EsDeImageFit.CROP -> return null
+    }
+    return width.coerceIn(1f, screenWidthPx * 3f) to height.coerceIn(1f, screenHeightPx * 3f)
+}
