@@ -103,6 +103,25 @@ non-commercially (droidtop bundling it for free, non-commercial
 distribution is fine; a commercial droidtop distribution would need this
 theme removed or re-licensed first).
 
+## Updating a device build now
+
+droidtop checks for its own updates on a schedule (Settings > Software
+updates). To make an installed build check and update right now, whatever
+that schedule says:
+
+    adb shell am broadcast -a dev.droidtop.UPDATE_NOW -n dev.droidtop.app/.UpdateNowReceiver
+
+It checks the rolling `latest` release immediately and, when the published
+build is newer than the installed one, downloads it, verifies it against the
+digest published with the release and hands it to the Android installer --
+the system's own confirmation is the only prompt. The same pass is the
+"Check and install now" row in Settings > Software updates. Only adb (the
+shell uid), root and droidtop itself can fire the broadcast. Watch what
+happened with:
+
+    adb logcat -s DroidtopUpdateNow
+
+
 ## Licensing
 
 GPL-3.0 sources are combined into this project, which means **the combined
