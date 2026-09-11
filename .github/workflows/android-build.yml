@@ -340,9 +340,13 @@ jobs:
         # -- see the lint block in app/build.gradle.kts for why this
         # exists. Runs after the APK so a lint failure never costs the
         # build artifact, the same bargain the unit-test step already
-        # makes. always(), for the same reason that step has it: a red
-        # step earlier in the job should not hide this one's answer.
-        if: always()
+        # makes. !cancelled() rather than always(), for the same reason
+        # that step wants a condition at all: a red step earlier in the
+        # job should not hide this one's answer, but a run cancelled by
+        # the next push has no answer to give, and running the gate there
+        # only reports a failure nobody caused. Several pushes land in
+        # this repo per hour, so that is the common case, not a corner.
+        if: ${{ !cancelled() }}
         run: ./gradlew :app:lintDebug --stacktrace
 
       - name: Upload lint report
