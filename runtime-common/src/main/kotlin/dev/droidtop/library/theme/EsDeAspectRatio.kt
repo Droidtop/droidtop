@@ -100,14 +100,20 @@ object EsDeAspectRatio {
     fun capabilityList(declared: List<String>): List<String> {
         val accepted = LinkedHashSet<String>()
         for (value in declared) {
-            if (value == "automatic") continue
+            // "automatic" is IN sSupportedAspectRatios, so a theme that
+            // declares it passes ES-DE's validation like any other name
+            // (ThemeData.cpp:1232-1243) and is then emitted twice, once
+            // by the unconditional prepend and once by the loop below
+            // (:1766-1775). Kept rather than smoothed over: no real
+            // theme declares it, and the only place this shows is the
+            // aspect-ratio setting's own option list.
             if (value !in SUPPORTED) continue
             accepted += value
         }
         if (accepted.isEmpty()) return emptyList()
         return buildList {
             add("automatic")
-            for (ratio in SUPPORTED) if (ratio != "automatic" && ratio in accepted) add(ratio)
+            for (ratio in SUPPORTED) if (ratio in accepted) add(ratio)
         }
     }
 
@@ -130,7 +136,17 @@ object EsDeAspectRatio {
         setting: String? = null,
         screenAspectRatio: Float? = null,
     ): Selection {
-        if (capabilities.isEmpty()) return Selection("16:9", false)
+        // A theme that declares no aspect ratio at all selects NOTHING,
+        // not "16:9": ES-DE only enters the block above when
+        // `capabilities.aspectRatios.size() > 0` (ThemeData.cpp:738), so
+        // `sSelectedAspectRatio` keeps its own empty default
+        // (ThemeData.h:301) and `parseAspectRatios` returns immediately
+        // on it (ThemeData.cpp:2036-2037) -- no <aspectRatio> block in
+        // the theme is applied. Returning "16:9" here instead would
+        // apply a 16:9 block of a theme whose capabilities.xml never
+        // declared one, which ES-DE treats as a theme error
+        // (ThemeData.cpp:2057-2061).
+        if (capabilities.isEmpty()) return Selection("", false)
         var selected = if (setting != null && setting in capabilities) setting else capabilities.first()
         if (selected != "automatic") return Selection(selected, false)
 
