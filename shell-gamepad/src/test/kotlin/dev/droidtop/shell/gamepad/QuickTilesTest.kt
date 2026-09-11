@@ -4,7 +4,7 @@ import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
-import dev.droidtop.library.settings.HandheldSettingsCatalog
+import dev.droidtop.library.settings.GamingSettingsCatalog
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.library.settings.ToggleItem
@@ -39,18 +39,18 @@ class QuickTilesTest {
                     "g", null,
                     listOf(
                         ActionItem(id = "a", title = "Network: Wi-Fi", run = {}),
-                        slider(HandheldSettingsCatalog.ID_SYSTEM_VOLUME, 0, 15, 7),
-                        slider(HandheldSettingsCatalog.ID_SYSTEM_BRIGHTNESS, 0, 255, 128),
-                        toggle(HandheldSettingsCatalog.ID_SYSTEM_DND, true),
+                        slider(GamingSettingsCatalog.ID_SYSTEM_VOLUME, 0, 15, 7),
+                        slider(GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS, 0, 255, 128),
+                        toggle(GamingSettingsCatalog.ID_SYSTEM_DND, true),
                     ),
                 ),
             ),
         )
         assertEquals(
-            listOf(HandheldSettingsCatalog.ID_SYSTEM_VOLUME, HandheldSettingsCatalog.ID_SYSTEM_BRIGHTNESS),
+            listOf(GamingSettingsCatalog.ID_SYSTEM_VOLUME, GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS),
             panel.sliders.map { it.id },
         )
-        assertEquals(listOf("a", HandheldSettingsCatalog.ID_SYSTEM_DND), panel.tiles.map { it.item.id })
+        assertEquals(listOf("a", GamingSettingsCatalog.ID_SYSTEM_DND), panel.tiles.map { it.item.id })
         assertEquals(4, panel.focusCount)
     }
 
@@ -63,12 +63,12 @@ class QuickTilesTest {
 
     @Test
     fun `toggles carry an on state, choices carry their current label`() {
-        val on = QuickTiles.tile(toggle(HandheldSettingsCatalog.ID_SYSTEM_DND, true))
+        val on = QuickTiles.tile(toggle(GamingSettingsCatalog.ID_SYSTEM_DND, true))
         assertEquals(true, on.on)
         assertNull(on.value)
         assertEquals(QuickGlyph.MOON, on.glyph)
 
-        val picked = QuickTiles.tile(choice(HandheldSettingsCatalog.ID_SYSTEM_TIMEOUT, 3))
+        val picked = QuickTiles.tile(choice(GamingSettingsCatalog.ID_SYSTEM_TIMEOUT, 3))
         assertNull(picked.on)
         assertEquals("Value 1", picked.value)
         assertEquals(QuickGlyph.TIMER, picked.glyph)
@@ -76,7 +76,7 @@ class QuickTilesTest {
 
         val opens = QuickTiles.tile(
             NestedScreenItem(
-                id = HandheldSettingsCatalog.ID_SYSTEM_ANDROID_LINKS,
+                id = GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS,
                 title = "Android settings",
                 registryId = "android_settings",
             ),
@@ -96,24 +96,24 @@ class QuickTilesTest {
     fun `the tab is the System group plus the display-role rows, in that order`() {
         val groups = listOf(
             CatalogGroup(
-                HandheldSettingsCatalog.GROUP_HANDHELD, null,
+                GamingSettingsCatalog.GROUP_GAMING, null,
                 listOf(
-                    toggle(HandheldSettingsCatalog.ID_SHOW_HINTS, true),
-                    choice(HandheldSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET, 4),
-                    choice(HandheldSettingsCatalog.ID_DISPLAY_SHELL_TARGET, 2),
+                    toggle(GamingSettingsCatalog.ID_SHOW_HINTS, true),
+                    choice(GamingSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET, 4),
+                    choice(GamingSettingsCatalog.ID_DISPLAY_SHELL_TARGET, 2),
                 ),
             ),
             CatalogGroup(
-                HandheldSettingsCatalog.GROUP_SYSTEM, "System",
-                listOf(toggle(HandheldSettingsCatalog.ID_SYSTEM_DND, false)),
+                GamingSettingsCatalog.GROUP_SYSTEM, "System",
+                listOf(toggle(GamingSettingsCatalog.ID_SYSTEM_DND, false)),
             ),
         )
         val ids = QuickTiles.systemGroups(groups).single().items.map { it.id }
         assertEquals(
             listOf(
-                HandheldSettingsCatalog.ID_SYSTEM_DND,
-                HandheldSettingsCatalog.ID_DISPLAY_SHELL_TARGET,
-                HandheldSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET,
+                GamingSettingsCatalog.ID_SYSTEM_DND,
+                GamingSettingsCatalog.ID_DISPLAY_SHELL_TARGET,
+                GamingSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET,
             ),
             ids,
         )

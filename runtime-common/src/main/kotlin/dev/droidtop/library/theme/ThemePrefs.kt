@@ -4,7 +4,7 @@ import android.content.Context
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
- * Real, single selected Handheld theme NAME -- a runtime setting, not a
+ * Real, single selected Gaming theme NAME -- a runtime setting, not a
  * compile-time constant, matching real ES-DE's own actual mechanism
  * (`Settings::getString("Theme")`, confirmed against
  * `es-core/src/ThemeData.cpp`'s `ThemeData::reloadTheme`/`populateThemes`):
@@ -25,7 +25,7 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * `:shell-gamepad`'s own `dev.droidtop.shell.gamepad.theme.ThemePrefs` is
  * a thin Compose-reactive wrapper around this same real object (adds a
  * `version` counter Compose can key `remember` blocks off); `:shell-default`
- * (SettingsHandheldFragment's real "Theme" preference) reads/writes this
+ * (SettingsGamingFragment's real "Theme" preference) reads/writes this
  * one directly, since AndroidX Preference has no equivalent reactivity
  * need.
  */

@@ -19,7 +19,7 @@ import java.io.FileOutputStream
 /**
  * Scans installed, launchable Android apps and surfaces each as a
  * [LibraryEntry]. Real integration with :shell-default's own Launcher3
- * fork, not a second app-list/icon-cache implementation -- Handheld's Apps
+ * fork, not a second app-list/icon-cache implementation -- Gaming's Apps
  * tab shows the exact same apps, titles, and themed icons Standard's own
  * app drawer shows, sourced from the same [LauncherAppState.iconCache].
  * The pattern (LauncherApps -> AppInfo -> iconCache.getTitleAndIcon) mirrors

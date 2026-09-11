@@ -21,7 +21,7 @@ import dev.droidtop.runtime.RootProcess
  * Selection REPORTS root as a state ([rootAccess]) and never fails on its
  * absence: on an unrooted device `su` cannot even be started, and that
  * used to escape this function as an IOException and crash droidtop at
- * launch in every non-Handheld mode (emulator rig, 2026-09-10). Root is
+ * launch in every non-Gaming mode (emulator rig, 2026-09-10). Root is
  * desktop-only, and even in Desktop mode its absence is a fallback rather
  * than an error.
  */

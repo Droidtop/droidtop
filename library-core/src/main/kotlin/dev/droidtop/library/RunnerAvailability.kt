@@ -235,7 +235,7 @@ object RunnerAvailability {
         if (!facts.hasLinuxBuild) {
             return RunnerOption(strategy, RunnerState.NOT_FOR_THIS_GAME, "No native Linux build in this game's folder")
         }
-        // Root is desktop-only, and a Handheld game is never gated on it:
+        // Root is desktop-only, and a Gaming game is never gated on it:
         // this row states the reason instead of offering a launch that
         // cannot work, and every other runner for the game stays offered.
         if (!facts.linuxContainerAvailable) {

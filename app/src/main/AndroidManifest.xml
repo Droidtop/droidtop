@@ -28,11 +28,11 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
 
-    <!-- Real wifi/cellular connectivity check for Handheld's own
+    <!-- Real wifi/cellular connectivity check for Gaming's own
          systemstatus theme element (EsDeThemeRenderer.kt). -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Wi-Fi signal level for the status surfaces (Companion bar,
-         Desktop tray, Handheld settings). SSID is deliberately never
+         Desktop tray, Gaming settings). SSID is deliberately never
          read: it would drag in fine-location. -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <!-- Do Not Disturb control. Like WRITE_SETTINGS this is a special
@@ -108,7 +108,7 @@
           shell-default/README.md), declared in that library module's own
           manifest and merged in here by AGP. This is deliberately NOT a
           second app-drawer icon: droidtop defaults to the normal Android
-          launcher experience, and reaches Desktop/Handheld/Settings via
+          launcher experience, and reaches Desktop/Gaming/Settings via
           the home screen's own back-button menu (see
           dev.droidtop.shell.standard.BackButtonMenu, patched into
           Launcher.onBackPressed()) launching this Activity by explicit
@@ -153,7 +153,7 @@
 
         <!--
           The widgets/ambient-info surface for whichever display the
-          Handheld shell is NOT on (docs/SPEC.md section 4, handheld
+          Gaming shell is NOT on (docs/SPEC.md section 4, Gaming-mode
           dual-screen roles). Started by MainActivity's role
           orchestration, never launched directly by the user.
         -->
@@ -219,7 +219,7 @@
              than reimplementing it: the store app screen and the
              downloads queue, the three web-view store sign-ins, and the
              container configuration dialog. Started by explicit class
-             name from the Handheld shell, which cannot depend on :app. -->
+             name from the Gaming shell, which cannot depend on :app. -->
         <activity
             android:name=".PcStoreActivity"
             android:exported="false"

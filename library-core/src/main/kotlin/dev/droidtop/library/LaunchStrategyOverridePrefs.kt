@@ -18,7 +18,7 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * `PlatformEntity.playerIdList`/`defaultPlayerId` this whole session keeps
  * coming back to). Stores [GameLaunchStrategy.name], keyed by
  * [LibraryEntry.id]. A real per-entry picker IS wired to this: the
- * Handheld shell's game detail screen reads it and writes the user's
+ * Gaming shell's game detail screen reads it and writes the user's
  * choice back (see `GamepadShell`), matching ConsoleSystemsActivity's
  * PlayerPicker for ROMs.
  */

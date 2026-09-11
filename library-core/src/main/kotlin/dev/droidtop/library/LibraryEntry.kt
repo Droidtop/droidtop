@@ -403,7 +403,7 @@ enum class LibraryEntryKind {
 
 /**
  * User-facing group/category name for a [LibraryEntryKind] — shared by the
- * Handheld shell's section grouping and the second-screen companion panel
+ * Gaming shell's section grouping and the second-screen companion panel
  * (moved here from a private GamepadShell copy so both surfaces name kinds
  * identically instead of each keeping its own mapping).
  */

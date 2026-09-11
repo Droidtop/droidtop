@@ -14,7 +14,7 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * real test device this session). `:shell-default` can't depend on `:app`
  * (see `:app`'s build.gradle.kts -- the dependency graph is one-way, `:app`
  * depends on the shells, never the reverse), so -- same established
- * pattern as [BackButtonMenu]'s Standard/Desktop/Handheld launches and
+ * pattern as [BackButtonMenu]'s Standard/Desktop/Gaming launches and
  * `:shell-gamepad`'s Settings launch -- this starts `:app`'s
  * OnboardingActivity by explicit component name rather than a typed Intent.
  */

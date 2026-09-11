@@ -60,7 +60,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import dev.droidtop.library.settings.HandheldSettingsCatalog
+import dev.droidtop.library.settings.GamingSettingsCatalog
 import dev.droidtop.library.EngineGameProvider
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
@@ -108,7 +108,7 @@ import kotlinx.coroutines.withContext
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
- * Full-screen, controller-first library shell — the "handheld style" UI.
+ * Full-screen, controller-first library shell — the Gaming-mode UI.
  * Never the default; a user opts into this the same way they'd opt into
  * :shell-desktop (see dev.droidtop.app.ShellPreference in :app).
  *
@@ -138,7 +138,7 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * real controller to tune against, none was available while writing
  * this), a real Settings screen (placeholder card only — droidtop's
  * actual settings live in `:shell-default`'s `SettingsActivity` per
- * docs/SPEC.md §4; whether Handheld gets its own in-shell settings
+ * docs/SPEC.md §4; whether Gaming gets its own in-shell settings
  * surface or just launches that one isn't decided), and dual-screen
  * presentation (§4's `DualScreenCoordinator` decides role assignment,
  * nothing here renders companion content on a second screen yet).
@@ -156,9 +156,9 @@ fun GamepadShell(
     onEntriesChanged: (List<LibraryEntry>) -> Unit = {},
     // Real deep-link params from :app's MainActivity, which itself reads
     // them from an Intent extra sent by :shell-default's
-    // SettingsHandheldFragment -- a different module with no compile
+    // SettingsGamingFragment -- a different module with no compile
     // dependency on this one, hence a plain String name here rather than
-    // HandheldSection itself (internal, module-private). Lets the real,
+    // GamingSection itself (internal, module-private). Lets the real,
     // unified Preference-based settings screen reach this Compose-only
     // shell's own actions (jump to a section, trigger a rescan) it has no
     // other way to invoke. deepLinkToken is real, not decorative: this
@@ -194,7 +194,7 @@ fun GamepadShell(
     // only way to force a fresh scan was clearing app data by hand over
     // adb; a real user has no such option.
     var rescanTrigger by remember { mutableStateOf(0) }
-    var section by remember { mutableStateOf(HandheldPrefs.defaultSection(context)) }
+    var section by remember { mutableStateOf(GamingPrefs.defaultSection(context)) }
     // Bumps whenever a real "Browse themes" deep-link arrives (see
     // deepLinkToken's own doc comment) -- SettingsCatalogView opens its
     // inline ThemeBrowserScreen off this token.
@@ -207,24 +207,24 @@ fun GamepadShell(
     LaunchedEffect(deepLinkToken) {
         if (triggerRescan) rescanTrigger++
         if (triggerBrowseThemes) {
-            section = HandheldSection.SETTINGS
+            section = GamingSection.SETTINGS
             browseThemesRequest++
         }
         startSectionName?.let { name ->
-            HandheldSection.entries.firstOrNull { it.name == name }?.let { section = it }
+            GamingSection.entries.firstOrNull { it.name == name }?.let { section = it }
         }
     }
     // Settings is a real in-shell section again -- cycling to it with L/R
-    // or picking its tab NEVER leaves the handheld context (per direction:
+    // or picking its tab NEVER leaves the Gaming context (per direction:
     // browsing sections must maintain context). It renders the SAME shared
     // settings catalog the unified Preference surface renders
-    // (HandheldSettingsCatalog, :runtime-common -- see docs/SPEC.md's
+    // (GamingSettingsCatalog, :runtime-common -- see docs/SPEC.md's
     // settings architecture), so nothing about the settings themselves is
     // shell-specific; only the chrome is. Explicitly activating a
     // navigation item inside it (Global settings, another shell's
     // settings, Console systems) still opens those real surfaces -- that's
     // a deliberate user choice, exactly the distinction this draws.
-    val selectSection: (HandheldSection) -> Unit = { target -> section = target }
+    val selectSection: (GamingSection) -> Unit = { target -> section = target }
     var canGoBack by remember { mutableStateOf(false) }
     // True only while GamesSection's own themed system-view render (the
     // real, loaded theme's <helpsystem> element, see EsDeThemedHelpSystem)
@@ -258,8 +258,8 @@ fun GamepadShell(
     var screensaverOn by remember { mutableStateOf(false) }
     val screensaverMode = remember { ScreensaverPrefs.mode(context) }
     LaunchedEffect(uiMode) {
-        if (uiMode.hidesSettings && section == HandheldSection.SETTINGS) {
-            section = HandheldSection.GAMES
+        if (uiMode.hidesSettings && section == GamingSection.SETTINGS) {
+            section = GamingSection.GAMES
         }
     }
     LaunchedEffect(lastInputMs, screensaverMode, launching) {
@@ -377,8 +377,8 @@ fun GamepadShell(
     // rescanKindsProgressive, whose own first emission is the real,
     // already-known cached data (see ConsoleRomProvider.rescanProgressive's
     // own doc comment), not an empty list. "Rescan library" itself now
-    // lives in SettingsHandheldFragment (see MainActivity's own
-    // EXTRA_HANDHELD_RESCAN, read once above into rescanTrigger's initial
+    // lives in SettingsGamingFragment (see MainActivity's own
+    // EXTRA_GAMING_RESCAN, read once above into rescanTrigger's initial
     // value) -- nothing left in this composition needs to bump it again.
     // Real, immediate in-memory update -- Library.toggleFavorite already
     // persists the real new state (see its own doc comment); updating the
@@ -429,7 +429,7 @@ fun GamepadShell(
     // [LocalShellOwnsHelpRow].
     androidx.compose.runtime.CompositionLocalProvider(
         LocalShellWindow provides shellWindow,
-        LocalShellOwnsHelpRow provides (HandheldPrefs.showHints(context) && shellWindow.touchFirst),
+        LocalShellOwnsHelpRow provides (GamingPrefs.showHints(context) && shellWindow.touchFirst),
     ) {
     Column(
         modifier = Modifier
@@ -634,11 +634,11 @@ fun GamepadShell(
                     onLaunch = { onLaunch(entry); detailEntry = null },
                     onClose = { detailEntry = null },
                 )
-                section == HandheldSection.SETTINGS -> {
+                section == GamingSection.SETTINGS -> {
                     canGoBack = false
                     themeHandlesHints = false
                     SettingsCatalogView(
-                        onBack = { section = HandheldPrefs.defaultSection(context) },
+                        onBack = { section = GamingPrefs.defaultSection(context) },
                         onRescan = { rescanTrigger++ },
                         browseThemesToken = browseThemesRequest,
                     )
@@ -647,10 +647,10 @@ fun GamepadShell(
                 // gameEntries/appEntries' own comment) -- Games' spinner no
                 // longer has anything to do with whether Apps is ready, and
                 // vice versa.
-                section == HandheldSection.GAMES && gameEntries == null -> CircularProgressIndicator(color = Color.White)
-                section == HandheldSection.APPS && appEntries == null -> CircularProgressIndicator(color = Color.White)
+                section == GamingSection.GAMES && gameEntries == null -> CircularProgressIndicator(color = Color.White)
+                section == GamingSection.APPS && appEntries == null -> CircularProgressIndicator(color = Color.White)
                 else -> when (section) {
-                    HandheldSection.GAMES -> GamesSection(
+                    GamingSection.GAMES -> GamesSection(
                         entries = gameEntries.orEmpty().let { all ->
                             if (uiMode.kidGamesOnly) all.filter { it.kidGame } else all
                         },
@@ -663,7 +663,7 @@ fun GamepadShell(
                         onToggleFavorite = onToggleFavorite,
                         onRequestRescan = { rescanTrigger++ },
                     )
-                    HandheldSection.APPS -> {
+                    GamingSection.APPS -> {
                         canGoBack = false
                         themeHandlesHints = false
                         AppsSection(
@@ -676,7 +676,7 @@ fun GamepadShell(
                     }
                     // SETTINGS is handled above, before the loading gate --
                     // unreachable here, kept only so `when` stays exhaustive.
-                    HandheldSection.SETTINGS -> Unit
+                    GamingSection.SETTINGS -> Unit
                 }
             }
         }
@@ -684,13 +684,13 @@ fun GamepadShell(
         // the controls: on a screen with no pad attached this bar is the
         // only route to B/Y/Select at all, so it stays. On the console a
         // theme's own help system still takes over, exactly as before.
-        if (HandheldPrefs.showHints(context) && (!themeHandlesHints || shellWindow.touchFirst)) {
+        if (GamingPrefs.showHints(context) && (!themeHandlesHints || shellWindow.touchFirst)) {
             ButtonHintFooter(
                 canGoBack = canGoBack || detailEntry != null,
                 showInfo = detailEntry == null,
                 showSectionSwitch = detailEntry == null,
-                showSystemSwitch = detailEntry == null && section == HandheldSection.GAMES && canGoBack,
-                showOptions = detailEntry == null && section == HandheldSection.GAMES,
+                showSystemSwitch = detailEntry == null && section == GamingSection.GAMES && canGoBack,
+                showOptions = detailEntry == null && section == GamingSection.GAMES,
             )
         }
     }
@@ -699,38 +699,38 @@ fun GamepadShell(
 
 /**
  * Reads the mode-specific preferences set from :shell-default's real
- * settings screen (SettingsHandheldFragment / murine_prefs_handheld.xml).
+ * settings screen (SettingsGamingFragment).
  * No compile-time dependency on :shell-default from here -- it and
  * :shell-gamepad are separate library modules wired together only by :app
  * -- so this reads the same shared SharedPreferences file
  * ([LAUNCHER_PREFS_FILE_NAME]) instead.
  */
-private object HandheldPrefs {
+private object GamingPrefs {
     private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
-    private const val KEY_DEFAULT_SECTION = "pref_handheld_default_section"
-    private const val KEY_SHOW_HINTS = "pref_handheld_show_hints"
-    private const val KEY_APPS_GRID_COLUMNS = "pref_handheld_apps_grid_columns"
+    private const val KEY_DEFAULT_SECTION = "pref_gaming_default_section"
+    private const val KEY_SHOW_HINTS = "pref_gaming_show_hints"
+    private const val KEY_APPS_GRID_COLUMNS = "pref_gaming_apps_grid_columns"
     private const val DEFAULT_APPS_GRID_COLUMNS = 5
     // One shared range definition -- the settings catalog
     // (:runtime-common) is the single owner of this setting now, so the
     // formerly hand-synced copy of the XML seekbar's range is gone.
-    const val MIN_APPS_GRID_COLUMNS = HandheldSettingsCatalog.MIN_APPS_GRID_COLUMNS
-    const val MAX_APPS_GRID_COLUMNS = HandheldSettingsCatalog.MAX_APPS_GRID_COLUMNS
+    const val MIN_APPS_GRID_COLUMNS = GamingSettingsCatalog.MIN_APPS_GRID_COLUMNS
+    const val MAX_APPS_GRID_COLUMNS = GamingSettingsCatalog.MAX_APPS_GRID_COLUMNS
 
-    fun defaultSection(context: Context): HandheldSection {
+    fun defaultSection(context: Context): GamingSection {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return when (prefs.getString(KEY_DEFAULT_SECTION, "games")) {
-            "apps" -> HandheldSection.APPS
-            else -> HandheldSection.GAMES
+            "apps" -> GamingSection.APPS
+            else -> GamingSection.GAMES
         }
     }
 
     fun showHints(context: Context): Boolean =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_SHOW_HINTS, true)
 
-    fun setDefaultSection(context: Context, section: HandheldSection) {
+    fun setDefaultSection(context: Context, section: GamingSection) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
-            .putString(KEY_DEFAULT_SECTION, if (section == HandheldSection.APPS) "apps" else "games")
+            .putString(KEY_DEFAULT_SECTION, if (section == GamingSection.APPS) "apps" else "games")
             .apply()
     }
 
@@ -746,7 +746,7 @@ private object HandheldPrefs {
     // override (SettingsDrawerFragment's GRID_SIZE_WIDTH_DRAWER_OVERRIDE) --
     // that one sizes Standard's app drawer, an entirely different view with
     // its own icon size/screen-real-estate needs. Same SharedPreferences
-    // file as every other Handheld pref here, set via SettingsHandheldFragment
+    // file as every other Gaming pref here, set via SettingsGamingFragment
     // (:shell-default) through the shared CustomSeekBarPreference widget,
     // which self-persists as an int.
     fun appsGridColumns(context: Context): Int =
@@ -1043,18 +1043,18 @@ private fun ButtonHintFooter(
     )
 }
 
-internal enum class HandheldSection { GAMES, APPS, SETTINGS }
+internal enum class GamingSection { GAMES, APPS, SETTINGS }
 
 /**
  * The sections a given UI mode allows. Kiosk and Kid hide Settings --
  * the point of both is handing the device to somebody without handing
  * over the device's configuration.
  */
-internal fun sectionsFor(mode: dev.droidtop.library.settings.UiMode): List<HandheldSection> =
+internal fun sectionsFor(mode: dev.droidtop.library.settings.UiMode): List<GamingSection> =
     if (mode.hidesSettings) {
-        listOf(HandheldSection.GAMES, HandheldSection.APPS)
+        listOf(GamingSection.GAMES, GamingSection.APPS)
     } else {
-        HandheldSection.entries
+        GamingSection.entries
     }
 
 // Apps are what is NOT a game. A Wine profile and a Linux-container game
@@ -1080,11 +1080,11 @@ private val GAME_KINDS = LibraryEntryKind.entries.toSet() - APP_KINDS
 
 @Composable
 private fun SectionTabBar(
-    current: HandheldSection,
-    onSelect: (HandheldSection) -> Unit,
+    current: GamingSection,
+    onSelect: (GamingSection) -> Unit,
     currentTabFocus: FocusRequester,
     onQuickMenu: () -> Unit,
-    sections: List<HandheldSection> = HandheldSection.entries,
+    sections: List<GamingSection> = GamingSection.entries,
 ) {
     val window = LocalShellWindow.current
     Row(
@@ -1158,10 +1158,10 @@ private fun SectionTabBar(
     }
 }
 
-private fun HandheldSection.displayName(): String = when (this) {
-    HandheldSection.GAMES -> "Games"
-    HandheldSection.APPS -> "Apps"
-    HandheldSection.SETTINGS -> "Settings"
+private fun GamingSection.displayName(): String = when (this) {
+    GamingSection.GAMES -> "Games"
+    GamingSection.APPS -> "Apps"
+    GamingSection.SETTINGS -> "Settings"
 }
 
 /**
@@ -2412,8 +2412,8 @@ private fun AppsSection(
     ) {
         items(sections, key = { it.title }) { homeSection ->
             // Native Android apps get their own dense, icon-first grid
-            // (columns configurable via SettingsHandheldFragment's
-            // "Apps grid columns" -- see HandheldPrefs.appsGridColumns),
+            // (columns configurable via SettingsGamingFragment's
+            // "Apps grid columns" -- see GamingPrefs.appsGridColumns),
             // separate from the artwork-carousel HomeSectionRow every other
             // kind still uses: apps have square launcher icons, not
             // portrait artwork, so the same 220x260 GameCard layout wastes
@@ -2421,7 +2421,7 @@ private fun AppsSection(
             if (homeSection.entries.firstOrNull()?.kind == LibraryEntryKind.NATIVE_ANDROID_APP) {
                 AppIconGrid(
                     homeSection,
-                    columns = HandheldPrefs.appsGridColumns(context),
+                    columns = GamingPrefs.appsGridColumns(context),
                     firstTileFocus = if (!firstAssigned) firstFocus else null,
                     onLaunch = onLaunch,
                     onShowDetail = onShowDetail,
@@ -2446,7 +2446,7 @@ private fun AppsSection(
  * Dense, non-scrolling-per-row icon grid for the Apps tab — Android app
  * drawer style (icon + label, no artwork card), unlike [HomeSectionRow]'s
  * portrait-artwork carousel. [columns] comes from
- * [HandheldPrefs.appsGridColumns] so density is user-configurable
+ * [GamingPrefs.appsGridColumns] so density is user-configurable
  * independent of :shell-default's own app-drawer grid width.
  */
 @Composable
@@ -2559,16 +2559,16 @@ private fun AppIconTile(
 }
 
 /**
- * Real, focused theme-browser screen -- the one real piece of Handheld's
+ * Real, focused theme-browser screen -- the one real piece of Gaming's
  * former in-house Settings tab that can't just become a flat Android
- * Preference entry in :shell-default's SettingsHandheldFragment (unlike
+ * Preference entry in :shell-default's SettingsGamingFragment (unlike
  * Library/Display/Theme/Sync theme index, all moved there -- see
  * docs/SPEC.md's own settings-architecture note): browsing/downloading a
  * NEW theme needs ThemeBrowserScreen's own rich, scrollable list of
  * remote entries with real screenshot previews, not reachable from a
  * different Gradle module. Reachable ONLY via a real deep-link (the
- * "Browse themes" preference in SettingsHandheldFragment, through
- * MainActivity's EXTRA_HANDHELD_START_SECTION) -- selecting Settings from
+ * "Browse themes" preference in SettingsGamingFragment, through
+ * MainActivity's EXTRA_GAMING_START_SECTION) -- selecting Settings from
  * the tab bar itself now goes straight to that real, unified Preference
  * screen instead (see GamepadShell's own selectSection).
  */
@@ -2658,7 +2658,7 @@ private fun GameCard(
             }
             .focusable()
             // Real bug fix, reported directly: touch input didn't work
-            // anywhere in Handheld mode -- .clickable() was never actually
+            // anywhere in Gaming mode -- .clickable() was never actually
             // applied here (an older comment claimed it was, but it wasn't;
             // .focusable() alone doesn't respond to taps, only to real
             // focus + the onKeyEvent below). This also gives DPAD_CENTER/

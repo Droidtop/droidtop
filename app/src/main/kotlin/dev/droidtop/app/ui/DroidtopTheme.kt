@@ -20,7 +20,7 @@ import androidx.compose.ui.graphics.Color
  * what shipped; the light palette is its real counterpart, new with this
  * theme. Follows the system dark/light setting.
  *
- * Deliberately NOT applied to the Handheld shell's ES-DE-themed surfaces:
+ * Deliberately NOT applied to the Gaming shell's ES-DE-themed surfaces:
  * a themed view owns its whole surface and takes every color from the
  * active ES-DE theme (docs/SPEC.md section 7f), not from Material.
  */
@@ -54,8 +54,8 @@ private val LightColors = lightColorScheme(
 
 /**
  * [darkTheme] defaults to the system setting; screens that live inside the
- * Handheld shell's always-dark world (Console systems is the real case --
- * it opens from Handheld's own Settings tab and deliberately matches
+ * Gaming shell's always-dark world (Console systems is the real case --
+ * it opens from Gaming's own Settings tab and deliberately matches
  * GamepadShell's plain-black ground) pass `darkTheme = true` so they keep
  * that identity regardless of the system light/dark setting.
  */

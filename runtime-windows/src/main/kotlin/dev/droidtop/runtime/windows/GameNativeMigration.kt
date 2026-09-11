@@ -20,7 +20,7 @@ import java.io.File
  * it doesn't, signing in again is cheap, unlike re-downloading games).
  *
  * ROOT IS REQUIRED and this is deliberately OPTIONAL: another app's data
- * directory is unreadable otherwise. Handheld features never *depend* on
+ * directory is unreadable otherwise. Gaming features never *depend* on
  * root (standing rule) -- signing in normally remains the universal
  * path; this is a shortcut for rooted devices.
  *

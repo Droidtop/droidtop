@@ -59,11 +59,11 @@ import kotlinx.coroutines.withContext
 /**
  * droidtop's real first-run flow — onboards the DEVICE, not one mode.
  * Real correction from an earlier draft: this used to force a single mode
- * choice and only ever configured Handheld's games folders. Per direction,
+ * choice and only ever configured Gaming's games folders. Per direction,
  * it now: (1) asks how the Android home screen itself should work (its own
  * Standard launcher / forward to a different installed launcher via
  * "Alternative" mode / neither), (2) lets the user independently choose to
- * also set up Desktop and/or Handheld, each with its own real setup step,
+ * also set up Desktop and/or Gaming, each with its own real setup step,
  * (3) asks which of everything actually configured should be the default
  * when droidtop is launched — configuring and defaulting are separate
  * questions, so a user shouldn't have to visit Settings right after first
@@ -148,7 +148,7 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
     val context = LocalContext.current
     var step by remember { mutableStateOf(startStep ?: OnboardingStep.WELCOME) }
     var configureDesktop by remember { mutableStateOf(false) }
-    var configureHandheld by remember { mutableStateOf(false) }
+    var configureGaming by remember { mutableStateOf(false) }
     var unresolvedFolderWarning by remember { mutableStateOf(false) }
     var pathEntry by remember { mutableStateOf("") }
     var pathError by remember { mutableStateOf<String?>(null) }
@@ -212,12 +212,12 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
             OnboardingStep.ALTERNATIVE_SETUP -> OnboardingStep.CONFIGURE_MORE
             OnboardingStep.CONFIGURE_MORE ->
                 if (configureDesktop) OnboardingStep.DESKTOP_SETUP
-                else if (configureHandheld) OnboardingStep.STORAGE_PERMISSION
+                else if (configureGaming) OnboardingStep.STORAGE_PERMISSION
                 // Still the keyboard step: it is the one offer that
                 // matters whichever mode the user picked.
                 else OnboardingStep.KEYBOARD
             OnboardingStep.DESKTOP_SETUP ->
-                if (configureHandheld) OnboardingStep.STORAGE_PERMISSION else OnboardingStep.KEYBOARD
+                if (configureGaming) OnboardingStep.STORAGE_PERMISSION else OnboardingStep.KEYBOARD
             OnboardingStep.STORAGE_PERMISSION -> OnboardingStep.GAMES_FOLDERS
             OnboardingStep.GAMES_FOLDERS ->
                 if (portraitThemeSwap != null) OnboardingStep.PORTRAIT_THEME else OnboardingStep.KEYBOARD
@@ -273,9 +273,9 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
 
                 OnboardingStep.CONFIGURE_MORE -> ConfigureMoreStep(
                     desktopChecked = configureDesktop,
-                    handheldChecked = configureHandheld,
+                    gamingChecked = configureGaming,
                     onDesktopChanged = { configureDesktop = it },
-                    onHandheldChanged = { configureHandheld = it },
+                    onGamingChanged = { configureGaming = it },
                     onContinue = { advanceFrom(OnboardingStep.CONFIGURE_MORE) },
                 )
 
@@ -350,7 +350,7 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
                 OnboardingStep.DEFAULT_MODE_CHOICE -> DefaultModeChoiceStep(
                     homeImplementation = HomeRolePrefs.activeHomeImplementation(context),
                     desktopConfigured = configureDesktop,
-                    handheldConfigured = configureHandheld,
+                    gamingConfigured = configureGaming,
                     onPicked = { mode ->
                         ModePrefs.setLastMode(context, mode)
                         finishOnboarding()
@@ -449,7 +449,7 @@ private fun AlternativeSetupStep(onPicked: (ComponentName) -> Unit, onBack: () -
 
     Text("Pick a launcher", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineSmall)
     Text(
-        "droidtop will still handle switching between Desktop and Handheld " +
+        "droidtop will still handle switching between Desktop and Gaming " +
             "mode -- pressing Home will open whichever launcher you pick here.",
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodyMedium,
@@ -483,21 +483,21 @@ private fun AlternativeSetupStep(onPicked: (ComponentName) -> Unit, onBack: () -
 @Composable
 private fun ConfigureMoreStep(
     desktopChecked: Boolean,
-    handheldChecked: Boolean,
+    gamingChecked: Boolean,
     onDesktopChanged: (Boolean) -> Unit,
-    onHandheldChanged: (Boolean) -> Unit,
+    onGamingChanged: (Boolean) -> Unit,
     onContinue: () -> Unit,
 ) {
     Text("Anything else to set up?", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineSmall)
     Text(
-        "Desktop (Wine/Linux containers) and Handheld (a gamepad-driven " +
+        "Desktop (Wine/Linux containers) and Gaming (a gamepad-driven " +
             "library) both stay reachable from droidtop's mode switcher " +
             "regardless of what you picked for your home screen.",
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodyMedium,
     )
     LabeledCheckbox("Desktop", desktopChecked, onDesktopChanged)
-    LabeledCheckbox("Handheld", handheldChecked, onHandheldChanged)
+    LabeledCheckbox("Gaming", gamingChecked, onGamingChanged)
     Button(onClick = onContinue) { Text("Continue") }
 }
 
@@ -731,8 +731,8 @@ private fun GamesFoldersStep(
 
     TextButton(onClick = onDone) { Text(if (roots.isEmpty()) "Skip for now" else "Done") }
     Text(
-        "Handheld's whole look is themeable (real ES-DE themes, bundled " +
-            "and downloadable) -- pick one any time in Settings > Handheld.",
+        "Gaming's whole look is themeable (real ES-DE themes, bundled " +
+            "and downloadable) -- pick one any time in Settings > Gaming.",
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodySmall,
     )
@@ -740,17 +740,17 @@ private fun GamesFoldersStep(
 
 /**
  * Only modes the user actually configured this run are offered — picking
- * an unconfigured Desktop/Handheld as the default landed straight in that
+ * an unconfigured Desktop/Gaming as the default landed straight in that
  * mode's failure/empty screen after onboarding (a real dead end the
  * coherence review flagged). When nothing was configured at all, the one
- * honest option is Handheld (it works unconfigured, showing its own
+ * honest option is Gaming (it works unconfigured, showing its own
  * empty-library guidance), labeled as such.
  */
 @Composable
 private fun DefaultModeChoiceStep(
     homeImplementation: HomeRolePrefs.HomeImplementation,
     desktopConfigured: Boolean,
-    handheldConfigured: Boolean,
+    gamingConfigured: Boolean,
     onPicked: (String) -> Unit,
 ) {
     Text("Which should droidtop open into?", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineSmall)
@@ -760,16 +760,16 @@ private fun DefaultModeChoiceStep(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodyMedium,
     )
-    val anyConfigured = homeImplementation != HomeRolePrefs.HomeImplementation.NONE || desktopConfigured || handheldConfigured
+    val anyConfigured = homeImplementation != HomeRolePrefs.HomeImplementation.NONE || desktopConfigured || gamingConfigured
     if (homeImplementation != HomeRolePrefs.HomeImplementation.NONE) {
         Button(onClick = { onPicked(BackButtonMenu.MODE_STANDARD) }) { Text("My home screen") }
     }
     if (desktopConfigured) {
         Button(onClick = { onPicked(BackButtonMenu.MODE_DESKTOP) }) { Text("Desktop") }
     }
-    if (handheldConfigured || !anyConfigured) {
-        Button(onClick = { onPicked(BackButtonMenu.MODE_HANDHELD) }) {
-            Text(if (handheldConfigured) "Handheld" else "Handheld (set up later in Settings)")
+    if (gamingConfigured || !anyConfigured) {
+        Button(onClick = { onPicked(BackButtonMenu.MODE_GAMING) }) {
+            Text(if (gamingConfigured) "Gaming" else "Gaming (set up later in Settings)")
         }
     }
 }

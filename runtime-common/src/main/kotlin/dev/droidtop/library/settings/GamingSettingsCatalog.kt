@@ -9,8 +9,8 @@ import dev.droidtop.library.theme.ThemeDownloader
 import dev.droidtop.library.theme.ThemePrefs
 
 /**
- * The Handheld mode settings catalog -- the single definition of what
- * Handheld's settings ARE (see SettingsCatalog.kt for the model and the
+ * The Gaming mode settings catalog -- the single definition of what
+ * Gaming's settings ARE (see SettingsCatalog.kt for the model and the
  * renderer contract). Layout convention shared by every mode's catalog
  * (docs/SPEC.md settings architecture): the droidtop-wide "global" group
  * first (a renderer whose chrome already exposes global settings -- the
@@ -19,35 +19,35 @@ import dev.droidtop.library.theme.ThemePrefs
  * modes' settings last, so nobody ever has to switch modes just to reach
  * a setting.
  */
-object HandheldSettingsCatalog {
+object GamingSettingsCatalog {
 
     const val GROUP_GLOBAL = "global"
-    const val GROUP_HANDHELD = "handheld"
+    const val GROUP_GAMING = "gaming"
     const val GROUP_OTHER_SHELLS = "other_shells"
 
     const val ID_GLOBAL_SETTINGS = "pref_global_settings"
-    const val ID_DEFAULT_SECTION = "pref_handheld_default_section"
-    const val ID_SHOW_HINTS = "pref_handheld_show_hints"
-    const val ID_SCRAPER = "pref_handheld_scraper"
-    const val ID_SCREENSAVER = "pref_handheld_screensaver"
-    const val ID_UI_MODE = "pref_handheld_ui_mode"
-    const val ID_CONSOLE_SYSTEMS = "pref_handheld_console_systems"
-    const val ID_WINDOWS_GAMES = "pref_handheld_windows_games"
-    const val GROUP_SYSTEM = "handheld_system"
-    const val ID_SYSTEM_NETWORK = "pref_handheld_system_network"
-    const val ID_SYSTEM_VOLUME = "pref_handheld_system_volume"
-    const val ID_SYSTEM_BRIGHTNESS = "pref_handheld_system_brightness"
-    const val ID_SYSTEM_BRIGHTNESS_GRANT = "pref_handheld_system_brightness_grant"
-    const val ID_SYSTEM_BLUETOOTH = "pref_handheld_system_bluetooth"
-    const val ID_SYSTEM_VPN = "pref_handheld_system_vpn"
-    const val ID_SYSTEM_LEAVE_UI_MODE = "pref_handheld_system_leave_ui_mode"
-    const val ID_SYSTEM_DND = "pref_handheld_system_dnd"
-    const val ID_SYSTEM_DND_GRANT = "pref_handheld_system_dnd_grant"
-    const val ID_SYSTEM_ADAPTIVE = "pref_handheld_system_adaptive"
-    const val ID_SYSTEM_ROTATE = "pref_handheld_system_rotate"
-    const val ID_SYSTEM_TIMEOUT = "pref_handheld_system_timeout"
-    const val ID_SYSTEM_ANDROID_LINKS = "pref_handheld_system_android_links"
-    const val ID_SYSTEM_UPDATES = "pref_handheld_system_updates"
+    const val ID_DEFAULT_SECTION = "pref_gaming_default_section"
+    const val ID_SHOW_HINTS = "pref_gaming_show_hints"
+    const val ID_SCRAPER = "pref_gaming_scraper"
+    const val ID_SCREENSAVER = "pref_gaming_screensaver"
+    const val ID_UI_MODE = "pref_gaming_ui_mode"
+    const val ID_CONSOLE_SYSTEMS = "pref_gaming_console_systems"
+    const val ID_WINDOWS_GAMES = "pref_gaming_windows_games"
+    const val GROUP_SYSTEM = "gaming_system"
+    const val ID_SYSTEM_NETWORK = "pref_gaming_system_network"
+    const val ID_SYSTEM_VOLUME = "pref_gaming_system_volume"
+    const val ID_SYSTEM_BRIGHTNESS = "pref_gaming_system_brightness"
+    const val ID_SYSTEM_BRIGHTNESS_GRANT = "pref_gaming_system_brightness_grant"
+    const val ID_SYSTEM_BLUETOOTH = "pref_gaming_system_bluetooth"
+    const val ID_SYSTEM_VPN = "pref_gaming_system_vpn"
+    const val ID_SYSTEM_LEAVE_UI_MODE = "pref_gaming_system_leave_ui_mode"
+    const val ID_SYSTEM_DND = "pref_gaming_system_dnd"
+    const val ID_SYSTEM_DND_GRANT = "pref_gaming_system_dnd_grant"
+    const val ID_SYSTEM_ADAPTIVE = "pref_gaming_system_adaptive"
+    const val ID_SYSTEM_ROTATE = "pref_gaming_system_rotate"
+    const val ID_SYSTEM_TIMEOUT = "pref_gaming_system_timeout"
+    const val ID_SYSTEM_ANDROID_LINKS = "pref_gaming_system_android_links"
+    const val ID_SYSTEM_UPDATES = "pref_gaming_system_updates"
 
     /** Real values the stock Settings app offers, labelled the same way. */
     private val TIMEOUT_OPTIONS = listOf(
@@ -59,23 +59,23 @@ object HandheldSettingsCatalog {
         600_000 to "10 minutes",
         1_800_000 to "30 minutes",
     )
-    const val ID_GAME_FOLDERS = "pref_handheld_game_folders"
+    const val ID_GAME_FOLDERS = "pref_gaming_game_folders"
     const val ID_DISPLAY_SHELL_TARGET = "pref_display_shell_target"
     const val ID_DISPLAY_GAME_LAUNCH_TARGET = "pref_display_game_launch_target"
     const val ID_DISPLAY_SWAP = "action_display_swap"
     const val ID_DISPLAY_REINIT = "action_display_reinit"
     const val ID_KEYBOARD_PICK = "action_keyboard_pick"
     const val ID_KEYBOARD_ENABLE = "action_keyboard_enable"
-    const val ID_RESCAN_LIBRARY = "pref_handheld_rescan_library"
-    const val ID_THEME = "pref_handheld_theme"
-    const val ID_THEME_COLOR_SCHEME = "pref_handheld_theme_colorscheme"
-    const val ID_THEME_VARIANT = "pref_handheld_theme_variant"
-    const val ID_THEME_ASPECT_RATIO = "pref_handheld_theme_aspect_ratio"
-    const val ID_SYNC_THEME_INDEX = "pref_handheld_sync_theme_index"
-    const val ID_BROWSE_THEMES = "pref_handheld_browse_themes"
-    const val ID_APPS_GRID_COLUMNS = "pref_handheld_apps_grid_columns"
-    const val ID_DESKTOP_SETTINGS = "pref_handheld_desktop_settings"
-    const val ID_STANDARD_SETTINGS = "pref_handheld_standard_settings"
+    const val ID_RESCAN_LIBRARY = "pref_gaming_rescan_library"
+    const val ID_THEME = "pref_gaming_theme"
+    const val ID_THEME_COLOR_SCHEME = "pref_gaming_theme_colorscheme"
+    const val ID_THEME_VARIANT = "pref_gaming_theme_variant"
+    const val ID_THEME_ASPECT_RATIO = "pref_gaming_theme_aspect_ratio"
+    const val ID_SYNC_THEME_INDEX = "pref_gaming_sync_theme_index"
+    const val ID_BROWSE_THEMES = "pref_gaming_browse_themes"
+    const val ID_APPS_GRID_COLUMNS = "pref_gaming_apps_grid_columns"
+    const val ID_DESKTOP_SETTINGS = "pref_gaming_desktop_settings"
+    const val ID_STANDARD_SETTINGS = "pref_gaming_standard_settings"
 
     const val MIN_APPS_GRID_COLUMNS = 2
     const val MAX_APPS_GRID_COLUMNS = 10
@@ -99,7 +99,7 @@ object HandheldSettingsCatalog {
             ),
         ),
         CatalogGroup(
-            id = GROUP_HANDHELD,
+            id = GROUP_GAMING,
             title = null,
             items = buildList {
                 add(defaultSectionItem(context))
@@ -182,7 +182,7 @@ object HandheldSettingsCatalog {
                 )
                 add(displayShellTargetItem(context))
                 add(displayGameLaunchTargetItem(context))
-                add(secondScreenRoleItem(context, MODE_HANDHELD))
+                add(secondScreenRoleItem(context, MODE_GAMING))
                 add(secondScreenRoleItem(context, MODE_DESKTOP))
                 // Detection can only guess which physical panel is which --
                 // Android exposes no position signal -- so the correction
@@ -239,8 +239,8 @@ object HandheldSettingsCatalog {
                         // substitutes its own scan-trigger bump by id.
                         run = launchComponent(
                             "dev.droidtop.app.MainActivity",
-                            "dev.droidtop.app.EXTRA_MODE" to "handheld",
-                            "dev.droidtop.app.EXTRA_HANDHELD_RESCAN" to true,
+                            "dev.droidtop.app.EXTRA_MODE" to "gaming",
+                            "dev.droidtop.app.EXTRA_GAMING_RESCAN" to true,
                         ),
                     ),
                 )
@@ -275,8 +275,8 @@ object HandheldSettingsCatalog {
                         // the browser inline instead (by id).
                         run = launchComponent(
                             "dev.droidtop.app.MainActivity",
-                            "dev.droidtop.app.EXTRA_MODE" to "handheld",
-                            "dev.droidtop.app.EXTRA_HANDHELD_BROWSE_THEMES" to true,
+                            "dev.droidtop.app.EXTRA_MODE" to "gaming",
+                            "dev.droidtop.app.EXTRA_GAMING_BROWSE_THEMES" to true,
                         ),
                     ),
                 )
@@ -491,7 +491,7 @@ object HandheldSettingsCatalog {
     private fun showHintsItem(context: Context) = ToggleItem(
         id = ID_SHOW_HINTS,
         title = "Show button hints",
-        subtitle = "Show the A/B/Y button legend at the bottom of the Handheld shell",
+        subtitle = "Show the A/B/Y button legend at the bottom of the Gaming shell",
         current = CatalogPrefs.prefs(context).getBoolean(ID_SHOW_HINTS, true),
         onToggle = { ctx, value ->
             CatalogPrefs.prefs(ctx).edit().putBoolean(ID_SHOW_HINTS, value).apply()
@@ -500,7 +500,7 @@ object HandheldSettingsCatalog {
 
     private fun displayShellTargetItem(context: Context) = ChoiceItem(
         id = ID_DISPLAY_SHELL_TARGET,
-        title = "Handheld shell display",
+        title = "Gaming shell display",
         options = listOf(
             ChoiceOption("SECOND_WHEN_PRESENT", "Second display when connected"),
             ChoiceOption("BUILT_IN", "Always the built-in screen"),
@@ -530,7 +530,7 @@ object HandheldSettingsCatalog {
      * What the second screen is FOR, per mode (docs/SPEC.md 4 and 6c).
      *
      * Per mode rather than once, because the modes genuinely differ:
-     * Desktop's lower screen is an input surface by design, while Handheld
+     * Desktop's lower screen is an input surface by design, while Gaming
      * moves the shell to the addon and leaves the built-in panel as the
      * ambient widgets surface. Both are the user's to change, which is
      * what section 4 means by the input role being toggleable.
@@ -544,7 +544,7 @@ object HandheldSettingsCatalog {
         val default = if (mode == MODE_DESKTOP) "INPUT" else "COMPANION"
         return ChoiceItem(
             id = id,
-            title = if (mode == MODE_DESKTOP) "Second screen in Desktop mode" else "Second screen in Handheld mode",
+            title = if (mode == MODE_DESKTOP) "Second screen in Desktop mode" else "Second screen in Gaming mode",
             options = listOf(
                 ChoiceOption("COMPANION", "Widgets and game info"),
                 ChoiceOption("INPUT", "Keyboard and trackpad"),
@@ -556,7 +556,7 @@ object HandheldSettingsCatalog {
         )
     }
 
-    private const val MODE_HANDHELD = "HANDHELD"
+    private const val MODE_GAMING = "GAMING"
     private const val MODE_DESKTOP = "DESKTOP"
 
     private fun themeItem(context: Context): ChoiceItem {

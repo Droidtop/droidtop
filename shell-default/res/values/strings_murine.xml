@@ -21,8 +21,8 @@
     <string name="pref_category_misc_desc">Other options</string>
     <string name="pref_category_desktop_title">Desktop mode</string>
     <string name="pref_category_desktop_desc">Settings for the Desktop shell</string>
-    <string name="pref_category_handheld_title">Handheld mode</string>
-    <string name="pref_category_handheld_desc">Settings for the Handheld shell</string>
+    <string name="pref_category_gaming_title">Gaming mode</string>
+    <string name="pref_category_gaming_desc">Settings for the Gaming shell</string>
     <string name="pref_standard_settings_title">Standard mode</string>
     <string name="pref_standard_settings_desc">General, icons, home screen, and everything else for the Standard shell</string>
 
@@ -33,8 +33,8 @@
     <string name="pref_global_default_mode_desc">Which mode droidtop starts in when launched fresh, instead of resuming whichever you used last</string>
     <string name="pref_global_enable_desktop_title">Enable Desktop mode</string>
     <string name="pref_global_enable_desktop_desc">Show Desktop as a choice in the shell switcher</string>
-    <string name="pref_global_enable_handheld_title">Enable Handheld mode</string>
-    <string name="pref_global_enable_handheld_desc">Show Handheld as a choice in the shell switcher</string>
+    <string name="pref_global_enable_gaming_title">Enable Gaming mode</string>
+    <string name="pref_global_enable_gaming_desc">Show Gaming as a choice in the shell switcher</string>
     <string name="pref_global_rerun_onboarding_title">Rerun onboarding</string>
     <string name="pref_global_rerun_onboarding_desc">Go through droidtop\'s first-run setup again</string>
     <string name="pref_global_backup_title">Back up settings</string>
@@ -50,27 +50,27 @@
     <string name="pref_desktop_root_compositor_setup_desc">Re-check root access and choose which distro + compositor to use</string>
     <string name="pref_desktop_containers_title">Containers</string>
     <string name="pref_desktop_containers_desc">Manage Linux containers and distros: create, start, stop, delete</string>
-    <string name="pref_handheld_theme_colorscheme_title">Theme color scheme</string>
-    <string name="pref_handheld_theme_variant_title">Theme variant</string>
-    <string name="pref_display_shell_target_title">Handheld shell display</string>
+    <string name="pref_gaming_theme_colorscheme_title">Theme color scheme</string>
+    <string name="pref_gaming_theme_variant_title">Theme variant</string>
+    <string name="pref_display_shell_target_title">Gaming shell display</string>
     <string name="pref_display_game_launch_target_title">Games launch on</string>
 
-    <string name="pref_handheld_default_section_title">Default section</string>
-    <string name="pref_handheld_show_hints_title">Show button hints</string>
-    <string name="pref_handheld_show_hints_desc">Show the A/B/Y button legend at the bottom of the Handheld shell</string>
-    <string name="pref_handheld_console_systems_title">Console systems</string>
-    <string name="pref_handheld_console_systems_desc">Assign game folders to a console system by hand</string>
-    <string name="pref_handheld_game_folders_title">Game folders</string>
-    <string name="pref_handheld_game_folders_desc">Add or remove the folders droidtop scans for games</string>
-    <string name="pref_handheld_apps_grid_columns_title">Apps grid columns</string>
-    <string name="pref_handheld_apps_grid_columns_desc">Icon density for the Apps tab, independent of the launcher app drawer\'s own grid width</string>
-    <string name="pref_handheld_rescan_library_title">Rescan library</string>
-    <string name="pref_handheld_rescan_library_desc">Look for new or changed games and apps again</string>
-    <string name="pref_handheld_theme_title">Theme</string>
-    <string name="pref_handheld_sync_theme_index_title">Sync theme index</string>
-    <string name="pref_handheld_sync_theme_index_desc">Update the real ES-DE theme list; run this before Browse themes if that list is empty</string>
-    <string name="pref_handheld_browse_themes_title">Browse themes</string>
-    <string name="pref_handheld_browse_themes_desc">Download or update an individual theme from the real ES-DE community index</string>
+    <string name="pref_gaming_default_section_title">Default section</string>
+    <string name="pref_gaming_show_hints_title">Show button hints</string>
+    <string name="pref_gaming_show_hints_desc">Show the A/B/Y button legend at the bottom of the Gaming shell</string>
+    <string name="pref_gaming_console_systems_title">Console systems</string>
+    <string name="pref_gaming_console_systems_desc">Assign game folders to a console system by hand</string>
+    <string name="pref_gaming_game_folders_title">Game folders</string>
+    <string name="pref_gaming_game_folders_desc">Add or remove the folders droidtop scans for games</string>
+    <string name="pref_gaming_apps_grid_columns_title">Apps grid columns</string>
+    <string name="pref_gaming_apps_grid_columns_desc">Icon density for the Apps tab, independent of the launcher app drawer\'s own grid width</string>
+    <string name="pref_gaming_rescan_library_title">Rescan library</string>
+    <string name="pref_gaming_rescan_library_desc">Look for new or changed games and apps again</string>
+    <string name="pref_gaming_theme_title">Theme</string>
+    <string name="pref_gaming_sync_theme_index_title">Sync theme index</string>
+    <string name="pref_gaming_sync_theme_index_desc">Update the real ES-DE theme list; run this before Browse themes if that list is empty</string>
+    <string name="pref_gaming_browse_themes_title">Browse themes</string>
+    <string name="pref_gaming_browse_themes_desc">Download or update an individual theme from the real ES-DE community index</string>
     <string-array name="pref_display_shell_target_entries">
         <item>Second display when connected</item>
         <item>Always the built-in screen</item>
@@ -89,11 +89,11 @@
         <item>BUILT_IN</item>
         <item>SECOND</item>
     </string-array>
-    <string-array name="pref_handheld_default_section_entries">
+    <string-array name="pref_gaming_default_section_entries">
         <item>Games</item>
         <item>Apps</item>
     </string-array>
-    <string-array name="pref_handheld_default_section_values">
+    <string-array name="pref_gaming_default_section_values">
         <item>games</item>
         <item>apps</item>
     </string-array>

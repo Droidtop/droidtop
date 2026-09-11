@@ -59,7 +59,7 @@ import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.FolderPickItem
-import dev.droidtop.library.settings.HandheldSettingsCatalog
+import dev.droidtop.library.settings.GamingSettingsCatalog
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.library.settings.SubScreenItem
@@ -309,7 +309,7 @@ fun CatalogNavigator(
 }
 
 /**
- * Handheld's Settings section: the handheld settings catalog rendered by
+ * Gaming's Settings section: the Gaming settings catalog rendered by
  * [CatalogNavigator], with the shell's renderer-native fulfillments
  * (rescan bumps the scan trigger via [onRescan]; Browse themes opens
  * [ThemeBrowserScreen] inline, also reachable by deep link via
@@ -334,17 +334,17 @@ internal fun SettingsCatalogView(
 
     val root = remember {
         CatalogScreen(
-            id = "handheld_settings",
+            id = "gaming_settings",
             title = "Settings",
-            groups = { ctx -> HandheldSettingsCatalog.groups(ctx) },
+            groups = { ctx -> GamingSettingsCatalog.groups(ctx) },
         )
     }
     CatalogNavigator(
         root = root,
         onExit = onBack,
         nativeActions = mapOf(
-            HandheldSettingsCatalog.ID_RESCAN_LIBRARY to onRescan,
-            HandheldSettingsCatalog.ID_BROWSE_THEMES to { browseThemes = true },
+            GamingSettingsCatalog.ID_RESCAN_LIBRARY to onRescan,
+            GamingSettingsCatalog.ID_BROWSE_THEMES to { browseThemes = true },
         ),
     )
 }

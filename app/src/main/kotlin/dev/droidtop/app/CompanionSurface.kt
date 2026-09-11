@@ -23,7 +23,7 @@ import dev.droidtop.library.LibraryEntry
  * The companion screen, in one place.
  *
  * There were two hosts for this surface and they had drifted:
- * [CompanionActivity] (used when the Handheld shell sits on the ADDON
+ * [CompanionActivity] (used when the Gaming shell sits on the ADDON
  * screen, so the companion lands on the built-in one) drew the system
  * bar, live notifications and the user's widgets; the second-screen host
  * (the far more common arrangement — shell built-in, companion on the
