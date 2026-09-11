@@ -45,9 +45,23 @@ class EsDeAspectRatioTest {
     @Test
     fun `a theme declaring nothing gets no list at all`() {
         assertEquals(emptyList<String>(), EsDeAspectRatio.capabilityList(emptyList()))
-        // "automatic" alone is not a declaration -- ES-DE only prepends it
-        // when at least one real ratio survived validation.
-        assertEquals(emptyList<String>(), EsDeAspectRatio.capabilityList(listOf("automatic")))
+    }
+
+    /**
+     * ES-DE validates "automatic" like any other supported name and then
+     * emits it twice, because the prepend is unconditional and the
+     * re-emit loop walks sSupportedAspectRatios from "automatic"
+     * (ThemeData.cpp:1232-1243, :1766-1775). Selection is unaffected --
+     * front() is "automatic" either way -- and this pins that droidtop
+     * does not quietly "fix" it.
+     */
+    @Test
+    fun `a theme that declares automatic itself gets ES-DEs own duplicate`() {
+        assertEquals(
+            listOf("automatic", "automatic", "16:9"),
+            EsDeAspectRatio.capabilityList(listOf("automatic", "16:9")),
+        )
+        assertEquals("16:9", EsDeAspectRatio.select(listOf("automatic", "automatic", "16:9")).name)
     }
 
     @Test
@@ -142,9 +156,16 @@ class EsDeAspectRatioTest {
         )
     }
 
+    /**
+     * ES-DE enters the selection block only when the theme declared at
+     * least one ratio (ThemeData.cpp:738), so sSelectedAspectRatio keeps
+     * its empty default (ThemeData.h:301) and parseAspectRatios returns
+     * on it immediately (ThemeData.cpp:2036-2037): NO aspectRatio block
+     * is applied, which is not the same as applying the 16:9 one.
+     */
     @Test
-    fun `a theme with no aspect ratios at all selects 16 to 9`() {
-        assertEquals("16:9", EsDeAspectRatio.select(emptyList(), screenAspectRatio = portrait).name)
+    fun `a theme with no aspect ratios at all selects nothing`() {
+        assertEquals("", EsDeAspectRatio.select(emptyList(), screenAspectRatio = portrait).name)
     }
 
     @Test
