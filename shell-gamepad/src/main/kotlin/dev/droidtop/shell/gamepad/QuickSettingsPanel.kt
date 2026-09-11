@@ -245,6 +245,7 @@ internal fun QuickSettingsPanel(sheetWidthDp: Int, onDismiss: () -> Unit) {
                     confirmArmed = confirmArmedId == tile.item.id,
                     status = statusById[tile.item.id],
                     onClick = {
+                        if (focusIndex != panel.sliders.size + index) confirmArmedId = null
                         focusIndex = panel.sliders.size + index
                         activate(tile.item)
                     },
