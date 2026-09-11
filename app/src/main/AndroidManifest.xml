@@ -196,6 +196,41 @@
             android:name=".SteamLoginActivity"
             android:exported="false" />
 
+        <!-- The PC surface's store half (docs/SPEC.md 7i, build-plan
+             steps 5 to 7). All three host UI that :runtime-windows
+             already compiles from the vendored gamenative tree rather
+             than reimplementing it: the store app screen and the
+             downloads queue, the three web-view store sign-ins, and the
+             container configuration dialog. Started by explicit class
+             name from the Handheld shell, which cannot depend on :app. -->
+        <activity
+            android:name=".PcStoreActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|navigation" />
+        <activity
+            android:name=".PcStoreSignInActivity"
+            android:exported="false" />
+        <activity
+            android:name=".PcContainerConfigActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|navigation" />
+
+        <!-- gamenative's own OAuth web views, the ones droidtop's store
+             sign-in shim starts for a result. Declared here because
+             :runtime-windows deliberately declares only the backbone
+             components (see its own manifest) and these are UI droidtop
+             does reach. Not exported: they are started from inside this
+             app and carry an auth code back. -->
+        <activity
+            android:name="app.gamenative.ui.screen.auth.GOGOAuthActivity"
+            android:exported="false" />
+        <activity
+            android:name="app.gamenative.ui.screen.auth.EpicOAuthActivity"
+            android:exported="false" />
+        <activity
+            android:name="app.gamenative.ui.screen.auth.AmazonOAuthActivity"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

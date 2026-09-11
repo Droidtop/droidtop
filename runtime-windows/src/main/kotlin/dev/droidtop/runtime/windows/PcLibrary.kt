@@ -117,6 +117,14 @@ object PcLibrary {
             addAll(runCatching { dao.amazonGameDao().getAllAsList().map { it.toGame() } }.getOrDefault(emptyList()))
             addAll(
                 runCatching {
+                    // The scanner looks in its own managed folders plus
+                    // whatever roots it has been told about. droidtop
+                    // already asks the user for their games folders ONCE,
+                    // so those are the roots -- without this the folder
+                    // source could only ever see gamenative's own
+                    // CustomGames directory, which nothing in droidtop
+                    // tells anybody about.
+                    adoptGamesRootsAsScanRoots(context)
                     CustomGameScanner.scanAsLibraryItems()
                         // The scanner recognizes a Steam install sitting in a
                         // scanned folder and returns it as a STEAM item; that
@@ -257,6 +265,106 @@ object PcLibrary {
         sizeBytes = if (isInstalled) installSize else downloadSize,
         artUrl = artUrl.takeIf { it.isNotEmpty() },
         compatibility = compatibilityFor(title),
+    )
+
+    /**
+     * droidtop's own games folders, handed to gamenative's folder scanner
+     * as its user scan roots.
+     *
+     * Additive and idempotent: the scanner's own managed directories stay
+     * where they are, and a root already present is not written again.
+     * One list of folders for the whole app is the point -- a user who
+     * added their games folder should not have to add it a second time
+     * somewhere else to see the Windows games in it.
+     */
+    private fun adoptGamesRootsAsScanRoots(context: Context) {
+        val wanted = dev.droidtop.library.GamesRoots.current(context).map { it.absolutePath }
+        if (wanted.isEmpty()) return
+        val current = runCatching { app.gamenative.PrefManager.customGameScanRoots }.getOrDefault(emptySet())
+        if (wanted.all { it in current }) return
+        runCatching { app.gamenative.PrefManager.customGameScanRoots = current + wanted }
+    }
+
+    /**
+     * The gamenative [LibraryItem] behind one droidtop PC entry id, which
+     * is what its own store screens (install, verify, DLC, downloads) are
+     * written against — droidtop hosts those screens rather than
+     * reimplementing the install lifecycle (docs/SPEC.md 7i, build-plan
+     * step 5).
+     *
+     * Built from each store's own row, not by reversing [Game.id]: a
+     * store's numeric id for its screens is not always the id droidtop
+     * keys an entry by (Epic's stable identity is its catalog id, while
+     * its screens look a game up by the integer row id), so going back to
+     * the row is the only mapping that cannot silently point at the wrong
+     * game. The item's shape mirrors gamenative's own LibraryViewModel
+     * for each source so the screens get exactly what they expect.
+     */
+    suspend fun libraryItemFor(context: Context, entryId: String): LibraryItem? {
+        val nativeId = entryId.substringAfter(':')
+        val dao = daos(context)
+        return runCatching {
+            when (entryId.substringBefore(':')) {
+                "steam" -> dao.steamAppDao().getAllOwnedAppsAsList()
+                    .firstOrNull { it.id.toString() == nativeId }?.toLibraryItem()
+                "gog" -> dao.gogGameDao().getAllAsList().firstOrNull { it.id == nativeId }?.toLibraryItem()
+                "epic" -> dao.epicGameDao().getAllAsList().firstOrNull { it.catalogId == nativeId }?.toLibraryItem()
+                "amazon" -> dao.amazonGameDao().getAllAsList().firstOrNull { it.productId == nativeId }?.toLibraryItem()
+                // A folder game IS a LibraryItem already -- the scanner
+                // produced the id this entry carries.
+                "folder" -> CustomGameScanner.scanAsLibraryItems().firstOrNull { it.appId == nativeId }
+                else -> null
+            }
+        }.getOrNull()
+    }
+
+    private fun SteamApp.toLibraryItem(): LibraryItem = LibraryItem(
+        appId = "${GameSource.STEAM.name}_$id",
+        name = name,
+        iconHash = clientIconHash,
+        capsuleImageUrl = runCatching { getCapsuleUrl() }.getOrDefault(""),
+        headerImageUrl = headerUrl,
+        heroImageUrl = runCatching { getHeroUrl() }.getOrDefault(""),
+        gameSource = GameSource.STEAM,
+        isInstalled = runCatching { SteamService.isAppInstalled(id) }.getOrDefault(false),
+    )
+
+    private fun GOGGame.toLibraryItem(): LibraryItem = LibraryItem(
+        appId = "${GameSource.GOG.name}_$id",
+        name = title,
+        iconHash = iconUrl.ifEmpty { imageUrl },
+        capsuleImageUrl = verticalCoverUrl.ifEmpty { iconUrl.ifEmpty { imageUrl } },
+        headerImageUrl = imageUrl.ifEmpty { iconUrl },
+        heroImageUrl = imageUrl.ifEmpty { iconUrl },
+        gameSource = GameSource.GOG,
+        sizeBytes = if (isInstalled) installSize else downloadSize,
+        isInstalled = isInstalled,
+    )
+
+    private fun EpicGame.toLibraryItem(): LibraryItem = LibraryItem(
+        // The integer row id, not the catalog id: Epic's own screens
+        // resolve a game through LibraryItem.gameId, which parses this.
+        appId = "${GameSource.EPIC.name}_$id",
+        name = title,
+        iconHash = artSquare.ifEmpty { artCover },
+        capsuleImageUrl = artCover.ifEmpty { artSquare },
+        headerImageUrl = artPortrait.ifEmpty { artSquare.ifEmpty { artCover } },
+        heroImageUrl = artPortrait.ifEmpty { artSquare.ifEmpty { artCover } },
+        gameSource = GameSource.EPIC,
+        sizeBytes = installSize,
+        isInstalled = isInstalled,
+    )
+
+    private fun AmazonGame.toLibraryItem(): LibraryItem = LibraryItem(
+        appId = "${GameSource.AMAZON.name}_$appId",
+        name = title,
+        iconHash = artUrl,
+        capsuleImageUrl = artUrl,
+        headerImageUrl = heroUrl.ifEmpty { artUrl },
+        heroImageUrl = heroUrl.ifEmpty { artUrl },
+        gameSource = GameSource.AMAZON,
+        sizeBytes = if (isInstalled) installSize else downloadSize,
+        isInstalled = isInstalled,
     )
 
     /**

@@ -318,7 +318,9 @@ class DroidtopPcGameRuntime(
             .joinToString("") { (letter, path) -> "$letter:$path" }
 
     override suspend fun launchWindows(executable: File, gameRoot: File): PcLaunchResult {
-        val container = runCatching { ContainerManager(context).containers.firstOrNull() }.getOrNull()
+        // The same rule the configuration screen resolves with, so the
+        // prefix somebody edited is the prefix this starts in.
+        val container = PcContainers.forGame(context, entryId = null)
             ?: return PcLaunchResult(
                 false,
                 // Names the real action that now exists. This used to say
@@ -355,7 +357,7 @@ class DroidtopPcGameRuntime(
         )
     }
 
-    private companion object {
+    internal companion object {
         // Trailing digit on purpose: ContainerUtils.extractGameIdFromContainerId
         // parses a trailing numeric run out of the id, and returns 0 for
         // anything that does not parse.
@@ -380,5 +382,58 @@ class DroidtopPcGameRuntime(
          * doing deliberately, not as a side effect of picking a default.
          */
         const val WINE_VERSION = "proton-9.0-x86_64"
+    }
+}
+
+/**
+ * WHICH Wine container a PC game runs in, in one place.
+ *
+ * Two shapes exist and both are real. gamenative keys a container by the
+ * store's own app id, so a game somebody configured under GameNative (or
+ * through the per-game config screen droidtop now opens) has a prefix of
+ * its own; droidtop provisions ONE container (id [DroidtopPcGameRuntime]
+ * writes) for everything else, because a person setting up Windows games
+ * once should not be asked to set one up per game. This answers "the
+ * game's own prefix if it has one, droidtop's otherwise" for both the
+ * launch path and the configuration screen, so the prefix a person edits
+ * is provably the prefix the game starts in (docs/SPEC.md 7i, build-plan
+ * step 7).
+ */
+object PcContainers {
+
+    /**
+     * [entryId] is droidtop's own PC entry id ("steam:440"); null, or an
+     * entry no store knows, means droidtop's own container. Null comes
+     * back only when there is no container at all yet, which is the
+     * "Set up Windows games" step rather than an error.
+     */
+    fun forGame(context: Context, entryId: String?): Container? {
+        val manager = runCatching { ContainerManager(context) }.getOrNull() ?: return null
+        val perGame = entryId?.let { gamenativeAppId(it) }
+        if (perGame != null && runCatching { manager.hasContainer(perGame) }.getOrDefault(false)) {
+            return runCatching { manager.getContainerById(perGame) }.getOrNull()
+        }
+        val containers = runCatching { manager.containers }.getOrNull().orEmpty()
+        return containers.firstOrNull { it.id == DroidtopPcGameRuntime.CONTAINER_ID } ?: containers.firstOrNull()
+    }
+
+    /**
+     * The id gamenative would have given this game's own container:
+     * "STEAM_440" for a store entry, and nothing at all for a detected
+     * folder game, which never had a gamenative identity to key one by.
+     */
+    private fun gamenativeAppId(entryId: String): String? {
+        val source = entryId.substringBefore(':')
+        val nativeId = entryId.substringAfter(':', "")
+        if (nativeId.isBlank()) return null
+        return when (source) {
+            "steam" -> "STEAM_$nativeId"
+            "gog" -> "GOG_$nativeId"
+            "epic" -> "EPIC_$nativeId"
+            "amazon" -> "AMAZON_$nativeId"
+            // A folder game's entry id IS the scanner's own appId.
+            "folder" -> nativeId
+            else -> null
+        }
     }
 }
