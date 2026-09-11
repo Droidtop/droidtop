@@ -129,9 +129,14 @@ fun CatalogNavigator(
         version++
     }
 
+    // Moving to a DIFFERENT row disarms a pending confirm. Re-selecting the
+    // same row must not: a tap selects and activates in one gesture, so the
+    // second tap of a two-step confirm arrives as "select this row again,
+    // then activate" -- if that cleared the arm, touch could never confirm
+    // (it could not remove a games root without a controller, 2026-09-11).
     fun setSelected(index: Int) {
+        if (selectionByDepth[depth] != index) confirmArmedId = null
         selectionByDepth[depth] = index
-        confirmArmedId = null
     }
 
     val folderPickLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
