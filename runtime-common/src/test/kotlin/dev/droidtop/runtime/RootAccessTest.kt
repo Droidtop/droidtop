@@ -25,7 +25,13 @@ class RootAccessTest {
 
     @Test
     fun `an empty command is a result too`() = runBlocking {
-        assertFalse(ProcessRunner.run(emptyList()).launched)
+        // ProcessBuilder.start() indexes before it validates, so this one
+        // throws ArrayIndexOutOfBoundsException rather than anything
+        // documented -- it is answered ahead of start(), not caught.
+        val result = ProcessRunner.run(emptyList())
+
+        assertFalse(result.launched)
+        assertEquals("no command to run", result.stderr)
     }
 
     @Test
