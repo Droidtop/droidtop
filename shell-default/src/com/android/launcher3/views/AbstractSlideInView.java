@@ -32,7 +32,6 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Outline;
 import android.graphics.drawable.Drawable;
-import android.os.Build;
 import android.util.AttributeSet;
 import android.util.FloatProperty;
 import android.view.MotionEvent;
@@ -40,12 +39,10 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
 import android.view.animation.Interpolator;
-import android.window.BackEvent;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.Px;
-import androidx.annotation.RequiresApi;
 
 import com.android.app.animation.Interpolators;
 import com.android.launcher3.AbstractFloatingView;
@@ -55,6 +52,7 @@ import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.touch.BaseSwipeDetector;
+import com.android.launcher3.util.BackGesture;
 import com.android.launcher3.touch.SingleAxisSwipeDetector;
 
 import java.util.ArrayList;
@@ -288,16 +286,14 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
     }
 
     @Override
-    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-    public void onBackStarted(BackEvent backEvent) {
-        super.onBackStarted(backEvent);
+    public void onBackStarted(BackGesture gesture) {
+        super.onBackStarted(gesture);
         mViewToAnimateInSwipeToDismiss = shouldAnimateContentViewInBackSwipe() ? mContent : this;
     }
 
     @Override
-    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-    public void onBackProgressed(BackEvent backEvent) {
-        final float progress = backEvent.getProgress();
+    public void onBackProgressed(BackGesture gesture) {
+        final float progress = gesture.getProgress();
         mSwipeToDismissProgress.updateValue(progress);
     }
 
@@ -307,7 +303,7 @@ public abstract class AbstractSlideInView<T extends Context & ActivityContext>
      * search mode.
      *
      * <p>Note that this method can be expensive, and should only be called from
-     * {@link #onBackStarted(BackEvent)}, not from {@link #onBackProgressed(BackEvent)}.
+     * {@link #onBackStarted(BackGesture)}, not from {@link #onBackProgressed(BackGesture)}.
      */
     protected boolean shouldAnimateContentViewInBackSwipe() {
         return false;
