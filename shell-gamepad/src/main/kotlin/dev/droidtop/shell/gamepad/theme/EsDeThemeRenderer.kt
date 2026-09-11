@@ -1047,8 +1047,8 @@ private fun EsDeThemedText(
                 // ^ VISIBLE ^ ROTATION` (GamelistView.cpp:317-319) -- the
                 // scrollable parent owns its transform.
                 .esDeRotation(element)
-                .size(width = width, height = height)
-                .let { if (backgroundColor != null) it.background(backgroundColor.copy(alpha = backgroundColor.alpha * opacity)) else it },
+                .esDeBackgroundBox(backgroundMarginsBoxOf(element, viewWidth, opacity))
+                .size(width = width, height = height),
             contentAlignment = boxAlignment,
         ) {
             Text(
@@ -1091,9 +1091,6 @@ private fun EsDeThemedText(
         // margins) is exactly what origin math ends up centering/
         // anchoring, matching real ES-DE with no separate pre-measure
         // pass needed.
-        val backgroundMarginsFraction = element.valueOrNull<EsDeThemeValue.Pair>("backgroundMargins")
-        val backgroundMarginX = backgroundMarginsFraction?.let { (viewWidth * it.x) } ?: 0.dp
-        val backgroundMarginY = backgroundMarginsFraction?.let { (viewHeight * it.y) } ?: 0.dp
         EsDeAutoOriginBox(
             viewWidth = viewWidth,
             viewHeight = viewHeight,
@@ -1103,8 +1100,10 @@ private fun EsDeThemedText(
             Box(
                 modifier = Modifier
                     .esDeRotation(element)
-                    .let { if (backgroundColor != null) it.background(backgroundColor.copy(alpha = backgroundColor.alpha * opacity)) else it }
-                    .padding(horizontal = backgroundMarginX, vertical = backgroundMarginY),
+                    // Real `backgroundMargins` -- see backgroundMarginsBoxOf for
+                    // why this is a horizontal (leading, trailing) pair and not
+                    // the (horizontal, vertical) one droidtop read it as.
+                    .esDeBackgroundBox(backgroundMarginsBoxOf(element, viewWidth, opacity)),
             ) {
                 Text(
                     text = text,
@@ -2018,14 +2017,13 @@ private fun EsDeThemedDateTime(element: EsDeThemeElement, viewWidth: Dp, viewHei
     // Same real DateTimeComponent default (0.035) as EsDeThemedClock.
     val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.035f
     val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * viewHeight.value).dp.toSp() }
-    // Real background box -- `datetime` shares `backgroundColor` and
-    // `backgroundCornerRadius` with `clock` (both are the same real
-    // DateTimeComponent), so the same helper applies. Its own third real
-    // property, `backgroundMargins`, is NOT part of that group and is
-    // deliberately left unimplemented: none of the ten themes measured for
-    // this pass declares it, and it is not the same (leading, trailing)
-    // pair the clock's own padding properties are.
-    val background = backgroundBoxOf(element, viewWidth, viewHeight, opacity)
+    // Real background box. A `datetime` is NOT in clock mode, so it takes
+    // `backgroundMargins` and never the clock's own padding pair
+    // (DateTimeComponent.cpp:289 gates one on `!mClockMode` and :294 the
+    // other on `mClockMode`) -- droidtop had it reading the clock's group,
+    // so a theme's declared margins did nothing and its clock padding
+    // applied to dates it was never meant for.
+    val background = backgroundMarginsBoxOf(element, viewWidth, opacity)
     EsDeAlignedTextBlock(
         element = element,
         viewWidth = viewWidth,
@@ -2384,6 +2382,14 @@ private fun EsDeThemedSystemStatus(element: EsDeThemeElement, viewWidth: Dp, vie
     // bar's own entrySpacing.
     val entrySpacing = (element.valueOrNull<EsDeThemeValue.FloatValue>("entrySpacing")?.value ?: 0.005f) * viewWidth.value
     val background = backgroundBoxOf(element, viewWidth, viewHeight, opacity)
+    // Real `textRelativeScale` (SystemStatusComponent.cpp:217-223, clamped
+    // 0.5-1.0): the status bar's FONT is `mSize.y * textRelativeScale`, so
+    // the property shrinks the battery percentage against the bar's own
+    // height while the icons keep that full height (they are resized to
+    // mSize.y at :100/:107). Nine of the fifteen collected themes declare
+    // it, and without it a theme that sized its bar for icons got oversized
+    // text beside them.
+    val textRelativeScale = (element.floatOrNull("textRelativeScale") ?: 1f).coerceIn(0.5f, 1f)
     Row(
         modifier = Modifier
             .absoluteOffset(x = offsetX, y = offsetY)
@@ -2410,7 +2416,7 @@ private fun EsDeThemedSystemStatus(element: EsDeThemeElement, viewWidth: Dp, vie
                 Text(
                     text = glyph,
                     color = color.copy(alpha = color.alpha * opacity),
-                    fontSize = with(LocalDensity.current) { heightDp.toSp() },
+                    fontSize = with(LocalDensity.current) { (heightDp * textRelativeScale).toSp() },
                     fontFamily = themeFontFamily(element),
                 )
             }
@@ -3103,6 +3109,46 @@ private data class EsDeBackgroundBox(
     val padBottom: Dp,
     val cornerRadius: Dp,
 )
+
+/**
+ * Real `backgroundMargins`, the `text`/`datetime` sibling of the clock's
+ * padding group -- and a genuinely different shape from it, which is what
+ * droidtop had wrong twice over.
+ *
+ * It is a (LEADING, TRAILING) pair on the X AXIS ONLY: ES-DE translates by
+ * `-margins.x` and draws the rect `mSize.x + margins.x + margins.y` wide by
+ * `mSize.y` tall -- the height is never touched (TextComponent.cpp:263-274).
+ * BOTH components scale against screen WIDTH and clamp to 0-0.5
+ * (TextComponent.cpp:616, DateTimeComponent.cpp:289-291). So reading the
+ * pair as (horizontal, vertical) -- which the `text` path did -- pads the
+ * wrong axis with the wrong number, and a `datetime` never takes the
+ * clock's own `backgroundHorizontalPadding`/`backgroundVerticalPadding` at
+ * all: DateTimeComponent gates those on `mClockMode` and this one on
+ * `!mClockMode` (:289, :294), so exactly one of the two applies per element
+ * type.
+ */
+private fun backgroundMarginsBoxOf(
+    element: EsDeThemeElement,
+    viewWidth: Dp,
+    opacity: Float,
+): EsDeBackgroundBox {
+    val raw = element.valueOrNull<EsDeThemeValue.Color>("backgroundColor")?.let { colorOf(it) }
+    val margins = element.valueOrNull<EsDeThemeValue.Pair>("backgroundMargins")
+    val radius = (element.valueOrNull<EsDeThemeValue.FloatValue>("backgroundCornerRadius")?.value ?: 0f)
+        .coerceIn(0f, 0.5f)
+    return EsDeBackgroundBox(
+        color = raw?.copy(alpha = raw.alpha * opacity),
+        // TextComponent has no gradient background: only the clock, the help
+        // bar and the status bar carry `backgroundColorEnd`.
+        colorEnd = raw?.copy(alpha = raw.alpha * opacity),
+        gradientHorizontal = true,
+        padStart = viewWidth * (margins?.x ?: 0f).coerceIn(0f, 0.5f),
+        padEnd = viewWidth * (margins?.y ?: 0f).coerceIn(0f, 0.5f),
+        padTop = 0.dp,
+        padBottom = 0.dp,
+        cornerRadius = (radius * viewWidth.value).dp,
+    )
+}
 
 private fun backgroundBoxOf(
     element: EsDeThemeElement,
