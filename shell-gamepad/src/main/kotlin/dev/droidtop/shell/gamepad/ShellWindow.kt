@@ -46,8 +46,22 @@ data class ShellWindow(
 
     val compact: Boolean get() = widthClass == ShellWidthClass.COMPACT
 
-    /** Touch affordances are shown IN ADDITION to the pad routes, never instead of them. */
-    val touchFirst: Boolean get() = portrait
+    /**
+     * Touch affordances are shown IN ADDITION to the pad routes, never
+     * instead of them.
+     *
+     * A window is treated as a phone's when it is upright OR when one of
+     * its sides is phone-sized, which is the same device turned
+     * sideways: a 1080x1920 phone at 420dpi is 411 x 731dp, so rotating
+     * it gives a 731dp-WIDE window that is not compact by width and is
+     * still a phone in somebody's hands with no pad attached. Keying on
+     * `portrait` alone took the touch bar away in that rotation
+     * (emulator capture, 2026-09-11: the rotated screen had the theme's
+     * own help legend and no route to B/Y/Select at all). The console
+     * is 1280x720dp, whose smaller side is 720dp, so nothing about it
+     * changes.
+     */
+    val touchFirst: Boolean get() = portrait || minOf(widthDp, heightDp) < 600
 
     /**
      * The shell's own screen-edge gutter. 48dp is right for a TV-distance
