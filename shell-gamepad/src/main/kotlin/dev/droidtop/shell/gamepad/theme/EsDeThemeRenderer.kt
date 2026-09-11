@@ -85,6 +85,8 @@ import com.github.penfeizhou.animation.loader.FileLoader
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.theme.EsDeImageTypes
 import dev.droidtop.library.theme.EsDeLetterCase
+import dev.droidtop.library.theme.esDeEntryLabel
+import dev.droidtop.library.theme.esDeLetterCase
 import dev.droidtop.library.theme.applyTo
 import dev.droidtop.library.theme.BADGE_SLOTS
 import dev.droidtop.library.theme.EsDeThemeElement
@@ -263,6 +265,11 @@ fun EsDeThemedView(
     // and a primary element's whole image chain turns on it -- see
     // [dev.droidtop.shell.gamepad.theme.esDePrimaryImage].
     gamelist: Boolean = false,
+    // Real ES-DE `file->getSystem()->isCollection()`, the guard on the
+    // `text` element's own `systemNameSuffix` (GamelistView.cpp:1115-1130
+    // and the identical block at :1160-1175). Only ever true together
+    // with [gamelist].
+    collectionGamelist: Boolean = false,
 ) {
     BoxWithConstraints(modifier = modifier) {
         val viewWidth = maxWidth
@@ -303,7 +310,8 @@ fun EsDeThemedView(
             .sortedBy { zIndexOf(it) }.forEach { element ->
             when (element.type) {
                 "image" -> EsDeThemedImage(element, viewWidth, viewHeight, gameSelection)
-                "text" -> EsDeThemedText(element, viewWidth, viewHeight, gameSelection, systemContext)
+                "text" ->
+                    EsDeThemedText(element, viewWidth, viewHeight, gameSelection, systemContext, collectionGamelist)
                 // Real video playback (see EsDeThemedVideo's own doc
                 // comment) when the selected game has a real, scraped
                 // video file; the same static-poster fallback
@@ -864,6 +872,8 @@ private fun EsDeThemedText(
     viewHeight: Dp,
     gameSelection: List<LibraryEntry>,
     systemContext: EsDeSystemContext? = null,
+    // Real `isCollection()` guard on `systemNameSuffix`; see where it is read.
+    collectionGamelist: Boolean = false,
 ) {
     // Real `metadataElement` -- see esDeHiddenByMetadataFlag's own doc
     // comment. `text` is where real themes flag it most (five of the ten
@@ -977,7 +987,33 @@ private fun EsDeThemedText(
     // `capitalize`) rendered in the raw case of the scraped string.
     // The four-value mapping already existed for the list widgets;
     // this is the same one, not a second copy.
-    val text = esDeLetterCaseOf(element.valueOrNull<EsDeThemeValue.Str>("letterCase")?.value).applyTo(rawText)
+    // Real `systemNameSuffix` on a `text` element, which is NOT the same
+    // property the three primary components carry even though it is
+    // spelled the same: TextComponent.cpp:597-602 only reads it for
+    // `metadata="name"` or `"description"`, defaulting it to true, and
+    // GamelistView.cpp:1115-1130 appends " [SYSTEM]" to the NAME of a game
+    // shown inside a collection -- naming the system the game really comes
+    // from, cased by `letterCaseSystemNameSuffix` (real default UPPERCASE,
+    // TextComponent.cpp:28) and NOT by the element's own `letterCase`,
+    // which has already been applied to the name by then. droidtop
+    // implemented this for the primary components only, so decaffe's own
+    // gamelist `text name="game"` showed a bare title in All Games where
+    // the same theme's textlist would have named the system.
+    //
+    // The `description` half of TextComponent.cpp:597 is a deliberate
+    // exception, not an omission: its only consumer is the auto-written
+    // description of a CUSTOM COLLECTION's own folder entry
+    // (CollectionSystemsManager.cpp:872-905), and droidtop has no custom
+    // collections and no folder entries to carry one.
+    val text = esDeEntryLabel(
+        name = esDeLetterCaseOf(element.valueOrNull<EsDeThemeValue.Str>("letterCase")?.value).applyTo(rawText),
+        letterCase = EsDeLetterCase.NONE,
+        systemNameSuffix = element.boolOrNull("systemNameSuffix") ?: true,
+        letterCaseSystemNameSuffix =
+            esDeLetterCase(element.strOrNull("letterCaseSystemNameSuffix")) ?: EsDeLetterCase.UPPERCASE,
+        sourceSystemName =
+            if (metadata == "name" && collectionGamelist) selectedGame?.systemId else null,
+    )
 
     val hasSize = element.valueOrNull<EsDeThemeValue.Pair>("size") != null
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
