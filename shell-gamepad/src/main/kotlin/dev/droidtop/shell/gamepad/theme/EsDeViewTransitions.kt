@@ -8,7 +8,9 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.EaseOutCubic
+import androidx.compose.animation.core.KeyframesSpec
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -160,4 +162,36 @@ fun esDeTransitionKind(from: Any?, to: Any?): EsDeViewTransition = when {
     from == null -> EsDeViewTransition.SYSTEM_TO_GAMELIST
     to == null -> EsDeViewTransition.GAMELIST_TO_SYSTEM
     else -> EsDeViewTransition.GAMELIST_TO_GAMELIST
+}
+
+/**
+ * How long a system-to-system fade runs: ES-DE's own carousel animation
+ * time of 400 ms multiplied by the 1.3 the fade animation is constructed
+ * with (SystemView.cpp:427 and :474).
+ */
+const val ES_DE_SYSTEM_FADE_MS = 520L
+
+/**
+ * The fade curve itself, SystemView.cpp:447-458, as fractions of that
+ * duration: up to full black over the first fifth, held to seven tenths,
+ * then back down, reaching zero at nine tenths. The step at 0.7 is ES-DE's
+ * own arithmetic -- its last segment mixes from `(t - 0.6) / 0.3`, which
+ * is already two thirds of the way down the moment the segment begins --
+ * and is reproduced rather than smoothed away.
+ */
+fun esDeSystemFadeSpec(startFade: Float = 0f): KeyframesSpec<Float> {
+    val start = startFade.coerceIn(0f, 1f)
+    // ES-DE's first segment is `mix(0, 1, clamp(t / 0.2 + startFade))`:
+    // a fade that begins part-way to black reaches it sooner, which is
+    // what keeps a fast scroll through the carousel from restarting the
+    // fade from nothing every time.
+    val black = (104f * (1f - start)).toInt().coerceIn(0, 363)
+    return keyframes {
+        durationMillis = ES_DE_SYSTEM_FADE_MS.toInt()
+        start at 0
+        1f at black
+        1f at 364
+        0.667f at 365
+        0f at 468
+    }
 }

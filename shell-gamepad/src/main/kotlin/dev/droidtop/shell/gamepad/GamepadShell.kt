@@ -84,11 +84,16 @@ import dev.droidtop.shell.gamepad.theme.EsDeListItem
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import dev.droidtop.shell.gamepad.theme.EsDeSystemListView
 import dev.droidtop.shell.gamepad.theme.EsDeThemedView
+import androidx.compose.animation.core.Animatable
+import dev.droidtop.library.theme.EsDeViewTransition
+import dev.droidtop.shell.gamepad.theme.ES_DE_SYSTEM_FADE_MS
+import dev.droidtop.shell.gamepad.theme.esDeSystemFadeSpec
 import dev.droidtop.shell.gamepad.theme.esDeTransitionContext
 import dev.droidtop.shell.gamepad.theme.esDeTransitionKind
 import dev.droidtop.shell.gamepad.theme.esDeViewTransition
 import dev.droidtop.shell.gamepad.theme.ThemePrefs
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
@@ -1798,7 +1803,38 @@ private fun GamesSection(
                         // onFocusedIndexChanged, driven by whichever carousel
                         // item actually has focus right now.
                         var focusedSystemIndex by remember { mutableStateOf(0) }
-                        val focusedGroup = orderedGroups.getOrNull(focusedSystemIndex)
+                        // ES-DE's system-to-system FADE (SystemView.cpp:
+                        // 447-458): the element layer fades to black over
+                        // the first fifth of the animation, holds, swaps
+                        // the system underneath at the midpoint and fades
+                        // back in -- the carousel itself keeps moving
+                        // throughout, which is why the swap is a second,
+                        // delayed index rather than the one the carousel
+                        // reads. With any other animation the element
+                        // layer follows the carousel immediately, as it
+                        // always has.
+                        val systemFade = esDeTransitions[EsDeViewTransition.SYSTEM_TO_SYSTEM]
+                            ?: EsDeTransitionAnimation.INSTANT
+                        var elementSystemIndex by remember { mutableStateOf(focusedSystemIndex) }
+                        val systemFadeOpacity = remember { Animatable(0f) }
+                        LaunchedEffect(focusedSystemIndex, systemFade) {
+                            if (systemFade != EsDeTransitionAnimation.FADE ||
+                                elementSystemIndex == focusedSystemIndex
+                            ) {
+                                elementSystemIndex = focusedSystemIndex
+                                systemFadeOpacity.snapTo(0f)
+                            } else {
+                                launch {
+                                    systemFadeOpacity.animateTo(
+                                        0f,
+                                        esDeSystemFadeSpec(systemFadeOpacity.value),
+                                    )
+                                }
+                                delay(ES_DE_SYSTEM_FADE_MS / 2)
+                                elementSystemIndex = focusedSystemIndex
+                            }
+                        }
+                        val focusedGroup = orderedGroups.getOrNull(elementSystemIndex)
                         val focusedSystemId = focusedGroup?.systemThemeFolder
                         val focusedThemeFolder = (focusedGroup as? GameGroup.Collection)?.themeFolder
                         // Keyed by ThemePrefs.version too, not just
@@ -1877,7 +1913,7 @@ private fun GamesSection(
                         // an empty list, which showed up on-device as
                         // "0 games (0 favorites)" in the themed gamecount strip
                         // and an empty game-preview for every collection.
-                        val focusedSystemEntries = when (val focused = orderedGroups.getOrNull(focusedSystemIndex)) {
+                        val focusedSystemEntries = when (val focused = orderedGroups.getOrNull(elementSystemIndex)) {
                             null -> emptyList()
                             is GameGroup.Collection -> collectionGroupMembers[focused].orEmpty()
                             else -> byGroup[focused].orEmpty()
@@ -1958,6 +1994,7 @@ private fun GamesSection(
                                 // is open. See EsDeThemedHelpSystem.
                                 backgroundDimmed = gamelistOptionsOpen,
                                 transition = esDeTransition,
+                                systemFadeOpacity = systemFadeOpacity.value,
                             )
                             // NO droidtop chrome over a themed screen: the
                             // "Continue Playing" overlay sat directly on top of
