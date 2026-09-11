@@ -229,7 +229,7 @@ object EngineDetectRules {
                 val file = File(folder, condition.path)
                 file.isFile && runCatching {
                     val head = file.inputStream().use { input ->
-                        String(input.readNBytes(FILE_HEAD_BYTES), Charsets.ISO_8859_1)
+                        String(input.readHeadBytes(FILE_HEAD_BYTES), Charsets.ISO_8859_1)
                     }
                     condition.regex.containsMatchIn(head)
                 }.getOrDefault(false)

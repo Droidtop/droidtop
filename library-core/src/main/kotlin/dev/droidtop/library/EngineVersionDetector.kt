@@ -251,7 +251,7 @@ object EngineVersionDetector {
     private fun readHead(file: File): String? {
         if (!file.isFile) return null
         return try {
-            file.inputStream().use { String(it.readNBytes(8 * 1024), Charsets.UTF_8) }
+            file.inputStream().use { String(it.readHeadBytes(8 * 1024), Charsets.UTF_8) }
         } catch (e: java.io.IOException) {
             null
         }

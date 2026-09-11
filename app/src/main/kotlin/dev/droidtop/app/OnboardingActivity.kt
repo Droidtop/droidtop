@@ -1,7 +1,9 @@
 package dev.droidtop.app
 
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -11,6 +13,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
@@ -119,8 +122,25 @@ private enum class OnboardingStep {
  * legitimate here the same way it's standard for file-manager and
  * ROM-manager apps generally.
  */
-private fun hasAllFilesAccess(): Boolean =
-    Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager()
+private fun hasStorageAccess(context: Context): Boolean =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        Environment.isExternalStorageManager()
+    } else {
+        ContextCompat.checkSelfPermission(context, LEGACY_STORAGE_PERMISSION) ==
+            PackageManager.PERMISSION_GRANTED
+    }
+
+/**
+ * The pre-API-30 equivalent of "All files access". Below API 30 there is
+ * no MANAGE_EXTERNAL_STORAGE and no
+ * ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION settings activity at all;
+ * firing that intent there throws ActivityNotFoundException and killed
+ * the app on the Android 9 rig (2026-09-11). minSdk is 26, so the legacy
+ * runtime permission is a real supported path rather than a fallback for
+ * an edge case: on API 26-29 it grants exactly the plain java.io.File
+ * reads across shared storage that GameEngineDetector needs.
+ */
+private const val LEGACY_STORAGE_PERMISSION = android.Manifest.permission.READ_EXTERNAL_STORAGE
 
 @Composable
 private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onDone: () -> Unit) {
@@ -129,7 +149,7 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
     var configureDesktop by remember { mutableStateOf(false) }
     var configureHandheld by remember { mutableStateOf(false) }
     var unresolvedFolderWarning by remember { mutableStateOf(false) }
-    var storageAccessGranted by remember { mutableStateOf(hasAllFilesAccess()) }
+    var storageAccessGranted by remember { mutableStateOf(hasStorageAccess(context)) }
     var rootsVersion by remember { mutableStateOf(0) }
     val roots = remember(rootsVersion) { GamesRootPrefs.gamesRootPaths(context) }
 
@@ -137,8 +157,14 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
         // ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION doesn't reliably
         // report grant/deny via its own result code -- re-checking the real
         // system state directly is the only trustworthy signal.
-        storageAccessGranted = hasAllFilesAccess()
+        storageAccessGranted = hasStorageAccess(context)
         if (storageAccessGranted) step = OnboardingStep.GAMES_FOLDERS
+    }
+
+    // API 26-29: the legacy runtime permission is the whole mechanism.
+    val requestLegacyStorage = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        storageAccessGranted = granted
+        if (granted) step = OnboardingStep.GAMES_FOLDERS
     }
 
     val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
@@ -255,13 +281,18 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
                 )
 
                 OnboardingStep.STORAGE_PERMISSION -> StoragePermissionStep(
+                    legacy = Build.VERSION.SDK_INT < Build.VERSION_CODES.R,
                     onGrant = {
-                        requestStorageAccess.launch(
-                            Intent(
-                                Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                                Uri.parse("package:${context.packageName}"),
-                            ),
-                        )
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            requestStorageAccess.launch(
+                                Intent(
+                                    Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                                    Uri.parse("package:${context.packageName}"),
+                                ),
+                            )
+                        } else {
+                            requestLegacyStorage.launch(LEGACY_STORAGE_PERMISSION)
+                        }
                     },
                     onSkip = { advanceFrom(OnboardingStep.STORAGE_PERMISSION) },
                 )
@@ -538,12 +569,19 @@ private fun DesktopSetupStep(onContinue: () -> Unit) {
 }
 
 @Composable
-private fun StoragePermissionStep(onGrant: () -> Unit, onSkip: () -> Unit) {
+private fun StoragePermissionStep(legacy: Boolean, onGrant: () -> Unit, onSkip: () -> Unit) {
     Text("One permission needed", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineSmall)
     Text(
-        "droidtop needs full storage access to read game files directly " +
-            "(including from an SD card) -- a folder picker alone isn't " +
-            "enough for that.",
+        if (legacy) {
+            "droidtop needs storage access to read game files directly " +
+                "(including from an SD card) -- a folder picker alone isn't " +
+                "enough for that. This version of Android asks for it as an " +
+                "ordinary permission prompt."
+        } else {
+            "droidtop needs full storage access to read game files directly " +
+                "(including from an SD card) -- a folder picker alone isn't " +
+                "enough for that."
+        },
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodyMedium,
     )
