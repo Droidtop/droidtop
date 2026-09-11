@@ -169,30 +169,67 @@ object GameEngineDetector {
         return entries.any { it.isDirectory && hasUnityPlayerRuntime(it, maxDepth - 1) }
     }
 
+    /** How many folders below a games root [scan] looks for games. */
+    const val MAX_SCAN_DEPTH = 4
+
     /**
-     * Every immediate subdirectory of [root] that [detect]s as some
-     * [GameEngine] -- skips any subdirectory whose name already resolves
-     * to a known console system (see [dev.droidtop.library.consoles.resolveSystem]),
-     * since those are provably ROM folders, not engine game folders. Real,
-     * not theoretical: a real ROMs folder's "j2me" system directory had
-     * 18,126 entries, and [isKirikiri]/[isRpgMakerVxAce] each do a full
-     * `listFiles()` scan looking for signature files -- wastefully slow on
-     * a folder this large, and on external/SD-card storage specifically,
-     * slow enough to be the real cause of a reported frozen-UI bug (see
-     * also [dev.droidtop.library.Library.scanAll]'s own fix for the other
-     * half of that: running this on the wrong dispatcher entirely).
+     * Every game under [root], wherever in its folder tree the games
+     * actually sit: the walk descends through folders that are not games
+     * until games are detected, and each detected game is ONE entry whose
+     * [DetectedGame.displayFolder] is the game's own folder. A folder that
+     * merely CONTAINS games is never itself a game (docs/SPEC.md 7i) --
+     * real case, and the reason this is a walk rather than one level:
+     * a library root added above the engine folders
+     * ("GameSync/Adult/<engine>/<game>") used to yield a single game named
+     * "Adult", because the compiled-Ren'Py `.rpa` fallback reads an
+     * unnamed subtree and so matched the wrapper three levels up.
      *
-     * Checks one level deeper when the top folder itself doesn't detect --
-     * a real, confirmed case, not theoretical: a real Ren'Py download
-     * ("BeingADik/BeingADIK-0.8.3-scrappy/{renpy,game}") had its actual
-     * `renpy`/`game` markers one folder deeper than the outer, nicely-named
-     * folder droidtop wants to show as the game's title (some Ren'Py
-     * distribution zips wrap everything in an extra version-named folder,
-     * others don't -- checked against several real downloads in the same
-     * library this session, inconsistent, so this has to handle both
-     * shapes rather than assuming either one). [DetectedGame.displayFolder]
-     * stays the outer folder either way (the nicer name); only
-     * [DetectedGame.gameRoot] moves to wherever the markers actually are.
+     * Three things bound and order the walk:
+     *
+     * - A folder that is itself a game STOPS the descent. Engine games
+     *   have subfolders of their own (`game/`, `www/`, `<name>_Data/`) and
+     *   none of them is a second game.
+     * - [MAX_SCAN_DEPTH] folders below the root, so a mistakenly-added
+     *   storage root cannot walk the whole device.
+     * - Any subdirectory whose name resolves to a known console system is
+     *   skipped at every level (see
+     *   [dev.droidtop.library.consoles.resolveSystem]), since those are
+     *   provably ROM folders. Real, not theoretical: a real ROMs folder's
+     *   "j2me" system directory had 18,126 entries, and
+     *   [isKirikiri]/[isRpgMakerVxAce] each do a full `listFiles()` scan
+     *   looking for signature files -- wastefully slow on a folder that
+     *   large, and on external/SD-card storage specifically, slow enough to
+     *   be the real cause of a reported frozen-UI bug (see also
+     *   [dev.droidtop.library.Library.scanAll]'s own fix for the other half
+     *   of that: running this on the wrong dispatcher entirely).
+     *
+     * Rules that read an unnamed subtree ([DetectRule.readsUnnamedSubtree]
+     * -- the compiled-Ren'Py `.rpa`/`.rpyc` fallback at depth 2, Unity's
+     * three-deep player search) say a game is somewhere below without
+     * naming where, so they match at every folder on the way down to the
+     * evidence: `Compiled/game/archive.rpa` matches at `Compiled` AND at
+     * `game`. The OUTERMOST of those is the game root the rule means, so a
+     * folder whose only evidence is a subtree rule keeps the game when
+     * nothing precise sits below it, and yields to the games below it when
+     * something does. The one case that stays ambiguous by construction is
+     * a category folder holding exactly one compiled game and nothing
+     * else: there is no evidence distinguishing it from that game's own
+     * wrapper, so it takes the game's place (one entry that launches, with
+     * the outer folder's name) rather than inventing a second.
+     *
+     * One folder keeps a nicer name than its markers deserve: the version
+     * wrapper, a real confirmed shape
+     * ("BeingADik/BeingADIK-0.8.3-scrappy/{renpy,game}") where a Ren'Py
+     * distribution zip adds a version-named folder around the game (some
+     * do, some do not -- checked against several real downloads in one
+     * library, so both shapes have to work). It is recognised
+     * structurally, not by guessing: the folder holds exactly one game,
+     * that game is an immediate subfolder detected in its own right, and
+     * its name starts with this folder's (version suffix appended to the
+     * game's name). Then [DetectedGame.displayFolder] stays the outer
+     * folder and only [DetectedGame.gameRoot] moves inwards. An engine or
+     * category folder fails that last test, which is precisely why it does
+     * not steal its games' names.
      */
     fun scan(
         root: File,
@@ -204,9 +241,81 @@ object GameEngineDetector {
         // over folder-name resolution for console folders.
         override: (File) -> GameEngine? = { null },
     ): List<DetectedGame> =
-        (root.listFiles() ?: emptyArray())
+        candidateFolders(root, systemsById)
+            .flatMap { gamesUnder(it, systemsById, defs, override, depth = 1) }
+            .map { it.game }
+
+    /**
+     * The subfolders of [folder] the walk may look at: directories that
+     * are not console-system folders, in name order rather than
+     * [File.listFiles] order (which is filesystem-defined and can differ
+     * between scans, and the walk's results must not).
+     */
+    private fun candidateFolders(
+        folder: File,
+        systemsById: Map<String, ConsoleSystemDef>,
+    ): List<File> =
+        (folder.listFiles() ?: emptyArray())
             .filter { it.isDirectory && resolveSystem(it.name, systemsById) == null }
-            .mapNotNull { top -> detectGame(top, defs, override) }
+            .sortedBy { it.name }
+
+    /**
+     * One step of [scan]'s walk. [Walked.precise] records whether a game
+     * was detected by evidence naming its own folder or only by a subtree
+     * rule, which is what lets a parent tell "games live below me" from
+     * "the subtree rule that matched me matched my own archive folder too".
+     */
+    private data class Walked(val game: DetectedGame, val precise: Boolean)
+
+    private fun gamesUnder(
+        folder: File,
+        systemsById: Map<String, ConsoleSystemDef>,
+        defs: List<EngineDef>,
+        override: (File) -> GameEngine?,
+        depth: Int,
+    ): List<Walked> {
+        override(folder)?.let { return listOf(Walked(DetectedGame(folder, folder, it), precise = true)) }
+        // Precise evidence that THIS folder is a game root ends the
+        // descent: a game's own subfolders are not further games.
+        detect(folder, defs) { !it.readsUnnamedSubtree }
+            ?.let { return listOf(Walked(DetectedGame(folder, folder, it), precise = true)) }
+
+        val subtreeHere = detect(folder, defs) { it.readsUnnamedSubtree }
+        val below =
+            if (depth < MAX_SCAN_DEPTH) {
+                candidateFolders(folder, systemsById)
+                    .flatMap { gamesUnder(it, systemsById, defs, override, depth + 1) }
+            } else {
+                emptyList()
+            }
+
+        versionWrapper(folder, below)?.let { return listOf(Walked(it, precise = true)) }
+        // The outermost folder a subtree rule matches is the game root it
+        // means -- unless precise games, or more than one game, sit below.
+        if (subtreeHere != null && below.size <= 1 && below.none { it.precise }) {
+            return listOf(Walked(DetectedGame(folder, folder, subtreeHere), precise = false))
+        }
+        // A folder holding games is a wrapper, not a game of its own.
+        return below
+    }
+
+    /**
+     * [folder] read as a version wrapper around the single game below it --
+     * see [scan]'s doc comment for the shape and for why the name test is
+     * part of it. Null when [folder] is an ordinary container.
+     */
+    private fun versionWrapper(folder: File, below: List<Walked>): DetectedGame? {
+        val inner = below.singleOrNull()?.takeIf { it.precise }?.game ?: return null
+        if (inner.displayFolder.parentFile != folder) return null
+        // Not an inner wrapper result in its own right: one rename only.
+        if (inner.displayFolder != inner.gameRoot) return null
+        if (!nameKey(inner.displayFolder.name).startsWith(nameKey(folder.name))) return null
+        return DetectedGame(folder, inner.gameRoot, inner.engine)
+    }
+
+    /** Folder names compared for the version-wrapper test only. */
+    private fun nameKey(name: String): String =
+        name.lowercase().filter { it.isLetterOrDigit() }
 
     /**
      * Is this ONE folder a game, and if so which engine and where are its
