@@ -283,5 +283,22 @@
             android:name="dev.droidtop.app.update.AppUpdateStatusReceiver"
             android:exported="false" />
 
+        <!--
+            The "update now" trigger (docs/SPEC.md 10b):
+            adb shell am broadcast -a dev.droidtop.UPDATE_NOW -n dev.droidtop.app/.UpdateNowReceiver
+            Exported on purpose, and guarded by a permission only the shell
+            (what adb runs as), root and the system hold, so no ordinary app
+            can drive droidtop's installer; the receiver re-checks the
+            sending uid where Android exposes it.
+        -->
+        <receiver
+            android:name="dev.droidtop.app.UpdateNowReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP">
+            <intent-filter>
+                <action android:name="dev.droidtop.UPDATE_NOW" />
+            </intent-filter>
+        </receiver>
+
     </application>
 </manifest>
