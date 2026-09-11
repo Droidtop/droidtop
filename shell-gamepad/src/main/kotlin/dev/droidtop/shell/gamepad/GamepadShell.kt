@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -24,6 +26,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -1075,35 +1078,49 @@ private fun SectionTabBar(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = window.edgePadding, vertical = if (window.compact) 10.dp else 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(window.tabGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        sections.forEach { entrySection ->
-            val focused = entrySection == current
-            Text(
-                text = entrySection.displayName(),
-                color = if (focused) Color.White else Color.Gray,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = (if (entrySection == current) Modifier.focusRequester(currentTabFocus) else Modifier)
-                    .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
-                    .focusable()
-                    // Same real touch-input fix as GameCard -- see its own
-                    // comment. This is the top-level Games/Apps/Settings
-                    // tab bar, the very first thing a user taps.
-                    .clickable(onClick = { onSelect(entrySection) })
-                    .onKeyEvent { event ->
-                        if (event.type == KeyEventType.KeyUp &&
-                            GamepadKeyMap.actionFor(event.key) == GamepadAction.A
-                        ) {
-                            onSelect(entrySection)
-                            true
-                        } else {
-                            false
-                        }
-                    },
-            )
+        // The tabs scroll and the Quick Menu control stays pinned beside
+        // them. On a phone the four names do not fit across 411dp, and a
+        // plain Row silently pushes the last one off the edge -- which on
+        // the desktop-mode tab set is the tab a user cannot otherwise
+        // reach without a pad. Same rule as the hint bar and the PC
+        // filter chips: a row that can outgrow the width scrolls rather
+        // than clipping.
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(window.tabGap),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            sections.forEach { entrySection ->
+                val focused = entrySection == current
+                Text(
+                    text = entrySection.displayName(),
+                    color = if (focused) Color.White else Color.Gray,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = (if (entrySection == current) Modifier.focusRequester(currentTabFocus) else Modifier)
+                        .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
+                        .focusable()
+                        // Same real touch-input fix as GameCard -- see its own
+                        // comment. This is the top-level Games/Apps/Settings
+                        // tab bar, the very first thing a user taps.
+                        .clickable(onClick = { onSelect(entrySection) })
+                        .onKeyEvent { event ->
+                            if (event.type == KeyEventType.KeyUp &&
+                                GamepadKeyMap.actionFor(event.key) == GamepadAction.A
+                            ) {
+                                onSelect(entrySection)
+                                true
+                            } else {
+                                false
+                            }
+                        },
+                )
+            }
         }
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.width(window.tabGap))
         // On-screen indicator for the Quick Menu button (per direction):
         // the bordered pill names the physical button, the label names
         // what it opens. Tapping it opens the menu too -- touch parity,
@@ -1111,7 +1128,9 @@ private fun SectionTabBar(
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.clickable(onClick = onQuickMenu),
+            modifier = Modifier
+                .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
+                .clickable(onClick = onQuickMenu),
         ) {
             Text(
                 "R2",
