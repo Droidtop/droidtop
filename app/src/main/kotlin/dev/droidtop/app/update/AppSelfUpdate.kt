@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.os.Build
+import androidx.core.content.pm.PackageInfoCompat
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -57,8 +58,12 @@ object AppSelfUpdate {
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
+    // PackageInfo.longVersionCode is API 28 and droidtop's minSdk is 26;
+    // PackageInfoCompat reads the same number on every release we ship to.
     fun installedVersionCode(context: Context): Long =
-        context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode
+        PackageInfoCompat.getLongVersionCode(
+            context.packageManager.getPackageInfo(context.packageName, 0),
+        )
 
     fun installedVersionName(context: Context): String =
         context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
