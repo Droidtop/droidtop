@@ -96,6 +96,46 @@ data class EsDeCarouselConfig(
     val imageBrightness: Float = 0f,
     val instantItemTransitions: Boolean = false,
     val fastScrolling: Boolean = false,
+    /**
+     * Real `imageCornerRadius` (CarouselComponent.h:1536-1538), already in
+     * pixels. Note the scaling: clamped 0-0.5, then multiplied by the
+     * item's own `itemScale` when that is 1.0 or more, THEN by the screen
+     * WIDTH -- the same per-item-scaled, width-axis rule every radius on
+     * this element uses, and why it is resolved here rather than at draw
+     * time.
+     */
+    val imageCornerRadius: Float = 0f,
+    /**
+     * Real `textRelativeScale` (CarouselComponent.h:1772-1773, clamped
+     * 0.2-1.0): the fraction of the item box the FALLBACK TEXT item lays
+     * out inside. Real ES-DE passes it to that item's own TextComponent as
+     * `relativeScale`, where it scales the wrap width and the vertical
+     * centring box (TextComponent.cpp:781-783) but NOT the background rect,
+     * which stays the full item size (:263-271).
+     */
+    val textRelativeScale: Float = 1f,
+    /** Real `textBackgroundCornerRadius` (CarouselComponent.h:1775-1779), same scaling as [imageCornerRadius]. */
+    val textBackgroundCornerRadius: Float = 0f,
+    /** Real `lineSpacing` (CarouselComponent.h:1816-1817, clamped 0.5-3.0), the item label's own line height multiplier. */
+    val lineSpacing: Float = 1.5f,
+    /** Real `textHorizontalScrolling` (CarouselComponent.h:1798-1799), real default FALSE -- unlike textlist, whose default is true. */
+    val textHorizontalScrolling: Boolean = false,
+    /** Real `textHorizontalScrollSpeed` (CarouselComponent.h:1801-1804), clamped 0.1-10. */
+    val textHorizontalScrollSpeed: Float = 1f,
+    /** Real `textHorizontalScrollDelay` (CarouselComponent.h:1806-1809), clamped 0-10 SECONDS and stored as ms; real default 1500 ms (TextComponent.h's own `scrollDelay`). */
+    val textHorizontalScrollDelayMs: Float = 1500f,
+    /** Real `textHorizontalScrollGap` (CarouselComponent.h:1811-1814), clamped 0.1-5. */
+    val textHorizontalScrollGap: Float = 1.5f,
+    /** Real `systemNameSuffix` (CarouselComponent.h:1882-1883), real default true: a collection entry names its own source system. */
+    val systemNameSuffix: Boolean = true,
+    /** Real `letterCaseSystemNameSuffix` (CarouselComponent.h:1885-1900), real default UPPERCASE -- deliberately not the element's own `letterCase`. */
+    val letterCaseSystemNameSuffix: EsDeLetterCase = EsDeLetterCase.UPPERCASE,
+    /** Real `letterCase` (CarouselComponent.h:1819-1836). */
+    val letterCase: EsDeLetterCase = EsDeLetterCase.NONE,
+    /** Real `letterCaseAutoCollections` (CarouselComponent.h:1838-1856): overrides [letterCase] for the auto-collection systems only. UNDEFINED means "no override". */
+    val letterCaseAutoCollections: EsDeLetterCase = EsDeLetterCase.UNDEFINED,
+    /** Real `letterCaseCustomCollections` (CarouselComponent.h:1860-1878). */
+    val letterCaseCustomCollections: EsDeLetterCase = EsDeLetterCase.UNDEFINED,
 )
 
 /**
@@ -204,6 +244,10 @@ fun esDeCarouselConfig(
     // CarouselComponent.h:1478-1496 -- both only apply to the non-wheel
     // types, and both scale by screen WIDTH for a horizontal carousel and
     // screen HEIGHT for a vertical one.
+    // Hoisted out of the constructor call because the radius properties
+    // below are scaled BY it, exactly as real ES-DE does (it reads
+    // itemScale into mItemScale earlier in the same applyTheme).
+    val itemScale = element.floatOrNull("itemScale")?.coerceIn(0.2f, 3f) ?: 1.2f
     val marginScale = if (type == EsDeCarouselType.HORIZONTAL) screenWidth else screenHeight
     val selectedItemMargins = element.pairOrNull("selectedItemMargins")?.takeIf { isPlain }
     val selectedItemOffset = element.pairOrNull("selectedItemOffset")?.takeIf { isPlain }
@@ -229,7 +273,7 @@ fun esDeCarouselConfig(
         itemsAfterCenter = element.uintOrNull("itemsAfterCenter")?.toInt()?.coerceIn(0, 20) ?: 8,
         itemSizeX = itemSizeX,
         itemSizeY = itemSizeY,
-        itemScale = element.floatOrNull("itemScale")?.coerceIn(0.2f, 3f) ?: 1.2f,
+        itemScale = itemScale,
         // CarouselComponent.h:1502-1506 -- both clamped -0.5 to 1.0.
         itemLinearScaleX = element.pairOrNull("itemLinearScale")?.x?.coerceIn(-0.5f, 1f) ?: 0f,
         itemLinearScaleY = element.pairOrNull("itemLinearScale")?.y?.coerceIn(-0.5f, 1f) ?: 0f,
@@ -287,7 +331,41 @@ fun esDeCarouselConfig(
         imageBrightness = element.floatOrNull("imageBrightness")?.coerceIn(-2f, 2f) ?: 0f,
         instantItemTransitions = element.strOrNull("itemTransitions") == "instant",
         fastScrolling = element.boolOrNull("fastScrolling") ?: false,
+        imageCornerRadius = itemScaledRadius(element, "imageCornerRadius", itemScale, screenWidth),
+        textRelativeScale = element.floatOrNull("textRelativeScale")?.coerceIn(0.2f, 1f) ?: 1f,
+        textBackgroundCornerRadius =
+            itemScaledRadius(element, "textBackgroundCornerRadius", itemScale, screenWidth),
+        lineSpacing = element.floatOrNull("lineSpacing")?.coerceIn(0.5f, 3f) ?: 1.5f,
+        textHorizontalScrolling = element.boolOrNull("textHorizontalScrolling") ?: false,
+        textHorizontalScrollSpeed = element.floatOrNull("textHorizontalScrollSpeed")?.coerceIn(0.1f, 10f) ?: 1f,
+        textHorizontalScrollDelayMs =
+            element.floatOrNull("textHorizontalScrollDelay")?.coerceIn(0f, 10f)?.times(1000f) ?: 1500f,
+        textHorizontalScrollGap = element.floatOrNull("textHorizontalScrollGap")?.coerceIn(0.1f, 5f) ?: 1.5f,
+        systemNameSuffix = element.boolOrNull("systemNameSuffix") ?: true,
+        letterCaseSystemNameSuffix =
+            esDeLetterCase(element.strOrNull("letterCaseSystemNameSuffix")) ?: EsDeLetterCase.UPPERCASE,
+        letterCase = esDeLetterCase(element.strOrNull("letterCase")) ?: EsDeLetterCase.NONE,
+        letterCaseAutoCollections =
+            esDeLetterCase(element.strOrNull("letterCaseAutoCollections")) ?: EsDeLetterCase.UNDEFINED,
+        letterCaseCustomCollections =
+            esDeLetterCase(element.strOrNull("letterCaseCustomCollections")) ?: EsDeLetterCase.UNDEFINED,
     )
+}
+
+/**
+ * Every corner radius on a carousel shares one real scaling rule
+ * (CarouselComponent.h:1536-1538 and :1775-1779 are the same three lines):
+ * clamp 0-0.5, multiply by `itemScale` when that is 1.0 or more, then by
+ * the screen WIDTH -- never the height, and never the item's own size.
+ */
+private fun itemScaledRadius(
+    element: EsDeThemeElement?,
+    property: String,
+    itemScale: Float,
+    screenWidth: Float,
+): Float {
+    val declared = element.floatOrNull(property) ?: return 0f
+    return declared.coerceIn(0f, 0.5f) * (if (itemScale >= 1f) itemScale else 1f) * screenWidth
 }
 
 private fun horizontalAlign(value: String?): EsDeHorizontalAlign = when (value) {

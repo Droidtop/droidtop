@@ -5,6 +5,7 @@ import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -22,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -50,19 +52,25 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.library.EsDeArtwork
 import dev.droidtop.library.GameMediaLocator
+import dev.droidtop.library.theme.EsDeCarouselConfig
 import dev.droidtop.library.theme.EsDeCarouselPlacement
 import dev.droidtop.library.theme.EsDeImageTypes
 import dev.droidtop.library.theme.EsDeCarouselType
 import dev.droidtop.library.theme.EsDeGridConfig
 import dev.droidtop.library.theme.EsDeGridLayout
+import dev.droidtop.library.theme.EsDeHorizontalAlign
 import dev.droidtop.library.theme.EsDeLetterCase
 import dev.droidtop.library.theme.EsDePrimaryAlignment
+import dev.droidtop.library.theme.EsDeVerticalAlign
 import dev.droidtop.library.theme.EsDeSelectorLayer
 import dev.droidtop.library.theme.EsDeTextListConfig
 import dev.droidtop.library.theme.EsDeThemeElement
@@ -76,6 +84,9 @@ import dev.droidtop.library.theme.esDeCarouselConfig
 import dev.droidtop.library.theme.esDeGridConfig
 import dev.droidtop.library.theme.esDeGridItemCenter
 import dev.droidtop.library.theme.esDeGridScrollRow
+import dev.droidtop.library.theme.esDeHorizontalReturnLengthPx
+import dev.droidtop.library.theme.esDeHorizontalScrollSpeedPxPerSec
+import dev.droidtop.library.theme.esDeHorizontalScrollState
 import dev.droidtop.library.theme.esDeIndicatorPrefix
 import dev.droidtop.library.theme.esDeTextListConfig
 import dev.droidtop.library.theme.layoutEsDeCarousel
@@ -300,9 +311,9 @@ fun EsDeSystemListView(
  * performs -- see [esDeColorShiftGradient]. `imageInterpolation` IS
  * honored too (see esDeFilterQuality).
  *
- * Honestly still unimplemented here, and NOT faked: `textRelativeScale`
- * (the carousel's own -- the grid's is implemented) and the four
- * `textHorizontalScroll*` properties.
+ * `textRelativeScale`, `lineSpacing`, `imageCornerRadius`,
+ * `textBackgroundCornerRadius` and the four `textHorizontalScroll*`
+ * properties are all honored now too -- see [EsDeCarouselItemText].
  */
 @Composable
 private fun EsDeCarousel(
@@ -322,7 +333,6 @@ private fun EsDeCarousel(
     val textBackgroundColor = element?.valueOrNull<EsDeThemeValue.Color>("textBackgroundColor")?.let { colorOf(it) } ?: Color.Transparent
     val textSelectedColor = element?.valueOrNull<EsDeThemeValue.Color>("textSelectedColor")?.let { colorOf(it) } ?: textColor
     val textSelectedBackgroundColor = element?.valueOrNull<EsDeThemeValue.Color>("textSelectedBackgroundColor")?.let { colorOf(it) } ?: textBackgroundColor
-    val letterCase = esDeLetterCaseOf(element?.valueOrNull<EsDeThemeValue.Str>("letterCase")?.value)
     // Real `imageInterpolation` (CarouselComponent.h's own applyTheme,
     // the same two "nearest"/"linear" literals as every other element's
     // `interpolation`) -- see esDeFilterQuality for the one honest
@@ -430,6 +440,30 @@ private fun EsDeCarousel(
     // consumed as no-ops so a stray press cannot escape the carousel and
     // land Compose focus on droidtop's own chrome, after which every
     // arrow key would move the wrong surface.
+    val itemTextStyle = EsDeCarouselItemText(
+        color = textColor,
+        backgroundColor = textBackgroundColor,
+        selectedColor = textSelectedColor,
+        selectedBackgroundColor = textSelectedBackgroundColor,
+        letterCase = config.letterCase,
+        fontSize = fontSizeSp,
+        fontFamily = itemFontFamily,
+        lineSpacing = config.lineSpacing,
+        relativeScale = config.textRelativeScale,
+        backgroundCornerRadius = config.textBackgroundCornerRadius.dp,
+        horizontalAlignment = config.itemHorizontalAlignment,
+        verticalAlignment = config.itemVerticalAlignment,
+        scrolling = if (config.textHorizontalScrolling) {
+            EsDeItemLabelScroll(
+                speed = config.textHorizontalScrollSpeed,
+                delayMs = config.textHorizontalScrollDelayMs,
+                gap = config.textHorizontalScrollGap,
+            )
+        } else {
+            null
+        },
+    )
+
     val verticalType = config.type == EsDeCarouselType.VERTICAL || config.type == EsDeCarouselType.VERTICAL_WHEEL
     fun step(delta: Int): Boolean {
         if (items.isEmpty()) return true
@@ -489,13 +523,8 @@ private fun EsDeCarousel(
                     width = itemWidth,
                     height = itemHeight,
                     isFocused = placement.index == focusedIndex,
-                    textColor = textColor,
-                    textBackgroundColor = textBackgroundColor,
-                    textSelectedColor = textSelectedColor,
-                    textSelectedBackgroundColor = textSelectedBackgroundColor,
-                    letterCase = letterCase,
-                    fontSize = fontSizeSp,
-                    fontFamily = itemFontFamily,
+                    text = itemTextStyle,
+                    imageCornerRadius = config.imageCornerRadius.dp,
                     imageColorShift = imageColor,
                     imageSelectedColorShift = imageSelectedColor,
                     imageColorShiftEnd = imageColorEnd,
@@ -535,13 +564,8 @@ private fun EsDeCarousel(
                 width = itemWidth,
                 height = itemHeight,
                 isFocused = placement.index == focusedIndex,
-                textColor = textColor,
-                textBackgroundColor = textBackgroundColor,
-                textSelectedColor = textSelectedColor,
-                textSelectedBackgroundColor = textSelectedBackgroundColor,
-                letterCase = letterCase,
-                fontSize = fontSizeSp,
-                fontFamily = itemFontFamily,
+                text = itemTextStyle,
+                imageCornerRadius = config.imageCornerRadius.dp,
                 imageColorShift = imageColor,
                 imageSelectedColorShift = imageSelectedColor,
                 imageColorShiftEnd = imageColorEnd,
@@ -623,19 +647,50 @@ private fun Modifier.reflectionFalloff(falloff: Float): Modifier {
  * transparent background, not white-on-a-dark-rounded-rect, which was a
  * fabricated droidtop-only look with no real ES-DE basis.
  */
+/**
+ * Everything about a carousel item's FALLBACK TEXT -- the label ES-DE
+ * draws when an entry has no image (CarouselComponent.h:385-399 builds a
+ * real TextComponent for exactly that case) -- resolved once for the whole
+ * carousel instead of threaded through as nine separate parameters.
+ *
+ * [relativeScale] and [lineSpacing] are that TextComponent's own
+ * constructor arguments (CarouselComponent.h:388-392), and
+ * [backgroundCornerRadius] is set on it right after (:395). ES-DE passes
+ * the carousel's own `itemHorizontalAlignment`/`itemVerticalAlignment`
+ * as the text's alignment (:387), so the label follows the item alignment
+ * rather than being unconditionally centred the way droidtop drew it.
+ */
+private data class EsDeCarouselItemText(
+    val color: Color,
+    val backgroundColor: Color,
+    val selectedColor: Color,
+    val selectedBackgroundColor: Color,
+    val letterCase: EsDeLetterCase,
+    val fontSize: androidx.compose.ui.unit.TextUnit,
+    val fontFamily: androidx.compose.ui.text.font.FontFamily?,
+    val lineSpacing: Float,
+    val relativeScale: Float,
+    val backgroundCornerRadius: Dp,
+    val horizontalAlignment: EsDeHorizontalAlign,
+    val verticalAlignment: EsDeVerticalAlign,
+    val scrolling: EsDeItemLabelScroll?,
+)
+
+/** Real `textHorizontalScroll*` group for an item label (CarouselComponent.h:1798-1814, GridComponent.h:1418-1434). */
+private data class EsDeItemLabelScroll(
+    val speed: Float,
+    val delayMs: Float,
+    val gap: Float,
+)
+
 @Composable
 private fun EsDeCarouselItem(
     item: EsDeListItem,
     width: Dp,
     height: Dp,
     isFocused: Boolean,
-    textColor: Color,
-    textBackgroundColor: Color,
-    textSelectedColor: Color,
-    textSelectedBackgroundColor: Color,
-    letterCase: EsDeLetterCase,
-    fontSize: androidx.compose.ui.unit.TextUnit,
-    fontFamily: androidx.compose.ui.text.font.FontFamily?,
+    text: EsDeCarouselItemText,
+    imageCornerRadius: Dp,
     imageColorShift: Color?,
     imageSelectedColorShift: Color?,
     // Real `imageColorEnd`/`imageSelectedColorEnd` and their gradient
@@ -677,18 +732,121 @@ private fun EsDeCarouselItem(
                 imageBrightness,
                 dimming,
             ),
-            modifier = baseModifier.esDeColorShiftGradient(shift, shiftEnd, horizontal),
+            modifier = baseModifier
+                // Real `imageCornerRadius` (CarouselComponent.h:1536-1538,
+                // applied per item at :328 and :441) -- rounds the ITEM
+                // image, which is a different property from the carousel
+                // bar's own radius.
+                .let { if (imageCornerRadius > 0.dp) it.clip(RoundedCornerShape(imageCornerRadius)) else it }
+                .esDeColorShiftGradient(shift, shiftEnd, horizontal),
         )
     } else {
+        // Real geometry of the fallback text item: the BACKGROUND rect
+        // covers the whole item box (TextComponent.cpp:263-271 draws it at
+        // mSize, unscaled), while `textRelativeScale` shrinks only the box
+        // the text itself lays out and aligns inside (:781-783 scale the
+        // wrap length and the vertical centring height by mRelativeScale).
+        // Drawing the label at the item's full size, centred, was the
+        // earlier approximation of both.
+        Box(
+            modifier = baseModifier
+                .let {
+                    if (text.backgroundCornerRadius > 0.dp) {
+                        it.clip(RoundedCornerShape(text.backgroundCornerRadius))
+                    } else {
+                        it
+                    }
+                }
+                .background(if (isFocused) text.selectedBackgroundColor else text.backgroundColor),
+            contentAlignment = esDeItemContentAlignment(text.horizontalAlignment, text.verticalAlignment),
+        ) {
+            EsDeItemLabel(
+                label = text.letterCase.applyTo(item.label),
+                color = if (isFocused) text.selectedColor else text.color,
+                width = width * text.relativeScale,
+                height = height * text.relativeScale,
+                fontSize = text.fontSize,
+                fontFamily = text.fontFamily,
+                lineSpacing = text.lineSpacing,
+                textAlign = when (text.horizontalAlignment) {
+                    EsDeHorizontalAlign.LEFT -> TextAlign.Start
+                    EsDeHorizontalAlign.CENTER -> TextAlign.Center
+                    EsDeHorizontalAlign.RIGHT -> TextAlign.End
+                },
+                scrolling = text.scrolling,
+            )
+        }
+    }
+}
+
+/** Real `itemHorizontalAlignment`/`itemVerticalAlignment` as one Compose alignment. */
+private fun esDeItemContentAlignment(
+    horizontal: EsDeHorizontalAlign,
+    vertical: EsDeVerticalAlign,
+): androidx.compose.ui.Alignment = when (vertical) {
+    EsDeVerticalAlign.TOP -> when (horizontal) {
+        EsDeHorizontalAlign.LEFT -> androidx.compose.ui.Alignment.TopStart
+        EsDeHorizontalAlign.CENTER -> androidx.compose.ui.Alignment.TopCenter
+        EsDeHorizontalAlign.RIGHT -> androidx.compose.ui.Alignment.TopEnd
+    }
+    EsDeVerticalAlign.CENTER -> when (horizontal) {
+        EsDeHorizontalAlign.LEFT -> androidx.compose.ui.Alignment.CenterStart
+        EsDeHorizontalAlign.CENTER -> androidx.compose.ui.Alignment.Center
+        EsDeHorizontalAlign.RIGHT -> androidx.compose.ui.Alignment.CenterEnd
+    }
+    EsDeVerticalAlign.BOTTOM -> when (horizontal) {
+        EsDeHorizontalAlign.LEFT -> androidx.compose.ui.Alignment.BottomStart
+        EsDeHorizontalAlign.CENTER -> androidx.compose.ui.Alignment.BottomCenter
+        EsDeHorizontalAlign.RIGHT -> androidx.compose.ui.Alignment.BottomEnd
+    }
+}
+
+/**
+ * One carousel-or-grid item label, inside the box `textRelativeScale`
+ * leaves it.
+ *
+ * `lineSpacing` is the line height multiplier ES-DE passes to the item's
+ * own TextComponent (CarouselComponent.h:391, GridComponent.h:390).
+ * `textHorizontalScrolling` turns the label into the same real marquee the
+ * `text` element's own horizontal container is -- one implementation,
+ * [EsDeMarqueeText], shared by both, since real ES-DE uses the identical
+ * TextComponent scrolling code for both cases (the four properties are
+ * passed straight into its constructor).
+ */
+@Composable
+private fun EsDeItemLabel(
+    label: String,
+    color: Color,
+    width: Dp,
+    height: Dp,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    fontFamily: androidx.compose.ui.text.font.FontFamily?,
+    lineSpacing: Float,
+    textAlign: TextAlign,
+    scrolling: EsDeItemLabelScroll?,
+) {
+    if (scrolling == null) {
         Text(
-            letterCase.applyTo(item.label),
-            color = if (isFocused) textSelectedColor else textColor,
+            label,
+            color = color,
             fontSize = fontSize,
             fontFamily = fontFamily,
-            textAlign = TextAlign.Center,
-            modifier = baseModifier
-                .background(if (isFocused) textSelectedBackgroundColor else textBackgroundColor)
-                .wrapContentHeight(),
+            lineHeight = fontSize * lineSpacing,
+            textAlign = textAlign,
+            modifier = Modifier.size(width = width, height = height).wrapContentHeight(),
+        )
+    } else {
+        EsDeMarqueeText(
+            text = label,
+            color = color,
+            fontSize = fontSize,
+            fontFamily = fontFamily,
+            lineSpacing = lineSpacing,
+            width = width,
+            height = height,
+            speedMultiplier = scrolling.speed,
+            startDelayMs = scrolling.delayMs,
+            gap = scrolling.gap,
         )
     }
 }
@@ -1321,12 +1479,30 @@ private fun EsDeGridEntry(
                 .clickable(onClick = onSelect),
             contentAlignment = androidx.compose.ui.Alignment.Center,
         ) {
-            Text(
-                config.letterCase.applyTo(item.label),
+            // Same item-label path as the carousel, for the same reason: ES-DE
+            // builds the grid's fallback item from the identical
+            // TextComponent with the identical arguments
+            // (GridComponent.h:386-397 against CarouselComponent.h:385-399),
+            // so `lineSpacing` and the `textHorizontalScroll*` group behave
+            // the same in both.
+            EsDeItemLabel(
+                label = config.letterCase.applyTo(item.label),
                 color = colorOfPacked(if (selected) config.textSelectedColor else config.textColor),
+                width = (config.itemSizeX * config.textRelativeScale * scale).dp,
+                height = (config.itemSizeY * config.textRelativeScale * scale).dp,
                 fontSize = fontSize,
                 fontFamily = fontFamily,
+                lineSpacing = config.lineSpacing,
                 textAlign = TextAlign.Center,
+                scrolling = if (config.textHorizontalScrolling) {
+                    EsDeItemLabelScroll(
+                        speed = config.textHorizontalScrollSpeed,
+                        delayMs = config.textHorizontalScrollDelayMs,
+                        gap = config.textHorizontalScrollGap,
+                    )
+                } else {
+                    null
+                },
             )
         }
     }
@@ -1409,3 +1585,82 @@ private fun esDeGradient(start: Long, end: Long, horizontal: Boolean): Brush {
 
 /** Real packed-RRGGBBAA to Compose color, for the layout layer's own color fields (which stay graphics-type-free). */
 private fun colorOfPacked(packed: Long): Color = colorOf(EsDeThemeValue.Color(packed))
+
+/**
+ * Real `textHorizontalScrolling` for a carousel or grid ITEM label.
+ *
+ * ES-DE gives the item's fallback TextComponent the four scroll properties
+ * in its constructor (CarouselComponent.h:388-392, GridComponent.h:388-392),
+ * so the behaviour is byte-for-byte the same marquee a `text` element's own
+ * horizontal container gets: a start delay, then a constant-speed pass, then
+ * a gap, with a second copy of the string entering from the right as the
+ * first leaves. All of that maths already lives in one place --
+ * [esDeHorizontalScrollSpeedPxPerSec], [esDeHorizontalReturnLengthPx] and
+ * [esDeHorizontalScrollState] in runtime-common, unit-tested there -- and
+ * this reuses it rather than restating the algorithm; only the draw differs,
+ * because an item label is a box inside a list widget and not a positioned
+ * element.
+ *
+ * The speed reference is the font's own "size reference", the summed
+ * advance of the 26 Latin capitals (TextComponent.cpp:700, Font.cpp:517-546),
+ * measured here exactly as the element path measures it.
+ */
+@Composable
+private fun EsDeMarqueeText(
+    text: String,
+    color: Color,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    fontFamily: androidx.compose.ui.text.font.FontFamily?,
+    lineSpacing: Float,
+    width: Dp,
+    height: Dp,
+    speedMultiplier: Float,
+    startDelayMs: Float,
+    gap: Float,
+) {
+    val density = LocalDensity.current
+    val measurer = rememberTextMeasurer()
+    val widthPx = with(density) { width.toPx() }
+    val style = TextStyle(
+        color = color,
+        fontSize = fontSize,
+        fontFamily = fontFamily,
+        lineHeight = fontSize * lineSpacing,
+        textAlign = TextAlign.Start,
+    )
+    // A scrolling label is single-line by construction: ES-DE sets
+    // mAutoCalcExtent {1, 0} for it and replaces line breaks with spaces
+    // (TextComponent.cpp:536, :788).
+    val oneLine = text.replace(Regex("\\s*[\\r\\n]+\\s*"), " ")
+    val layout = remember(oneLine, style) { measurer.measure(oneLine, style, softWrap = false, maxLines = 1) }
+    val sizeReferencePx = remember(style) {
+        measurer.measure("ABCDEFGHIJKLMNOPQRSTUVWXYZ", style, softWrap = false).size.width.toFloat()
+    }
+    val textWidthPx = layout.size.width.toFloat()
+    val speedPxPerSec = esDeHorizontalScrollSpeedPxPerSec(sizeReferencePx, speedMultiplier)
+    val returnLengthPx = esDeHorizontalReturnLengthPx(sizeReferencePx, gap)
+    val scrolls = textWidthPx > widthPx && speedPxPerSec > 0f
+    val first = remember { mutableFloatStateOf(0f) }
+    val second = remember { mutableFloatStateOf(0f) }
+
+    EsDeContainerScrollClock(enabled = scrolls, resetKey = listOf(oneLine, widthPx, speedPxPerSec)) { elapsedMs ->
+        val state = esDeHorizontalScrollState(
+            elapsedMs = elapsedMs,
+            textWidthPx = textWidthPx,
+            boxWidthPx = widthPx,
+            speedPxPerSec = speedPxPerSec,
+            returnLengthPx = returnLengthPx,
+            startDelayMs = startDelayMs,
+        )
+        first.floatValue = state.firstOffsetPx
+        second.floatValue = state.secondOffsetPx
+    }
+
+    Canvas(Modifier.size(width = width, height = height).clipToBounds()) {
+        val y = ((size.height - layout.size.height) / 2f).coerceAtLeast(0f)
+        drawText(layout, color = color, topLeft = Offset(-first.floatValue, y))
+        if (second.floatValue < 0f) {
+            drawText(layout, color = color, topLeft = Offset(-second.floatValue, y))
+        }
+    }
+}
