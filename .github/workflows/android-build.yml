@@ -335,6 +335,22 @@ jobs:
       # ES-DE formulas -- exactly the kind of code a unit test can verify
       # without a screen, which is otherwise the only way this project
       # checks theme rendering at all.
+      - name: Lint (minSdk API gate)
+        # NewApi/InlinedApi only, across :app and everything it depends on
+        # -- see the lint block in app/build.gradle.kts for why this
+        # exists. Runs after the APK so a lint failure never costs the
+        # build artifact, the same bargain the unit-test step already
+        # makes.
+        run: ./gradlew :app:lintDebug --stacktrace
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-debug.*
+          if-no-files-found: ignore
+
       - name: Run unit tests
         # Every module that actually has a src/test tree (library-core,
         # runtime-common, shell-gamepad, input-seat, runtime-windows,
