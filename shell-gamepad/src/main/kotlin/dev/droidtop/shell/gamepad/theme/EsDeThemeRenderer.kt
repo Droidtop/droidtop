@@ -370,17 +370,17 @@ fun EsDeThemedView(
                     transition.animation,
                 )
             if (skippedAsOutgoingCopy || hiddenForThisTransition) return@forEach
-            // Translating the element back by the container's own current
-            // displacement is ES-DE rendering it with the identity matrix
-            // instead of the camera's (GamelistView.cpp:552-556): the
-            // element stays where it is on screen while the view slides
-            // past it.
             val fadingAbovePrimary = element !== primaryElement &&
                 zIndexOf(element) > primaryZIndex && fadeAbovePrimary
             val fadingBelowPrimary = element !== primaryElement &&
                 zIndexOf(element) <= primaryZIndex
             val elementAlpha = if (fadingAbovePrimary) 1f - systemFadeOpacity else 1f
             val elementDim = if (fadingBelowPrimary) systemFadeOpacity else 0f
+            // Translating the element back by the container's own current
+            // displacement is ES-DE rendering it with the identity matrix
+            // instead of the camera's (GamelistView.cpp:552-556): the
+            // element stays where it is on screen while the view slides
+            // past it.
             val stationaryHold: Modifier =
                 if (stationary) {
                     Modifier.fillMaxSize().graphicsLayer {

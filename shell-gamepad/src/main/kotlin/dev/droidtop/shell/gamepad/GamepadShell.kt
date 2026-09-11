@@ -1735,7 +1735,7 @@ private fun GamesSection(
         // not state: it is read in the same composition that changes it
         // and never needs to trigger one of its own.
         val groupHistory = remember { EsDeGroupHistory() }
-        if (groupHistory.current !== selectedGroup) {
+        if (groupHistory.current != selectedGroup) {
             groupHistory.previous = groupHistory.current
             groupHistory.current = selectedGroup
         }
@@ -1764,7 +1764,7 @@ private fun GamesSection(
                 kind = transitionKind,
                 animation = transitionAnimation,
                 towardsGamelist = transitionTowardsGamelist,
-                outgoing = group !== selectedGroup,
+                outgoing = group != selectedGroup,
             )
             if (group == null) {
                 val continuePlaying = entries.filter { it.lastPlayedEpochMs != null }.sortedByDescending { it.lastPlayedEpochMs }
