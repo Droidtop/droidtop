@@ -1403,6 +1403,7 @@ private fun GamesSection(
     val selectedGroupSystemId = selectedGroup?.systemThemeFolder
     val selectedGroupThemeFolder = (selectedGroup as? GameGroup.Collection)?.themeFolder
     val selectedGroupLabel = selectedGroup?.label
+    val selectedGroupCollectionKind = selectedGroup?.esDeCollectionKind() ?: EsDeCollectionKind.NONE
     val gamelistTheme = remember(selectedGroup, selectedGroupSystemId, selectedGroupThemeFolder, ThemePrefs.version) {
         if (selectedGroup != null) {
             ThemeAssets.loadActiveTheme(
@@ -1410,7 +1411,7 @@ private fun GamesSection(
                 selectedGroupSystemId,
                 selectedGroupThemeFolder,
                 systemFullName = selectedGroupLabel,
-                collectionKind = selectedGroup.esDeCollectionKind(),
+                collectionKind = selectedGroupCollectionKind,
             )
         } else {
             null
