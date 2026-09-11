@@ -106,6 +106,29 @@ data class ShellWindow(
     }
 }
 
+/**
+ * True while droidtop's own button bar ([ButtonHintFooter]) is on screen,
+ * which makes it THE help bar for that screen.
+ *
+ * Real ES-DE has exactly one help bar: the Window owns a single
+ * `HelpComponent` (Window.cpp:126, and `Window::setHelpPrompts`,
+ * Window.cpp:884, is the one way anything fills it), and that component
+ * draws nothing at all when help prompts are switched off
+ * (HelpComponent.cpp:629 -- `ShowHelpPrompts` false resets the grid).
+ * A themed view's own `<helpsystem>` styles that one bar; it is not a
+ * second bar of its own.
+ *
+ * On a touch-first window droidtop draws its button bar IN ADDITION to
+ * whatever the theme would draw, because the theme's row is a legend and
+ * the button bar is the only route to B/Y/Select with no pad attached.
+ * Two bars then stacked on top of each other (portrait capture,
+ * 2026-09-11). This local is how the themed renderer learns that the
+ * shell has already taken the bar, so the theme's `<helpsystem>` gives
+ * way to it -- the same one-bar rule ES-DE has, decided by who owns the
+ * row rather than by drawing both.
+ */
+val LocalShellOwnsHelpRow = staticCompositionLocalOf { false }
+
 val LocalShellWindow = staticCompositionLocalOf {
     // Only ever seen by a preview or a test composing a screen outside
     // the shell: the console's own landscape geometry.
