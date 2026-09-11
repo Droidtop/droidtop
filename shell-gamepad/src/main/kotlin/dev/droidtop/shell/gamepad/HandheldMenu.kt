@@ -57,6 +57,19 @@ import androidx.compose.ui.unit.dp
  *   in a value's place.
  * - Unset reads as a dim placeholder, never as loud as a real value.
  */
+/**
+ * The shell's own colour palette, and the only one its menus may use.
+ *
+ * These are ABSOLUTE values against [OverlaySurface], not a theme-aware
+ * scheme: the fills are white at low alpha and the text is white, which
+ * is legible over this surface and over nothing else. So any surface
+ * that hosts them has to be painted from this same object -- a panel
+ * painted with `MaterialTheme.colorScheme.surface` is white wherever the
+ * platform is in a light colour state, and these tokens then render
+ * white on white (the Quick Menu's System tab did exactly that; see
+ * QuickMenu.kt). One palette for the shell, not a platform scheme
+ * underneath a hand-picked one.
+ */
 object MenuTokens {
     val Surface = Color(0x0DFFFFFF)
     val SurfaceSelected = Color(0x2BFFFFFF)
