@@ -26,6 +26,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
+import dev.droidtop.library.GameEngine
 import dev.droidtop.library.GameLaunchStrategy
 import dev.droidtop.library.RunnerOption
 import dev.droidtop.library.RunnerState
@@ -50,6 +51,7 @@ import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 @Composable
 internal fun RunnerPicker(
     options: List<RunnerOption>,
+    engine: GameEngine?,
     current: GameLaunchStrategy?,
     overridden: Boolean,
     onPick: (GameLaunchStrategy?) -> Unit,
@@ -90,7 +92,7 @@ internal fun RunnerPicker(
             }
             items(offered, key = { it.strategy.name }) { option ->
                 RunnerRow(
-                    title = option.strategy.displayName(),
+                    title = option.strategy.displayName(engine),
                     detail = listOfNotNull(
                         option.reason,
                         option.caveat,
@@ -114,7 +116,7 @@ internal fun RunnerPicker(
                 if (showWhyNot) {
                     items(hidden, key = { "why:" + it.strategy.name }) { option ->
                         Text(
-                            "${option.strategy.displayName()} - ${option.reason.orEmpty()}",
+                            "${option.strategy.displayName(engine)} - ${option.reason.orEmpty()}",
                             color = Color.Gray,
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
