@@ -209,6 +209,81 @@ class GameEngineDetectorTest {
     }
 
     @Test
+    fun `scan walks a root added above the engine folders down to the games`() {
+        // The reported case: the user added a root ABOVE the engine
+        // folders, so every game sits at GameSync/Adult/<engine>/<game>.
+        // That used to be ONE game named "Adult" -- the wrapper three
+        // levels up matched the compiled-Ren'Py subtree fallback.
+        File(tmp.root, "Adult/RenPy/Amnesia/renpy").mkdirs()
+        File(tmp.root, "Adult/RenPy/Amnesia/game").mkdirs()
+        File(tmp.root, "Adult/RenPy/Amnesia/game/.keep").createNewFile()
+        File(tmp.root, "Adult/RenPy/Compiled/game").mkdirs()
+        File(tmp.root, "Adult/RenPy/Compiled/game/archive.rpa").createNewFile()
+        File(tmp.root, "Adult/RPGMaker/Celeste/js").mkdirs()
+        File(tmp.root, "Adult/RPGMaker/Celeste/js/rpg_core.js").createNewFile()
+
+        val results = GameEngineDetector.scan(tmp.root, emptyMap(), defs)
+
+        assertEquals(
+            listOf("Amnesia", "Celeste", "Compiled"),
+            results.map { it.displayFolder.name }.sorted(),
+        )
+        // No wrapper folder became a game, at any level.
+        assertEquals(emptyList<String>(), results.map { it.displayFolder.name }.filter { it in setOf("Adult", "RenPy", "RPGMaker") })
+        val compiled = results.first { it.displayFolder.name == "Compiled" }
+        assertEquals(GameEngine.RENPY, compiled.engine)
+        assertEquals(compiled.displayFolder, compiled.gameRoot)
+        assertEquals(GameEngine.RPG_MAKER_MV, results.first { it.displayFolder.name == "Celeste" }.engine)
+    }
+
+    @Test
+    fun `a game's own subfolders are not scanned for further games`() {
+        // www/ is part of an RPG Maker MV game, not a second game inside
+        // it: a folder that detects stops the walk.
+        File(tmp.root, "RPG1/www/js").mkdirs()
+        File(tmp.root, "RPG1/www/js/rpg_core.js").createNewFile()
+
+        val results = GameEngineDetector.scan(tmp.root, emptyMap(), defs)
+
+        assertEquals(1, results.size)
+        assertEquals("RPG1", results.single().displayFolder.name)
+    }
+
+    @Test
+    fun `the walk skips console system folders at every level`() {
+        val n3ds = dev.droidtop.library.consoles.ConsoleSystemDef(
+            id = "n3ds",
+            displayName = "Nintendo 3DS",
+            extensions = setOf("3ds"),
+            retroArchCore = null,
+        )
+        // A ROM system folder deeper than the top level -- skipped for the
+        // same reason as at the top: it is provably ROMs, and one real
+        // j2me folder had 18,126 entries to listFiles() through.
+        File(tmp.root, "Roms/n3ds/renpy").mkdirs()
+        File(tmp.root, "Roms/n3ds/game").mkdirs()
+        File(tmp.root, "Roms/n3ds/game/.keep").createNewFile()
+        File(tmp.root, "Roms/VN1/renpy").mkdirs()
+        File(tmp.root, "Roms/VN1/game").mkdirs()
+        File(tmp.root, "Roms/VN1/game/.keep").createNewFile()
+
+        val results = GameEngineDetector.scan(tmp.root, mapOf("n3ds" to n3ds), defs)
+
+        assertEquals(listOf("VN1"), results.map { it.displayFolder.name })
+    }
+
+    @Test
+    fun `the walk stops at a bounded depth`() {
+        var dir = tmp.root
+        repeat(GameEngineDetector.MAX_SCAN_DEPTH + 1) { dir = File(dir, "deep") }
+        File(dir, "renpy").mkdirs()
+        File(dir, "game").mkdirs()
+        File(dir, "game/.keep").createNewFile()
+
+        assertEquals(emptyList<DetectedGame>(), GameEngineDetector.scan(tmp.root, emptyMap(), defs))
+    }
+
+    @Test
     fun `detects RPG Maker XP via rgssad archive`() {
         touch("Game.rgssad")
         org.junit.Assert.assertEquals(GameEngine.RPG_MAKER_XP, GameEngineDetector.detect(tmp.root, defs))
