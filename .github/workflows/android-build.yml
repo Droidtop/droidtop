@@ -272,6 +272,22 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
+      - name: Class-load API gate (minSdk)
+        # The bug lint cannot see: a framework type newer than minSdk in a
+        # class's own shape -- superclass, implemented interface, method
+        # signature -- is resolved when that class is LOADED, so no
+        # Build.VERSION check can guard it and the class simply cannot
+        # exist on an older device. That is what stopped droidtop starting
+        # as HOME on Android 9 (build 497, NoClassDefFoundError
+        # android.window.OnBackAnimationCallback at
+        # AppComponentFactory.instantiateActivity). The check reads the
+        # built dex, so nothing gets past it by being generated or
+        # desugared; it runs after the APK is uploaded, the same bargain
+        # the lint and unit-test steps make, so a red gate never costs
+        # anyone the installable build.
+        if: ${{ !cancelled() }}
+        run: python3 build-scripts/check_class_load_api.py app/build/outputs/apk/debug/app-debug.apk
+
       - name: Publish rolling "latest" release
         # Workflow artifacts (the step above) are ephemeral — ~90-day
         # retention, buried under the Actions tab, awkward to hand someone

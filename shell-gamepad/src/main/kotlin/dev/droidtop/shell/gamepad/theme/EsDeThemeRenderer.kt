@@ -1816,7 +1816,7 @@ private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight
                 // blend pass below, exactly as the carousel item does it.
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
                     view.setRenderEffect(
-                        esDeVideoRenderEffect(
+                        EsDeVideoRenderEffect.of(
                             tint = if (esDeHasColorGradient(videoTint, videoTintEnd)) null else videoTint,
                             saturation = videoSaturation,
                             brightness = videoBrightness,
@@ -3496,27 +3496,6 @@ internal fun esDeFilterQuality(element: EsDeThemeElement, property: String = "in
         "linear" -> FilterQuality.Low
         else -> null
     }
-
-/**
- * The shared ES-DE colour pipeline as an `android.graphics.RenderEffect`,
- * for the one surface that is a View and not a Compose draw: the video
- * player. Returns null when the theme asks for nothing, so the effect is
- * cleared rather than set to an identity matrix.
- *
- * The matrix itself comes from [esDeImageColorFilter] -- the one port of
- * core.glsl's own brightness-then-saturation-then-shift order this package
- * has -- rather than a second copy of that maths.
- */
-private fun esDeVideoRenderEffect(
-    tint: Color?,
-    saturation: Float,
-    brightness: Float,
-): android.graphics.RenderEffect? {
-    if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) return null
-    if (tint == null && saturation == 1f && brightness == 0f) return null
-    val filter = esDeImageColorFilter(tint, saturation, brightness, dimming = 1f) ?: return null
-    return android.graphics.RenderEffect.createColorFilterEffect(filter.asAndroidColorFilter())
-}
 
 /**
  * Real `cropPos`/`imageCropPos` as a Compose alignment for a cropped

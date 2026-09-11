@@ -16,7 +16,6 @@
 
 package com.android.launcher3.model.data;
 
-import android.app.Person;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -229,9 +228,7 @@ public class WorkspaceItemInfo extends ItemInfoWithIcon {
         }
 
         if (Utilities.ATLEAST_Q) {
-            Person[] persons = ApiWrapper.INSTANCE.get(context).getPersons(shortcutInfo);
-            personKeys = persons.length == 0 ? Utilities.EMPTY_STRING_ARRAY
-                    : Arrays.stream(persons).map(Person::getKey).sorted().toArray(String[]::new);
+            personKeys = ApiWrapper.INSTANCE.get(context).getPersonKeys(shortcutInfo);
         }
     }
 
