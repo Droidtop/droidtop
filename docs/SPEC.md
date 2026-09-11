@@ -3204,14 +3204,20 @@ types because of it. Entries with no ES-DE media layout behind them
 (native Android apps, store PC games with remote art) carry no locator
 and keep using `artworkUri` exactly as before.
 
-One deliberate divergence, documented in the code at each site: when the
-theme's declared types resolve to nothing, droidtop falls back to the
-entry's single `artworkUri` before falling back to the element's
-`<default>`. Real ES-DE goes straight to `<default>`. droidtop's own
-scraper writes covers and little else, so a strict port would blank a
-fully scraped library the moment a theme asked for a marquee. `none` is
-exempt from that fallback, because there the theme did not fail to find
-media -- it asked for text. Also fixed on the way past: the media-type
+The chain ends where ES-DE's ends. When the theme's declared types
+resolve to nothing, the element shows its own `<default>` and otherwise
+nothing at all; it does NOT fall back to the entry's single `artworkUri`.
+droidtop did fall back that way for a while, on the grounds that its own
+scraper writes covers and little else and a strict port would blank a
+scraped library the moment a theme asked for a marquee -- but a scraper
+gap is not a renderer rule, and the place to fix it is the scraper. The
+divergence is removed on all four element types that carry such a chain
+(`carousel`, `grid`, `image`, `video`), and with it goes the other half
+of the same ES-DE function that had been missing entirely: an `imageType`
+a GAMELIST primary element never declared is not "no image type", it is
+`marquee` (CarouselComponent.h:485-486, GridComponent.h:452-453). `none`
+still breaks the walk before the default, because there the theme did not
+fail to find media -- it asked for text. Also fixed on the way past: the media-type
 map was missing `3dbox` -> `3dboxes` and `backcover` -> `backcovers`
 (FileData.cpp:381-391), and the extension walk was missing `webp`
 (FileData.h:161), so real ES-DE WebP output resolved nothing at all.
@@ -3557,6 +3563,33 @@ user has chosen nothing, an explicit choice always wins (including
 choosing DEcaffe on a phone), and onboarding says what happened and
 writes the result down as a real choice so a later rotation cannot move
 the theme under the user (`ThemeAssets.defaultThemeFor`).
+
+**View transitions (2026-09-11)**: moving between the system view and a
+gamelist is animated by the theme, not by droidtop. The animation for
+each of ES-DE's six transition kinds comes from a `<transitions>` profile
+in the theme's own capabilities.xml, selected by
+`ThemeData::setThemeTransitions` (ThemeData.cpp:1042-1120), which droidtop
+now ports in full: everything starts at instant; with the setting on
+`automatic` the profile is the one the selected variant named if it named
+one and otherwise the theme's FIRST declared profile; a named profile
+always beats `builtin-slide`/`builtin-fade`, which apply only when no
+profile carries that name and the theme has not listed it under
+`suppressTransitionProfiles`. The three animations are ES-DE's own and
+their timings are not what the names suggest: a fade is a 120 ms fade out,
+200 ms of black with the view already swapped underneath, and a 120 ms
+fade back in (ViewController.cpp:951-992) -- not a cross-fade; a slide is a
+400 ms ease-out cubic camera move (MoveCameraAnimation.h:25-33) that
+travels downward into a gamelist, because ES-DE's system-select view sits
+one screen height below the gamelists (ViewController.cpp:1229).
+
+Twelve of the fifteen themes collected for the parity work declare a
+profile, and DEcaffe's own first-declared profile fades both into and out
+of a gamelist, so this was visible under the bundled theme on every
+system entry. What is deliberately still missing is the PER-ELEMENT half:
+`stationary`, `renderDuringTransitions` and `fadeAbovePrimary` let an
+individual element sit still, keep drawing, or wear a fade while the
+transition runs, and none of them was implementable before there was a
+transition to act during. They are the named next step.
 
 ## 7g. One library across every source (audit + plan, directed 2026-09-01)
 
