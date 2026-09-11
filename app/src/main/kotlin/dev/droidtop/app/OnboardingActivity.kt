@@ -461,8 +461,14 @@ private fun AlternativeSetupStep(onPicked: (ComponentName) -> Unit, onBack: () -
         Text("No other launcher is installed on this device.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton(onClick = onBack) { Text("Back") }
     } else {
-        LazyColumn(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-            items(current) { (component, label) ->
+        // A plain Column, not a LazyColumn: every onboarding step is
+        // already inside one vertically scrolling Column, and a lazy list
+        // nested in that is measured with an infinite maximum height,
+        // which Compose throws on -- it took the app down on the Android
+        // 9 rig the moment this list had an entry (2026-09-11). Laziness
+        // buys nothing here anyway; a device has a handful of launchers.
+        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+            current.forEach { (component, label) ->
                 Text(
                     label,
                     color = MaterialTheme.colorScheme.onBackground,
@@ -673,8 +679,14 @@ private fun GamesFoldersStep(
         style = MaterialTheme.typography.bodyMedium,
     )
     if (roots.isNotEmpty()) {
-        LazyColumn(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-            items(roots.toList()) { path ->
+        // Same reason as the launcher list above: a lazy list inside the
+        // step's scrolling Column is an infinite-height measure and a
+        // crash. This one is how the crash was found -- adding the first
+        // games root killed the app on the next frame, so the storage
+        // step could be passed but the folders step could never be
+        // finished.
+        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+            roots.toList().forEach { path ->
                 Text(path, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 4.dp))
             }
         }
