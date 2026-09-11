@@ -1399,6 +1399,18 @@ private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         return
     }
 
+    // Real `scanlines` (VideoComponent.cpp:436-446) is a deliberate
+    // exception with a licensing reason, not an unfinished item. ES-DE's
+    // scanline rendering is one specific shader --
+    // `resources/shaders/glsl/scanlines.glsl`, a phosphor shader taken
+    // from RetroArch and carrying its own "GNU General Public License
+    // version 2 or later" header. droidtop's own code takes the most
+    // permissive licence its upstreams allow, and copying that shader in
+    // would make the whole app GPL. Writing a different scanline effect
+    // instead would not be ES-DE's, so the honest answer is to draw no
+    // scanlines rather than to draw ours and call it parity. The same
+    // line is already drawn for ES-DE's Qt-resource badge and button art.
+    //
     // Real `delay` (VideoComponent.cpp:325-330): seconds, clamped to
     // 0..15, before playback starts -- and real ES-DE sets
     // `showStaticImageDelay` when it is non-zero (VideoComponent.cpp:329-
