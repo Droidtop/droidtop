@@ -154,7 +154,7 @@ internal fun Screensaver(entries: List<LibraryEntry>, onDismiss: () -> Unit) {
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 48.dp),
+                modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding),
             )
         }
     }

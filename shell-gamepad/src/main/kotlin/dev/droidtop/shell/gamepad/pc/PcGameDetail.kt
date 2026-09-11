@@ -200,7 +200,10 @@ internal fun PcGameDetail(
             },
     ) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize().weight(1f).padding(horizontal = 48.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .weight(1f)
+                .padding(horizontal = dev.droidtop.shell.gamepad.LocalShellWindow.current.edgePadding),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             item {

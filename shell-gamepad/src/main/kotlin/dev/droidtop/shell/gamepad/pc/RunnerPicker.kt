@@ -31,6 +31,7 @@ import dev.droidtop.library.GameLaunchStrategy
 import dev.droidtop.library.RunnerOption
 import dev.droidtop.library.RunnerState
 import dev.droidtop.library.displayName
+import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 
@@ -65,7 +66,7 @@ internal fun RunnerPicker(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .padding(horizontal = 48.dp, vertical = 32.dp)
+            .padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 32.dp)
             .onKeyEvent { event ->
                 val action = GamepadKeyMap.actionFor(event.key)
                 if (event.type == KeyEventType.KeyUp && (action == GamepadAction.BACK || action == GamepadAction.B)) {

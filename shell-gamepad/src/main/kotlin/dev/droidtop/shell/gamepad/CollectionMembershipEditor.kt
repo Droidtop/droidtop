@@ -71,7 +71,7 @@ internal fun CollectionMembershipEditor(entry: LibraryEntry, library: Library, o
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .padding(horizontal = 48.dp, vertical = 32.dp)
+            .padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 32.dp)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp && GamepadKeyMap.actionFor(event.key) == GamepadAction.BACK) {
                     onDismiss()

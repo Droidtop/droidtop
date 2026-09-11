@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -154,6 +155,10 @@ fun GamepadShell(
     triggerBrowseThemes: Boolean = false,
 ) {
     val context = LocalContext.current
+    // One layout system for both orientations: every screen below reads
+    // LocalShellWindow instead of assuming the console's landscape
+    // geometry. There is no portrait COPY of any screen.
+    val shellWindow = currentShellWindow()
     // Two independent states, not one -- see Library.scanKinds' own doc
     // comment: a single combined scan meant Apps stayed empty until the
     // (real, SD-card-scale) Games/ROM scan also finished, even though
@@ -399,6 +404,7 @@ fun GamepadShell(
     // Real dispatcher-route for closing the detail screen with B/back --
     // same reason as the drill-up BackHandler in GamesSection.
     androidx.activity.compose.BackHandler(enabled = detailEntry != null) { detailEntry = null }
+    androidx.compose.runtime.CompositionLocalProvider(LocalShellWindow provides shellWindow) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -509,7 +515,7 @@ fun GamepadShell(
             missingEmulator?.let { problem ->
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 4.dp),
                 ) {
                     ActionChip(
                         "Get an emulator",
@@ -648,14 +654,20 @@ fun GamepadShell(
                 }
             }
         }
-        if (HandheldPrefs.showHints(context) && !themeHandlesHints) {
+        // A theme that draws its own help row replaces the LEGEND, not
+        // the controls: on a screen with no pad attached this bar is the
+        // only route to B/Y/Select at all, so it stays. On the console a
+        // theme's own help system still takes over, exactly as before.
+        if (HandheldPrefs.showHints(context) && (!themeHandlesHints || shellWindow.touchFirst)) {
             ButtonHintFooter(
                 canGoBack = canGoBack || detailEntry != null,
                 showInfo = detailEntry == null,
                 showSectionSwitch = detailEntry == null,
                 showSystemSwitch = detailEntry == null && section == HandheldSection.GAMES && canGoBack,
+                showOptions = detailEntry == null && section == HandheldSection.GAMES,
             )
         }
+    }
     }
 }
 
@@ -802,7 +814,7 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(48.dp)
+            .padding(LocalShellWindow.current.edgePadding)
             .onKeyEvent { event ->
                 val action = GamepadKeyMap.actionFor(event.key)
                 if (event.type == KeyEventType.KeyUp && (action == GamepadAction.BACK || action == GamepadAction.B)) {
@@ -967,47 +979,42 @@ internal fun ActionChip(label: String, highlighted: Boolean, modifier: Modifier 
  * buttons currently do — never leaves the user guessing, a real,
  * valuable pattern not present in this shell before (docs/SPEC.md §7).
  */
+/**
+ * The shell's persistent legend for what the face buttons do right now
+ * -- and, since every hint names exactly one pad action, its touch
+ * control surface too: tapping a hint dispatches that button press
+ * (see [TouchHintBar]). One list, one meaning, two ways in; no screen
+ * needs a second copy of what a press does.
+ */
 @Composable
 private fun ButtonHintFooter(
     canGoBack: Boolean,
     showInfo: Boolean,
     showSectionSwitch: Boolean = false,
     showSystemSwitch: Boolean = false,
+    showOptions: Boolean = false,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFF111111))
-            .padding(horizontal = 48.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(32.dp),
-    ) {
-        ButtonHint("A", "Select")
-        if (showInfo) ButtonHint("Y", "Info")
-        if (canGoBack) ButtonHint("B", "Back")
-        // L1/R1 switch top-level sections (Games/Apps/Settings) from
-        // anywhere; Left/Right additionally jump between sibling systems
-        // while browsing a per-engine game grid -- ES-DE's own documented
-        // "General navigation" convention (left/right "navigate ... between
-        // gamelists"), adopted here for the same reason it works well
-        // there: skips a Back-then-reselect round trip.
-        if (showSystemSwitch) ButtonHint("◄/►", "Switch system")
-        if (showSectionSwitch) ButtonHint("L/R", "Switch section")
-    }
-}
-
-@Composable
-private fun ButtonHint(button: String, action: String) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            button,
-            color = Color.Black,
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier
-                .background(Color.White, RoundedCornerShape(50))
-                .padding(horizontal = 8.dp, vertical = 2.dp),
-        )
-        Text(action, color = Color.Gray, style = MaterialTheme.typography.labelMedium)
-    }
+    TouchHintBar(
+        hints = buildList {
+            add(GamepadAction.A to "Select")
+            if (showInfo) add(GamepadAction.Y to "Info")
+            if (canGoBack) add(GamepadAction.B to "Back")
+            // Gamelist options (sort/scrape/import for where you are)
+            // were on Select and named nowhere on screen: with no pad
+            // attached they were unreachable, and with one they were
+            // undiscoverable.
+            if (showOptions) add(GamepadAction.SELECT to "Options")
+            // ES-DE's own documented "General navigation": Left/Right
+            // inside a gamelist jump to the adjacent system rather than
+            // going back and reselecting. Named as two separate hints
+            // rather than one compound arrow glyph, because each has to
+            // be tappable on its own.
+            if (showSystemSwitch) add(GamepadAction.LEFT to "Previous system")
+            if (showSystemSwitch) add(GamepadAction.RIGHT to "Next system")
+            // L1/R1 cycle the top-level sections from anywhere.
+            if (showSectionSwitch) add(GamepadAction.R to "Switch section")
+        },
+    )
 }
 
 internal enum class HandheldSection { GAMES, APPS, SETTINGS }
@@ -1053,9 +1060,13 @@ private fun SectionTabBar(
     onQuickMenu: () -> Unit,
     sections: List<HandheldSection> = HandheldSection.entries,
 ) {
+    val window = LocalShellWindow.current
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(32.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = window.edgePadding, vertical = if (window.compact) 10.dp else 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(window.tabGap),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         sections.forEach { entrySection ->
             val focused = entrySection == current
@@ -1703,7 +1714,7 @@ private fun GamesSection(
             // signature was already in the device's older crash logs.
             if (entries.isEmpty()) {
                 Column(modifier = Modifier.fillMaxSize().padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(32.dp)) {
-                    Text("No games detected yet.", color = Color.White, modifier = Modifier.padding(horizontal = 48.dp))
+                    Text("No games detected yet.", color = Color.White, modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding))
                 }
             } else {
                 // Box, not Column: EsDeThemedView needs to genuinely fill
@@ -1896,7 +1907,7 @@ private fun GamesSection(
                             element = listElement,
                             items = items,
                             firstItemFocus = firstFocus,
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = LocalShellWindow.current.edgePadding),
                         )
                         if (continuePlaying.isNotEmpty()) {
                             HomeSectionRow(
@@ -2011,7 +2022,7 @@ private fun GamesSection(
                 },
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 48.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     FilterChip("${allGames.size} items", selected = !recentOnly, onClick = { recentOnly = false })
@@ -2040,7 +2051,7 @@ private fun GamesSection(
                     // right/left within the grid, matching ES-DE's real
                     // "switch system at the edge" convention instead of
                     // hijacking every keypress.
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 48.dp)
+                    modifier = Modifier.fillMaxSize().padding(horizontal = LocalShellWindow.current.edgePadding)
                         .onKeyEvent { event ->
                             if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
                             when (GamepadKeyMap.actionFor(event.key)) {
@@ -2142,6 +2153,7 @@ private fun AppsSection(
                     columns = HandheldPrefs.appsGridColumns(context),
                     firstTileFocus = if (!firstAssigned) firstFocus else null,
                     onLaunch = onLaunch,
+                    onShowDetail = onShowDetail,
                     onFocusedEntryChanged = onFocusedEntryChanged,
                 )
             } else {
@@ -2172,6 +2184,7 @@ private fun AppIconGrid(
     columns: Int,
     firstTileFocus: FocusRequester?,
     onLaunch: (LibraryEntry) -> Unit,
+    onShowDetail: (LibraryEntry) -> Unit,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
 ) {
     Column {
@@ -2179,7 +2192,7 @@ private fun AppIconGrid(
             section.title,
             color = Color.White,
             style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(horizontal = 48.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 8.dp),
         )
         // Sized to fit every row with no internal scrolling of its own --
         // this grid lives inside AppsSection's outer LazyColumn (one item
@@ -2194,7 +2207,7 @@ private fun AppIconGrid(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(120.dp * rowCount.coerceAtLeast(1))
-                .padding(horizontal = 48.dp),
+                .padding(horizontal = LocalShellWindow.current.edgePadding),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -2203,6 +2216,7 @@ private fun AppIconGrid(
                     entry = entry,
                     modifier = if (index == 0 && firstTileFocus != null) Modifier.focusRequester(firstTileFocus) else Modifier,
                     onLaunch = { onLaunch(entry) },
+                    onShowDetail = { onShowDetail(entry) },
                     onFocused = { onFocusedEntryChanged(entry) },
                 )
             }
@@ -2210,8 +2224,15 @@ private fun AppIconGrid(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun AppIconTile(entry: LibraryEntry, modifier: Modifier = Modifier, onLaunch: () -> Unit, onFocused: () -> Unit = {}) {
+private fun AppIconTile(
+    entry: LibraryEntry,
+    modifier: Modifier = Modifier,
+    onLaunch: () -> Unit,
+    onShowDetail: () -> Unit = {},
+    onFocused: () -> Unit = {},
+) {
     var focused by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
@@ -2221,8 +2242,9 @@ private fun AppIconTile(entry: LibraryEntry, modifier: Modifier = Modifier, onLa
                 if (it.isFocused) onFocused()
             }
             .focusable()
-            // Same real touch-input fix as GameCard -- see its own comment.
-            .clickable(onClick = onLaunch)
+            // Same real touch-input fix as GameCard -- see its own
+            // comment -- and the same long-press-is-Y convention.
+            .combinedClickable(onClick = onLaunch, onLongClick = onShowDetail)
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
                 when (GamepadKeyMap.actionFor(event.key)) {
@@ -2318,10 +2340,10 @@ private fun HomeSectionRow(
             section.title,
             color = Color.White,
             style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(horizontal = 48.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 8.dp),
         )
         LazyRow(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = LocalShellWindow.current.edgePadding),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             itemsIndexed(section.entries, key = { _, entry -> entry.id }) { index, entry ->
@@ -2338,6 +2360,7 @@ private fun HomeSectionRow(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun GameCard(
     entry: LibraryEntry,
@@ -2348,9 +2371,16 @@ private fun GameCard(
     onToggleFavorite: () -> Unit = {},
 ) {
     var focused by remember { mutableStateOf(false) }
+    val window = LocalShellWindow.current
     Box(
         modifier = modifier
-            .size(width = 220.dp, height = 260.dp)
+            // A 220dp card is a third of a phone's width and two
+            // thirds of a console row; the card follows the window
+            // rather than the console it was drawn for.
+            .size(
+                width = window.gridItemMinWidth,
+                height = window.gridItemMinWidth * 260f / 220f,
+            )
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused) onFocused()
@@ -2367,7 +2397,12 @@ private fun GameCard(
             // mappings, so it's still handled explicitly below rather than
             // relying on clickable() to cover it. Y opens the detail screen
             // (§7).
-            .clickable(onClick = onLaunch)
+            // Long-press is the touch equivalent of Y: the same
+            // "tell me more / act on this one" the pad reaches with a
+            // second button, on a surface that only has one gesture.
+            // Android's own list convention, and the one Daijisho and
+            // the platform launchers already train.
+            .combinedClickable(onClick = onLaunch, onLongClick = onShowDetail)
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
                 when (GamepadKeyMap.actionFor(event.key)) {
