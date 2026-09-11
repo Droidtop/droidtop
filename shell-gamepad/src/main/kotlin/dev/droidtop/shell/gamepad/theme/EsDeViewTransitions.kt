@@ -78,4 +78,3 @@ private fun ContentTransform.withoutSizeAnimation(): ContentTransform = ContentT
     targetContentZIndex,
     SizeTransform(clip = true) { _, _ -> snap() },
 )
-}
