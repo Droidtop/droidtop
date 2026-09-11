@@ -221,4 +221,9 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.android)
     implementation(libs.coil.svg)
+
+    // The UPDATE_NOW trigger's guard and bypass are decided by pure
+    // functions (UpdateNow/AppSelfUpdate.mayCheck), so :app carries plain
+    // JVM tests now; CI runs :app:testDebugUnitTest with the rest.
+    testImplementation(libs.junit)
 }
