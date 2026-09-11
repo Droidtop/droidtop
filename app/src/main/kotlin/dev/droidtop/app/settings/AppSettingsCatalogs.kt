@@ -764,22 +764,22 @@ object AppSettingsCatalogs {
                                 }
                             },
                         ),
+                        // The forced pass, the same one the UPDATE_NOW
+                        // broadcast fires: check right now whatever the
+                        // schedule says, and install if newer.
                         AsyncActionItem(
                             id = "updates_install",
-                            title = "Download and install the newest build",
-                            subtitle = "Verified against the digest published with the release, then handed to " +
-                                "the Android installer -- Android checks the signing key and asks you to confirm",
+                            title = "Check and install now",
+                            subtitle = "Checks immediately, whatever the schedule above says, and installs a newer " +
+                                "build straight away: verified against the digest published with the release, then " +
+                                "handed to the Android installer -- Android checks the signing key and asks you to " +
+                                "confirm. Also reachable over adb: " +
+                                "am broadcast -a dev.droidtop.UPDATE_NOW -n dev.droidtop.app/.UpdateNowReceiver",
                             run = { ctx, onStatus ->
-                                onStatus("Checking...")
-                                val info = withContext(Dispatchers.IO) { update.fetch() }
-                                if (info.versionCode <= update.installedVersionCode(ctx)) {
-                                    "Already the newest published build."
-                                } else {
-                                    withContext(Dispatchers.IO) {
-                                        update.downloadAndInstall(ctx, info, onStatus)
+                                withContext(Dispatchers.IO) {
+                                    dev.droidtop.app.update.UpdateNow.runNow(ctx) { status ->
+                                        onStatus(status)
                                     }
-                                    "Handed ${info.versionName} to the Android installer. If nothing happens, " +
-                                        "allow droidtop to install apps when asked and try again."
                                 }
                             },
                         ),
