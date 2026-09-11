@@ -63,6 +63,12 @@ public class NotificationKeyData {
         if (people == null || people.isEmpty()) {
             return Utilities.EMPTY_STRING_ARRAY;
         }
+        if (!Utilities.ATLEAST_P) {
+            // Person.getKey arrived in API 28. Before it there is no key
+            // to group notifications by, which is the same answer an empty
+            // people list gives.
+            return Utilities.EMPTY_STRING_ARRAY;
+        }
         return people.stream().filter(person -> person.getKey() != null)
                 .map(Person::getKey).sorted().toArray(String[]::new);
     }

@@ -32,6 +32,7 @@ import android.provider.Settings;
 
 import androidx.annotation.VisibleForTesting;
 
+import com.android.launcher3.Utilities;
 import com.android.launcher3.dagger.ApplicationContext;
 import com.android.launcher3.dagger.LauncherAppSingleton;
 import com.android.launcher3.dagger.LauncherBaseAppComponent;
@@ -52,8 +53,12 @@ public class VibratorWrapper {
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
             .build();
 
-    public static final VibrationEffect EFFECT_CLICK =
-            createPredefined(VibrationEffect.EFFECT_CLICK);
+    public static final VibrationEffect EFFECT_CLICK = Utilities.ATLEAST_Q
+            ? createPredefined(VibrationEffect.EFFECT_CLICK)
+            // createPredefined is API 29. EFFECT_CLICK is documented as a
+            // short sharp tick, which is what a one-shot of the platform's
+            // own default amplitude is on the platforms that predate it.
+            : VibrationEffect.createOneShot(20, VibrationEffect.DEFAULT_AMPLITUDE);
     @VisibleForTesting
     static final Uri HAPTIC_FEEDBACK_URI = Settings.System.getUriFor(HAPTIC_FEEDBACK_ENABLED);
 
@@ -126,7 +131,9 @@ public class VibratorWrapper {
 
     /** Indicates that Taskbar has been invoked. */
     public void vibrateForTaskbarUnstash() {
-        if (mVibrator.areAllPrimitivesSupported(PRIMITIVE_LOW_TICK)) {
+        // Composition primitives are API 30; there is no low tick to
+        // compose below that and nothing to play here.
+        if (Utilities.ATLEAST_R && mVibrator.areAllPrimitivesSupported(PRIMITIVE_LOW_TICK)) {
             VibrationEffect primitiveLowTickEffect = VibrationEffect
                     .startComposition()
                     .addPrimitive(PRIMITIVE_LOW_TICK, LOW_TICK_SCALE)

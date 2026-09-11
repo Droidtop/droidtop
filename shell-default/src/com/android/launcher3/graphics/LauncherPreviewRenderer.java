@@ -108,6 +108,7 @@ import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.SandboxContext;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.util.WindowBounds;
+import com.android.launcher3.Utilities;
 import com.android.launcher3.util.window.WindowManagerProxy;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.BaseDragLayer;
@@ -303,8 +304,10 @@ public class LauncherPreviewRenderer extends BaseContext
                 mWallpaperColorResources = LocalColorExtractor.newInstance(
                         context).generateColorsOverride(wallpaperColorsOverride);
             } else {
-                WallpaperColors wallpaperColors = WallpaperManager.getInstance(
-                        context).getWallpaperColors(FLAG_SYSTEM);
+                WallpaperColors wallpaperColors = Utilities.ATLEAST_O_MR1
+                        ? WallpaperManager.getInstance(context)
+                                .getWallpaperColors(FLAG_SYSTEM)
+                        : null;
                 mWallpaperColorResources = wallpaperColors != null
                         ? LocalColorExtractor.newInstance(context).generateColorsOverride(
                         wallpaperColors)
@@ -313,7 +316,10 @@ public class LauncherPreviewRenderer extends BaseContext
         } else {
             WallpaperColors wallpaperColors = wallpaperColorsOverride != null
                     ? wallpaperColorsOverride
-                    : WallpaperManager.getInstance(context).getWallpaperColors(FLAG_SYSTEM);
+                    : (Utilities.ATLEAST_O_MR1
+                            ? WallpaperManager.getInstance(context)
+                                    .getWallpaperColors(FLAG_SYSTEM)
+                            : null);
             mWallpaperColorResources = wallpaperColors != null
                     ? LocalColorExtractor.newInstance(context).generateColorsOverride(
                     wallpaperColors)
@@ -354,12 +360,12 @@ public class LauncherPreviewRenderer extends BaseContext
     private Rect getInsets(Context context) {
         DisplayController.Info info = DisplayController.INSTANCE.get(context).getInfo();
         float maxDiff = Float.MAX_VALUE;
-        Display display = context.getDisplay();
+        Display display = WindowManagerProxy.INSTANCE.get(context).getDisplay(context);
         Rect insets = new Rect();
         for (WindowBounds supportedBound : info.supportedBounds) {
             double diff = Math.pow(display.getWidth() - supportedBound.availableSize.x, 2)
                     + Math.pow(display.getHeight() - supportedBound.availableSize.y, 2);
-            if (supportedBound.rotationHint == context.getDisplay().getRotation()
+            if (supportedBound.rotationHint == display.getRotation()
                     && diff < maxDiff) {
                 maxDiff = (float) diff;
                 insets = supportedBound.insets;
@@ -490,7 +496,8 @@ public class LauncherPreviewRenderer extends BaseContext
         AppWidgetHostView view = mAppWidgetHost.createView(
                 mContext, info.appWidgetId, providerInfo);
 
-        if (mWallpaperColorResources != null) {
+        if (mWallpaperColorResources != null && Utilities.ATLEAST_S) {
+            // Widget colour resources are the API-31 dynamic-colour path.
             view.setColorResources(mWallpaperColorResources);
         }
 

@@ -17,7 +17,8 @@
 */
 -->
 
-<resources xmlns:android="http://schemas.android.com/apk/res/android">
+<resources xmlns:android="http://schemas.android.com/apk/res/android"
+           xmlns:tools="http://schemas.android.com/tools">
     <!-- Launcher theme -->
     <style name="BaseLauncherTheme" parent="@android:style/Theme.DeviceDefault.Light">
         <item name="disabledIconAlpha">.54</item>
@@ -407,9 +408,9 @@
 
     <style name="WidgetListHeader.Title" parent="@android:style/TextAppearance.DeviceDefault" >
         <!-- Title / Medium -->
-        <item name="android:textFontWeight">@integer/widget_picker_header_app_title_font_weight</item>
+        <item name="android:textFontWeight" tools:targetApi="28">@integer/widget_picker_header_app_title_font_weight</item>
         <item name="android:textSize">@dimen/widget_picker_header_app_title_font_size</item>
-        <item name="android:lineHeight">@dimen/widget_picker_header_app_title_line_height</item>
+        <item name="android:lineHeight" tools:targetApi="28">@dimen/widget_picker_header_app_title_line_height</item>
         <item name="android:textColor">?attr/widgetPickerHeaderAppTitleColor</item>
         <item name="android:fontFamily" android:featureFlag="com.android.launcher3.gsf_res">
             variable-title-medium
@@ -421,7 +422,7 @@
         <item name="android:fontFamily" android:featureFlag="com.android.launcher3.gsf_res">
             variable-title-medium-emphasized
         </item>
-        <item name="android:textFontWeight">
+        <item name="android:textFontWeight" tools:targetApi="28">
             @integer/widget_picker_header_selected_app_title_font_weight
         </item>
     </style>
@@ -431,9 +432,9 @@
         <item name="android:fontFamily" android:featureFlag="com.android.launcher3.gsf_res">
             variable-title-small
         </item>
-        <item name="android:textFontWeight">@integer/widget_picker_header_app_subtitle_font_weight</item>
+        <item name="android:textFontWeight" tools:targetApi="28">@integer/widget_picker_header_app_subtitle_font_weight</item>
         <item name="android:textSize">@dimen/widget_picker_header_app_subtitle_font_size</item>
-        <item name="android:lineHeight">@dimen/widget_picker_header_app_subtitle_line_height</item>
+        <item name="android:lineHeight" tools:targetApi="28">@dimen/widget_picker_header_app_subtitle_line_height</item>
         <item name="android:textColor">?attr/widgetPickerHeaderAppSubtitleColor</item>
     </style>
 
@@ -442,7 +443,7 @@
         <item name="android:fontFamily" android:featureFlag="com.android.launcher3.gsf_res">
             variable-title-small-emphasized
         </item>
-        <item name="android:textFontWeight">
+        <item name="android:textFontWeight" tools:targetApi="28">
             @integer/widget_picker_header_selected_app_subtitle_font_weight
         </item>
     </style>
@@ -635,7 +636,7 @@
         </item>
     </style>
 
-    <style name="WidgetPickerActivityTheme" parent="@android:style/Theme.DeviceDefault.DayNight">
+    <style name="WidgetPickerActivityTheme" parent="@android:style/Theme.DeviceDefault.Light">
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowContentOverlay">@null</item>
@@ -646,10 +647,10 @@
         <!-- Edge to edge with transparent (not translucent nav / status bars) -->
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:enforceNavigationBarContrast">false</item>
+        <item name="android:enforceNavigationBarContrast" tools:targetApi="29">false</item>
         <item name="android:windowTranslucentNavigation">false</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:enforceStatusBarContrast">false</item>
+        <item name="android:enforceStatusBarContrast" tools:targetApi="29">false</item>
         <item name="android:windowTranslucentStatus">false</item>
 
         <item name="widgetsTheme">@style/WidgetContainerTheme</item>

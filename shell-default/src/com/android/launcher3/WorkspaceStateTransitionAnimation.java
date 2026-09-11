@@ -90,7 +90,11 @@ public class WorkspaceStateTransitionAnimation {
     private static final FloatProperty<WorkspaceStateTransitionAnimation> PREVIEW_BLUR_PROGRESS = new FloatProperty<WorkspaceStateTransitionAnimation>("previewBlurProgress") {
         @Override
         public void setValue(WorkspaceStateTransitionAnimation anim, float v) {
-            anim.setPreviewBlurProgress(v);
+            // Window background blur is API 31; below that there is no
+            // preview blur to drive and the progress is simply not applied.
+            if (Utilities.ATLEAST_S) {
+                anim.setPreviewBlurProgress(v);
+            }
         }
 
         @Override

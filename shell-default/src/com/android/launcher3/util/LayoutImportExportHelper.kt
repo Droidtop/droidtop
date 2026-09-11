@@ -20,6 +20,7 @@ import android.app.blob.BlobStoreManager
 import android.content.Context
 import android.os.ParcelFileDescriptor.AutoCloseOutputStream
 import android.provider.Settings.Secure
+import com.android.launcher3.Utilities
 import com.android.launcher3.AutoInstallsLayout
 import com.android.launcher3.LauncherAppState
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_DESKTOP
@@ -78,6 +79,11 @@ object LayoutImportExportHelper {
     }
 
     fun importModelFromXml(context: Context, data: ByteArray) {
+        // The import handshake hands the layout to the model through the
+        // system blob store, which is API 30. There is no pre-30 route:
+        // LauncherProvider's import call simply does nothing there.
+        if (!Utilities.ATLEAST_R) return
+
         val model = LauncherAppState.getInstance(context).model
 
         val digest = MessageDigest.getInstance("SHA-256").digest(data)

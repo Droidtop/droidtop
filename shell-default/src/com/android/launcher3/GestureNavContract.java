@@ -71,7 +71,11 @@ public class GestureNavContract {
             @Nullable SurfaceControl surfaceControl) {
         Bundle result = new Bundle();
         result.putParcelable(EXTRA_ICON_POSITION, position);
-        result.putParcelable(EXTRA_ICON_SURFACE, surfaceControl);
+        if (Utilities.ATLEAST_Q) {
+            // SurfaceControl only became Parcelable in API 29, and below
+            // that there is no gesture-nav handoff to send it to.
+            result.putParcelable(EXTRA_ICON_SURFACE, surfaceControl);
+        }
         if (sMessageReceiver == null) {
             sMessageReceiver = new StaticMessageReceiver();
         }

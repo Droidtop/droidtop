@@ -199,7 +199,12 @@ public class FloatingSurfaceView extends AbstractFloatingView implements
 
     private void sendIconInfo() {
         if (mContract != null) {
-            mContract.sendEndPosition(mIconPosition, mLauncher, mSurfaceView.getSurfaceControl());
+            // SurfaceView.getSurfaceControl is API 29, and the gesture-nav
+            // contract's own surface handoff starts there too; below it the
+            // position alone is the whole message.
+            mContract.sendEndPosition(mIconPosition, mLauncher,
+                    com.android.launcher3.Utilities.ATLEAST_Q
+                            ? mSurfaceView.getSurfaceControl() : null);
         }
     }
 
