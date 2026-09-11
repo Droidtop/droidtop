@@ -86,6 +86,24 @@ data class EsDeGridConfig(
      */
     val textBackgroundCornerRadius: Float = 0f,
     val letterCase: EsDeLetterCase = EsDeLetterCase.NONE,
+    /** Real `lineSpacing` (GridComponent.h:1436-1437, clamped 0.5-3.0) -- the item label's line height multiplier. */
+    val lineSpacing: Float = 1.5f,
+    /** Real `textHorizontalScrolling` (GridComponent.h:1418-1419), real default FALSE. */
+    val textHorizontalScrolling: Boolean = false,
+    /** Real `textHorizontalScrollSpeed` (GridComponent.h:1421-1424), clamped 0.1-10. */
+    val textHorizontalScrollSpeed: Float = 1f,
+    /** Real `textHorizontalScrollDelay` (GridComponent.h:1426-1429), clamped 0-10 seconds, stored as ms. */
+    val textHorizontalScrollDelayMs: Float = 1500f,
+    /** Real `textHorizontalScrollGap` (GridComponent.h:1431-1434), clamped 0.1-5. */
+    val textHorizontalScrollGap: Float = 1.5f,
+    /** Real `systemNameSuffix` (GridComponent.h:1502-1503), real default true. */
+    val systemNameSuffix: Boolean = true,
+    /** Real `letterCaseSystemNameSuffix` (GridComponent.h:1505-1520), real default UPPERCASE. */
+    val letterCaseSystemNameSuffix: EsDeLetterCase = EsDeLetterCase.UPPERCASE,
+    /** Real `letterCaseAutoCollections` (GridComponent.h:1458-1476). */
+    val letterCaseAutoCollections: EsDeLetterCase = EsDeLetterCase.UNDEFINED,
+    /** Real `letterCaseCustomCollections` (GridComponent.h:1480-1498). */
+    val letterCaseCustomCollections: EsDeLetterCase = EsDeLetterCase.UNDEFINED,
     val instantItemTransitions: Boolean = false,
     val instantRowTransitions: Boolean = false,
 ) {
@@ -235,12 +253,20 @@ fun esDeGridConfig(
         // itemScale-then-screen-WIDTH scaling as every other radius on
         // this element, which is what `cornerRadius` above already is.
         textBackgroundCornerRadius = cornerRadius("textBackgroundCornerRadius"),
-        letterCase = when (element.strOrNull("letterCase")) {
-            "uppercase" -> EsDeLetterCase.UPPERCASE
-            "lowercase" -> EsDeLetterCase.LOWERCASE
-            "capitalize" -> EsDeLetterCase.CAPITALIZE
-            else -> EsDeLetterCase.NONE
-        },
+        letterCase = esDeLetterCase(element.strOrNull("letterCase")) ?: EsDeLetterCase.NONE,
+        lineSpacing = element.floatOrNull("lineSpacing")?.coerceIn(0.5f, 3f) ?: 1.5f,
+        textHorizontalScrolling = element.boolOrNull("textHorizontalScrolling") ?: false,
+        textHorizontalScrollSpeed = element.floatOrNull("textHorizontalScrollSpeed")?.coerceIn(0.1f, 10f) ?: 1f,
+        textHorizontalScrollDelayMs =
+            element.floatOrNull("textHorizontalScrollDelay")?.coerceIn(0f, 10f)?.times(1000f) ?: 1500f,
+        textHorizontalScrollGap = element.floatOrNull("textHorizontalScrollGap")?.coerceIn(0.1f, 5f) ?: 1.5f,
+        systemNameSuffix = element.boolOrNull("systemNameSuffix") ?: true,
+        letterCaseSystemNameSuffix =
+            esDeLetterCase(element.strOrNull("letterCaseSystemNameSuffix")) ?: EsDeLetterCase.UPPERCASE,
+        letterCaseAutoCollections =
+            esDeLetterCase(element.strOrNull("letterCaseAutoCollections")) ?: EsDeLetterCase.UNDEFINED,
+        letterCaseCustomCollections =
+            esDeLetterCase(element.strOrNull("letterCaseCustomCollections")) ?: EsDeLetterCase.UNDEFINED,
         instantItemTransitions = element.strOrNull("itemTransitions") == "instant",
         instantRowTransitions = element.strOrNull("rowTransitions") == "instant",
     )

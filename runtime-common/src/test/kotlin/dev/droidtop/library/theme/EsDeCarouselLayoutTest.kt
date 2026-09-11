@@ -1,6 +1,7 @@
 package dev.droidtop.library.theme
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.abs
@@ -38,6 +39,89 @@ class EsDeCarouselLayoutTest {
         assertEquals(0.5f, selected.originFractionX, 0f)
         assertEquals(0.5f, selected.originFractionY, 0f)
         assertEquals(0f, selected.rotationDegrees, 0.01f)
+    }
+
+    @Test
+    fun `a corner radius is scaled by itemScale and then by screen WIDTH`() {
+        // CarouselComponent.h:1536-1538 -- clamp 0-0.5, times itemScale when
+        // that is >= 1, times the screen WIDTH. Height must not appear: a
+        // 1920x1080 screen with itemScale 2 and radius 0.1 gives
+        // 0.1 * 2 * 1920 = 384.
+        val config = esDeCarouselConfig(
+            element(
+                "imageCornerRadius" to EsDeThemeValue.FloatValue(0.1f),
+                "itemScale" to EsDeThemeValue.FloatValue(2f),
+            ),
+            1920f,
+            1080f,
+        )
+        assertEquals(384f, config.imageCornerRadius, 0.01f)
+    }
+
+    @Test
+    fun `an itemScale below one does not shrink a corner radius`() {
+        // The same three lines use `mItemScale >= 1.0f ? mItemScale : 1.0f`,
+        // so a carousel whose items scale DOWN keeps the unscaled radius.
+        val config = esDeCarouselConfig(
+            element(
+                "textBackgroundCornerRadius" to EsDeThemeValue.FloatValue(0.25f),
+                "itemScale" to EsDeThemeValue.FloatValue(0.5f),
+            ),
+            1000f,
+            1000f,
+        )
+        assertEquals(250f, config.textBackgroundCornerRadius, 0.01f)
+    }
+
+    @Test
+    fun `a corner radius clamps at one half before any scaling`() {
+        val config = esDeCarouselConfig(
+            element(
+                "imageCornerRadius" to EsDeThemeValue.FloatValue(5f),
+                "itemScale" to EsDeThemeValue.FloatValue(1f),
+            ),
+            1000f,
+            1000f,
+        )
+        assertEquals(500f, config.imageCornerRadius, 0.01f)
+    }
+
+    @Test
+    fun `the item label properties carry their real defaults and clamps`() {
+        val defaults = esDeCarouselConfig(null, 1000f, 1000f)
+        // CarouselComponent.h:283-301.
+        assertEquals(1f, defaults.textRelativeScale, 0f)
+        assertEquals(1.5f, defaults.lineSpacing, 0f)
+        assertEquals(0f, defaults.textBackgroundCornerRadius, 0f)
+        // :1798 -- false here, unlike a textlist, whose default is true.
+        assertFalse(defaults.textHorizontalScrolling)
+        assertEquals(1500f, defaults.textHorizontalScrollDelayMs, 0f)
+        assertEquals(EsDeLetterCase.NONE, defaults.letterCase)
+        // :300 -- the suffix case is UPPERCASE and is NOT the element's own letterCase.
+        assertEquals(EsDeLetterCase.UPPERCASE, defaults.letterCaseSystemNameSuffix)
+        assertTrue(defaults.systemNameSuffix)
+        // The two per-collection-kind overrides start out unset, which is a
+        // third state: "fall back to letterCase", not "NONE".
+        assertEquals(EsDeLetterCase.UNDEFINED, defaults.letterCaseAutoCollections)
+        assertEquals(EsDeLetterCase.UNDEFINED, defaults.letterCaseCustomCollections)
+
+        val clamped = esDeCarouselConfig(
+            element(
+                "textRelativeScale" to EsDeThemeValue.FloatValue(0.05f),
+                "lineSpacing" to EsDeThemeValue.FloatValue(9f),
+                "textHorizontalScrollSpeed" to EsDeThemeValue.FloatValue(99f),
+                "textHorizontalScrollDelay" to EsDeThemeValue.FloatValue(2.5f),
+                "textHorizontalScrollGap" to EsDeThemeValue.FloatValue(0f),
+            ),
+            1000f,
+            1000f,
+        )
+        assertEquals(0.2f, clamped.textRelativeScale, 0f)
+        assertEquals(3f, clamped.lineSpacing, 0f)
+        assertEquals(10f, clamped.textHorizontalScrollSpeed, 0f)
+        // :1806-1809 -- declared in SECONDS, stored as milliseconds.
+        assertEquals(2500f, clamped.textHorizontalScrollDelayMs, 0f)
+        assertEquals(0.1f, clamped.textHorizontalScrollGap, 0f)
     }
 
     @Test

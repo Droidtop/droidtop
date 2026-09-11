@@ -20,6 +20,35 @@ class EsDeGridLayoutTest {
     )
 
     @Test
+    fun `the grid item label carries the same real defaults and clamps as the carousel`() {
+        // GridComponent.h:1418-1437 and :1502-1520, which are the same lines
+        // as the carousel's own -- including lineSpacing 1.5, scrolling off,
+        // a 1500 ms delay and an UPPERCASE system-name suffix.
+        val defaults = esDeGridConfig(null, 1000f, 1000f)
+        assertEquals(1.5f, defaults.lineSpacing, 0f)
+        assertFalse(defaults.textHorizontalScrolling)
+        assertEquals(1500f, defaults.textHorizontalScrollDelayMs, 0f)
+        assertEquals(EsDeLetterCase.UPPERCASE, defaults.letterCaseSystemNameSuffix)
+        assertEquals(EsDeLetterCase.UNDEFINED, defaults.letterCaseAutoCollections)
+        assertTrue(defaults.systemNameSuffix)
+
+        val clamped = esDeGridConfig(
+            element(
+                "lineSpacing" to EsDeThemeValue.FloatValue(0.1f),
+                "textHorizontalScrollDelay" to EsDeThemeValue.FloatValue(4f),
+                "letterCaseAutoCollections" to EsDeThemeValue.Str("lowercase"),
+                "systemNameSuffix" to EsDeThemeValue.Bool(false),
+            ),
+            1000f,
+            1000f,
+        )
+        assertEquals(0.5f, clamped.lineSpacing, 0f)
+        assertEquals(4000f, clamped.textHorizontalScrollDelayMs, 0f)
+        assertEquals(EsDeLetterCase.LOWERCASE, clamped.letterCaseAutoCollections)
+        assertFalse(clamped.systemNameSuffix)
+    }
+
+    @Test
     fun `item spacing is calculated from itemScale when the theme declares none`() {
         // Real ES-DE: with no itemSpacing property, spacing becomes
         // ((itemSize * itemScale) - itemSize) / 2 so scaled items don't

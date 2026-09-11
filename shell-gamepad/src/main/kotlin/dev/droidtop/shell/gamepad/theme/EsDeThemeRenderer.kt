@@ -3236,7 +3236,7 @@ private fun EsDeTextScrollContainer(
  * no reason to hold a frame callback open for it either.
  */
 @Composable
-private fun EsDeContainerScrollClock(
+internal fun EsDeContainerScrollClock(
     enabled: Boolean,
     resetKey: Any?,
     onElapsed: (Float) -> Unit,

@@ -169,9 +169,9 @@ fun esDeTextListConfig(
             else -> EsDePrimaryAlignment.LEFT
         },
         horizontalMargin = (element.floatOrNull("horizontalMargin") ?: 0f) * screenWidth,
-        letterCase = letterCase(element.strOrNull("letterCase")) ?: EsDeLetterCase.NONE,
-        letterCaseAutoCollections = letterCase(element.strOrNull("letterCaseAutoCollections")) ?: EsDeLetterCase.UNDEFINED,
-        letterCaseCustomCollections = letterCase(element.strOrNull("letterCaseCustomCollections")) ?: EsDeLetterCase.UNDEFINED,
+        letterCase = esDeLetterCase(element.strOrNull("letterCase")) ?: EsDeLetterCase.NONE,
+        letterCaseAutoCollections = esDeLetterCase(element.strOrNull("letterCaseAutoCollections")) ?: EsDeLetterCase.UNDEFINED,
+        letterCaseCustomCollections = esDeLetterCase(element.strOrNull("letterCaseCustomCollections")) ?: EsDeLetterCase.UNDEFINED,
         // TextListComponent.h:668-703 -- an unrecognized value warns and
         // falls back to symbols; "none" is valid for indicators only.
         indicators = when (element.strOrNull("indicators")) {
@@ -184,12 +184,22 @@ fun esDeTextListConfig(
             else -> EsDeIndicators.SYMBOLS
         },
         systemNameSuffix = element.boolOrNull("systemNameSuffix") ?: true,
-        letterCaseSystemNameSuffix = letterCase(element.strOrNull("letterCaseSystemNameSuffix")) ?: EsDeLetterCase.UPPERCASE,
+        letterCaseSystemNameSuffix = esDeLetterCase(element.strOrNull("letterCaseSystemNameSuffix")) ?: EsDeLetterCase.UPPERCASE,
         fadeAbovePrimary = element.boolOrNull("fadeAbovePrimary") ?: false,
     )
 }
 
-private fun letterCase(value: String?): EsDeLetterCase? = when (value) {
+/**
+ * Real `letterCase` parsing, identical in all three primary components
+ * (TextListComponent.h:585-603, CarouselComponent.h:1819-1836,
+ * GridComponent.h:1439-1456) and in TextComponent.cpp:643-658: exactly
+ * four accepted literals, anything else warns and leaves the value alone.
+ * Null means "the theme said nothing usable", which each caller turns into
+ * its own real default -- NONE for the element's own `letterCase`,
+ * UPPERCASE for `letterCaseSystemNameSuffix`, UNDEFINED for the two
+ * per-collection-kind overrides.
+ */
+fun esDeLetterCase(value: String?): EsDeLetterCase? = when (value) {
     "uppercase" -> EsDeLetterCase.UPPERCASE
     "lowercase" -> EsDeLetterCase.LOWERCASE
     "capitalize" -> EsDeLetterCase.CAPITALIZE
