@@ -549,8 +549,7 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // exists wins. This used to be unimplementable -- a LibraryEntry
     // carried one already-resolved artworkUri and nothing to choose
     // between -- and is now resolved through LibraryEntry.mediaLocator.
-    // The `?: artworkUri` tail is droidtop's own documented divergence
-    // from ES-DE, see LibraryEntry.mediaForImageTypes.
+    // The walk ends where ES-DE's does: at the element's own `default`.
     val gameselectorEntry = element.valueOrNull<EsDeThemeValue.UInt>("gameselectorEntry")?.value?.toInt()
     val imageTypes = remember(element) {
         EsDeImageTypes.forImageElement(element.valueOrNull<EsDeThemeValue.Str>("imageType")?.value)
@@ -564,13 +563,15 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // default, clamped to the selector's game count, SystemView.cpp:1069
     // -1072), which is the currently selected game.
     val path = if (imageTypes.isNotEmpty()) {
-        gameSelection.getOrNull(gameselectorEntry ?: 0)?.let { entry ->
-            entry.mediaForImageTypes(imageTypes) ?: entry.artworkUri
-        }
+        gameSelection.getOrNull(gameselectorEntry ?: 0)?.mediaForImageTypes(imageTypes)
         // Nothing resolved: real ES-DE calls setImage("") and the
         // element's own `default` is what remains (GamelistView.cpp:1331
         // -1334). `path` is deliberately NOT consulted -- a game-driven
-        // element's static path is not a fallback in real ES-DE.
+        // element's static path is not a fallback in real ES-DE -- and
+        // neither is the entry's pre-resolved artwork, which used to be
+        // tried here first. Same removal, same reason, as the primary
+        // components' own chain: a theme asking for a marquee and getting
+        // the cover back is not the theme.
             ?: element.valueOrNull<EsDeThemeValue.Path>("default")?.resolved?.takeIf { File(it).exists() }
     } else if (gameselectorEntry != null) {
         gameSelection.getOrNull(gameselectorEntry)?.artworkUri
@@ -1832,9 +1833,11 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
     // runs the identical setGameImage call over its video components
     // (GamelistView.cpp:836-838) as over its image ones.
     val path = if (imageTypes.isNotEmpty()) {
-        gameSelection.getOrNull(gameselectorEntry ?: 0)?.let { entry ->
-            entry.mediaForImageTypes(imageTypes) ?: entry.artworkUri
-        }
+        // Same chain, same removed pre-resolved-artwork step, as
+        // EsDeThemedImage's -- real ES-DE runs the identical
+        // setGameImage call over its video components as over its image
+        // ones (GamelistView.cpp:836-838).
+        gameSelection.getOrNull(gameselectorEntry ?: 0)?.mediaForImageTypes(imageTypes)
             ?: element.valueOrNull<EsDeThemeValue.Path>("default")?.resolved?.takeIf { File(it).exists() }
             ?: element.valueOrNull<EsDeThemeValue.Path>("defaultImage")?.resolved?.takeIf { File(it).exists() }
     } else if (gameselectorEntry != null) {
