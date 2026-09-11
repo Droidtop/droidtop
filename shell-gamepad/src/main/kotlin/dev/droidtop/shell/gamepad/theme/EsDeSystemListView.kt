@@ -787,7 +787,7 @@ internal fun esDeHasColorGradient(start: Color?, end: Color?): Boolean =
     start != null && end != null && start != end
 
 /** Real `letterCase` parsing, shared by every list widget (real ES-DE's own four values). */
-private fun esDeLetterCaseOf(value: String?): EsDeLetterCase = when (value) {
+internal fun esDeLetterCaseOf(value: String?): EsDeLetterCase = when (value) {
     "uppercase" -> EsDeLetterCase.UPPERCASE
     "lowercase" -> EsDeLetterCase.LOWERCASE
     "capitalize" -> EsDeLetterCase.CAPITALIZE
