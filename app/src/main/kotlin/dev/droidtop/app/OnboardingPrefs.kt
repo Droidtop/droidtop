@@ -81,6 +81,59 @@ object GamesRootPrefs {
         prefs.edit().putStringSet(KEY_GAMES_ROOT_PATHS, current + resolvedPath.absolutePath).apply()
     }
 
+    /**
+     * Adds a games root the user typed as a plain filesystem path,
+     * bypassing SAF entirely. Returns null when it was added, or a
+     * user-facing reason it was not.
+     *
+     * Why this exists at all, when there is already a folder picker: the
+     * picker can only offer what Android exposes as a SAF storage volume,
+     * and real games live outside that set often enough to matter.
+     *
+     *  - An emulator's host share. BlueStacks mounts the Windows folder
+     *    it shares at /mnt/windows/BstSharedFolder over vboxsf; it is
+     *    readable, it is not a storage volume, and it is not mirrored
+     *    under /sdcard, so on 2026-09-11 the Android 9 rig could not be
+     *    pointed at the user's game library at all. The same is true of
+     *    an SDK emulator folder pushed in over adb.
+     *  - A rooted device's extra mounts: a second SD card bind-mounted
+     *    somewhere of the user's choosing, a USB drive mounted by hand,
+     *    an OTG disk under /mnt.
+     *  - Anywhere [resolveStoragePath] gives up: a SAF tree URI whose
+     *    volume does not follow the /storage/<volumeId> convention
+     *    resolves to null and the folder is silently unusable. Typing the
+     *    real path is the escape hatch from that.
+     *
+     * Validation is the same question the scanner will ask later, asked
+     * now while the user is still looking at the screen: an absolute path
+     * that exists, is a directory, and whose contents this process can
+     * actually list. listFiles() returning null is the one check that
+     * catches a path that exists but is unreadable for want of the
+     * storage permission -- File.canRead() alone does not.
+     */
+    fun addGamesRootByPath(context: Context, rawPath: String): String? {
+        val trimmed = rawPath.trim()
+        if (trimmed.isEmpty()) return "Type a folder path first"
+        val file = File(trimmed)
+        if (!file.isAbsolute) return "Use a full path, starting at /"
+        val canonical = try {
+            file.canonicalFile
+        } catch (e: java.io.IOException) {
+            return "Could not resolve $trimmed on this device"
+        }
+        if (!canonical.exists()) return "$trimmed does not exist"
+        if (!canonical.isDirectory) return "$trimmed is a file, not a folder"
+        if (canonical.listFiles() == null) {
+            return "droidtop cannot read $trimmed -- grant storage access first, " +
+                "or add it with the folder picker instead"
+        }
+        if (canonical.absolutePath in gamesRootPaths(context)) {
+            return "$trimmed is already being scanned"
+        }
+        addGamesRoot(context, canonical)
+        return null
+    }
+
     fun removeGamesRoot(context: Context, path: String) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val current = prefs.getStringSet(KEY_GAMES_ROOT_PATHS, emptySet()) ?: emptySet()
