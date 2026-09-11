@@ -21,7 +21,7 @@ import android.os.Looper
  * Mirrors `com.android.launcher3.Launcher`'s own real cold-boot redirect
  * (its `mDroidtopPendingModeRedirect` handling, already built and shipping)
  * -- without this, picking Alternative as the home implementation but
- * Desktop/Handheld as the *default mode* would always forward to the other
+ * Desktop/Gaming as the *default mode* would always forward to the other
  * launcher instead, since this activity (not Launcher.java) is what
  * actually runs on boot when Alternative is active.
  */

@@ -65,7 +65,7 @@ import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
-import dev.droidtop.library.settings.HandheldSettingsCatalog
+import dev.droidtop.library.settings.GamingSettingsCatalog
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.runtime.systemstatus.NetworkKind
@@ -109,7 +109,7 @@ internal fun QuickSettingsPanel(sheetWidthDp: Int, onDismiss: () -> Unit) {
     // battery broadcast and a connectivity query.
     val groups by produceState(initialValue = emptyList<CatalogGroup>(), version) {
         value = withContext(Dispatchers.IO) {
-            QuickTiles.systemGroups(HandheldSettingsCatalog.groups(context))
+            QuickTiles.systemGroups(GamingSettingsCatalog.groups(context))
         }
     }
     val panel = remember(groups) { QuickTiles.panel(groups) }

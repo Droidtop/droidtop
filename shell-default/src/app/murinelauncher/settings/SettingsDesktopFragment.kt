@@ -9,7 +9,7 @@ import com.android.launcher3.util.DisplayController
 
 /**
  * Desktop-mode preferences, reachable from the same root settings screen as
- * every other mode (Standard, Handheld) so settings stay one consistent
+ * every other mode (Standard, Gaming) so settings stay one consistent
  * surface rather than one screen per shell. Read directly by
  * dev.droidtop.shell.desktop.DesktopShell via the shared
  * "com.android.launcher3.prefs" SharedPreferences file (see
@@ -29,7 +29,7 @@ public final class SettingsDesktopFragment : AbstractSettingsFragment() {
     override fun initPreference(preference: Preference, info: DisplayController.Info): Boolean {
         if (preference.key == PREF_ROOT_COMPOSITOR_SETUP) {
             // Re-entry into onboarding's own DESKTOP_SETUP step -- same
-            // explicit-component-name pattern SettingsHandheldFragment's
+            // explicit-component-name pattern SettingsGamingFragment's
             // own PREF_GAME_FOLDERS/PREF_CONSOLE_SYSTEMS use, same reasoning
             // (:shell-default can't compile-depend on :app).
             preference.setOnPreferenceClickListener {

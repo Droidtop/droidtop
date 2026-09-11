@@ -166,16 +166,16 @@ system dark/light setting through one shared Material theme
 `MaterialTheme.colorScheme` tokens, never literals (the previous state:
 every screen hardcoded its palette, and no light mode existed at all).
 Two deliberate exceptions stay always-dark regardless of the system
-setting: surfaces living inside the Handheld shell's world (Console
-systems opens from Handheld's Settings tab and matches its plain-black
+setting: surfaces living inside the Gaming shell's world (Console
+systems opens from Gaming's Settings tab and matches its plain-black
 ground) and ambient second-screen companion surfaces; ES-DE-themed
-Handheld views take every color from the active ES-DE theme (§7f) and
+Gaming views take every color from the active ES-DE theme (§7f) and
 are outside Material theming entirely.
 
 ## 2b. Desktop mode gets the library context, and Android apps as windows (directed 2026-09-01)
 
 Desktop mode currently has a container and a shell and no library. The
-whole gamenative/Wine context that Handheld now reaches through
+whole gamenative/Wine context that Gaming now reaches through
 `PcLibrary` — store library managers, installed games, owned-but-not-
 installed titles, and the Wine container shortcuts — belongs in Desktop
 too, as ordinary desktop entries.
@@ -187,13 +187,13 @@ surface should read the same `LibraryEntry` stream `:shell-gamepad`
 reads, differing only in presentation. Same rule as the secondary display
 (§4c): one mechanism, the active mode selects what it looks like.
 
-Two things this needs that Handheld did not:
+Two things this needs that Gaming did not:
 
 - **Shortcuts as first-class desktop objects.** A Wine shortcut has an
   icon, a working directory and an executable — everything a `.desktop`
   entry has. Desktop should place them the way a Linux desktop does,
   rather than treating them as rows in a game list.
-- **Windowed launching.** Handheld launches fullscreen to a display;
+- **Windowed launching.** Gaming launches fullscreen to a display;
   Desktop launches into a window on the shared desktop
   (`WindowPlacement`, §4), which is a different launch path through the
   same entry.
@@ -597,7 +597,7 @@ It also holds `REORDER_TASKS`, which droidtop does not.
 real starting point for droidtop's multi-display patch work ... not
 building multi-display support from nothing." That wiring was never done.
 
-Instead the Handheld shell uses `Presentation` for the companion plus
+Instead the Gaming shell uses `Presentation` for the companion plus
 manual `startActivity` + `setLaunchDisplayId` relocation for itself. So
 on a live dual-screen device two things compete for the second display:
 Android placing the SECONDARY_HOME activity there, and droidtop pushing
@@ -643,15 +643,15 @@ activity Android hosts where, not a manual relocation.
 
 **One module owns secondary-display behaviour; the active mode selects it
 (directed 2026-09-01).** The forked launcher already has secondary-display
-behaviour and the Handheld shell has its own. These must not become two
+behaviour and the Gaming shell has its own. These must not become two
 implementations of one job. A single module owns:
 
 - the one `SECONDARY_HOME` activity in the merged manifest — Launcher3's
-  `SecondaryDisplayLauncher` and any Handheld equivalent collapse into
+  `SecondaryDisplayLauncher` and any Gaming equivalent collapse into
   it, since two activities both claiming that category is precisely the
   duplication to remove;
 - what that activity renders, chosen by the active mode: Standard gets
-  the launcher's secondary-display UI, Handheld gets the companion
+  the launcher's secondary-display UI, Gaming gets the companion
   surface, Desktop gets its input surface (§4);
 - the panel role assignment and swap (`DualScreenCoordinator`);
 - launch-target resolution, relative vocabulary first.
@@ -765,7 +765,7 @@ a droidtop surface, never a mirror.
 
 What "the addon is the better screen" concretely means in each mode:
 
-- **Handheld**: the shell itself moves to the addon (the existing
+- **Gaming**: the shell itself moves to the addon (the existing
   SECOND_WHEN_PRESENT default), the built-in panel gets the companion.
 - **Desktop**: same relocation, same default — the desktop renders on
   the addon/external and the built-in panel becomes the input surface
@@ -848,12 +848,12 @@ What "the addon is the better screen" concretely means in each mode:
     it is an ordinary droidtop window on that display, and droidtop's IME
     is told to stop drawing over the primary one while it is up.
     **Toggleable**: "Second screen in Desktop mode" and "Second screen in
-    Handheld mode" in settings choose between this input surface and the
+    Gaming mode" in settings choose between this input surface and the
     companion/widgets surface, per mode, per the per-output role model
-    above. Handheld defaults to the companion, Desktop to input.
-- **Handheld dual-screen roles (directed 2026-08-30, first live addon
+    above. Gaming defaults to the companion, Desktop to input.
+- **Gaming dual-screen roles (directed 2026-08-30, first live addon
   session)**: when the Dual-Screen Add-On (or any second display) is
-  present, the HANDHELD SHELL ITSELF moves to it — the addon is the
+  present, the GAMING SHELL ITSELF moves to it — the addon is the
   upper/main screen — and the built-in screen becomes the
   widgets/ambient-info surface (FocusCompanion/PresencePanel tenants,
   §7e), the inverse of a phone-style "companion on the accessory"
@@ -897,7 +897,7 @@ What "the addon is the better screen" concretely means in each mode:
   windowing per §2a's native-apps plan). Widget layout persists
   per-display-role. droidtop's info stays the BACKGROUND layer; user
   content composites above it.
-- **Handheld Quick Menu (directed 2026-08-31, iiSU-inspired)**: a
+- **Gaming Quick Menu (directed 2026-08-31, iiSU-inspired)**: a
   trigger-opened overlay with a Notifications tab and a System tab.
   Paradigm survey behind the design (knowledge-based; no iiSU decompile
   artifacts exist in the container): the Steam Deck QAM (dedicated
@@ -948,7 +948,7 @@ What "the addon is the better screen" concretely means in each mode:
 - **Display reinit + parked displays (directed 2026-08-30)**: Android
   silently MIRRORS a second display nothing presents on (confirmed live
   on the addon) — droidtop's answer is that some droidtop surface owns
-  every display whenever Handheld runs, and a HOME press is the user's
+  every display whenever Gaming runs, and a HOME press is the user's
   "fix my screens" gesture: Launcher forwards a warm HOME press back to
   the last-used shell with a display-reinit flag, and MainActivity
   re-runs its role orchestration. A display an app was LAUNCHED onto is
@@ -1443,7 +1443,7 @@ rather than writing a renderer; the alternative is a second renderer for
 a window system that already has one.
 
 Where it lives is droidtop's decision, and it is an **Activity**
-(`WineGameActivity`). Handheld launches are placed on the configured
+(`WineGameActivity`). Gaming launches are placed on the configured
 launch-target display through `LaunchDisplay`, which means
 `ActivityOptions.setLaunchDisplayId` -- so the picture has to be
 something Android can place on a display, which a surface inside the
@@ -1621,7 +1621,7 @@ that produces.
   keys. The compositor's XKB keymap applies the layout and its own
   auto-repeat, exactly as for a lapdock's physical keyboard. No IME
   involved, no editor focus needed.
-- **Into an Android app** (Handheld and Standard): each key becomes an
+- **Into an Android app** (Gaming and Standard): each key becomes an
   `InputConnection.sendKeyEvent`, whose contract is precisely "as though a
   hardware key was pressed". This needs droidtop's IME to be the selected
   input method (that is what supplies the connection) and an editor to
@@ -1680,9 +1680,9 @@ twice:
   of `DesktopShell` constructing its own, because two surfaces now drive
   it and two seats over one bridge would break the one-normalized-seat
   invariant §6 exists for.
-- **Handheld / Standard**: there is no pointer, and droidtop cannot make
+- **Gaming / Standard**: there is no pointer, and droidtop cannot make
   one — moving a system cursor over another app's window needs
-  `INJECT_EVENTS`, a signature permission, and the Handheld shell is
+  `INJECT_EVENTS`, a signature permission, and the Gaming shell is
   Compose focus navigation driven by a D-pad, so a drawn arrow would have
   nothing to click. The trackpad drives what the shell actually
   understands: `DirectionalStepper` quantises travel into focus steps
@@ -1882,11 +1882,11 @@ app-drawer icon or a floating switcher button:
   settings DATA and LAYOUT live in renderer-agnostic catalogs
   (`dev.droidtop.library.settings` in `:runtime-common` —
   `SettingsCatalog.kt` model + one catalog object per mode, e.g.
-  `HandheldSettingsCatalog`): which settings exist, their grouping and
+  `GamingSettingsCatalog`): which settings exist, their grouping and
   order, their live values, and their single write path each. Every UI
   surface just chromes a catalog in its own visual context — the unified
   Preference screen renders it via `CatalogPreferenceBuilder`
-  (`:shell-default`), and Handheld's own in-shell Settings section
+  (`:shell-default`), and Gaming's own in-shell Settings section
   renders the SAME catalog with pure gamepad input
   (`SettingsCatalogView`, `:shell-gamepad`) so cycling sections with L/R
   never leaves the handheld context (per direction: browsing sections
@@ -1897,7 +1897,7 @@ app-drawer icon or a floating switcher button:
   action-bar item — skips it by group id), the current mode's own
   settings next, shortcuts to the OTHER modes' settings last, so nobody
   ever switches modes just to reach a setting. Renderers may substitute
-  a native fulfillment for an item by its stable id (Handheld performs
+  a native fulfillment for an item by its stable id (Gaming performs
   "Rescan library" by bumping its own scan trigger and opens the theme
   browser inline); every catalog default must still be real and correct
   on its own so an id-unaware renderer gets working behavior for
@@ -1939,7 +1939,7 @@ app-drawer icon or a floating switcher button:
   UI in favor of a real task manager, since the app launcher belongs in
   the primary container instead. The live desktop connection itself is
   blocked on `DesktopSessionService` (still a TODO — see `:app`).
-- **`:shell-gamepad` ("Handheld")** — full-screen, D-pad-navigable, reading
+- **`:shell-gamepad` ("Gaming")** — full-screen, D-pad-navigable, reading
   the same `Library`; optional and toggleable, never the assumed default
   experience. **Superseded design decision (2026-08-29): a single real
   paradigm for game browsing specifically, not two competing whole-shell
@@ -1947,7 +1947,7 @@ app-drawer icon or a floating switcher button:
   selectable UI paradigms" (a visuals-first artwork-carousel design
   alongside a separate grid/list one, presented as two whole alternate
   shells) as the real intended shape — that framing is now stale, but
-  Daijishō's own real INFLUENCE on Handheld's overall structure is not
+  Daijishō's own real INFLUENCE on Gaming's overall structure is not
   superseded, just narrowed to where it actually applies: the real,
   current shell shape (top-level **Games**/**Apps**/**Settings** tabs,
   **Apps** as a flat kind-sectioned browser) is Daijishō-derived, same
@@ -1981,8 +1981,8 @@ app-drawer icon or a floating switcher button:
   unified `com.android.launcher3.settings.SettingsActivity` (the same
   Android Preference-based screen every other mode's settings live in —
   see §7's own "no separate standalone settings app" note), deep-linked
-  straight to its "Handheld mode" category
-  (`SettingsHandheldFragment`/`droidtop_handheld_prefs.xml`, `:shell-default`).
+  straight to its "Gaming mode" category
+  (`SettingsGamingFragment`/`droidtop_gaming_prefs.xml`, `:shell-default`).
   Default section/Show button hints/Console systems/Game folders/Rescan
   library/Theme/Sync theme index are all real, direct Preference entries
   there now (Theme is a dynamically-populated `ListPreference` — real
@@ -2008,14 +2008,14 @@ app-drawer icon or a floating switcher button:
   shell's screen already links here). It's reached instead via a real,
   persistent action-bar item on `SettingsActivity` itself
   (`onCreateOptionsMenu`/`settings_activity_menu.xml`), present on every
-  settings screen — Standard's root, Desktop, Handheld, and Global
+  settings screen — Standard's root, Desktop, Gaming, and Global
   itself — genuinely above the scrollable list rather than part of it,
   hidden only when already on Global settings (`onPrepareOptionsMenu`).
   Real droidtop-wide content lives there, none of it specific to any one
   shell: which HOME role droidtop holds; a **Modes** category (a real
   Default-mode `ListPreference` with dynamic entries reflecting which
   modes are currently enabled, `ModePrefs.defaultMode`; per-mode
-  enable/disable `SwitchPreferenceCompat` toggles for Desktop/Handheld,
+  enable/disable `SwitchPreferenceCompat` toggles for Desktop/Gaming,
   `ModePrefs.isModeEnabled` — a disabled mode's entry is hidden entirely
   from `BackButtonMenu`'s own shell-switcher, not shown greyed out); a
   **Data** category (Rerun onboarding — relaunches `OnboardingActivity`
@@ -2149,7 +2149,7 @@ by reading actual code/formats, not assumed):
     mechanisms above are.
 - **Platform/system taxonomy**: `LibraryEntry`'s retro/emulation entries
   need a canonical platform identifier (`"snes"`, `"psx"`, `"gba"`, ...) to
-  group, filter, and theme by in the Handheld shell — and to have anywhere
+  group, filter, and theme by in the Gaming shell — and to have anywhere
   to map *into* from each importer above. Rather than inventing droidtop's
   own scheme, adopt **ES-DE's `es_systems.xml` platform-naming
   convention as the canonical standard**: it's already the mechanism
@@ -2166,7 +2166,7 @@ by reading actual code/formats, not assumed):
   they also want, since configuring a mode and picking the default are
   independent questions. Real flow:
   `WELCOME → HOME_CHOICE → [STANDARD_SETUP | ALTERNATIVE_SETUP] →
-  CONFIGURE_MORE (multi-select: Desktop, Handheld) → [DESKTOP_SETUP] →
+  CONFIGURE_MORE (multi-select: Desktop, Gaming) → [DESKTOP_SETUP] →
   [STORAGE_PERMISSION/GAMES_FOLDERS] → DEFAULT_MODE_CHOICE`.
   - **HOME_CHOICE**: how the Android home screen itself should work —
     droidtop's own Standard launcher, a new **Alternative** mode (see
@@ -2175,7 +2175,7 @@ by reading actual code/formats, not assumed):
     app). Every mode-specific setup step below is independently
     skippable and re-enterable later from Settings — see each Settings
     fragment's own `PREF_*` entries
-    (`SettingsHandheldFragment.PREF_GAME_FOLDERS`,
+    (`SettingsGamingFragment.PREF_GAME_FOLDERS`,
     `SettingsDesktopFragment.PREF_ROOT_COMPOSITOR_SETUP`,
     `SettingsMiscFragment.PREF_DROIDTOP_HOME_SCREEN`), each relaunching
     `OnboardingActivity` at one step via
@@ -2717,11 +2717,11 @@ runner-execution mapping goes through the existing strategy resolver
 (§7e2) and gamenative-tux's container backends, never a new parallel
 launch path.
 
-## 7f. Handheld mode: real, generic ES-DE theme engine
+## 7f. Gaming mode: real, generic ES-DE theme engine
 
-**Status as of 2026-08-29 — this is Handheld's actual, current, singular
+**Status as of 2026-08-29 — this is Gaming's actual, current, singular
 paradigm (§2a's earlier "multiple selectable paradigms" framing is
-superseded, see that section's own updated note).** droidtop's Handheld
+superseded, see that section's own updated note).** droidtop's Gaming
 mode renders real, vendored ES-DE (EmulationStation Desktop Edition)
 themes — currently `decaffe-es-de` (bundled, CC-BY-NC-SA) and
 `art-book-next-es-de` (no longer bundled — it was kept in the APK to
@@ -2837,7 +2837,7 @@ fixed, not guessed — see git history for the individual commits):
 custom collections, plus real, computed-on-the-fly auto collections
 (all games/favorites/last played, `LAST_PLAYED_MAX`=50 confirmed
 against `CollectionSystemsManager.cpp`). Both appear as real
-`GameGroup.Collection` pseudo-systems leading the Handheld system
+`GameGroup.Collection` pseudo-systems leading the Gaming system
 carousel, with real per-collection theme overrides (`auto-allgames`/
 `auto-favorites`/`auto-lastplayed`/`custom-collections` theme
 subfolders, confirmed against the same real source) — falls back to
@@ -3848,7 +3848,7 @@ ESDE theme, because of how much infrastructure we have to build. It needs
 to be a PC in a box, like droidtop, controlling detection, runners, and
 etc based on availability."
 
-In Handheld mode every console system is rendered by the ES-DE theme
+In Gaming mode every console system is rendered by the ES-DE theme
 engine (§7f) and one category is not: **PC**. The `pc` card stays in the
 theme's own carousel, drawn from the theme's own `pc` art, and opening it
 enters droidtop's own full-screen surface instead of a themed gamelist.
@@ -3943,7 +3943,7 @@ the environment is provisioned; the rule and its one build-level switch
 stay, because the next backend behind the same seam (FEX/arm64ec) will
 need them again.
 
-**Root never gates a Handheld game.** Native Linux inside a container
+**Root never gates a Gaming game.** Native Linux inside a container
 needs root today and is therefore "not on this device" on an unrooted
 console. It is never the only route offered for a game that has another;
 where it genuinely is the only one, the game says so with the reason
@@ -4020,7 +4020,7 @@ not four separate looks.
 
 ### Relationship to the Quick Menu
 
-The surface is a shell screen, so the Handheld Quick Menu (§7f) opens over
+The surface is a shell screen, so the Gaming Quick Menu (§7f) opens over
 it unchanged. In-game is a separate surface and gets no new mechanism: an
 enginehost game's in-game menu is enginehost's own, a Wine game's is
 gamenative's own menu over its renderer, adopted rather than rewritten and
@@ -4042,7 +4042,7 @@ reimplements an engine's input model.
 (§9), so the store logins, install and download flows, container
 configuration dialogs, compatibility badge and folder-game scanner are
 present in the APK and need entry points, not ports (§7c's "increment 2").
-Those entry points are `:app` Activities, because the Handheld shell
+Those entry points are `:app` Activities, because the Gaming shell
 cannot depend on `:app` and these screens are Compose UI rather than
 catalog data: the store's own app screen for one game (which brings its
 install, verify, update, DLC and delete dialogs with it), the downloads
@@ -4112,7 +4112,7 @@ shell-desktop           → "Desktop" shell's Android-side half (§2a): cross-co
                           task manager + frame passthrough, NOT the taskbar/app
                           launcher (that's container-side); depends on library-core,
                           host-bridge, runtime-common
-shell-gamepad           → "Handheld" shell: optional gamepad console UI, multiple
+shell-gamepad           → "Gaming" shell: optional gamepad console UI, multiple
                           selectable paradigms — see §7; depends on library-core.
                           The best-developed module in the repo (~8,000 lines)
 input-keyboard          → second-screen persistent keyboard (§4/§6/§6c), forked

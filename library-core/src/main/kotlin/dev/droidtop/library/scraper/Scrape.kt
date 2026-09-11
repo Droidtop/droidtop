@@ -10,7 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 // The scrape ENGINE, moved here from :app (directed: actions live on
-// the MAIN screen, so the Handheld shell must be able to run scrapes
+// the MAIN screen, so the Gaming shell must be able to run scrapes
 // and gamelist imports itself -- and every type this uses already lived
 // in library-core). :app's settings catalogs call the same functions.
 

@@ -10,7 +10,7 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * `GamesRootPrefs` (dev.droidtop.app.OnboardingPrefs) writes, by literal
  * name rather than a compile-time dependency -- :library-core can't
  * depend on :app (:app depends on it), same established pattern
- * shell-gamepad's own HandheldPrefs doc comment documents for the same
+ * shell-gamepad's own GamingPrefs doc comment documents for the same
  * reason.
  *
  * Read fresh on every call, not cached or passed in frozen at

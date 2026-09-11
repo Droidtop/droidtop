@@ -9,7 +9,7 @@ import dev.droidtop.library.theme.ThemePrefs as LibraryThemePrefs
 /**
  * Thin Compose-reactive wrapper around the real, framework-agnostic
  * `dev.droidtop.library.theme.ThemePrefs` (`:library-core` -- also read/
- * written directly by `:shell-default`'s SettingsHandheldFragment, which
+ * written directly by `:shell-default`'s SettingsGamingFragment, which
  * has no Compose to react with). This object exists ONLY to add [version]:
  * `ThemeAssets.loadActiveTheme`'s own callers key their `remember` blocks
  * off it (alongside the system id they already key off), so changing the

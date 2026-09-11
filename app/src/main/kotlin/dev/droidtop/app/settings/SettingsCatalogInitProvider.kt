@@ -54,7 +54,7 @@ class SettingsCatalogInitProvider : ContentProvider() {
 }
 
 /**
- * Handheld draws either the companion surface or the input surface, per
+ * Gaming draws either the companion surface or the input surface, per
  * the user's role choice for that mode; Standard hands off to Launcher3's
  * own secondary-display UI; Desktop draws the input surface, which is what
  * docs/SPEC.md section 4 says its lower screen is for.
@@ -66,16 +66,16 @@ class SettingsCatalogInitProvider : ContentProvider() {
  */
 private fun registerSecondaryDisplayContent() {
     dev.droidtop.display.SecondaryDisplayContent.register(
-        dev.droidtop.display.SecondaryDisplayContent.Mode.HANDHELD,
+        dev.droidtop.display.SecondaryDisplayContent.Mode.GAMING,
     ) {
         val context = androidx.compose.ui.platform.LocalContext.current
         val role = dev.droidtop.app.SecondScreenInputPrefs.role(
             context,
-            dev.droidtop.display.SecondaryDisplayContent.Mode.HANDHELD,
+            dev.droidtop.display.SecondaryDisplayContent.Mode.GAMING,
         )
         if (role == dev.droidtop.app.SecondScreenInputPrefs.Role.INPUT) {
             dev.droidtop.app.SecondScreenInputSurface(
-                dev.droidtop.display.SecondaryDisplayContent.Mode.HANDHELD,
+                dev.droidtop.display.SecondaryDisplayContent.Mode.GAMING,
             )
         } else {
             val entry by dev.droidtop.app.CompanionState.focusedEntry.collectAsState()

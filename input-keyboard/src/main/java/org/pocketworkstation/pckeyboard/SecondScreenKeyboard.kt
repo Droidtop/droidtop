@@ -42,7 +42,7 @@ import android.view.inputmethod.InputConnection
  *   already knows how to turn one into an evdev key. The compositor's XKB
  *   keymap applies the layout and its own auto-repeat, exactly as it does
  *   for a lapdock's physical keyboard.
- * - **Into an Android app** (Handheld and Standard modes): each key
+ * - **Into an Android app** (Gaming and Standard modes): each key
  *   becomes an `InputConnection.sendKeyEvent`, which is precisely the call
  *   whose contract is "as though a hardware key was pressed". It needs
  *   droidtop's IME to be the selected input method (that is what supplies

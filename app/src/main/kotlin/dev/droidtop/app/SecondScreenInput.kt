@@ -37,11 +37,11 @@ import java.lang.ref.WeakReference
  *
  * Two real roles, with different defaults per mode because the modes want
  * different things (docs/SPEC.md section 4): Desktop mode's lower screen
- * is an input surface by design, while in Handheld mode the shell itself
+ * is an input surface by design, while in Gaming mode the shell itself
  * moves to the addon and the remaining screen is the ambient widgets
  * panel. Both are switchable, because a user with a physical keyboard
  * wants the companion in Desktop mode, and a user browsing a large library
- * one-handed wants the trackpad in Handheld mode.
+ * one-handed wants the trackpad in Gaming mode.
  */
 object SecondScreenInputPrefs {
 
@@ -75,7 +75,7 @@ object SecondScreenInputPrefs {
  * `Activity.dispatchKeyEvent` is an ordinary public call into droidtop's
  * OWN window; it needs no permission and reaches the same Compose focus
  * machinery a real D-pad reaches. Reaching another app's window would need
- * `INJECT_EVENTS`, a signature permission, which is why the Handheld
+ * `INJECT_EVENTS`, a signature permission, which is why the Gaming
  * trackpad navigates droidtop and nothing else -- see `FocusNavTrackpadSink`.
  *
  * Weak, because holding an Activity from a process-wide object is the
@@ -128,7 +128,7 @@ object ForegroundShell {
  * - **Desktop**: the pointer and the keys go into the primary container
  *   through the one `InputSeat`, exactly as the main desktop surface's own
  *   touch and keyboard do. A real trackpad and a real keyboard.
- * - **Handheld / Standard**: there is no pointer to move, so the trackpad
+ * - **Gaming / Standard**: there is no pointer to move, so the trackpad
  *   drives the shell's focus navigation, and the keyboard types into
  *   whatever Android editor has focus through droidtop's own IME. Both
  *   limits are the platform's, and both are stated on the surface rather

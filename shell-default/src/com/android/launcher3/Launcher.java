@@ -455,7 +455,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     @TargetApi(Build.VERSION_CODES.S)
     protected void onCreate(Bundle savedInstanceState) {
         // droidtop patch (not upstream Murine/Launcher3): resume the user's
-        // last-used shell mode (Desktop/Handheld) instead of always landing
+        // last-used shell mode (Desktop/Gaming) instead of always landing
         // on Standard's own home grid, so a device reboot or a launcher
         // process restart returns to where the user actually left off.
         // Only redirects on a genuine fresh task start (isTaskRoot() + no
@@ -1770,7 +1770,7 @@ public class Launcher extends StatefulActivity<LauncherState>
         super.onNewIntent(intent);
 
         // droidtop: a HOME press while the last-used shell is Desktop/
-        // Handheld forwards straight back to that shell (same lastMode
+        // Gaming forwards straight back to that shell (same lastMode
         // redirect as onCreate/onStart's cold-start path, but for the
         // warm case where this Launcher instance already exists), with a
         // display-reinit flag: MainActivity re-runs its dual-screen role
@@ -2289,7 +2289,7 @@ public class Launcher extends StatefulActivity<LauncherState>
 
     // droidtop patch (not upstream Murine/Launcher3): there's no dedicated
     // "menu" button on modern Android, so a long-press of the back key
-    // opens droidtop's shell switcher (Android/Desktop/Handheld/Settings)
+    // opens droidtop's shell switcher (Android/Desktop/Gaming/Settings)
     // instead. A plain back press above still does its normal job
     // (closing all-apps/a folder/etc.) regardless of state — this is a
     // second, independent trigger, not a replacement for it. See

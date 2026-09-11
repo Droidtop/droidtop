@@ -20,13 +20,13 @@ data class RootProcessResult(val exitCode: Int, val stdout: String, val stderr: 
 /**
  * What root access this device actually offers, as a value.
  *
- * Root is desktop-only and gates nothing in Handheld, so "there is no
+ * Root is desktop-only and gates nothing in Gaming, so "there is no
  * root here" has to be an ordinary answer every caller can read and
  * report. It used to be an exception out of `ProcessBuilder.start()`:
  * on a device with no `su`, `start()` throws
  * `IOException: error=13, Permission denied`, which escaped
  * `ContainerRuntimeFactory.select` on a `Dispatchers.IO` coroutine and
- * took the whole process down at launch in any non-Handheld mode
+ * took the whole process down at launch in any non-Gaming mode
  * (reproduced on the emulator rig, 2026-09-10).
  */
 enum class RootAccess(val description: String) {

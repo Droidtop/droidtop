@@ -29,7 +29,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
- * The user-populatable widgets/info surface for the display the Handheld
+ * The user-populatable widgets/info surface for the display the Gaming
  * shell is NOT on (docs/SPEC.md §4, companion surface — directed): real
  * Android app widgets via [AppWidgetHost] (the same mechanism every
  * launcher uses — music controls and the like), composited ABOVE

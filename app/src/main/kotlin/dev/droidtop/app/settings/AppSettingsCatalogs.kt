@@ -52,7 +52,7 @@ import kotlinx.coroutines.withContext
  * renderers; these used to be a hand-rolled Compose activity with its
  * own one-off look). Registered into [SettingsScreenRegistry] at process
  * start by [SettingsCatalogInitProvider], so lower modules
- * (HandheldSettingsCatalog in :runtime-common, the Preference surface in
+ * (GamingSettingsCatalog in :runtime-common, the Preference surface in
  * :shell-default) can open them by id without depending on :app.
  */
 object AppSettingsCatalogs {
@@ -993,7 +993,7 @@ object AppSettingsCatalogs {
      *
      * A catalog screen rather than a screen of its own, for two reasons.
      * It is reachable from both settings surfaces for free, and the
-     * Handheld PC surface renders it in place through the same
+     * Gaming PC surface renders it in place through the same
      * CatalogNavigator it already uses, so "the first-run cards" and "the
      * surface's options menu" are one list of rows instead of two
      * implementations of the same four actions.

@@ -1333,7 +1333,7 @@ private fun EsDeTextListRow(
                     )
                 }
                 // Real touch-input fix, reported directly: nothing in
-                // Handheld mode responded to taps -- the list's own
+                // Gaming mode responded to taps -- the list's own
                 // container-level key handling only covers D-pad/gamepad.
                 .clickable(onClick = onSelect),
         )

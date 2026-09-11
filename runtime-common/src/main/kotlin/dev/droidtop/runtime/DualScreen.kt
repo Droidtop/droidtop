@@ -7,7 +7,7 @@ import android.content.Context
  * handling — the general model §4 establishes (physical position, not
  * enumeration order; manual override + a persisted choice, the same
  * pattern Mjolnir uses for exactly this problem), applied consistently
- * across Desktop and Handheld modes. droidtop treats a dual-screen
+ * across Desktop and Gaming modes. droidtop treats a dual-screen
  * handheld as a real dual-monitor computer throughout (per direction:
  * "we're treating this handheld like a full computer throughout") — this
  * is deliberately not a `:shell-gamepad`-only concept.

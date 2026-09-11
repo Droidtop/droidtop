@@ -16,7 +16,7 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 
 /**
- * The LIVE companion on the second screen, driven by the Handheld shell
+ * The LIVE companion on the second screen, driven by the Gaming shell
  * while that shell is foreground on the primary display.
  *
  * This coexists with `:display`'s `SecondaryDisplayActivity`; they are not

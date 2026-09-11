@@ -387,7 +387,7 @@ object GameEngineDetector {
      *
      * Decided from the FOLDER, by both providers, so the answer does not
      * depend on which provider scanned first (they do not even scan
-     * together -- the handheld shell runs Games and Apps as two
+     * together -- the Gaming shell runs Games and Apps as two
      * independent scans) and does not change between scans.
      *
      * What the suppressed entry knew is not lost: the same install

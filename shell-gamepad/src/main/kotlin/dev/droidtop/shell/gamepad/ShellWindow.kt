@@ -8,7 +8,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * The one place the Handheld shell asks "how much room is there, and is
+ * The one place the Gaming shell asks "how much room is there, and is
  * this a screen somebody is holding upright?". Every screen in the shell
  * reads this instead of hardcoding the console's 1280x720dp landscape --
  * there are no portrait COPIES of any screen, only the same screens

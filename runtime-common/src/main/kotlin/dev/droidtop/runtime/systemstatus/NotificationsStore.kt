@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
  * The live notification list every droidtop surface reads — fed by
  * `:app`'s `DroidtopNotificationListener` (a real
  * NotificationListenerService, the same mechanism any custom launcher
- * uses), consumed by the Handheld Quick Menu's Notifications tab. Lives
+ * uses), consumed by the Gaming Quick Menu's Notifications tab. Lives
  * here rather than in `:app` because `:shell-gamepad` cannot depend on
  * `:app`; the service and the shell share this in-process singleton.
  *

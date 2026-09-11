@@ -518,12 +518,12 @@ class DirectionalStepper(private val stepMm: Float = 10f) {
 }
 
 /**
- * Trackpad output for the Handheld shell, which has no pointer at all.
+ * Trackpad output for the Gaming shell, which has no pointer at all.
  *
  * Stated plainly, because it is the decision this class exists to record:
- * a cursor is not available to droidtop in Handheld mode. Moving a system
+ * a cursor is not available to droidtop in Gaming mode. Moving a system
  * cursor over another app's window needs `INJECT_EVENTS`, a signature
- * permission no ordinary app holds, and the Handheld shell is Compose
+ * permission no ordinary app holds, and the Gaming shell is Compose
  * focus navigation driven by a D-pad -- a drawn arrow would have nothing
  * to click even if droidtop drew one. So the trackpad drives what the
  * shell actually understands: focus steps, confirm and back. It is a

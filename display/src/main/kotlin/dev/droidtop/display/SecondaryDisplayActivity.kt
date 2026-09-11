@@ -15,7 +15,7 @@ import androidx.compose.ui.graphics.Color
  *
  * This is the platform's own mechanism: Android places a SECONDARY_HOME
  * activity on secondary displays and re-places it when whatever ran there
- * finishes. droidtop previously did that job by hand for the Handheld
+ * finishes. droidtop previously did that job by hand for the Gaming
  * shell, with a `Presentation` plus `setLaunchDisplayId` relocation and a
  * cooldown guarding a relaunch loop that the code's own comments record as
  * confirmed-live. Reading iiSU (docs/SPEC.md §4c) showed the loop for what

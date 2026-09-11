@@ -18,7 +18,7 @@ import kotlinx.coroutines.flow.callbackFlow
 
 /**
  * One shared system-status source for every droidtop surface that shows
- * it — the Companion bar, the Desktop taskbar tray, and the Handheld
+ * it — the Companion bar, the Desktop taskbar tray, and the Gaming
  * settings' System group all read THIS, rather than each mode growing
  * its own battery receiver and network callback (docs/SPEC.md's own
  * settings philosophy: shared data, per-surface chrome).

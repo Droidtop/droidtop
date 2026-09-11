@@ -4,7 +4,7 @@
      instance (see that class's own onCreateOptionsMenu/onOptionsItemSelected),
      not a row in any one screen's own preference list. Genuinely separate
      from and above whichever shell's settings happen to be showing, not
-     something a "Handheld mode"-titled screen could visually claim as its
+     something a "Gaming mode"-titled screen could visually claim as its
      own. See SettingsGlobalFragment.kt.
 -->
 <menu xmlns:android="http://schemas.android.com/apk/res/android">

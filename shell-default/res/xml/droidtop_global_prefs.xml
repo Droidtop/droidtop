@@ -2,13 +2,13 @@
 <!--
      Real droidtop-wide preferences: config that affects the whole app,
      or things outside any single shell's own UI entirely, not any one
-     shell's own settings (Standard/Desktop/Handheld each have their own
+     shell's own settings (Standard/Desktop/Gaming each have their own
      real screen for that, see this same res/xml/ directory). Lives in
      :shell-default alongside every other settings screen; see
      shell-default/src/app/murinelauncher/settings/SettingsGlobalFragment.kt
      and docs/SPEC.md's settings-architecture note.
 
-     Deliberately does NOT link back out to Standard/Desktop/Handheld's own
+     Deliberately does NOT link back out to Standard/Desktop/Gaming's own
      settings screens: each of those already links here (and to their
      siblings), and linking both ways would just be a redundant loop, since
      this screen isn't itself a hub between the three shells.
@@ -47,9 +47,9 @@
             android:persistent="false" />
 
         <SwitchPreferenceCompat
-            android:key="pref_global_enable_handheld"
-            android:title="@string/pref_global_enable_handheld_title"
-            android:summary="@string/pref_global_enable_handheld_desc"
+            android:key="pref_global_enable_gaming"
+            android:title="@string/pref_global_enable_gaming_title"
+            android:summary="@string/pref_global_enable_gaming_desc"
             android:persistent="false" />
 
     </PreferenceCategory>

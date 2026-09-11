@@ -50,7 +50,7 @@ import kotlinx.coroutines.launch
  * activity that's already the top of its task is to just bring it forward
  * with its *original* Intent/mode still in effect, silently dropping
  * whatever mode the new Intent asked for. This was a real, confirmed bug —
- * once Desktop mode had opened once, no `EXTRA_MODE` switch back to Handheld
+ * once Desktop mode had opened once, no `EXTRA_MODE` switch back to Gaming
  * (or vice versa) could ever take effect, because onCreate (where `mode` was
  * read) never ran a second time.
  *
@@ -71,22 +71,22 @@ class MainActivity : AppCompatActivity() {
     private var mode by mutableStateOf<String?>(null)
 
     // Real bug this avoids: MainActivity is android:launchMode="singleTask",
-    // so a deep-link Intent from SettingsHandheldFragment (FLAG_ACTIVITY_
+    // so a deep-link Intent from SettingsGamingFragment (FLAG_ACTIVITY_
     // NEW_TASK against this same Activity) almost always resolves through
-    // onNewIntent, not onCreate, whenever Handheld mode is already running
+    // onNewIntent, not onCreate, whenever Gaming mode is already running
     // -- the common case, not an edge case, since the whole point of these
-    // deep links is jumping back INTO an already-open Handheld session.
+    // deep links is jumping back INTO an already-open Gaming session.
     // Reading `intent.getStringExtra(...)` directly inside `setContent`
     // would silently do nothing then: `mode` often doesn't change (already
-    // MODE_HANDHELD), so nothing triggers GamepadShell to recompose with
+    // MODE_GAMING), so nothing triggers GamepadShell to recompose with
     // the new extras. A separate token, bumped on every onCreate/onNewIntent
     // and read by GamepadShell via LaunchedEffect(token), fires every real
     // deep-link regardless of whether `mode` itself changed or the extras'
     // own values happen to repeat (e.g. "Rescan library" pressed twice).
-    private var handheldDeepLinkToken by mutableStateOf(0)
-    private var handheldStartSection by mutableStateOf<String?>(null)
-    private var handheldTriggerRescan by mutableStateOf(false)
-    private var handheldTriggerBrowseThemes by mutableStateOf(false)
+    private var gamingDeepLinkToken by mutableStateOf(0)
+    private var gamingStartSection by mutableStateOf<String?>(null)
+    private var gamingTriggerRescan by mutableStateOf(false)
+    private var gamingTriggerBrowseThemes by mutableStateOf(false)
 
     // Re-runs the dual-screen role orchestration on demand (home-press
     // reinit, explicit shell re-entry, a game launch) -- display
@@ -172,20 +172,20 @@ class MainActivity : AppCompatActivity() {
         private var relocationAttempts = 0
     }
 
-    private fun applyHandheldDeepLink(intent: Intent) {
-        handheldStartSection = intent.getStringExtra(BackButtonMenu.EXTRA_HANDHELD_START_SECTION)
-        handheldTriggerRescan = intent.getBooleanExtra(BackButtonMenu.EXTRA_HANDHELD_RESCAN, false)
-        handheldTriggerBrowseThemes = intent.getBooleanExtra(BackButtonMenu.EXTRA_HANDHELD_BROWSE_THEMES, false)
-        handheldDeepLinkToken++
+    private fun applyGamingDeepLink(intent: Intent) {
+        gamingStartSection = intent.getStringExtra(BackButtonMenu.EXTRA_GAMING_START_SECTION)
+        gamingTriggerRescan = intent.getBooleanExtra(BackButtonMenu.EXTRA_GAMING_RESCAN, false)
+        gamingTriggerBrowseThemes = intent.getBooleanExtra(BackButtonMenu.EXTRA_GAMING_BROWSE_THEMES, false)
+        gamingDeepLinkToken++
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        applyHandheldDeepLink(intent)
+        applyGamingDeepLink(intent)
 
         // Real gap this closes: OnboardingGate was only ever called from
         // LauncherApplication.java (Standard's own boot) -- a user who
-        // launches straight into Desktop/Handheld (droidtop not set as
+        // launches straight into Desktop/Gaming (droidtop not set as
         // system HOME, or opened via BackButtonMenu/EXTRA_MODE directly)
         // never saw onboarding at all. Both real entry points need this,
         // not just one.
@@ -264,12 +264,12 @@ class MainActivity : AppCompatActivity() {
 
         setContent {
             // DroidtopTheme provides Material tokens for droidtop's own
-            // chrome (DesktopShell panels etc.); the Handheld shell's
+            // chrome (DesktopShell panels etc.); the Gaming shell's
             // ES-DE-themed surfaces take their colors from the active
             // ES-DE theme instead and simply don't read these tokens.
             dev.droidtop.app.ui.DroidtopTheme {
             when (mode) {
-                BackButtonMenu.MODE_HANDHELD -> GamepadShell(
+                BackButtonMenu.MODE_GAMING -> GamepadShell(
                     library = library,
                     onFocusedEntryChanged = { CompanionState.focusedEntry.value = it },
                     // The companion's idle rotation draws from this
@@ -278,10 +278,10 @@ class MainActivity : AppCompatActivity() {
                     // screen the user is not driving and must not do
                     // work of its own.
                     onEntriesChanged = { CompanionState.libraryEntries.value = it },
-                    deepLinkToken = handheldDeepLinkToken,
-                    startSectionName = handheldStartSection,
-                    triggerRescan = handheldTriggerRescan,
-                    triggerBrowseThemes = handheldTriggerBrowseThemes,
+                    deepLinkToken = gamingDeepLinkToken,
+                    startSectionName = gamingStartSection,
+                    triggerRescan = gamingTriggerRescan,
+                    triggerBrowseThemes = gamingTriggerBrowseThemes,
                 )
                 else -> {
                     val sessionState by DesktopSessionService.state.collectAsState()
@@ -320,19 +320,19 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        applyHandheldDeepLink(intent)
+        applyGamingDeepLink(intent)
         mode = resolveMode(intent)
-        if (mode != BackButtonMenu.MODE_HANDHELD) {
+        if (mode != BackButtonMenu.MODE_GAMING) {
             startForegroundService(Intent(this, DesktopSessionService::class.java))
         }
         // Display reinit on every re-entry (a HOME press routes here via
         // Launcher.onNewIntent's forwarding, carrying EXTRA_DISPLAY_REINIT).
-        // An EXPLICIT shell entry (BackButtonMenu's Handheld item, no
+        // An EXPLICIT shell entry (BackButtonMenu's Gaming item, no
         // reinit extra) also reclaims a display an app was launched onto;
         // the home-press reinit deliberately does NOT -- "fix my screens"
         // must never cover a running game (see LaunchDisplay.parkedDisplayId).
         if (!intent.getBooleanExtra(BackButtonMenu.EXTRA_DISPLAY_REINIT, false) &&
-            mode == BackButtonMenu.MODE_HANDHELD
+            mode == BackButtonMenu.MODE_GAMING
         ) {
             dev.droidtop.library.LaunchDisplay.parkedDisplayId = null
         }
@@ -357,13 +357,13 @@ class MainActivity : AppCompatActivity() {
      * which the `when(mode)` below's `else` branch silently treats as
      * Desktop. That's the correct behavior for "genuinely undecided," but
      * this Activity instance never got a chance to reconsider once the
-     * user actually finished onboarding and picked Handheld: finishing a
+     * user actually finished onboarding and picked Gaming: finishing a
      * child Activity that was merely stacked on top (not `startActivity`'d
      * with new-task/single-top semantics against *this* Activity) resumes
      * this Activity via `onResume`, not `onNewIntent` -- so `mode` stayed
      * frozen at its original `null` forever, and the user landed on
      * Desktop (which then fails outright, since it was never set up)
-     * instead of the Handheld they actually chose. Re-resolving here,
+     * instead of the Gaming they actually chose. Re-resolving here,
      * gated on `mode == null` so an already-decided mode is never stomped
      * mid-session, is what actually fixes it.
      */
@@ -371,7 +371,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         refreshModeIfUndecided()
         // Where the second screen's trackpad sends navigation keys in
-        // Handheld mode: this window, through ordinary dispatchKeyEvent.
+        // Gaming mode: this window, through ordinary dispatchKeyEvent.
         // See ForegroundShell for why that is the only route available.
         ForegroundShell.set(this)
     }
@@ -386,7 +386,7 @@ class MainActivity : AppCompatActivity() {
     private fun refreshModeIfUndecided() {
         if (mode != null) return
         mode = resolveMode(intent)
-        if (mode != BackButtonMenu.MODE_HANDHELD) {
+        if (mode != BackButtonMenu.MODE_GAMING) {
             startForegroundService(Intent(this, DesktopSessionService::class.java))
         }
     }
@@ -408,10 +408,10 @@ class MainActivity : AppCompatActivity() {
     private fun resolveMode(intent: Intent): String? {
         val explicit = intent.getStringExtra(BackButtonMenu.EXTRA_MODE)
         val default = ModePrefs.defaultMode(this)?.takeIf {
-            (it == BackButtonMenu.MODE_HANDHELD || it == BackButtonMenu.MODE_DESKTOP) && ModePrefs.isModeEnabled(this, it)
+            (it == BackButtonMenu.MODE_GAMING || it == BackButtonMenu.MODE_DESKTOP) && ModePrefs.isModeEnabled(this, it)
         }
         val resolved = explicit ?: default ?: ModePrefs.lastMode(this).takeIf {
-            it == BackButtonMenu.MODE_HANDHELD || it == BackButtonMenu.MODE_DESKTOP
+            it == BackButtonMenu.MODE_GAMING || it == BackButtonMenu.MODE_DESKTOP
         }
         if (resolved != null) ModePrefs.setLastMode(this, resolved)
         return resolved
@@ -450,10 +450,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Dual-screen role orchestration (docs/SPEC.md §4, handheld
+     * Dual-screen role orchestration (docs/SPEC.md §4, Gaming-mode
      * dual-screen roles — directed after the first live addon session):
      * when a second display is present and [DisplayRolePrefs.shellTarget]
-     * says so (the default), the HANDHELD SHELL ITSELF moves to it (the
+     * says so (the default), the GAMING SHELL ITSELF moves to it (the
      * addon is the upper/main screen) and the built-in screen gets the
      * widgets panel ([CompanionActivity] — a real Activity, since
      * `Presentation` can only target non-default displays). The
@@ -569,7 +569,7 @@ class MainActivity : AppCompatActivity() {
                     return@collectLatest
                 }
                 val second = outputs.firstOrNull { it.kind == DisplayOutputKind.SECOND_SCREEN }
-                val handheld = mode == BackButtonMenu.MODE_HANDHELD
+                val gaming = mode == BackButtonMenu.MODE_GAMING
                 val desktop = mode == BackButtonMenu.MODE_DESKTOP
                 // Always current, whatever the mode: LaunchDisplay resolves
                 // a remembered "add-on screen" choice through this.
@@ -593,7 +593,7 @@ class MainActivity : AppCompatActivity() {
                     .firstOrNull { it.value == dev.droidtop.runtime.DualScreenRole.UPPER_OUTPUT }
                     ?.key
                 val hasSavedAssignment = dualScreenStore.get().size >= 2
-                // Handheld AND Desktop both put the shell on the addon by
+                // Gaming AND Desktop both put the shell on the addon by
                 // default -- the add-on is the better surface and droidtop
                 // treats it as the main output, not an afterthought (per
                 // direction; docs/SPEC.md section 4). Standard stays with
@@ -661,7 +661,7 @@ class MainActivity : AppCompatActivity() {
                 // keyboard and trackpad live (docs/SPEC.md 4, 6c), and the
                 // live window is the one that exists whether or not
                 // droidtop holds the home role. `shellOnSecond` is only
-                // ever true in Handheld mode, so the Handheld behaviour
+                // ever true in Gaming mode, so the Gaming behaviour
                 // this condition already had is unchanged.
                 if (!shellOnSecond && second != null && secondAvailable) {
                     if (secondScreenPresentation?.display?.displayId != second.androidDisplayId) {

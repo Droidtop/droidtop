@@ -65,9 +65,9 @@
             android:fragment="app.murinelauncher.settings.SettingsDesktopFragment"/>
         <Preference
             android:icon="@drawable/ic_settings_general"
-            android:title="@string/pref_category_handheld_title"
-            android:summary="@string/pref_category_handheld_desc"
-            android:fragment="app.murinelauncher.settings.SettingsHandheldFragment"/>
+            android:title="@string/pref_category_gaming_title"
+            android:summary="@string/pref_category_gaming_desc"
+            android:fragment="app.murinelauncher.settings.SettingsGamingFragment"/>
     </PreferenceCategory>
 
 </androidx.preference.PreferenceScreen>

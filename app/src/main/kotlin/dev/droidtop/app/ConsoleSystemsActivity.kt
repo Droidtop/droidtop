@@ -33,7 +33,7 @@ import java.io.File
  * list, per-folder system/player choices, scraping, platform CRUD, ROM
  * folders, scraper credentials -- lives in
  * [dev.droidtop.app.settings.AppSettingsCatalogs] and is chromed here by
- * the same [CatalogNavigator] the Handheld shell's own Settings section
+ * the same [CatalogNavigator] the Gaming shell's own Settings section
  * uses, so reaching this from anywhere looks and drives exactly like the
  * rest of settings instead of a one-off hand-rolled screen (which this
  * used to be -- reported directly as "ew" on sight). This Activity is

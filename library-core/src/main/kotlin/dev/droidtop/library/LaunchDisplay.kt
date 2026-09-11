@@ -6,7 +6,7 @@ import android.content.Intent
 
 /**
  * Launcher-wide launch-display targeting (docs/SPEC.md section 4,
- * handheld dual-screen roles): every game/app launch goes through
+ * Gaming-mode dual-screen roles): every game/app launch goes through
  * [start] so the whole launcher system honors one launch-screen model —
  * console ROM players, engine games (enginehost/Kirikiroid2), and native
  * apps alike. Desktop mode never sets a target (its windows are the
@@ -74,7 +74,7 @@ object LaunchDisplay {
      * role orchestration): a reinit re-asserts droidtop's surfaces on
      * every display EXCEPT one still parked here, so a game running on
      * the addon isn't covered by the shell or the widgets panel. Cleared
-     * by an explicit shell entry (BackButtonMenu's Handheld item).
+     * by an explicit shell entry (BackButtonMenu's Gaming item).
      */
     @Volatile
     var parkedDisplayId: Int? = null

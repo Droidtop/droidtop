@@ -55,7 +55,7 @@ public class SettingsActivity extends FragmentActivity
     // real, persistent toolbar action on every SettingsActivity instance
     // (see onCreateOptionsMenu/onOptionsItemSelected below), not a row in
     // any one shell's own preference list. Directly requested: a
-    // "Handheld mode"-titled screen visually claiming a "Global settings"
+    // "Gaming mode"-titled screen visually claiming a "Global settings"
     // row as its own was confusing -- this is genuinely separate from,
     // and shown above, whichever shell's settings happen to be showing.
     private static final String GLOBAL_SETTINGS_FRAGMENT = "app.murinelauncher.settings.SettingsGlobalFragment";

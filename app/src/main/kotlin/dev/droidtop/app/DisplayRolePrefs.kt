@@ -5,12 +5,12 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * User-configurable dual-screen role mapping for the launcher system
- * (docs/SPEC.md §4, handheld dual-screen roles — directed 2026-08-30).
+ * (docs/SPEC.md §4, Gaming-mode dual-screen roles — directed 2026-08-30).
  * Same shared LAUNCHER_PREFS_FILE_NAME file/`KEY_`-object convention
  * as every other settings concern, written by :shell-default's settings
  * rows and read here.
  *
- * Desktop mode honors [shellTarget] like Handheld does (the desktop
+ * Desktop mode honors [shellTarget] like Gaming does (the desktop
  * renders on the addon/external panel by default, and the built-in panel
  * becomes its input surface — docs/SPEC.md §4c, external screen
  * priority) but deliberately ignores [gameLaunchTarget]: its windows are
@@ -21,7 +21,7 @@ object DisplayRolePrefs {
     private const val KEY_SHELL_DISPLAY = "pref_display_shell_target"
     private const val KEY_GAME_LAUNCH_DISPLAY = "pref_display_game_launch_target"
 
-    /** Where the Handheld shell itself renders. */
+    /** Where the Gaming shell itself renders. */
     enum class ShellTarget {
         /** The second display when one is present (the addon is the upper/main screen — per direction, the default), built-in otherwise. */
         SECOND_WHEN_PRESENT,

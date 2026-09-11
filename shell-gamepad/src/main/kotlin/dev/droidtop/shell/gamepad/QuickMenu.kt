@@ -43,7 +43,7 @@ import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 
 /**
- * The Quick Menu: press R2 anywhere in the Handheld shell (docs/
+ * The Quick Menu: press R2 anywhere in the Gaming shell (docs/
  * SPEC.md §4, quick-menu paradigm). A right-edge sheet in the Steam
  * Deck QAM family — the paradigm survey that picked it is in the SPEC:
  * the Deck's quick access menu (dedicated button, right sheet, vertical

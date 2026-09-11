@@ -5,7 +5,7 @@ import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.ChoiceItem
-import dev.droidtop.library.settings.HandheldSettingsCatalog
+import dev.droidtop.library.settings.GamingSettingsCatalog
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.library.settings.ToggleItem
@@ -58,27 +58,27 @@ object QuickTiles {
 
     /**
      * The display-role rows the System tab shows besides the catalog's
-     * own System group. They live in the Handheld group (they are shell
+     * own System group. They live in the Gaming group (they are shell
      * configuration, and the Settings section wants them beside the
      * other shell settings) but they are exactly what someone opens this
      * menu for after plugging a screen in, so the tab takes a view of
      * them too -- by id, the same items, never a copy.
      */
     val DISPLAY_ROLE_IDS = listOf(
-        HandheldSettingsCatalog.ID_DISPLAY_SHELL_TARGET,
-        HandheldSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET,
-        HandheldSettingsCatalog.ID_DISPLAY_SWAP,
+        GamingSettingsCatalog.ID_DISPLAY_SHELL_TARGET,
+        GamingSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET,
+        GamingSettingsCatalog.ID_DISPLAY_SWAP,
     )
 
     /**
      * The System tab's own single group: the catalog's System group
      * followed by the display-role rows, both pulled out of the live
-     * handheld catalog.
+     * Gaming catalog.
      */
     fun systemGroups(all: List<CatalogGroup>): List<CatalogGroup> {
-        val system = all.firstOrNull { it.id == HandheldSettingsCatalog.GROUP_SYSTEM }?.items.orEmpty()
+        val system = all.firstOrNull { it.id == GamingSettingsCatalog.GROUP_SYSTEM }?.items.orEmpty()
         val displays = all
-            .filter { it.id != HandheldSettingsCatalog.GROUP_SYSTEM }
+            .filter { it.id != GamingSettingsCatalog.GROUP_SYSTEM }
             .flatMap { it.items }
             .filter { it.id in DISPLAY_ROLE_IDS }
             .sortedBy { DISPLAY_ROLE_IDS.indexOf(it.id) }
@@ -128,25 +128,25 @@ object QuickTiles {
     }
 
     fun glyphFor(item: CatalogItem): QuickGlyph = when (item.id) {
-        HandheldSettingsCatalog.ID_SYSTEM_NETWORK -> QuickGlyph.NETWORK
-        HandheldSettingsCatalog.ID_SYSTEM_VOLUME -> QuickGlyph.VOLUME
-        HandheldSettingsCatalog.ID_SYSTEM_BRIGHTNESS,
-        HandheldSettingsCatalog.ID_SYSTEM_BRIGHTNESS_GRANT,
-        HandheldSettingsCatalog.ID_SYSTEM_ADAPTIVE,
+        GamingSettingsCatalog.ID_SYSTEM_NETWORK -> QuickGlyph.NETWORK
+        GamingSettingsCatalog.ID_SYSTEM_VOLUME -> QuickGlyph.VOLUME
+        GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS,
+        GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS_GRANT,
+        GamingSettingsCatalog.ID_SYSTEM_ADAPTIVE,
         -> QuickGlyph.BRIGHTNESS
-        HandheldSettingsCatalog.ID_SYSTEM_DND,
-        HandheldSettingsCatalog.ID_SYSTEM_DND_GRANT,
+        GamingSettingsCatalog.ID_SYSTEM_DND,
+        GamingSettingsCatalog.ID_SYSTEM_DND_GRANT,
         -> QuickGlyph.MOON
-        HandheldSettingsCatalog.ID_SYSTEM_ROTATE -> QuickGlyph.ROTATE
-        HandheldSettingsCatalog.ID_SYSTEM_TIMEOUT -> QuickGlyph.TIMER
-        HandheldSettingsCatalog.ID_SYSTEM_BLUETOOTH -> QuickGlyph.BLUETOOTH
-        HandheldSettingsCatalog.ID_SYSTEM_VPN -> QuickGlyph.VPN
-        HandheldSettingsCatalog.ID_SYSTEM_UPDATES -> QuickGlyph.UPDATE
-        HandheldSettingsCatalog.ID_SYSTEM_ANDROID_LINKS -> QuickGlyph.ANDROID
-        HandheldSettingsCatalog.ID_SYSTEM_LEAVE_UI_MODE -> QuickGlyph.EXIT
-        HandheldSettingsCatalog.ID_DISPLAY_SHELL_TARGET -> QuickGlyph.DISPLAY
-        HandheldSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET -> QuickGlyph.GAMEPAD
-        HandheldSettingsCatalog.ID_DISPLAY_SWAP -> QuickGlyph.SWAP
+        GamingSettingsCatalog.ID_SYSTEM_ROTATE -> QuickGlyph.ROTATE
+        GamingSettingsCatalog.ID_SYSTEM_TIMEOUT -> QuickGlyph.TIMER
+        GamingSettingsCatalog.ID_SYSTEM_BLUETOOTH -> QuickGlyph.BLUETOOTH
+        GamingSettingsCatalog.ID_SYSTEM_VPN -> QuickGlyph.VPN
+        GamingSettingsCatalog.ID_SYSTEM_UPDATES -> QuickGlyph.UPDATE
+        GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS -> QuickGlyph.ANDROID
+        GamingSettingsCatalog.ID_SYSTEM_LEAVE_UI_MODE -> QuickGlyph.EXIT
+        GamingSettingsCatalog.ID_DISPLAY_SHELL_TARGET -> QuickGlyph.DISPLAY
+        GamingSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET -> QuickGlyph.GAMEPAD
+        GamingSettingsCatalog.ID_DISPLAY_SWAP -> QuickGlyph.SWAP
         // An item this file has never heard of still gets a real tile --
         // that is the point of rendering the catalog rather than a
         // hand-listed set.
