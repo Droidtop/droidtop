@@ -1983,6 +1983,7 @@ private fun GamesSection(
                 ),
                 backgroundDimmed = gamelistOptionsOpen,
                 gamelist = true,
+                collectionGamelist = inCollectionGamelist,
             )
         } else {
             val allGames = entries.filter { it.gameGroup() == group }

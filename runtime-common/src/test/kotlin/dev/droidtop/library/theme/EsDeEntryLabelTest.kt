@@ -104,4 +104,44 @@ class EsDeEntryLabelTest {
             ),
         )
     }
+
+    /**
+     * The `text` element's own use of the same two properties
+     * (TextComponent.cpp:597-602, GamelistView.cpp:1115-1130): the suffix
+     * is appended to a name that has ALREADY been cased by the element's
+     * own `letterCase`, so the renderer passes NONE here and the suffix
+     * still takes its own real UPPERCASE default.
+     */
+    @Test
+    fun `a text element's name keeps its own case and the suffix keeps its default`() {
+        assertEquals(
+            "sonic [megadrive]",
+            esDeEntryLabel(
+                name = EsDeLetterCase.LOWERCASE.applyTo("Sonic"),
+                letterCase = EsDeLetterCase.NONE,
+                letterCaseSystemNameSuffix = EsDeLetterCase.LOWERCASE,
+                sourceSystemName = "megadrive",
+            ),
+        )
+        assertEquals(
+            "sonic [MEGADRIVE]",
+            esDeEntryLabel(
+                name = EsDeLetterCase.LOWERCASE.applyTo("Sonic"),
+                letterCase = EsDeLetterCase.NONE,
+                sourceSystemName = "megadrive",
+            ),
+        )
+    }
+
+    @Test
+    fun `systemNameSuffix false drops it, and so does a game outside a collection`() {
+        assertEquals(
+            "Sonic",
+            esDeEntryLabel(name = "Sonic", letterCase = EsDeLetterCase.NONE, systemNameSuffix = false, sourceSystemName = "megadrive"),
+        )
+        assertEquals(
+            "Sonic",
+            esDeEntryLabel(name = "Sonic", letterCase = EsDeLetterCase.NONE, sourceSystemName = null),
+        )
+    }
 }
