@@ -50,6 +50,32 @@ This project is distributed under the GNU General Public License v3.0 (see
   and made to compile as its own module; not yet wired up to any real
   input surface.
 
+## Bundled themes
+
+Both ship inside the APK under
+`shell-gamepad/src/main/assets/themes/` and are rendered unmodified by
+droidtop's own ES-DE theme engine. Both are
+**CC-BY-NC-SA 4.0** (Attribution-NonCommercial-ShareAlike): attribution
+is required, changes must be indicated and published under the same
+licence, and commercial distribution is prohibited. droidtop makes no
+changes to either theme's files; the per-system metadata droidtop adds
+for its own invented systems lives outside the theme, in the separate
+`droidtop-theme-patches` overlay. Each theme's own `LICENSE` and
+`CREDITS.md` travel with it in the asset tree. The logos and trademarks
+they contain are copyright of their respective owners.
+
+- **DEcaffe (decaffe-es-de)** — https://github.com/DEcaffe/decaffe-es-de —
+  CC-BY-NC-SA 4.0. droidtop's default theme on a landscape display.
+- **Slate (slate-es-de)** — https://gitlab.com/es-de/themes/slate,
+  vendored at upstream commit `c072efc`, by Leon Styhre and
+  contributors (itself based on recalbox-multi by the Recalbox
+  community prior to their 2018 licence change, with graphics from
+  RetroPie's Carbon theme by Rookervik, vector graphics by Bezza191 and
+  logotypes by Dan Patrick — see its own CREDITS.md) — CC-BY-NC-SA 4.0.
+  ES-DE's own default theme, and the only bundled theme that declares
+  vertical aspect-ratio variants (`16:9_vertical`, `4:3_vertical`), so
+  it is droidtop's default on a portrait display (docs/SPEC.md §7f).
+
 ## Design references (not vendored, no code copied)
 
 Moonlight Android (input interaction model, LAN host discovery approach),

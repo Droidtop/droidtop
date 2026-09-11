@@ -64,6 +64,10 @@ object ThemeAssets {
     // own doc comment) -- matches the vendored folder name under
     // [BUNDLED_THEMES_ASSET_ROOT], not a display name.
     private const val DEFAULT_THEME_NAME = "decaffe-es-de"
+    // The default on a PORTRAIT display -- see [defaultThemeFor]. Slate is
+    // ES-DE's own default theme and the only bundled one that declares
+    // vertical variants (16:9_vertical, 4:3_vertical).
+    private const val PORTRAIT_DEFAULT_THEME_NAME = "slate-es-de"
 
     data class ThemeDescriptor(val name: String, val bundledAssetFolder: String?, val userDir: File?)
 
@@ -136,10 +140,84 @@ object ThemeAssets {
         val discovered = discoverThemes(context)
         if (discovered.isEmpty()) return null
         val selected = ThemePrefs.get(context)
-        return discovered.firstOrNull { it.name == selected }
-            ?: discovered.firstOrNull { it.name == DEFAULT_THEME_NAME }
-            ?: discovered.first()
+        discovered.firstOrNull { it.name == selected }?.let { return it }
+        return defaultThemeFor(context, discovered)
     }
+
+    /**
+     * The default when the user has chosen nothing: [DEFAULT_THEME_NAME]
+     * normally, but on a PORTRAIT screen the first discovered theme that
+     * actually ships a vertical variant.
+     *
+     * This is not a second selection mechanism, it is the honest reading
+     * of what the aspect-ratio axis can and cannot do. ES-DE picks the
+     * closest DECLARED ratio and stretches it over the screen
+     * (EsDeAspectRatio.select, ThemeData.cpp:736-771); a theme with no
+     * vertical variant therefore renders its closest landscape layout on
+     * a phone -- DEcaffe lands on 4:3 at 1080x1920 -- which is a real
+     * layout drawn at the wrong shape, not a portrait layout. No engine
+     * fix can invent the portrait artwork and element positions the
+     * theme never wrote. So on a portrait display droidtop defaults to a
+     * theme that HAS them, preferring Slate (ES-DE's own default theme,
+     * which ships 16:9_vertical and 4:3_vertical). DEcaffe stays the
+     * landscape default, and an explicit user choice always wins over
+     * this -- including choosing DEcaffe on a phone.
+     */
+    fun defaultThemeFor(
+        context: Context,
+        discovered: List<ThemeDescriptor> = discoverThemes(context),
+    ): ThemeDescriptor? {
+        if (discovered.isEmpty()) return null
+        val landscapeDefault = discovered.firstOrNull { it.name == DEFAULT_THEME_NAME }
+            ?: discovered.first()
+        if (!isPortraitScreen(context)) return landscapeDefault
+        if (hasVerticalVariant(context, landscapeDefault)) return landscapeDefault
+        return discovered.firstOrNull {
+            it.name == PORTRAIT_DEFAULT_THEME_NAME && hasVerticalVariant(context, it)
+        }
+            ?: discovered.firstOrNull { hasVerticalVariant(context, it) }
+            ?: landscapeDefault
+    }
+
+    /** Width < height on the live display, the same test ES-DE makes (Renderer.cpp:188-191). */
+    fun isPortraitScreen(context: Context): Boolean {
+        val metrics = context.resources.displayMetrics
+        return metrics.heightPixels > metrics.widthPixels
+    }
+
+    /** Does this theme declare any `_vertical` aspect ratio at all -- i.e. did its author lay out a portrait screen? */
+    fun hasVerticalVariant(context: Context, theme: ThemeDescriptor): Boolean {
+        val capabilities = capabilitiesOf(context, theme) ?: return false
+        return EsDeAspectRatio.hasVerticalVariant(capabilities.aspectRatios)
+    }
+
+    /**
+     * Reads a discovered theme's capabilities.xml without extracting the
+     * whole theme: a bundled theme is read straight out of the APK's
+     * assets, which is what makes this cheap enough to ask about every
+     * theme at startup (extraction copies tens of megabytes).
+     */
+    fun capabilitiesOf(context: Context, theme: ThemeDescriptor): EsDeThemeCapabilities? {
+        capabilitiesCache[theme.name]?.let { return it }
+        val parsed = try {
+            when {
+                theme.userDir != null ->
+                    EsDeThemeParser.parseCapabilities(File(theme.userDir, "capabilities.xml"))
+                theme.bundledAssetFolder != null -> {
+                    val asset = "$BUNDLED_THEMES_ASSET_ROOT/${theme.bundledAssetFolder}/capabilities.xml"
+                    context.assets.open(asset).use { EsDeThemeParser.parseCapabilities(it) }
+                }
+                else -> null
+            }
+        } catch (t: Exception) {
+            Log.w("droidtop.ThemeAssets", "Cannot read capabilities of '${theme.name}'", t)
+            null
+        } ?: return null
+        capabilitiesCache[theme.name] = parsed
+        return parsed
+    }
+
+    private val capabilitiesCache = mutableMapOf<String, EsDeThemeCapabilities>()
 
     /** Public read of [resolveActiveTheme]'s own name -- the real, resolved active theme, for UI display/cycling, not just the raw (possibly unset) [ThemePrefs] value. */
     fun activeThemeName(context: Context): String? = resolveActiveTheme(context)?.name
@@ -152,7 +230,10 @@ object ThemeAssets {
         // by ThemeBrowserScreen after a real download) -- must drop every
         // cached parse: entries are keyed by theme NAME, so an updated
         // theme's stale parse would otherwise keep serving forever.
-        ThemePrefs.addOnChangeListener { systemThemeCache.clear() }
+        ThemePrefs.addOnChangeListener {
+            systemThemeCache.clear()
+            capabilitiesCache.clear()
+        }
     }
 
     /**

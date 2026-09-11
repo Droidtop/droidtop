@@ -38,6 +38,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import dev.droidtop.library.theme.ThemeAssets
+import dev.droidtop.library.theme.ThemePrefs as LibraryThemePrefs
 import dev.droidtop.runtime.BundledImageRepositories
 import dev.droidtop.runtime.ImageCatalogRole
 import dev.droidtop.runtime.KnownImageRepository
@@ -96,7 +98,7 @@ class OnboardingActivity : AppCompatActivity() {
 private enum class OnboardingStep {
     WELCOME, HOME_CHOICE, STANDARD_SETUP, ALTERNATIVE_SETUP,
     CONFIGURE_MORE, DESKTOP_SETUP, STORAGE_PERMISSION, GAMES_FOLDERS,
-    KEYBOARD, DEFAULT_MODE_CHOICE,
+    PORTRAIT_THEME, KEYBOARD, DEFAULT_MODE_CHOICE,
 }
 
 /**
@@ -148,6 +150,23 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
         unresolvedFolderWarning = resolved == null
     }
 
+    // Portrait devices: the theme droidtop would otherwise default to
+    // (DEcaffe) ships no vertical variant, so ES-DE's aspect-ratio
+    // selection can only stretch its closest landscape layout over the
+    // screen (EsDeAspectRatio.select). Non-null = this device is
+    // portrait AND droidtop is defaulting to a different theme because
+    // of it; the step below says so rather than quietly swapping.
+    val portraitThemeSwap: String? = remember {
+        if (!ThemeAssets.isPortraitScreen(context)) {
+            null
+        } else {
+            val chosen = ThemeAssets.activeThemeName(context)
+            val landscapeDefault = ThemeAssets.discoverThemes(context)
+                .firstOrNull { it.name == "decaffe-es-de" }?.name
+            if (chosen != null && chosen != landscapeDefault) chosen else null
+        }
+    }
+
     // Advances to the pipeline's next real step after [current] -- or
     // finishes outright when re-entering a single step from Settings.
     fun advanceFrom(current: OnboardingStep) {
@@ -169,7 +188,9 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
             OnboardingStep.DESKTOP_SETUP ->
                 if (configureHandheld) OnboardingStep.STORAGE_PERMISSION else OnboardingStep.KEYBOARD
             OnboardingStep.STORAGE_PERMISSION -> OnboardingStep.GAMES_FOLDERS
-            OnboardingStep.GAMES_FOLDERS -> OnboardingStep.KEYBOARD
+            OnboardingStep.GAMES_FOLDERS ->
+                if (portraitThemeSwap != null) OnboardingStep.PORTRAIT_THEME else OnboardingStep.KEYBOARD
+            OnboardingStep.PORTRAIT_THEME -> OnboardingStep.KEYBOARD
             OnboardingStep.KEYBOARD -> OnboardingStep.DEFAULT_MODE_CHOICE
             OnboardingStep.DEFAULT_MODE_CHOICE -> OnboardingStep.DEFAULT_MODE_CHOICE
         }
@@ -245,6 +266,21 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
                     onDone = { advanceFrom(OnboardingStep.GAMES_FOLDERS) },
                 )
 
+                OnboardingStep.PORTRAIT_THEME -> PortraitThemeStep(
+                    themeName = portraitThemeSwap.orEmpty(),
+                    onKeep = {
+                        // Write the resolved default down as a real
+                        // choice, so rotating the device later does not
+                        // silently move the theme under the user.
+                        portraitThemeSwap?.let { LibraryThemePrefs.set(context, it) }
+                        advanceFrom(OnboardingStep.PORTRAIT_THEME)
+                    },
+                    onUseLandscapeTheme = {
+                        LibraryThemePrefs.set(context, "decaffe-es-de")
+                        advanceFrom(OnboardingStep.PORTRAIT_THEME)
+                    },
+                )
+
                 OnboardingStep.KEYBOARD -> KeyboardStep(
                     onEnable = {
                         dev.droidtop.library.settings.Keyboards.openSystemSettings(context)
@@ -267,6 +303,28 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
             }
         }
     }
+}
+
+/**
+ * Portrait devices get a theme that was actually laid out for one.
+ * Said out loud rather than swapped silently: the user is about to see
+ * a different theme from the one the docs and the console screenshots
+ * show, and the reason is a property of the theme, not a preference.
+ */
+@Composable
+private fun PortraitThemeStep(themeName: String, onKeep: () -> Unit, onUseLandscapeTheme: () -> Unit) {
+    Text("A theme built for a tall screen", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineMedium)
+    Text(
+        "This screen is taller than it is wide. droidtop's usual theme, DEcaffe, " +
+            "only ships landscape layouts, so on a phone it would be stretched sideways " +
+            "to fit. $themeName ships portrait layouts of its own, so that is what " +
+            "droidtop will use here. You can change it any time in Settings, and " +
+            "plugging into a TV or a landscape screen does not change this choice.",
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    Button(onClick = onKeep) { Text("Use $themeName") }
+    TextButton(onClick = onUseLandscapeTheme) { Text("Use DEcaffe anyway") }
 }
 
 @Composable

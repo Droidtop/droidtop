@@ -110,6 +110,20 @@ object EsDeThemeParser {
      */
     fun parseCapabilities(capabilitiesFile: File): EsDeThemeCapabilities {
         if (!capabilitiesFile.isFile) return EsDeThemeCapabilities(emptyList(), emptyList(), emptyList(), emptyList())
+        return parseCapabilities(capabilitiesFile.readText())
+    }
+
+    /**
+     * Same parse from an open stream -- a BUNDLED theme's
+     * capabilities.xml lives inside the APK, and asking what a theme
+     * declares (does it have a vertical variant?) must not require
+     * extracting tens of megabytes of it to disk first. See
+     * `ThemeAssets.capabilitiesOf`.
+     */
+    fun parseCapabilities(input: java.io.InputStream): EsDeThemeCapabilities =
+        parseCapabilities(input.reader().readText())
+
+    fun parseCapabilities(xml: String): EsDeThemeCapabilities {
         val aspectRatios = mutableListOf<String>()
         val colorSchemes = mutableListOf<String>()
         val fontSizes = mutableListOf<String>()
@@ -122,7 +136,7 @@ object EsDeThemeParser {
         var pendingLabelTarget: Pair<MutableMap<String, String>, String>? = null
         val parser = Xml.newPullParser().apply {
             setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
-            setInput(StringReader(capabilitiesFile.readText()))
+            setInput(StringReader(xml))
         }
         var event = parser.eventType
         while (event != XmlPullParser.END_DOCUMENT) {
