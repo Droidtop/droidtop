@@ -67,20 +67,24 @@ fun EsDeSystemElementLayer(
         // camera moves past, which is what keeps a video or an animation
         // from restarting on every step.
         key(position) {
-            val system = slot(EsDeSystemSlide.wrap(position, systemCount)) ?: return@key
-            EsDeThemedView(
-                view = system.view,
-                items = emptyList(),
-                firstItemFocus = null,
-                modifier = Modifier.fillMaxSize(),
-                focusedSystemEntries = system.entries,
-                systemContext = system.systemContext,
-                backgroundDimmed = backgroundDimmed,
-                transition = transition,
-                layer = layer,
-                slide = { EsDeSystemSlide.displacement(position, camOffset.value) },
-                slideHorizontal = slideHorizontal,
-            )
+            // Not `?: return@key`: a non-local return out of an inline
+            // composable lambda compiles to a synthetic D8 cannot name.
+            val system = slot(EsDeSystemSlide.wrap(position, systemCount))
+            if (system != null) {
+                EsDeThemedView(
+                    view = system.view,
+                    items = emptyList(),
+                    firstItemFocus = null,
+                    modifier = Modifier.fillMaxSize(),
+                    focusedSystemEntries = system.entries,
+                    systemContext = system.systemContext,
+                    backgroundDimmed = backgroundDimmed,
+                    transition = transition,
+                    layer = layer,
+                    slide = { EsDeSystemSlide.displacement(position, camOffset.value) },
+                    slideHorizontal = slideHorizontal,
+                )
+            }
         }
     }
 }
