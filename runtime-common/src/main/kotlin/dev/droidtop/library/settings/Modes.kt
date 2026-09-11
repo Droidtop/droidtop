@@ -33,6 +33,55 @@ enum class Mode(val id: String, val label: String) {
 }
 
 /**
+ * Every piece of droidtop that belongs to a mode rather than to the shared
+ * core, and which mode(s) it belongs to. Enumerating them is the point:
+ * "a disabled mode runs no code" is only checkable if the code a mode owns
+ * is a list rather than a habit (docs/SPEC.md, "Modes and what each
+ * contributes"). [dev.droidtop.app.ModeStartup] starts exactly the pieces
+ * [ModeGate.piecesToStart] returns, and stops the rest.
+ *
+ * Pieces here are only the ones that would otherwise run with their mode
+ * off -- process-start work and components the SYSTEM binds or broadcasts
+ * to on its own. A mode's Activities and Compose trees are not listed
+ * because they cannot start without the mode: MainActivity renders one
+ * shell or none, and the launcher's Activities follow the HOME role.
+ */
+enum class ModePiece(vararg owners: Mode) {
+    /**
+     * The Launcher3 fork's four system-started components: the
+     * notification-dots listener, the screen-off accessibility service,
+     * and the session-commit and widgets-restored receivers.
+     */
+    LAUNCHER_SYSTEM_COMPONENTS(Mode.LAUNCHER),
+
+    /** Handing the secondary screen to Launcher3's own second-screen UI. */
+    LAUNCHER_SECOND_SCREEN(Mode.LAUNCHER),
+
+    /** droidtop's own notification listener, read only by the Quick Menu. */
+    GAMING_NOTIFICATION_LISTENER(Mode.GAMING),
+
+    /** The Gaming companion/input surface on a secondary screen. */
+    GAMING_SECOND_SCREEN(Mode.GAMING),
+
+    /** Warming the platforms database for Gaming's synchronous label lookups. */
+    GAMING_PLATFORMS_DATABASE(Mode.GAMING),
+
+    /** The Desktop companion/input surface on a secondary screen. */
+    DESKTOP_SECOND_SCREEN(Mode.DESKTOP),
+
+    /**
+     * The vendored gamenative backbone. Two owners, not one: Gaming's PC
+     * surface and Desktop's containers both need it. The shared PC launch
+     * path starts it on demand as well, which is why it is reached through
+     * one idempotent entry point rather than started twice.
+     */
+    WINDOWS_BACKBONE(Mode.GAMING, Mode.DESKTOP),
+    ;
+
+    val owners: Set<Mode> = owners.toSet()
+}
+
+/**
  * The pure half of mode gating: no Android, no I/O, so it is unit-tested
  * directly (`ModesTest`).
  */
@@ -62,6 +111,16 @@ object ModeGate {
      * to the launcher rather than fall through to Desktop, which is what
      * it used to do.
      */
+    /**
+     * What this process should have running, given what is enabled. A
+     * piece whose owners are all off is absent from the result, and
+     * ModeStartup then stops it rather than merely not starting it -- a
+     * mode switched off mid-session must stop contributing immediately,
+     * not at the next process start.
+     */
+    fun piecesToStart(enabled: Set<Mode>): Set<ModePiece> =
+        ModePiece.entries.filterTo(mutableSetOf()) { piece -> piece.owners.any { it in enabled } }
+
     fun resolveAppMode(
         explicitId: String?,
         defaultId: String?,

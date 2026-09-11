@@ -20,9 +20,12 @@ import dev.droidtop.display.SecondaryDisplayContent
  */
 object SecondaryDisplayRegistrations {
 
-    fun registerGaming() = register(SecondaryDisplayContent.Mode.GAMING)
+    fun setGaming(enabled: Boolean) = set(SecondaryDisplayContent.Mode.GAMING, enabled)
 
-    fun registerDesktop() = register(SecondaryDisplayContent.Mode.DESKTOP)
+    fun setDesktop(enabled: Boolean) = set(SecondaryDisplayContent.Mode.DESKTOP, enabled)
+
+    fun unregisterLauncherHandoff() =
+        SecondaryDisplayContent.unregister(SecondaryDisplayContent.Mode.STANDARD)
 
     fun registerLauncherHandoff() {
         SecondaryDisplayContent.registerHandoff(SecondaryDisplayContent.Mode.STANDARD) { context ->
@@ -37,8 +40,12 @@ object SecondaryDisplayRegistrations {
         }
     }
 
-    private fun register(mode: SecondaryDisplayContent.Mode) {
-        SecondaryDisplayContent.register(mode) { Surface(mode) }
+    private fun set(mode: SecondaryDisplayContent.Mode, enabled: Boolean) {
+        if (enabled) {
+            SecondaryDisplayContent.register(mode) { Surface(mode) }
+        } else {
+            SecondaryDisplayContent.unregister(mode)
+        }
     }
 
     @Composable
