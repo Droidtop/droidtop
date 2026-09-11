@@ -616,30 +616,10 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // in the same orientation without these). Rotation applies around the
     // element's own real `origin` point (same anchor `pos` already uses),
     // not Compose's center-of-box default.
-    val originFraction = element.valueOrNull<EsDeThemeValue.Pair>("origin") ?: EsDeThemeValue.Pair(0f, 0f)
-    val rotation = element.valueOrNull<EsDeThemeValue.FloatValue>("rotation")?.value ?: 0f
-    val rotationOriginFraction = element.valueOrNull<EsDeThemeValue.Pair>("rotationOrigin")
-        ?.let { EsDeThemeValue.Pair(it.x.coerceIn(0f, 1f), it.y.coerceIn(0f, 1f)) }
-        ?: EsDeThemeValue.Pair(0.5f, 0.5f)
-    val flipHorizontal = element.valueOrNull<EsDeThemeValue.Bool>("flipHorizontal")?.value ?: false
-    val flipVertical = element.valueOrNull<EsDeThemeValue.Bool>("flipVertical")?.value ?: false
     val placement = Modifier
         .absoluteOffset(x = drawOffsetX, y = drawOffsetY)
         .size(width = drawWidth, height = drawHeight)
-        .graphicsLayer {
-            // Real `rotationOrigin` (GuiComponent.cpp:384-385), whose own real
-            // default is 0.5 0.5 (GuiComponent.cpp:31) -- a SEPARATE property
-            // from `origin`, and the pivot the rotation actually turns about
-            // (GuiComponent.cpp:311-312 offsets the draw by
-            // `origin - rotationOrigin`, i.e. the two are independent).
-            // droidtop pivoted on `origin`, whose own real default is 0 0, so
-            // every rotated element with a non-centre origin -- decaffe
-            // declares `rotation` on ten of them -- swung about the wrong point.
-            transformOrigin = TransformOrigin(rotationOriginFraction.x, rotationOriginFraction.y)
-            rotationZ = rotation
-            scaleX = if (flipHorizontal) -1f else 1f
-            scaleY = if (flipVertical) -1f else 1f
-        }
+        .esDeRotation(element)
         .let { if (cornerRadius > 0.dp) it.clip(RoundedCornerShape(cornerRadius)) else it }
 
     // Real `tile` -- repeats the source texture across the element's box
@@ -1041,6 +1021,12 @@ private fun EsDeThemedText(
         Box(
             modifier = Modifier
                 .absoluteOffset(x = offsetX, y = offsetY)
+                // Real exception, not an omission: the CONTAINER branch above
+                // takes no rotation at all, because ES-DE applies a container
+                // text's theme with `ALL ^ POSITION ^ ORIGIN ^ Z_INDEX ^ SIZE
+                // ^ VISIBLE ^ ROTATION` (GamelistView.cpp:317-319) -- the
+                // scrollable parent owns its transform.
+                .esDeRotation(element)
                 .size(width = width, height = height)
                 .let { if (backgroundColor != null) it.background(backgroundColor.copy(alpha = backgroundColor.alpha * opacity)) else it },
             contentAlignment = boxAlignment,
@@ -1096,6 +1082,7 @@ private fun EsDeThemedText(
         ) {
             Box(
                 modifier = Modifier
+                    .esDeRotation(element)
                     .let { if (backgroundColor != null) it.background(backgroundColor.copy(alpha = backgroundColor.alpha * opacity)) else it }
                     .padding(horizontal = backgroundMarginX, vertical = backgroundMarginY),
             ) {
@@ -1193,6 +1180,7 @@ private fun EsDeAlignedTextBlock(
             // rect rather than shrinking the text area inside a fixed box.
             modifier = Modifier
                 .absoluteOffset(x = offsetX, y = offsetY)
+                .esDeRotation(element)
                 .let { if (background != null) it.esDeBackgroundBox(background) else it }
                 .size(width = width, height = height),
             contentAlignment = esDeVerticalBoxAlignment(element),
@@ -1214,7 +1202,11 @@ private fun EsDeAlignedTextBlock(
             posFraction = element.valueOrNull<EsDeThemeValue.Pair>("pos") ?: EsDeThemeValue.Pair(0f, 0f),
             originFraction = element.valueOrNull<EsDeThemeValue.Pair>("origin") ?: EsDeThemeValue.Pair(0f, 0f),
         ) {
-            Box(modifier = if (background != null) Modifier.esDeBackgroundBox(background) else Modifier) {
+            Box(
+                modifier = Modifier
+                    .esDeRotation(element)
+                    .let { if (background != null) it.esDeBackgroundBox(background) else it },
+            ) {
                 Text(
                     text = text,
                     color = color,
@@ -1469,6 +1461,15 @@ private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     Box(
         modifier = Modifier
             .absoluteOffset(x = offsetX, y = offsetY)
+            // Real `rotation` on the PLAYING surface, not just on the static
+            // poster fallback: ES-DE's VideoComponent is a GuiComponent like
+            // any other and its render multiplies by the same getTransform
+            // (VideoComponent.cpp:261 reads the property,
+            // GuiComponent.cpp:305-315 applies it). Wrapping the whole
+            // element means the black pillarbox frame turns with the video,
+            // which is what ES-DE does -- it draws that rect under the same
+            // matrix (VideoFFmpegComponent.cpp:220-223).
+            .esDeRotation(element)
             .size(width = width, height = height)
             .graphicsLayer { alpha = opacity },
         contentAlignment = Alignment.Center,
@@ -1598,11 +1599,6 @@ private fun EsDeThemedAnimation(element: EsDeThemeElement, viewWidth: Dp, viewHe
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
-    val originFraction = element.valueOrNull<EsDeThemeValue.Pair>("origin") ?: EsDeThemeValue.Pair(0f, 0f)
-    val rotation = element.valueOrNull<EsDeThemeValue.FloatValue>("rotation")?.value ?: 0f
-    val rotationOriginFraction = element.valueOrNull<EsDeThemeValue.Pair>("rotationOrigin")
-        ?.let { EsDeThemeValue.Pair(it.x.coerceIn(0f, 1f), it.y.coerceIn(0f, 1f)) }
-        ?: EsDeThemeValue.Pair(0.5f, 0.5f)
     val tint = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) }
     // Real GIFAnimComponent.cpp:399-401: cornerRadius scales against
     // screen WIDTH (the same one-axis exception image documents).
@@ -1657,11 +1653,8 @@ private fun EsDeThemedAnimation(element: EsDeThemeElement, viewWidth: Dp, viewHe
         modifier = Modifier
             .absoluteOffset(x = offsetX, y = offsetY)
             .size(width = width, height = height)
-            .graphicsLayer {
-                alpha = opacity
-                transformOrigin = TransformOrigin(rotationOriginFraction.x, rotationOriginFraction.y)
-                rotationZ = rotation
-            }
+            .esDeRotation(element)
+            .graphicsLayer { alpha = opacity }
             .let { if (cornerRadius > 0.dp) it.clip(RoundedCornerShape(cornerRadius)) else it },
     )
 }
@@ -1781,6 +1774,7 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
         contentScale = contentScale,
         modifier = Modifier
             .absoluteOffset(x = offsetX, y = offsetY)
+            .esDeRotation(element)
             .size(width = width, height = height)
             .let { if (cornerRadius > 0.dp) it.clip(RoundedCornerShape(cornerRadius)) else it },
     )
@@ -2079,6 +2073,21 @@ private fun EsDeThemedBadges(element: EsDeThemeElement, viewWidth: Dp, viewHeigh
     val badgeColor = element.valueOrNull<EsDeThemeValue.Color>("badgeIconColor")?.let { colorOf(it) } ?: Color.White
     val density = LocalDensity.current
 
+    // One wrapper around the whole flexbox rather than per-cell placement in
+    // the view's own coordinate space: real ES-DE's BadgeComponent is a
+    // single GuiComponent whose children are laid out inside its own
+    // `mSize` box and drawn under its own transform (FlexboxComponent.cpp's
+    // `calculateLayout` positions every item relative to the component, and
+    // BadgeComponent::render multiplies by getTransform once), so `rotation`
+    // turns the grid as a unit. Per-cell offsets are now relative to this
+    // box, which is also what makes the overlay geometry below agree with
+    // ES-DE's own.
+    Box(
+        modifier = Modifier
+            .absoluteOffset(x = offsetX, y = offsetY)
+            .esDeRotation(element)
+            .size(width = width, height = height),
+    ) {
     activeSlots.forEachIndexed { index, slot ->
         val gx: Int
         val gy: Int
@@ -2089,8 +2098,8 @@ private fun EsDeThemedBadges(element: EsDeThemeElement, viewWidth: Dp, viewHeigh
             gx = index / gridY
             gy = index % gridY
         }
-        val cellX = offsetX + alignOffsetX + (cellSize + itemMarginX) * gx
-        val cellY = offsetY + (cellSize + itemMarginY) * gy
+        val cellX = alignOffsetX + (cellSize + itemMarginX) * gx
+        val cellY = (cellSize + itemMarginY) * gy
 
         val customIcon = element.valueOrNull<EsDeThemeValue.Path>("badge_$slot")?.resolved
         if (customIcon != null) {
@@ -2155,6 +2164,7 @@ private fun EsDeThemedBadges(element: EsDeThemeElement, viewWidth: Dp, viewHeigh
                     .graphicsLayer { alpha = opacity },
             )
         }
+    }
     }
 }
 
@@ -2272,6 +2282,7 @@ private fun EsDeThemedSystemStatus(element: EsDeThemeElement, viewWidth: Dp, vie
     Row(
         modifier = Modifier
             .absoluteOffset(x = offsetX, y = offsetY)
+            .esDeRotation(element)
             .esDeBackgroundBox(background),
         horizontalArrangement = Arrangement.spacedBy(entrySpacing.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -2383,6 +2394,7 @@ private fun EsDeThemedRating(element: EsDeThemeElement, viewWidth: Dp, viewHeigh
         Box(
             modifier = Modifier
                 .absoluteOffset(x = offsetX, y = offsetY)
+                .esDeRotation(element)
                 .size(width = width, height = height)
                 .graphicsLayer { alpha = opacity },
         ) {
@@ -2426,7 +2438,9 @@ private fun EsDeThemedRating(element: EsDeThemeElement, viewWidth: Dp, viewHeigh
             text = "★".repeat(filledStars) + "☆".repeat(5 - filledStars),
             color = color.copy(alpha = color.alpha * opacity),
             fontSize = with(LocalDensity.current) { height.toSp() },
-            modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY),
+            modifier = Modifier
+                .absoluteOffset(x = offsetX, y = offsetY)
+                .esDeRotation(element),
         )
     }
 }
@@ -2573,6 +2587,7 @@ private fun EsDeThemedHelpSystem(
     Row(
         modifier = Modifier
             .absoluteOffset(x = offsetX, y = offsetY)
+            .esDeRotation(element)
             .esDeBackgroundBox(background)
             .graphicsLayer { alpha = opacity },
         horizontalArrangement = Arrangement.spacedBy(entrySpacing.dp),
@@ -2810,6 +2825,50 @@ internal fun esDeFilterQuality(element: EsDeThemeElement, property: String = "in
         "linear" -> FilterQuality.Low
         else -> null
     }
+
+/**
+ * Real `rotation` / `rotationOrigin` (and, where the element type has
+ * them, `flipHorizontal` / `flipVertical`) for ANY element type.
+ *
+ * Rotation is a `GuiComponent` property, read by
+ * `GuiComponent::applyTheme` (GuiComponent.cpp:382-385) for every one of
+ * the sixteen element types and applied by `GuiComponent::getTransform`
+ * (:305-315), which every component's own `render` multiplies its matrix
+ * by. droidtop applied it on the `image` and `animation` paths only, so a
+ * rotated `text`, `datetime`, `clock`, `rating`, `badges`, `gamelistinfo`,
+ * `helpsystem` or `systemstatus` element drew upright -- decaffe declares
+ * `rotation` on ten elements, two of them clocks (its vertical side
+ * clock, which read as horizontal).
+ *
+ * `rotationOrigin` is a SEPARATE property from `origin`, with its own real
+ * default of 0.5 0.5 (GuiComponent.cpp:31) against `origin`'s 0 0, and it
+ * is the pivot the rotation actually turns about (:311-312 offsets the
+ * draw by `origin - rotationOrigin`, i.e. the two are independent).
+ *
+ * The pivot fraction is taken against the node this modifier wraps. For an
+ * element with a background box that means the padded rect rather than the
+ * bare text extent, a sub-pixel difference at the padding sizes real
+ * themes use, and the alternative -- rotating the text without its own
+ * background -- would be visibly wrong instead.
+ *
+ * Returns the receiver untouched when the theme declares none of the four,
+ * so no `graphicsLayer` is allocated on the overwhelmingly common path.
+ */
+private fun Modifier.esDeRotation(element: EsDeThemeElement): Modifier {
+    val rotation = element.valueOrNull<EsDeThemeValue.FloatValue>("rotation")?.value ?: 0f
+    val flipHorizontal = element.valueOrNull<EsDeThemeValue.Bool>("flipHorizontal")?.value ?: false
+    val flipVertical = element.valueOrNull<EsDeThemeValue.Bool>("flipVertical")?.value ?: false
+    if (rotation == 0f && !flipHorizontal && !flipVertical) return this
+    val pivot = element.valueOrNull<EsDeThemeValue.Pair>("rotationOrigin")
+        ?.let { EsDeThemeValue.Pair(it.x.coerceIn(0f, 1f), it.y.coerceIn(0f, 1f)) }
+        ?: EsDeThemeValue.Pair(0.5f, 0.5f)
+    return this.graphicsLayer {
+        transformOrigin = TransformOrigin(pivot.x, pivot.y)
+        rotationZ = rotation
+        scaleX = if (flipHorizontal) -1f else 1f
+        scaleY = if (flipVertical) -1f else 1f
+    }
+}
 
 /**
  * Real ES-DE background-box group -- `backgroundColor`,
