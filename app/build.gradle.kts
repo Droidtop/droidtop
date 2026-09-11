@@ -117,6 +117,34 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    /**
+     * The minSdk gate. droidtop's minSdk is 26 and every module agrees on
+     * that, but nothing was checking it, so two API-30/33-only calls
+     * shipped and crashed the app outright on the Android 9 rig
+     * (2026-09-11): an ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION
+     * intent that does not exist below API 30, and InputStream.readNBytes,
+     * which is API 33+. Lint's own NewApi/InlinedApi detectors find
+     * exactly this class of bug, and understand Build.VERSION guards, so a
+     * correctly guarded call still passes.
+     *
+     * checkDependencies is on because the crash was not in this module:
+     * everything droidtop ships in the APK is linted from here, one task
+     * and one report, rather than eleven per-module lint blocks that drift
+     * apart. checkOnly keeps it to this one question -- the rest of lint's
+     * catalogue over a Launcher3 fork is a separate, much larger job and
+     * not what this gate is for.
+     */
+    lint {
+        checkOnly += listOf("NewApi", "InlinedApi")
+        checkDependencies = true
+        abortOnError = true
+        warningsAsErrors = false
+        // The gate runs on the debug variant in CI; there is no release
+        // build in this repo yet, and letting lint chase one doubles the
+        // work for nothing.
+        checkReleaseBuilds = false
+    }
 }
 
 // Two protobuf runtimes meet in this app: shell-default's Launcher3
