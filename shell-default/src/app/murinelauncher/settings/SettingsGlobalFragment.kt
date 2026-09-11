@@ -50,7 +50,7 @@ public final class SettingsGlobalFragment : AbstractSettingsFragment() {
 
         // Real, honest scope: backs up the one real SharedPreferences file
         // every droidtop-specific setting across every shell actually lives
-        // in (GamingPrefs/ThemePrefs/ModePrefs/HomeRolePrefs/
+        // in (GamingPrefs/ThemePrefs/Modes/HomeRolePrefs/
         // ConsoleSystemOverrides/etc all share it -- see e.g.
         // SettingsGamingFragment's own doc comment). Deliberately NOT a
         // full device backup -- RomDatabase's own scan cache, downloaded
