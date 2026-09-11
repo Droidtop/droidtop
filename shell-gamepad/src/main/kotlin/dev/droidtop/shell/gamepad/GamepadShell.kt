@@ -1023,10 +1023,13 @@ internal fun sectionsFor(mode: dev.droidtop.library.settings.UiMode): List<Handh
         HandheldSection.entries
     }
 
+// Apps are what is NOT a game. A Wine profile and a Linux-container game
+// used to live here, which is why the PC surface -- the declared home of
+// "every PC and engine game" (DECISIONS 2026-09-10 17:05) -- could never
+// be handed a store or Wine title: the Games section never saw one. They
+// are games; the PC card is where they belong.
 private val APP_KINDS = setOf(
     LibraryEntryKind.NATIVE_ANDROID_APP,
-    LibraryEntryKind.WINE_PROFILE,
-    LibraryEntryKind.LINUX_CONTAINER_APP,
     LibraryEntryKind.REMOTE_STREAM,
 )
 
@@ -1161,10 +1164,24 @@ private sealed interface GameGroup {
      */
     val systemThemeFolder: String?
 
-    data class Engine(val kind: LibraryEntryKind) : GameGroup {
-        override val key get() = "engine:${kind.name}"
-        override val label get() = kind.displayName()
-        override val systemThemeFolder get() = "pc"
+    /**
+     * The PC category: ONE card for every PC and engine game, and the
+     * only group the ES-DE theme does not draw past its own card (see
+     * [dev.droidtop.shell.gamepad.pc.PcSurface], docs/SPEC.md 7i).
+     *
+     * There used to be a card per engine here (a "Ren'Py" card, an "RPG
+     * Maker" card, ...), invented by droidtop and retired by the user
+     * 2026-09-10: "Engine games were ALWAYS going to be under PC. PC is
+     * a list of games, and each game is run according to its
+     * configuration." This group is also the one owner of the `pc`
+     * system id and theme folder, so a games-root folder literally named
+     * `pc` full of ROM files can no longer produce a second, rival "PC"
+     * card whose surface then has nothing in it.
+     */
+    object Pc : GameGroup {
+        override val key get() = "system:$PC_SYSTEM_ID"
+        override val label get() = PlatformsDatabase.displayNameOrNull(PC_SYSTEM_ID) ?: "PC"
+        override val systemThemeFolder get() = PC_SYSTEM_ID
     }
 
     data class System(val systemId: String) : GameGroup {
@@ -1231,19 +1248,36 @@ internal object CollectionsRefresh {
     }
 }
 
-// systemId-based grouping isn't CONSOLE_ROM-specific: PcGameProvider tags
-// its real WINE_PROFILE entries with systemId = "pc" (ES-DE's own system
-// id) specifically so they render through this same System -> Game
-// carousel/theming, not a generic "Windows" engine bucket -- any future
-// kind that sets systemId gets the same real theming for free.
+/**
+ * Which carousel card an entry belongs to.
+ *
+ * Two groups only: a real console system (a ROM with a systemId the
+ * platforms database knows) and [GameGroup.Pc], which is everything
+ * else. A detected engine game carries no systemId at all -- that is why
+ * it used to land in a per-engine bucket and could never reach the PC
+ * surface (emulator rig, 2026-09-10) -- and a store or Wine title
+ * carries systemId "pc", which the PC group now owns outright rather
+ * than sharing with a console system of the same name.
+ */
 private fun LibraryEntry.gameGroup(): GameGroup {
     // Local val, not a direct smart-cast on systemId: it's a public property
     // declared in a different module (library-core), which Kotlin won't
     // smart-cast across module boundaries -- a real compile error caught by
     // CI, not a style choice.
     val id = systemId
-    return if (id != null) GameGroup.System(id) else GameGroup.Engine(kind)
+    return when {
+        isPcOrEngineGame -> GameGroup.Pc
+        // ES-DE's `pc` system folder is droidtop's own category now
+        // (DECISIONS 2026-09-10 16:36), so whatever a user dropped in
+        // roms/pc joins the one PC list instead of claiming a card of
+        // its own that the PC surface would then render empty.
+        id == null || id == PC_SYSTEM_ID -> GameGroup.Pc
+        else -> GameGroup.System(id)
+    }
 }
+
+/** Which card an entry lands on, as a plain string -- the grouping rule above, reachable from a unit test. */
+internal fun gameGroupKey(entry: LibraryEntry): String = entry.gameGroup().key
 
 /**
  * System-first, then per-system game grid — ES-DE's System → Game
@@ -1382,7 +1416,13 @@ private fun GamesSection(
                 // An empty key is the library scope: no group is open.
                 groupKey = group?.label.orEmpty(),
                 groupLabel = group?.label ?: "Library",
-                systemId = (group as? GameGroup.System)?.systemId,
+                systemId = when (group) {
+                    is GameGroup.System -> group.systemId
+                    // The PC group's downloaded_media folder is `pc`, the
+                    // same one PcScrape.systemFolderFor writes into.
+                    GameGroup.Pc -> PC_SYSTEM_ID
+                    else -> null
+                },
                 onSortChanged = { sortVersion += 1 },
                 // A finished scrape/import refreshes the REAL library
                 // scan -- cached rows now live-resolve media, so the
@@ -1449,22 +1489,18 @@ private fun GamesSection(
     // per-system grid view share one ordering (needed for ES-DE-style
     // Left/Right sibling-system switching below).
     val byGroup = entries.groupBy { it.gameGroup() }
-    val orderedEngineGroups = GAME_KINDS
-        // Both real systemId-bearing kinds -- CONSOLE_ROM always, WINE_PROFILE
-        // via PcGameProvider's "pc" tagging -- route through GameGroup.System
-        // above, not this generic engine bucket.
-        .filter { it != LibraryEntryKind.CONSOLE_ROM && it != LibraryEntryKind.WINE_PROFILE }
-        .map { GameGroup.Engine(it) }
-        .filter { byGroup.containsKey(it) }
     // Keyed on the platform database's load version as well as the
     // groups: labels resolve through its cache, which warms on a
     // background thread -- sorting before the warm lands used raw
     // system ids and froze "switch" at the end of the carousel
     // (observed live) instead of "Nintendo Switch" among the Nintendos.
     val platformsLoadVersion by dev.droidtop.library.consoles.PlatformsDatabase.loadVersion.collectAsState()
+    // The PC card sorts among the console systems by its own label, the
+    // same as every other card: it is a category of the library, not a
+    // section of chrome.
     val orderedSystemGroups = remember(byGroup, platformsLoadVersion) {
         byGroup.keys
-            .filterIsInstance<GameGroup.System>()
+            .filterNot { it is GameGroup.Collection }
             .sortedBy { it.label.lowercase() }
     }
     // Carousel order, per direction (2026-08-31): "All games" leads
@@ -1474,7 +1510,7 @@ private fun GamesSection(
     val leadingCollections = collectionGroups.filter { it.id == AutoCollections.ALL_GAMES_ID }
     val trailingCollections = collectionGroups.filterNot { it.id == AutoCollections.ALL_GAMES_ID }
     val orderedGroups: List<GameGroup> =
-        leadingCollections + orderedEngineGroups + orderedSystemGroups + trailingCollections
+        leadingCollections + orderedSystemGroups + trailingCollections
     LaunchedEffect(selectedGroup, hasThemedGamelist, focusedGameIndex) {
         // Real regardless of whether the theme's gamelist has its own
         // list widget -- a widget's onFocusedIndexChanged (wired at the
@@ -1494,7 +1530,7 @@ private fun GamesSection(
             onThemeHandlesHints(
                 // The PC surface draws its own hint row, so the shell's
                 // footer would be a second copy of the same legend.
-                (selectedGroup as? GameGroup.System)?.systemId == PC_SYSTEM_ID ||
+                selectedGroup is GameGroup.Pc ||
                     (hasThemedGamelist && gamelistHasHelpSystem),
             )
         }
@@ -1527,8 +1563,7 @@ private fun GamesSection(
                 // index into a list it does not show, so they stop at
                 // its edge. Back and the shoulders still mean what they
                 // mean everywhere else.
-                val themed = hasThemedGamelist &&
-                    (group as? GameGroup.System)?.systemId != PC_SYSTEM_ID
+                val themed = hasThemedGamelist && group !is GameGroup.Pc
                 val action = GamepadKeyMap.actionFor(event.key)
                 when {
                     (action == GamepadAction.BACK || action == GamepadAction.B) && group != null -> {
@@ -1725,11 +1760,8 @@ private fun GamesSection(
                     // currently has focus on -- feeds EsDeThemedView's own
                     // gameselector-driven elements (screen2's game-preview
                     // poster, the game1..game9 mosaic, the metadata-bound
-                    // title caption). Empty for a non-System group (an
-                    // engine bucket like "Ren'Py") since there's no single
-                    // real games-folder game list for those; those groups
-                    // legitimately just show no game preview.
-                    // byGroup only partitions real System/Engine groups --
+                    // title caption).
+                    // byGroup only partitions System and Pc groups --
                     // a Collection's members live in collectionGroupMembers
                     // (cross-cutting, see GameGroup.Collection's own doc
                     // comment). Reading byGroup for a collection returned
@@ -1848,14 +1880,18 @@ private fun GamesSection(
                     }
                 }
             }
-        } else if (group is GameGroup.System && group.systemId == PC_SYSTEM_ID) {
+        } else if (group is GameGroup.Pc) {
             // The one category the theme does not draw past its own card
             // (docs/SPEC.md 7i). The system view, the pc art and the
             // transition into here all stay the theme's; everything
             // inside is droidtop's, because ES-DE's element schema has no
             // element type for a runner, a prefix or a store login.
             PcSurface(
-                entries = entries.filter { it.isPcOrEngineGame },
+                // The group's own members, not a second predicate over the
+                // whole library: the card's game count and this grid were
+                // computed two different ways, which is how the card could
+                // say "1 game" over a surface that said "No PC games yet".
+                entries = systemGamesForGroup,
                 onOpen = onShowDetail,
                 onFocusedEntryChanged = onFocusedEntryChanged,
             )
