@@ -32,6 +32,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -149,6 +150,8 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
     var configureDesktop by remember { mutableStateOf(false) }
     var configureHandheld by remember { mutableStateOf(false) }
     var unresolvedFolderWarning by remember { mutableStateOf(false) }
+    var pathEntry by remember { mutableStateOf("") }
+    var pathError by remember { mutableStateOf<String?>(null) }
     var storageAccessGranted by remember { mutableStateOf(hasStorageAccess(context)) }
     var rootsVersion by remember { mutableStateOf(0) }
     val roots = remember(rootsVersion) { GamesRootPrefs.gamesRootPaths(context) }
@@ -301,6 +304,21 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
                     roots = roots,
                     unresolvedFolderWarning = unresolvedFolderWarning,
                     onAddFolder = { pickFolder.launch(null) },
+                    pathEntry = pathEntry,
+                    pathError = pathError,
+                    onPathEntryChange = {
+                        pathEntry = it
+                        pathError = null
+                    },
+                    onAddPath = {
+                        val error = GamesRootPrefs.addGamesRootByPath(context, pathEntry)
+                        pathError = error
+                        if (error == null) {
+                            pathEntry = ""
+                            unresolvedFolderWarning = false
+                            rootsVersion++
+                        }
+                    },
                     onDone = { advanceFrom(OnboardingStep.GAMES_FOLDERS) },
                 )
 
@@ -639,6 +657,10 @@ private fun GamesFoldersStep(
     roots: Set<String>,
     unresolvedFolderWarning: Boolean,
     onAddFolder: () -> Unit,
+    pathEntry: String,
+    pathError: String?,
+    onPathEntryChange: (String) -> Unit,
+    onAddPath: () -> Unit,
     onDone: () -> Unit,
 ) {
     Text("Game folders", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineSmall)
@@ -667,6 +689,34 @@ private fun GamesFoldersStep(
         )
     }
     Button(onClick = onAddFolder) { Text(if (roots.isEmpty()) "Add a folder" else "Add another folder") }
+
+    // The picker can only offer what Android calls a storage volume, and
+    // real libraries live outside that set: an emulator's host share
+    // (BlueStacks mounts one at /mnt/windows/BstSharedFolder, unreachable
+    // from the picker and unmirrored under /sdcard), a mount a rooted
+    // device adds itself, a USB drive under /mnt. Typing the path is the
+    // way in for all of those, and it is validated for real before it is
+    // stored -- see GamesRootPrefs.addGamesRootByPath.
+    Text(
+        "Somewhere the picker can't reach -- an emulator's shared folder, " +
+            "a mount you added yourself? Type its full path.",
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.bodySmall,
+    )
+    OutlinedTextField(
+        value = pathEntry,
+        onValueChange = onPathEntryChange,
+        singleLine = true,
+        label = { Text("Folder path") },
+        placeholder = { Text("/mnt/windows/BstSharedFolder/Games") },
+        isError = pathError != null,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    if (pathError != null) {
+        Text(pathError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+    }
+    TextButton(onClick = onAddPath) { Text("Add this path") }
+
     TextButton(onClick = onDone) { Text(if (roots.isEmpty()) "Skip for now" else "Done") }
     Text(
         "Handheld's whole look is themeable (real ES-DE themes, bundled " +

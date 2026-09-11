@@ -1159,6 +1159,10 @@ object AppSettingsCatalogs {
     // ROM folders (games roots).
     // ------------------------------------------------------------------
 
+    // Buffers the typed path between the field and the Add action, the
+    // same pending-buffer shape addCustomPlayerScreen uses.
+    private var pendingRootPath = ""
+
     private fun romFoldersScreen() = CatalogScreen(
         id = SCREEN_ROM_FOLDERS,
         title = "ROM folders",
@@ -1180,6 +1184,39 @@ object AppSettingsCatalogs {
                                     null
                                 } else {
                                     "Couldn't resolve that folder to a real path on this device -- not added"
+                                }
+                            },
+                        ),
+                    ),
+                ),
+                CatalogGroup(
+                    id = "rom_folders_add_by_path",
+                    title = "Add a folder by path",
+                    items = listOf(
+                        TextInputItem(
+                            id = "rom_folders_path",
+                            title = "Folder path",
+                            subtitle = "The picker only offers what Android calls a storage volume. " +
+                                "An emulator's host share (BlueStacks' /mnt/windows/BstSharedFolder), " +
+                                "a mount a rooted device adds itself, or a USB drive under /mnt is none " +
+                                "of those, and is typed here instead",
+                            value = pendingRootPath,
+                            onChange = { _, value -> pendingRootPath = value },
+                        ),
+                        AsyncActionItem(
+                            id = "rom_folders_path_add",
+                            title = "Add this folder",
+                            subtitle = "Checked for real before it is stored: it must exist, be a folder, and be readable",
+                            run = { ctx, _ ->
+                                val typed = pendingRootPath
+                                val error = withContext(Dispatchers.IO) {
+                                    GamesRootPrefs.addGamesRootByPath(ctx, typed)
+                                }
+                                if (error == null) {
+                                    pendingRootPath = ""
+                                    "Added " + typed.trim()
+                                } else {
+                                    error
                                 }
                             },
                         ),
