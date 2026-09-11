@@ -4315,6 +4315,32 @@ automatically by a separate, default-off switch). In enginehost the same
 pass also refreshes the plugin catalogs and the engine detection rules, so
 "Check now" there is the whole pass.
 
+**"Update now" (directed 2026-09-11).** The schedule is the wrong
+instrument when a build has just been published and the device is in front
+of you, and the console is a play device rather than a test rig: builds
+reach it through droidtop's own updater, not a reinstall. So the forced
+pass exists and has one implementation, `UpdateNow.runNow`, reached two
+ways. Over adb:
+
+    adb shell am broadcast -a dev.droidtop.UPDATE_NOW -n dev.droidtop.app/.UpdateNowReceiver
+
+and from Settings > Software updates, the row "Check and install now". It
+checks the release feed immediately, and when the published `versionCode`
+is higher it downloads, verifies and hands the APK to PackageInstaller
+straight away -- the system's own confirmation is the only prompt that
+remains. What it bypasses is droidtop's own gating and nothing else: the
+frequency (including "never"), the interval since the last check and the
+unmetered-only option all come from one function,
+`AppSelfUpdate.mayCheck(forced = ...)`, which the scheduled pass calls with
+`forced = false` and this one with `forced = true`, so the bypass cannot
+drift from what it bypasses. Guard: `UpdateNowReceiver` is exported but
+declares `android:permission="android.permission.DUMP"`, which only shell
+(what adb runs as), root and the system hold, and it re-checks the sending
+uid where Android exposes one (API 34+); any other caller is ignored with a
+log line under the tag `DroidtopUpdateNow`, which is also where the outcome
+of every forced pass is logged. Enginehost gets the same trigger,
+`dev.enginehost.UPDATE_NOW`, extended to its plugin catalogs.
+
 **Self-update (both APKs) -- what is honestly possible.** A normally
 installed app cannot silently replace itself. What it can do, and what is
 built: download the release APK, verify it against the published sha256,
