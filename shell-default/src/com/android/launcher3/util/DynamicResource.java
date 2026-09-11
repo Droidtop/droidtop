@@ -79,7 +79,15 @@ public class DynamicResource implements
 
     @Override
     public float getFloat(@DimenRes int resId) {
-        return mContext.getResources().getFloat(resId);
+        if (com.android.launcher3.Utilities.ATLEAST_Q) {
+            return mContext.getResources().getFloat(resId);
+        }
+        // Resources.getFloat is API 29. A float resource is stored as a
+        // TypedValue either way, so read it the way the platform did
+        // before that convenience existed.
+        android.util.TypedValue out = new android.util.TypedValue();
+        mContext.getResources().getValue(resId, out, true);
+        return out.getFloat();
     }
 
     @Override

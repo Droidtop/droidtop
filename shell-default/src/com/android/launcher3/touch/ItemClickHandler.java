@@ -244,7 +244,10 @@ public class ItemClickHandler {
                         .getActiveSessionInfo(item.user, packageName),
                 UI_HELPER_EXECUTOR);
         Consumer<SessionInfo> marketLaunchAction = sessionInfo -> {
-            if (sessionInfo != null) {
+            if (sessionInfo != null && Utilities.ATLEAST_Q) {
+                // startPackageInstallerSessionDetailsActivity is API 29;
+                // below that the market-intent fallback below is the only
+                // route, which is what this code does when it is missing.
                 LauncherApps launcherApps = launcher.getSystemService(LauncherApps.class);
                 try {
                     launcherApps.startPackageInstallerSessionDetailsActivity(sessionInfo, null,

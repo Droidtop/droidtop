@@ -43,6 +43,7 @@ import androidx.core.view.WindowInsetsCompat;
 
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.CellLayout;
+import com.android.launcher3.Utilities;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Hotseat;
 import com.android.launcher3.InvariantDeviceProfile;
@@ -166,12 +167,20 @@ public class TestInformationHandler implements ResourceBasedOverride {
             }
 
             case TestProtocol.REQUEST_TARGET_INSETS: {
+                // android.graphics.Insets and the gesture-inset getters
+                // are API 29; this request has no answer below that.
+                if (!Utilities.ATLEAST_Q) {
+                    return null;
+                }
                 return getUIProperty(Bundle::putParcelable, insets -> Insets.max(
                         insets.getSystemGestureInsets(),
                         insets.getSystemWindowInsets()), this::getWindowInsets);
             }
 
             case TestProtocol.REQUEST_WINDOW_INSETS: {
+                if (!Utilities.ATLEAST_Q) {
+                    return null;
+                }
                 return getUIProperty(Bundle::putParcelable,
                         WindowInsets::getSystemWindowInsets, this::getWindowInsets);
             }
@@ -186,9 +195,13 @@ public class TestInformationHandler implements ResourceBasedOverride {
                 return getUIProperty(Bundle::putParcelable, windowInsets -> {
                     WindowInsetsCompat insets =
                             WindowInsetsCompat.toWindowInsetsCompat(windowInsets);
-                    return insets.getInsets(WindowInsetsCompat.Type.ime()
-                            | WindowInsetsCompat.Type.systemGestures())
-                            .toPlatformInsets();
+                    // Insets.toPlatformInsets returns android.graphics.Insets,
+                    // which is API 29.
+                    return Utilities.ATLEAST_Q
+                            ? insets.getInsets(WindowInsetsCompat.Type.ime()
+                                    | WindowInsetsCompat.Type.systemGestures())
+                                    .toPlatformInsets()
+                            : null;
                 }, this::getWindowInsets);
             }
 

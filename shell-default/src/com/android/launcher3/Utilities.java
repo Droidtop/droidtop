@@ -122,13 +122,18 @@ public final class Utilities {
 
     public static final String[] EMPTY_STRING_ARRAY = new String[0];
 
+    @ChecksSdkIntAtLeast(api = VERSION_CODES.N)
     public static final boolean ATLEAST_N = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N;
+    @ChecksSdkIntAtLeast(api = VERSION_CODES.O)
     public static final boolean ATLEAST_O = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O;
 
+    @ChecksSdkIntAtLeast(api = VERSION_CODES.O_MR1)
     public static final boolean ATLEAST_O_MR1 = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1;
 
+    @ChecksSdkIntAtLeast(api = VERSION_CODES.P)
     public static final boolean ATLEAST_P = Build.VERSION.SDK_INT >= VERSION_CODES.P;
 
+    @ChecksSdkIntAtLeast(api = VERSION_CODES.Q)
     public static final boolean ATLEAST_Q = Build.VERSION.SDK_INT >= VERSION_CODES.Q;
 
     @ChecksSdkIntAtLeast(api = VERSION_CODES.R)

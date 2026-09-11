@@ -99,13 +99,20 @@ public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
                     R.dimen.focus_rect_widget_outsets);
         }
 
-        if (Themes.getAttrBoolean(context, R.attr.isWorkspaceDarkText)) {
+        if (Utilities.ATLEAST_Q && Themes.getAttrBoolean(context, R.attr.isWorkspaceDarkText)) {
+            // setOnLightBackground is API 29; RemoteViews had no light
+            // background mode to switch to before it.
             setOnLightBackground(true);
         }
     }
 
     @Override
     public void setColorResources(@Nullable SparseIntArray colors) {
+        if (!Utilities.ATLEAST_S) {
+            // Widget colour resources are the API-31 dynamic-colour path;
+            // neither half of this exists below it.
+            return;
+        }
         if (colors == null) {
             resetColorResources();
         } else {

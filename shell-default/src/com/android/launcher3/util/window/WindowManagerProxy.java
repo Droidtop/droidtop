@@ -52,6 +52,7 @@ import android.view.WindowMetrics;
 import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 import androidx.core.view.DisplayCutoutCompat;
+import androidx.annotation.RequiresApi;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.window.layout.WindowMetricsCalculator;
 
@@ -243,6 +244,7 @@ public class WindowManagerProxy {
      * For large screen, when display cutout is at bottom left/right corner of screen, override
      * display cutout's bottom inset to 0, because launcher allows drawing content over that area.
      */
+    @RequiresApi(Build.VERSION_CODES.R)
     private static void applyDisplayCutoutBottomInsetOverrideOnLargeScreen(
             @NonNull Context context,
             boolean isLargeScreen,
@@ -465,6 +467,7 @@ public class WindowManagerProxy {
     /**
      * Returns a CachedDisplayInfo initialized for the current display
      */
+    @RequiresApi(Build.VERSION_CODES.R)
     protected CachedDisplayInfo getDisplayInfo(WindowMetrics windowMetrics, int rotation) {
         Point size = new Point(windowMetrics.getBounds().right, windowMetrics.getBounds().bottom);
         return new CachedDisplayInfo(size, rotation,
@@ -497,9 +500,11 @@ public class WindowManagerProxy {
      * Returns the display associated with the context, or DEFAULT_DISPLAY if the context isn't
      * associated with a display.
      */
-    protected Display getDisplay(Context displayInfoContext) {
+    public Display getDisplay(Context displayInfoContext) {
         try {
-            return displayInfoContext.getDisplay();
+            if (Utilities.ATLEAST_R) {
+                return displayInfoContext.getDisplay();
+            }
         } catch (UnsupportedOperationException e) {
             // Ignore
         }
