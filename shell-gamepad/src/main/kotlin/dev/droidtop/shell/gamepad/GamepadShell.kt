@@ -1397,7 +1397,13 @@ private fun GamesSection(
     val selectedGroupLabel = selectedGroup?.label
     val gamelistTheme = remember(selectedGroup, selectedGroupSystemId, selectedGroupThemeFolder, ThemePrefs.version) {
         if (selectedGroup != null) {
-            ThemeAssets.loadActiveTheme(context, selectedGroupSystemId, selectedGroupThemeFolder, systemFullName = selectedGroupLabel)
+            ThemeAssets.loadActiveTheme(
+                context,
+                selectedGroupSystemId,
+                selectedGroupThemeFolder,
+                systemFullName = selectedGroupLabel,
+                collectionKind = selectedGroup.esDeCollectionKind(),
+            )
         } else {
             null
         }
@@ -1783,7 +1789,13 @@ private fun GamesSection(
                         // ThemePrefs.version's own doc comment).
                         val focusedGroupLabel = focusedGroup?.label
                         val theme = remember(focusedSystemId, focusedThemeFolder, ThemePrefs.version) {
-                            ThemeAssets.loadActiveTheme(context, focusedSystemId, focusedThemeFolder, systemFullName = focusedGroupLabel)
+                            ThemeAssets.loadActiveTheme(
+                                context,
+                                focusedSystemId,
+                                focusedThemeFolder,
+                                systemFullName = focusedGroupLabel,
+                                collectionKind = focusedGroup?.esDeCollectionKind() ?: EsDeCollectionKind.NONE,
+                            )
                         }
                         // Same real navigation-sound rebinding as the gamelist
                         // screen's own hook (see that LaunchedEffect's comment)

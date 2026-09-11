@@ -245,7 +245,7 @@ object ThemeAssets {
         )
     }
 
-    private val systemThemeCache = mutableMapOf<Triple<String, String?, Pair<String?, String?>>, EsDeTheme>()
+    private val systemThemeCache = mutableMapOf<Triple<String, String?, Triple<String?, String?, EsDeCollectionKind>>, EsDeTheme>()
 
     init {
         // A theme selection change -- or a theme re-downloaded/updated in
@@ -292,9 +292,14 @@ object ThemeAssets {
         systemId: String? = null,
         collectionThemeFolder: String? = null,
         systemFullName: String? = null,
+        // NONE for a real system; the caller knows whether the collection
+        // it is showing is one of ES-DE's three automatic ones or a custom
+        // one, and the three mutually exclusive `${system.*}` variable
+        // families turn on exactly that (SystemData.cpp:1978-2032).
+        collectionKind: EsDeCollectionKind = EsDeCollectionKind.NONE,
     ): EsDeTheme? {
         val active = resolveActiveTheme(context) ?: return null
-        val cacheKey = Triple(active.name, systemId, collectionThemeFolder to systemFullName)
+        val cacheKey = Triple(active.name, systemId, Triple(collectionThemeFolder, systemFullName, collectionKind))
         systemThemeCache[cacheKey]?.let { return it }
 
         val themeDir = when {
@@ -344,6 +349,7 @@ object ThemeAssets {
                 screenAspectRatio = screenAspectRatio,
                 deviceLocale = deviceLocale,
                 systemFullName = systemFullName,
+                collectionKind = collectionKind,
                 // capabilities.xml lives at the THEME ROOT even when the
                 // parsed file is a collection's subfolder theme.xml --
                 // see parseWithCapabilities' own parameter comment for
