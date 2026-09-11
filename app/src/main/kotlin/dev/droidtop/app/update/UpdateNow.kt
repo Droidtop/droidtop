@@ -42,7 +42,7 @@ object UpdateNow {
      * only shell, root and system hold -- but that check is invisible in
      * this code and does not exist on a caller that reaches the receiver
      * some other way, so the uid is checked here too and the outcome is
-     * logged. [senderUid] is only knowable from API 34 (getSendingUid);
+     * logged. [senderUid] is only knowable from API 34 (getSentFromUid);
      * below that the manifest permission is the whole guard and this
      * function is handed [ownUid].
      */
