@@ -87,8 +87,13 @@ public class PackageManagerHelper {
      */
     public String getAppInstallerPackage(@NonNull final String packageName) {
         try {
+            if (!Utilities.ATLEAST_R) {
+                // getInstallSourceInfo is API 30; getInstallerPackageName
+                // is the same answer on the platforms that predate it.
+                return mPm.getInstallerPackageName(packageName);
+            }
             return mPm.getInstallSourceInfo(packageName).getInstallingPackageName();
-        } catch (NameNotFoundException e) {
+        } catch (NameNotFoundException | IllegalArgumentException e) {
             Log.e(TAG, "Failed to get installer package for app package:" + packageName, e);
             return null;
         }

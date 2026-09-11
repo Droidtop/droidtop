@@ -13,6 +13,13 @@
   ~ See the License for the specific language governing permissions and
   ~ limitations under the License.
   -->
+<!-- Pre-31 fallback for res/color-v31/: the @android:color/system_*
+     tones this scrim is built from are the dynamic-colour palette,
+     which the platform only publishes from API 31. Below that the
+     reference does not resolve at all and inflating the scrim throws.
+     The replacement is this fork's own copy of the same Material
+     role from res/values/colors.xml: upstream's own pre-31
+     palette, not a new colour. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:alpha="0.10" android:color="@android:color/system_accent1_100"/>
+    <item android:alpha="0.10" android:color="@color/system_primary_container_light"/>
 </selector>

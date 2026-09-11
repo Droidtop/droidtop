@@ -419,6 +419,11 @@ public class RestoreDbTask {
      */
     private UserHandle getUserForAncestralSerialNumber(BackupManager backupManager,
             long ancestralSerialNumber) {
+        if (!Utilities.ATLEAST_Q) {
+            // Ancestral serial numbers are an API-29 restore concept; on
+            // older platforms there is no profile to map back to.
+            return null;
+        }
         return backupManager.getUserForAncestralSerialNumber(ancestralSerialNumber);
     }
 

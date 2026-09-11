@@ -24,6 +24,7 @@ import android.util.Log
 import androidx.annotation.AnyThread
 import androidx.annotation.VisibleForTesting
 import androidx.annotation.WorkerThread
+import com.android.launcher3.Utilities
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_DESKTOP
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT
 import com.android.launcher3.model.data.CollectionInfo
@@ -176,7 +177,9 @@ object FirstScreenBroadcastHelper {
         val myUser = Process.myUserHandle()
         return userKeyToSessionMap.values
             .filter {
-                it.user == myUser &&
+                // SessionInfo.getUser is API 29; before it every install
+                // session visible here belonged to the calling user.
+                (!Utilities.ATLEAST_Q || it.user == myUser) &&
                     !it.installerPackageName.isNullOrEmpty() &&
                     !it.appPackageName.isNullOrEmpty()
             }

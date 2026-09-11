@@ -29,7 +29,7 @@
     <style name="DynamicColorsBaseLauncherTheme" parent="@style/BaseLauncherTheme">
     </style>
 
-    <style name="WidgetPickerActivityTheme" parent="@android:style/Theme.DeviceDefault.DayNight">
+    <style name="WidgetPickerActivityTheme" parent="@android:style/Theme.DeviceDefault">
         <item name="widgetsTheme">@style/WidgetContainerTheme.Dark</item>
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowNoTitle">true</item>

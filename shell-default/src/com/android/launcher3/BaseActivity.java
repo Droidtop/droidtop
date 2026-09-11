@@ -30,13 +30,16 @@ import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.Bundle;
 import android.util.Log;
+import android.graphics.Rect;
 import android.view.ActionMode;
 import android.view.View;
+import android.view.WindowInsets;
 import android.window.OnBackInvokedDispatcher;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.lifecycle.Lifecycle;
 
 import com.android.launcher3.DeviceProfile.OnDeviceProfileChangeListener;
@@ -53,6 +56,7 @@ import com.android.launcher3.util.SystemUiController;
 import com.android.launcher3.util.ViewCache;
 import com.android.launcher3.util.WeakCleanupSet;
 import com.android.launcher3.util.WindowBounds;
+import com.android.launcher3.util.window.WindowManagerProxy;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.ScrimView;
 
@@ -476,7 +480,23 @@ public abstract class BaseActivity extends FragmentActivity implements ActivityC
     }
 
     protected WindowBounds getMultiWindowDisplaySize() {
-        return WindowBounds.fromWindowMetrics(getWindowManager().getCurrentWindowMetrics());
+        if (Utilities.ATLEAST_R) {
+            return WindowBounds.fromWindowMetrics(getWindowManager().getCurrentWindowMetrics());
+        }
+        // Pre-30 there is no WindowMetrics. For a multi-window activity
+        // WindowMetrics reports the activity's own bounds, which is what
+        // the configuration already carries, with the insets the decor
+        // view is already reporting.
+        Rect bounds = WindowManagerProxy.INSTANCE.get(this).getCurrentBounds(this);
+        Rect insets = new Rect();
+        WindowInsets rootInsets = getWindow().getDecorView().getRootWindowInsets();
+        if (rootInsets != null) {
+            androidx.core.graphics.Insets systemBars =
+                    WindowInsetsCompat.toWindowInsetsCompat(rootInsets)
+                            .getInsets(WindowInsetsCompat.Type.systemBars());
+            insets.set(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
+        }
+        return new WindowBounds(bounds, insets);
     }
 
     @Override

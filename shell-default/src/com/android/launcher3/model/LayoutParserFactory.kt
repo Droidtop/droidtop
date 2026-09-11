@@ -25,6 +25,7 @@ import android.text.TextUtils
 import android.util.Base64
 import android.util.Log
 import android.util.Xml
+import com.android.launcher3.Utilities
 import com.android.launcher3.AutoInstallsLayout
 import com.android.launcher3.AutoInstallsLayout.SourceResources
 import com.android.launcher3.DefaultLayoutParser
@@ -87,9 +88,17 @@ constructor(@ApplicationContext private val context: Context) {
             return null
         }
 
-        // Try the blob store first
-        val blobManager = context.getSystemService(BlobStoreManager::class.java)
-        if (systemLayoutProvider.startsWith(Settings.BLOB_KEY_PREFIX) && blobManager != null) {
+        // Try the blob store first. BlobStoreManager is API 30; below it
+        // the content-provider route further down is the only one there
+        // has ever been.
+        val blobManager =
+            if (Utilities.ATLEAST_R) context.getSystemService(BlobStoreManager::class.java)
+            else null
+        if (
+            Utilities.ATLEAST_R &&
+                systemLayoutProvider.startsWith(Settings.BLOB_KEY_PREFIX) &&
+                blobManager != null
+        ) {
             val blobHandlerDigest = systemLayoutProvider.substring(Settings.BLOB_KEY_PREFIX.length)
             try {
                 AutoCloseInputStream(
