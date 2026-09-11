@@ -6,6 +6,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.focusable
@@ -341,12 +343,12 @@ private fun QuickSliderRow(item: SliderItem, focused: Boolean, onSet: (Int) -> U
             // drops the screen to its dimmest. The D-pad keeps its own
             // stepping; this is the pointer's route to the same write.
             .pointerInput(item.min, item.max, item.current) {
-                androidx.compose.foundation.gestures.detectHorizontalDragGestures(
+                detectHorizontalDragGestures(
                     onDragStart = { offset -> setFromX(offset.x) },
                 ) { change, _ -> setFromX(change.position.x) }
             }
             .pointerInput(item.min, item.max) {
-                androidx.compose.foundation.gestures.detectTapGestures { offset -> setFromX(offset.x) }
+                detectTapGestures { offset -> setFromX(offset.x) }
             }
             .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
