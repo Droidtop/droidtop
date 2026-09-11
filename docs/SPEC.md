@@ -222,6 +222,140 @@ forecloses it: entries carry their `LibraryEntryKind` all the way to
 launch, and nothing in Desktop's launch path should assume "a window
 means a Linux process."
 
+## 2c. Modes and what each contributes (directed 2026-09-11)
+
+droidtop is one app and one process hosting three modes. The user's words:
+*"for performance reasons, we need to make sure disabled UI modes are
+actually not loaded and run... Each mode contributes something to the
+whole."* Two rules follow, and the rest of this section is what they mean
+concretely.
+
+**Rule 1 — a disabled mode runs no code.** Not "renders nothing": runs
+nothing. No process-start initialiser, no service, no system-bound
+component, no background scan, no warm-up thread, no Compose tree. A mode
+that is off costs cold-start time and resident memory only for the
+package it sits in.
+
+**Rule 2 — each mode contributes to the whole, and none re-implements
+another's job.** What the modes share is not copied between them; it sits
+underneath all three as the shared core, and each mode is a surface over
+it plus the integrations only that surface can offer.
+
+### The shared core (runs in every mode, including none)
+
+| Piece | Where |
+| --- | --- |
+| The library: providers, scan, dedup, one `LibraryEntry` stream | `LibraryCore` (`:app`), `:library-core` |
+| Launch resolution — which player runs this entry, and how | `:library-core` launch strategies, `PcGameRuntimeRegistry` |
+| A mode-independent launch entry point | `GameLaunchActivity` (`:app`) |
+| Settings catalogs and their registry | `SettingsCatalogInitProvider`, `:runtime-common` |
+| Preferences, including the mode switches themselves | `Modes` (`:runtime-common`), one prefs file |
+| Self-update and the update-now trigger (§10b) | `AppSelfUpdate`, `UpdateNowReceiver` |
+| Crash reporting and recovery | `CrashReporting`, `LauncherApplication` |
+
+The core is why "with Gaming off a game still launches" is true rather
+than a claim: the library and its resolution never belonged to Gaming, and
+since the modes pass they are no longer built inside `MainActivity`, which
+only runs in Gaming or Desktop.
+
+### Launcher mode — the Android home screen
+
+The Launcher3 fork (`:shell-default`): home screen, app drawer, widgets,
+notification dots, the fork's own gestures. It contributes the *device*
+surface: droidtop as the thing the Home key reaches, and the place a game
+or a container app appears as an ordinary icon.
+
+Enablement follows the HOME role rather than a switch of its own —
+`HomeRolePrefs` enables exactly one of the fork's two HOME activities (or
+neither), and `Modes` reads that component state rather than a second
+flag.
+
+### Gaming mode — the gaming-focused shell (renamed from Handheld)
+
+The mode was never about the form factor; it is the gaming shell, and it
+is offered on devices that are not handhelds. It contributes:
+
+- the ES-DE theme engine and its themed surfaces (§7f),
+- the gamepad shell and its in-context menus, the Quick Menu (§7f),
+- the PC surface — every PC and engine game as one list (§7i),
+- enginehost/emulator integration and the per-game runner choice (§7e2b),
+- scraping and metadata (the standing gap, §7),
+- the companion/input surface on a secondary screen (§4c, §4d).
+
+With Gaming off, games still launch — from the launcher, or from any
+entry point onto the shared library — through the same resolution. What
+is lost is the integration around them: the themed browsing surface, the
+Quick Menu overlay, the companion screen, scraped metadata.
+
+### Desktop mode — the PC in a box
+
+Containers and the primary container session (`DesktopSessionService`),
+the Wine/Linux desktop and its window placement, the host bridge, the
+clipboard bridge, container management UI, and window streaming through
+windowcast (§7a). It contributes everything that makes a Linux or Windows
+program a first-class window rather than a game launch.
+
+### Integration points (named, so nothing is re-implemented)
+
+- **One library, three surfaces.** Launcher shows entries as icons,
+  Gaming as themed rows, Desktop as desktop objects (§2b). One scan.
+- **One launch resolution.** Every surface launches through the same
+  strategy selection; only placement differs (fullscreen on a display vs
+  windowed on the shared desktop).
+- **One settings catalog.** The same catalog renders as Android
+  preferences (`:shell-default`) and as the in-shell gamepad settings
+  (`:shell-gamepad`).
+- **One secondary-screen mechanism.** `SecondaryDisplayContent` holds one
+  registration per mode; the active mode selects what the second screen
+  draws (§4c).
+- **Quick Menu reaches Desktop.** Gaming's Quick Menu offers Desktop's
+  containers rather than carrying a container implementation of its own.
+- **The Windows backbone has two owners.** The vendored gamenative
+  bootstrap serves Gaming's PC surface and Desktop's containers, and the
+  shared PC launch path; it is one idempotent entry point
+  (`WindowsBackbone.ensureStarted`, `:runtime-windows`), never a second
+  init path.
+
+### How the rule is enforced
+
+`ModePiece` (`:runtime-common`) lists every piece of droidtop that belongs
+to a mode rather than to the core, with the mode(s) that own it.
+`ModeGate.piecesToStart(enabled)` turns the enabled set into the set of
+pieces that may run, and `ModeStartup` (`:app`) is the single place that
+starts exactly those and stops the rest. It runs from
+`DroidtopApplication.onCreate` and again on every mode switch, so a mode
+turned off mid-session stops contributing immediately rather than at the
+next process start.
+
+Components the SYSTEM starts on its own — a bound
+`NotificationListenerService`, an accessibility service, a broadcast
+receiver the platform fires — cannot be gated by any Activity of ours, so
+they are enabled and disabled as components
+(`PackageManager.setComponentEnabledSetting`). The honest price: a
+system-bound service loses its grant when its component is disabled, so
+re-enabling the mode means granting notification or accessibility access
+again.
+
+Deliberately not component-gated, with reasons: a device-admin receiver
+(disabling an active admin is not droidtop's call behind the user's
+back), exported Activities the HOME role already gates, and the
+launcher's ContentProviders, whose `onCreate` is a bare `return true`.
+
+A mode's Activities and Compose trees need no gate of their own:
+`MainActivity` renders one enabled shell or nothing (it used to fall
+through to Desktop for an undecided mode), and the launcher's Activities
+follow the HOME role.
+
+### Renaming Handheld to Gaming
+
+Every user-facing string, heading and identifier that carried the old word
+now says Gaming; "handheld" survives only where it means a device shape,
+and in vendored trees whose own vocabulary it is (the AOSP launcher's
+device profiles, ES-DE theme metadata). Stored preferences move with the
+identifiers: `ModeRenameMigration` rewrites the renamed keys and the two
+keys that store a mode id, once, reading each old key exactly once and
+writing its marker in the same commit as the migrated entries.
+
 ## 3. Containers
 
 One `ContainerRuntime` interface (`runtime-common`), two interchangeable
@@ -1889,7 +2023,7 @@ app-drawer icon or a floating switcher button:
   (`:shell-default`), and Gaming's own in-shell Settings section
   renders the SAME catalog with pure gamepad input
   (`SettingsCatalogView`, `:shell-gamepad`) so cycling sections with L/R
-  never leaves the handheld context (per direction: browsing sections
+  never leaves the Gaming context (per direction: browsing sections
   must maintain context; explicitly activating a navigation item is the
   one thing that may switch surfaces). Catalog layout convention, every
   mode: the droidtop-wide "global" group first (a surface whose chrome
@@ -3765,7 +3899,7 @@ per-folder, never general.
 
 The rule is decided from the FOLDER, by `GameEngineDetector.engineOwnsInstall`,
 which both providers call. Not from whichever provider returned first:
-the two are never even in the same scan (the handheld shell runs Games
+the two are never even in the same scan (the Gaming shell runs Games
 and Apps as two independent `scanKinds` calls, and `WINE_PROFILE` is an
 Apps kind while every engine kind is a Games kind), so a
 `Library`-level dedup pass would never have seen both. Folder-decided
