@@ -75,6 +75,8 @@ import dev.droidtop.library.integrations.openWithTargetsFor
 import dev.droidtop.library.theme.SystemThemeColors
 import dev.droidtop.library.theme.EsDeCollectionKind
 import dev.droidtop.library.theme.ThemeAssets
+import dev.droidtop.library.theme.EsDeTransitionAnimation
+import dev.droidtop.library.theme.EsDeViewTransition
 import dev.droidtop.library.theme.primaryListElement
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
@@ -82,6 +84,7 @@ import dev.droidtop.shell.gamepad.theme.EsDeListItem
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import dev.droidtop.shell.gamepad.theme.EsDeSystemListView
 import dev.droidtop.shell.gamepad.theme.EsDeThemedView
+import dev.droidtop.shell.gamepad.theme.esDeViewTransition
 import dev.droidtop.shell.gamepad.theme.ThemePrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -1700,384 +1703,414 @@ private fun GamesSection(
                 }
             },
     ) {
-        val group = selectedGroup
-        if (group == null) {
-            val continuePlaying = entries.filter { it.lastPlayedEpochMs != null }.sortedByDescending { it.lastPlayedEpochMs }
-            // NOTE: the focus request for this screen now lives INSIDE the
-            // render branch below, where whether firstFocus will actually
-            // ATTACH to anything is knowable -- see its own doc comment.
-            // Requesting up here (the old shape) crashed the whole app
-            // ("FocusRequester is not initialized") for any real theme
-            // whose system view declares no carousel/grid/textlist for the
-            // requester to attach to -- confirmed live with a real
-            // downloaded community theme (ES-DWEE), and the same crash
-            // signature was already in the device's older crash logs.
-            if (entries.isEmpty()) {
-                Column(modifier = Modifier.fillMaxSize().padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(32.dp)) {
-                    Text("No games detected yet.", color = Color.White, modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding))
+        // Real ES-DE view transitions (ViewController.cpp:664-1010,
+        // chosen per transition kind by ThemeData::setThemeTransitions at
+        // :1042-1120). droidtop cut between the system view and a gamelist
+        // no matter what the theme asked for; decaffe's own default
+        // profile fades both ways, and twelve of the fifteen themes
+        // measured for this pass declare a profile of some kind.
+        //
+        // The animation depends on WHICH transition this is, so the
+        // animated state is the selected group itself rather than a
+        // boolean: the outgoing content has to keep rendering the group it
+        // was showing while it leaves.
+        val esDeTransitions = remember(ThemePrefs.version) { ThemeAssets.activeTransitions(context) }
+        androidx.compose.animation.AnimatedContent(
+            targetState = selectedGroup,
+            transitionSpec = {
+                val towardsGamelist = initialState == null && targetState != null
+                val kind = when {
+                    initialState == null && targetState == null -> EsDeViewTransition.SYSTEM_TO_SYSTEM
+                    towardsGamelist -> EsDeViewTransition.SYSTEM_TO_GAMELIST
+                    initialState != null && targetState == null -> EsDeViewTransition.GAMELIST_TO_SYSTEM
+                    else -> EsDeViewTransition.GAMELIST_TO_GAMELIST
                 }
-            } else {
-                // Box, not Column: EsDeThemedView needs to genuinely fill
-                // the whole screen (a real full-bleed background image is
-                // one of its own themed elements) -- a Column sibling would
-                // have measured it against the Column's remaining-height
-                // constraint and clipped/overlapped continuePlaying instead,
-                // the same class of sizing bug fillMaxSize itself just
-                // fixed at the EsDeThemedView call site below. continuePlaying
-                // renders on top, anchored to the top -- the reference
-                // theme has no equivalent concept, so this is droidtop's
-                // own addition layered over the theme rather than part of it.
-                Box(modifier = Modifier.fillMaxSize()) {
-                    val context = LocalContext.current
-                    // Real per-system metadata (systemName/systemManufacturer/
-                    // systemReleaseYear/...) needs a theme parsed with the
-                    // CURRENTLY FOCUSED system's own ${system.theme}
-                    // substituted -- see ThemeAssets.loadActiveTheme's own
-                    // doc comment for why this can't be one static parse.
-                    // focusedSystemIndex is fed by EsDeThemedView's own
-                    // onFocusedIndexChanged, driven by whichever carousel
-                    // item actually has focus right now.
-                    var focusedSystemIndex by remember { mutableStateOf(0) }
-                    val focusedGroup = orderedGroups.getOrNull(focusedSystemIndex)
-                    val focusedSystemId = focusedGroup?.systemThemeFolder
-                    val focusedThemeFolder = (focusedGroup as? GameGroup.Collection)?.themeFolder
-                    // Keyed by ThemePrefs.version too, not just
-                    // focusedSystemId -- otherwise switching the active
-                    // theme from Settings has no effect until some
-                    // unrelated recomposition happens to also fire (see
-                    // ThemePrefs.version's own doc comment).
-                    val focusedGroupLabel = focusedGroup?.label
-                    val theme = remember(focusedSystemId, focusedThemeFolder, ThemePrefs.version) {
-                        ThemeAssets.loadActiveTheme(context, focusedSystemId, focusedThemeFolder, systemFullName = focusedGroupLabel)
+                esDeViewTransition(
+                    esDeTransitions[kind] ?: EsDeTransitionAnimation.INSTANT,
+                    towardsGamelist = towardsGamelist,
+                )
+            },
+            label = "ES-DE view transition",
+        ) { group ->
+            if (group == null) {
+                val continuePlaying = entries.filter { it.lastPlayedEpochMs != null }.sortedByDescending { it.lastPlayedEpochMs }
+                // NOTE: the focus request for this screen now lives INSIDE the
+                // render branch below, where whether firstFocus will actually
+                // ATTACH to anything is knowable -- see its own doc comment.
+                // Requesting up here (the old shape) crashed the whole app
+                // ("FocusRequester is not initialized") for any real theme
+                // whose system view declares no carousel/grid/textlist for the
+                // requester to attach to -- confirmed live with a real
+                // downloaded community theme (ES-DWEE), and the same crash
+                // signature was already in the device's older crash logs.
+                if (entries.isEmpty()) {
+                    Column(modifier = Modifier.fillMaxSize().padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(32.dp)) {
+                        Text("No games detected yet.", color = Color.White, modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding))
                     }
-                    // Same real navigation-sound rebinding as the gamelist
-                    // screen's own hook (see that LaunchedEffect's comment)
-                    // -- this is the site that runs FIRST after app start /
-                    // a live theme switch, so sounds bind before any
-                    // gamelist is ever entered.
-                    LaunchedEffect(theme) { EsDeNavigationSounds.load(theme) }
-                    val listElement = remember(theme) { theme?.views?.get("system")?.primaryListElement() }
-                    // remember(): building this list runs systemLogoPath/
-                    // SystemThemeColors per group -- cache-hit lookups, but
-                    // still N of them per recomposition, and the carousel
-                    // recomposes every animation frame. Keyed on
-                    // ThemePrefs.version so a live theme switch still
-                    // rebuilds the logo paths.
-                    val items = remember(orderedGroups, ThemePrefs.version) {
-                        orderedGroups.map { entryGroup ->
-                            EsDeListItem(
-                                key = entryGroup.key,
-                                label = entryGroup.label,
-                                logoPath = entryGroup.systemThemeFolder?.let { ThemeAssets.systemLogoPath(context, it) },
-                                // Real `letterCaseAutoCollections` /
-                                // `letterCaseCustomCollections`: ES-DE cases a
-                                // collection's own name by which KIND of
-                                // collection it is (SystemView.cpp:835-849).
-                                collectionKind = entryGroup.esDeCollectionKind(),
-                                // Real ES-DE select sound -- entering a
-                                // system from the system view plays
-                                // SELECTSOUND (SystemView.cpp:129).
-                                onSelect = {
-                                    EsDeNavigationSounds.play("select")
-                                    selectedGroup = entryGroup
-                                },
-                            )
+                } else {
+                    // Box, not Column: EsDeThemedView needs to genuinely fill
+                    // the whole screen (a real full-bleed background image is
+                    // one of its own themed elements) -- a Column sibling would
+                    // have measured it against the Column's remaining-height
+                    // constraint and clipped/overlapped continuePlaying instead,
+                    // the same class of sizing bug fillMaxSize itself just
+                    // fixed at the EsDeThemedView call site below. continuePlaying
+                    // renders on top, anchored to the top -- the reference
+                    // theme has no equivalent concept, so this is droidtop's
+                    // own addition layered over the theme rather than part of it.
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        val context = LocalContext.current
+                        // Real per-system metadata (systemName/systemManufacturer/
+                        // systemReleaseYear/...) needs a theme parsed with the
+                        // CURRENTLY FOCUSED system's own ${system.theme}
+                        // substituted -- see ThemeAssets.loadActiveTheme's own
+                        // doc comment for why this can't be one static parse.
+                        // focusedSystemIndex is fed by EsDeThemedView's own
+                        // onFocusedIndexChanged, driven by whichever carousel
+                        // item actually has focus right now.
+                        var focusedSystemIndex by remember { mutableStateOf(0) }
+                        val focusedGroup = orderedGroups.getOrNull(focusedSystemIndex)
+                        val focusedSystemId = focusedGroup?.systemThemeFolder
+                        val focusedThemeFolder = (focusedGroup as? GameGroup.Collection)?.themeFolder
+                        // Keyed by ThemePrefs.version too, not just
+                        // focusedSystemId -- otherwise switching the active
+                        // theme from Settings has no effect until some
+                        // unrelated recomposition happens to also fire (see
+                        // ThemePrefs.version's own doc comment).
+                        val focusedGroupLabel = focusedGroup?.label
+                        val theme = remember(focusedSystemId, focusedThemeFolder, ThemePrefs.version) {
+                            ThemeAssets.loadActiveTheme(context, focusedSystemId, focusedThemeFolder, systemFullName = focusedGroupLabel)
                         }
-                    }
-                    // Real fix: the theme now drives this whole screen's
-                    // layout, not just a decorative background behind
-                    // droidtop's own hardcoded system-list Column. The
-                    // carousel/grid/textlist is positioned at the theme's
-                    // own real pos/size (see EsDeThemedView's own doc
-                    // comment) alongside every other themed element
-                    // (background art, info text, help icons), composited
-                    // together by real z-index -- fillMaxSize (not the
-                    // fillMaxWidth this used to be) is what actually lets a
-                    // full-bleed background image cover the real screen
-                    // instead of just whatever height droidtop's own
-                    // content happened to wrap to. No separate "Systems"
-                    // label anymore -- the theme's own carousel title
-                    // treatment is the real visual identity for "what's
-                    // selected," matching the reference theme.
-                    // The real games backing whichever system the carousel
-                    // currently has focus on -- feeds EsDeThemedView's own
-                    // gameselector-driven elements (screen2's game-preview
-                    // poster, the game1..game9 mosaic, the metadata-bound
-                    // title caption).
-                    // byGroup only partitions System and Pc groups --
-                    // a Collection's members live in collectionGroupMembers
-                    // (cross-cutting, see GameGroup.Collection's own doc
-                    // comment). Reading byGroup for a collection returned
-                    // an empty list, which showed up on-device as
-                    // "0 games (0 favorites)" in the themed gamecount strip
-                    // and an empty game-preview for every collection.
-                    val focusedSystemEntries = when (val focused = orderedGroups.getOrNull(focusedSystemIndex)) {
-                        null -> emptyList()
-                        is GameGroup.Collection -> collectionGroupMembers[focused].orEmpty()
-                        else -> byGroup[focused].orEmpty()
-                    }
-                    // Real hints for THIS exact screen state, matching what
-                    // ButtonHintFooter would compute for it (canGoBack=false,
-                    // showInfo=true, showSectionSwitch=true, showSystemSwitch=
-                    // false -- there's no drilled-into system yet to switch
-                    // siblings of). L/R and the old compound "L/R" glyph
-                    // collapse to a single representative L icon here -- a
-                    // real, deliberate simplification (see
-                    // EsDeThemedHelpSystem's own doc comment), not a hack.
-                    val systemListHints = listOf(
-                        GamepadAction.A to "Select",
-                        GamepadAction.Y to "Info",
-                        GamepadAction.L to "Switch section",
-                    )
-                    val hasThemeHelpSystem = remember(theme) {
-                        theme?.views?.get("system")?.elements?.values?.any { it.type == "helpsystem" } == true
-                    }
-                    LaunchedEffect(hasThemeHelpSystem) { onThemeHandlesHints(hasThemeHelpSystem) }
-                    val systemView = theme?.views?.get("system")
-                    // Real crash boundary (confirmed live with a real
-                    // downloaded community theme, ES-DWEE): firstFocus only
-                    // ATTACHES when a real list widget composes with at
-                    // least one item -- the themed path only does that when
-                    // the theme's own system view actually declares a
-                    // carousel/grid/textlist; the fallback path always
-                    // does. Requesting focus on an unattached
-                    // FocusRequester is a hard IllegalStateException that
-                    // killed the whole app. Belt AND braces: gate on the
-                    // real attachment condition, and never let a focus
-                    // request crash droidtop over a theme's own structure
-                    // regardless -- a theme must never be able to kill the
-                    // app.
-                    val willAttachFocus = items.isNotEmpty() &&
-                        (systemView == null || systemView.primaryListElement() != null)
-                    LaunchedEffect(willAttachFocus, systemView) {
-                        if (willAttachFocus) {
-                            requestFocusWhenAttached(firstFocus, "System list")
-                        }
-                    }
-                    if (systemView != null) {
-                        EsDeThemedView(
-                            view = systemView,
-                            items = items,
-                            firstItemFocus = firstFocus,
-                            modifier = Modifier.fillMaxSize(),
-                            // Real ES-DE systembrowse sound: moving the
-                            // system carousel plays SYSTEMBROWSESOUND
-                            // (CarouselComponent.h:108-110 -- the primary
-                            // component's own scroll plays systembrowse
-                            // when NOT hosted in a gamelist, scroll when it
-                            // is). Guarded on a real index CHANGE: this
-                            // callback also fires for the initial focus
-                            // attach, which is not a browse.
-                            onFocusedIndexChanged = {
-                                if (it != focusedSystemIndex) EsDeNavigationSounds.play("systembrowse")
-                                focusedSystemIndex = it
-                            },
-                            focusedSystemEntries = focusedSystemEntries,
-                            hints = systemListHints,
-                            systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
-                                name = focusedGroupLabel,
-                                gameCount = focusedSystemEntries.size,
-                                favoriteCount = focusedSystemEntries.count { it.favorite },
-                                // Real ES-DE special case (SystemView.cpp's own
-                                // favoriteSystem/recentSystem flags): those two
-                                // auto-collections show a bare game count.
-                                countsOnly = (focusedGroup as? GameGroup.Collection)?.id
-                                    ?.let { it == AutoCollections.FAVORITES_ID || it == AutoCollections.LAST_PLAYED_ID } == true,
-                            ),
-                            // droidtop's own real equivalent of ES-DE's
-                            // Window::isBackgroundDimmed -- the options
-                            // menu is a Compose Dialog drawn over this
-                            // view with a scrim, so the theme's own
-                            // helpsystem *Dimmed variants apply while it
-                            // is open. See EsDeThemedHelpSystem.
-                            backgroundDimmed = gamelistOptionsOpen,
-                        )
-                        // NO droidtop chrome over a themed screen: the
-                        // "Continue Playing" overlay sat directly on top of
-                        // decaffe's own real metadata sidebar (and collided
-                        // on every other real theme tested) -- a themed view
-                        // owns its whole surface, same as real ES-DE. The
-                        // row stays on the unthemed fallback below, which IS
-                        // droidtop's own surface. (docs/SPEC.md §7f's
-                        // "needs real per-theme-aware safe-zone placement"
-                        // note is resolved by this simpler decision:
-                        // themed screens get no overlay at all.)
-                    } else {
-                        EsDeSystemListView(
-                            element = listElement,
-                            items = items,
-                            firstItemFocus = firstFocus,
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = LocalShellWindow.current.edgePadding),
-                        )
-                        if (continuePlaying.isNotEmpty()) {
-                            HomeSectionRow(
-                                HomeSection("Continue Playing", continuePlaying),
-                                firstCardFocus = null,
-                                onLaunch = onLaunch,
-                                onShowDetail = onShowDetail,
-                                onFocusedEntryChanged = onFocusedEntryChanged,
-                                modifier = Modifier.align(Alignment.TopStart).padding(top = 16.dp),
-                                onToggleFavorite = onToggleFavorite,
-                            )
-                        }
-                    }
-                }
-            }
-        } else if (group is GameGroup.Pc) {
-            // The one category the theme does not draw past its own card
-            // (docs/SPEC.md 7i). The system view, the pc art and the
-            // transition into here all stay the theme's; everything
-            // inside is droidtop's, because ES-DE's element schema has no
-            // element type for a runner, a prefix or a store login.
-            PcSurface(
-                // The group's own members, not a second predicate over the
-                // whole library: the card's game count and this grid were
-                // computed two different ways, which is how the card could
-                // say "1 game" over a surface that said "No PC games yet".
-                entries = systemGamesForGroup,
-                onOpen = onShowDetail,
-                onFocusedEntryChanged = onFocusedEntryChanged,
-            )
-        } else if (hasThemedGamelist && gamelistView != null) {
-            // Real, unified theme-driven gamelist render -- ONE call into
-            // the same generic EsDeThemedView/EsDeSystemListView
-            // machinery the system-list screen already uses. Whether
-            // THIS theme's gamelist declares a real <carousel>/<grid>/
-            // <textlist> or none at all (DEcaffe: none; Art Book Next: a
-            // real <textlist>/<grid>) is decided internally
-            // (EsDeThemeView.primaryListElement) -- not a droidtop-level
-            // "which theme is this" branch, so an arbitrary third-party
-            // theme gets the same real treatment as either of these two.
-            // A widget owns its own D-pad focus movement (real Compose
-            // focus + EsDeListItem.onSelect, firstItemFocus attaches to
-            // its first item); with no widget, this composable's own
-            // headless Up/Down handling above drives focusedGameIndex
-            // instead -- either way, onFocusedIndexChanged and
-            // focusedGameIndex both point at the exact same state, so
-            // every other element (metadata/rating/datetime/video) always
-            // binds to whichever game is actually current.
-            LaunchedEffect(group, gamelistHasListWidget, gamelistWidgetItems) {
-                // Same never-crash boundary AND same frame-retry as the
-                // system-list screen's own focus request above (see
-                // requestFocusWhenAttached).
-                if (gamelistHasListWidget && gamelistWidgetItems.isNotEmpty()) {
-                    requestFocusWhenAttached(firstFocus, "Gamelist")
-                }
-            }
-            EsDeThemedView(
-                view = gamelistView,
-                items = gamelistWidgetItems,
-                firstItemFocus = if (gamelistHasListWidget) firstFocus else null,
-                modifier = Modifier.fillMaxSize(),
-                // Same real SCROLLSOUND as the headless Up/Down branch
-                // above (a widget hosted in a gamelist scrolls with the
-                // scroll sound, CarouselComponent.h:105-108) -- guarded on
-                // a real index change, same reason as the system carousel.
-                onFocusedIndexChanged = {
-                    if (it != focusedGameIndex) EsDeNavigationSounds.play("scroll")
-                    focusedGameIndex = it
-                },
-                focusedSystemEntries = systemGamesForGroup,
-                focusedGameIndex = focusedGameIndex,
-                hints = listOf(
-                    GamepadAction.A to "Launch",
-                    GamepadAction.Y to "Info",
-                    GamepadAction.X to "Favorite",
-                    GamepadAction.B to "Back",
-                ),
-                systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
-                    name = selectedGroupLabel,
-                    gameCount = systemGamesForGroup.size,
-                    favoriteCount = systemGamesForGroup.count { it.favorite },
-                    countsOnly = (group as? GameGroup.Collection)?.id
-                        ?.let { it == AutoCollections.FAVORITES_ID || it == AutoCollections.LAST_PLAYED_ID } == true,
-                ),
-                backgroundDimmed = gamelistOptionsOpen,
-                gamelist = true,
-                collectionGamelist = inCollectionGamelist,
-            )
-        } else {
-            val allGames = entries.filter { it.gameGroup() == group }
-            val recentCount = allGames.count { it.lastPlayedEpochMs != null }
-            val games = if (recentOnly) allGames.filter { it.lastPlayedEpochMs != null } else allGames
-            // Same "don't request focus on an unattached FocusRequester" fix
-            // as the system-list view above -- games can be empty here too
-            // (the "recent" filter selected with zero recently-played entries).
-            LaunchedEffect(group, recentOnly) { if (games.isNotEmpty()) requestFocusWhenAttached(firstFocus, "Game grid") }
-            // Same real per-system accent as GroupCard's own border, applied
-            // as a subtle top-down vignette behind the whole grid -- carries
-            // the "dynamic per-system," not just per-card, through into the
-            // actual game-browsing view rather than stopping at the system
-            // list.
-            val drillDownAccent = group.systemThemeFolder
-                ?.let { SystemThemeColors.forSystem(LocalContext.current, it) }
-                ?.let { Color(it) }
-            Column(
-                modifier = Modifier.fillMaxSize().let {
-                    if (drillDownAccent != null) {
-                        it.background(Brush.verticalGradient(listOf(drillDownAccent.copy(alpha = 0.16f), Color.Transparent)))
-                    } else {
-                        it
-                    }
-                },
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    FilterChip("${allGames.size} items", selected = !recentOnly, onClick = { recentOnly = false })
-                    if (recentCount > 0) {
-                        FilterChip("$recentCount recent", selected = recentOnly, onClick = { recentOnly = true })
-                    }
-                }
-                val focusManager = LocalFocusManager.current
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 220.dp),
-                    // Real bug fix, reported directly: arrow keys couldn't
-                    // actually move focus between games at all -- GameCard
-                    // only ever handles A/Center/Enter/Y, never Up/Down/
-                    // Left/Right, and Compose has no automatic arrow-key
-                    // focus movement in a grid by default. Without this,
-                    // every directional keypress bubbled straight past this
-                    // grid to the outer Box's sibling-system switcher (see
-                    // GamesSection's own onKeyEvent above), which
-                    // unconditionally treated Left/Right as "switch system"
-                    // on *every* press, not just at a real grid edge.
-                    // FocusManager.moveFocus's own real return value (true =
-                    // moved, false = no further focusable target that
-                    // direction) is exactly what onKeyEvent needs: false
-                    // lets Left/Right correctly bubble up to that outer
-                    // handler only once focus genuinely can't move further
-                    // right/left within the grid, matching ES-DE's real
-                    // "switch system at the edge" convention instead of
-                    // hijacking every keypress.
-                    modifier = Modifier.fillMaxSize().padding(horizontal = LocalShellWindow.current.edgePadding)
-                        .onKeyEvent { event ->
-                            if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
-                            when (GamepadKeyMap.actionFor(event.key)) {
-                                GamepadAction.UP -> focusManager.moveFocus(FocusDirection.Up)
-                                GamepadAction.DOWN -> focusManager.moveFocus(FocusDirection.Down)
-                                GamepadAction.LEFT -> focusManager.moveFocus(FocusDirection.Left)
-                                GamepadAction.RIGHT -> focusManager.moveFocus(FocusDirection.Right)
-                                else -> false
+                        // Same real navigation-sound rebinding as the gamelist
+                        // screen's own hook (see that LaunchedEffect's comment)
+                        // -- this is the site that runs FIRST after app start /
+                        // a live theme switch, so sounds bind before any
+                        // gamelist is ever entered.
+                        LaunchedEffect(theme) { EsDeNavigationSounds.load(theme) }
+                        val listElement = remember(theme) { theme?.views?.get("system")?.primaryListElement() }
+                        // remember(): building this list runs systemLogoPath/
+                        // SystemThemeColors per group -- cache-hit lookups, but
+                        // still N of them per recomposition, and the carousel
+                        // recomposes every animation frame. Keyed on
+                        // ThemePrefs.version so a live theme switch still
+                        // rebuilds the logo paths.
+                        val items = remember(orderedGroups, ThemePrefs.version) {
+                            orderedGroups.map { entryGroup ->
+                                EsDeListItem(
+                                    key = entryGroup.key,
+                                    label = entryGroup.label,
+                                    logoPath = entryGroup.systemThemeFolder?.let { ThemeAssets.systemLogoPath(context, it) },
+                                    // Real `letterCaseAutoCollections` /
+                                    // `letterCaseCustomCollections`: ES-DE cases a
+                                    // collection's own name by which KIND of
+                                    // collection it is (SystemView.cpp:835-849).
+                                    collectionKind = entryGroup.esDeCollectionKind(),
+                                    // Real ES-DE select sound -- entering a
+                                    // system from the system view plays
+                                    // SELECTSOUND (SystemView.cpp:129).
+                                    onSelect = {
+                                        EsDeNavigationSounds.play("select")
+                                        selectedGroup = entryGroup
+                                    },
+                                )
                             }
-                        },
-                    horizontalArrangement = Arrangement.spacedBy(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(24.dp),
-                ) {
-                    gridItemsIndexed(games, key = { _, entry -> entry.id }) { index, entry ->
-                        GameCard(
-                            entry = entry,
-                            modifier = if (index == 0) Modifier.focusRequester(firstFocus) else Modifier,
-                            onLaunch = { onLaunch(entry) },
-                            onShowDetail = { onShowDetail(entry) },
-                            onFocused = { onFocusedEntryChanged(entry) },
-                            onToggleFavorite = { onToggleFavorite(entry) },
+                        }
+                        // Real fix: the theme now drives this whole screen's
+                        // layout, not just a decorative background behind
+                        // droidtop's own hardcoded system-list Column. The
+                        // carousel/grid/textlist is positioned at the theme's
+                        // own real pos/size (see EsDeThemedView's own doc
+                        // comment) alongside every other themed element
+                        // (background art, info text, help icons), composited
+                        // together by real z-index -- fillMaxSize (not the
+                        // fillMaxWidth this used to be) is what actually lets a
+                        // full-bleed background image cover the real screen
+                        // instead of just whatever height droidtop's own
+                        // content happened to wrap to. No separate "Systems"
+                        // label anymore -- the theme's own carousel title
+                        // treatment is the real visual identity for "what's
+                        // selected," matching the reference theme.
+                        // The real games backing whichever system the carousel
+                        // currently has focus on -- feeds EsDeThemedView's own
+                        // gameselector-driven elements (screen2's game-preview
+                        // poster, the game1..game9 mosaic, the metadata-bound
+                        // title caption).
+                        // byGroup only partitions System and Pc groups --
+                        // a Collection's members live in collectionGroupMembers
+                        // (cross-cutting, see GameGroup.Collection's own doc
+                        // comment). Reading byGroup for a collection returned
+                        // an empty list, which showed up on-device as
+                        // "0 games (0 favorites)" in the themed gamecount strip
+                        // and an empty game-preview for every collection.
+                        val focusedSystemEntries = when (val focused = orderedGroups.getOrNull(focusedSystemIndex)) {
+                            null -> emptyList()
+                            is GameGroup.Collection -> collectionGroupMembers[focused].orEmpty()
+                            else -> byGroup[focused].orEmpty()
+                        }
+                        // Real hints for THIS exact screen state, matching what
+                        // ButtonHintFooter would compute for it (canGoBack=false,
+                        // showInfo=true, showSectionSwitch=true, showSystemSwitch=
+                        // false -- there's no drilled-into system yet to switch
+                        // siblings of). L/R and the old compound "L/R" glyph
+                        // collapse to a single representative L icon here -- a
+                        // real, deliberate simplification (see
+                        // EsDeThemedHelpSystem's own doc comment), not a hack.
+                        val systemListHints = listOf(
+                            GamepadAction.A to "Select",
+                            GamepadAction.Y to "Info",
+                            GamepadAction.L to "Switch section",
                         )
+                        val hasThemeHelpSystem = remember(theme) {
+                            theme?.views?.get("system")?.elements?.values?.any { it.type == "helpsystem" } == true
+                        }
+                        LaunchedEffect(hasThemeHelpSystem) { onThemeHandlesHints(hasThemeHelpSystem) }
+                        val systemView = theme?.views?.get("system")
+                        // Real crash boundary (confirmed live with a real
+                        // downloaded community theme, ES-DWEE): firstFocus only
+                        // ATTACHES when a real list widget composes with at
+                        // least one item -- the themed path only does that when
+                        // the theme's own system view actually declares a
+                        // carousel/grid/textlist; the fallback path always
+                        // does. Requesting focus on an unattached
+                        // FocusRequester is a hard IllegalStateException that
+                        // killed the whole app. Belt AND braces: gate on the
+                        // real attachment condition, and never let a focus
+                        // request crash droidtop over a theme's own structure
+                        // regardless -- a theme must never be able to kill the
+                        // app.
+                        val willAttachFocus = items.isNotEmpty() &&
+                            (systemView == null || systemView.primaryListElement() != null)
+                        LaunchedEffect(willAttachFocus, systemView) {
+                            if (willAttachFocus) {
+                                requestFocusWhenAttached(firstFocus, "System list")
+                            }
+                        }
+                        if (systemView != null) {
+                            EsDeThemedView(
+                                view = systemView,
+                                items = items,
+                                firstItemFocus = firstFocus,
+                                modifier = Modifier.fillMaxSize(),
+                                // Real ES-DE systembrowse sound: moving the
+                                // system carousel plays SYSTEMBROWSESOUND
+                                // (CarouselComponent.h:108-110 -- the primary
+                                // component's own scroll plays systembrowse
+                                // when NOT hosted in a gamelist, scroll when it
+                                // is). Guarded on a real index CHANGE: this
+                                // callback also fires for the initial focus
+                                // attach, which is not a browse.
+                                onFocusedIndexChanged = {
+                                    if (it != focusedSystemIndex) EsDeNavigationSounds.play("systembrowse")
+                                    focusedSystemIndex = it
+                                },
+                                focusedSystemEntries = focusedSystemEntries,
+                                hints = systemListHints,
+                                systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
+                                    name = focusedGroupLabel,
+                                    gameCount = focusedSystemEntries.size,
+                                    favoriteCount = focusedSystemEntries.count { it.favorite },
+                                    // Real ES-DE special case (SystemView.cpp's own
+                                    // favoriteSystem/recentSystem flags): those two
+                                    // auto-collections show a bare game count.
+                                    countsOnly = (focusedGroup as? GameGroup.Collection)?.id
+                                        ?.let { it == AutoCollections.FAVORITES_ID || it == AutoCollections.LAST_PLAYED_ID } == true,
+                                ),
+                                // droidtop's own real equivalent of ES-DE's
+                                // Window::isBackgroundDimmed -- the options
+                                // menu is a Compose Dialog drawn over this
+                                // view with a scrim, so the theme's own
+                                // helpsystem *Dimmed variants apply while it
+                                // is open. See EsDeThemedHelpSystem.
+                                backgroundDimmed = gamelistOptionsOpen,
+                            )
+                            // NO droidtop chrome over a themed screen: the
+                            // "Continue Playing" overlay sat directly on top of
+                            // decaffe's own real metadata sidebar (and collided
+                            // on every other real theme tested) -- a themed view
+                            // owns its whole surface, same as real ES-DE. The
+                            // row stays on the unthemed fallback below, which IS
+                            // droidtop's own surface. (docs/SPEC.md §7f's
+                            // "needs real per-theme-aware safe-zone placement"
+                            // note is resolved by this simpler decision:
+                            // themed screens get no overlay at all.)
+                        } else {
+                            EsDeSystemListView(
+                                element = listElement,
+                                items = items,
+                                firstItemFocus = firstFocus,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = LocalShellWindow.current.edgePadding),
+                            )
+                            if (continuePlaying.isNotEmpty()) {
+                                HomeSectionRow(
+                                    HomeSection("Continue Playing", continuePlaying),
+                                    firstCardFocus = null,
+                                    onLaunch = onLaunch,
+                                    onShowDetail = onShowDetail,
+                                    onFocusedEntryChanged = onFocusedEntryChanged,
+                                    modifier = Modifier.align(Alignment.TopStart).padding(top = 16.dp),
+                                    onToggleFavorite = onToggleFavorite,
+                                )
+                            }
+                        }
+                    }
+                }
+            } else if (group is GameGroup.Pc) {
+                // The one category the theme does not draw past its own card
+                // (docs/SPEC.md 7i). The system view, the pc art and the
+                // transition into here all stay the theme's; everything
+                // inside is droidtop's, because ES-DE's element schema has no
+                // element type for a runner, a prefix or a store login.
+                PcSurface(
+                    // The group's own members, not a second predicate over the
+                    // whole library: the card's game count and this grid were
+                    // computed two different ways, which is how the card could
+                    // say "1 game" over a surface that said "No PC games yet".
+                    entries = systemGamesForGroup,
+                    onOpen = onShowDetail,
+                    onFocusedEntryChanged = onFocusedEntryChanged,
+                )
+            } else if (hasThemedGamelist && gamelistView != null) {
+                // Real, unified theme-driven gamelist render -- ONE call into
+                // the same generic EsDeThemedView/EsDeSystemListView
+                // machinery the system-list screen already uses. Whether
+                // THIS theme's gamelist declares a real <carousel>/<grid>/
+                // <textlist> or none at all (DEcaffe: none; Art Book Next: a
+                // real <textlist>/<grid>) is decided internally
+                // (EsDeThemeView.primaryListElement) -- not a droidtop-level
+                // "which theme is this" branch, so an arbitrary third-party
+                // theme gets the same real treatment as either of these two.
+                // A widget owns its own D-pad focus movement (real Compose
+                // focus + EsDeListItem.onSelect, firstItemFocus attaches to
+                // its first item); with no widget, this composable's own
+                // headless Up/Down handling above drives focusedGameIndex
+                // instead -- either way, onFocusedIndexChanged and
+                // focusedGameIndex both point at the exact same state, so
+                // every other element (metadata/rating/datetime/video) always
+                // binds to whichever game is actually current.
+                LaunchedEffect(group, gamelistHasListWidget, gamelistWidgetItems) {
+                    // Same never-crash boundary AND same frame-retry as the
+                    // system-list screen's own focus request above (see
+                    // requestFocusWhenAttached).
+                    if (gamelistHasListWidget && gamelistWidgetItems.isNotEmpty()) {
+                        requestFocusWhenAttached(firstFocus, "Gamelist")
+                    }
+                }
+                EsDeThemedView(
+                    view = gamelistView,
+                    items = gamelistWidgetItems,
+                    firstItemFocus = if (gamelistHasListWidget) firstFocus else null,
+                    modifier = Modifier.fillMaxSize(),
+                    // Same real SCROLLSOUND as the headless Up/Down branch
+                    // above (a widget hosted in a gamelist scrolls with the
+                    // scroll sound, CarouselComponent.h:105-108) -- guarded on
+                    // a real index change, same reason as the system carousel.
+                    onFocusedIndexChanged = {
+                        if (it != focusedGameIndex) EsDeNavigationSounds.play("scroll")
+                        focusedGameIndex = it
+                    },
+                    focusedSystemEntries = systemGamesForGroup,
+                    focusedGameIndex = focusedGameIndex,
+                    hints = listOf(
+                        GamepadAction.A to "Launch",
+                        GamepadAction.Y to "Info",
+                        GamepadAction.X to "Favorite",
+                        GamepadAction.B to "Back",
+                    ),
+                    systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
+                        name = selectedGroupLabel,
+                        gameCount = systemGamesForGroup.size,
+                        favoriteCount = systemGamesForGroup.count { it.favorite },
+                        countsOnly = (group as? GameGroup.Collection)?.id
+                            ?.let { it == AutoCollections.FAVORITES_ID || it == AutoCollections.LAST_PLAYED_ID } == true,
+                    ),
+                    backgroundDimmed = gamelistOptionsOpen,
+                    gamelist = true,
+                    collectionGamelist = inCollectionGamelist,
+                )
+            } else {
+                val allGames = entries.filter { it.gameGroup() == group }
+                val recentCount = allGames.count { it.lastPlayedEpochMs != null }
+                val games = if (recentOnly) allGames.filter { it.lastPlayedEpochMs != null } else allGames
+                // Same "don't request focus on an unattached FocusRequester" fix
+                // as the system-list view above -- games can be empty here too
+                // (the "recent" filter selected with zero recently-played entries).
+                LaunchedEffect(group, recentOnly) { if (games.isNotEmpty()) requestFocusWhenAttached(firstFocus, "Game grid") }
+                // Same real per-system accent as GroupCard's own border, applied
+                // as a subtle top-down vignette behind the whole grid -- carries
+                // the "dynamic per-system," not just per-card, through into the
+                // actual game-browsing view rather than stopping at the system
+                // list.
+                val drillDownAccent = group.systemThemeFolder
+                    ?.let { SystemThemeColors.forSystem(LocalContext.current, it) }
+                    ?.let { Color(it) }
+                Column(
+                    modifier = Modifier.fillMaxSize().let {
+                        if (drillDownAccent != null) {
+                            it.background(Brush.verticalGradient(listOf(drillDownAccent.copy(alpha = 0.16f), Color.Transparent)))
+                        } else {
+                            it
+                        }
+                    },
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        FilterChip("${allGames.size} items", selected = !recentOnly, onClick = { recentOnly = false })
+                        if (recentCount > 0) {
+                            FilterChip("$recentCount recent", selected = recentOnly, onClick = { recentOnly = true })
+                        }
+                    }
+                    val focusManager = LocalFocusManager.current
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = 220.dp),
+                        // Real bug fix, reported directly: arrow keys couldn't
+                        // actually move focus between games at all -- GameCard
+                        // only ever handles A/Center/Enter/Y, never Up/Down/
+                        // Left/Right, and Compose has no automatic arrow-key
+                        // focus movement in a grid by default. Without this,
+                        // every directional keypress bubbled straight past this
+                        // grid to the outer Box's sibling-system switcher (see
+                        // GamesSection's own onKeyEvent above), which
+                        // unconditionally treated Left/Right as "switch system"
+                        // on *every* press, not just at a real grid edge.
+                        // FocusManager.moveFocus's own real return value (true =
+                        // moved, false = no further focusable target that
+                        // direction) is exactly what onKeyEvent needs: false
+                        // lets Left/Right correctly bubble up to that outer
+                        // handler only once focus genuinely can't move further
+                        // right/left within the grid, matching ES-DE's real
+                        // "switch system at the edge" convention instead of
+                        // hijacking every keypress.
+                        modifier = Modifier.fillMaxSize().padding(horizontal = LocalShellWindow.current.edgePadding)
+                            .onKeyEvent { event ->
+                                if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
+                                when (GamepadKeyMap.actionFor(event.key)) {
+                                    GamepadAction.UP -> focusManager.moveFocus(FocusDirection.Up)
+                                    GamepadAction.DOWN -> focusManager.moveFocus(FocusDirection.Down)
+                                    GamepadAction.LEFT -> focusManager.moveFocus(FocusDirection.Left)
+                                    GamepadAction.RIGHT -> focusManager.moveFocus(FocusDirection.Right)
+                                    else -> false
+                                }
+                            },
+                        horizontalArrangement = Arrangement.spacedBy(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(24.dp),
+                    ) {
+                        gridItemsIndexed(games, key = { _, entry -> entry.id }) { index, entry ->
+                            GameCard(
+                                entry = entry,
+                                modifier = if (index == 0) Modifier.focusRequester(firstFocus) else Modifier,
+                                onLaunch = { onLaunch(entry) },
+                                onShowDetail = { onShowDetail(entry) },
+                                onFocused = { onFocusedEntryChanged(entry) },
+                                onToggleFavorite = { onToggleFavorite(entry) },
+                            )
+                        }
                     }
                 }
             }
         }
+
     }
 }
 

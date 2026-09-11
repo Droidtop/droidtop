@@ -95,6 +95,15 @@ data class EsDeThemeCapabilities(
     /** Human-readable `<label>` per colorScheme/variant name, when capabilities.xml declares one — what a real selection UI shows (real ES-DE's own theme menus use these labels). */
     val colorSchemeLabels: Map<String, String> = emptyMap(),
     val variantLabels: Map<String, String> = emptyMap(),
+    /**
+     * Real `<transitions name="...">` profiles in declared order
+     * (ThemeData.cpp:1568-1700). Order is load-bearing: with the
+     * transitions setting on `automatic` the FIRST one is what a theme
+     * gets (ThemeData.cpp:1063-1064).
+     */
+    val transitions: List<EsDeTransitionProfile> = emptyList(),
+    /** Real `<suppressTransitionProfiles><entry>` (ThemeData.cpp:1719-1751): built-in profiles this theme refuses. */
+    val suppressedTransitionProfiles: List<String> = emptyList(),
 )
 
 object EsDeThemeParser {
@@ -109,7 +118,9 @@ object EsDeThemeParser {
      * irrelevant here and simply fall through unmatched.
      */
     fun parseCapabilities(capabilitiesFile: File): EsDeThemeCapabilities {
-        if (!capabilitiesFile.isFile) return EsDeThemeCapabilities(emptyList(), emptyList(), emptyList(), emptyList())
+        if (!capabilitiesFile.isFile) {
+            return EsDeThemeCapabilities(emptyList(), emptyList(), emptyList(), emptyList())
+        }
         return parseCapabilities(capabilitiesFile.readText())
     }
 
@@ -134,6 +145,33 @@ object EsDeThemeParser {
         // Tracks which axis entry a following <label> belongs to (labels
         // are children of their colorScheme/variant block).
         var pendingLabelTarget: Pair<MutableMap<String, String>, String>? = null
+        val transitions = mutableListOf<EsDeTransitionProfile>()
+        val suppressedTransitionProfiles = mutableListOf<String>()
+        // The <transitions> block currently being read, if any -- its own
+        // six transition tags and its <label>/<selectable> are children,
+        // and this flat walk needs to know they belong to it.
+        var openTransitions: EsDeTransitionProfile? = null
+        var openAnimations = mutableMapOf<EsDeViewTransition, EsDeTransitionAnimation>()
+        var inSuppressBlock = false
+        val transitionTags = EsDeViewTransition.entries.associateBy { it.tag }
+        // ThemeData.cpp:1580-1599: a profile with no name, a name that
+        // collides with one of the three built-in animation names, or a
+        // name already used by an earlier profile, is dropped entirely.
+        val reservedNames = setOf("builtin-instant", "builtin-slide", "builtin-fade")
+        fun closeTransitions() {
+            val open = openTransitions ?: return
+            openTransitions = null
+            if (openAnimations.isEmpty()) return
+            // ThemeData.cpp:1653-1671: an undeclared startup transition
+            // inherits the matching same-view one, when that was declared.
+            openAnimations[EsDeViewTransition.SYSTEM_TO_SYSTEM]?.let {
+                openAnimations.putIfAbsent(EsDeViewTransition.STARTUP_TO_SYSTEM, it)
+            }
+            openAnimations[EsDeViewTransition.GAMELIST_TO_GAMELIST]?.let {
+                openAnimations.putIfAbsent(EsDeViewTransition.STARTUP_TO_GAMELIST, it)
+            }
+            transitions += open.copy(animations = openAnimations.toMap())
+        }
         val parser = Xml.newPullParser().apply {
             setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
             setInput(StringReader(xml))
@@ -144,6 +182,42 @@ object EsDeThemeParser {
                 when (parser.name) {
                     "aspectRatio" -> aspectRatios += readText(parser)
                     "fontSize" -> fontSizes += readText(parser)
+                    "transitions" -> {
+                        closeTransitions()
+                        val name = parser.getAttributeValue(null, "name")
+                        openAnimations = mutableMapOf()
+                        openTransitions =
+                            if (name.isNullOrBlank() || name in reservedNames ||
+                                transitions.any { it.name == name }
+                            ) {
+                                null
+                            } else {
+                                EsDeTransitionProfile(name)
+                            }
+                    }
+                    "selectable" -> openTransitions?.let { open ->
+                        // ThemeData.cpp:1605-1611 tests the FIRST character
+                        // only, against 0/f/F/n/N.
+                        val first = readText(parser).firstOrNull()
+                        openTransitions = open.copy(selectable = first !in listOf('0', 'f', 'F', 'n', 'N'))
+                    }
+                    "suppressTransitionProfiles" -> inSuppressBlock = true
+                    "entry" -> if (inSuppressBlock) {
+                        // ThemeData.cpp:1730-1740: only the three built-in
+                        // names are accepted here at all.
+                        readText(parser).takeIf { it in reservedNames }?.let {
+                            if (it !in suppressedTransitionProfiles) suppressedTransitionProfiles += it
+                        }
+                    }
+                    in transitionTags.keys -> if (openTransitions != null) {
+                        val kind = transitionTags.getValue(parser.name)
+                        val raw = readText(parser)
+                        // ThemeData.cpp:1618-1630: an empty or unrecognised
+                        // value is dropped, not silently read as instant.
+                        if (raw.isNotEmpty() && raw in listOf("instant", "slide", "fade")) {
+                            openAnimations[kind] = esDeTransitionAnimation(raw)
+                        }
+                    }
                     "colorScheme" -> parser.getAttributeValue(null, "name")?.let {
                         colorSchemes += it
                         pendingLabelTarget = colorSchemeLabels to it
@@ -152,12 +226,31 @@ object EsDeThemeParser {
                         variants += it
                         pendingLabelTarget = variantLabels to it
                     }
-                    "label" -> pendingLabelTarget?.let { (map, name) -> map[name] = readText(parser) }
+                    // A <label> inside a <transitions> block belongs to
+                    // THAT profile, not to the last colorScheme/variant
+                    // seen (ThemeData.cpp:1675-1700 reads it as a child of
+                    // the transitions node).
+                    "label" -> {
+                        val text = readText(parser)
+                        val open = openTransitions
+                        if (open != null) {
+                            openTransitions = open.copy(label = open.label ?: text)
+                        } else {
+                            pendingLabelTarget?.let { (map, name) -> map[name] = text }
+                        }
+                    }
                     "language" -> languages += readText(parser)
+                }
+            }
+            if (event == XmlPullParser.END_TAG) {
+                when (parser.name) {
+                    "transitions" -> closeTransitions()
+                    "suppressTransitionProfiles" -> inSuppressBlock = false
                 }
             }
             event = parser.next()
         }
+        closeTransitions()
         return EsDeThemeCapabilities(
             // ES-DE validates, de-duplicates and re-orders the declared
             // ratios and PREPENDS "automatic" (ThemeData.cpp:1232-1252,
@@ -167,6 +260,7 @@ object EsDeThemeParser {
             EsDeAspectRatio.capabilityList(aspectRatios),
             colorSchemes, fontSizes, variants, languages,
             colorSchemeLabels, variantLabels,
+            transitions, suppressedTransitionProfiles,
         )
     }
 

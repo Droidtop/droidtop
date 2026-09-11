@@ -222,6 +222,29 @@ object ThemeAssets {
     /** Public read of [resolveActiveTheme]'s own name -- the real, resolved active theme, for UI display/cycling, not just the raw (possibly unset) [ThemePrefs] value. */
     fun activeThemeName(context: Context): String? = resolveActiveTheme(context)?.name
 
+    /**
+     * The active theme's own view-transition animations, already resolved
+     * through ES-DE's own selection rule -- see [esDeTransitionAnimations].
+     * Every transition is INSTANT when there is no active theme or it
+     * declares no profile, which is also ES-DE's own baseline.
+     */
+    fun activeTransitions(context: Context): Map<EsDeViewTransition, EsDeTransitionAnimation> {
+        val active = resolveActiveTheme(context)
+            ?: return EsDeViewTransition.entries.associateWith { EsDeTransitionAnimation.INSTANT }
+        val capabilities = capabilitiesOf(context, active)
+        return esDeTransitionAnimations(
+            profiles = capabilities?.transitions.orEmpty(),
+            setting = ThemePrefs.transitionsSetting(context),
+            // ES-DE's `sVariantDefinedTransitions` -- a variant may name a
+            // profile of its own. droidtop's parser does not read the
+            // variant's `<transitions>` override yet, so this stays null
+            // and the first-declared rule applies, which is what a theme
+            // whose variants define none already gets.
+            variantDefinedTransitions = null,
+            suppressedProfiles = capabilities?.suppressedTransitionProfiles.orEmpty(),
+        )
+    }
+
     private val systemThemeCache = mutableMapOf<Triple<String, String?, Pair<String?, String?>>, EsDeTheme>()
 
     init {
