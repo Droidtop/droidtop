@@ -112,7 +112,7 @@ internal fun ManualMatchPicker(
     BackHandler { onDismiss() }
     Dialog(onDismissRequest = onDismiss) {
         MenuPanel(
-            modifier = Modifier.width(620.dp),
+            modifier = Modifier.width(LocalShellWindow.current.panelWidth(620.dp)),
             focusLabel = "Manual match",
             onKey = { event ->
                 val list = candidates.orEmpty()

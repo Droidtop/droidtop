@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -1078,6 +1079,7 @@ private fun SectionTabBar(
                 color = if (focused) Color.White else Color.Gray,
                 style = MaterialTheme.typography.titleMedium,
                 modifier = (if (entrySection == current) Modifier.focusRequester(currentTabFocus) else Modifier)
+                    .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
                     .focusable()
                     // Same real touch-input fix as GameCard -- see its own
                     // comment. This is the top-level Games/Apps/Settings

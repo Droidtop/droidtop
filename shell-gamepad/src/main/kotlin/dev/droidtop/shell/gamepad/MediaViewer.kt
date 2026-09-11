@@ -100,7 +100,18 @@ internal fun MediaViewer(title: String, media: List<Pair<String, String>>, onClo
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text("$label  (${index + 1}/${media.size})", color = MenuTokens.Value, style = MaterialTheme.typography.bodyMedium)
-            MenuHint("Left/Right browses, B closes")
+            // The same three actions the key handler above implements,
+            // as the only route to them on a screen with no pad: each
+            // hint dispatches the real press (see TouchHintBar), so
+            // there is still one definition of what each one does.
+            TouchHintBar(
+                hints = listOf(
+                    GamepadAction.LEFT to "Previous",
+                    GamepadAction.RIGHT to "Next",
+                    GamepadAction.B to "Close",
+                ),
+                background = Color.Transparent,
+            )
         }
     }
 }

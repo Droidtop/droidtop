@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -87,7 +89,6 @@ object MenuTokens {
     val RowShape = RoundedCornerShape(10.dp)
     val OverlayShape = RoundedCornerShape(14.dp)
     val RowSpacing = 6.dp
-    val ScreenPadding = 48.dp
 }
 
 /** List padding shared by every full-screen menu list. */
@@ -99,7 +100,9 @@ internal val MenuListPadding: PaddingValues
 /** A screen-level menu header: name first, explanation second, both quiet. */
 @Composable
 internal fun MenuHeader(title: String, subtitle: String? = null, modifier: Modifier = Modifier) {
-    Column(modifier.padding(horizontal = MenuTokens.ScreenPadding).padding(top = 18.dp, bottom = 2.dp)) {
+    // The same gutter the list below it uses. A fixed 48dp here put the
+    // header a third of a phone's width in from rows indented 16dp.
+    Column(modifier.padding(horizontal = LocalShellWindow.current.edgePadding).padding(top = 18.dp, bottom = 2.dp)) {
         Text(
             title,
             color = MenuTokens.OnSurface,
@@ -148,11 +151,19 @@ internal fun MenuRow(
     danger: Boolean = false,
     accent: Color? = null,
     onClick: (() -> Unit)? = null,
+    // An [adjustable] row is stepped with Left/Right on the pad. A touch
+    // screen has no Left/Right, so on one the two arrows this row
+    // already draws become the two targets that call this -- without it
+    // a slider in Settings has no touch route at all, in either
+    // direction, and a cycling choice only has a forwards one.
+    onAdjust: ((Int) -> Unit)? = null,
 ) {
+    val window = LocalShellWindow.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
+            .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
             .clip(MenuTokens.RowShape)
             .background(if (selected) MenuTokens.SurfaceSelected else MenuTokens.Surface)
             // Touch works on every row, always -- the shell is
@@ -191,22 +202,56 @@ internal fun MenuRow(
         }
         if (value != null) {
             Spacer(Modifier.width(16.dp))
-            Text(
-                if (selected && adjustable) "‹ $value ›" else value,
-                color = when {
-                    placeholder -> MenuTokens.Placeholder
-                    selected -> MenuTokens.OnSurface
-                    else -> MenuTokens.Value
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            val valueColor = when {
+                placeholder -> MenuTokens.Placeholder
+                selected -> MenuTokens.OnSurface
+                else -> MenuTokens.Value
+            }
+            if (adjustable && onAdjust != null && window.touchFirst) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    AdjustArrow("‹") { onAdjust(-1) }
+                    Text(
+                        value,
+                        color = valueColor,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    AdjustArrow("›") { onAdjust(+1) }
+                }
+            } else {
+                Text(
+                    if (selected && adjustable) "‹ $value ›" else value,
+                    color = valueColor,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         if (chevron) {
             Spacer(Modifier.width(8.dp))
             Text("›", color = MenuTokens.Placeholder, style = MaterialTheme.typography.bodyLarge)
         }
+    }
+}
+
+/**
+ * One side of a touch-adjustable row's value: the arrow the row already
+ * draws, given a real 48dp target around it. It steps the value through
+ * the same [adjustCatalogItem] path Left/Right does -- the arrow is a
+ * second way in, never a second definition.
+ */
+@Composable
+private fun AdjustArrow(glyph: String, onPress: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(LocalShellWindow.current.minTouchTarget)
+            .clip(RoundedCornerShape(24.dp))
+            .clickable(onClick = onPress),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(glyph, color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
     }
 }
 

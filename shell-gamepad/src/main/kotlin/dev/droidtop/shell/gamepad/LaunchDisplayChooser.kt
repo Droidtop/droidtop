@@ -5,7 +5,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -64,9 +66,11 @@ internal fun LaunchDisplayChooserDialog(
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { requestFocusWhenAttached(focus, "Launch display chooser") }
 
+    val window = LocalShellWindow.current
     Dialog(onDismissRequest = onCancel) {
         Column(
             Modifier
+                .width(window.panelWidth(400.dp))
                 .clip(RoundedCornerShape(14.dp))
                 .background(MenuTokens.OverlaySurface)
                 .focusRequester(focus)
@@ -110,6 +114,9 @@ internal fun LaunchDisplayChooserDialog(
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier
                         .fillMaxWidth()
+                        // A row is a button here, so it is at least as
+                        // big as a finger on a screen without a pad.
+                        .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (index == selected) MenuTokens.SurfaceSelected else Color.Transparent)
                         .clickable { onPick(row.option, row.remember) }
