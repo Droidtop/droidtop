@@ -4704,6 +4704,18 @@ The pad keeps everything. Touch affordances are additions; no key route
 was changed or removed, and a pad plugged into a portrait phone behaves
 exactly as it does on the console.
 
+ES-DE's own Android answer is the same idea taken further from the UI: a
+floating virtual gamepad overlay whose fingers are fed into the ordinary
+input path as `DEVICE_TOUCH` presses (`InputManager.cpp:446-500`,
+`InputTouchOverlay*` settings in `GuiMenu.cpp:1401-1436`). droidtop
+routes touch the same way --- one input path, no second definition ---
+but puts the targets on the real affordances rather than under a
+translucent d-pad drawn over the screen, because droidtop's chrome is
+its own, is laid out for the window it is in, and is the part a phone
+user spends their time in. A themed view, whose element positions belong
+to the theme's author, is where the swipe-steps gesture does the same
+job the overlay would.
+
 Rigs: the emulator `droidtop-portrait` AVD (1080x1920 at 420dpi = 411 x
 731dp, a real 1080p phone) alongside `droidtop-1080p`, driven by the same
 `run.ps1` with `-Portrait`; and a portrait BlueStacks instance.
