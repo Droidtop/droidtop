@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "dev.droidtop.shell.gamepad"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 26
