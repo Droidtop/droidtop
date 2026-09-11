@@ -99,4 +99,20 @@ object ThemePrefs {
             .apply()
         changeListeners.forEach { it() }
     }
+
+    // ES-DE's "ThemeAspectRatio" setting (ThemeData.cpp:739-746). Per
+    // theme for the same reason colorScheme/variant are: the names a
+    // theme declares mean nothing to a different theme. Unset is the
+    // normal state and means "automatic", which is what ES-DE resolves
+    // against the live screen -- see EsDeAspectRatio.select.
+    fun aspectRatio(context: Context, themeName: String): String? =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString("droidtop_theme_aspect_ratio::$themeName", null)
+
+    fun setAspectRatio(context: Context, themeName: String, aspectRatio: String?) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .apply { if (aspectRatio == null) remove("droidtop_theme_aspect_ratio::$themeName") else putString("droidtop_theme_aspect_ratio::$themeName", aspectRatio) }
+            .apply()
+        changeListeners.forEach { it() }
+    }
 }
