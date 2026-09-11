@@ -35,6 +35,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
@@ -93,6 +94,7 @@ import dev.droidtop.library.theme.EsDeDateTimeDisplay
 import dev.droidtop.library.theme.esDeBadgeOverlay
 import dev.droidtop.library.theme.EsDeThemeView
 import dev.droidtop.library.theme.esDeDateTimeDisplay
+import dev.droidtop.library.theme.esDeCropBias
 import dev.droidtop.library.theme.esDeDisplayRelative
 import dev.droidtop.library.theme.esDeScopeAllows
 import dev.droidtop.library.theme.EsDeHorizontalAlignment
@@ -708,6 +710,10 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         // stays an honest approximation of ES-DE's own sub-rectangle crop
         // -- Compose's Crop fills the box and trims the overflowing axis
         // symmetrically, and this renderer decodes no `cropPos`.
+        // Real `cropPos` -- which part of the texture a `cropSize` crop keeps
+        // (see esDeCropBias). Compose's own Crop is centred, which is ES-DE's
+        // default and was previously the only thing droidtop could express.
+        alignment = esDeCropAlignment(element, "cropPos"),
         contentScale = when (imageArea.fit) {
             EsDeImageFit.STRETCH -> ContentScale.FillBounds
             EsDeImageFit.FIT -> ContentScale.Fit
@@ -1863,6 +1869,14 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
         colorFilter = tint?.let { ColorFilter.tint(it, BlendMode.Modulate) },
         alpha = opacity,
         contentScale = contentScale,
+        // A `video` element's static poster takes `imageCropPos` when the
+        // theme gives one and plain `cropPos` otherwise -- the same
+        // image-specific-then-shared fallback its own `imageCropSize`/
+        // `cropSize` pair already uses (VideoComponent.cpp:172 vs :206).
+        alignment = esDeCropAlignment(
+            element,
+            if (element.pairOrNull("imageCropPos") != null) "imageCropPos" else "cropPos",
+        ),
         modifier = Modifier
             .absoluteOffset(x = offsetX, y = offsetY)
             .esDeRotation(element)
@@ -2981,6 +2995,20 @@ private fun esDeVideoRenderEffect(
     if (tint == null && saturation == 1f && brightness == 0f) return null
     val filter = esDeImageColorFilter(tint, saturation, brightness, dimming = 1f) ?: return null
     return android.graphics.RenderEffect.createColorFilterEffect(filter.asAndroidColorFilter())
+}
+
+/**
+ * Real `cropPos`/`imageCropPos` as a Compose alignment for a cropped
+ * image. [esDeCropBias] carries the conversion and its citation; this is
+ * the element-level lookup, with ES-DE's own centred default when the
+ * theme declares nothing.
+ */
+internal fun esDeCropAlignment(element: EsDeThemeElement, property: String): Alignment {
+    val cropPos = element.pairOrNull(property) ?: return Alignment.Center
+    return BiasAlignment(
+        horizontalBias = esDeCropBias(cropPos.x),
+        verticalBias = esDeCropBias(cropPos.y),
+    )
 }
 
 /**
