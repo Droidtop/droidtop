@@ -285,15 +285,17 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .background(if (focused) MenuTokens.SurfaceSelected else MenuTokens.Surface)
                             // Without this a notification could only be
                             // reached with a pad: the rows carried no
                             // touch route at all, in the one sheet a
-                            // phone user opens most.
+                            // phone user opens most. After the
+                            // background, so the press indication is
+                            // drawn over it rather than under it.
                             .clickable {
                                 focusIndex = index
                                 press(GamepadAction.A)
                             }
-                            .background(if (focused) MenuTokens.SurfaceSelected else MenuTokens.Surface)
                             .padding(10.dp),
                     ) {
                         Row {
