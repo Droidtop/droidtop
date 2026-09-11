@@ -1695,6 +1695,11 @@ private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight
             SimpleDateFormat(strftimeToJavaPattern(format), Locale.getDefault()).format(now)
         }.getOrDefault("")
     }
+    // Real `letterCase` -- clock is a DateTimeComponent, which derives from
+    // TextComponent and so inherits LETTER_CASE through
+    // TextComponent::applyTheme (DateTimeComponent.cpp:341,
+    // TextComponent.cpp:643-658: uppercase/lowercase/capitalize/none).
+    val cased = esDeLetterCaseOf(element.strOrNull("letterCase")).applyTo(formatted)
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight)
     val color = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color.White
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
