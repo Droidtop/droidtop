@@ -64,6 +64,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.layout.Row
@@ -93,6 +94,10 @@ import dev.droidtop.library.theme.esDeBadgeOverlay
 import dev.droidtop.library.theme.EsDeThemeView
 import dev.droidtop.library.theme.esDeDateTimeDisplay
 import dev.droidtop.library.theme.esDeDisplayRelative
+import dev.droidtop.library.theme.EsDeHorizontalAlignment
+import dev.droidtop.library.theme.EsDeVerticalAlignment
+import dev.droidtop.library.theme.esDeHorizontalAlignment
+import dev.droidtop.library.theme.esDeVerticalAlignment
 import dev.droidtop.library.theme.boolOrNull
 import dev.droidtop.library.theme.colorOrNull
 import dev.droidtop.library.theme.floatOrNull
@@ -982,16 +987,9 @@ private fun EsDeThemedText(
     val fontSizeSp = with(LocalDensity.current) { fontSizeDp.toSp() }
     val lineSpacing = (element.valueOrNull<EsDeThemeValue.FloatValue>("lineSpacing")?.value ?: 1.5f).coerceIn(0.5f, 3f)
 
-    val textAlign = when (element.valueOrNull<EsDeThemeValue.Str>("horizontalAlignment")?.value) {
-        "center" -> TextAlign.Center
-        "right" -> TextAlign.End
-        else -> TextAlign.Start
-    }
-    val boxAlignment = when (element.valueOrNull<EsDeThemeValue.Str>("verticalAlignment")?.value) {
-        "center" -> Alignment.CenterStart
-        "bottom" -> Alignment.BottomStart
-        else -> Alignment.TopStart
-    }
+    val textAlign = esDeTextAlign(element)
+    // Real default is ALIGN_CENTER, not top -- see [EsDeVerticalAlignment].
+    val boxAlignment = esDeVerticalBoxAlignment(element)
 
     // Real ES-DE `text` scrolling container, the `container*` family.
     // Eight of the ten themes measured for this pass put their game
@@ -1104,6 +1102,122 @@ private fun EsDeThemedText(
                 Text(
                     text = text,
                     color = color.copy(alpha = color.alpha * opacity),
+                    fontSize = fontSizeSp,
+                    fontFamily = themeFontFamily(element),
+                    lineHeight = fontSizeSp * lineSpacing,
+                    textAlign = textAlign,
+                )
+            }
+        }
+    }
+}
+
+/** Real `horizontalAlignment` as a Compose [TextAlign]; real default ALIGN_LEFT. */
+private fun esDeTextAlign(element: EsDeThemeElement): TextAlign =
+    when (esDeHorizontalAlignment(element.strOrNull("horizontalAlignment"))) {
+        EsDeHorizontalAlignment.CENTER -> TextAlign.Center
+        EsDeHorizontalAlignment.RIGHT -> TextAlign.End
+        EsDeHorizontalAlignment.LEFT -> TextAlign.Start
+    }
+
+/**
+ * Real `verticalAlignment` as the alignment of the text inside the
+ * element's own box, which is exactly what real ES-DE's own `yOff`
+ * computes (TextComponent.cpp:283-297: top -> 0, bottom -> size.y -
+ * textHeight, center -> half of that, and no offset at all when the text
+ * is taller than the box). The horizontal axis stays `Start` here because
+ * the child fills the box's width and its own [TextAlign] does that axis
+ * -- mirroring ES-DE, where horizontal alignment is baked into the text
+ * cache and only the vertical offset is applied at draw time.
+ */
+private fun esDeVerticalBoxAlignment(element: EsDeThemeElement): Alignment =
+    when (esDeVerticalAlignment(element.strOrNull("verticalAlignment"))) {
+        EsDeVerticalAlignment.TOP -> Alignment.TopStart
+        EsDeVerticalAlignment.BOTTOM -> Alignment.BottomStart
+        EsDeVerticalAlignment.CENTER -> Alignment.CenterStart
+    }
+
+/**
+ * One text-bearing element drawn the way real ES-DE's own `TextComponent`
+ * draws one: inside the element's OWN box, aligned on both axes.
+ *
+ * Shared by `clock`, `datetime` and `gamelistinfo`, all three of which
+ * previously drew a bare `Text` at `pos` with no box at all, so
+ * `horizontalAlignment`/`verticalAlignment` had nothing to align inside
+ * and were silently dropped -- decaffe declares `horizontalAlignment` on
+ * four of its own `datetime` elements and on both its clocks, and a
+ * right-aligned date in a left-anchored box lands at the wrong end of the
+ * row. `text` shares the same two resolvers (and so the same corrected
+ * centre default) but keeps its own body, because its `container*`
+ * scrolling branch and its `backgroundMargins` handling have no
+ * equivalent on these three.
+ *
+ * Both real branches:
+ * - With a declared `size`, that box IS the size and alignment applies
+ *   inside it (TextComponent.cpp:283-297).
+ * - With none, real ES-DE's `mAutoCalcExtent` is `{1, 0}`
+ *   (TextComponent.cpp:32), so `onTextChanged` sets `mSize.x` to the
+ *   MEASURED text width and `mSize.y` to one line height
+ *   (TextComponent.cpp:772, :797-801) -- alignment inside a box that
+ *   tightly fits the text is a no-op, but `origin` is then applied
+ *   against that real measured size, which is what [EsDeAutoOriginBox]
+ *   exists for. Passing a zero size to [positionOf] instead -- what these
+ *   three did -- silently ignored `origin` entirely.
+ *
+ * `lineSpacing` is read here too (TextComponent.cpp:673-674, clamped
+ * 0.5-3.0, applied as `mFont->getHeight(mLineSpacing)`): a `datetime` with
+ * a box taller than one line had no way to space its lines before, and
+ * decaffe declares it on one.
+ */
+@Composable
+private fun EsDeAlignedTextBlock(
+    element: EsDeThemeElement,
+    viewWidth: Dp,
+    viewHeight: Dp,
+    text: String,
+    color: Color,
+    fontSizeSp: TextUnit,
+    background: EsDeBackgroundBox? = null,
+) {
+    val textAlign = esDeTextAlign(element)
+    val lineSpacing = (element.valueOrNull<EsDeThemeValue.FloatValue>("lineSpacing")?.value ?: 1.5f)
+        .coerceIn(0.5f, 3f)
+    val size = element.valueOrNull<EsDeThemeValue.Pair>("size")
+    if (size != null) {
+        val (width, height) = sizeOf(element, viewWidth, viewHeight)
+        val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
+        Box(
+            // The background box is applied OUTSIDE `size` on purpose: real
+            // ES-DE draws the rect at `size + leading + trailing` padding
+            // (DateTimeComponent.cpp:170-172), so the pads grow the painted
+            // rect rather than shrinking the text area inside a fixed box.
+            modifier = Modifier
+                .absoluteOffset(x = offsetX, y = offsetY)
+                .let { if (background != null) it.esDeBackgroundBox(background) else it }
+                .size(width = width, height = height),
+            contentAlignment = esDeVerticalBoxAlignment(element),
+        ) {
+            Text(
+                text = text,
+                color = color,
+                fontSize = fontSizeSp,
+                fontFamily = themeFontFamily(element),
+                lineHeight = fontSizeSp * lineSpacing,
+                textAlign = textAlign,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    } else {
+        EsDeAutoOriginBox(
+            viewWidth = viewWidth,
+            viewHeight = viewHeight,
+            posFraction = element.valueOrNull<EsDeThemeValue.Pair>("pos") ?: EsDeThemeValue.Pair(0f, 0f),
+            originFraction = element.valueOrNull<EsDeThemeValue.Pair>("origin") ?: EsDeThemeValue.Pair(0f, 0f),
+        ) {
+            Box(modifier = if (background != null) Modifier.esDeBackgroundBox(background) else Modifier) {
+                Text(
+                    text = text,
+                    color = color,
                     fontSize = fontSizeSp,
                     fontFamily = themeFontFamily(element),
                     lineHeight = fontSizeSp * lineSpacing,
@@ -1700,7 +1814,6 @@ private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // TextComponent::applyTheme (DateTimeComponent.cpp:341,
     // TextComponent.cpp:643-658: uppercase/lowercase/capitalize/none).
     val cased = esDeLetterCaseOf(element.strOrNull("letterCase")).applyTo(formatted)
-    val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight)
     val color = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color.White
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
     // Same real scaling axis as EsDeThemedText/textlist rows, but a
@@ -1717,14 +1830,14 @@ private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // drew no box at all, so the time floated over whatever art was behind
     // it.
     val background = backgroundBoxOf(element, viewWidth, viewHeight, opacity)
-    Text(
+    EsDeAlignedTextBlock(
+        element = element,
+        viewWidth = viewWidth,
+        viewHeight = viewHeight,
         text = cased,
         color = color.copy(alpha = color.alpha * opacity),
-        fontSize = fontSizeSp,
-        fontFamily = themeFontFamily(element),
-        modifier = Modifier
-            .absoluteOffset(x = offsetX, y = offsetY)
-            .esDeBackgroundBox(background),
+        fontSizeSp = fontSizeSp,
+        background = background,
     )
 }
 
@@ -1801,12 +1914,6 @@ private fun EsDeThemedDateTime(element: EsDeThemeElement, viewWidth: Dp, viewHei
     // TextComponent::applyTheme). Unhandled here before.
     val cased = esDeLetterCaseOf(element.strOrNull("letterCase")).applyTo(formatted)
 
-    val hasSize = element.valueOrNull<EsDeThemeValue.Pair>("size") != null
-    val (width, height) = sizeOf(element, viewWidth, viewHeight)
-    val (offsetX, offsetY) = positionOf(
-        element, viewWidth, viewHeight,
-        if (hasSize) width else 0.dp, if (hasSize) height else 0.dp,
-    )
     val color = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color.White
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
     // Same real DateTimeComponent default (0.035) as EsDeThemedClock.
@@ -1820,14 +1927,14 @@ private fun EsDeThemedDateTime(element: EsDeThemeElement, viewWidth: Dp, viewHei
     // this pass declares it, and it is not the same (leading, trailing)
     // pair the clock's own padding properties are.
     val background = backgroundBoxOf(element, viewWidth, viewHeight, opacity)
-    Text(
+    EsDeAlignedTextBlock(
+        element = element,
+        viewWidth = viewWidth,
+        viewHeight = viewHeight,
         text = cased,
         color = color.copy(alpha = color.alpha * opacity),
-        fontSize = fontSizeSp,
-        fontFamily = themeFontFamily(element),
-        modifier = Modifier
-            .absoluteOffset(x = offsetX, y = offsetY)
-            .esDeBackgroundBox(background),
+        fontSizeSp = fontSizeSp,
+        background = background,
     )
 }
 
@@ -2220,15 +2327,14 @@ private fun EsDeThemedGamelistInfo(element: EsDeThemeElement, viewWidth: Dp, vie
     val color = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color.White
     val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.035f
     val fontSizeDp = (fontSizeFraction * viewHeight.value).dp
-    val (width, height) = sizeOf(element, viewWidth, viewHeight)
-    val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
 
-    Text(
+    EsDeAlignedTextBlock(
+        element = element,
+        viewWidth = viewWidth,
+        viewHeight = viewHeight,
         text = text,
         color = color.copy(alpha = color.alpha * opacity),
-        fontSize = with(LocalDensity.current) { fontSizeDp.toSp() },
-        fontFamily = themeFontFamily(element),
-        modifier = Modifier.absoluteOffset(x = offsetX, y = offsetY),
+        fontSizeSp = with(LocalDensity.current) { fontSizeDp.toSp() },
     )
 }
 
