@@ -59,6 +59,23 @@
         tools:ignore="ScopedStorage" />
 
     <!--
+      minSdk is 26, and "All files access" only exists from API 30. On
+      API 26-29 the equivalent capability IS the legacy runtime storage
+      permission, so it is declared (capped at 29, where it stops being
+      the mechanism) and OnboardingActivity's storage step requests it
+      instead. Without this the step fired an API-30-only Settings
+      intent on Android 9 and died with ActivityNotFoundException: a
+      hard crash on every device below API 30, seen on the Android 9
+      rig on 2026-09-11.
+    -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
+
+    <!--
       Real bug this fixes: dev.droidtop.library.NativeAppProvider's
       queryIntentActivities() call was returning an empty/filtered list on
       real devices, showing as an empty Apps section regardless of what's
