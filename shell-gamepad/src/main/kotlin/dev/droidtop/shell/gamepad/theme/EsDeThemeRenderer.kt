@@ -5,8 +5,6 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.BitmapFactory
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffColorFilter
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.BatteryManager
@@ -1638,21 +1636,25 @@ internal fun esDeAnimationKind(path: String): EsDeAnimationKind {
  *
  * Real properties applied: pos/size/maxSize/origin/rotation/opacity via
  * the same [sizeOf]/[positionOf]/graphicsLayer helpers every other
- * element uses; `color` as a real multiply color shift
- * (PorterDuff.Mode.MULTIPLY -- the AndroidView equivalent of the
- * BlendMode.Modulate rationale documented in [EsDeThemedImage]);
+ * element uses; `color` as a real multiply colour shift, through the same
+ * shared colour matrix every other element uses (see the Modulate
+ * rationale in [EsDeThemedImage]);
  * `cornerRadius` against screen WIDTH (GIFAnimComponent.cpp:399-401,
  * same axis exception as image); `iterationCount` via
  * FrameAnimationDrawable.setLoopLimit (real range 0-10, 0 = infinite,
- * GIFAnimComponent.cpp:370-371 / THEMES.md). Real, honest gaps -- all
- * parsed, none rendered, because APNG4Android's decoder has no
- * corresponding control: `speed` (real clamp 0.2-3.0), `direction`
+ * GIFAnimComponent.cpp:370-371 / THEMES.md); `brightness`/`saturation` and
+ * `colorEnd`/`gradientType`, through the same shared colour pipeline as
+ * every other element (see [esDeImageColorFilter] and
+ * [esDeColorShiftGradient]).
+ *
+ * Real, honest gaps -- parsed, not rendered, because APNG4Android's
+ * decoder genuinely exposes no corresponding control: `speed` (real clamp
+ * 0.2-3.0, GIFAnimComponent.cpp:340-341), `direction`
  * (normal/reverse/alternate/alternateReverse, including alternate's real
- * iteration-doubling, GIFAnimComponent.cpp:343-373), `interpolation`,
- * `colorEnd`/`gradientType` (a per-vertex gradient shift a flat
- * ColorFilter can't express), `brightness`/`saturation` (not applied for
- * plain images either), and `stationary`/`metadataElement` (droidtop has
- * no slide-transition or fast-scroll-fade machinery for any element yet).
+ * iteration-doubling, :343-373) and `interpolation` (its Paint is private,
+ * and calling Drawable.setFilterBitmap on a drawable that does not honour
+ * it would look implemented while doing nothing). Plus
+ * `stationary`/`metadataElement`, which wait on inter-view transitions.
  */
 @Composable
 private fun EsDeThemedAnimation(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp) {
@@ -1675,6 +1677,21 @@ private fun EsDeThemedAnimation(element: EsDeThemeElement, viewWidth: Dp, viewHe
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
     val tint = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) }
+    // Real `colorEnd`/`gradientType` (GIFAnimComponent.cpp:408-425): the far
+    // end of the POSITIONAL colour-shift gradient, defaulting to `color`
+    // itself, which is how ES-DE detects "no gradient" too. Drawn as the same
+    // Modulate blend pass the carousel items and the video surface use, since
+    // that is the multiply ES-DE's own shader performs.
+    val tintEnd = element.valueOrNull<EsDeThemeValue.Color>("colorEnd")?.let { colorOf(it) } ?: tint
+    val gradientHorizontal = element.strOrNull("gradientType") != "vertical"
+    // Real `brightness` and `saturation` (GuiComponent.cpp:393-405, clamped
+    // -2..2 and 0..1), which core.glsl applies to an animation exactly as to
+    // an image. An ImageView takes a ColorMatrixColorFilter directly, so the
+    // shared esDeImageColorFilter -- the one port of that shader's own
+    // brightness-then-saturation-then-shift order -- replaces the
+    // PorterDuff multiply that could carry only the flat shift.
+    val brightness = (element.floatOrNull("brightness") ?: 0f).coerceIn(-2f, 2f)
+    val saturation = (element.floatOrNull("saturation") ?: 1f).coerceIn(0f, 1f)
     // Real GIFAnimComponent.cpp:399-401: cornerRadius scales against
     // screen WIDTH (the same one-axis exception image documents).
     val cornerRadiusFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("cornerRadius")?.value ?: 0f
@@ -1705,31 +1722,30 @@ private fun EsDeThemedAnimation(element: EsDeThemeElement, viewWidth: Dp, viewHe
         factory = { ctx ->
             ImageView(ctx).apply {
                 scaleType = if (hasExactSize) ImageView.ScaleType.FIT_XY else ImageView.ScaleType.FIT_CENTER
-                if (tint != null) {
-                    // Real ES-DE `color` on an animation is the same
-                    // multiply color SHIFT as on images
-                    // (GIFAnimComponent's mColorShift, THEMES.md:
-                    // "multiplying each pixel's color by this color
-                    // value") -- MULTIPLY, never SRC_IN.
-                    colorFilter = PorterDuffColorFilter(
-                        android.graphics.Color.argb(
-                            (tint.alpha * 255).toInt(),
-                            (tint.red * 255).toInt(),
-                            (tint.green * 255).toInt(),
-                            (tint.blue * 255).toInt(),
-                        ),
-                        PorterDuff.Mode.MULTIPLY,
-                    )
-                }
                 setImageDrawable(drawable)
             }
         },
-        update = { view -> if (view.drawable !== drawable) view.setImageDrawable(drawable) },
+        update = { view ->
+            if (view.drawable !== drawable) view.setImageDrawable(drawable)
+            // `color` is a multiply colour SHIFT, never a SRC_IN replacement
+            // (GIFAnimComponent's own mColorShift; THEMES.md: "multiplying
+            // each pixel's color by this color value"), and it is the same
+            // multiply the matrix below ends with -- so a flat shift goes in
+            // here and a gradient one is left to the blend pass on the
+            // modifier, never both, or the colour would be applied twice.
+            view.colorFilter = esDeImageColorFilter(
+                if (esDeHasColorGradient(tint, tintEnd)) null else tint,
+                saturation,
+                brightness,
+                dimming = 1f,
+            )?.asAndroidColorFilter()
+        },
         modifier = Modifier
             .absoluteOffset(x = offsetX, y = offsetY)
             .size(width = width, height = height)
             .esDeRotation(element)
             .graphicsLayer { alpha = opacity }
+            .esDeColorShiftGradient(tint, tintEnd, gradientHorizontal)
             .let { if (cornerRadius > 0.dp) it.clip(RoundedCornerShape(cornerRadius)) else it },
     )
 }
