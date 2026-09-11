@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageShader
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.asAndroidColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.scale
@@ -1473,6 +1474,44 @@ private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         cornerRadius = cornerRadius.value,
     )
 
+    // Real `fadeInType` (VideoComponent.cpp:332-345, real default "black"
+    // at :29): it decides whether the BLACK FRAME behind the video is
+    // rendered at all -- "transparent" switches it off, so the video fades
+    // up over whatever art is behind it instead of out of a black rect
+    // (VideoFFmpegComponent.cpp:220-223 gates the frame on exactly that
+    // flag). Note this also removes the pillarbox fill, because in ES-DE
+    // the pillarboxes ARE that same black frame, offset.
+    val renderBlackFrame = element.strOrNull("fadeInType") != "transparent"
+    // Real `fadeInTime` (VideoComponent.cpp:347-348): seconds, clamped
+    // 0-8, real default 1000 ms (:57). ES-DE resets mFadeIn to 0 whenever a
+    // new stream starts (VideoFFmpegComponent.cpp:1655) and ramps the
+    // video's own vertex opacity up over that time (:327) -- so it is the
+    // SURFACE that fades, not the black frame behind it, and the key here
+    // is the video itself so moving the cursor re-runs the fade.
+    val fadeInTimeMs = ((element.floatOrNull("fadeInTime") ?: 1f).coerceIn(0f, 8f) * 1000f).toInt()
+    var fadeInTarget by remember(videoUri) { mutableStateOf(fadeInTimeMs == 0) }
+    LaunchedEffect(videoUri) { fadeInTarget = true }
+    val fadeIn by animateFloatAsState(
+        targetValue = if (fadeInTarget) 1f else 0f,
+        animationSpec = tween(durationMillis = fadeInTimeMs),
+        label = "esDeVideoFadeIn",
+    )
+
+    // Real colour pipeline on the PLAYING surface. ES-DE runs every video
+    // frame through the same core.glsl the image path uses, so `color`
+    // (a colorSHIFT, VideoComponent.cpp:395-399), `colorEnd`/`gradientType`
+    // (:400-417), `brightness` and `saturation` (GuiComponent.cpp:393-405)
+    // all apply to the video and not only to the static poster.
+    // `android.graphics.RenderEffect` is the one place a View hierarchy can
+    // take a colour matrix, which is why brightness/saturation are gated on
+    // API 31; the colorShift half is a Modulate blend pass and needs no such
+    // gate, the same way the carousel's own item gradient works.
+    val videoTint = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) }
+    val videoTintEnd = element.valueOrNull<EsDeThemeValue.Color>("colorEnd")?.let { colorOf(it) } ?: videoTint
+    val videoGradientHorizontal = element.strOrNull("gradientType") != "vertical"
+    val videoBrightness = (element.floatOrNull("brightness") ?: 0f).coerceIn(-2f, 2f)
+    val videoSaturation = (element.floatOrNull("saturation") ?: 1f).coerceIn(0f, 1f)
+
     Box(
         modifier = Modifier
             .absoluteOffset(x = offsetX, y = offsetY)
@@ -1493,12 +1532,14 @@ private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         // (VideoFFmpegComponent.cpp:220-223) -- it is what the
         // pillarboxes/letterboxes actually are, and it also covers the
         // moment before the first frame decodes.
-        Box(
-            modifier = Modifier
-                .size(width = frame.frameWidth.dp, height = frame.frameHeight.dp)
-                .let { if (cornerRadius > 0.dp) it.clip(RoundedCornerShape(cornerRadius)) else it }
-                .background(Color.Black),
-        )
+        if (renderBlackFrame) {
+            Box(
+                modifier = Modifier
+                    .size(width = frame.frameWidth.dp, height = frame.frameHeight.dp)
+                    .let { if (cornerRadius > 0.dp) it.clip(RoundedCornerShape(cornerRadius)) else it }
+                    .background(Color.Black),
+            )
+        }
         AndroidView(
             factory = { ctx ->
                 PlayerView(ctx).apply {
@@ -1517,8 +1558,27 @@ private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight
                     }
                 }
             },
+            update = { view ->
+                // The colour matrix half of the pipeline. One ColorMatrix,
+                // built by the same esDeImageColorFilter the image and item
+                // paths use, so there is a single implementation of ES-DE's
+                // own brightness-then-saturation-then-shift order; a flat
+                // `color` goes in here and a gradient one is left to the
+                // blend pass below, exactly as the carousel item does it.
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    view.setRenderEffect(
+                        esDeVideoRenderEffect(
+                            tint = if (esDeHasColorGradient(videoTint, videoTintEnd)) null else videoTint,
+                            saturation = videoSaturation,
+                            brightness = videoBrightness,
+                        ),
+                    )
+                }
+            },
             modifier = Modifier
                 .fillMaxSize()
+                .graphicsLayer { alpha = fadeIn }
+                .esDeColorShiftGradient(videoTint, videoTintEnd, videoGradientHorizontal)
                 .let {
                     if (cornerRadius > 0.dp && frame.roundVideoCorners) {
                         it.clip(RoundedCornerShape(cornerRadius))
@@ -2885,6 +2945,27 @@ internal fun esDeFilterQuality(element: EsDeThemeElement, property: String = "in
         "linear" -> FilterQuality.Low
         else -> null
     }
+
+/**
+ * The shared ES-DE colour pipeline as an `android.graphics.RenderEffect`,
+ * for the one surface that is a View and not a Compose draw: the video
+ * player. Returns null when the theme asks for nothing, so the effect is
+ * cleared rather than set to an identity matrix.
+ *
+ * The matrix itself comes from [esDeImageColorFilter] -- the one port of
+ * core.glsl's own brightness-then-saturation-then-shift order this package
+ * has -- rather than a second copy of that maths.
+ */
+private fun esDeVideoRenderEffect(
+    tint: Color?,
+    saturation: Float,
+    brightness: Float,
+): android.graphics.RenderEffect? {
+    if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) return null
+    if (tint == null && saturation == 1f && brightness == 0f) return null
+    val filter = esDeImageColorFilter(tint, saturation, brightness, dimming = 1f) ?: return null
+    return android.graphics.RenderEffect.createColorFilterEffect(filter.asAndroidColorFilter())
+}
 
 /**
  * Real `rotation` / `rotationOrigin` (and, where the element type has
