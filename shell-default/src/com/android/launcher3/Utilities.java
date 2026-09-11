@@ -27,7 +27,6 @@ import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_TYPE_MA
 import android.annotation.SuppressLint;
 import android.app.ActivityManager;
 import android.app.ActivityOptions;
-import android.app.Person;
 import android.app.WallpaperManager;
 import android.content.Context;
 import android.content.pm.LauncherActivityInfo;
@@ -122,7 +121,6 @@ public final class Utilities {
     private static final Matrix sInverseMatrix = new Matrix();
 
     public static final String[] EMPTY_STRING_ARRAY = new String[0];
-    public static final Person[] EMPTY_PERSON_ARRAY = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ? new Person[0] : null;
 
     public static final boolean ATLEAST_N = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N;
     public static final boolean ATLEAST_O = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O;

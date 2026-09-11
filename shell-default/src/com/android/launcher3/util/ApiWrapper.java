@@ -20,7 +20,6 @@ import static com.android.launcher3.LauncherConstants.ActivityCodes.REQUEST_HOME
 
 import android.annotation.SuppressLint;
 import android.app.ActivityOptions;
-import android.app.Person;
 import android.app.role.RoleManager;
 import android.content.Context;
 import android.content.Intent;
@@ -75,10 +74,21 @@ public class ApiWrapper {
     }
 
     /**
-     * Returns the list of persons associated with the provided shortcut info
+     * Returns the sorted keys of the persons associated with the provided
+     * shortcut info, or an empty array when there are none.
+     *
+     * droidtop returns KEYS rather than upstream's android.app.Person[]:
+     * Person is API 28 and this class is a Dagger singleton the launcher
+     * builds on every start, so an API-28 type in its method signature is
+     * resolved when ApiWrapper itself is LOADED -- unloadable on this
+     * project's minSdk of 26, exactly the failure
+     * build-scripts/check_class_load_api.py exists to catch. The keys are
+     * all the one caller ever wanted (WorkspaceItemInfo.personKeys), and a
+     * privileged override of this seam is free to read Person objects
+     * inside its own class, where nothing resolves them early.
      */
-    public Person[] getPersons(ShortcutInfo si) {
-        return Utilities.EMPTY_PERSON_ARRAY;
+    public String[] getPersonKeys(ShortcutInfo si) {
+        return Utilities.EMPTY_STRING_ARRAY;
     }
 
     public Map<String, LauncherActivityInfo> getActivityOverrides() {
