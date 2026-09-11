@@ -83,6 +83,7 @@ import com.github.penfeizhou.animation.gif.GifDrawable
 import com.github.penfeizhou.animation.loader.FileLoader
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.theme.EsDeImageTypes
+import dev.droidtop.library.theme.applyTo
 import dev.droidtop.library.theme.BADGE_SLOTS
 import dev.droidtop.library.theme.EsDeThemeElement
 import dev.droidtop.library.theme.EsDeThemeValue
@@ -881,8 +882,15 @@ private fun EsDeThemedText(
     // it as ":SPACE:" in at least one real variant block, which rendered
     // the literal token on-device under an exact-case check.
     val rawText = if (resolvedText.equals(":space:", ignoreCase = true)) "" else resolvedText
-    val uppercase = element.valueOrNull<EsDeThemeValue.Str>("letterCase")?.value == "uppercase"
-    val text = if (uppercase) rawText.uppercase() else rawText
+    // Real `letterCase`: ES-DE accepts FOUR values here, not one --
+    // uppercase, lowercase, capitalize and the default none
+    // (TextComponent.cpp:643-658), anything else warns and keeps none.
+    // droidtop matched only "uppercase", so decaffe's own metadata values
+    // (playtime1, publisher1, developer1, genre1, players1 all declare
+    // `capitalize`) rendered in the raw case of the scraped string.
+    // The four-value mapping already existed for the list widgets;
+    // this is the same one, not a second copy.
+    val text = esDeLetterCaseOf(element.valueOrNull<EsDeThemeValue.Str>("letterCase")?.value).applyTo(rawText)
 
     val hasSize = element.valueOrNull<EsDeThemeValue.Pair>("size") != null
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
@@ -1627,7 +1635,7 @@ private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // it.
     val background = backgroundBoxOf(element, viewWidth, viewHeight, opacity)
     Text(
-        text = formatted,
+        text = cased,
         color = color.copy(alpha = color.alpha * opacity),
         fontSize = fontSizeSp,
         fontFamily = themeFontFamily(element),
@@ -1703,6 +1711,12 @@ private fun EsDeThemedDateTime(element: EsDeThemeElement, viewWidth: Dp, viewHei
         }
     }
     if (formatted.isNullOrBlank()) return
+    // Real `letterCase`, the same four-value property and the same
+    // TextComponent code path -- DateTimeComponent derives from
+    // TextComponent, so its applyTheme inherits LETTER_CASE
+    // (TextComponent.cpp:643-658, DateTimeComponent.cpp:341 calls
+    // TextComponent::applyTheme). Unhandled here before.
+    val cased = esDeLetterCaseOf(element.strOrNull("letterCase")).applyTo(formatted)
 
     val hasSize = element.valueOrNull<EsDeThemeValue.Pair>("size") != null
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
@@ -1724,7 +1738,7 @@ private fun EsDeThemedDateTime(element: EsDeThemeElement, viewWidth: Dp, viewHei
     // pair the clock's own padding properties are.
     val background = backgroundBoxOf(element, viewWidth, viewHeight, opacity)
     Text(
-        text = formatted,
+        text = cased,
         color = color.copy(alpha = color.alpha * opacity),
         fontSize = fontSizeSp,
         fontFamily = themeFontFamily(element),
