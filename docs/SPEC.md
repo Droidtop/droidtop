@@ -4699,6 +4699,18 @@ pad. Consequences:
   (`Modifier.esDeSwipeSteps`). Those widgets own a cursor and move in
   whole entries rather than scrolling, so no Compose gesture applied to
   them at all before: a themed view could only be driven by a pad.
+- a **tap on a themed entry is one selection, not two**: it moves the
+  widget's own cursor onto the entry it hit --- through that widget's own
+  `step()`, so the move carries the direction and animation the D-pad
+  gives it --- and then acts on it. The carousel activated without moving
+  its cursor, so backing out of a system landed on a different entry than
+  the one just visited. A reflection is decoration and takes no taps at
+  all; it used to be a second, invisible hit target for the entry it
+  mirrors.
+- the top-level **tab bar scrolls** and keeps the Quick Menu control
+  pinned beside it. Four tab names do not fit across a 411dp phone, and a
+  plain row pushes the last one --- in desktop mode, a tab with no other
+  touch route --- silently off the edge.
 
 The pad keeps everything. Touch affordances are additions; no key route
 was changed or removed, and a pad plugged into a portrait phone behaves

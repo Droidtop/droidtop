@@ -597,6 +597,7 @@ private fun EsDeCarousel(
                     imageContentScale = imageFit,
                     imageCropAlignment = imageCropAlignment,
                     imageFilterQuality = imageFilterQuality,
+                    onSelect = null,
                     modifier = Modifier
                         .placeCarouselItem(placement, itemWidth, itemHeight)
                         // Applied OUTSIDE the mirror below, deliberately:
@@ -639,6 +640,17 @@ private fun EsDeCarousel(
                 imageContentScale = imageFit,
                 imageCropAlignment = imageCropAlignment,
                 imageFilterQuality = imageFilterQuality,
+                // Pointer and focus are one selection: a tap moves the
+                // cursor onto the entry it hit and then acts on it,
+                // through the carousel's OWN step() -- the same move the
+                // D-pad makes, with its direction and animation. Before
+                // this the tap activated the entry while the cursor
+                // stayed behind on another one, so coming back out of a
+                // system landed on the wrong entry.
+                onSelect = {
+                    if (placement.index != focusedIndex) step(placement.index - focusedIndex)
+                    item.onSelect()
+                },
                 modifier = Modifier
                     .placeCarouselItem(placement, itemWidth, itemHeight)
                     .graphicsLayer { alpha = placement.opacity },
@@ -772,6 +784,11 @@ private fun EsDeCarouselItem(
     imageCropAlignment: androidx.compose.ui.Alignment,
     imageFilterQuality: FilterQuality,
     modifier: Modifier,
+    // A tap on this item. Null for the mirrored REFLECTION copy, which is
+    // decoration drawn below the item and must not be a second, invisible
+    // hit target for it -- tapping the reflection of the entry above the
+    // cursor used to enter that entry.
+    onSelect: (() -> Unit)?,
 ) {
     // No focusable()/onKeyEvent here: the carousel CONTAINER owns focus
     // and key handling (real CarouselComponent::input architecture -- see
@@ -779,7 +796,7 @@ private fun EsDeCarouselItem(
     // item directly.
     val baseModifier = modifier
         .size(width = width, height = height)
-        .clickable(onClick = item.onSelect)
+        .then(if (onSelect != null) Modifier.clickable(onClick = onSelect) else Modifier)
     // Real entry-name assembly -- the per-collection letter case and the
     // system-name suffix, see [esDeEntryLabel].
     val label = esDeEntryLabel(
