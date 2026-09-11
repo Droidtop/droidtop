@@ -85,6 +85,8 @@ import com.github.penfeizhou.animation.loader.FileLoader
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.theme.EsDeImageTypes
 import dev.droidtop.library.theme.EsDeLetterCase
+import dev.droidtop.library.theme.esDeGameOverrideImage
+import dev.droidtop.library.theme.esDeTilePhaseOffset
 import dev.droidtop.library.theme.EsDeHelpButton
 import dev.droidtop.library.theme.esDeHelpButtonIconKey
 import dev.droidtop.library.theme.esDeEntryLabel
@@ -585,7 +587,22 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         // ${system.theme} with a real `<default>` fallback logo for
         // systems it has no art for -- without this check the dead path
         // rendered nothing and the declared fallback never showed.
-        element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved?.takeIf { File(it).exists() }
+        // Real `gameOverridePath` (ImageComponent.cpp:723-736, :147-161,
+        // GamelistView.cpp:1336-1337): a per-game replacement for a
+        // STATIC theme image, addressed by the game's own basename. It is
+        // read only on this branch because that is ES-DE's own condition
+        // -- it parses the property only for an element with no
+        // `imageType`, under the source comment "it's by design not
+        // possible to override scraped media".
+        val declared = element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved
+            ?.takeIf { File(it).exists() }
+        val locator = gameSelection.getOrNull(0)?.mediaLocator
+        esDeGameOverrideImage(
+            gameOverridePath = element.valueOrNull<EsDeThemeValue.Path>("gameOverridePath")?.resolved,
+            system = locator?.system,
+            baseName = locator?.baseName,
+            originalPath = declared,
+        )
             ?: element.valueOrNull<EsDeThemeValue.Path>("default")?.resolved?.takeIf { File(it).exists() }
     } ?: return
     // Real ImageComponent::resize (ImageComponent.cpp:775-828): the
@@ -682,6 +699,11 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
             }
             val scaleX = tile.first / tileBitmap.width
             val scaleY = tile.second / tileBitmap.height
+            // Real `tileHorizontalAlignment`/`tileVerticalAlignment`
+            // (ImageComponent.cpp:684-718): exactly two literals each,
+            // anything else warned about and treated as the default.
+            val tileAlignRight = element.strOrNull("tileHorizontalAlignment") == "right"
+            val tileAlignBottom = element.strOrNull("tileVerticalAlignment") == "bottom"
             Box(
                 modifier = placement.drawBehind {
                     // The shader repeats at the bitmap's own pixel size, so
@@ -689,9 +711,22 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
                     // tile size over the un-scaled box -- equivalent to
                     // repeating at the tile size itself.
                     scale(scaleX = scaleX, scaleY = scaleY, pivot = Offset.Zero) {
+                        // Widths in the SHADER's own coordinates: the
+                        // scale above is what turns one bitmap pixel into
+                        // one tileSize pixel, so the phase shift is
+                        // computed in bitmap pixels too.
+                        val boxW = size.width / scaleX
+                        val boxH = size.height / scaleY
+                        val phaseX =
+                            esDeTilePhaseOffset(boxW, tileBitmap.width.toFloat(), tileAlignRight)
+                        val phaseY =
+                            esDeTilePhaseOffset(boxH, tileBitmap.height.toFloat(), tileAlignBottom)
+                        // The rect grows by exactly what the shift moved
+                        // it back by, so the box stays fully covered.
                         drawRect(
                             brush = brush,
-                            size = Size(size.width / scaleX, size.height / scaleY),
+                            topLeft = Offset(phaseX, phaseY),
+                            size = Size(boxW - phaseX, boxH - phaseY),
                             alpha = opacity,
                             colorFilter = imageColorFilter,
                         )
@@ -817,10 +852,8 @@ private fun rememberTileBitmap(path: String?): ImageBitmap? {
  *    source's real aspect ratio (ImageComponent.cpp:845-850).
  *
  * `tileHorizontalAlignment`/`tileVerticalAlignment`
- * (ImageComponent.cpp:686-716) are deliberately not implemented: neither
- * appears in any of the ten real themes measured for this pass, and the
- * anchor they choose only shows when the tile grid doesn't divide the box
- * evenly.
+ * (ImageComponent.cpp:684-718) are applied separately, as a phase shift
+ * of the repeating pattern -- see [dev.droidtop.library.theme.esDeTilePhaseOffset].
  */
 internal fun esDeTileSize(
     declaredWidthPx: Float?,
