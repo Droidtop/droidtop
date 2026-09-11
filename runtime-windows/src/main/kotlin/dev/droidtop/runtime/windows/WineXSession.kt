@@ -5,10 +5,12 @@ import com.winlator.alsaserver.ALSAClient
 import com.winlator.container.Container
 import com.winlator.contents.ContentsManager
 import com.winlator.core.Callback
+import com.winlator.core.FileUtils
 import com.winlator.core.KeyValueSet
 import com.winlator.core.ProcessHelper
 import com.winlator.core.WineInfo
 import com.winlator.core.envvars.EnvVars
+import com.winlator.winhandler.WinHandler.PreferredInputApi
 import com.winlator.xconnector.UnixSocketConfig
 import com.winlator.xenvironment.ImageFs
 import com.winlator.xenvironment.XEnvironment
@@ -23,17 +25,19 @@ import com.winlator.xenvironment.components.XServerComponent
 import com.winlator.xserver.XServer
 import java.io.File
 import java.util.ArrayDeque
+import kotlinx.coroutines.runBlocking
 
 /**
  * The Wine guest and everything it draws and listens through, as one
  * object with a lifetime.
  *
  * This is the whole of what used to live inside `BionicWineEngine.launch`
- * plus the pieces that launch never had: the audio server, the GPU
- * renderer component, and an [XServer] whose renderer is a real Android
- * surface. The reason those were missing is the reason a Windows game
- * used to start and show nothing -- Wine connected to a headless X
- * server, drew into it, and no one was looking.
+ * plus the pieces that launch never had: the prefix preparation
+ * ([WinePrefixPreparation]), the audio server, the GPU renderer
+ * component, and an [XServer] whose renderer is a real Android surface.
+ * The reason those were missing is the reason a Windows game used to
+ * start and show nothing -- Wine connected to a headless X server, drew
+ * into it, and no one was looking.
  *
  * Nothing here is a new renderer. Every component is gamenative's own,
  * constructed in the same order and from the same container fields its
@@ -74,24 +78,39 @@ class WineXSession(
     fun output(): String = synchronized(tail) { tail.joinToString("\n") }
 
     /**
-     * Builds the environment and starts the guest. [onTerminated] fires
-     * with the guest's exit status when it ends, on whatever thread
-     * gamenative's launcher reports on.
+     * Prepares the prefix, builds the environment and starts the guest.
+     * [onTerminated] fires with the guest's exit status when it ends, on
+     * whatever thread gamenative's launcher reports on.
      *
-     * Throws if the environment itself refuses to start; the caller
-     * reports that rather than an exit code that never happened.
+     * Throws if the preparation or the environment itself refuses to
+     * start; the caller reports that rather than an exit code that never
+     * happened.
      */
     fun start(onTerminated: (Int) -> Unit) {
+        // A wineserver left behind by a previous launch owns the prefix
+        // and will refuse this one's; killing stale guests first is what
+        // gamenative does before every launch, for the same reason.
+        runCatching { ProcessHelper.hardKillStaleWineProcesses() }
+
         val imageFs = ImageFs.find(context)
         val contentsManager = ContentsManager(context).apply { syncContents() }
         val wineInfo = WineInfo.fromIdentifier(context, contentsManager, prefix.wineVersion)
-        // getWinePath() defaults to <rootfs>/opt/wine; a proton build
-        // lives at opt/<version>, so point ImageFs at the one this prefix
-        // is configured for before anything reads it (upstream does
-        // exactly this in its own pre-launch phase).
-        wineInfo.path?.takeIf { it.isNotEmpty() }?.let { imageFs.setWinePath(it) }
+
+        // Drive symlinks, DX wrapper DLLs, the Vulkan driver, the wine
+        // audio-driver registry value: everything the guest needs to
+        // already be true of the prefix. It also hands back the
+        // environment variables those steps communicate through, which is
+        // why its result IS the base env rather than something merged
+        // into one.
+        val envVars = runBlocking { WinePrefixPreparation.prepare(context, prefix, xServer.screenInfo) }
 
         val rootPath = imageFs.rootDir.path
+        // Wine's own temp directory, from a previous run. gamenative
+        // clears it at the same point; a half-written shader cache or
+        // installer payload left there is read back as if it were this
+        // launch's.
+        runCatching { FileUtils.clear(imageFs.tmpDir) }
+
         val environment = XEnvironment(context, imageFs)
         this.environment = environment
 
@@ -106,8 +125,13 @@ class WineXSession(
         )
         environment.addComponent(NetworkInfoUpdateComponent())
 
-        val envVars = EnvVars().apply {
-            putAll(prefix.envVars)
+        envVars.apply {
+            // The prefix's own locale. A Japanese-locale game reads
+            // cp932 paths and text through it, so leaving it out is not
+            // neutral -- it is choosing C.
+            put("LC_ALL", prefix.lC_ALL)
+            put("MESA_DEBUG", "silent")
+            put("MESA_NO_ERROR", "1")
             // droidtop owns where the prefix lives: this container's own
             // directory, not whatever `home/xuser` happens to point at,
             // so the same game keeps the same prefix no matter which
@@ -117,12 +141,27 @@ class WineXSession(
             // EnvVars parses a string or copies another EnvVars; there is
             // no map overload, so the plan's pairs go in one at a time.
             WineLaunchPlan.audioEnvVars(prefix.audioDriver, rootPath).forEach { (name, value) -> put(name, value) }
+            WineLaunchPlan.controllerEnvVars(prefix.isSdlControllerAPI, prefix.inputType)
+                .forEach { (name, value) -> put(name, value) }
+            // The prefix's own variables last, so a person who set one by
+            // hand wins over every default above.
+            putAll(prefix.envVars)
+            // Frame-rate caps belong to gamenative's own in-game limiter
+            // UI, which droidtop does not present; a stale value from the
+            // prefix would silently cap a game nobody asked to cap.
+            remove("DXVK_FRAME_RATE")
+            remove("VKD3D_FRAME_RATE")
+            if (!has("WINEESYNC")) put("WINEESYNC", "1")
+            WineLaunchPlan.turnipDebug(KeyValueSet(prefix.graphicsDriverConfig).get("version"), get("TU_DEBUG"))
+                ?.let { put("TU_DEBUG", it) }
         }
 
         // Audio, wired the way gamenative wires it and driven by the same
         // container field. Its own default is pulseaudio; alsa is the
         // other value a prefix can carry, and a prefix carrying neither
-        // gets no audio server rather than a crash.
+        // gets no audio server rather than a crash. Which backend WINE
+        // hands audio to is the same field, written into the prefix's
+        // registry by the preparation above.
         when (WineLaunchPlan.audioDriverOf(prefix.audioDriver)) {
             WineLaunchPlan.AudioDriver.PULSEAUDIO -> environment.addComponent(
                 PulseAudioComponent(
@@ -180,13 +219,15 @@ class WineXSession(
             isWoW64Mode = prefix.isWoW64Mode
             box64Version = prefix.box64Version
             box64Preset = prefix.box64Preset
+            box86Version = prefix.box86Version
+            box86Preset = prefix.box86Preset
             setFEXCorePreset(prefix.fexCorePreset)
             // Every mapped drive, so a game on an SD card is reachable
             // from inside the prefix rather than only from Android.
             bindingPaths = prefix.drivesIterator().map { it[1] }.toTypedArray()
             this.envVars = envVars
             setWorkingDir(workingDir.takeIf { it.isDirectory } ?: imageFs.rootDir)
-            guestExecutable = WineLaunchPlan.guestExecutable(xServer.screenInfo.toString(), target)
+            guestExecutable = WineLaunchPlan.guestExecutable(xServer.screenInfo.toString(), target, prefix.execArgs)
             setTerminationCallback { code -> onTerminated(code ?: EXEC_FAILED) }
         }
         environment.addComponent(launcher)
@@ -265,6 +306,49 @@ object WineLaunchPlan {
         }
 
     /**
+     * What a guest built against SDL needs told about controllers, when
+     * the prefix says its games read the pad through SDL rather than
+     * through wine's own xinput.
+     *
+     * SDL picks its own joystick backend from these, and which backend
+     * is right is the prefix's `inputType` -- the same field WinHandler
+     * is configured from on the Android side, so the two halves of one
+     * decision cannot disagree. A prefix that does not claim the SDL API
+     * gets nothing, exactly as upstream.
+     */
+    fun controllerEnvVars(sdlControllerApi: Boolean, inputType: Int): Map<String, String> {
+        if (!sdlControllerApi) return emptyMap()
+        val xinput = inputType == PreferredInputApi.XINPUT.ordinal ||
+            inputType == PreferredInputApi.AUTO.ordinal ||
+            inputType == PreferredInputApi.BOTH.ordinal
+        val dinput = inputType == PreferredInputApi.DINPUT.ordinal ||
+            inputType == PreferredInputApi.BOTH.ordinal
+        return mapOf(
+            "SDL_XINPUT_ENABLED" to if (xinput) "1" else "0",
+            "SDL_DIRECTINPUT_ENABLED" to if (dinput) "1" else "0",
+            "SDL_JOYSTICK_HIDAPI" to if (xinput) "1" else "0",
+            "SDL_JOYSTICK_WGI" to "0",
+            "SDL_JOYSTICK_RAWINPUT" to "0",
+            "SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS" to "1",
+            "SDL_HINT_FORCE_RAISEWINDOW" to "0",
+            "SDL_ALLOW_TOPMOST" to "0",
+            "SDL_MOUSE_FOCUS_CLICKTHROUGH" to "1",
+        )
+    }
+
+    /**
+     * Turnip's `nolrz` workaround, added for the gen8 driver versions
+     * that need it and for no others -- returns null when the current
+     * value already stands, so the caller never writes a variable it did
+     * not change.
+     */
+    fun turnipDebug(graphicsDriverVersion: String, currentValue: String): String? {
+        if (!graphicsDriverVersion.lowercase().contains("gen8")) return null
+        if (currentValue.contains("nolrz")) return null
+        return if (currentValue.isEmpty()) "nolrz" else "$currentValue,nolrz"
+    }
+
+    /**
      * The command handed to the guest.
      *
      * `explorer /desktop=shell,<w>x<h>` is not decoration: it makes Wine
@@ -277,8 +361,12 @@ object WineLaunchPlan {
      * Spaces are escaped rather than quoted: `ProcessHelper.splitCommand`
      * keeps quote characters inside the argument it produces, which would
      * hand Wine a path that does not exist, but it treats a
-     * backslash-space pair as a literal space.
+     * backslash-space pair as a literal space. [execArgs] is the prefix's
+     * own argument string and goes through unescaped, the way a person
+     * typed it.
      */
-    fun guestExecutable(screenInfo: String, target: String): String =
-        "wine explorer /desktop=shell,$screenInfo " + target.replace(" ", "\\ ")
+    fun guestExecutable(screenInfo: String, target: String, execArgs: String = ""): String {
+        val command = "wine explorer /desktop=shell,$screenInfo " + target.replace(" ", "\\ ")
+        return if (execArgs.isBlank()) command else "$command ${execArgs.trim()}"
+    }
 }

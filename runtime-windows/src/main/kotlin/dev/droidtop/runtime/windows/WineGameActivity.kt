@@ -13,14 +13,19 @@ import android.view.WindowManager
 import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.TextView
+import app.gamenative.data.TouchGestureConfig
 import com.winlator.container.Container
 import com.winlator.container.ContainerManager
+import com.winlator.inputcontrols.ControllerManager
 import com.winlator.inputcontrols.TouchMouse
+import com.winlator.renderer.ASurfaceRenderer
+import com.winlator.renderer.VulkanRenderer
 import com.winlator.widget.TouchpadView
 import com.winlator.widget.XServerRendererView
 import com.winlator.widget.XServerView
 import com.winlator.widget.XServerViewGL
 import com.winlator.winhandler.WinHandler
+import com.winlator.winhandler.WinHandler.PreferredInputApi
 import com.winlator.xserver.Keyboard
 import com.winlator.xserver.ScreenInfo
 import com.winlator.xserver.XServer
@@ -82,6 +87,13 @@ class WineGameActivity : Activity() {
         // view and renderer code, and both inits are no-ops once done.
         GameNativePrefManager.init(this)
         WinlatorPrefManager.init(this)
+        // Not optional, and not cosmetic: WinHandler.start() asks the
+        // controller manager to scan for devices, and the manager holds
+        // the InputManager it scans with only after this call. Without it
+        // the first thing every Wine launch did was throw inside
+        // start(), which surfaced as a failure screen over a game that
+        // had in fact begun to boot.
+        ControllerManager.getInstance().init(applicationContext)
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         goFullscreen()
@@ -104,29 +116,52 @@ class WineGameActivity : Activity() {
         // view, which shares its EGL context with the VirGL component;
         // everything else is the Vulkan/SurfaceFlinger view, picked by
         // the prefix's own display-renderer field.
-        val view: XServerRendererView = if (prefix.graphicsDriver == "virgl" ||
-            prefix.displayRenderer.equals("gl", ignoreCase = true)
-        ) {
+        val useGl = prefix.graphicsDriver == "virgl" || prefix.displayRenderer.equals("gl", ignoreCase = true)
+        val view: XServerRendererView = if (useGl) {
             XServerViewGL(this, xServer)
         } else {
             XServerView(this, xServer, prefix.displayRenderer)
         }
         rendererView = view
-        xServer.renderer = view.renderer
+        val renderer = view.renderer
+        xServer.renderer = renderer
+
+        // How frames reach the screen, from the prefix's own fields --
+        // the presentation mode is the difference between a game that
+        // tears and one that stalls, and a prefix that asked for one has
+        // to get it.
+        if (!useGl && renderer is VulkanRenderer) {
+            renderer.setVkPresentMode(WinePresentation.vkPresentMode(prefix.rendererPresentMode))
+        }
+        if (renderer is ASurfaceRenderer) {
+            renderer.setSfCompatMode(prefix.sfCompatMode)
+        }
+        // A pointer the person can see, unless this prefix is set up to
+        // be played by touching the screen directly.
+        renderer.setCursorVisible(!prefix.isTouchscreenMode)
 
         // The virtual desktop `explorer` opens is the window a game lives
         // in; the shell window itself must not be presented, and the
         // game's own window is what should fill the screen.
-        view.renderer.setUnviewableWMClasses("explorer.exe")
+        renderer.setUnviewableWMClasses("explorer.exe")
         // The WM class the renderer should blow up to fill the screen is
         // the executable's own file name. Both separators are stripped
         // because a .desktop shortcut stores a Windows path, and
         // File(...).name would keep the whole of one on Android.
-        target.substringAfterLast('/').substringAfterLast('\\')
-            .takeIf { it.isNotBlank() }
-            ?.let { view.renderer.forceFullscreenWMClass = it }
+        WinePresentation.fullscreenWMClass(target)?.let { renderer.forceFullscreenWMClass = it }
 
-        winHandler = WinHandler(xServer, view).also { xServer.winHandler = it }
+        winHandler = WinHandler(xServer, view).also { handler ->
+            xServer.winHandler = handler
+            // Which Windows input API the guest's games are expected to
+            // read the pad through, and how a DirectInput device is
+            // mapped onto it: both are the prefix's own settings, and a
+            // value outside the enum (an older prefix, a hand-edited
+            // file) becomes BOTH rather than an index crash.
+            val inputType = prefix.inputType.takeIf { it in PreferredInputApi.values().indices }
+                ?: PreferredInputApi.BOTH.ordinal
+            handler.setPreferredInputApi(PreferredInputApi.values()[inputType])
+            handler.setDInputMapperType(prefix.dinputMapperType)
+        }
         touchMouse = TouchMouse(xServer)
         keyboard = Keyboard(xServer)
 
@@ -138,6 +173,17 @@ class WineGameActivity : Activity() {
         // the touch-to-screen transform.
         val touchpad = TouchpadView(this, xServer, GameNativePrefManager.getBoolean("capture_pointer_on_external_mouse", true))
         touchpadView = touchpad
+        touchpad.setMoveCursorToTouchpoint(GameNativePrefManager.getBoolean("move_cursor_to_touchpoint", false))
+        // Touch behaviour, again from the prefix: a prefix with mouse
+        // input disabled must not move the pointer at all, and one in
+        // touchscreen mode treats a touch as a click where it landed,
+        // under its own gesture configuration.
+        if (prefix.isDisableMouseInput) {
+            touchpad.setTouchscreenMouseDisabled(true)
+        } else if (prefix.isTouchscreenMode) {
+            touchpad.setTouchscreenMode(true)
+            touchpad.setGestureConfig(TouchGestureConfig.fromJson(prefix.gestureConfig))
+        }
         root.addView(touchpad, matchParent())
         setContentView(root)
 
@@ -285,4 +331,33 @@ class WineGameActivity : Activity() {
                 putExtra(EXTRA_WORKING_DIR, workingDir.absolutePath)
             }
     }
+}
+
+/**
+ * The presentation decisions that are pure functions of the prefix and
+ * the target, so they are tested without a surface.
+ */
+object WinePresentation {
+
+    /**
+     * The Vulkan present mode for a prefix's named one. The numbers are
+     * `VkPresentModeKHR`'s own (immediate 0, mailbox 1, fifo 2, relaxed
+     * 3); anything unnamed is fifo, which is the mode that always
+     * exists.
+     */
+    fun vkPresentMode(name: String?): Int = when (name?.lowercase()) {
+        "immediate" -> 0
+        "mailbox" -> 1
+        "relaxed" -> 3
+        else -> 2
+    }
+
+    /**
+     * The WM class the renderer should blow up to fill the screen: the
+     * target executable's own file name. Both separators are stripped
+     * because a `.desktop` shortcut stores a Windows path and an
+     * installed game stores a Unix one.
+     */
+    fun fullscreenWMClass(target: String): String? =
+        target.substringAfterLast('/').substringAfterLast('\\').takeIf { it.isNotBlank() }
 }
