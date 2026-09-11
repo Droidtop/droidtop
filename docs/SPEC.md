@@ -3529,6 +3529,18 @@ variants a theme may ship for a screen held upright:
    theme declares it, otherwise the list's `front()` --- which is
    therefore always `"automatic"`, since no real theme writes that value
    itself (`ThemeData.cpp:739-746`).
+   A theme that declares NOTHING gets no list, selects nothing, and has
+   no `<aspectRatio>` block applied at all --- ES-DE enters the selection
+   at all only for a non-empty list (`ThemeData.cpp:738`), leaves
+   `sSelectedAspectRatio` empty (`ThemeData.h:301`) and returns on that
+   immediately when parsing (`:2036-2037`). It is not the same as
+   selecting `16:9`, which would apply a block the theme never declared
+   --- a state ES-DE reports as a theme error (`:2057-2061`). A theme
+   that declares `"automatic"` itself gets it twice, because the prepend
+   is unconditional and the re-emit loop starts there; droidtop
+   reproduces that rather than tidying it, since selection is identical
+   either way and the only surface it reaches is the aspect-ratio
+   setting's own option list.
 3. `"automatic"` resolves to the declared ratio numerically closest to
    the live screen's width/height, seeded with `16:9` and its own
    difference so a theme whose every ratio is further away still yields
@@ -4675,6 +4687,14 @@ pad. Consequences:
   Select for gamelist options, Y for the PC surface's stores and folders;
 - **long-press is Y** on a game card or app tile --- the same "act on
   this one" the pad reaches with a second button;
+- a value that is **stepped** rather than opened --- a slider, a small
+  cycling choice --- makes the two arrows the row already draws into two
+  targets, because a touch screen has no Left/Right and a slider has no
+  "open" to tap: it was otherwise pad-only, in the settings list a phone
+  user has to use;
+- the Quick Menu's notifications are rows, not a read-out: a tap moves
+  the cursor and opens one, and dismiss/clear-all are on the hint bar
+  instead of a legend naming buttons that were not there;
 - **swipe steps** a themed carousel, textlist or grid
   (`Modifier.esDeSwipeSteps`). Those widgets own a cursor and move in
   whole entries rather than scrolling, so no Compose gesture applied to
