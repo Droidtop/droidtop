@@ -3713,6 +3713,19 @@ their per-game overrides, and their metadata actions.
 It does not own console ROMs, native Android apps, or anything in the
 theme's system view other than the `pc` card itself.
 
+**What "every game in a folder" means on disk.** A games root is walked
+down through folders that are not games until games are detected, bounded
+at four folders below the root, skipping console-system folders at every
+level. Each detected game is one entry named by its own folder, and a
+folder that merely CONTAINS games is never itself a game — a root added
+above the engine folders (`GameSync/Adult/<engine>/<game>`) yields every
+game inside it, not one game called "Adult". A folder that is itself a
+game stops the descent, because a game's own subfolders (`game/`, `www/`,
+`<name>_Data/`) are not further games. Detection rules that only prove "a
+game is somewhere below here" (the compiled-Ren'Py archive fallback,
+Unity's player search) match every folder between the game root and the
+evidence, so the outermost match in a branch is the game.
+
 ### The model
 
 **Entries.** One `LibraryEntry` per game, exactly as §7g requires — no
@@ -3754,8 +3767,13 @@ it and never gates a launch enginehost would otherwise resolve.
 **Resolution order: availability first, the database's priority second.**
 The engines database's `strategies` list only ranks what is already
 available. The resolved runner and the reason it won are stated on the
-game ("enginehost — default for Ren'Py"), which is what turns that
-priority from an invisible constant into something the user can see.
+game, which is what turns that priority from an invisible constant into
+something the user can see. The runner's name carries the engine where
+the engine is what it means — "enginehost (Ren'Py) — the default for this
+engine" — because enginehost runs a Ren'Py game through one plugin and an
+RPG Maker game through another, and "enginehost" alone does not say
+which. One engine-naming table serves that row, the picker and
+"Install the … plugin".
 
 **Overrides.** Per-game runner choice is an override over that stated
 default, editable where the game is and clearable back to the default.
@@ -3810,10 +3828,16 @@ other people's results on other hardware. It is shown factually, it may be
 filtered on by the user's own act, and it may never hide an entry, reorder
 the library, or block a download (directed 2026-09-01).
 
-**First run.** An empty PC library offers three concrete repairs — sign in
-to stores, add a games folder, set up Windows games — never an empty grid.
-All three are optional, skippable, and reachable again from the surface's
-options menu.
+**First run.** An empty PC library offers concrete repairs — sign in to a
+store, add a games folder, set up Windows games, see what is downloading
+— never an empty grid. They are optional, skippable, and reachable again
+from the surface's options menu, which is the SAME list: implementation
+showed that "three first-run cards" and "the options menu" were the same
+four actions, so they are one settings-catalog screen (`pc_stores`,
+registered by `:app`) rendered in place by the catalog navigator the
+shell's settings already use, rather than two implementations of the same
+rows. Each row states the state it found — whether a store is signed in,
+how many game folders exist.
 
 ### Relationship to the theme engine
 
@@ -3859,6 +3883,20 @@ reimplements an engine's input model.
 (§9), so the store logins, install and download flows, container
 configuration dialogs, compatibility badge and folder-game scanner are
 present in the APK and need entry points, not ports (§7c's "increment 2").
+Those entry points are `:app` Activities, because the Handheld shell
+cannot depend on `:app` and these screens are Compose UI rather than
+catalog data: the store's own app screen for one game (which brings its
+install, verify, update, DLC and delete dialogs with it), the downloads
+queue, an OAuth shim per store, and the container-configuration dialog.
+Which container a game's prefix row opens is droidtop's own question and
+has one answer shared with the launch path — the game's own prefix when a
+store app id keyed one, droidtop's single provisioned container otherwise
+— so the prefix somebody configures is the prefix the game starts in.
+Playing is never one of these screens' jobs: a runner is resolved on the
+game's own screen, so their own play buttons return the user there rather
+than opening a second launch path that could disagree (a store-installed
+engine game is exactly that case — gamenative would run it under Wine,
+droidtop runs it on enginehost).
 What droidtop adds on top is what gamenative has no concept of at all:
 engine games, enginehost routing, availability across four runners, the
 per-game override, and the carousel entry point.
