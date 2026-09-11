@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.asAndroidColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
@@ -288,6 +289,10 @@ fun EsDeThemedView(
     // transition-time element behaviours, `stationary` and
     // `renderDuringTransitions`; see [EsDeTransitionContext].
     transition: EsDeTransitionContext? = null,
+    // How far through a system-to-system FADE the system view currently
+    // is, 0 at rest (SystemView.cpp's own `mFadeOpacity`). Only the
+    // system view has one; every other caller leaves it at rest.
+    systemFadeOpacity: Float = 0f,
 ) {
     BoxWithConstraints(modifier = modifier) {
         val viewWidth = maxWidth
@@ -320,6 +325,20 @@ fun EsDeThemedView(
                 GameSelector.select(focusedSystemEntries, gameCount, allowDuplicates, selection)
             }
         }
+        // SystemView.cpp:1570 and :1695-1725: the primary component's own
+        // zIndex splits the view into what is drawn UNDER it and what is
+        // drawn OVER it, and a system-to-system fade treats the two
+        // differently. Below the primary, ES-DE dims -- multiplies the
+        // element's own colours toward black; above it, elements keep
+        // full opacity and stay legible over the fading carousel unless
+        // the primary itself asked for `fadeAbovePrimary`, in which case
+        // they fade with everything else (:1696-1699, and :207 where they
+        // stop being drawn at all at full fade). The primary is rendered
+        // between the two and is never faded (:204).
+        val primaryElement = view.elements.values.firstOrNull { it.type in ES_DE_PRIMARY_TYPES }
+        val primaryZIndex = primaryElement?.let { zIndexOf(it) } ?: defaultZIndexOf("carousel")
+        val fadeAbovePrimary =
+            primaryElement?.valueOrNull<EsDeThemeValue.Bool>("fadeAbovePrimary")?.value ?: false
         view.elements.values
             // Real ES-DE `visible` property, applies to every element type
             // -- checked once here rather than duplicated in each
@@ -353,6 +372,12 @@ fun EsDeThemedView(
             // instead of the camera's (GamelistView.cpp:552-556): the
             // element stays where it is on screen while the view slides
             // past it.
+            val fadingAbovePrimary = element !== primaryElement &&
+                zIndexOf(element) > primaryZIndex && fadeAbovePrimary
+            val fadingBelowPrimary = element !== primaryElement &&
+                zIndexOf(element) <= primaryZIndex
+            val elementAlpha = if (fadingAbovePrimary) 1f - systemFadeOpacity else 1f
+            val elementDim = if (fadingBelowPrimary) systemFadeOpacity else 0f
             val stationaryHold: Modifier =
                 if (stationary) {
                     Modifier.fillMaxSize().graphicsLayer {
@@ -361,7 +386,7 @@ fun EsDeThemedView(
                 } else {
                     Modifier
                 }
-            EsDeElementLayer(stationaryHold, stationary) {
+            EsDeElementLayer(stationaryHold, stationary, elementAlpha, elementDim) {
             when (element.type) {
                 "image" -> EsDeThemedImage(element, viewWidth, viewHeight, gameSelection)
                 "text" ->
@@ -3909,10 +3934,39 @@ internal fun EsDeContainerScrollClock(
  * are offsets from the same top-left corner -- untouched.
  */
 @Composable
-private fun EsDeElementLayer(modifier: Modifier, held: Boolean, content: @Composable () -> Unit) {
-    if (!held) {
+private fun EsDeElementLayer(
+    modifier: Modifier,
+    held: Boolean,
+    alpha: Float,
+    dim: Float,
+    content: @Composable () -> Unit,
+) {
+    if (!held && alpha >= 1f && dim <= 0f) {
         content()
-    } else {
-        Box(modifier = modifier) { content() }
+        return
     }
+    val base = if (held) modifier else Modifier.fillMaxSize()
+    val painted = if (alpha >= 1f && dim <= 0f) {
+        base
+    } else {
+        base
+            .graphicsLayer {
+                this.alpha = alpha
+                // The dim has to be composited against this element's own
+                // pixels and nothing else, which is what ES-DE's own
+                // per-component `setDimming` does; without its own layer
+                // the black would land on everything already drawn.
+                compositingStrategy = CompositingStrategy.Offscreen
+            }
+            .drawWithContent {
+                drawContent()
+                if (dim > 0f) {
+                    drawRect(Color.Black, alpha = dim, blendMode = BlendMode.SrcAtop)
+                }
+            }
+    }
+    Box(modifier = painted) { content() }
 }
+
+/** The three element types that can be a view's primary component (PrimaryComponent.h). */
+private val ES_DE_PRIMARY_TYPES = setOf("carousel", "grid", "textlist")
