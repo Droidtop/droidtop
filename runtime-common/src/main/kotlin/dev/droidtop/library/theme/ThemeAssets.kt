@@ -141,7 +141,17 @@ object ThemeAssets {
         if (discovered.isEmpty()) return null
         val selected = ThemePrefs.get(context)
         discovered.firstOrNull { it.name == selected }?.let { return it }
-        return defaultThemeFor(context, discovered)
+        val default = defaultThemeFor(context, discovered) ?: return null
+        // A default chosen BECAUSE of the screen's shape is written down
+        // the first time it is resolved, exactly as onboarding's own
+        // portrait step writes it. Without this the choice is re-made on
+        // every read: turning a phone sideways makes isPortraitScreen
+        // false, which puts DEcaffe back mid-session and takes it away
+        // again on the way back -- the theme moving under the user,
+        // which is the one thing this rule must not do. Onboarding only
+        // covers an install that saw that step; this covers the rest.
+        if (default.name != DEFAULT_THEME_NAME) ThemePrefs.set(context, default.name)
+        return default
     }
 
     /**
