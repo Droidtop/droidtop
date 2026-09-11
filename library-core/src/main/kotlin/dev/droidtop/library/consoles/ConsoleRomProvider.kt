@@ -1,6 +1,7 @@
 package dev.droidtop.library.consoles
 
 import android.content.Context
+import dev.droidtop.library.disambiguateTitles
 import dev.droidtop.library.LaunchDisplay
 import dev.droidtop.library.EsDeArtwork
 import dev.droidtop.library.GameMediaLocator
@@ -519,7 +520,12 @@ class ConsoleRomProvider(
                     ),
                 )
             }
-        }.awaitAll().withMetadata()
+        }.awaitAll()
+            // Four rows all reading "LIBRARY" is what a flat filename
+            // title does to an engine that names every game's entry file
+            // the same thing. See disambiguateTitles.
+            .disambiguateTitles(systemFolder)
+            .withMetadata()
     }
 
     /**
