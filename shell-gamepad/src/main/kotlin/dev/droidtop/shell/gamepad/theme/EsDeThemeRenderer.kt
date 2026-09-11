@@ -103,6 +103,7 @@ import dev.droidtop.library.theme.uintOrNull
 import dev.droidtop.library.theme.EsDeImageFit
 import dev.droidtop.library.theme.esDeVideoFrame
 import dev.droidtop.library.theme.esDeImageArea
+import dev.droidtop.library.theme.esDeImageFittedSize
 import dev.droidtop.library.theme.esDeVideoArea
 import dev.droidtop.library.theme.esDeVideoStaticImageArea
 import dev.droidtop.shell.gamepad.input.GamepadAction
@@ -548,6 +549,36 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved?.takeIf { File(it).exists() }
             ?: element.valueOrNull<EsDeThemeValue.Path>("default")?.resolved?.takeIf { File(it).exists() }
     } ?: return
+    // Real ImageComponent::resize (ImageComponent.cpp:775-828): the
+    // element's own mSize is NOT always the declared box. For `maxSize`
+    // (:788-801) it is the FITTED size, and for a `size` with one axis
+    // left at zero (:814-821) the missing axis is derived from the
+    // source's aspect ratio. `origin` then anchors that real size the way
+    // GuiComponent::getPosition does for every ES-DE component. droidtop
+    // anchored the declared box instead, so decaffe's own off-centre edge
+    // art (`back`/`back2`: maxSize 0.5 x 0.77, origin 0 0.5) sat in the
+    // wrong place, and a one-axis `size` produced a box of zero height
+    // and drew nothing at all. A TILED image keeps the box, which is
+    // ES-DE's own :784-786. The intrinsic size needs a decode, which is
+    // why this runs here rather than inside esDeImageArea.
+    val tileEnabled = element.valueOrNull<EsDeThemeValue.Bool>("tile")?.value == true
+    val intrinsic = rememberIntrinsicImageSize(if (tileEnabled) null else path)
+    val fitted = intrinsic?.let {
+        esDeImageFittedSize(
+            targetWidthPx = imageArea.width,
+            targetHeightPx = imageArea.height,
+            sourceWidthPx = it.first,
+            sourceHeightPx = it.second,
+            fit = imageArea.fit,
+            screenWidthPx = viewWidth.value,
+            screenHeightPx = viewHeight.value,
+        )
+    }
+    val drawWidth = (fitted?.first ?: imageArea.width).dp
+    val drawHeight = (fitted?.second ?: imageArea.height).dp
+    val (drawOffsetX, drawOffsetY) =
+        if (fitted == null) offsetX to offsetY
+        else positionOf(element, viewWidth, viewHeight, drawWidth, drawHeight)
     val tint = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) }
     // Real `brightness` (GuiComponent.cpp:393-394, clamped -2..2) and
     // `saturation` (GuiComponent.cpp:404-405, clamped 0..1), applied by
@@ -585,8 +616,8 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     val flipHorizontal = element.valueOrNull<EsDeThemeValue.Bool>("flipHorizontal")?.value ?: false
     val flipVertical = element.valueOrNull<EsDeThemeValue.Bool>("flipVertical")?.value ?: false
     val placement = Modifier
-        .absoluteOffset(x = offsetX, y = offsetY)
-        .size(width = width, height = height)
+        .absoluteOffset(x = drawOffsetX, y = drawOffsetY)
+        .size(width = drawWidth, height = drawHeight)
         .graphicsLayer {
             transformOrigin = TransformOrigin(originFraction.x, originFraction.y)
             rotationZ = rotation
@@ -599,7 +630,6 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // instead of stretching one copy over it. Falls through to the plain
     // stretched draw below when the source can't be decoded to a bitmap
     // (an SVG tile) -- see rememberTileBitmap's own doc comment.
-    val tileEnabled = element.valueOrNull<EsDeThemeValue.Bool>("tile")?.value == true
     val tileBitmap = rememberTileBitmap(if (tileEnabled) path else null)
     if (tileBitmap != null) {
         val tileSize = element.valueOrNull<EsDeThemeValue.Pair>("tileSize")
@@ -689,6 +719,40 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
  * here: an SVG tile falls back to the plain stretched draw rather than
  * being rendered as something invented.
  */
+/**
+ * The source image's own intrinsic pixel size, for the two
+ * [dev.droidtop.library.theme.esDeImageFittedSize] branches that need it.
+ * A bounds-only decode (`inJustDecodeBounds`), so no bitmap is ever
+ * allocated -- ES-DE reads the same number from
+ * `Texture::getSourceImageSize()` (ImageComponent.cpp:780).
+ *
+ * Null for a path that is absent or that BitmapFactory cannot read the
+ * bounds of -- notably SVG, the same honest gap [rememberTileBitmap]
+ * already has. The caller then keeps the declared box, which is what
+ * droidtop did for every image before this.
+ */
+@Composable
+private fun rememberIntrinsicImageSize(path: String?): kotlin.Pair<Float, Float>? {
+    val size by produceState<kotlin.Pair<Float, Float>?>(initialValue = null, path) {
+        value = if (path == null) {
+            null
+        } else {
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeFile(path, options)
+                    if (options.outWidth > 0 && options.outHeight > 0) {
+                        options.outWidth.toFloat() to options.outHeight.toFloat()
+                    } else {
+                        null
+                    }
+                }.getOrNull()
+            }
+        }
+    }
+    return size
+}
+
 @Composable
 private fun rememberTileBitmap(path: String?): ImageBitmap? {
     val bitmap by produceState<ImageBitmap?>(initialValue = null, path) {
