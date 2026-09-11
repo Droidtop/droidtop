@@ -53,6 +53,18 @@ object SecondaryDisplayContent {
         handoffs[mode] = handoff
     }
 
+    /**
+     * Takes a mode's surface back off the secondary screen. A mode
+     * switched OFF mid-session used to leave its registration behind, so
+     * the platform could still compose a disabled mode's surface until the
+     * process next started; [dev.droidtop.app.ModeStartup] now calls this
+     * from the same pass that stops everything else the mode contributes.
+     */
+    fun unregister(mode: Mode) {
+        contents -= mode
+        handoffs -= mode
+    }
+
     internal fun contentFor(mode: Mode): (@Composable () -> Unit)? = contents[mode]
 
     internal fun handoffFor(mode: Mode): ((Context) -> Boolean)? = handoffs[mode]

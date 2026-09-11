@@ -30,11 +30,6 @@ class SettingsCatalogInitProvider : ContentProvider() {
         // where the one-time Handheld -> Gaming preference migration runs.
         Modes.load(appContext)
         AppSettingsCatalogs.ensureRegistered()
-        // Standard hands its secondary display to Launcher3's own UI; that
-        // is the launcher's, not a mode-gated extra, and the platform can
-        // place the secondary-display activity before any droidtop
-        // Activity has run (docs/SPEC.md section 4c).
-        dev.droidtop.app.SecondaryDisplayRegistrations.registerLauncherHandoff()
         // The at-most-daily release probe (one small unauthenticated
         // download, off switch in Settings > Software updates). Process
         // start is the honest trigger: droidtop is a launcher, so its
