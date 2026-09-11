@@ -4339,7 +4339,7 @@ unmetered-only option all come from one function,
 `forced = false` and this one with `forced = true`, so the bypass cannot
 drift from what it bypasses. Guard: `UpdateNowReceiver` is exported but
 declares `android:permission="android.permission.DUMP"`, which only shell
-(what adb runs as), root and the system hold, and it re-checks the sending
+(what adb runs as), root and the system hold, and that permission is the whole guard: a receiver cannot learn the
 uid where Android exposes one (API 34+); any other caller is ignored with a
 log line under the tag `DroidtopUpdateNow`, which is also where the outcome
 of every forced pass is logged. Enginehost gets the same trigger,
