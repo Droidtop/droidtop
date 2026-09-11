@@ -84,6 +84,8 @@ import com.github.penfeizhou.animation.gif.GifDrawable
 import com.github.penfeizhou.animation.loader.FileLoader
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.theme.EsDeImageTypes
+import dev.droidtop.library.theme.EsDeStationaryMode
+import dev.droidtop.library.theme.EsDeTransitionBehaviour
 import dev.droidtop.library.theme.EsDeLetterCase
 import dev.droidtop.library.theme.EsDeAnimationDirection
 import dev.droidtop.library.theme.esDeAnimationFrame
@@ -280,6 +282,12 @@ fun EsDeThemedView(
     // and the identical block at :1160-1175). Only ever true together
     // with [gamelist].
     collectionGamelist: Boolean = false,
+    // What the view around these elements is doing, when it is in the
+    // middle of one of ES-DE's own view transitions -- null whenever
+    // there is no transition concept at the call site. Drives the two
+    // transition-time element behaviours, `stationary` and
+    // `renderDuringTransitions`; see [EsDeTransitionContext].
+    transition: EsDeTransitionContext? = null,
 ) {
     BoxWithConstraints(modifier = modifier) {
         val viewWidth = maxWidth
@@ -318,6 +326,42 @@ fun EsDeThemedView(
             // per-type renderer below.
             .filter { it.valueOrNull<EsDeThemeValue.Bool>("visible")?.value != false }
             .sortedBy { zIndexOf(it) }.forEach { element ->
+            // ES-DE's two transition-time behaviours, both decided per
+            // rendered child (GamelistView.cpp:526-562, SystemView.cpp:
+            // 1673-1740) and both no-ops whenever no transition is
+            // running.
+            val stationary = transition != null && transition.running &&
+                EsDeTransitionBehaviour.isStationary(
+                    EsDeStationaryMode.parse(element.strOrNull("stationary")),
+                    transition.kind,
+                    transition.animation,
+                )
+            // A stationary element is drawn ONCE, by the view being moved
+            // TO -- ES-DE skips the other one outright
+            // (GamelistView.cpp:550-551, the `getSystem() != mRoot->
+            // getSystem()` continue).
+            val skippedAsOutgoingCopy = stationary && transition!!.outgoing
+            val hiddenForThisTransition = transition != null && transition.running &&
+                !EsDeTransitionBehaviour.rendersDuringTransition(
+                    element.valueOrNull<EsDeThemeValue.Bool>("renderDuringTransitions")?.value ?: true,
+                    transition.kind,
+                    transition.animation,
+                )
+            if (skippedAsOutgoingCopy || hiddenForThisTransition) return@forEach
+            // Translating the element back by the container's own current
+            // displacement is ES-DE rendering it with the identity matrix
+            // instead of the camera's (GamelistView.cpp:552-556): the
+            // element stays where it is on screen while the view slides
+            // past it.
+            val stationaryHold: Modifier =
+                if (stationary) {
+                    Modifier.fillMaxSize().graphicsLayer {
+                        translationY = -transition!!.displacement * size.height
+                    }
+                } else {
+                    Modifier
+                }
+            EsDeElementLayer(stationaryHold, stationary) {
             when (element.type) {
                 "image" -> EsDeThemedImage(element, viewWidth, viewHeight, gameSelection)
                 "text" ->
@@ -399,6 +443,7 @@ fun EsDeThemedView(
                 // in the currently browsed system, not just the one/few
                 // gameSelector picked.
                 "gamelistinfo" -> EsDeThemedGamelistInfo(element, viewWidth, viewHeight, focusedSystemEntries)
+            }
             }
         }
         // Real ES-DE HelpComponent semantics: ONE help bar per view,
@@ -3850,5 +3895,24 @@ internal fun EsDeContainerScrollClock(
                 onElapsed(elapsedMs)
             }
         }
+    }
+}
+
+/**
+ * One element's own layer inside a themed view.
+ *
+ * With nothing to hold (the usual case, and every case outside a running
+ * slide) the element is composed exactly where it was before, with no box
+ * around it, so nothing about ordinary rendering changes. While a slide
+ * holds it stationary it gets a full-size layer of its own to be
+ * translated in, which leaves its own placement modifiers -- all of which
+ * are offsets from the same top-left corner -- untouched.
+ */
+@Composable
+private fun EsDeElementLayer(modifier: Modifier, held: Boolean, content: @Composable () -> Unit) {
+    if (!held) {
+        content()
+    } else {
+        Box(modifier = modifier) { content() }
     }
 }
