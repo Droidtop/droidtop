@@ -3849,10 +3849,15 @@ models "a game and its metadata" rather than "a game, four runners and an
 override"; and the screens droidtop reuses here are Compose, so theming
 them would mean rewriting them.
 
-Because every real theme already ships `pc` art, this needs no theme patch
-— which is also why droidtop's engine buckets already theme as `pc` today.
+Because every real theme already ships `pc` art, this needs no theme patch.
 Engine games fold into this one PC entry, with engine as a filter inside
-it, rather than appearing as invented per-engine systems in the carousel.
+it, rather than appearing as invented per-engine systems in the carousel:
+the shell has ONE group for the PC category, and it owns the `pc` system
+id and theme folder outright. Everything that is not a console system's
+ROM belongs to it — a detected engine game (which carries no system id at
+all), a store or Wine title, a Linux-container game, and whatever a user
+put in a games-root folder named `pc`, which can no longer become a
+second card of its own that this surface would then render empty.
 
 Breaking from the theme carries an obligation: droidtop's own chrome —
 this surface, the Quick Menu, the settings catalog and the adopted
