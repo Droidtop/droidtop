@@ -613,13 +613,24 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // not Compose's center-of-box default.
     val originFraction = element.valueOrNull<EsDeThemeValue.Pair>("origin") ?: EsDeThemeValue.Pair(0f, 0f)
     val rotation = element.valueOrNull<EsDeThemeValue.FloatValue>("rotation")?.value ?: 0f
+    val rotationOriginFraction = element.valueOrNull<EsDeThemeValue.Pair>("rotationOrigin")
+        ?.let { EsDeThemeValue.Pair(it.x.coerceIn(0f, 1f), it.y.coerceIn(0f, 1f)) }
+        ?: EsDeThemeValue.Pair(0.5f, 0.5f)
     val flipHorizontal = element.valueOrNull<EsDeThemeValue.Bool>("flipHorizontal")?.value ?: false
     val flipVertical = element.valueOrNull<EsDeThemeValue.Bool>("flipVertical")?.value ?: false
     val placement = Modifier
         .absoluteOffset(x = drawOffsetX, y = drawOffsetY)
         .size(width = drawWidth, height = drawHeight)
         .graphicsLayer {
-            transformOrigin = TransformOrigin(originFraction.x, originFraction.y)
+            // Real `rotationOrigin` (GuiComponent.cpp:384-385), whose own real
+            // default is 0.5 0.5 (GuiComponent.cpp:31) -- a SEPARATE property
+            // from `origin`, and the pivot the rotation actually turns about
+            // (GuiComponent.cpp:311-312 offsets the draw by
+            // `origin - rotationOrigin`, i.e. the two are independent).
+            // droidtop pivoted on `origin`, whose own real default is 0 0, so
+            // every rotated element with a non-centre origin -- decaffe
+            // declares `rotation` on ten of them -- swung about the wrong point.
+            transformOrigin = TransformOrigin(rotationOriginFraction.x, rotationOriginFraction.y)
             rotationZ = rotation
             scaleX = if (flipHorizontal) -1f else 1f
             scaleY = if (flipVertical) -1f else 1f
@@ -1475,6 +1486,9 @@ private fun EsDeThemedAnimation(element: EsDeThemeElement, viewWidth: Dp, viewHe
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
     val originFraction = element.valueOrNull<EsDeThemeValue.Pair>("origin") ?: EsDeThemeValue.Pair(0f, 0f)
     val rotation = element.valueOrNull<EsDeThemeValue.FloatValue>("rotation")?.value ?: 0f
+    val rotationOriginFraction = element.valueOrNull<EsDeThemeValue.Pair>("rotationOrigin")
+        ?.let { EsDeThemeValue.Pair(it.x.coerceIn(0f, 1f), it.y.coerceIn(0f, 1f)) }
+        ?: EsDeThemeValue.Pair(0.5f, 0.5f)
     val tint = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) }
     // Real GIFAnimComponent.cpp:399-401: cornerRadius scales against
     // screen WIDTH (the same one-axis exception image documents).
@@ -1531,7 +1545,7 @@ private fun EsDeThemedAnimation(element: EsDeThemeElement, viewWidth: Dp, viewHe
             .size(width = width, height = height)
             .graphicsLayer {
                 alpha = opacity
-                transformOrigin = TransformOrigin(originFraction.x, originFraction.y)
+                transformOrigin = TransformOrigin(rotationOriginFraction.x, rotationOriginFraction.y)
                 rotationZ = rotation
             }
             .let { if (cornerRadius > 0.dp) it.clip(RoundedCornerShape(cornerRadius)) else it },
