@@ -102,7 +102,7 @@ class WineXSession(
         // environment variables those steps communicate through, which is
         // why its result IS the base env rather than something merged
         // into one.
-        val envVars = runBlocking { WinePrefixPreparation.prepare(context, prefix, xServer.screenInfo) }
+        val envVars: EnvVars = runBlocking { WinePrefixPreparation.prepare(context, prefix, xServer.screenInfo) }
 
         val rootPath = imageFs.rootDir.path
         // Wine's own temp directory, from a previous run. gamenative

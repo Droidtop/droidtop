@@ -126,9 +126,13 @@ class StoreEngineGameTest {
         assertEquals(RunnerState.READY, resolved.option.state)
         assertEquals("enginehost (Ren'Py)", resolved.label)
         // Wine is a real row for this game -- the store shipped an .exe --
-        // and it still loses, which is the point of the yardstick.
+        // and it still loses, which is the point of the yardstick. It is
+        // now READY rather than a setup step (the renderer seam landed),
+        // so what makes enginehost win is the engine row's own priority
+        // and not Wine being unavailable: the stronger form of the same
+        // claim.
         val wine = options.first { it.strategy == GameLaunchStrategy.WINE_PREFIX }
-        assertEquals(RunnerState.NEEDS_SETUP, wine.state)
+        assertEquals(RunnerState.READY, wine.state)
         assertTrue(options.indexOf(wine) > options.indexOf(resolved.option))
     }
 
