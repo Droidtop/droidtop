@@ -85,6 +85,9 @@ import com.github.penfeizhou.animation.loader.FileLoader
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.theme.EsDeImageTypes
 import dev.droidtop.library.theme.EsDeLetterCase
+import dev.droidtop.library.theme.EsDeAnimationDirection
+import dev.droidtop.library.theme.esDeAnimationFrame
+import dev.droidtop.library.theme.esDeAnimationPacingMs
 import dev.droidtop.library.theme.esDeGameOverrideImage
 import dev.droidtop.library.theme.esDeTilePhaseOffset
 import dev.droidtop.library.theme.EsDeHelpButton
@@ -135,6 +138,9 @@ import java.util.TimeZone
 import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -1743,14 +1749,23 @@ internal fun esDeAnimationKind(path: String): EsDeAnimationKind {
  * every other element (see [esDeImageColorFilter] and
  * [esDeColorShiftGradient]).
  *
- * Real, honest gaps -- parsed, not rendered, because APNG4Android's
- * decoder genuinely exposes no corresponding control: `speed` (real clamp
- * 0.2-3.0, GIFAnimComponent.cpp:340-341), `direction`
- * (normal/reverse/alternate/alternateReverse, including alternate's real
- * iteration-doubling, :343-373) and `interpolation` (its Paint is private,
- * and calling Drawable.setFilterBitmap on a drawable that does not honour
- * it would look implemented while doing nothing). Plus
- * `stationary`/`metadataElement`, which wait on inter-view transitions.
+ * `speed` (GIFAnimComponent.cpp:340-341), `direction` (:343-373,
+ * including alternate's iteration-doubling) and `interpolation` (:383-397)
+ * are implemented, but NOT through APNG4Android, which exposes none of
+ * the three -- checked against its own 3.0.2 sources, not assumed:
+ * `FrameSeqDecoder` has no speed or direction control at all, and
+ * `FrameAnimationDrawable`'s `Paint` and its `PaintFlagsDrawFilter` (which
+ * hardcodes FILTER_BITMAP_FLAG) are private finals. A vendored library's
+ * gaps are not droidtop's scope, so when a theme asks for any of the
+ * three the frames are decoded once through the decoder's own public
+ * `getFrameCount`/`getFrameBitmap` and then driven by droidtop's own
+ * clock -- see [esDeAnimationFrame], a port of the frame bookkeeping in
+ * `GIFAnimComponent::update`/`::render`, and [EsDeDrivenAnimation]. A
+ * theme that asks for none of them keeps the library's own playback,
+ * which is the same picture for less memory.
+ *
+ * Real, honest gaps: `stationary`/`metadataElement`, which wait on
+ * per-element opt-outs from the inter-view transitions that now exist.
  */
 @Composable
 private fun EsDeThemedAnimation(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp) {
@@ -1795,10 +1810,48 @@ private fun EsDeThemedAnimation(element: EsDeThemeElement, viewWidth: Dp, viewHe
     // Real clamp 0-10, 0 = infinite (GIFAnimComponent.cpp:370-371).
     // setLoopLimit's own 0 also means unlimited, a direct match.
     val iterationCount = (element.valueOrNull<EsDeThemeValue.UInt>("iterationCount")?.value?.toInt() ?: 0).coerceIn(0, 10)
+    // Real `direction`/`speed`/`interpolation`. Declaring any of them is
+    // what switches this element onto droidtop's own frame driver, since
+    // the library honours none of them; see this function's doc comment.
+    val animationDirection = EsDeAnimationDirection.of(element.strOrNull("direction"))
+    val animationSpeed = element.floatOrNull("speed")
+    val animationFilterQuality = esDeFilterQuality(element)
+    val drivenPlayback = animationDirection != EsDeAnimationDirection.of(null) ||
+        animationSpeed != null ||
+        animationFilterQuality != null
     // Real `size` vs `maxSize` semantics, same as sizeOf's own doc
     // comment: an exact `size` stretches, `maxSize` fits within bounds
     // preserving aspect -- ImageView scale types express exactly that.
     val hasExactSize = element.valueOrNull<EsDeThemeValue.Pair>("size") != null
+    // The shared modifier both playback paths place themselves with, so
+    // the two really are the same element drawn two ways.
+    val animationModifier = Modifier
+        .absoluteOffset(x = offsetX, y = offsetY)
+        .size(width = width, height = height)
+        .esDeRotation(element)
+        .graphicsLayer { alpha = opacity }
+        .esDeColorShiftGradient(tint, tintEnd, gradientHorizontal)
+        .let { if (cornerRadius > 0.dp) it.clip(RoundedCornerShape(cornerRadius)) else it }
+    val animationColorFilter = esDeImageColorFilter(
+        if (esDeHasColorGradient(tint, tintEnd)) null else tint,
+        saturation,
+        brightness,
+        dimming = 1f,
+    )
+    if (drivenPlayback) {
+        EsDeDrivenAnimation(
+            path = path,
+            kind = kind,
+            direction = animationDirection,
+            speed = animationSpeed,
+            iterationCount = iterationCount,
+            filterQuality = animationFilterQuality ?: FilterQuality.Low,
+            hasExactSize = hasExactSize,
+            colorFilter = animationColorFilter,
+            modifier = animationModifier,
+        )
+        return
+    }
     val drawable = remember(path, iterationCount) {
         val loader = FileLoader(path)
         val animation: FrameAnimationDrawable<*> = when (kind) {
@@ -1836,14 +1889,120 @@ private fun EsDeThemedAnimation(element: EsDeThemeElement, viewWidth: Dp, viewHe
                 dimming = 1f,
             )?.asAndroidColorFilter()
         },
-        modifier = Modifier
-            .absoluteOffset(x = offsetX, y = offsetY)
-            .size(width = width, height = height)
-            .esDeRotation(element)
-            .graphicsLayer { alpha = opacity }
-            .esDeColorShiftGradient(tint, tintEnd, gradientHorizontal)
-            .let { if (cornerRadius > 0.dp) it.clip(RoundedCornerShape(cornerRadius)) else it },
+        modifier = animationModifier,
     )
+}
+
+/**
+ * An `animation` element whose theme asked for something APNG4Android
+ * cannot do -- `direction`, `speed` or `interpolation`. The frames are
+ * decoded once, up front, through the decoder's own public
+ * `getFrameCount`/`getFrameBitmap`, and then droidtop's own clock picks
+ * which one is on screen via [esDeAnimationFrame], the port of
+ * `GIFAnimComponent`'s own frame bookkeeping.
+ *
+ * Two honest limits, both stated rather than hidden:
+ *
+ *  * `getFrameBitmap` decodes from frame zero on every call, so building
+ *    the list costs quadratic decode work in the frame count. It happens
+ *    once, off the main thread, and only for an element that asked for
+ *    this path.
+ *  * Every frame is held as a bitmap. A file whose frames would exceed
+ *    [MAX_DECODED_ANIMATION_BYTES] is left to the library's own streaming
+ *    playback with a warning rather than being allowed to exhaust the
+ *    heap -- the theme's `direction`/`speed` then do not apply, and the
+ *    log says so.
+ *
+ * ES-DE reads ONE frame rate for the whole animation rather than
+ * per-frame delays (GIFAnimComponent.cpp:238 divides `1000 / mFrameRate`
+ * by the speed modifier), so the pace here is the file's own first
+ * non-zero frame duration -- the same number for every animation with a
+ * uniform rate, which is every one ES-DE itself plays correctly.
+ */
+private const val MAX_DECODED_ANIMATION_BYTES = 48L * 1024L * 1024L
+
+private class EsDeDecodedAnimation(val frames: List<ImageBitmap>, val pacingMs: Int)
+
+@Composable
+private fun EsDeDrivenAnimation(
+    path: String,
+    kind: EsDeAnimationKind,
+    direction: EsDeAnimationDirection,
+    speed: Float?,
+    iterationCount: Int,
+    filterQuality: FilterQuality,
+    hasExactSize: Boolean,
+    colorFilter: ColorFilter?,
+    modifier: Modifier,
+) {
+    var decoded by remember(path) { mutableStateOf<EsDeDecodedAnimation?>(null) }
+    var tooLarge by remember(path) { mutableStateOf(false) }
+    LaunchedEffect(path, speed) {
+        val result = withContext(Dispatchers.IO) { esDeDecodeAnimation(path, kind, speed) }
+        if (result == null) tooLarge = true else decoded = result
+    }
+    val animation = decoded
+    if (animation == null) {
+        if (tooLarge) {
+            android.util.Log.w(
+                "droidtop.EsDeTheme",
+                "animation $path: too large to drive frame by frame, so direction/speed do not apply",
+            )
+        }
+        return
+    }
+    // withFrameNanos rather than a timer: the frame index is a pure
+    // function of elapsed time, so it only has to be recomputed when
+    // there is actually a frame to draw it on.
+    var elapsedMs by remember(path) { mutableLongStateOf(0L) }
+    LaunchedEffect(animation) {
+        val start = withFrameNanos { it }
+        while (true) {
+            elapsedMs = withFrameNanos { (it - start) / 1_000_000L }
+        }
+    }
+    val index = esDeAnimationFrame(
+        elapsedMs = elapsedMs,
+        totalFrames = animation.frames.size,
+        targetPacingMs = animation.pacingMs,
+        direction = direction,
+        iterationCount = iterationCount,
+    )
+    Image(
+        bitmap = animation.frames[index.coerceIn(animation.frames.indices)],
+        contentDescription = null,
+        // Same `size` vs `maxSize` verbs as the library path.
+        contentScale = if (hasExactSize) ContentScale.FillBounds else ContentScale.Fit,
+        filterQuality = filterQuality,
+        colorFilter = colorFilter,
+        modifier = modifier,
+    )
+}
+
+/** Null when the file's frames would not fit in [MAX_DECODED_ANIMATION_BYTES], or cannot be decoded. */
+private fun esDeDecodeAnimation(path: String, kind: EsDeAnimationKind, speed: Float?): EsDeDecodedAnimation? {
+    val loader = FileLoader(path)
+    val drawable: FrameAnimationDrawable<*> =
+        if (kind == EsDeAnimationKind.GIF) GifDrawable(loader) else APNGDrawable(loader)
+    val decoder = drawable.frameSeqDecoder
+    val count = decoder.frameCount
+    if (count <= 0) return null
+    val bounds = decoder.bounds
+    val bytes = count.toLong() * bounds.width().toLong() * bounds.height().toLong() * 4L
+    if (bytes > MAX_DECODED_ANIMATION_BYTES) return null
+    val frames = ArrayList<ImageBitmap>(count)
+    for (i in 0 until count) {
+        val bitmap = try {
+            decoder.getFrameBitmap(i)
+        } catch (e: java.io.IOException) {
+            null
+        } ?: return null
+        frames += bitmap.asImageBitmap()
+    }
+    val interval = (0 until count)
+        .firstNotNullOfOrNull { decoder.getFrame(it)?.frameDuration?.takeIf { duration -> duration > 0 } }
+        ?: 100
+    return EsDeDecodedAnimation(frames, esDeAnimationPacingMs(interval, speed))
 }
 
 /**
