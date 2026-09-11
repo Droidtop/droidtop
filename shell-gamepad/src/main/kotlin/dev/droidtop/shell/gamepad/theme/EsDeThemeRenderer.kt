@@ -2507,8 +2507,42 @@ private fun sizeOf(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp): ko
     return viewWidth * size.x to viewHeight * size.y
 }
 
+/**
+ * Real per-element-type DEFAULT zIndex. ES-DE does not default every
+ * element to zero: each view builds its components and calls
+ * `setDefaultZIndex` with a value that depends on the element TYPE, then
+ * `zIndex` in the theme overrides it (GuiComponent.h:153,
+ * CarouselComponent.h:1337 `mZIndex = mDefaultZIndex`). The values are
+ * ES-DE's own, identical in both views:
+ * image/video 30 (GamelistView.cpp:220, :232, :244; SystemView.cpp:632,
+ * :640), animation 35 (GamelistView.cpp:257, :265; SystemView.cpp:653,
+ * :661), badges 35 (GamelistView.cpp:286), text/datetime 40
+ * (GamelistView.cpp:330, :346; SystemView.cpp:697, :708, :711, :731,
+ * :741), gamelistinfo/rating 45 (GamelistView.cpp:355, :362;
+ * SystemView.cpp:750) and the primary component -- carousel, grid or
+ * textlist -- 50 (GamelistView.cpp:176, :193, :209, :403;
+ * SystemView.cpp:596, :819).
+ *
+ * droidtop defaulted all of them to 0, which is why decaffe's gamelist
+ * metadata column was invisible: every one of its labels (`playtime2`,
+ * `publisher2`, `developer2`, `genre2`, `players2`, `release2`, `rating`)
+ * declares no `zIndex`, so they sorted at 0 -- BELOW the same view's
+ * `back`/`back2` (1), `backart3` (2) and `gamedisplay` (3) art, which do
+ * declare one. In ES-DE they default to 40/45 and land above all of it.
+ * The elements that did draw (`text name="game"`, the side bands) are
+ * exactly the ones with an explicit `zIndex`.
+ */
+internal fun defaultZIndexOf(type: String): Float = when (type) {
+    "image", "video" -> 30f
+    "animation", "badges" -> 35f
+    "text", "datetime" -> 40f
+    "gamelistinfo", "rating" -> 45f
+    "carousel", "grid", "textlist" -> 50f
+    else -> 0f
+}
+
 private fun zIndexOf(element: EsDeThemeElement): Float =
-    element.valueOrNull<EsDeThemeValue.FloatValue>("zIndex")?.value ?: 0f
+    element.valueOrNull<EsDeThemeValue.FloatValue>("zIndex")?.value ?: defaultZIndexOf(element.type)
 
 /** [EsDeThemeValue.Color.argbLikeRgba] is packed RRGGBBAA (same layout as ES-DE's own getHexColor) -- Compose's Color wants ARGB, so the channels need reordering, not just a straight reinterpret. Internal: EsDeSystemListView shares this exact conversion (it used to keep its own private copy -- one job, one implementation). */
 internal fun colorOf(value: EsDeThemeValue.Color): Color {
