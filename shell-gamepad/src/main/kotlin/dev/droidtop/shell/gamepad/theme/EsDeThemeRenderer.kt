@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -51,6 +52,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageShader
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.asAndroidColorFilter
@@ -160,6 +162,7 @@ import dev.droidtop.library.theme.esDeVerticalContainerHeight
 import dev.droidtop.library.theme.esDeVerticalMaxScrollPx
 import dev.droidtop.library.theme.esDeVerticalScrollIntervalMs
 import dev.droidtop.library.theme.esDeVerticalScrollState
+import kotlin.math.roundToInt
 
 /**
  * Real ES-DE `pos`/`size`/`fontSize`/etc. fractions are of the "screen"
@@ -764,17 +767,26 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
             sourceHeightPx = tileBitmap.height.toFloat(),
         )
         if (tile != null) {
-            // Honest gap, narrow and deliberate: this Compose version's
-            // ImageShader takes no filterQuality, and a per-tile
-            // drawImage loop (which does) would be tens of thousands of
-            // draws for a small tile over a full-screen box. So a TILED
-            // image keeps the platform's own filtering regardless of its
-            // `interpolation` -- every other image path honors it.
-            val brush = remember(tileBitmap) {
-                ShaderBrush(ImageShader(tileBitmap, TileMode.Repeated, TileMode.Repeated))
+            // `interpolation` on a tiled image (ImageComponent.cpp:590).
+            // This Compose version's ImageShader takes no filterQuality
+            // and a per-tile drawImage loop would be tens of thousands of
+            // draws, so the resampling happens ONCE instead: the tile is
+            // scaled to the size the theme asked for with the filter the
+            // theme asked for, and the shader then repeats it one to one.
+            // A theme that declares nothing keeps the platform's filtered
+            // default, exactly as esDeFilterQuality's own doc comment
+            // explains for every other image path.
+            val nearestTile = esDeFilterQuality(element) == FilterQuality.None
+            val tilePixels = remember(tileBitmap, tile, nearestTile) {
+                esDeResampledTile(tileBitmap, tile.first, tile.second, nearestTile)
             }
-            val scaleX = tile.first / tileBitmap.width
-            val scaleY = tile.second / tileBitmap.height
+            val brush = remember(tilePixels) {
+                ShaderBrush(ImageShader(tilePixels, TileMode.Repeated, TileMode.Repeated))
+            }
+            // The tile is already at its requested size, so the fill is
+            // drawn one to one.
+            val scaleX = 1f
+            val scaleY = 1f
             // Real `tileHorizontalAlignment`/`tileVerticalAlignment`
             // (ImageComponent.cpp:684-718): exactly two literals each,
             // anything else warned about and treated as the default.
@@ -794,9 +806,9 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
                         val boxW = size.width / scaleX
                         val boxH = size.height / scaleY
                         val phaseX =
-                            esDeTilePhaseOffset(boxW, tileBitmap.width.toFloat(), tileAlignRight)
+                            esDeTilePhaseOffset(boxW, tilePixels.width.toFloat(), tileAlignRight)
                         val phaseY =
-                            esDeTilePhaseOffset(boxH, tileBitmap.height.toFloat(), tileAlignBottom)
+                            esDeTilePhaseOffset(boxH, tilePixels.height.toFloat(), tileAlignBottom)
                         // The rect grows by exactly what the shift moved
                         // it back by, so the box stays fully covered.
                         drawRect(
@@ -3970,3 +3982,29 @@ private fun EsDeElementLayer(
 
 /** The three element types that can be a view's primary component (PrimaryComponent.h). */
 private val ES_DE_PRIMARY_TYPES = setOf("carousel", "grid", "textlist")
+
+/**
+ * One tile resampled to the size the theme asked for, with the filter the
+ * theme asked for (`interpolation`, ImageComponent.cpp:590). Bounded
+ * because a tile is repeated, not stretched: a tile larger than the
+ * screen is a theme error, not a reason to allocate for it.
+ *
+ * Returns the source untouched when it is already that size, which is the
+ * common case of a tile with no tileSize of its own.
+ */
+private fun esDeResampledTile(
+    source: ImageBitmap,
+    widthPx: Float,
+    heightPx: Float,
+    nearest: Boolean,
+): ImageBitmap {
+    val width = widthPx.roundToInt().coerceIn(1, ES_DE_MAX_TILE_PX)
+    val height = heightPx.roundToInt().coerceIn(1, ES_DE_MAX_TILE_PX)
+    val android = source.asAndroidBitmap()
+    if (width == android.width && height == android.height) return source
+    return runCatching {
+        Bitmap.createScaledBitmap(android, width, height, !nearest).asImageBitmap()
+    }.getOrDefault(source)
+}
+
+private const val ES_DE_MAX_TILE_PX = 4096
