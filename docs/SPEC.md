@@ -2200,19 +2200,12 @@ by reading actual code/formats, not assumed):
     `droidtop_games_root_paths` set and scanned identically: the SAF
     folder picker, and a typed absolute path
     (`GamesRootPrefs.addGamesRootByPath`, mirrored in Settings > ROM
-    folders as "Add a folder by path"). The typed path is not a
-    convenience — the picker can only offer what Android exposes as a SAF
-    storage volume, and real libraries live outside that set: an
-    emulator's host share (BlueStacks mounts one at
-    `/mnt/windows/BstSharedFolder`, readable but neither a volume nor
-    mirrored under `/sdcard`, which left the Android 9 rig with no way to
-    reach the user's games at all), mounts a rooted device adds itself, a
-    USB disk under `/mnt`, and any tree URI whose volume does not follow
-    the `/storage/<volumeId>` convention `resolveStoragePath` depends on.
-    It is validated at entry against the same question the scanner will
-    ask — absolute, exists, is a directory, and `listFiles()` returns
-    something — so an unreadable path is refused with a reason rather
-    than stored and silently scanning nothing.
+    folders as "Add a folder by path"). The typed path is validated at
+    entry against the same question the scanner will ask — absolute,
+    exists, is a directory, and `listFiles()` returns something — so an
+    unreadable path is refused with a reason rather than stored and
+    silently scanning nothing. Why a step that already has a picker also
+    takes a path is §7g, "A root is a place, not a picker result".
   - **DEFAULT_MODE_CHOICE** calls `ModePrefs.setLastMode` — this is what
     `com.android.launcher3.Launcher`'s own real cold-boot redirect
     (`mDroidtopPendingModeRedirect`, already shipping) and
@@ -3663,6 +3656,46 @@ Not present upstream, genuinely absent: **itch.io** (the keyword hits are
 8. **Configuration lives where the thing is.** Per-game choices in
    context on the game; per-platform defaults in that platform's
    settings; nothing important reachable only through a settings hunt.
+
+### A root is a place, not a picker result (directed by the rig, 2026-09-11)
+
+One library across every source has an edge nobody had looked at: the
+library has to be *nameable* in the first place. droidtop could only ever
+learn a games root from a SAF tree URI, which means it could only ever be
+told about places Android is willing to call a storage volume. That is a
+narrower set than "places this app can read", and the difference is not
+exotic — it is where real libraries live. An emulator's host share
+(BlueStacks mounts one at `/mnt/windows/BstSharedFolder`: readable by the
+app, not a volume, not mirrored under `/sdcard`) left the Android 9 rig
+with no way to point droidtop at the user's games at all. So do mounts a
+rooted device adds itself, a USB disk under `/mnt`, and any tree URI
+whose volume does not follow the `/storage/<volumeId>` convention
+`resolveStoragePath` has to reverse.
+
+The design position, which is the same one §7g takes about sources: the
+*place* is the fact, and the way the user named it is not part of the
+library model. A picked tree and a typed path are two input methods for
+one thing, so they write the same `droidtop_games_root_paths` set, are
+scanned by the same walk, and are listed and removed in the same UI. No
+"advanced" second list of roots, no second scanner, no per-origin
+behaviour — which is what would have grown if the typed path had been
+added as an escape hatch beside the real mechanism instead of as a peer
+of it.
+
+Two consequences worth stating, because both are deliberate:
+
+- **A typed path is checked at entry, not at scan time.** The scanner's
+  question (absolute, exists, is a directory, `listFiles()` returns
+  something) is asked while the user is still looking at the field, so a
+  path that is wrong, or that this app is not allowed to read, is refused
+  with the reason. The alternative — store it and let the next scan find
+  nothing — turns a typo into a silent empty library, which is the
+  failure mode droidtop's scanner honesty rules (§7h) exist to prevent.
+- **Typing a path is not a permission.** It reaches only what the app can
+  already read: on API 30+ that is All files access, on API 26-29 the
+  legacy runtime permission (§7b). A path the app has no right to is
+  refused by the same entry check as a path that does not exist, because
+  from the library's point of view they are the same fact.
 
 ### Launch resolution: keep the default, expose it
 
