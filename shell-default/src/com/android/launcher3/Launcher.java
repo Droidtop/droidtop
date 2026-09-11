@@ -161,13 +161,10 @@ import android.view.WindowManager.LayoutParams;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.animation.OvershootInterpolator;
 import android.widget.Toast;
-import android.window.BackEvent;
-import android.window.OnBackAnimationCallback;
 
 import androidx.annotation.CallSuper;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
 import androidx.annotation.UiThread;
 import androidx.annotation.VisibleForTesting;
 import androidx.core.os.BuildCompat;
@@ -234,7 +231,10 @@ import com.android.launcher3.touch.NotificationSwipeController;
 import com.android.launcher3.touch.ItemClickHandler;
 import com.android.launcher3.touch.ItemLongClickListener;
 import com.android.launcher3.util.ActivityResultInfo;
+import com.android.launcher3.util.BackCallback;
+import com.android.launcher3.util.BackGesture;
 import com.android.launcher3.util.BackPressHandler;
+import com.android.launcher3.util.PredictiveBackAdapter;
 import com.android.launcher3.util.CannedAnimationCoordinator;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.ContextTracker;
@@ -698,7 +698,27 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     /**
-     * Provide {@link OnBackAnimationCallback} in below order:
+     * droidtop's predictive-back registration. On API 34 and newer the
+     * launcher can animate a back gesture, so it registers the adapter that
+     * speaks android.window's callback interface; below that the platform
+     * has no gesture to animate and BaseActivity's plain registration (API
+     * 33) or an ordinary KEYCODE_BACK press is the whole story.
+     *
+     * The version check is what keeps {@link PredictiveBackAdapter} -- the
+     * only class here naming API-34 framework types -- off this class's own
+     * load path. See {@link BackGesture}.
+     */
+    @Override
+    protected void registerBackDispatcher() {
+        if (Utilities.ATLEAST_U) {
+            PredictiveBackAdapter.register(this, this::getBackCallback);
+        } else {
+            super.registerBackDispatcher();
+        }
+    }
+
+    /**
+     * Provide {@link BackCallback} in below order:
      * <ol>
      *  <li> auto cancel action mode handler
      *  <li> drag handler
@@ -714,8 +734,7 @@ public class Launcher extends StatefulActivity<LauncherState>
      * Note that state handler will always be handling the back press event if the previous 3 don't.
      */
     @NonNull
-    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-    protected OnBackAnimationCallback getOnBackAnimationCallback() {
+    protected BackCallback getBackCallback() {
         // #1 auto cancel action mode handler
         if (isInAutoCancelActionMode()) {
             return this::finishAutoCancelActionMode;
@@ -741,9 +760,9 @@ public class Launcher extends StatefulActivity<LauncherState>
         }
 
         // #5 state handler
-        return new OnBackAnimationCallback() {
+        return new BackCallback() {
             @Override
-            public void onBackStarted(BackEvent backEvent) {
+            public void onBackStarted(BackGesture gesture) {
                 Launcher.this.onBackStarted();
             }
 
@@ -753,9 +772,9 @@ public class Launcher extends StatefulActivity<LauncherState>
             }
 
             @Override
-            public void onBackProgressed(@NonNull BackEvent backEvent) {
+            public void onBackProgressed(@NonNull BackGesture gesture) {
                 mStateManager.getState().onBackProgressed(
-                        Launcher.this, backEvent.getProgress());
+                        Launcher.this, gesture.getProgress());
             }
 
             @Override
@@ -2264,9 +2283,8 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     @Override
-    @TargetApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     public void onBackPressed() {
-        getOnBackAnimationCallback().onBackInvoked();
+        getBackCallback().onBackInvoked();
     }
 
     // droidtop patch (not upstream Murine/Launcher3): there's no dedicated

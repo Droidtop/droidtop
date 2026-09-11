@@ -15,16 +15,15 @@
  */
 package com.android.launcher3.util;
 
-import android.os.Build;
-import android.window.OnBackAnimationCallback;
-
-import androidx.annotation.RequiresApi;
-
 /**
- * Extension of {@link OnBackAnimationCallback} that allows a check to determine
- * if this callback supports handling back or not
+ * Extension of {@link BackCallback} that allows a check to determine
+ * if this callback supports handling back or not.
+ *
+ * Extends droidtop's own {@link BackCallback}, not
+ * android.window.OnBackAnimationCallback: a class that implements this is
+ * loadable on API 26, which one implementing the framework interface is not
+ * (see {@link BackGesture}).
  */
-@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-public interface BackPressHandler extends OnBackAnimationCallback {
+public interface BackPressHandler extends BackCallback {
     boolean canHandleBack();
 }
