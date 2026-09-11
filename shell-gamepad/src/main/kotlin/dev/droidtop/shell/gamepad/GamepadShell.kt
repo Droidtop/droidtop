@@ -1982,6 +1982,7 @@ private fun GamesSection(
                         ?.let { it == AutoCollections.FAVORITES_ID || it == AutoCollections.LAST_PLAYED_ID } == true,
                 ),
                 backgroundDimmed = gamelistOptionsOpen,
+                gamelist = true,
             )
         } else {
             val allGames = entries.filter { it.gameGroup() == group }

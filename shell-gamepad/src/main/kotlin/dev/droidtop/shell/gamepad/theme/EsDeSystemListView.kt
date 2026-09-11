@@ -176,27 +176,43 @@ data class EsDeListItem(
  * `${system.theme}` logo the theme doesn't ship. The item's own name is
  * drawn as text only when this is null too.
  *
- * One deliberate point where this is not a literal port: when nothing
- * resolves, droidtop tries [logoPath] -- the entry's single pre-resolved
- * artwork -- BEFORE [defaultImage]. A knowing divergence, not an accident:
- * droidtop's own scraper writes covers and little else, so a strict port
- * would blank a fully scraped library the moment a theme asked for a
- * marquee. `none` is exempt from THAT step, because there the theme did
- * not fail to find media, it asked for text -- but not from
- * [defaultImage], because real ES-DE's own `none` branch breaks out of the
- * walk and then falls into exactly the same empty-path default assignment
- * (CarouselComponent.h:571-579).
+ * When the walk finds nothing, the chain ENDS at [defaultImage] and then
+ * at the item's own name as text. It does NOT fall back to [logoPath] --
+ * the entry's single pre-resolved artwork -- which is what droidtop used
+ * to do. That divergence was removed deliberately: real ES-DE's
+ * `CarouselComponent::onDemandTextureLoad` (CarouselComponent.h:549-580,
+ * `GridComponent::onDemandTextureLoad` at GridComponent.h:447-520 is the
+ * same code) runs the type walk, breaks on `none`, and then assigns
+ * `entry.data.defaultImagePath` and nothing else
+ * (CarouselComponent.h:577-578). A theme that asks for a marquee and
+ * gets a cover instead is not showing the theme, and "our scraper mostly
+ * writes covers" is a scraper gap, not a renderer rule.
+ *
+ * [gamelist] is real ES-DE's own `mGamelistView` gate, and it carries the
+ * OTHER half of the same function: an undeclared `<imageType>` in a
+ * gamelist is not "no image type", it is `marquee`
+ * (CarouselComponent.h:485-486, GridComponent.h:452-453 both
+ * `emplace_back("marquee")` on an empty list before the walk). A SYSTEM
+ * carousel never reaches any of this -- its entries arrive with their
+ * logo already assigned, so ES-DE's own `if (entry.data.imagePath == "")`
+ * guard (CarouselComponent.h:549) skips the whole block -- which is why
+ * [logoPath] is still the answer there.
  */
-internal fun EsDeListItem.esDePrimaryImage(imageTypes: List<String>, defaultImage: String?): String? {
-    if (imageTypes.isEmpty()) return logoPath ?: defaultImage
-    val untilNone = imageTypes.takeWhile { it != "none" }
+internal fun EsDeListItem.esDePrimaryImage(
+    imageTypes: List<String>,
+    defaultImage: String?,
+    gamelist: Boolean,
+): String? {
+    // A system-view entry keeps its logo: ES-DE's walk is guarded on an
+    // entry whose image path is still empty, and a system entry's never is.
+    if (!gamelist) return logoPath ?: defaultImage
+    // CarouselComponent.h:485-486 / GridComponent.h:452-453.
+    val declared = imageTypes.ifEmpty { listOf("marquee") }
+    val untilNone = declared.takeWhile { it != "none" }
     val resolved = mediaLocator?.let { EsDeArtwork.resolveImageTypes(it, untilNone) }
-    if (resolved != null) return resolved
-    // `none` reached without a match: the theme asked for text, so the
-    // pre-resolved artwork is skipped -- but the declared default still is
-    // what real ES-DE assigns here.
-    if (untilNone.size != imageTypes.size) return defaultImage
-    return logoPath ?: defaultImage
+    // CarouselComponent.h:577-578: the chain's last link, for a hit and a
+    // miss alike, is the element's own declared default.
+    return resolved ?: defaultImage
 }
 
 /**
@@ -216,6 +232,10 @@ fun EsDeSystemListView(
     firstItemFocus: FocusRequester?,
     modifier: Modifier = Modifier,
     onFocusedIndexChanged: (Int) -> Unit = {},
+    // Real ES-DE `mGamelistView` -- true when this list is browsing GAMES
+    // rather than systems. It decides both halves of the per-entry image
+    // chain; see [esDePrimaryImage].
+    gamelist: Boolean = false,
 ) {
     // Real ES-DE `fontSize`/`itemSize`/`itemSpacing` etc. are fractions of
     // the THEMED area (see LocalEsDeThemedAreaSize's own doc comment for
@@ -260,9 +280,16 @@ fun EsDeSystemListView(
             null
         }
     }
-    val typedItems = remember(items, imageTypes, defaultImage) {
-        if (imageTypes.isEmpty() && defaultImage == null) items
-        else items.map { item -> item.copy(logoPath = item.esDePrimaryImage(imageTypes, defaultImage)) }
+    // A gamelist ALWAYS runs the chain, even with no `imageType` and no
+    // `defaultImage` declared, because the implicit list is `marquee`
+    // there and a miss must reach text rather than the pre-resolved
+    // artwork. A system list only has work to do when the theme declared
+    // a `defaultImage` for its logo-less systems.
+    val typedItems = remember(items, imageTypes, defaultImage, gamelist) {
+        if (!gamelist && defaultImage == null) items
+        else items.map { item ->
+            item.copy(logoPath = item.esDePrimaryImage(imageTypes, defaultImage, gamelist))
+        }
     }
     when (element?.type) {
         // The grid doesn't get onFocusedIndexChanged wired through -- it
