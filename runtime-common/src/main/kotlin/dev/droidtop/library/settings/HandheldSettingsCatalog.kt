@@ -3,6 +3,7 @@ package dev.droidtop.library.settings
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import dev.droidtop.library.theme.EsDeAspectRatio
 import dev.droidtop.library.theme.ThemeAssets
 import dev.droidtop.library.theme.ThemeDownloader
 import dev.droidtop.library.theme.ThemePrefs
@@ -69,6 +70,7 @@ object HandheldSettingsCatalog {
     const val ID_THEME = "pref_handheld_theme"
     const val ID_THEME_COLOR_SCHEME = "pref_handheld_theme_colorscheme"
     const val ID_THEME_VARIANT = "pref_handheld_theme_variant"
+    const val ID_THEME_ASPECT_RATIO = "pref_handheld_theme_aspect_ratio"
     const val ID_SYNC_THEME_INDEX = "pref_handheld_sync_theme_index"
     const val ID_BROWSE_THEMES = "pref_handheld_browse_themes"
     const val ID_APPS_GRID_COLUMNS = "pref_handheld_apps_grid_columns"
@@ -245,6 +247,7 @@ object HandheldSettingsCatalog {
                 add(themeItem(context))
                 themeColorSchemeItem(context)?.let { add(it) }
                 themeVariantItem(context)?.let { add(it) }
+                themeAspectRatioItem(context)?.let { add(it) }
                 add(
                     AsyncActionItem(
                         id = ID_SYNC_THEME_INDEX,
@@ -596,6 +599,34 @@ object HandheldSettingsCatalog {
             options = variants.map { ChoiceOption(it, caps.variantLabels[it] ?: it) },
             current = ThemePrefs.variant(context, themeName) ?: variants.first(),
             onSelect = { ctx, value -> ThemePrefs.setVariant(ctx, themeName, value) },
+        )
+    }
+
+    /**
+     * ES-DE's own "THEME ASPECT RATIO" menu entry (GuiMenu.cpp:365-404):
+     * the options are the active theme's whole capability list in its own
+     * order, labelled by `getAspectRatioLabel`, and the first of them is
+     * always "automatic" -- the resolve-against-the-screen default.
+     * Stored per theme like the color scheme and the variant beside it,
+     * and absent when the theme declares no ratio at all, which is
+     * ES-DE's disabled "NONE DEFINED" state (:397-404).
+     *
+     * Until this, the setting existed and had no way in: a phone user
+     * could not ask a theme with a vertical variant for its landscape
+     * one, or the other way round.
+     */
+    private fun themeAspectRatioItem(context: Context): ChoiceItem? {
+        val caps = ThemeAssets.activeThemeCapabilities(context) ?: return null
+        val themeName = ThemeAssets.activeThemeName(context) ?: return null
+        val ratios = caps.aspectRatios
+        if (ratios.isEmpty()) return null
+        return ChoiceItem(
+            id = ID_THEME_ASPECT_RATIO,
+            title = "Theme aspect ratio",
+            subtitle = "Automatic follows the screen the app is on",
+            options = ratios.map { ChoiceOption(it, EsDeAspectRatio.labelFor(it)) },
+            current = ThemePrefs.aspectRatio(context, themeName) ?: ratios.first(),
+            onSelect = { ctx, value -> ThemePrefs.setAspectRatio(ctx, themeName, value) },
         )
     }
 
