@@ -221,7 +221,8 @@ internal fun PcSurface(
 private fun PcHeader(total: Int, shown: Int, entries: List<LibraryEntry>) {
     val installed = entries.count { it.pcInfo?.installed != false }
     val engineGames = entries.count { it.kind != LibraryEntryKind.WINE_PROFILE }
-    Column(modifier = Modifier.fillMaxWidth().padding(start = 48.dp, end = 48.dp, top = 20.dp, bottom = 4.dp)) {
+    val edge = LocalShellWindow.current.edgePadding
+    Column(modifier = Modifier.fillMaxWidth().padding(start = edge, end = edge, top = 20.dp, bottom = 4.dp)) {
         Text("PC", color = Color.White, style = MaterialTheme.typography.headlineMedium)
         Text(
             buildString {
