@@ -126,7 +126,7 @@ class ScanProgressTest {
     }
 
     @Test
-    fun `only the folder whose own step is slow is skipped; its siblings keep their games`() {
+    fun `only the folder whose own step is slow is skipped, and its siblings keep their games`() {
         renpyGame("cat/A Game")
         renpyGame("cat/B Game")
         renpyGame("cat/slow/Hidden By Slowness")
