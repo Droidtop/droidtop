@@ -72,6 +72,12 @@ object Measure {
      * characters on the rig) is a defect.
      */
     val bodyMaxWidth = 560.dp
+
+    /**
+     * A leading icon in a row -- an app's own icon, a system's logo. One
+     * size, so a run of rows does not step in and out as icons vary.
+     */
+    val rowIcon = 32.dp
 }
 
 /**
