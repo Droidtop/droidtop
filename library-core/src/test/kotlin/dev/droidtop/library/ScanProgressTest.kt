@@ -71,7 +71,7 @@ class ScanProgressTest {
         val budget = ScanBudget.start(budgetMs = 10L, clock = { now })
         now = 100L
 
-        val scanned = GameEngineDetector.scanFolder(folder, emptyMap(), defs, budget = budget)
+        val scanned = GameEngineDetector.scanFolder(folder, emptyMap(), defs, budget = { budget })
 
         assertEquals(emptyList<DetectedGame>(), scanned.games)
         assertEquals(folder, scanned.stoppedAt)
@@ -85,7 +85,7 @@ class ScanProgressTest {
         renpyGame("adult/renpy/Another Game")
         val folder = File(temp.root, "adult")
 
-        val scanned = GameEngineDetector.scanFolder(folder, emptyMap(), defs, budget = ScanBudget.unlimited())
+        val scanned = GameEngineDetector.scanFolder(folder, emptyMap(), defs, budget = { ScanBudget.unlimited() })
 
         assertEquals(
             listOf("A Game", "Another Game"),
@@ -113,16 +113,71 @@ class ScanProgressTest {
         // And every folder's games are found, the store one included
         // (SPEC 7g, yardstick item 5) while the workshop tree is not walked.
         val games = top.folders.flatMap {
-            GameEngineDetector.scanFolder(it, emptyMap(), defs, budget = ScanBudget.unlimited()).games
+            GameEngineDetector.scanFolder(it, emptyMap(), defs, budget = { ScanBudget.unlimited() }).games
         }
         assertEquals(
             listOf("A Game", "Another Game", "Store Game"),
             games.map { it.displayFolder.name }.sorted(),
         )
         val steamSkips = GameEngineDetector
-            .scanFolder(File(root, "Steam"), emptyMap(), defs, budget = ScanBudget.unlimited())
+            .scanFolder(File(root, "Steam"), emptyMap(), defs, budget = { ScanBudget.unlimited() })
             .skippedByReason
         assertTrue(steamSkips.keys.toString(), steamSkips.keys.any { it.contains("Steam owns this tree") })
+    }
+
+    @Test
+    fun `only the folder whose own step is slow is skipped; its siblings keep their games`() {
+        renpyGame("cat/A Game")
+        renpyGame("cat/B Game")
+        renpyGame("cat/slow/Hidden By Slowness")
+        val folder = File(temp.root, "cat")
+
+        // One budget per folder, in walk order: cat, A Game, B Game, slow.
+        // Only the fourth expires, which is the whole point -- a big
+        // healthy library is not pathology, and must not be truncated as
+        // though it were (rig: `adult/` surfaced ONE game of hundreds when
+        // the budget covered a subtree instead of a folder's own step).
+        var folders = 0
+        val scanned = GameEngineDetector.scanFolder(folder, emptyMap(), defs) {
+            folders++
+            if (folders == 4) {
+                var tick = 0L
+                ScanBudget.start(budgetMs = 5L, clock = { tick += 10L; tick })
+            } else {
+                ScanBudget.unlimited()
+            }
+        }
+
+        assertEquals(listOf("A Game", "B Game"), scanned.games.map { it.displayFolder.name }.sorted())
+        assertEquals("slow", scanned.stoppedAt?.name)
+        assertTrue(scanned.skippedByReason.keys.single().contains("budget"))
+    }
+
+    @Test
+    fun `the rom walk skips only the directory whose own listing is slow`() {
+        for (name in listOf("a.iso", "b.iso")) File(temp.root, "ps2/$name").apply { parentFile.mkdirs(); writeText("x") }
+        File(temp.root, "ps2/slow/c.iso").apply { parentFile.mkdirs(); writeText("x") }
+        File(temp.root, "ps2/slow/deeper/d.iso").apply { parentFile.mkdirs(); writeText("x") }
+        File(temp.root, "ps2/DLC/e.iso").apply { parentFile.mkdirs(); writeText("x") }
+
+        // Directories are listed in name order: ps2, DLC (refused by name),
+        // slow. The budget handed out for `slow` is the one that expires.
+        var directories = 0
+        val result = dev.droidtop.library.consoles.RomScanWalk.walk(File(temp.root, "ps2"), setOf("iso")) {
+            directories++
+            if (directories == 2) {
+                var tick = 0L
+                ScanBudget.start(budgetMs = 5L, clock = { tick += 10L; tick })
+            } else {
+                ScanBudget.unlimited()
+            }
+        }
+
+        assertEquals(listOf("a.iso", "b.iso"), result.files.map { it.name })
+        assertEquals("slow", result.stoppedAt?.name)
+        val reasons = ScanLog.countByReason(result.skipped)
+        assertEquals(1, reasons.count { it.key.contains("add-on content") })
+        assertEquals(1, reasons.count { it.key.contains("budget") })
     }
 
     // --- the log line ----------------------------------------------------

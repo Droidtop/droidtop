@@ -291,7 +291,7 @@ object GameEngineDetector {
         systemsById: Map<String, ConsoleSystemDef>,
         defs: List<EngineDef>,
         override: (File) -> GameEngine? = { null },
-        budget: ScanBudget? = null,
+        budget: () -> ScanBudget? = { null },
     ): FolderScan {
         val state = WalkState(budget)
         val games = gamesUnder(folder, systemsById, defs, override, depth = 1, state = state).map { it.game }
@@ -316,7 +316,7 @@ object GameEngineDetector {
         skipped.putAll(top.skippedByReason)
         var stoppedAt: File? = null
         for (folder in top.folders) {
-            val scanned = scanFolder(folder, systemsById, defs, override, ScanBudget.start(budgetMs))
+            val scanned = scanFolder(folder, systemsById, defs, override) { ScanBudget.start(budgetMs) }
             games += scanned.games
             for ((reason, count) in scanned.skippedByReason) skipped[reason] = (skipped[reason] ?: 0) + count
             if (stoppedAt == null) stoppedAt = scanned.stoppedAt
@@ -330,7 +330,7 @@ object GameEngineDetector {
      * returned up it, because a recursive walk that has to thread three
      * accumulators through every return value stops being readable.
      */
-    private class WalkState(val budget: ScanBudget?) {
+    private class WalkState(val newBudget: () -> ScanBudget?) {
         val skipped = LinkedHashMap<String, Int>()
         var stoppedAt: File? = null
 
@@ -338,14 +338,16 @@ object GameEngineDetector {
             skipped[reason] = (skipped[reason] ?: 0) + 1
         }
 
-        /** True when the walk must stop descending; records where, once. */
-        fun stop(folder: File): Boolean {
-            val running = budget ?: return false
-            if (!running.expired) return false
-            if (stoppedAt == null) {
-                stoppedAt = folder
-                skip(running.reason())
-            }
+        /**
+         * True when [folder]'s OWN listing and detection ran past the
+         * budget it was given, which means nothing below it is read. The
+         * first such folder is remembered so the scan's log line can name
+         * it; its siblings carry on with budgets of their own.
+         */
+        fun tooSlow(folder: File, own: ScanBudget?): Boolean {
+            if (own == null || !own.expired) return false
+            if (stoppedAt == null) stoppedAt = folder
+            skip(own.reason())
             return true
         }
     }
@@ -393,11 +395,11 @@ object GameEngineDetector {
         depth: Int,
         state: WalkState,
     ): List<Walked> {
-        // The budget is checked HERE, before this folder's own listFiles()
-        // calls, which is the only place it can actually bound the work:
-        // see ScanBudget's own doc comment for why a timeout outside the
-        // walk stops waiting without stopping walking.
-        if (state.stop(folder)) return emptyList()
+        // This folder's own budget, covering its own listing and
+        // detection below -- not its subtree, which is what would make a
+        // big healthy library look like a pathological one. See
+        // ScanBudget's own doc comment for the rig evidence.
+        val own = state.newBudget()
         override(folder)?.let { return listOf(Walked(DetectedGame(folder, folder, it), precise = true)) }
         // Precise evidence that THIS folder is a game root ends the
         // descent: a game's own subfolders are not further games.
@@ -406,7 +408,7 @@ object GameEngineDetector {
 
         val subtreeHere = detect(folder, defs) { it.readsUnnamedSubtree }
         val below =
-            if (depth < MAX_SCAN_DEPTH) {
+            if (depth < MAX_SCAN_DEPTH && !state.tooSlow(folder, own)) {
                 candidateFolders(folder, systemsById, state)
                     .flatMap { gamesUnder(it, systemsById, defs, override, depth + 1, state) }
             } else {
@@ -817,7 +819,7 @@ class EngineGameProvider(
                     systemsById,
                     defs,
                     override = { candidate -> EngineOverridePrefs.engineFor(context, candidate.absolutePath) },
-                    budget = ScanBudget.start(),
+                    budget = { ScanBudget.start() },
                 )
                 for ((reason, count) in scanned.skippedByReason) {
                     rootSkips[reason] = (rootSkips[reason] ?: 0) + count
