@@ -3838,6 +3838,71 @@ Two consequences worth stating, because both are deliberate:
   refused by the same entry check as a path that does not exist, because
   from the library's point of view they are the same fact.
 
+### The scan's unit of work is a folder (directed by the rig, 2026-09-11)
+
+Pointing droidtop at a whole-library root — the rig's games root is the
+user's entire `G:\games`, stores and ROMs and engine games side by side —
+broke the scan in a way no smaller root had shown. Build 523 surfaced 11
+games out of hundreds and logged `ConsoleRomProvider timed out scanning`.
+Three separate defects, each with its own rule now:
+
+**A store's install tree belongs to the store provider.** The root's
+`Steam` folder resolves to the real ES-DE platform id `steam` ("Valve
+Steam", extensions `desktop`/`sh`), so the ROM provider walked the entire
+Steam install — 1434 directories under `steamapps/workshop` alone. There
+is exactly one prune rule, `ScanPrune`, and every walk that enumerates
+folders asks it and nothing else: the engine detector's candidate folders
+and nested search, the ROM walk, the games-root report, the ES-DE system
+probe. It carries hidden folders and filesystem/sync markers (what the
+detector used to own alone) plus the store rule: **a store library root is
+recognised by its own marker, and a generic scan follows only the subtree
+that holds installed games.** Stated that way rather than as a list of
+folder names to avoid, because the list is long, version-dependent and
+unknowable, while the games subtree is one documented path — the same rule
+prunes `workshop`, `downloading`, `shadercache`, `temp`, `sourcemods` and
+the 19 client directories of a real Steam install without naming any of
+them. `steamapps/common` stays open, deliberately: a store-installed
+engine game must flow through the same detection, grouping and launch
+resolution as one in a games folder (§7g, yardstick item 5). Engine
+detection may look inside `steamapps/common`; nothing looks inside
+`workshop`. Every table entry is read off a real install and cited in
+code; `Launcher` is deliberately not pruned, because a real GOG game in
+this library ships its own.
+
+**A time limit belongs to the unit of work it can bound, which is one
+folder.** The whole-provider timeouts (60 s streaming, 15 s not) are gone,
+and what replaces them is `ScanBudget`: per folder, and checked *inside*
+the walk. Both properties are the point. Per folder, because that is the
+unit whose results can be kept when a sibling is slow — a budget that
+discards everything it did not finish turns a slow scan into an empty one,
+which is precisely what the rig saw. Inside the walk, because a coroutine
+timeout cannot preempt a blocking `listFiles()` already in progress (a
+real case on this device: a corrupted directory entry that hung `ls`
+itself), so enforcing it from outside stops *waiting* without stopping
+*walking*. Over budget means stop descending, keep what was found, and
+name the folder it stopped in.
+
+**Results are published as they arrive, per folder.** `ConsoleRomProvider`
+already streamed per system folder and now gives each one a budget;
+`EngineGameProvider` walked a whole root as one indivisible call and now
+walks each top-level folder of a root separately, so `adult/renpy` appears
+while `Steam` is still being read. A folder that fails or runs over costs
+that folder: nothing already published is ever withdrawn.
+
+**A scan's log is one line per folder and one per root.** Counts, by the
+rule that fired — `1434 x Steam owns this tree` — with games found and the
+duration, never one line per skipped directory. Scanning the whole library
+used to print several hundred `Not listing games in …: it is a hidden
+folder` lines and bury the one line that mattered. The duration is in
+every line because "is the scan bounded" is a question the log has to be
+able to answer.
+
+And because the screen that changes *which* folders are scanned should be
+able to act on that change, ROM folders offers the same "Rescan library"
+action Gaming settings does — the same item, by id, so the in-shell
+renderer's real in-place rescan serves both rather than one screen getting
+a second, weaker mechanism.
+
 ### Launch resolution: keep the default, expose it
 
 The Daijisho model stands, and droidtop half-implements it already. The
