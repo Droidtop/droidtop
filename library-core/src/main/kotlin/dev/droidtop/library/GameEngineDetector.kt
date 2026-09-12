@@ -272,7 +272,7 @@ object GameEngineDetector {
      * ([scanRoot]).
      */
     fun topLevelFolders(root: File, systemsById: Map<String, ConsoleSystemDef>): FolderList {
-        val state = WalkState(budget = null)
+        val state = WalkState(newBudget = { null })
         val folders = candidateFolders(root, systemsById, state)
         return FolderList(folders, state.skipped)
     }
@@ -281,10 +281,12 @@ object GameEngineDetector {
     data class FolderList(val folders: List<File>, val skippedByReason: Map<String, Int> = emptyMap())
 
     /**
-     * Every game under ONE top-level folder (see [topLevelFolders]),
-     * bounded by [budget] if one is given -- the budget is checked at each
-     * folder step, so an over-budget folder stops being descended into and
-     * every game already found in it is still returned.
+     * Every game under ONE top-level folder (see [topLevelFolders]).
+     * [budget] is asked for a FRESH budget at every folder the walk
+     * enters, bounding that folder own listing and detection rather than
+     * the subtree below it: a folder whose own step runs over is not
+     * descended into, its siblings are untouched, and every game already
+     * found is still returned. See [ScanBudget].
      */
     fun scanFolder(
         folder: File,
