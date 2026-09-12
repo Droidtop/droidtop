@@ -17,10 +17,18 @@ import java.io.File
  * So the budget is per folder and cooperative, which are the two
  * properties that make it honest:
  *
- * - **Per folder.** A folder that runs over its budget stops being walked
- *   and says so with a reason; every other folder under every root keeps
- *   its results and its cache row. Nothing a scan already found is ever
- *   discarded because something else was slow.
+ * - **Per folder, and per folder's OWN work.** Each folder gets its own
+ *   budget covering its own listing and detection -- not its whole
+ *   subtree. The rig proved why that distinction decides whether games
+ *   appear: with a subtree budget, `adult/` (eleven engine folders,
+ *   hundreds of games, every individual step fast) surfaced ONE game
+ *   before its 20 seconds ran out. Bigness is not pathology. What a
+ *   budget must catch is a single operation that does not come back -- a
+ *   directory with 18,126 entries on a slow share, a corrupted entry that
+ *   hung `ls` itself -- and that is one folder's own step. A folder whose
+ *   own step runs over is skipped with a reason; its siblings, its parent
+ *   and every other root are untouched, and a large healthy library is
+ *   never truncated for being large.
  * - **Cooperative.** The walks check [expired] between folder steps rather
  *   than being cancelled from outside. A coroutine timeout cannot preempt
  *   one long blocking `listFiles()` already in progress (a real case on
@@ -46,7 +54,8 @@ class ScanBudget private constructor(
     val expired: Boolean get() = budgetMs > 0 && elapsedMs >= budgetMs
 
     /** What a log line says when this budget cut a folder short. */
-    fun reason(): String = "it ran past its ${budgetMs} ms budget; the rest of this folder was not read"
+    fun reason(): String =
+        "reading this folder itself ran past its ${budgetMs} ms budget, so nothing below it was read"
 
     companion object {
         /**

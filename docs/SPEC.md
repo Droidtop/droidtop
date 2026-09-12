@@ -3869,8 +3869,27 @@ detection may look inside `steamapps/common`; nothing looks inside
 code; `Launcher` is deliberately not pruned, because a real GOG game in
 this library ships its own.
 
+**A store root is not a ROM system folder, whatever it is called.**
+`steam` and `epic` are real ids in the platforms database ("Valve Steam",
+"Epic Games Store") whose extensions are `desktop`/`sh`, because in ES-DE
+they hold shortcut FILES. A folder that is an actual store library is a
+different thing, and the ROM scan refuses it: build 525 still spent its
+whole budget walking `steamapps/common` and listed five Linux launch
+scripts as ROMs of system "steam". Store games are the PC surface's, with
+their store facts, runners and install state (§7i).
+
+**A console system is looked for two folders below a root, not one.** The
+rig's root IS the whole library and the user's ROMs live at
+`<root>/roms/<system>`, so at one level droidtop found no systems at all.
+Not deeper, deliberately: platform ids are ordinary words (`android`,
+`pc`, `windows`, `flash`) and a folder three levels down is inside a game,
+where a subfolder named like a platform would invent a system that does
+not exist. Two folders that resolve to the same system under one root
+(`ps2/` beside `roms/ps2/`) are ONE unit of work, because the scan cache
+is keyed on (root, system id).
+
 **A time limit belongs to the unit of work it can bound, which is one
-folder.** The whole-provider timeouts (60 s streaming, 15 s not) are gone,
+folder's own step.** The whole-provider timeouts (60 s streaming, 15 s not) are gone,
 and what replaces them is `ScanBudget`: per folder, and checked *inside*
 the walk. Both properties are the point. Per folder, because that is the
 unit whose results can be kept when a sibling is slow — a budget that
@@ -3881,6 +3900,20 @@ real case on this device: a corrupted directory entry that hung `ls`
 itself), so enforcing it from outside stops *waiting* without stopping
 *walking*. Over budget means stop descending, keep what was found, and
 name the folder it stopped in.
+
+The budget covers a folder's **own** listing and detection, never its
+subtree, and build 525 is why that distinction is in the spec: with a
+subtree budget, `adult/` -- eleven engine folders, hundreds of games,
+every individual step fast -- surfaced ONE game before its twenty seconds
+ran out. Bigness is not pathology. What a budget must catch is a single
+operation that does not come back (a directory of 18,126 entries on a slow
+share; a corrupted entry that hung `ls` itself), and that is one folder's
+own step. A folder whose own step runs over is skipped with its reason;
+its siblings, its parent and every other root are untouched, and a large
+healthy library is never truncated for being large. Total scan time is
+therefore not capped, and must not be: results are published as they
+arrive, so a long scan is a filling grid, while a capped one is a missing
+library.
 
 **Results are published as they arrive, per folder.** `ConsoleRomProvider`
 already streamed per system folder and now gives each one a budget;

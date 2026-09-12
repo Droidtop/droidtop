@@ -8,6 +8,7 @@ import dev.droidtop.library.GameMediaLocator
 import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.ScanBudget
 import dev.droidtop.library.ScanLog
+import dev.droidtop.library.ScanPrune
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
@@ -324,33 +325,34 @@ class ConsoleRomProvider(
                 val root = File(rootPath)
                 val rootStartedAt = System.currentTimeMillis()
                 val rootGames = java.util.concurrent.atomic.AtomicInteger(0)
-                val systemFolders = (root.listFiles() ?: emptyArray()).filter { it.isDirectory }
-                    .mapNotNull { systemFolder ->
-                        SystemOverridePrefs.resolveForFolder(context, systemFolder.absolutePath, systemFolder.name, systemsById)
-                            ?.let { systemFolder to it }
-                    }
+                val systemScan = systemUnitsUnder(root, systemsById)
                 coroutineScope {
-                    systemFolders.forEach { (systemFolder, system) ->
+                    systemScan.units.forEach { unit ->
+                        val system = unit.system
                         coroutineLaunch {
-                        try {
-                            val freshEntries = scanSystemFolder(systemFolder, system)
-                            rootGames.addAndGet(freshEntries.size)
-                            synchronized(accumulatedLock) {
-                                val folderList = accumulatedByRoot.getOrPut(rootPath) { mutableListOf() }
-                                folderList.removeAll { it.systemId == system.id }
-                                folderList += freshEntries
+                            try {
+                                val freshEntries = scanSystemUnit(unit)
+                                rootGames.addAndGet(freshEntries.size)
+                                synchronized(accumulatedLock) {
+                                    val folderList = accumulatedByRoot.getOrPut(rootPath) { mutableListOf() }
+                                    folderList.removeAll { it.systemId == system.id }
+                                    folderList += freshEntries
+                                }
+                                send(accumulatedByRoot.values.flatten())
+                                dao.clearSystemFolder(rootPath, system.id)
+                                dao.insertEntries(freshEntries.map { it.toRomEntity(rootPath, system.id) })
+                                dao.markScanned(ScanMetadataEntity(rootPath, system.id, System.currentTimeMillis()))
+                            } catch (t: Throwable) {
+                                android.util.Log.e(
+                                    "droidtop.ConsoleRomProvider",
+                                    "rescan system=${system.id} under ${root.absolutePath} FAILED",
+                                    t,
+                                )
                             }
-                            send(accumulatedByRoot.values.flatten())
-                            dao.clearSystemFolder(rootPath, system.id)
-                            dao.insertEntries(freshEntries.map { it.toRomEntity(rootPath, system.id) })
-                            dao.markScanned(ScanMetadataEntity(rootPath, system.id, System.currentTimeMillis()))
-                        } catch (t: Throwable) {
-                            android.util.Log.e("droidtop.ConsoleRomProvider", "rescan folder=${systemFolder.absolutePath} FAILED", t)
-                        }
                         }
                     }
                 }
-                logRootSummary(root, systemFolders.size, rootGames.get(), rootStartedAt)
+                logRootSummary(root, systemScan, rootGames.get(), rootStartedAt)
                 }
             }
         }
@@ -369,24 +371,22 @@ class ConsoleRomProvider(
                 coroutineLaunch {
                 val rootStartedAt = System.currentTimeMillis()
                 val rootGames = java.util.concurrent.atomic.AtomicInteger(0)
-                val systemFolders = (root.listFiles() ?: emptyArray()).filter { it.isDirectory }
-                    .mapNotNull { systemFolder ->
-                        SystemOverridePrefs.resolveForFolder(context, systemFolder.absolutePath, systemFolder.name, systemsById)
-                            ?.let { systemFolder to it }
-                    }
-                    // Already has a real scan_metadata row for THIS folder
+                val systemScan = systemUnitsUnder(root, systemsById)
+                val units = systemScan.units
+                    // Already has a real scan_metadata row for THIS system
                     // -- its rows are already in `cached`, skip re-walking.
-                    .filter { (_, system) -> (root.absolutePath to system.id) !in scannedFolders }
-                // Each system folder is its own coroutine with its own
+                    .filter { (root.absolutePath to it.system.id) !in scannedFolders }
+                // Each system is its own coroutine with its own per-folder
                 // budget and publishes the moment it finishes, so one slow
                 // folder costs that folder and nothing else. The root's own
-                // one-line summary is sent once every folder under it has
+                // one-line summary is logged once every system under it has
                 // reported.
                 coroutineScope {
-                    systemFolders.forEach { (systemFolder, system) ->
+                    units.forEach { unit ->
+                        val system = unit.system
                         coroutineLaunch {
                             try {
-                                val folderEntries = scanSystemFolder(systemFolder, system)
+                                val folderEntries = scanSystemUnit(unit)
                                 rootGames.addAndGet(folderEntries.size)
                                 accumulated += folderEntries
                                 send(accumulated.toList())
@@ -394,27 +394,33 @@ class ConsoleRomProvider(
                                 dao.insertEntries(folderEntries.map { it.toRomEntity(root.absolutePath, system.id) })
                                 dao.markScanned(ScanMetadataEntity(root.absolutePath, system.id, System.currentTimeMillis()))
                             } catch (t: Throwable) {
-                                android.util.Log.e("droidtop.ConsoleRomProvider", "scan folder=${systemFolder.absolutePath} FAILED", t)
+                                android.util.Log.e(
+                                    "droidtop.ConsoleRomProvider",
+                                    "scan system=${system.id} under ${root.absolutePath} FAILED",
+                                    t,
+                                )
                             }
                         }
                     }
                 }
-                logRootSummary(root, systemFolders.size, rootGames.get(), rootStartedAt)
+                logRootSummary(root, systemScan, rootGames.get(), rootStartedAt)
                 }
             }
         }
     }
 
     /** One line per root, whatever happened under it (see [ScanLog]). */
-    private fun logRootSummary(root: File, folders: Int, games: Int, startedAt: Long) {
+    private fun logRootSummary(root: File, systemScan: SystemScan, games: Int, startedAt: Long) {
         android.util.Log.i(
             ScanLog.TAG,
             ScanLog.summary(
                 label = "roms root ${root.absolutePath}",
                 games = games,
-                skippedByReason = emptyMap(),
+                skippedByReason = systemScan.skippedByReason,
                 durationMs = System.currentTimeMillis() - startedAt,
-                note = "$folders system folders scanned",
+                note = systemScan.units.joinToString(", ") { unit ->
+                    unit.system.id + if (unit.folders.size > 1) " (${unit.folders.size} folders)" else ""
+                }.ifEmpty { "no console systems found" },
             ),
         )
     }
@@ -440,23 +446,104 @@ class ConsoleRomProvider(
         scannedFolders: Set<Pair<String, String>> = emptySet(),
     ): List<LibraryEntry> = coroutineScope {
         roots.flatMap { root ->
-            (root.listFiles() ?: emptyArray()).filter { it.isDirectory }
-                .mapNotNull { systemFolder ->
-                    SystemOverridePrefs.resolveForFolder(context, systemFolder.absolutePath, systemFolder.name, systemsById)
-                        ?.let { systemFolder to it }
-                }
-                .filter { (_, system) -> (root.absolutePath to system.id) !in scannedFolders }
-                .map { (systemFolder, system) -> Triple(root, systemFolder, system) }
-        }.map { (root, systemFolder, system) ->
+            systemUnitsUnder(root, systemsById).units
+                .filter { (root.absolutePath to it.system.id) !in scannedFolders }
+                .map { unit -> root to unit }
+        }.map { (root, unit) ->
             async {
-                val entries = scanSystemFolder(systemFolder, system)
-                dao.clearSystemFolder(root.absolutePath, system.id)
-                dao.insertEntries(entries.map { it.toRomEntity(root.absolutePath, system.id) })
-                dao.markScanned(ScanMetadataEntity(root.absolutePath, system.id, System.currentTimeMillis()))
+                val entries = scanSystemUnit(unit)
+                dao.clearSystemFolder(root.absolutePath, unit.system.id)
+                dao.insertEntries(entries.map { it.toRomEntity(root.absolutePath, unit.system.id) })
+                dao.markScanned(ScanMetadataEntity(root.absolutePath, unit.system.id, System.currentTimeMillis()))
                 entries
             }
         }.awaitAll().flatten()
     }
+
+
+    /**
+     * One system under one root: the system, and every folder under that
+     * root holding its ROMs. A list of folders rather than one, because a
+     * whole-library root can hold `ps2/` beside `roms/ps2/`, and the scan
+     * cache is keyed on (root, system id) -- one unit of work per system
+     * keeps that key honest instead of letting the second folder's rows
+     * clear the first's.
+     */
+    private data class SystemUnit(val system: ConsoleSystemDef, val folders: List<File>)
+
+    /** [systemUnitsUnder]'s result: the units of work, and what was refused. */
+    private data class SystemScan(val units: List<SystemUnit>, val skippedByReason: Map<String, Int>)
+
+    /**
+     * How far below a games root a console system folder is looked for.
+     *
+     * Two, because the rig's root IS the user's whole library
+     * (`/mnt/windows/BstSharedFolder`, stores and ROMs side by side) and
+     * their ROMs live at `<root>/roms/<system>`: at one level droidtop saw
+     * no systems at all. Not deeper, deliberately -- platform ids are
+     * ordinary words (`android`, `pc`, `windows`, `flash`), and a folder
+     * three levels down is inside a game, where a subfolder that happens
+     * to be named like a platform would invent a system that does not
+     * exist. At two levels the containers are the root's own top-level
+     * folders, whose children are libraries and games, not game internals.
+     */
+    private val MAX_SYSTEM_SEARCH_DEPTH = 2
+
+    /**
+     * Every console system under [root], with the folders holding its
+     * ROMs, plus counts of what was refused and why.
+     *
+     * The one place all four scan paths get their system folders from;
+     * there used to be four copies of a one-level `listFiles()` and none
+     * of them knew about store trees.
+     */
+    private fun systemUnitsUnder(root: File, systemsById: Map<String, ConsoleSystemDef>): SystemScan {
+        val skipped = LinkedHashMap<String, Int>()
+        val found = mutableListOf<Pair<File, ConsoleSystemDef>>()
+
+        fun refuse(reason: String) {
+            skipped[reason] = (skipped[reason] ?: 0) + 1
+        }
+
+        fun walk(folder: File, depth: Int) {
+            val children = (folder.listFiles() ?: emptyArray()).filter { it.isDirectory }.sortedBy { it.name }
+            for (child in children) {
+                val pruned = ScanPrune.skipReason(child)
+                val storeOwner = ScanPrune.storeRootOwner(child)
+                when {
+                    pruned != null -> refuse(pruned)
+                    // A store's install tree is the PC library's, whatever
+                    // the folder is called -- see ScanPrune.storeRootOwner.
+                    storeOwner != null ->
+                        refuse("$storeOwner owns this tree -- its games are the PC library's, not a ROM system")
+                    else -> {
+                        val system = SystemOverridePrefs.resolveForFolder(
+                            context,
+                            child.absolutePath,
+                            child.name,
+                            systemsById,
+                        )
+                        when {
+                            // A system folder's contents are ROMs, so the
+                            // search stops here and the walk takes over.
+                            system != null -> found += child to system
+                            depth < MAX_SYSTEM_SEARCH_DEPTH -> walk(child, depth + 1)
+                        }
+                    }
+                }
+            }
+        }
+
+        walk(root, 1)
+        val units = found
+            .groupBy { it.second.id }
+            .map { (_, pairs) -> SystemUnit(pairs.first().second, pairs.map { it.first }) }
+        return SystemScan(units, skipped)
+    }
+
+    /** Every ROM of [unit]'s system under [unit]'s folders, each folder budgeted on its own. */
+    private suspend fun scanSystemUnit(unit: SystemUnit): List<LibraryEntry> =
+        unit.folders.flatMap { folder -> scanSystemFolder(folder, unit.system) }
 
     // Recursive, not just the system folder's immediate children -- lets a
     // large system be reorganized into subfolders (by first letter, by
@@ -503,7 +590,7 @@ class ConsoleRomProvider(
         // timeout and a line per skipped directory -- see ScanBudget and
         // ScanLog for the rig evidence behind each.
         val startedAt = System.currentTimeMillis()
-        val romScan = RomScanWalk.walk(systemFolder, system.extensions, ScanBudget.start(folderBudgetMs))
+        val romScan = RomScanWalk.walk(systemFolder, system.extensions) { ScanBudget.start(folderBudgetMs) }
         val romFiles = romScan.files
         // Real, genuine file detection beyond what either ES-DE or EmuDeck
         // actually do (both confirmed this session to be purely
