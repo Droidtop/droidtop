@@ -123,36 +123,57 @@ object RomScanWalk {
      * dot) to keep only ROM files for a system; omit it for the raw file
      * set.
      *
-     * [budget] bounds this one folder: when it expires the walk stops
-     * descending and returns the files it already has, with the directory
-     * it stopped in named in [RomScanResult.stoppedAt]. Every sibling
-     * system folder keeps its own full walk -- see [ScanBudget] for why
-     * the budget lives inside the walk rather than around it.
+     * [newBudget] gives each directory its own budget, bounding that
+     * directory's own listing rather than the subtree below it: a
+     * directory that does not come back (a real case on this device: a
+     * `j2me` folder of 18,126 entries, one of them a corrupted entry that
+     * hung `ls` itself) is skipped with its reason and the walk carries on
+     * with its siblings. A large healthy system is never truncated for
+     * being large -- see [dev.droidtop.library.ScanBudget] for why that
+     * distinction decides whether a user's games appear at all.
+     *
+     * An explicit queue rather than [File.walkTopDown], because the budget
+     * has to wrap the one `listFiles()` call it is judging, and a walk
+     * whose listing happens between two of its own callbacks cannot say
+     * which directory was the slow one. Children are taken in name order
+     * and the files come back sorted, so two scans of one folder return
+     * the same list in the same order.
      */
     fun walk(
         systemFolder: File,
         extensions: Set<String>? = null,
-        budget: dev.droidtop.library.ScanBudget? = null,
+        newBudget: () -> dev.droidtop.library.ScanBudget? = { null },
     ): RomScanResult {
+        val files = mutableListOf<File>()
         val skipped = mutableListOf<Pair<File, String>>()
         var stoppedAt: File? = null
-        val files = systemFolder.walkTopDown()
-            .onEnter { directory ->
-                val running = budget
-                if (running != null && running.expired) {
-                    if (stoppedAt == null) {
-                        stoppedAt = directory
-                        skipped += directory to running.reason()
-                    }
-                    return@onEnter false
-                }
-                val reason = skipReason(directory, systemFolder)
-                if (reason != null) skipped += directory to reason
-                reason == null
+        val queue = ArrayDeque<File>()
+        skipReason(systemFolder, systemFolder)
+            ?.let { return RomScanResult(emptyList(), listOf(systemFolder to it)) }
+        queue += systemFolder
+        while (queue.isNotEmpty()) {
+            val directory = queue.removeFirst()
+            val budget = newBudget()
+            val children = directory.listFiles()
+            if (budget != null && budget.expired) {
+                if (stoppedAt == null) stoppedAt = directory
+                skipped += directory to budget.reason()
+                continue
             }
-            .filter { it.isFile && (extensions == null || it.extension.lowercase() in extensions) }
-            .toList()
-        return RomScanResult(files, skipped, stoppedAt)
+            if (children == null) {
+                skipped += directory to "it could not be listed at all"
+                continue
+            }
+            for (child in children.sortedBy { it.name }) {
+                if (child.isDirectory) {
+                    val reason = skipReason(child, systemFolder)
+                    if (reason != null) skipped += child to reason else queue += child
+                } else if (extensions == null || child.extension.lowercase() in extensions) {
+                    files += child
+                }
+            }
+        }
+        return RomScanResult(files.sortedBy { it.absolutePath }, skipped, stoppedAt)
     }
 
     /** [walk]'s file list only, for callers with nothing to report. */

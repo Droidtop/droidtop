@@ -170,6 +170,23 @@ object ScanPrune {
     fun isScannableFolder(dir: File): Boolean = skipReason(dir) == null
 
     /**
+     * The store whose install root [dir] IS, or null.
+     *
+     * A store's install tree is the PC library's business (docs/SPEC.md
+     * §7g, §7i): those games are store games with store facts, runners and
+     * install state. The ROM scan asks this because a store root's NAME can
+     * resolve to a real ES-DE platform -- `steam` ("Valve Steam") and
+     * `epic` ("Epic Games Store") are real ids in the platforms database,
+     * whose extensions are `desktop`/`sh` because in ES-DE they hold
+     * shortcut FILES -- and the rig showed what that costs when the folder
+     * is an actual Steam library instead: the ROM provider walked
+     * `steamapps/common` for 20 seconds and listed five Linux launch
+     * scripts as ROMs of system "steam". A store root is not a system
+     * folder, whatever it is called.
+     */
+    fun storeRootOwner(dir: File): String? = storeRootAt(dir)?.store
+
+    /**
      * Why [dir] is a store's own business rather than a place games live.
      * Walks up to the nearest store root and judges the path from there,
      * so the rule is stated once per store instead of once per folder name
