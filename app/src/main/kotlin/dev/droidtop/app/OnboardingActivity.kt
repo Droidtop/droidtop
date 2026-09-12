@@ -31,6 +31,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -107,6 +109,7 @@ import java.io.File
 class OnboardingActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         val startStep = intent.getStringExtra(EXTRA_START_STEP)
             ?.let { name -> OnboardingStep.entries.firstOrNull { it.name == name } }
         setContent {
@@ -563,6 +566,14 @@ private fun OnboardingScaffold(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            // The action area is docked at the bottom, so it is the first
+            // thing a keyboard covers: typing a games-folder path put Next
+            // underneath the IME with no way to reach it (phone AVD,
+            // 2026-09-11). imePadding lifts the whole frame instead, which
+            // is why the activity fits its own insets rather than letting
+            // the decor do it.
+            .systemBarsPadding()
+            .imePadding()
             .padding(horizontal = window.edgePadding),
     ) {
         // --- progress and Back -------------------------------------
