@@ -62,6 +62,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
@@ -3186,6 +3187,19 @@ private fun EsDeThemedHelpSystem(
     val pos = (if (dimmed) element.pairOrNull("posDimmed") else null) ?: element.pairOrNull("pos")
     val offsetX = viewWidth * (pos?.x ?: 0f)
     val offsetY = viewHeight * (pos?.y ?: 0f)
+    // `origin` says which point of the bar `pos` names, and it was being
+    // ignored here -- the ONE element type that read pos without it.
+    // decaffe declares `<origin>0 0.5</origin>`, so ES-DE centres the bar
+    // vertically on pos while droidtop hung its TOP there: half a row
+    // lower, and with decaffe's pos near the bottom edge the landscape
+    // gamelist drew its help row clipped in half off the window (capture,
+    // 2026-09-11). Every other element goes through `positionOf`, which
+    // has always subtracted origin * size; this one cannot, because the
+    // bar's size is whatever its hints measure to -- so it is applied
+    // after measurement instead.
+    val origin = element.pairOrNull("origin")
+    val originX = origin?.x ?: 0f
+    val originY = origin?.y ?: 0f
     // Real HelpComponent.cpp defaults (0x777777FF, gray) for BOTH colors --
     // droidtop previously guessed White/Black, confirmed wrong against real
     // ES-DE source: a theme that sets only one of textColor/iconColor would
@@ -3252,6 +3266,15 @@ private fun EsDeThemedHelpSystem(
     Row(
         modifier = Modifier
             .absoluteOffset(x = offsetX, y = offsetY)
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                layout(placeable.width, placeable.height) {
+                    placeable.place(
+                        x = -(placeable.width * originX).toInt(),
+                        y = -(placeable.height * originY).toInt(),
+                    )
+                }
+            }
             .esDeRotation(element)
             .esDeBackgroundBox(background)
             .graphicsLayer { alpha = opacity },

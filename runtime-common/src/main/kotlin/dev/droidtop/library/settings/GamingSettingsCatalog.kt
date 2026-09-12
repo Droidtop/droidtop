@@ -560,11 +560,14 @@ object GamingSettingsCatalog {
     private const val MODE_DESKTOP = "DESKTOP"
 
     private fun themeItem(context: Context): ChoiceItem {
-        val themeNames = ThemeAssets.discoverThemes(context).map { it.name }
+        // The VALUE stays the directory id, which is what ThemePrefs
+        // stores; the LABEL is the theme's own name. Settings used to show
+        // the id, so the row read "slate-es-de".
+        val themes = ThemeAssets.discoverThemes(context)
         return ChoiceItem(
             id = ID_THEME,
             title = "Theme",
-            options = themeNames.map { ChoiceOption(it, it) },
+            options = themes.map { ChoiceOption(it.name, ThemeAssets.displayName(context, it)) },
             current = ThemeAssets.activeThemeName(context),
             onSelect = { ctx, value -> ThemePrefs.set(ctx, value) },
         )
