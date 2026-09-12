@@ -99,6 +99,10 @@ object RomScanWalk {
     fun skipReason(directory: File, systemFolder: File): String? = when {
         File(directory, NO_LOAD_MARKER).isFile -> "a $NO_LOAD_MARKER file is present"
         directory.absolutePath == systemFolder.absolutePath -> null
+        // The same rule the engine walk applies: a hidden folder or a
+        // sync/filesystem marker is bookkeeping, not a place ROMs live.
+        !dev.droidtop.library.GameEngineDetector.isScannableFolder(directory) ->
+            "it is a hidden folder or a sync marker, not a game folder"
         isAddOnDirectoryName(directory.name) -> "it holds add-on content, not games"
         else -> null
     }
