@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch as coroutineLaunch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * One "installed thing," modeled after Playnite's plugin architecture: a
@@ -452,10 +451,13 @@ interface LibraryProvider {
      * the caller to wait for the single slowest part of a scan before
      * showing anything at all. Default implementation just wraps [scan]
      * as one single final emission, so every provider keeps working with
-     * zero changes required; only [dev.droidtop.library.consoles.ConsoleRomProvider]
-     * overrides this for real, since it's the one provider whose scan can
-     * take meaningfully long (a real SD card, a real folder with
-     * thousands of files) -- see its own doc comment.
+     * zero changes required; the two providers that walk the filesystem
+     * ([dev.droidtop.library.consoles.ConsoleRomProvider] per system
+     * folder, [EngineGameProvider] per top-level folder of a games root)
+     * override it for real, since they are the ones whose scan can take
+     * meaningfully long (a real SD card, a real folder with thousands of
+     * files) -- see their own doc comments, and ScanBudget for why the
+     * time limit lives per folder inside them rather than around them.
      */
     fun scanProgressive(): Flow<List<LibraryEntry>> = flow { emit(scan()) }
 
@@ -563,16 +565,23 @@ class Library(
         coroutineScope {
             matchingProviders.forEachIndexed { index, provider ->
                 coroutineLaunch {
+                    // No whole-provider timeout, deliberately. There was
+                    // one (60 s), and the rig showed exactly what it cost
+                    // (build 523): one slow subtree under a games root ran
+                    // past it and every game the provider had already
+                    // found was discarded -- "ConsoleRomProvider timed out
+                    // scanning", 11 games in the library. A budget belongs
+                    // to the unit of work it can bound, which is one
+                    // folder, not one provider: see ScanBudget, and the
+                    // per-folder budgets in ConsoleRomProvider and
+                    // EngineGameProvider. A provider that genuinely never
+                    // returns now costs its own results and nothing else,
+                    // which is the same isolation every other failure here
+                    // already gets.
                     try {
-                        val completed = withTimeoutOrNull(60_000) {
-                            streamFor(provider).collect { partial ->
-                                perProviderResults[index] = partial
-                                send(withPlayHistory(perProviderResults.flatten()))
-                            }
-                            true
-                        }
-                        if (completed == null) {
-                            Log.e("droidtop.Library", "Provider ${provider::class.simpleName} timed out scanning")
+                        streamFor(provider).collect { partial ->
+                            perProviderResults[index] = partial
+                            send(withPlayHistory(perProviderResults.flatten()))
                         }
                     } catch (t: Throwable) {
                         Log.e("droidtop.Library", "Provider ${provider::class.simpleName} failed to scan", t)
@@ -583,20 +592,14 @@ class Library(
     }.flowOn(Dispatchers.IO)
 
     private suspend fun scanProviderSafely(provider: LibraryProvider): List<LibraryEntry> = try {
-        // A caught exception alone doesn't cover a provider that genuinely
-        // never returns (a real possibility, not just a defensive guess --
-        // e.g. a storage provider that blocks indefinitely on denied
-        // access rather than throwing or returning null). Note this only
-        // actually helps if the provider's own work has real suspension
-        // points -- a coroutine timeout can't preempt a single long
-        // blocking File I/O call already in progress, only stop waiting
-        // for it further once it does return control. Making the scan
-        // itself fast (see ConsoleRomProvider's own per-system
-        // parallelism) matters more than this timeout for that reason.
-        withTimeoutOrNull(15_000) { provider.scan() } ?: run {
-            Log.e("droidtop.Library", "Provider ${provider::class.simpleName} timed out scanning")
-            emptyList()
-        }
+        // Failures are isolated per provider; slowness is bounded per
+        // FOLDER, inside the provider, by a ScanBudget. There used to be a
+        // 15-second timeout here too, and it had the same defect as the
+        // streaming one above: it could not preempt a blocking File I/O
+        // call already in progress (so it never actually stopped the slow
+        // work), and all it could do when it fired was throw away results
+        // the provider had already produced.
+        provider.scan()
     } catch (t: Throwable) {
         Log.e("droidtop.Library", "Provider ${provider::class.simpleName} failed to scan", t)
         emptyList()

@@ -106,26 +106,53 @@ object RomScanWalk {
             ?: if (isAddOnDirectoryName(directory.name)) "it holds add-on content, not games" else null
     }
 
-    /** Files found, and the directories deliberately not descended into. */
-    data class RomScanResult(val files: List<File>, val skipped: List<Pair<File, String>>)
+    /**
+     * Files found, the directories deliberately not descended into, and
+     * the directory a [dev.droidtop.library.ScanBudget] stopped the walk
+     * in (null when the walk finished).
+     */
+    data class RomScanResult(
+        val files: List<File>,
+        val skipped: List<Pair<File, String>>,
+        val stoppedAt: File? = null,
+    )
 
     /**
      * Every file under [systemFolder] at any depth, minus the ones inside
      * directories [skipReason] rejects. Pass [extensions] (lowercase, no
      * dot) to keep only ROM files for a system; omit it for the raw file
      * set.
+     *
+     * [budget] bounds this one folder: when it expires the walk stops
+     * descending and returns the files it already has, with the directory
+     * it stopped in named in [RomScanResult.stoppedAt]. Every sibling
+     * system folder keeps its own full walk -- see [ScanBudget] for why
+     * the budget lives inside the walk rather than around it.
      */
-    fun walk(systemFolder: File, extensions: Set<String>? = null): RomScanResult {
+    fun walk(
+        systemFolder: File,
+        extensions: Set<String>? = null,
+        budget: dev.droidtop.library.ScanBudget? = null,
+    ): RomScanResult {
         val skipped = mutableListOf<Pair<File, String>>()
+        var stoppedAt: File? = null
         val files = systemFolder.walkTopDown()
             .onEnter { directory ->
+                val running = budget
+                if (running != null && running.expired) {
+                    if (stoppedAt == null) {
+                        stoppedAt = directory
+                        skipped += directory to running.reason()
+                    }
+                    return@onEnter false
+                }
                 val reason = skipReason(directory, systemFolder)
                 if (reason != null) skipped += directory to reason
                 reason == null
             }
             .filter { it.isFile && (extensions == null || it.extension.lowercase() in extensions) }
             .toList()
-        return RomScanResult(files, skipped)
+        return RomScanResult(files, skipped, stoppedAt)
     }
 
     /** [walk]'s file list only, for callers with nothing to report. */
