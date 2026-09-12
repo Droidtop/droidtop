@@ -98,6 +98,6 @@ object EsDeFolderStructure {
      */
     fun alreadyStructured(root: File): Boolean =
         (root.listFiles() ?: emptyArray()).count {
-            it.isDirectory && GameEngineDetector.isScannableFolder(it) && File(it, "systeminfo.txt").isFile
+            it.isDirectory && dev.droidtop.library.ScanPrune.isScannableFolder(it) && File(it, "systeminfo.txt").isFile
         } > 0
 }

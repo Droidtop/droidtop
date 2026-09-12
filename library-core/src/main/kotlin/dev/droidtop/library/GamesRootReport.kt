@@ -62,7 +62,7 @@ object GamesRootReport {
         var roms = 0
         val systems = mutableListOf<String>()
         (root.listFiles() ?: emptyArray())
-            .filter { it.isDirectory && GameEngineDetector.isScannableFolder(it) }
+            .filter { it.isDirectory && ScanPrune.isScannableFolder(it) }
             .sortedBy { it.name }
             .forEach { folder ->
                 val system = resolveSystem(folder.name, systemsById) ?: return@forEach
