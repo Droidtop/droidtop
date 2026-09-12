@@ -6,6 +6,8 @@ import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.consoles.resolveSystem
 import java.io.File
 import java.io.RandomAccessFile
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
 
 /** Which engine a game folder was built with — decoupled from how it gets launched (see [GameLaunchStrategy]/[GameLaunchStrategyResolver]): several launch paths can exist for the same engine. */
 enum class GameEngine {
@@ -240,23 +242,139 @@ object GameEngineDetector {
         // wins over every rule, exactly like SystemOverridePrefs wins
         // over folder-name resolution for console folders.
         override: (File) -> GameEngine? = { null },
-    ): List<DetectedGame> =
-        candidateFolders(root, systemsById)
-            .flatMap { gamesUnder(it, systemsById, defs, override, depth = 1) }
-            .map { it.game }
+    ): List<DetectedGame> = scanRoot(root, systemsById, defs, override).games
+
+    /**
+     * What one walk found, what it did not walk and why, and whether a
+     * budget cut it short.
+     *
+     * [skippedByReason] is counts keyed by the rule that fired, never the
+     * folders it fired on, because that is what a scan's log line says
+     * (see [ScanLog]). [stoppedAt] names the folder a [ScanBudget] ran out
+     * in, and is null when the walk finished -- a scan that was cut short
+     * has to be able to SAY so, since the alternative is a library that is
+     * quietly missing games.
+     */
+    data class FolderScan(
+        val games: List<DetectedGame>,
+        val skippedByReason: Map<String, Int> = emptyMap(),
+        val stoppedAt: File? = null,
+    )
+
+    /**
+     * The top-level folders under [root] that a scan walks, each its own
+     * independent unit of work, plus what was skipped at the root itself.
+     *
+     * Separate from [scanFolder] so a caller can publish results folder by
+     * folder as they arrive and give each folder its own budget
+     * ([EngineGameProvider.scanProgressive] does exactly that). A whole
+     * root is one unit only for callers that genuinely want the final list
+     * ([scanRoot]).
+     */
+    fun topLevelFolders(root: File, systemsById: Map<String, ConsoleSystemDef>): FolderList {
+        val state = WalkState(budget = null)
+        val folders = candidateFolders(root, systemsById, state)
+        return FolderList(folders, state.skipped)
+    }
+
+    /** [topLevelFolders]' result: the units of work, and the root's own skips. */
+    data class FolderList(val folders: List<File>, val skippedByReason: Map<String, Int> = emptyMap())
+
+    /**
+     * Every game under ONE top-level folder (see [topLevelFolders]),
+     * bounded by [budget] if one is given -- the budget is checked at each
+     * folder step, so an over-budget folder stops being descended into and
+     * every game already found in it is still returned.
+     */
+    fun scanFolder(
+        folder: File,
+        systemsById: Map<String, ConsoleSystemDef>,
+        defs: List<EngineDef>,
+        override: (File) -> GameEngine? = { null },
+        budget: ScanBudget? = null,
+    ): FolderScan {
+        val state = WalkState(budget)
+        val games = gamesUnder(folder, systemsById, defs, override, depth = 1, state = state).map { it.game }
+        return FolderScan(games, state.skipped, state.stoppedAt)
+    }
+
+    /**
+     * Every game under [root], as one unit of work -- [topLevelFolders]
+     * plus [scanFolder] for each, with [budgetMs] applied to each folder
+     * separately (0 = no budget).
+     */
+    fun scanRoot(
+        root: File,
+        systemsById: Map<String, ConsoleSystemDef>,
+        defs: List<EngineDef>,
+        override: (File) -> GameEngine? = { null },
+        budgetMs: Long = 0L,
+    ): FolderScan {
+        val top = topLevelFolders(root, systemsById)
+        val games = mutableListOf<DetectedGame>()
+        val skipped = LinkedHashMap<String, Int>()
+        skipped.putAll(top.skippedByReason)
+        var stoppedAt: File? = null
+        for (folder in top.folders) {
+            val scanned = scanFolder(folder, systemsById, defs, override, ScanBudget.start(budgetMs))
+            games += scanned.games
+            for ((reason, count) in scanned.skippedByReason) skipped[reason] = (skipped[reason] ?: 0) + count
+            if (stoppedAt == null) stoppedAt = scanned.stoppedAt
+        }
+        return FolderScan(games, skipped, stoppedAt)
+    }
+
+    /**
+     * One walk's bookkeeping: the budget it runs under, the skips it has
+     * counted, and where it stopped. Carried through the walk rather than
+     * returned up it, because a recursive walk that has to thread three
+     * accumulators through every return value stops being readable.
+     */
+    private class WalkState(val budget: ScanBudget?) {
+        val skipped = LinkedHashMap<String, Int>()
+        var stoppedAt: File? = null
+
+        fun skip(reason: String) {
+            skipped[reason] = (skipped[reason] ?: 0) + 1
+        }
+
+        /** True when the walk must stop descending; records where, once. */
+        fun stop(folder: File): Boolean {
+            val running = budget ?: return false
+            if (!running.expired) return false
+            if (stoppedAt == null) {
+                stoppedAt = folder
+                skip(running.reason())
+            }
+            return true
+        }
+    }
+
+    /** Why a console-system folder is not walked for engine games. */
+    private const val CONSOLE_SYSTEM_FOLDER_REASON =
+        "it is a console system folder, scanned for ROMs instead"
 
     /**
      * The subfolders of [folder] the walk may look at: directories that
-     * are not console-system folders, in name order rather than
-     * [File.listFiles] order (which is filesystem-defined and can differ
-     * between scans, and the walk's results must not).
+     * [ScanPrune] allows and that are not console-system folders, in name
+     * order rather than [File.listFiles] order (which is
+     * filesystem-defined and can differ between scans, and the walk's
+     * results must not). Every rejection is counted in [state] so the
+     * scan's one log line can say what it skipped and why.
      */
     private fun candidateFolders(
         folder: File,
         systemsById: Map<String, ConsoleSystemDef>,
+        state: WalkState,
     ): List<File> =
         (folder.listFiles() ?: emptyArray())
-            .filter { it.isDirectory && ScanPrune.isScannableFolder(it) && resolveSystem(it.name, systemsById) == null }
+            .filter { it.isDirectory }
+            .filter { dir ->
+                val reason = ScanPrune.skipReason(dir)
+                    ?: CONSOLE_SYSTEM_FOLDER_REASON.takeIf { resolveSystem(dir.name, systemsById) != null }
+                if (reason != null) state.skip(reason)
+                reason == null
+            }
             .sortedBy { it.name }
 
     /**
@@ -273,7 +391,13 @@ object GameEngineDetector {
         defs: List<EngineDef>,
         override: (File) -> GameEngine?,
         depth: Int,
+        state: WalkState,
     ): List<Walked> {
+        // The budget is checked HERE, before this folder's own listFiles()
+        // calls, which is the only place it can actually bound the work:
+        // see ScanBudget's own doc comment for why a timeout outside the
+        // walk stops waiting without stopping walking.
+        if (state.stop(folder)) return emptyList()
         override(folder)?.let { return listOf(Walked(DetectedGame(folder, folder, it), precise = true)) }
         // Precise evidence that THIS folder is a game root ends the
         // descent: a game's own subfolders are not further games.
@@ -283,8 +407,8 @@ object GameEngineDetector {
         val subtreeHere = detect(folder, defs) { it.readsUnnamedSubtree }
         val below =
             if (depth < MAX_SCAN_DEPTH) {
-                candidateFolders(folder, systemsById)
-                    .flatMap { gamesUnder(it, systemsById, defs, override, depth + 1) }
+                candidateFolders(folder, systemsById, state)
+                    .flatMap { gamesUnder(it, systemsById, defs, override, depth + 1, state) }
             } else {
                 emptyList()
             }
@@ -636,7 +760,43 @@ class EngineGameProvider(
     override val kinds: Set<LibraryEntryKind> = GameEngine.entries.map { it.toLibraryEntryKind() }.toSet()
 
     override suspend fun scan(): List<LibraryEntry> {
+        val found = mutableListOf<LibraryEntry>()
+        scanRootsByFolder { entries -> found += entries }
+        return found.finish()
+    }
+
+    /**
+     * Real, streaming scan: every top-level folder under every root is its
+     * own unit of work, published the moment it finishes and bounded by its
+     * own [ScanBudget].
+     *
+     * The rig's failure (build 523) is why this provider has one at all.
+     * It used to walk every root as a single indivisible call, so its
+     * results existed only at the very end -- and when
+     * [dev.droidtop.library.Library]'s whole-provider timeout fired on one
+     * slow subtree, every game the walk had already found went in the bin.
+     * Folder by folder, a slow folder costs that folder: `Adult/renpy`
+     * appears while `Steam` is still being read, and a folder that runs
+     * over budget says so in its own log line instead of silently taking
+     * the library down with it.
+     */
+    override fun scanProgressive(): Flow<List<LibraryEntry>> = channelFlow {
+        val accumulated = mutableListOf<LibraryEntry>()
+        scanRootsByFolder { entries ->
+            accumulated += entries
+            send(accumulated.finish())
+        }
+    }
+
+    /**
+     * The one walk behind both [scan] and [scanProgressive]: every root's
+     * top-level folders, each scanned under its own budget and handed to
+     * [publish] as it finishes, with one log line per folder and one per
+     * root (see [ScanLog]).
+     */
+    private suspend fun scanRootsByFolder(publish: suspend (List<LibraryEntry>) -> Unit) {
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
+        val defs = EnginesDatabase.defs(context)
         val installs = storeInstalls()
         val installsByDir = installs.byInstallDir()
         // A store game's install directory is a CHILD of the root
@@ -645,38 +805,75 @@ class EngineGameProvider(
         // here so this provider works from a bare list of installs too.
         val roots = (GamesRoots.current(context) + extraRoots() + installs.mapNotNull { it.installDir.parentFile })
             .distinctBy { it.absolutePath }
-        // .withScrapedMetadata is what makes a scrape of an engine game
-        // visible at all: the scraper writes a game_metadata row keyed by
-        // the entry id, and without this merge the next scan rebuilt the
-        // entry straight from the filesystem and dropped every scraped
-        // field on the floor.
-        return roots.flatMap { root ->
-            GameEngineDetector.scan(
-                root,
-                systemsById,
-                EnginesDatabase.defs(context),
-                override = { folder -> EngineOverridePrefs.engineFor(context, folder.absolutePath) },
-            ).map { detected ->
-                LibraryEntry(
-                    id = detected.displayFolder.absolutePath,
-                    title = detected.displayFolder.name,
-                    kind = detected.engine.toLibraryEntryKind(),
-                    artworkUri = EsDeArtwork.resolve(root, detected.engine.esDeSystemName(), detected.displayFolder.name),
-                    // Same three arguments the resolve() above already
-                    // takes -- carried instead of re-derived. See
-                    // GameMediaLocator.
-                    mediaLocator = GameMediaLocator(
-                        root.absolutePath,
-                        detected.engine.esDeSystemName(),
-                        detected.displayFolder.name,
+        for (root in roots) {
+            val rootStartedAt = System.currentTimeMillis()
+            val top = GameEngineDetector.topLevelFolders(root, systemsById)
+            val rootSkips = LinkedHashMap<String, Int>(top.skippedByReason)
+            var rootGames = 0
+            for (folder in top.folders) {
+                val folderStartedAt = System.currentTimeMillis()
+                val scanned = GameEngineDetector.scanFolder(
+                    folder,
+                    systemsById,
+                    defs,
+                    override = { candidate -> EngineOverridePrefs.engineFor(context, candidate.absolutePath) },
+                    budget = ScanBudget.start(),
+                )
+                for ((reason, count) in scanned.skippedByReason) {
+                    rootSkips[reason] = (rootSkips[reason] ?: 0) + count
+                }
+                rootGames += scanned.games.size
+                android.util.Log.i(
+                    ScanLog.TAG,
+                    ScanLog.summary(
+                        label = "engine folder ${folder.absolutePath}",
+                        games = scanned.games.size,
+                        skippedByReason = scanned.skippedByReason,
+                        durationMs = System.currentTimeMillis() - folderStartedAt,
+                        note = scanned.stoppedAt?.let { "stopped in ${it.absolutePath}" },
                     ),
-                ).withStoreInstall(installsByDir.forFolder(detected.displayFolder))
+                )
+                publish(scanned.games.map { it.toEntry(root, installsByDir) })
             }
+            android.util.Log.i(
+                ScanLog.TAG,
+                ScanLog.summary(
+                    label = "games root ${root.absolutePath}",
+                    games = rootGames,
+                    skippedByReason = rootSkips,
+                    durationMs = System.currentTimeMillis() - rootStartedAt,
+                    note = "${top.folders.size} folders scanned",
+                ),
+            )
         }
-            // Roots can overlap now that store installs contribute their
-            // own parents; the same folder reached from two roots is
-            // still one game.
-            .distinctBy { it.id }
+    }
+
+    private fun DetectedGame.toEntry(root: File, installsByDir: Map<String, StoreInstall>): LibraryEntry =
+        LibraryEntry(
+            id = displayFolder.absolutePath,
+            title = displayFolder.name,
+            kind = engine.toLibraryEntryKind(),
+            artworkUri = EsDeArtwork.resolve(root, engine.esDeSystemName(), displayFolder.name),
+            // Same three arguments the resolve() above already takes --
+            // carried instead of re-derived. See GameMediaLocator.
+            mediaLocator = GameMediaLocator(
+                root.absolutePath,
+                engine.esDeSystemName(),
+                displayFolder.name,
+            ),
+        ).withStoreInstall(installsByDir.forFolder(displayFolder))
+
+    /**
+     * What every published snapshot passes through: roots can overlap now
+     * that store installs contribute their own parents, so the same folder
+     * reached from two roots is still one game, and .withScrapedMetadata is
+     * what makes a scrape of an engine game visible at all (the scraper
+     * writes a game_metadata row keyed by the entry id, and without this
+     * merge the next scan rebuilt the entry straight from the filesystem
+     * and dropped every scraped field on the floor).
+     */
+    private suspend fun List<LibraryEntry>.finish(): List<LibraryEntry> =
+        distinctBy { it.id }
             .withScrapedMetadata(
                 dev.droidtop.library.consoles.RomDatabase.get(context).romDao(),
                 // A game scraped BEFORE this rule existed has its metadata
@@ -685,7 +882,6 @@ class EngineGameProvider(
                 // look like it had been thrown away.
                 alsoUnderId = { it.pcInfo?.storeId },
             )
-    }
 
     /** [gameRoot] to [detectedEngine] -- see [GameEngineDetector.scan]'s own doc comment for why [gameRoot] isn't always [entry]'s own [LibraryEntry.id] folder. */
     private data class ResolvedEntry(val gameRoot: File, val detectedEngine: GameEngine)
