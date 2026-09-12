@@ -21,33 +21,8 @@ class LibraryNamingTest {
     /** The real shipped registry, as GameEngineDetectorTest uses. */
     private val defs = EngineRegistryParser.parse(SeedAssets.read("engines-database.json"))
 
-    // --- hidden and marker folders are not games -------------------------
-
-    @Test
-    fun `sync markers and hidden folders are never scanned`() {
-        listOf(
-            ".stfolder",
-            ".stversions",
-            ".stignore",
-            ".Trash-1000",
-            ".thumbnails",
-            "System Volume Information",
-            "\$RECYCLE.BIN",
-            "lost+found",
-        ).forEach { name ->
-            assertFalse(
-                "$name must not be scanned as a game folder",
-                GameEngineDetector.isScannableFolder(File(temp.root, name)),
-            )
-        }
-    }
-
-    @Test
-    fun `an ordinary game folder is still scanned`() {
-        listOf("Sonic Adventure", "renpy-game", "Adult", "found", "recycle bin of doom").forEach { name ->
-            assertTrue(name, GameEngineDetector.isScannableFolder(File(temp.root, name)))
-        }
-    }
+    // --- hidden and marker folders are not games ---------------------
+    // The rule itself is ScanPruneTest's; this is the detector using it.
 
     @Test
     fun `a marker folder beside a real game does not become an entry`() {
