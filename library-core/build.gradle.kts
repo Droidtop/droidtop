@@ -26,6 +26,16 @@ android {
     }
 
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/platformDatabase/assets"))
+
+    // The scan code logs for real (one line per folder, one per root --
+    // see ScanLog), and a JVM unit test that walks a temporary folder
+    // therefore reaches android.util.Log, whose unmocked stub throws. The
+    // library's per-provider isolation is exactly the behaviour a test
+    // must be able to exercise, so the stubs return defaults here rather
+    // than the production code growing a second, test-only log seam.
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 // --- The bundled databases are a SNAPSHOT of droidtop-platforms ----------
