@@ -36,6 +36,7 @@ import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.FolderPickItem
+import dev.droidtop.library.settings.GamingSettingsCatalog
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.library.settings.TextInputItem
@@ -1221,6 +1222,14 @@ object AppSettingsCatalogs {
                             },
                         ),
                     ),
+                ),
+                CatalogGroup(
+                    id = "rom_folders_rescan",
+                    title = null,
+                    // The same action Gaming settings offers, not a second
+                    // one: this screen changes WHICH folders are scanned,
+                    // so it is where a user wants to act on that change.
+                    items = listOf(GamingSettingsCatalog.rescanLibraryItem()),
                 ),
                 CatalogGroup(
                     id = "rom_folders_list",

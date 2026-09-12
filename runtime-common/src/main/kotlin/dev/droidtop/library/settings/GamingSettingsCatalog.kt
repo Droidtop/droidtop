@@ -228,22 +228,7 @@ object GamingSettingsCatalog {
                         run = { _ -> dev.droidtop.runtime.DisplayArrangement.reinitialize() },
                     ),
                 )
-                add(
-                    ActionItem(
-                        id = ID_RESCAN_LIBRARY,
-                        title = "Rescan library",
-                        subtitle = "Look for new or changed games and apps again",
-                        // Default fulfillment: the real deep-link relaunch
-                        // (the only mechanism available from outside the
-                        // shell's own composition). The in-shell renderer
-                        // substitutes its own scan-trigger bump by id.
-                        run = launchComponent(
-                            "dev.droidtop.app.MainActivity",
-                            "dev.droidtop.app.EXTRA_MODE" to "gaming",
-                            "dev.droidtop.app.EXTRA_GAMING_RESCAN" to true,
-                        ),
-                    ),
-                )
+                add(rescanLibraryItem())
                 add(themeItem(context))
                 themeColorSchemeItem(context)?.let { add(it) }
                 themeVariantItem(context)?.let { add(it) }
@@ -643,6 +628,28 @@ object GamingSettingsCatalog {
         onChange = { ctx, value ->
             CatalogPrefs.prefs(ctx).edit().putInt(ID_APPS_GRID_COLUMNS, value).apply()
         },
+    )
+
+    /**
+     * The ONE "look at my games again" action, so the screen that changes
+     * which folders are scanned can offer it too (ROM folders, whose own
+     * subtitle says changes apply on the next rescan and used to leave the
+     * user to find it elsewhere). Same id deliberately: the in-shell
+     * renderer substitutes its own scan-trigger bump by id, so both places
+     * get the real in-place rescan rather than one of them getting a
+     * second, weaker mechanism.
+     */
+    fun rescanLibraryItem(): ActionItem = ActionItem(
+        id = ID_RESCAN_LIBRARY,
+        title = "Rescan library",
+        subtitle = "Look for new or changed games and apps again",
+        // Default fulfillment: the real deep-link relaunch (the only
+        // mechanism available from outside the shell's own composition).
+        run = launchComponent(
+            "dev.droidtop.app.MainActivity",
+            "dev.droidtop.app.EXTRA_MODE" to "gaming",
+            "dev.droidtop.app.EXTRA_GAMING_RESCAN" to true,
+        ),
     )
 
     private fun launchComponent(className: String, vararg extras: Pair<String, Any>): (Context) -> Unit = { ctx ->
