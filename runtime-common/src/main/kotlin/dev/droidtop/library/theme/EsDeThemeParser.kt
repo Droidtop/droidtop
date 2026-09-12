@@ -104,6 +104,13 @@ data class EsDeThemeCapabilities(
     val transitions: List<EsDeTransitionProfile> = emptyList(),
     /** Real `<suppressTransitionProfiles><entry>` (ThemeData.cpp:1719-1751): built-in profiles this theme refuses. */
     val suppressedTransitionProfiles: List<String> = emptyList(),
+    /**
+     * The theme's own `<themeName>`, which is what a person calls it --
+     * "Slate", not the directory id `slate-es-de`. Settings showed the
+     * directory id, which is developer notation in a user-facing string
+     * (docs/SPEC.md 7k, "Copy is part of the system").
+     */
+    val themeName: String? = null,
 )
 
 object EsDeThemeParser {
@@ -140,11 +147,18 @@ object EsDeThemeParser {
         val fontSizes = mutableListOf<String>()
         val variants = mutableListOf<String>()
         val languages = mutableListOf<String>()
-        val colorSchemeLabels = mutableMapOf<String, String>()
-        val variantLabels = mutableMapOf<String, String>()
+        // Every language's label, per axis entry. Real capabilities.xml
+        // files declare one <label> per supported language (slate-es-de
+        // ships 24), so keeping ONE string per entry meant the last one
+        // parsed won and Settings showed a Traditional Chinese label on an
+        // English device -- "Theme variant" read the Chinese for "textlist
+        // with videos" on the rig. See [resolveLabels].
+        val colorSchemeLabelsByLanguage = mutableMapOf<String, MutableMap<String, String>>()
+        val variantLabelsByLanguage = mutableMapOf<String, MutableMap<String, String>>()
+        var themeName: String? = null
         // Tracks which axis entry a following <label> belongs to (labels
         // are children of their colorScheme/variant block).
-        var pendingLabelTarget: Pair<MutableMap<String, String>, String>? = null
+        var pendingLabelTarget: Pair<MutableMap<String, MutableMap<String, String>>, String>? = null
         val transitions = mutableListOf<EsDeTransitionProfile>()
         val suppressedTransitionProfiles = mutableListOf<String>()
         // The <transitions> block currently being read, if any -- its own
@@ -220,25 +234,29 @@ object EsDeThemeParser {
                     }
                     "colorScheme" -> parser.getAttributeValue(null, "name")?.let {
                         colorSchemes += it
-                        pendingLabelTarget = colorSchemeLabels to it
+                        pendingLabelTarget = colorSchemeLabelsByLanguage to it
                     }
                     "variant" -> parser.getAttributeValue(null, "name")?.let {
                         variants += it
-                        pendingLabelTarget = variantLabels to it
+                        pendingLabelTarget = variantLabelsByLanguage to it
                     }
                     // A <label> inside a <transitions> block belongs to
                     // THAT profile, not to the last colorScheme/variant
                     // seen (ThemeData.cpp:1675-1700 reads it as a child of
                     // the transitions node).
                     "label" -> {
+                        val language = parser.getAttributeValue(null, "language").orEmpty()
                         val text = readText(parser)
                         val open = openTransitions
                         if (open != null) {
                             openTransitions = open.copy(label = open.label ?: text)
                         } else {
-                            pendingLabelTarget?.let { (map, name) -> map[name] = text }
+                            pendingLabelTarget?.let { (map, name) ->
+                                map.getOrPut(name) { mutableMapOf() }[language] = text
+                            }
                         }
                     }
+                    "themeName" -> themeName = readText(parser)
                     "language" -> languages += readText(parser)
                 }
             }
@@ -259,9 +277,37 @@ object EsDeThemeParser {
             // first declared ratio and the screen was never consulted at all.
             EsDeAspectRatio.capabilityList(aspectRatios),
             colorSchemes, fontSizes, variants, languages,
-            colorSchemeLabels, variantLabels,
-            transitions, suppressedTransitionProfiles,
+            resolveLabels(colorSchemeLabelsByLanguage), resolveLabels(variantLabelsByLanguage),
+            transitions, suppressedTransitionProfiles, themeName,
         )
+    }
+
+    /**
+     * One label per axis entry, in the language actually being read.
+     *
+     * Real ES-DE looks the label up by the running language and falls back
+     * to `en_US` when the theme does not declare that language
+     * (ThemeData.cpp's `mCurrentLanguage` lookups over the capability
+     * labels); droidtop has no language setting of its own yet, so the
+     * device's own locale is the language. The order is: the exact
+     * `language_COUNTRY`, any label in the same language, `en_US`,
+     * `en_GB`, a label with no `language` attribute at all (older themes),
+     * and finally the first one declared -- never "the last one parsed",
+     * which is what this used to be.
+     */
+    internal fun resolveLabels(byEntry: Map<String, Map<String, String>>): Map<String, String> {
+        val locale = java.util.Locale.getDefault()
+        val exact = if (locale.country.isNullOrBlank()) locale.language else "${locale.language}_${locale.country}"
+        val languagePrefix = locale.language + "_"
+        return byEntry.mapNotNull { (entry, labels) ->
+            val chosen = labels[exact]
+                ?: labels.entries.firstOrNull { it.key.startsWith(languagePrefix) }?.value
+                ?: labels["en_US"]
+                ?: labels["en_GB"]
+                ?: labels[""]
+                ?: labels.values.firstOrNull()
+            chosen?.let { entry to it }
+        }.toMap()
     }
 
     /**

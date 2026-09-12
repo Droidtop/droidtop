@@ -227,6 +227,31 @@ object ThemeAssets {
         return parsed
     }
 
+    /**
+     * What a person calls this theme. A theme's own `<themeName>` where it
+     * declares one, and otherwise its directory id with the `-es-de`
+     * suffix dropped and the words capitalised -- never the raw id, which
+     * is developer notation in a user-facing string (docs/SPEC.md 7k).
+     * Settings listed "slate-es-de" and onboarding called the same theme
+     * "DEcaffe" in prose, two notations for one thing in one flow.
+     */
+    fun displayName(context: Context, theme: ThemeDescriptor): String =
+        capabilitiesOf(context, theme)?.themeName?.takeIf { it.isNotBlank() }
+            ?: humanisedThemeId(theme.name)
+
+    /** [displayName] for a theme known only by its directory id. */
+    fun displayName(context: Context, themeId: String): String =
+        discoverThemes(context).firstOrNull { it.name == themeId }
+            ?.let { displayName(context, it) }
+            ?: humanisedThemeId(themeId)
+
+    private fun humanisedThemeId(id: String): String =
+        id.removeSuffix("-es-de")
+            .split('-', '_')
+            .filter { it.isNotBlank() }
+            .joinToString(" ") { part -> part.replaceFirstChar { it.uppercase() } }
+            .ifBlank { id }
+
     private val capabilitiesCache = mutableMapOf<String, EsDeThemeCapabilities>()
 
     /** Public read of [resolveActiveTheme]'s own name -- the real, resolved active theme, for UI display/cycling, not just the raw (possibly unset) [ThemePrefs] value. */

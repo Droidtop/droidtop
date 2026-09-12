@@ -11,6 +11,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import dev.droidtop.hostbridge.ClipboardBridge
 import dev.droidtop.library.Library
@@ -216,6 +220,14 @@ class MainActivity : AppCompatActivity() {
             // ES-DE-themed surfaces take their colors from the active
             // ES-DE theme instead and simply don't read these tokens.
             dev.droidtop.app.ui.DroidtopTheme {
+            // Two clocks disagreeing on one screen is what a themed view
+            // under a visible system status bar looks like (portrait
+            // capture, 2026-09-11: the OS bar read 5:14 and the theme's
+            // own clock 17:14). A themed view owns its whole surface, so
+            // in Gaming mode droidtop goes immersive and the theme's clock
+            // is the only one. Every other mode keeps the system bars: a
+            // home screen and a desktop both want them.
+            LaunchedEffect(mode) { applySystemBars(mode) }
             when (mode) {
                 Mode.GAMING -> GamepadShell(
                     library = library,
@@ -267,6 +279,27 @@ class MainActivity : AppCompatActivity() {
                 Mode.LAUNCHER, null -> Unit
             }
             }
+        }
+    }
+
+
+    /**
+     * The system bars' one decision point. Gaming mode is immersive --
+     * the ES-DE theme draws its own clock, help row and battery, and a
+     * second set above it is two answers to one question (SPEC 7k, "one
+     * help/hint bar per screen"; the clock defect was found on the
+     * portrait rig). Transient-by-swipe, so the bars are still reachable.
+     */
+    private fun applySystemBars(mode: Mode?) {
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        if (mode == Mode.GAMING) {
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            controller.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+        } else {
+            WindowCompat.setDecorFitsSystemWindows(window, true)
+            controller.show(WindowInsetsCompat.Type.systemBars())
         }
     }
 
