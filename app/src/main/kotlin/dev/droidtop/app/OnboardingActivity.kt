@@ -1377,7 +1377,9 @@ private fun WhatNextStep(
         }
         if (gamingConfigured) {
             add(
-                if (gamesFound > 0) "Gaming: $gamesFound games found in your folders."
+                if (gamesFound > 0) {
+                    "Gaming: $gamesFound " + (if (gamesFound == 1) "game" else "games") + " found in your folders."
+                }
                 else "Gaming: set up, with no games found yet.",
             )
         }
