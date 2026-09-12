@@ -2321,7 +2321,9 @@ buttons and a link. The component is the shell's existing menu row anatomy
   and offers the A/B swap as an explicit question rather than a setting to discover. Skippable,
   and says so.
 - **Appearance.** Themes as the one choice component with a real rendered preview, named by
-  display name — never a directory id, never a theme's own untranslated capability label. On a
+  display name — the theme's own `<themeName>`, never a directory id, and never a theme's own
+  untranslated capability label (a `capabilities.xml` declares one `<label>` per language, so
+  the label is resolved for the running language with `en_US` as the floor, as ES-DE does). On a
   portrait screen the portrait-capable theme is preselected and the reason is stated as a
   property of the themes, not as a swap to accept; choosing a landscape-only theme anyway
   restates what that will look like. The resolved default is written down the first time it
@@ -4949,4 +4951,21 @@ screen, positioned inside the window.
 
 **Copy is part of the system.** Sentence case, one dash convention, one name per concept, verb
 labels on buttons, no developer notation and no backend error strings in a user-facing string.
+
+**Where it lives.** One file, `shell-gamepad/.../DesignTokens.kt`, in that module because it is
+the one both the Gaming shell and `:app` can see — a token half the chrome cannot reach is not
+a system. It carries `Space` (the step scale), `Measure.bodyMaxWidth` (the readable line),
+`TypeRole` naming the job of each role with `DroidtopTypography` behind it, and `ChromeColors`
+as the colour source for chrome outside the shell's menus. `DroidtopTheme` supplies the colour
+scheme and the type scale together and defines neither itself. The window-derived
+measurements — gutter, tab gap, minimum grid item, minimum touch target, maximum panel
+width — stay on `ShellWindow`, which is the one place that asks how much room there is.
+
+Two things implementation settled. A **disabled label** needs its own token: Material's stock
+38% alpha lands at 2.3:1 on the light ground, which is not a control a person sees, so
+`ChromeColors.DisabledAlpha` is the one value droidtop's chrome fades by and it clears 3:1 in
+both palettes. And **onboarding takes the dark palette deliberately** rather than the system
+setting (section 7b), which is what lets it use the shell's own menu row anatomy — those
+tokens are absolute against the menu overlay surface and legible over a dark ground and
+nothing else.
 

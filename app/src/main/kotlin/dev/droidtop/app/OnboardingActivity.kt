@@ -56,7 +56,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import dev.droidtop.library.GamesRootReport
 import dev.droidtop.library.consoles.EsDeFolderStructure
 import dev.droidtop.library.theme.ThemeAssets
@@ -688,7 +687,7 @@ private fun SelectableRow(
             val bitmap = remember(drawable) {
                 runCatching { drawable.toBitmap(width = 96, height = 96).asImageBitmap() }.getOrNull()
             }
-            bitmap?.let { Image(bitmap = it, contentDescription = null, modifier = Modifier.size(32.dp)) }
+            bitmap?.let { Image(bitmap = it, contentDescription = null, modifier = Modifier.size(Measure.rowIcon)) }
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Hair)) {
             Text(
