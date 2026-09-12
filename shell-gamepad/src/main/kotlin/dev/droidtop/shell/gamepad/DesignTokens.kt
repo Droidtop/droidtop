@@ -22,6 +22,16 @@ import androidx.compose.ui.unit.sp
  * screens) can see; a token that only half the chrome can reach is not a
  * system. A themed ES-DE view is deliberately out of scope: it takes
  * every colour, typeface and measurement from the theme's own files.
+ *
+ * **Names first, values second.** What a screen reads is a ROLE -- the
+ * gap between two things that belong together, the style of a row title,
+ * the colour of a supporting line. The numbers and hex values behind
+ * those roles are one visual identity, they all live in this file, and
+ * swapping the identity is an edit HERE and nowhere else: no screen
+ * names a size, a weight or a colour of its own, so none of them has to
+ * change when the identity does. The values below are droidtop's current
+ * ones (the dark set is exactly what the chrome used as literals before
+ * any theme existed, so dark mode did not move when this landed).
  */
 
 /**
