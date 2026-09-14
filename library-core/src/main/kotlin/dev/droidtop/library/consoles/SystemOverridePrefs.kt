@@ -40,7 +40,7 @@ object SystemOverridePrefs {
      */
     fun resolveForFolder(context: Context, folderPath: String, folderName: String, systemsById: Map<String, ConsoleSystemDef>): ConsoleSystemDef? {
         val overrideId = get(context, folderPath)
-        if (overrideId != null) return systemsById[overrideId]
+        if (overrideId != null) return systemsById[overrideId]?.takeIf { it.canResolveFromFolder() }
         return resolveSystem(folderName, systemsById)
     }
 }
