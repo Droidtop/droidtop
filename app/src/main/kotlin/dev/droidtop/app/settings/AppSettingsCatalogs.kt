@@ -6,6 +6,7 @@ import dev.droidtop.app.GamesRootPrefs
 import dev.droidtop.library.scraper.importGamelistXml
 import dev.droidtop.library.scraper.scrapeSystemArtwork
 import dev.droidtop.library.consoles.ConsoleSystemDef
+import dev.droidtop.library.consoles.canResolveFromFolder
 import dev.droidtop.library.consoles.ConsoleSystemEntity
 import dev.droidtop.library.consoles.ConsoleSystemsDatabase
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
@@ -490,7 +491,7 @@ object AppSettingsCatalogs {
         title = "System",
         subtitle = "Which platform this folder's games belong to",
         options = listOf(ChoiceOption("", "(automatic, from the folder name)")) +
-            systems.sortedBy { it.displayName.lowercase() }.map { ChoiceOption(it.id, "${it.displayName} (${it.id})") },
+            systems.filter { it.canResolveFromFolder() }.sortedBy { it.displayName.lowercase() }.map { ChoiceOption(it.id, "${it.displayName} (${it.id})") },
         current = SystemOverridePrefs.get(context, folder.absolutePath) ?: "",
         onSelect = { ctx, value ->
             SystemOverridePrefs.set(ctx, folder.absolutePath, value.ifEmpty { null })

@@ -202,6 +202,7 @@ private val SYSTEM_ID_ALIASES: Map<String, String> = mapOf(
 internal fun resolveSystem(folderName: String, systemsById: Map<String, ConsoleSystemDef>): ConsoleSystemDef? {
     val id = folderName.lowercase()
     return systemsById[SYSTEM_ID_ALIASES[id] ?: id]
+        ?.takeIf { it.canResolveFromFolder() }
 }
 
 /**

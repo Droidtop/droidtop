@@ -27,4 +27,9 @@ data class ConsoleSystemDef(
     val displayName: String,
     val extensions: Set<String>,
     val retroArchCore: String?,
+    /** Discovery integration which owns this platform, when applicable. */
+    val ownedBy: String? = null,
 )
+
+/** Store libraries come from their integration, never folder-name inference. */
+fun ConsoleSystemDef.canResolveFromFolder(): Boolean = !ownedBy.equals("store", ignoreCase = true)

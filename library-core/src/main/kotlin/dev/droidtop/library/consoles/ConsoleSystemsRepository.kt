@@ -16,7 +16,11 @@ object ConsoleSystemsRepository {
     suspend fun allSystems(context: Context): List<ConsoleSystemDef> {
         val dao = ConsoleSystemsDatabase.get(context).consoleSystemDao()
         seedIfEmpty(context, dao)
-        return dao.getAll().map { it.toConsoleSystemDef() }
+        // Ownership is integration policy from the refreshable platform
+        // database, not a user-editable platform property. Join it at read
+        // time so a refresh takes effect without overwriting user edits.
+        val owners = PlatformsDatabase.builtIns(context).associate { it.id to it.ownedBy }
+        return dao.getAll().map { it.toConsoleSystemDef().copy(ownedBy = owners[it.id]) }
     }
 
     suspend fun upsert(context: Context, system: ConsoleSystemDef, isBuiltIn: Boolean = false) {

@@ -78,6 +78,7 @@ object PlatformsDatabase {
                 displayName = platform.optString("name", platform.getString("id")),
                 extensions = extensions,
                 retroArchCore = platform.optString("retroArchCore", "").ifEmpty { null },
+                ownedBy = platform.optString("ownedBy", "").ifEmpty { null },
             )
         }
         check(result.isNotEmpty()) { "Platforms database has no platforms" }
