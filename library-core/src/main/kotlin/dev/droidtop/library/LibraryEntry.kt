@@ -2,11 +2,18 @@ package dev.droidtop.library
 
 import android.util.Log
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
@@ -479,6 +486,45 @@ class Library(
     private val providers: List<LibraryProvider>,
     private val playHistory: PlayHistoryStore = NoOpPlayHistoryStore,
 ) {
+    private val scanScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val backgroundScanStates = ConcurrentHashMap<Set<LibraryEntryKind>, MutableStateFlow<List<LibraryEntry>?>>()
+    private val backgroundScanJobs = mutableMapOf<Set<LibraryEntryKind>, Job>()
+
+    /**
+     * Process-owned scan results. The Library instance belongs to LibraryCore and
+     * outlives every Activity/Compose screen, so collectors may come and go
+     * without cancelling the filesystem walk that produces these values.
+     */
+    fun backgroundScanState(kinds: Set<LibraryEntryKind>): StateFlow<List<LibraryEntry>?> =
+        backgroundScanStates.getOrPut(kinds.toSet()) { MutableStateFlow(null) }.asStateFlow()
+
+    /** Start (or explicitly restart) a scan in [scanScope], never in a UI scope. */
+    fun scanInBackground(kinds: Set<LibraryEntryKind>, rescan: Boolean = false) {
+        val key = kinds.toSet()
+        val state = backgroundScanStates.getOrPut(key) { MutableStateFlow(null) }
+        lateinit var job: Job
+        job = scanScope.coroutineLaunch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
+            try {
+                val flow = if (rescan) rescanKindsProgressive(key) else scanKindsProgressive(key)
+                flow.collect { state.value = it }
+            } finally {
+                synchronized(backgroundScanJobs) {
+                    if (backgroundScanJobs[key] === job) backgroundScanJobs.remove(key)
+                }
+            }
+        }
+        synchronized(backgroundScanJobs) {
+            val running = backgroundScanJobs[key]
+            // A configuration change replays the Activity's rescan intent.
+            // Joining the process-owned job is what makes that harmless;
+            // cancelling/restarting here would still lose the folder currently
+            // being scanned even though Compose no longer owns the coroutine.
+            if (running?.isActive == true) return
+            backgroundScanJobs[key] = job
+            job.start()
+        }
+    }
+
     // Two real, separate bugs this fixes, found by actually reading how
     // Daijishō does the equivalent (its DaijishouSynchronizationModel):
     //
