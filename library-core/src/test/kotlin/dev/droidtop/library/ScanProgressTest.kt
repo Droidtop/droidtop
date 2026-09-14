@@ -1,6 +1,9 @@
 package dev.droidtop.library
 
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.toList
@@ -292,5 +295,41 @@ class ScanProgressTest {
         assertTrue(last.map { it.id }.contains("kept"))
         assertTrue(last.map { it.id }.contains("other"))
         assertFalse(last.map { it.id }.contains("never"))
+    }
+
+    @Test
+    fun `background rescan survives when its screen stops observing`() = runBlocking {
+        val first = entry("first", LibraryEntryKind.RENPY)
+        val second = entry("second", LibraryEntryKind.RENPY)
+        val continueScan = CompletableDeferred<Unit>()
+        val starts = AtomicInteger()
+        val provider = object : LibraryProvider {
+            override val kinds = setOf(LibraryEntryKind.RENPY)
+            override suspend fun scan() = emptyList<LibraryEntry>()
+            override suspend fun launch(entry: LibraryEntry) = Unit
+            override fun rescanProgressive(): Flow<List<LibraryEntry>> = flow {
+                starts.incrementAndGet()
+                emit(listOf(first))
+                continueScan.await()
+                emit(listOf(first, second))
+            }
+        }
+        val library = Library(listOf(provider))
+        val state = library.backgroundScanState(provider.kinds)
+
+        library.scanInBackground(provider.kinds, rescan = true)
+        while (state.value != listOf(first)) delay(1)
+
+        // Recreating the screen replays the same trigger, but must attach to
+        // the in-flight process job instead of restarting its folder walk.
+        library.scanInBackground(provider.kinds, rescan = true)
+
+        // No StateFlow collector remains here: this models navigating away
+        // or destroying/recreating the Activity while the provider is busy.
+        continueScan.complete(Unit)
+        while (state.value != listOf(first, second)) delay(1)
+
+        assertEquals(listOf(first, second), state.value)
+        assertEquals(1, starts.get())
     }
 }
