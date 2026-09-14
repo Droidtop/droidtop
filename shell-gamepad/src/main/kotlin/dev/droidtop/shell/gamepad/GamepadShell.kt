@@ -182,11 +182,15 @@ fun GamepadShell(
     // comment: a single combined scan meant Apps stayed empty until the
     // (real, SD-card-scale) Games/ROM scan also finished, even though
     // NativeAppProvider itself completes almost instantly on its own.
-    // Each LaunchedEffect below runs as its own coroutine, so one
-    // section's slow provider can never gate the other section's ready
-    // results from ever rendering.
-    var gameEntries by remember { mutableStateOf<List<LibraryEntry>?>(null) }
-    var appEntries by remember { mutableStateOf<List<LibraryEntry>?>(null) }
+    // Library owns one background job per section, so one section's slow
+    // provider can never gate the other section's ready results, and
+    // leaving/recreating this composition cannot cancel either scan.
+    val gameScanState = remember(library) { library.backgroundScanState(GAME_KINDS) }
+    val appScanState = remember(library) { library.backgroundScanState(APP_KINDS) }
+    val processGameEntries by gameScanState.collectAsState()
+    val processAppEntries by appScanState.collectAsState()
+    var gameEntries by remember { mutableStateOf<List<LibraryEntry>?>(processGameEntries) }
+    var appEntries by remember { mutableStateOf<List<LibraryEntry>?>(processAppEntries) }
     // Bumped by the real, user-facing "Rescan library" Settings action --
     // included in both LaunchedEffect keys below so bumping it restarts
     // both collections against Library.rescanKindsProgressive instead of
@@ -357,16 +361,20 @@ fun GamepadShell(
     // screen fill in gradually as real results arrive, without this file
     // needing to know anything about how the underlying scan is chunked.
     LaunchedEffect(library, rescanTrigger) {
-        val flow = if (rescanTrigger == 0) library.scanKindsProgressive(GAME_KINDS) else library.rescanKindsProgressive(GAME_KINDS)
-        flow.collect {
-            val games = it.filter { entry -> entry.kind in GAME_KINDS }
+        library.scanInBackground(GAME_KINDS, rescan = rescanTrigger != 0)
+    }
+    LaunchedEffect(library, rescanTrigger) {
+        library.scanInBackground(APP_KINDS, rescan = rescanTrigger != 0)
+    }
+    LaunchedEffect(processGameEntries) {
+        processGameEntries?.let { entries ->
+            val games = entries.filter { it.kind in GAME_KINDS }
             gameEntries = games
             onEntriesChanged(games)
         }
     }
-    LaunchedEffect(library, rescanTrigger) {
-        val flow = if (rescanTrigger == 0) library.scanKindsProgressive(APP_KINDS) else library.rescanKindsProgressive(APP_KINDS)
-        flow.collect { appEntries = it.filter { entry -> entry.kind in APP_KINDS } }
+    LaunchedEffect(processAppEntries) {
+        processAppEntries?.let { entries -> appEntries = entries.filter { it.kind in APP_KINDS } }
     }
     // Real bug this fixes, reported directly: nulling gameEntries/appEntries
     // here made the entire already-known library disappear the instant
