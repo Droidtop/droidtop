@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -318,16 +319,20 @@ class ScanProgressTest {
         val state = library.backgroundScanState(provider.kinds)
 
         library.scanInBackground(provider.kinds, rescan = true)
-        while (state.value != listOf(first)) delay(1)
+        withTimeout(5_000) {
+            while (state.value != listOf(first)) delay(1)
+        }
 
         // Recreating the screen replays the same trigger, but must attach to
         // the in-flight process job instead of restarting its folder walk.
-        library.scanInBackground(provider.kinds, rescan = true)
+        repeat(100) { library.scanInBackground(provider.kinds, rescan = true) }
 
         // No StateFlow collector remains here: this models navigating away
         // or destroying/recreating the Activity while the provider is busy.
         continueScan.complete(Unit)
-        while (state.value != listOf(first, second)) delay(1)
+        withTimeout(5_000) {
+            while (state.value != listOf(first, second)) delay(1)
+        }
 
         assertEquals(listOf(first, second), state.value)
         assertEquals(1, starts.get())
