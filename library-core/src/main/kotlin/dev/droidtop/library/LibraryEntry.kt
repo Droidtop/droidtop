@@ -519,7 +519,12 @@ class Library(
             // Joining the process-owned job is what makes that harmless;
             // cancelling/restarting here would still lose the folder currently
             // being scanned even though Compose no longer owns the coroutine.
-            if (running?.isActive == true) return
+            if (running?.isActive == true) {
+                // A lazy coroutine is already attached to scanScope. Dispose
+                // of this unused child rather than retaining it indefinitely.
+                job.cancel()
+                return
+            }
             backgroundScanJobs[key] = job
             job.start()
         }
