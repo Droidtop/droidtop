@@ -31,7 +31,8 @@ object EsDeFolderStructure {
     data class Created(val systemFolders: List<String>, val alreadyThere: List<String>, val biosFolder: Boolean)
 
     suspend fun generate(context: Context, root: File): Created = withContext(Dispatchers.IO) {
-        val systems = ConsoleSystemsRepository.allSystems(context).sortedBy { it.id }
+        val systems = ConsoleSystemsRepository.allSystems(context)
+            .filter { it.canResolveFromFolder() }.sortedBy { it.id }
         val made = mutableListOf<String>()
         val existing = mutableListOf<String>()
 
