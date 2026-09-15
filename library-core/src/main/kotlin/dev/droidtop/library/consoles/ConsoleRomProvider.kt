@@ -252,7 +252,8 @@ class ConsoleRomProvider(
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         val scannedFolders = dao.getScannedSystemFolders(romsRoots.map { it.absolutePath })
             .map { it.romsRoot to it.systemFolderId }.toSet()
-        val cached = dao.getEntries(romsRoots.map { it.absolutePath }).map { it.toLibraryEntry() }.withMetadata()
+        val cached = dao.getEntries(romsRoots.map { it.absolutePath }).map { it.toLibraryEntry() }
+            .filter { systemsById[it.systemId]?.canResolveFromFolder() != false }.withMetadata()
         val fresh = scanRootsFresh(romsRoots, systemsById, scannedFolders)
         return cached + fresh
     }
@@ -272,7 +273,8 @@ class ConsoleRomProvider(
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         val scannedFolders = dao.getScannedSystemFolders(romsRoots.map { it.absolutePath })
             .map { it.romsRoot to it.systemFolderId }.toSet()
-        val cached = dao.getEntries(romsRoots.map { it.absolutePath }).map { it.toLibraryEntry() }.withMetadata()
+        val cached = dao.getEntries(romsRoots.map { it.absolutePath }).map { it.toLibraryEntry() }
+            .filter { systemsById[it.systemId]?.canResolveFromFolder() != false }.withMetadata()
         streamRootsProgressively(cached, romsRoots, systemsById, scannedFolders)
     }
 
@@ -304,7 +306,8 @@ class ConsoleRomProvider(
         val romsRoots = GamesRoots.current(context)
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         val cachedByRoot = romsRoots.associate { root ->
-            root.absolutePath to dao.getEntries(listOf(root.absolutePath)).map { it.toLibraryEntry() }.withMetadata()
+            root.absolutePath to dao.getEntries(listOf(root.absolutePath)).map { it.toLibraryEntry() }
+                .filter { systemsById[it.systemId]?.canResolveFromFolder() != false }.withMetadata()
         }
         streamRootsRescan(cachedByRoot, systemsById)
     }

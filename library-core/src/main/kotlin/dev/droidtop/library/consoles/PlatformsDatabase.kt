@@ -33,8 +33,13 @@ object PlatformsDatabase {
             val updated = File(context.filesDir, DB_FILE_NAME)
                 .takeIf { it.isFile }
                 ?.let { runCatching { parse(it.readText()) }.getOrNull() }
-            val loaded = updated
-                ?: parse(context.assets.open(DB_FILE_NAME).bufferedReader().use { it.readText() })
+            val bundled = parse(context.assets.open(DB_FILE_NAME).bufferedReader().use { it.readText() })
+            // Older downloaded snapshots predate ownership metadata. Preserve
+            // their platform edits while inheriting policy shipped with this APK.
+            val bundledOwners = bundled.associate { it.id to it.ownedBy }
+            val loaded = updated?.map { platform ->
+                platform.copy(ownedBy = platform.ownedBy ?: bundledOwners[platform.id])
+            } ?: bundled
             cached = loaded
             loadVersion.value += 1
             return loaded
