@@ -132,7 +132,7 @@ class OnboardingActivity : AppCompatActivity() {
     }
 }
 
-private enum class OnboardingStep {
+internal enum class OnboardingStep {
     WELCOME, HOME_CHOICE, STANDARD_SETUP, ALTERNATIVE_SETUP,
     CONFIGURE_MORE, DESKTOP_SETUP, STORAGE_PERMISSION, GAMES_FOLDERS,
     PORTRAIT_THEME, KEYBOARD, DEFAULT_MODE_CHOICE, WHAT_NEXT,
@@ -148,7 +148,7 @@ private enum class OnboardingStep {
  * next entry after the current one instead of carrying a second, separate
  * `when` that could disagree with the count.
  */
-private fun plannedSteps(
+internal fun plannedSteps(
     home: HomeRolePrefs.HomeImplementation?,
     configureDesktop: Boolean,
     configureGaming: Boolean,
@@ -165,8 +165,17 @@ private fun plannedSteps(
     add(OnboardingStep.CONFIGURE_MORE)
     if (configureDesktop) add(OnboardingStep.DESKTOP_SETUP)
     if (configureGaming) {
-        // Skipped outright when the permission is already held: the step
-        // used to re-ask for something droidtop already had.
+        // Skipped outright when the permission was already held WHEN
+        // ONBOARDING OPENED -- the step used to re-ask for something
+        // droidtop already had. Deliberately not "is held now": granting
+        // it on the step itself would otherwise take the step out of the
+        // plan while the user is standing on it, and the run has nowhere
+        // to go from a step that is no longer in its own pipeline. On the
+        // Android 9 rig (build 531, fresh data) that ended the whole flow
+        // at "Allow": progress jumped from "Step 4 of 8" to "Step 7 of 7"
+        // and the next press landed on "You're set up" with the games
+        // folders, theme and default-mode steps never shown, so a fresh
+        // install finished with no games root at all.
         if (!storageGranted) add(OnboardingStep.STORAGE_PERMISSION)
         add(OnboardingStep.GAMES_FOLDERS)
         if (portraitThemeSwap != null) add(OnboardingStep.PORTRAIT_THEME)
@@ -300,7 +309,11 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
         }
     }
 
-    val plan = plannedSteps(homeChoice, configureDesktop, configureGaming, storageAccessGranted, portraitThemeSwap)
+    // The plan's storage question is asked once, at entry, for the reason
+    // plannedSteps gives: a plan that changes under the user's feet
+    // cannot say where to go next.
+    val storageGrantedAtEntry = remember { storageAccessGranted }
+    val plan = plannedSteps(homeChoice, configureDesktop, configureGaming, storageGrantedAtEntry, portraitThemeSwap)
 
     fun goTo(next: OnboardingStep) {
         history.add(step)
@@ -314,7 +327,15 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
             return
         }
         val here = plan.indexOf(current)
-        val next = if (here >= 0 && here + 1 < plan.size) plan[here + 1] else OnboardingStep.WHAT_NEXT
+        val next = when {
+            here >= 0 && here + 1 < plan.size -> plan[here + 1]
+            // A step that is not in the plan at all is a bug, but it must
+            // not cost the user the rest of their setup: continue with the
+            // first planned step they have not seen yet, and only finish
+            // when there genuinely is none.
+            here < 0 -> plan.firstOrNull { it != current && it !in history } ?: OnboardingStep.WHAT_NEXT
+            else -> OnboardingStep.WHAT_NEXT
+        }
         goTo(next)
     }
 
