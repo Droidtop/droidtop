@@ -361,7 +361,12 @@ fun GamepadShell(
     // screen fill in gradually as real results arrive, without this file
     // needing to know anything about how the underlying scan is chunked.
     LaunchedEffect(library, rescanTrigger) {
-        library.scanInBackground(GAME_KINDS, rescan = rescanTrigger != 0)
+        // A changed root set invalidates what the providers cached about
+        // the old one, so the first scan after onboarding adds a folder
+        // is a real walk and not a replay of an empty cache.
+        val rootsChanged = dev.droidtop.library.GamesRoots.rootsChangedSinceLastScan(context)
+        library.scanInBackground(GAME_KINDS, rescan = rescanTrigger != 0 || rootsChanged)
+        if (rootsChanged) dev.droidtop.library.GamesRoots.markScanned(context)
     }
     LaunchedEffect(library, rescanTrigger) {
         library.scanInBackground(APP_KINDS, rescan = rescanTrigger != 0)
