@@ -124,7 +124,7 @@ object PcLibrary {
                     // source could only ever see gamenative's own
                     // CustomGames directory, which nothing in droidtop
                     // tells anybody about.
-                    adoptGamesRootsAsScanRoots(context)
+                    adoptScannedGameFolders(context)
                     CustomGameScanner.scanAsLibraryItems()
                         // The scanner recognizes a Steam install sitting in a
                         // scanned folder and returns it as a STEAM item; that
@@ -268,21 +268,48 @@ object PcLibrary {
     )
 
     /**
-     * droidtop's own games folders, handed to gamenative's folder scanner
-     * as its user scan roots.
+     * The PC game folders under droidtop's own games roots, handed to
+     * gamenative's folder scanner as the exact folders to make items for.
      *
-     * Additive and idempotent: the scanner's own managed directories stay
-     * where they are, and a root already present is not written again.
-     * One list of folders for the whole app is the point -- a user who
-     * added their games folder should not have to add it a second time
-     * somewhere else to see the Windows games in it.
+     * Why not hand it the ROOTS, which is what this did until 2026-09-16:
+     * the vendored scanner's rule is "every immediate subfolder of a scan
+     * root is a game", and a games root is not laid out that way. On the
+     * rig it produced `EA [PC]`, `EPIC [PC]`, `GAMEPASS [PC]`,
+     * `UBISOFT [PC]`, `BATTLE.NET [PC]`, `ROMS [PC]` and `.STFOLDER [PC]`
+     * -- none of them games -- while SimCity, three Ubisoft games and
+     * every other game one level deeper never appeared at all. Which
+     * folders are games is droidtop's own question and it has its own
+     * answer ([PcFolderScan]); the scanner keeps everything it is
+     * genuinely good at -- app ids, icon extraction, container
+     * configuration, the install lifecycle -- for the folders droidtop
+     * names.
+     *
+     * Roots droidtop previously wrote into the scanner's own root list
+     * are taken back out, so an upgrade stops producing the wrapper
+     * entries rather than keeping them until the user finds the vendored
+     * setting. Manual folders the user added by hand outside droidtop's
+     * roots are left alone.
      */
-    private fun adoptGamesRootsAsScanRoots(context: Context) {
-        val wanted = dev.droidtop.library.GamesRoots.current(context).map { it.absolutePath }
-        if (wanted.isEmpty()) return
-        val current = runCatching { app.gamenative.PrefManager.customGameScanRoots }.getOrDefault(emptySet())
-        if (wanted.all { it in current }) return
-        runCatching { app.gamenative.PrefManager.customGameScanRoots = current + wanted }
+    private fun adoptScannedGameFolders(context: Context) {
+        val roots = dev.droidtop.library.GamesRoots.current(context)
+        if (roots.isEmpty()) return
+        val rootPaths = roots.map { it.absolutePath }
+        runCatching {
+            val currentRoots = app.gamenative.PrefManager.customGameScanRoots
+            val keptRoots = currentRoots.filterNot { it in rootPaths }.toSet()
+            if (keptRoots.size != currentRoots.size) {
+                app.gamenative.PrefManager.customGameScanRoots = keptRoots
+            }
+        }
+        val found = roots.flatMap { dev.droidtop.library.PcFolderScan.gamesUnder(it) }
+            .map { it.absolutePath }
+            .toSet()
+        runCatching {
+            val current = app.gamenative.PrefManager.customGameManualFolders
+            val theirs = current.filterNot { manual -> rootPaths.any { manual.startsWith(it + "/") } }
+            val wanted = (theirs + found).toSet()
+            if (wanted != current) app.gamenative.PrefManager.customGameManualFolders = wanted
+        }
     }
 
     /**

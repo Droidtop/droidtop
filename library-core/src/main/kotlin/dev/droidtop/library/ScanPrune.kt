@@ -77,6 +77,13 @@ object ScanPrune {
         "recycler",
         "lost+found",
         "found.000",
+        // Java/Adobe AIR packaging metadata. Verified on the rig: an AIR
+        // game (`Bunnycop-049-WINDOWS`) ships its native extensions as
+        // `META-INF/AIR/extensions/<ext>/META-INF/ANE/default/library.swf`,
+        // and the Flash rule matched four of those `library.swf` files, so
+        // the library listed four entries named after the extension or
+        // after the whole path to it -- and never the game itself.
+        "meta-inf",
     )
 
     /**
@@ -185,6 +192,23 @@ object ScanPrune {
      * folder, whatever it is called.
      */
     fun storeRootOwner(dir: File): String? = storeRootAt(dir)?.store
+
+    /**
+     * The store install root at or above [dir], or null when [dir] is not
+     * inside one. [PcFolderScan] asks this because the "a folder with its
+     * own files and one game below it IS that game" shape is true of a
+     * game and false of `steamapps`.
+     */
+    fun storeTreeRoot(dir: File): File? {
+        var candidate: File? = dir
+        var depth = 0
+        while (candidate != null && depth <= MAX_STORE_ROOT_SEARCH_DEPTH) {
+            if (storeRootAt(candidate) != null) return candidate
+            candidate = candidate.parentFile
+            depth++
+        }
+        return null
+    }
 
     /**
      * Why [dir] is a store's own business rather than a place games live.

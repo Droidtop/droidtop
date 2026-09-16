@@ -58,3 +58,30 @@ private fun relativeLabel(file: File, scannedFolder: File): String {
     val relative = if (full.startsWith(base)) full.removePrefix(base) else file.name
     return relative.removeSuffix("." + file.extension).removeSuffix(".")
 }
+
+/**
+ * A game folder's name as a title, with the one shape a folder name is
+ * not a title: an episode folder.
+ *
+ * Seen on the rig: a Ren'Py series ships one runnable game per episode
+ * (`Thief of Hearts/Part1`, `Fetish Locator/Week 1`, `BeingADik/Chap3+`),
+ * so the library listed "PART1", "WEEK 1" and "CHAP3+" as games with
+ * nothing to say which series they belong to -- and "PART 1" and "PART1",
+ * two different series, sat beside each other. These are real separate
+ * games and must stay separate entries; only the name was wrong.
+ *
+ * Deliberately narrow: the whole name has to be a sequence word plus its
+ * number, so a game actually called "Part Time Job" or "Seasons" keeps
+ * its own name. Unlike [disambiguateTitles], which repairs a collision
+ * after the fact, this is a naming rule that does not need two entries to
+ * notice the problem.
+ */
+fun qualifiedFolderTitle(folder: File): String {
+    val name = folder.name
+    if (!SEQUENCE_LABEL.matches(name)) return name
+    val parent = folder.parentFile?.name?.takeIf { it.isNotBlank() } ?: return name
+    return "$parent - $name"
+}
+
+private val SEQUENCE_LABEL =
+    Regex("""(part|chapter|chap|episode|ep|week|day|season|vol|volume|disc|disk)[ _.-]*[0-9]+[+a-z]*""", RegexOption.IGNORE_CASE)

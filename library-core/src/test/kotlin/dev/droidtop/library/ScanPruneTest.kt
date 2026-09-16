@@ -32,6 +32,7 @@ class ScanPruneTest {
         for (name in listOf(
             ".stfolder", ".stversions", ".stignore", ".thumbnails", ".gamenative", ".Trash-1000",
             "System Volume Information", "\$RECYCLE.BIN", "lost+found", "FOUND.000",
+            "META-INF", "meta-inf",
         )) {
             assertFalse(name, ScanPrune.isScannableFolder(dir(name)))
         }
