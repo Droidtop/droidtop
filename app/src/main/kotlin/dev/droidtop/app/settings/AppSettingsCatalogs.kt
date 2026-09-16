@@ -130,8 +130,8 @@ object AppSettingsCatalogs {
                     ),
                     NestedScreenItem(
                         id = "console_systems_rom_folders",
-                        title = "ROM folders",
-                        subtitle = "Add or remove the folders droidtop scans for ROMs",
+                        title = "Game folders",
+                        subtitle = "Add or remove the folders droidtop scans for games",
                         registryId = SCREEN_ROM_FOLDERS,
                     ),
                     NestedScreenItem(
@@ -1167,8 +1167,13 @@ object AppSettingsCatalogs {
 
     private fun romFoldersScreen() = CatalogScreen(
         id = SCREEN_ROM_FOLDERS,
-        title = "ROM folders",
-        subtitle = "droidtop scans <folder>/<system>/<romFile> under each of these; changes apply on the next library rescan",
+        // One name for one concept: the Settings row that opens this
+        // screen already said "Game folders" and the screen itself said
+        // "ROM folders", one navigation step apart -- and the folders are
+        // not only ROMs: engine and Windows games are found in them too.
+        title = "Game folders",
+        subtitle = "Console ROMs in <folder>/<system>/<romFile>, and engine or Windows games anywhere " +
+            "under these; changes apply on the next library rescan",
         groups = { context ->
             listOf(
                 CatalogGroup(
@@ -1244,7 +1249,7 @@ object AppSettingsCatalogs {
                             run = { ctx -> GamesRootPrefs.removeGamesRoot(ctx, path) },
                         )
                     }.ifEmpty {
-                        listOf(ActionItem(id = "rom_folders_none", title = "No ROM folders configured", run = {}))
+                        listOf(ActionItem(id = "rom_folders_none", title = "No game folders configured", run = {}))
                     },
                 ),
             )

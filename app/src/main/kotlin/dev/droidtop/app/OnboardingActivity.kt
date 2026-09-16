@@ -253,11 +253,12 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
     // roots appear; a root with no report yet shows "Looking…" rather
     // than a number it has not counted.
     val rootReports = remember { mutableStateMapOf<String, GamesRootReport.Report>() }
+    val rootProgress = remember { mutableStateMapOf<String, GamesRootReport.Progress>() }
 
     LaunchedEffect(rootsVersion, roots) {
         roots.forEach { path ->
             if (!rootReports.containsKey(path)) {
-                rootReports[path] = GamesRootReport.of(context, path)
+                rootReports[path] = GamesRootReport.of(context, path) { rootProgress[path] = it }
             }
         }
         rootReports.keys.toList().forEach { if (it !in roots) rootReports.remove(it) }
@@ -450,6 +451,7 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
             progress, back,
             roots = roots,
             reports = rootReports,
+            scanProgress = rootProgress,
             unresolvedFolderWarning = unresolvedFolderWarning,
             structureReport = structureReport,
             onAddFolder = { pickFolder.launch(null) },
@@ -462,7 +464,7 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
                 scope.launch {
                     val created = EsDeFolderStructure.generate(context, File(path))
                     structureReport = EsDeFolderStructure.describe(created)
-                    rootReports[path] = GamesRootReport.of(context, path)
+                    rootReports[path] = GamesRootReport.of(context, path) { rootProgress[path] = it }
                 }
             },
             pathEntry = pathEntry,
@@ -1109,6 +1111,7 @@ private fun GamesFoldersStep(
     onBack: (() -> Unit)?,
     roots: Set<String>,
     reports: Map<String, GamesRootReport.Report>,
+    scanProgress: Map<String, GamesRootReport.Progress>,
     unresolvedFolderWarning: Boolean,
     structureReport: String?,
     onAddFolder: () -> Unit,
@@ -1142,7 +1145,8 @@ private fun GamesFoldersStep(
                 val report = reports[path]
                 SelectableRow(
                     title = path,
-                    supporting = report?.let { GamesRootReport.describe(it) } ?: "Looking at this folder.",
+                    supporting = report?.let { GamesRootReport.describe(it) }
+                        ?: GamesRootReport.describe(scanProgress[path]),
                     trailing = {
                         TextButton(
                             onClick = { onRemoveRoot(path) },
