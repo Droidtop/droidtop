@@ -65,6 +65,5 @@ object GamesRoots {
     }
 
     private fun signature(context: Context): String =
-        current(context).map { it.absolutePath }.sorted().joinToString("
-")
+        current(context).map { it.absolutePath }.sorted().joinToString(File.pathSeparator)
 }
