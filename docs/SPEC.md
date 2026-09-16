@@ -4510,8 +4510,10 @@ run that built the APK. Enginehost mirrors this exactly (its
 declares it, but until 2026-09-11 nothing checked it, and two calls that do
 not exist on API 26 shipped and crashed the app on an Android 9 rig. CI now
 runs `:app:lintDebug` with `checkOnly` NewApi/InlinedApi and
-`checkDependencies` on, after the APK is built so a lint failure never costs
-the artifact. The gate's scope is one mechanism and one exception: every
+`checkDependencies` on. Lint and the unit tests are their own workflow run
+(`android-checks.yml`) beside the APK run (`android-build.yml`) on the same
+push: the APK run ends when the APK is published, and a red check never costs
+the artifact or delays it. The gate's scope is one mechanism and one exception: every
 module droidtop writes -- `shell-default/src`, the launcher fork's own
 sources, included -- is strict, and a NewApi error there fails the build;
 the trees droidtop vendors rather than writes are covered by
