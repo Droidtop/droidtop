@@ -97,4 +97,17 @@ class LibraryNamingTest {
         ).disambiguateTitles(system)
         assertEquals(listOf("library", "deep"), entries.map { it.title })
     }
+
+    @Test
+    fun `an episode folder is named by its series`() {
+        assertEquals("Thief of Hearts - Part1", qualifiedFolderTitle(File("/games/renpy/Thief of Hearts/Part1")))
+        assertEquals("Fetish Locator - Week 1", qualifiedFolderTitle(File("/games/renpy/Fetish Locator/Week 1")))
+        assertEquals("BeingADik - Chap3+", qualifiedFolderTitle(File("/games/renpy/BeingADik/Chap3+")))
+    }
+
+    @Test
+    fun `a game whose own name starts with a sequence word keeps it`() {
+        assertEquals("Part Time Job", qualifiedFolderTitle(File("/games/renpy/Part Time Job")))
+        assertEquals("Eternum-0.9.5-pc", qualifiedFolderTitle(File("/games/renpy/Eternum-0.9.5-pc")))
+    }
 }
