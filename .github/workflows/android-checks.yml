@@ -1,0 +1,260 @@
+name: Android checks
+
+# Lint (the minSdk API gate) and the unit tests, split out of android-build.yml
+# so the APK run finishes when the APK is published. This run reports on the
+# same push and its red is as red as before; it just no longer stands between
+# a push and an installable build. Same triggers and path filters as the build,
+# the same caches (actions/cache is repository-scoped, so a build run's SDK and
+# vendor-deps entries serve this one too).
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - "NOTICE.md"
+      - "LICENSE"
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - "NOTICE.md"
+      - "LICENSE"
+  workflow_dispatch:
+
+env:
+  NDK_VERSION: "27.0.12077973"
+  ANDROID_SDK_ROOT: ${{ github.workspace }}/.android-sdk
+  ANDROID_HOME: ${{ github.workspace }}/.android-sdk
+  ANDROID_DEPS_PREFIX: ${{ github.workspace }}/.android-deps
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          # Vendored upstream sources (GameNative, DroidSpaces, sway,
+          # wlroots, moonlight-common-c, mbedtls, libffi, ...) are large;
+          # we only ever need their current tip, not history.
+          fetch-depth: 1
+
+      - name: Set up JDK 17 + 21
+        # 21 is needed for shell-default's forked-in sub-modules (Murine
+        # Launcher/Launcher3) — several of them request a Gradle toolchain
+        # matching JDK 21, confirmed by a real
+        # ToolchainProvisioningException locally ("Cannot find a Java
+        # installation... matching: {languageVersion=21, ...}"). Installing
+        # both means Gradle's toolchain auto-detection can satisfy whichever
+        # each module asks for; the rest of droidtop stays on 17.
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            17
+            21
+
+      - name: Set up Go
+        # For cross-compiling crane (vendor/go-containerregistry), the OCI
+        # registry client CraneRootfsPuller shells out to — see
+        # build-scripts/build-vendor-deps.sh's crane section.
+        # go-containerregistry's go.mod requires >= 1.25; not assuming the
+        # runner's own preinstalled Go meets that.
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Install build dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+          NEEDRESTART_MODE: a
+        run: |
+          # Three prior runs hung with ZERO visible output before being
+          # cancelled -- including one AFTER adding the apt-daily-timer
+          # stop + DPkg::Lock::Timeout fix, which didn't help either. The
+          # real problem so far has been that `-qq` suppresses literally
+          # all diagnostic output, so every "fix" up to now has been a
+          # guess with no evidence to confirm or rule it out. Fixing that
+          # first: `set -x` echoes each command as it starts (pinpoints
+          # exactly which one is stuck), dropped `-qq` so apt's own
+          # progress streams instead of being swallowed, and `timeout`
+          # wraps each command so a hang fails loudly with a clear signal
+          # after a bounded wait instead of running indefinitely and
+          # needing manual cancellation to even notice.
+          set -x
+          sudo systemctl stop apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
+          sudo systemctl stop apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
+          timeout 120 sudo apt-get update -o DPkg::Lock::Timeout=300
+          timeout 300 sudo apt-get install -y -o DPkg::Lock::Timeout=300 \
+            build-essential cmake ninja-build meson pkg-config git python3 \
+            autoconf automake libtool libltdl-dev texinfo \
+            libexpat1-dev libffi-dev libxml2-utils \
+            wayland-protocols libwayland-bin \
+            unzip curl
+
+      - name: Cache Android SDK/NDK
+        id: sdk-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.ANDROID_SDK_ROOT }}
+          # v2: added platforms;android-36 + build-tools;36.0.0 — shell-default
+          # (forked-in Murine Launcher) and its sub-modules compile against 36;
+          # several of their AndroidX deps require :app to compile against 35+
+          # too (AAR-metadata check), confirmed locally, so :app is now on
+          # compileSdk 36 as well. 34 is kept for the rest of droidtop's modules.
+          key: android-sdk-ndk${{ env.NDK_VERSION }}-v2
+
+      - name: Install Android SDK + NDK
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
+          curl -sL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o /tmp/cmdline-tools.zip
+          unzip -q /tmp/cmdline-tools.zip -d "$ANDROID_SDK_ROOT/cmdline-tools"
+          mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+          rm /tmp/cmdline-tools.zip
+
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" --licenses > /dev/null
+          "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" \
+            "platform-tools" "platforms;android-34" "build-tools;34.0.0" \
+            "platforms;android-36" "build-tools;36.0.0" "ndk;${NDK_VERSION}"
+
+      - name: Cache cross-compiled vendor deps (libffi, libwayland-client, droidspaces)
+        id: deps-cache
+        uses: actions/cache@v4
+        with:
+          # Caches the final packaged output (assets/bin) *and* the
+          # ANDROID_DEPS_PREFIX build dir. assets/bin alone isn't enough: on
+          # a cache hit the "Build cross-compiled vendor deps" step is
+          # skipped entirely, but host-bridge's own CMake build (via
+          # ANDROID_DEPS_PREFIX) still needs wayland-client.h/
+          # wayland-util.h/libffi.a from that prefix at compile time, every
+          # run, cache hit or not. Run 32405390718 hit exactly this: cache
+          # hit skipped the deps step, .android-deps was never populated,
+          # and host-bridge's ninja build failed with "'wayland-util.h' file
+          # not found". Covers both ABIs since they all live under these
+          # same parent directories.
+          #
+          # host-bridge/src/main/jniLibs is NOT cached (or populated by the
+          # build step) — libwayland-client.so is packaged via CMake's own
+          # prebuilt-shared-lib linking instead (see host-bridge/native/
+          # CMakeLists.txt and build-scripts/build-vendor-deps.sh); a
+          # separate copy into jniLibs duplicated that same APK path and
+          # broke :host-bridge:mergeDebugNativeLibs.
+          path: |
+            runtime-linux-root/src/main/assets/bin
+            ${{ env.ANDROID_DEPS_PREFIX }}
+          # Keyed on every vendored submodule this script actually builds
+          # from, not just a static string — a submodule bump on any of
+          # them should invalidate this. go-containerregistry added for
+          # crane (v6); bumping the version suffix too, since the v5 key
+          # (unaffected by this submodule addition) would otherwise cache-hit
+          # on an old assets/bin that never had crane-* built into it at all.
+          # v7: crane is now built CGO_ENABLED=1 on arm64 too (the v6
+          # binary's pure-Go DNS resolver was dead on-device — see
+          # build-vendor-deps.sh's crane section); the cached v6 assets/bin
+          # would keep serving that broken binary forever otherwise.
+          key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD') }}-v7
+
+      - name: Build cross-compiled vendor deps (libffi, libwayland-client, droidspaces)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        # Invoked via `bash` explicitly, not `./build-scripts/build-vendor-deps.sh`
+        # — this repo is developed partly on Windows, where the executable
+        # bit doesn't reliably survive a commit, and relying on it here
+        # failed CI outright ("Permission denied") the first time.
+        #
+        # One fat APK covers both arm64-v8a (real hardware) and x86_64
+        # (emulators/x86 devices) — the script builds one ABI per
+        # invocation, so run it once per target here.
+        #
+        # GH_TOKEN is required because the script now pulls the musl
+        # cross-compiler toolchains from our own mirrored "build-toolchains"
+        # release via `gh release download` instead of musl.cc directly —
+        # musl.cc proved unreachable from GitHub-hosted runners often enough
+        # (curl exit 28, timed out after 6 retries over 12+ minutes on run
+        # 32400505729) that self-hosting the tarballs was the only reliable
+        # fix. The repo is private, so authentication is required even for
+        # read-only release downloads.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for abi in arm64-v8a x86_64; do
+            bash build-scripts/build-vendor-deps.sh "$abi"
+          done
+
+      # These run in their own workflow so that a failing check turns THIS
+      # run red and never costs anyone the installable build: this
+      # project's real workflow is installing the CI artifact on a rig, and
+      # blocking that on lint or a unit test would trade something real for
+      # a convention. The signal is what matters here, not the gate.
+      # :runtime-common joins the run because the ES-DE theme engine lives
+      # there, and its carousel/textlist geometry is a literal port of real
+      # ES-DE formulas -- exactly the kind of code a unit test can verify
+      # without a screen, which is otherwise the only way this project
+      # checks theme rendering at all.
+      - name: Lint (minSdk API gate)
+        # NewApi/InlinedApi only, across :app and everything it depends on
+        # -- see the lint block in app/build.gradle.kts for why this
+        # exists. !cancelled() rather than always(): a red step earlier in
+        # the job should not hide this one's answer, but a run cancelled by
+        # the next push has no answer to give, and running the gate there
+        # only reports a failure nobody caused.
+        #
+        # Scope: our own modules are strict -- a NewApi error in anything
+        # droidtop writes, shell-default/src (the launcher fork's own
+        # sources) included, fails this step. The exceptions are the trees
+        # droidtop vendors rather than writes -- the gamenative tree and
+        # shell-default's vendored AOSP sub-libraries (:WMShared, :msdl,
+        # :Shared) -- whose findings are recorded in app/lint-baseline.xml;
+        # see the lint block in app/build.gradle.kts and SPEC 10b for why
+        # a baseline rather than an exclusion, and note that the baseline
+        # still fails any finding it does not already list.
+        if: ${{ !cancelled() }}
+        run: ./gradlew :app:lintDebug --stacktrace
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          # The baseline itself goes up too: when it does not exist lint
+          # WRITES it and aborts, and that generated file is how the
+          # committed one is produced (filtered to the vendored tree)
+          # rather than hand-written against a format lint owns.
+          path: |
+            app/build/reports/lint-results-debug.*
+            app/lint-baseline.xml
+          name: lint-report
+          if-no-files-found: ignore
+
+      - name: Run unit tests
+        # Every module that actually has a src/test tree (app,
+        # library-core, runtime-common, shell-gamepad, input-seat,
+        # runtime-windows, input-keyboard and host-bridge), not just library-core — that
+        # narrower scope meant roughly 30% of this repo's test methods had
+        # never once run in CI. Add the module here the moment it grows its
+        # first test; a test nothing runs is not a test.
+        if: always()
+        run: ./gradlew :app:testDebugUnitTest :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :runtime-windows:testDebugUnitTest :input-keyboard:testDebugUnitTest :host-bridge:testDebugUnitTest --stacktrace
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: |
+            app/build/reports/tests/
+            library-core/build/reports/tests/
+            runtime-common/build/reports/tests/
+            shell-gamepad/build/reports/tests/
+            input-seat/build/reports/tests/
+            runtime-windows/build/reports/tests/
+            input-keyboard/build/reports/tests/
+            host-bridge/build/reports/tests/
+          if-no-files-found: ignore
