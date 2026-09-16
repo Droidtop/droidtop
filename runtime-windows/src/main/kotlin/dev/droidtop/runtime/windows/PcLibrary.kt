@@ -300,17 +300,31 @@ object PcLibrary {
             if (keptRoots.size != currentRoots.size) {
                 app.gamenative.PrefManager.customGameScanRoots = keptRoots
             }
-        }
+        }.onFailure { android.util.Log.w(TAG, "Could not take droidtop's roots out of the folder scanner", it) }
+        val startedAt = android.os.SystemClock.elapsedRealtime()
         val found = roots.flatMap { dev.droidtop.library.PcFolderScan.gamesUnder(it) }
             .map { it.absolutePath }
             .toSet()
+        // A scan that finds nothing and a scan that never ran look the
+        // same from the library; this line is how they are told apart.
+        android.util.Log.i(
+            dev.droidtop.library.ScanLog.TAG,
+            dev.droidtop.library.ScanLog.summary(
+                label = "pc folders under " + rootPaths.joinToString(", "),
+                games = found.size,
+                skippedByReason = emptyMap(),
+                durationMs = android.os.SystemClock.elapsedRealtime() - startedAt,
+            ),
+        )
         runCatching {
             val current = app.gamenative.PrefManager.customGameManualFolders
             val theirs = current.filterNot { manual -> rootPaths.any { manual.startsWith(it + "/") } }
             val wanted = (theirs + found).toSet()
             if (wanted != current) app.gamenative.PrefManager.customGameManualFolders = wanted
-        }
+        }.onFailure { android.util.Log.w(TAG, "Could not tell the folder scanner which folders are games", it) }
     }
+
+    private const val TAG = "droidtop.PcLibrary"
 
     /**
      * The gamenative [LibraryItem] behind one droidtop PC entry id, which

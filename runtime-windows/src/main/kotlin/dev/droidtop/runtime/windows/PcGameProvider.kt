@@ -68,7 +68,12 @@ class PcGameProvider(
      * at all. See [dev.droidtop.library.GameEngineDetector.engineOwnsInstall].
      */
     override suspend fun scan(): List<LibraryEntry> {
-        val allStoreGames = runCatching { PcLibrary.allGames(context) }.getOrDefault(emptyList())
+        val allStoreGames = runCatching { PcLibrary.allGames(context) }
+            // Swallowed silently until 2026-09-16, which is why a PC
+            // library that produced nothing on the rig could not be told
+            // apart from one that legitimately had nothing in it.
+            .onFailure { android.util.Log.w("droidtop.PcGameProvider", "Reading the PC library failed", it) }
+            .getOrDefault(emptyList())
         // The store/engine ownership rule (docs/SPEC.md 7g), asked of the
         // folder rather than of whichever provider ran first: a store
         // game whose install directory engine detection recognises is
@@ -88,6 +93,10 @@ class PcGameProvider(
                 EngineOverridePrefs.engineFor(context, folder.absolutePath)
             }
         }
+        android.util.Log.i(
+            dev.droidtop.library.ScanLog.TAG,
+            "pc library: ${allStoreGames.size} games known, ${storeGames.size} not already owned by engine detection",
+        )
         val storeEntries = storeGames.map { it.toLibraryEntry() }
         // Shortcut suppression below still measures against EVERY store
         // game's install directory, engine-owned ones included: a Wine
