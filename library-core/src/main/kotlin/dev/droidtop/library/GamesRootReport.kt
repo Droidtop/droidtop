@@ -44,19 +44,57 @@ object GamesRootReport {
         val empty: Boolean get() = total == 0
     }
 
-    suspend fun of(context: Context, path: String): Report = withContext(Dispatchers.IO) {
+    /**
+     * How far the report has got, for the row that is waiting on it.
+     *
+     * The rig made this necessary rather than nice: on the user's own
+     * library (150 games on a host share) the folder row sat on a motionless
+     * "Looking at this folder." for over six minutes. A count that takes
+     * minutes has to say it is moving, and the walk is already folder by
+     * folder ([GameEngineDetector.topLevelFolders]), so the progress is
+     * real work done rather than an animation.
+     */
+    data class Progress(val foldersDone: Int, val foldersTotal: Int, val gamesSoFar: Int)
+
+    /** What the folder row shows while [of] is still running. */
+    fun describe(progress: Progress?): String = when {
+        progress == null || progress.foldersTotal == 0 -> "Looking at this folder."
+        else -> "Looking at this folder - ${progress.foldersDone} of ${progress.foldersTotal} folders, " +
+            "${progress.gamesSoFar} " + (if (progress.gamesSoFar == 1) "game" else "games") + " so far."
+    }
+
+    suspend fun of(
+        context: Context,
+        path: String,
+        onProgress: (Progress) -> Unit = {},
+    ): Report = withContext(Dispatchers.IO) {
+        // The walk runs on IO; the caller's progress state does not
+        // belong to this thread, so every report crosses back to Main.
+        suspend fun report(progress: Progress) = withContext(Dispatchers.Main) { onProgress(progress) }
         val root = File(path)
         if (!root.isDirectory) {
             return@withContext Report(path, exists = false, engineGames = 0, romFiles = 0, systems = emptyList())
         }
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         val engineGames = runCatching {
-            GameEngineDetector.scan(
-                root,
-                systemsById,
-                EnginesDatabase.defs(context),
-                override = { folder -> EngineOverridePrefs.engineFor(context, folder.absolutePath) },
-            ).size
+            // Folder by folder, with the same per-folder budget the real
+            // library scan uses, so the count the user is shown and the
+            // library they get afterwards cannot disagree.
+            val defs = EnginesDatabase.defs(context)
+            val top = GameEngineDetector.topLevelFolders(root, systemsById)
+            var found = 0
+            report(Progress(0, top.folders.size, 0))
+            top.folders.forEachIndexed { index, folder ->
+                found += GameEngineDetector.scanFolder(
+                    folder,
+                    systemsById,
+                    defs,
+                    override = { f -> EngineOverridePrefs.engineFor(context, f.absolutePath) },
+                    budget = { ScanBudget.start() },
+                ).games.size
+                report(Progress(index + 1, top.folders.size, found))
+            }
+            found
         }.getOrDefault(0)
 
         var roms = 0

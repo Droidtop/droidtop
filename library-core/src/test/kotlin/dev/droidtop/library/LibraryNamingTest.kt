@@ -110,4 +110,17 @@ class LibraryNamingTest {
         assertEquals("Part Time Job", qualifiedFolderTitle(File("/games/renpy/Part Time Job")))
         assertEquals("Eternum-0.9.5-pc", qualifiedFolderTitle(File("/games/renpy/Eternum-0.9.5-pc")))
     }
+
+    @Test
+    fun `a folder still being counted says how far it has got`() {
+        assertEquals("Looking at this folder.", GamesRootReport.describe(null as GamesRootReport.Progress?))
+        assertEquals(
+            "Looking at this folder - 3 of 12 folders, 84 games so far.",
+            GamesRootReport.describe(GamesRootReport.Progress(3, 12, 84)),
+        )
+        assertEquals(
+            "Looking at this folder - 1 of 2 folders, 1 game so far.",
+            GamesRootReport.describe(GamesRootReport.Progress(1, 2, 1)),
+        )
+    }
 }
