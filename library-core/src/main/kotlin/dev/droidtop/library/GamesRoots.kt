@@ -34,4 +34,37 @@ object GamesRoots {
             listOf(File(context.getExternalFilesDir(null), "games").apply { mkdirs() })
         }
     }
+
+    private const val KEY_SCANNED_ROOTS = "droidtop_games_roots_last_scanned"
+
+    /**
+     * Whether the set of roots has changed since the last scan that was
+     * told about it -- in which case an ordinary scan has to re-walk
+     * instead of serving what a provider cached.
+     *
+     * The rig showed why this is not optional. On a fresh install the
+     * shell composes once with no roots, every provider caches "nothing",
+     * and onboarding then adds the games folder. The next ordinary scan
+     * trusted those cached rows, so first run ended on "No games detected
+     * yet." with 152 games in the folder the user had just named and no
+     * hint that Settings > Game folders > Rescan library was the way out.
+     * Changing which folders are scanned is exactly the event a cache of
+     * what is in them cannot survive.
+     */
+    fun rootsChangedSinceLastScan(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_SCANNED_ROOTS, null) != signature(context)
+    }
+
+    /** Records that a scan has covered the roots as they are now. */
+    fun markScanned(context: Context) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_SCANNED_ROOTS, signature(context))
+            .apply()
+    }
+
+    private fun signature(context: Context): String =
+        current(context).map { it.absolutePath }.sorted().joinToString("
+")
 }
