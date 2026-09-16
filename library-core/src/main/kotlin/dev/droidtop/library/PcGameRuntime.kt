@@ -142,6 +142,20 @@ object GameExecutableResolver {
     // own executable and must never be mistaken for it.
     private val NON_GAME_PREFIXES = listOf("unins", "setup", "install", "vcredist", "dxsetup", "crashpad", "crashreport")
 
+    /**
+     * Whether [gameRoot] directly holds anything runnable at all --
+     * "is this folder a PC game" rather than "which file do I run",
+     * which is what [PcFolderScan] needs and what [windowsExecutable]
+     * deliberately will not answer: a folder with three equally
+     * plausible `.exe` files IS a game, it just cannot be launched
+     * without the user naming one.
+     */
+    fun hasExecutable(gameRoot: File): Boolean =
+        candidates(gameRoot) { it.extension.equals("exe", ignoreCase = true) }.isNotEmpty() ||
+            candidates(gameRoot) { it.extension.equals("sh", ignoreCase = true) }.isNotEmpty() ||
+            candidates(gameRoot) { it.extension.lowercase() in LINUX_ELF_EXTENSIONS }.isNotEmpty() ||
+            candidates(gameRoot) { it.extension.isEmpty() && it.canExecute() }.isNotEmpty()
+
     fun windowsExecutable(gameRoot: File): File? = pickOne(
         candidates(gameRoot) { it.extension.equals("exe", ignoreCase = true) },
         gameRoot,
