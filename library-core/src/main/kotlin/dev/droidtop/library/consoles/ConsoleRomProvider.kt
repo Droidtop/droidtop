@@ -415,17 +415,14 @@ class ConsoleRomProvider(
 
     /** One line per root, whatever happened under it (see [ScanLog]). */
     private fun logRootSummary(root: File, systemScan: SystemScan, games: Int, startedAt: Long) {
-        android.util.Log.i(
-            ScanLog.TAG,
-            ScanLog.summary(
-                label = "roms root ${root.absolutePath}",
-                games = games,
-                skippedByReason = systemScan.skippedByReason,
-                durationMs = System.currentTimeMillis() - startedAt,
-                note = systemScan.units.joinToString(", ") { unit ->
-                    unit.system.id + if (unit.folders.size > 1) " (${unit.folders.size} folders)" else ""
-                }.ifEmpty { "no console systems found" },
-            ),
+        ScanLog.write(
+            label = "roms root ${root.absolutePath}",
+            games = games,
+            skippedByReason = systemScan.skippedByReason,
+            durationMs = System.currentTimeMillis() - startedAt,
+            note = systemScan.units.joinToString(", ") { unit ->
+                unit.system.id + if (unit.folders.size > 1) " (${unit.folders.size} folders)" else ""
+            }.ifEmpty { "no console systems found" },
         )
     }
 
@@ -657,15 +654,12 @@ class ConsoleRomProvider(
             // the same thing. See disambiguateTitles.
             .disambiguateTitles(systemFolder)
             .withMetadata()
-        android.util.Log.i(
-            ScanLog.TAG,
-            ScanLog.summary(
-                label = "rom folder ${systemFolder.absolutePath}",
-                games = entries.size,
-                skippedByReason = ScanLog.countByReason(romScan.skipped),
-                durationMs = System.currentTimeMillis() - startedAt,
-                note = romScan.stoppedAt?.let { "stopped in ${it.absolutePath}" },
-            ),
+        ScanLog.write(
+            label = "rom folder ${systemFolder.absolutePath}",
+            games = entries.size,
+            skippedByReason = ScanLog.countByReason(romScan.skipped),
+            durationMs = System.currentTimeMillis() - startedAt,
+            note = romScan.stoppedAt?.let { "stopped in ${it.absolutePath}" },
         )
         entries
     }
