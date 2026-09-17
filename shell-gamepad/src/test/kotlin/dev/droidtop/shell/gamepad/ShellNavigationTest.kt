@@ -30,6 +30,40 @@ class ShellNavigationTest {
     }
 
     @Test
+    fun `back from a group's options screen returns to that group`() {
+        val nav = stack()
+        nav.openGroup("system:pc")
+        nav.rememberFocus("astroneer")
+        nav.openOptions()
+
+        assertEquals(ShellPlace.Options("system:pc"), nav.place)
+        assertEquals(ShellPlace.Group("system:pc"), nav.under)
+
+        assertEquals(ShellPlace.Group("system:pc"), nav.back())
+        assertFalse(nav.optionsOpen)
+        assertEquals("system:pc", nav.groupKey)
+        assertEquals("astroneer", nav.focusHere)
+    }
+
+    @Test
+    fun `leaving the group closes its options screen with it`() {
+        val nav = stack()
+        nav.openGroup("system:pc")
+        nav.openOptions()
+        nav.openGroup(null)
+        assertFalse(nav.optionsOpen)
+        assertEquals(ShellPlace.Section(GamingSection.GAMES), nav.place)
+    }
+
+    @Test
+    fun `there is no options screen without a group under it`() {
+        val nav = stack()
+        nav.openOptions()
+        assertFalse(nav.optionsOpen)
+        assertFalse(nav.canGoBack)
+    }
+
+    @Test
     fun `back from a group returns to the section`() {
         val nav = stack()
         nav.openGroup("system:snes")
