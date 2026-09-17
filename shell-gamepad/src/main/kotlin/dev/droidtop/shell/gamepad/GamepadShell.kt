@@ -72,6 +72,8 @@ import dev.droidtop.shell.gamepad.pc.PcSurface
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.consoles.PlatformsDatabase
 import dev.droidtop.library.displayName
+import dev.droidtop.library.itemName
+import dev.droidtop.library.kindLine
 import dev.droidtop.library.integrations.Integration
 import dev.droidtop.library.integrations.IntegrationCapability
 import dev.droidtop.library.integrations.IntegrationStore
@@ -1006,13 +1008,13 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
                         .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000))))
                         .padding(12.dp),
                 ) {
-                    Text(entry.kind.displayName(), color = Color.White, style = MaterialTheme.typography.labelMedium)
+                    Text(entry.kind.itemName(), color = Color.White, style = MaterialTheme.typography.labelMedium)
                 }
             }
         }
         Text(entry.title, color = Color.White, style = MaterialTheme.typography.headlineMedium)
         if (entry.artworkUri == null) {
-            Text(entry.kind.displayName(), color = Color.Gray, style = MaterialTheme.typography.titleMedium)
+            Text(entry.kind.itemName(), color = Color.Gray, style = MaterialTheme.typography.titleMedium)
         }
         if (entry.playtimeSeconds > 0) {
             Text("Played ${entry.playtimeSeconds / 60} min", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
@@ -2750,6 +2752,12 @@ private fun AppIconTile(
         // fixed (rig, build 546), which left a grid of names with no
         // statement of kind -- and this grid does hold more than one
         // (`REMOTE_STREAM` is an Apps kind too).
+        //
+        // It says what the TILE is, never the heading it sits under: the
+        // app's own declared category when it has one, and what one entry
+        // of its kind is called when it does not. It read "Apps" on every
+        // tile -- the name of the tab, two lines below a heading that
+        // already said it (rig, build 547).
         Text(
             entry.title,
             color = Color.White,
@@ -2759,7 +2767,7 @@ private fun AppIconTile(
             modifier = Modifier.padding(top = 6.dp),
         )
         Text(
-            entry.kind.displayName(),
+            entry.kindLine(),
             color = Color.Gray,
             style = MaterialTheme.typography.labelSmall,
             maxLines = 1,
