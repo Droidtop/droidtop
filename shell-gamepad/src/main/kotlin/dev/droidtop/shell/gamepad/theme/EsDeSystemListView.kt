@@ -426,7 +426,7 @@ private fun EsDeCarousel(
     // theme declares its own real `fontSize`, so the 0.045f fallback here
     // only matters for a theme that genuinely omits it.
     val fontSizeFraction = element?.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
-    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * screenHeight.value).dp.toSp() }
+    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * esDeFontScreenSize(screenWidth, screenHeight).value).dp.toSp() }
     val itemFontFamily = element?.let { themeFontFamily(it) }
     // Real CarouselComponent item-image properties (its own
     // mImageColorShift/mImageSaturation/mImageBrightness, applied per item
@@ -954,6 +954,13 @@ private fun EsDeItemLabel(
     scrolling: EsDeItemLabelScroll?,
 ) {
     if (scrolling == null) {
+        // Real ES-DE builds an item's name as a TextComponent sized to the
+        // item box (CarouselComponent.h:387-392, GridComponent.h:388-393),
+        // so it obeys the same box-vs-line rule every other themed text
+        // does: it wraps only while the box is taller than a line, and
+        // what still does not fit is abbreviated, not cut. Without that
+        // rule a long name wrapped out of its own item.
+        val fit = esDeTextBoxFit(height, with(LocalDensity.current) { fontSize.toDp() } * lineSpacing)
         Text(
             label,
             color = color,
@@ -961,6 +968,8 @@ private fun EsDeItemLabel(
             fontFamily = fontFamily,
             lineHeight = fontSize * lineSpacing,
             textAlign = textAlign,
+            maxLines = fit.maxLines,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             modifier = Modifier.size(width = width, height = height).wrapContentHeight(),
         )
     } else {
@@ -1128,7 +1137,7 @@ private fun EsDeTextList(
     // area (see EsDeSystemListView's own screenWidth/screenHeight doc
     // comment), not a fixed 1080 reference.
     val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
-    val fontSizeDp = fontSizeFraction * screenHeight.value
+    val fontSizeDp = fontSizeFraction * esDeFontScreenSize(screenWidth, screenHeight).value
     val fontSizeSp = with(LocalDensity.current) { fontSizeDp.dp.toSp() }
     val rowFontFamily = themeFontFamily(element)
 
@@ -1303,13 +1312,18 @@ private fun EsDeTextListRow(
             fontSize = fontSize,
             fontFamily = fontFamily,
             // Real ES-DE TextListComponent rows are strictly single-line
-            // -- a long title clips (or horizontally scrolls, its
-            // `textHorizontalScrolling` feature, not built here yet),
-            // never wraps. Real, confirmed-live bug this fixes: without
+            // -- a long title is abbreviated (or horizontally scrolls,
+            // its `textHorizontalScrolling` feature, not built here yet),
+            // never wrapped. Real, confirmed-live bug this fixes: without
             // maxLines, long real titles wrapped to two lines inside a
             // one-line-tall row, painting over the next row.
+            // The row is built with a maxLength of the list's own width
+            // (TextListComponent.h:209-213), and text that exceeds it
+            // loses glyphs until an ellipsis fits (Font.cpp:1074-1078) --
+            // so the end of a long title reads as cut on purpose rather
+            // than as a word that stops mid-letter.
             maxLines = 1,
-            overflow = androidx.compose.ui.text.style.TextOverflow.Clip,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             modifier = Modifier
                 // Real selected-row background (TextListComponent.h:
                 // 421-444): a rect exactly as wide as the row's own TEXT
@@ -1390,7 +1404,7 @@ private fun EsDeGrid(
     screenHeight: Dp,
 ) {
     val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
-    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * screenHeight.value).dp.toSp() }
+    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * esDeFontScreenSize(screenWidth, screenHeight).value).dp.toSp() }
     val tileFontFamily = themeFontFamily(element)
     // Real `imageInterpolation` -- same real property, same two literals
     // as the carousel's; see esDeFilterQuality.
