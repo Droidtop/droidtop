@@ -20,12 +20,18 @@ package dev.droidtop.library
 object AppLabels {
 
     /**
-     * Package segments that name a platform or a layer rather than an
-     * app, so the segment before them is the one that means something:
-     * `com.example.coolGame.android` is "Cool Game", not "Android".
+     * Package segments that name a platform, a layer or a domain rather
+     * than an app, so a segment that is not one of these is what means
+     * something: `com.example.coolGame.android` is "Cool Game", not
+     * "Android", and never "Com".
+     *
+     * The reverse-domain head is in here for that last reason -- it is
+     * the first segment of nearly every package there is, and CI caught
+     * `com.android.app` coming back as "Com" because of it.
      */
     private val GENERIC_SEGMENTS = setOf(
-        "android", "app", "apps", "application", "client", "main", "mobile",
+        "com", "org", "net", "io", "co", "dev", "me", "app", "xyz", "info",
+        "android", "apps", "application", "client", "main", "mobile",
         "ui", "launcher", "free", "pro", "lite", "beta", "release", "demo",
     )
 
