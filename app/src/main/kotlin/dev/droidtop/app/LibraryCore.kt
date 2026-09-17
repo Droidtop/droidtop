@@ -4,6 +4,7 @@ import android.content.Context
 import dev.droidtop.library.EngineGameProvider
 import dev.droidtop.library.Library
 import dev.droidtop.library.NativeAppProvider
+import dev.droidtop.library.RoomFavoritesStore
 import dev.droidtop.library.RoomPlayHistoryStore
 import dev.droidtop.library.consoles.ConsoleRomProvider
 import dev.droidtop.runtime.PrimaryContainerSession
@@ -76,6 +77,7 @@ object LibraryCore {
                 PcGameProvider(app),
             ),
             playHistory = RoomPlayHistoryStore(app),
+            favorites = RoomFavoritesStore(app),
         )
     }
 }

@@ -9,6 +9,8 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Transaction
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
  * Real gap this closes, confirmed by reading the actual code: [LibraryEntry]
@@ -59,12 +61,38 @@ interface PlayHistoryDao {
     }
 }
 
-@Database(entities = [PlayHistoryEntity::class], version = 1, exportSchema = false)
+/** One row per favourite non-ROM entry; absence is "not a favourite". See [FavoritesStore]. */
+@Entity(tableName = "favorites")
+data class FavoriteEntity(@PrimaryKey val id: String)
+
+@Dao
+interface FavoritesDao {
+    @Query("SELECT id FROM favorites WHERE id IN (:ids)")
+    suspend fun getAll(ids: Collection<String>): List<String>
+
+    @Query("INSERT OR IGNORE INTO favorites (id) VALUES (:id)")
+    suspend fun add(id: String)
+
+    @Query("DELETE FROM favorites WHERE id = :id")
+    suspend fun remove(id: String)
+}
+
+@Database(entities = [PlayHistoryEntity::class, FavoriteEntity::class], version = 2, exportSchema = false)
 abstract class PlayHistoryDatabase : RoomDatabase() {
     abstract fun playHistoryDao(): PlayHistoryDao
+    abstract fun favoritesDao(): FavoritesDao
 
     companion object {
         @Volatile private var instance: PlayHistoryDatabase? = null
+
+        // A second table beside play history, not a rebuild: destroying
+        // and recreating this database would throw away every real play
+        // count on the device for the sake of an empty new table.
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `favorites` (`id` TEXT NOT NULL, PRIMARY KEY(`id`))")
+            }
+        }
 
         fun get(context: Context): PlayHistoryDatabase =
             instance ?: synchronized(this) {
@@ -72,8 +100,21 @@ abstract class PlayHistoryDatabase : RoomDatabase() {
                     context.applicationContext,
                     PlayHistoryDatabase::class.java,
                     "droidtop-play-history.db",
-                ).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2).build().also { instance = it }
             }
+    }
+}
+
+class RoomFavoritesStore(context: Context) : FavoritesStore {
+    private val dao = PlayHistoryDatabase.get(context).favoritesDao()
+
+    override suspend fun setFavorite(id: String, favorite: Boolean) {
+        if (favorite) dao.add(id) else dao.remove(id)
+    }
+
+    override suspend fun getAll(ids: Collection<String>): Set<String> {
+        if (ids.isEmpty()) return emptySet()
+        return dao.getAll(ids).toSet()
     }
 }
 
