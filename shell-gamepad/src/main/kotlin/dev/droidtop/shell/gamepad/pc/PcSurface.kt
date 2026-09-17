@@ -249,6 +249,12 @@ internal fun PcSurface(
                         },
                     horizontalArrangement = Arrangement.spacedBy(24.dp),
                     verticalArrangement = Arrangement.spacedBy(24.dp),
+                    // The hint bar's own room at the end of the grid
+                    // (MenuTokens.HintBarRoom): the last row of cards
+                    // clears the bar instead of ending against it.
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        bottom = dev.droidtop.shell.gamepad.MenuTokens.HintBarRoom,
+                    ),
                 ) {
                     itemsIndexed(shown, key = { _, entry -> entry.id }) { index, entry ->
                         PcGameCard(

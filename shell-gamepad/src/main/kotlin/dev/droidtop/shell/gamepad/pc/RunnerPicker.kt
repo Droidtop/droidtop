@@ -79,7 +79,14 @@ internal fun RunnerPicker(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Text("Runs with", color = Color.White, style = MaterialTheme.typography.headlineSmall)
-        LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            // The hint bar's own room (MenuTokens.HintBarRoom).
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                bottom = dev.droidtop.shell.gamepad.MenuTokens.HintBarRoom,
+            ),
+        ) {
             if (overridden) {
                 item {
                     RunnerRow(
