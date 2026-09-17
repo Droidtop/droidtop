@@ -239,12 +239,17 @@ fun GamepadShell(
     // a deliberate user choice, exactly the distinction this draws.
     val selectSection: (GamingSection) -> Unit = { target -> nav.openSection(target) }
     var canGoBack by remember { mutableStateOf(false) }
-    // True only while GamesSection's own themed system-view render (the
-    // real, loaded theme's <helpsystem> element, see EsDeThemedHelpSystem)
-    // is actually drawing button hints itself -- lets the hardcoded
-    // ButtonHintFooter below step aside instead of drawing a second,
-    // redundant, differently-styled hint bar on top of the theme's own.
-    var themeHandlesHints by remember { mutableStateOf(false) }
+    // Which screen, if any, has claimed the help row for the THEME it is
+    // drawing (its real, loaded <helpsystem> element, see
+    // EsDeThemedHelpSystem). A screen key rather than a bare flag,
+    // because the screens cross over during the Crossfade below and the
+    // one that is leaving must not answer for the one arriving: with a
+    // flag, leaving Settings for Games put the answer back to "no theme
+    // row" AFTER the Games screen had already said there was one, and it
+    // stayed wrong until the section changed again -- droidtop's bar and
+    // Slate's own row then drew at once, the theme's sliced in half by
+    // the bar on top of it (rig, build 546, landscape).
+    var themeHintsOwner by remember { mutableStateOf<String?>(null) }
     // Derived, not a second piece of state: the stack says WHICH entry is
     // open and the scan says what that entry is. An entry a rescan no
     // longer finds closes its own detail instead of showing a game that
@@ -469,13 +474,31 @@ fun GamepadShell(
     // Real dispatcher-route for closing the detail screen with B/back --
     // same reason as the drill-up BackHandler in GamesSection.
     androidx.activity.compose.BackHandler(enabled = detailEntry != null) { nav.back() }
-    // The shell's own button bar is drawn on every touch-first window
-    // where hints are enabled at all (see the ButtonHintFooter call at the
-    // bottom of this Column), and while it is up it IS the help bar -- see
-    // [LocalShellOwnsHelpRow].
+    // Which screen is on top right now. One expression, read by the
+    // Crossfade below as its target and by the help-row claim.
+    val currentScreenKey = nav.detailId ?: "section:${section.name}"
+    // A screen claims the theme's help row only while it is the screen on
+    // top; anything else -- a plain droidtop screen, a screen whose theme
+    // declares no <helpsystem>, a stale claim from a screen that has left
+    // -- leaves the row to the shell.
+    val themeHandlesHints = themeHintsOwner == currentScreenKey
+    // ONE answer to "who draws the help row", read by both sides of it:
+    // the shell's own button bar below is drawn exactly when this is
+    // true, and the themed renderer suppresses the theme's own
+    // <helpsystem> exactly when this is true -- see [LocalShellOwnsHelpRow].
+    // Real ES-DE has one help bar per window (Window.cpp:126, :884), and
+    // two independent conditions for it is how droidtop ended up drawing
+    // both at once. On a touch-first window the bar always wins, because
+    // it is the only route to B/Y/Select with no pad attached; otherwise
+    // the theme takes the row whenever it has one to draw.
+    val shellOwnsHelpRow = esDeShellOwnsHelpRow(
+        showHints = GamingPrefs.showHints(context),
+        touchFirst = shellWindow.touchFirst,
+        themeHandlesHints = themeHandlesHints,
+    )
     androidx.compose.runtime.CompositionLocalProvider(
         LocalShellWindow provides shellWindow,
-        LocalShellOwnsHelpRow provides (GamingPrefs.showHints(context) && shellWindow.touchFirst),
+        LocalShellOwnsHelpRow provides shellOwnsHelpRow,
     ) {
     Column(
         modifier = Modifier
@@ -644,7 +667,7 @@ fun GamepadShell(
             // not on the group, so a move between systems is still ES-DE's
             // own animation and not two animations at once.
             androidx.compose.animation.Crossfade(
-                targetState = nav.detailId ?: "section:${section.name}",
+                targetState = currentScreenKey,
                 animationSpec = androidx.compose.animation.core.tween(SHELL_SCREEN_TRANSITION_MS),
                 label = "shell screen",
                 modifier = Modifier.fillMaxSize(),
@@ -718,7 +741,6 @@ fun GamepadShell(
                             // settings screen had no way out that a finger could
                             // reach at all.
                             canGoBack = true
-                            themeHandlesHints = false
                             SettingsCatalogView(
                                 onBack = { nav.openSection(GamingPrefs.defaultSection(context)) },
                                 onRescan = { rescanTrigger++ },
@@ -742,13 +764,20 @@ fun GamepadShell(
                                 onShowDetail = { nav.rememberFocus(it.id); nav.openDetail(it.id) },
                                 onDrillDownChanged = { canGoBack = it },
                                 onFocusedEntryChanged = onFocusedEntryChanged,
-                                onThemeHandlesHints = { themeHandlesHints = it },
+                                // Scoped to the screen that says it: a
+                                // claim from a copy the Crossfade is
+                                // still drawing on its way out cannot
+                                // answer for the one arriving.
+                                onThemeHandlesHints = { handled ->
+                                    if (screenKey == currentScreenKey) {
+                                        themeHintsOwner = if (handled) screenKey else null
+                                    }
+                                },
                                 onToggleFavorite = onToggleFavorite,
                                 onRequestRescan = { rescanTrigger++ },
                             )
                             GamingSection.APPS -> {
                                 canGoBack = false
-                                themeHandlesHints = false
                                 AppsSection(
                                     entries = appEntries.orEmpty(),
                                     onLaunch = onLaunch,
@@ -769,7 +798,9 @@ fun GamepadShell(
         // the controls: on a screen with no pad attached this bar is the
         // only route to B/Y/Select at all, so it stays. On the console a
         // theme's own help system still takes over, exactly as before.
-        if (GamingPrefs.showHints(context) && (!themeHandlesHints || shellWindow.touchFirst)) {
+        // Same value the themed renderer suppresses the theme's row by,
+        // so the two can never both draw.
+        if (shellOwnsHelpRow) {
             ButtonHintFooter(
                 canGoBack = canGoBack || detailEntry != null,
                 showInfo = detailEntry == null,

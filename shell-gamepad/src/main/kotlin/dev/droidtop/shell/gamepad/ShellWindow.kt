@@ -129,6 +129,21 @@ data class ShellWindow(
  */
 val LocalShellOwnsHelpRow = staticCompositionLocalOf { false }
 
+/**
+ * Who draws the help row, as one answer both sides read: true means
+ * droidtop's own [ButtonHintFooter] draws it AND the themed renderer
+ * suppresses the theme's `<helpsystem>`; false means the theme draws it
+ * and the footer stays down. See docs/SPEC.md 7j.
+ *
+ * [themeHandlesHints] is whether the screen currently on top has a
+ * theme-drawn help row to offer at all.
+ */
+fun esDeShellOwnsHelpRow(
+    showHints: Boolean,
+    touchFirst: Boolean,
+    themeHandlesHints: Boolean,
+): Boolean = showHints && (touchFirst || !themeHandlesHints)
+
 val LocalShellWindow = staticCompositionLocalOf {
     // Only ever seen by a preview or a test composing a screen outside
     // the shell: the console's own landscape geometry.
