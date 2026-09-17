@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -106,6 +107,15 @@ private fun TouchHint(action: GamepadAction, label: String, onPress: () -> Unit)
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
+            // The bar is a LEGEND that happens to be tappable, never a
+            // place the cursor goes: `clickable` makes a node focusable,
+            // so D-pad Down out of the last row of the PC grid landed in
+            // here, where A does nothing at all and the way back is Up
+            // (rig, build 546). One selection, and it stays on the
+            // content -- `canFocus = false` ahead of the clickable in the
+            // same chain makes exactly that node unfocusable while
+            // leaving the tap intact.
+            .focusProperties { canFocus = false }
             // On a touch screen the hint is a button and has to be big
             // enough to hit; on the console it stays the compact legend
             // it always was.
