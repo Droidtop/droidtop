@@ -581,13 +581,23 @@ object GameEngineDetector {
             return emptyList()
         }
         val tooSlow = state.tooSlow(folder, own)
-        val below =
-            if (depth < MAX_SCAN_DEPTH) {
-                candidateFolders(folder, systemsById, state, childDepth = depth + 1)
-                    .flatMap { gamesUnder(it, systemsById, defs, override, depth + 1, state) }
-            } else {
-                emptyList()
+        // A folder named for a part or a version of a game (`Chap3+`,
+        // `12.0-scrappy`, `Week 2`) is the structure of ONE game, not a
+        // level of the library, so it costs the walk no depth
+        // (GameNaming.isStructuralFolderName, docs/SPEC.md 7m). The rig's
+        // `adult/renpy/BeingADik/Chap3+/12.0-scrappy` is the game, five
+        // folders below the root and one past MAX_SCAN_DEPTH: the walk
+        // stopped at `Chap3+`, claimed it on the .rpa fallback, and
+        // enginehost was handed a folder with no game in it (build 550).
+        // The bound still holds for everything else: a mistakenly added
+        // root is walked four TITLE folders deep and no further.
+        val below = candidateFolders(folder, systemsById, state, childDepth = depth + 1).flatMap { child ->
+            when {
+                GameNaming.isStructuralFolderName(child.name) -> gamesUnder(child, systemsById, defs, override, depth, state)
+                depth < MAX_SCAN_DEPTH -> gamesUnder(child, systemsById, defs, override, depth + 1, state)
+                else -> emptyList()
             }
+        }
 
         wrapper(folder, below)?.let { return listOf(Walked(it, precise = true)) }
         // A folder whose own step ran past its budget cannot claim to be
