@@ -85,6 +85,16 @@ import kotlinx.coroutines.withContext
  * editors, runs actions), B pops one level and exits at the root.
  * Touch works on every row too.
  *
+ * B has three routes into here, because on real hardware it arrives as
+ * three different things and a screen with no way out is the worst
+ * defect a menu can have (rig, build 539: the Settings tab sat on
+ * "Windows games" with Game folders, Rescan library and Software updates
+ * all unreachable): the system back DISPATCHER (BackHandler, which is
+ * what KEYCODE_BACK and the hint row's own touch route become),
+ * KEYCODE_BUTTON_B and Escape as ordinary key events (the branch in the
+ * key handler), and the hint row itself, which the shell draws for this
+ * section because Back always does something here.
+ *
  * [nativeActions]: renderer-native fulfillments by catalog item id (see
  * the catalog doc comment) -- when present, activating that item calls
  * the override instead of the item's own default run.
@@ -278,6 +288,18 @@ fun CatalogNavigator(
                         }
                         Key.ButtonA, Key.Enter, Key.DirectionCenter, Key.NumPadEnter -> {
                             rows.getOrNull(selected)?.let { activate(it.item) }
+                            true
+                        }
+                        // B and Escape leave a screen the same way the
+                        // system Back button does. Deliberately NOT
+                        // Key.Back: that one is delivered through the
+                        // back DISPATCHER (the BackHandler above), and
+                        // handling it here as well would pop twice.
+                        // Without this branch a pad whose B reports as
+                        // KEYCODE_BUTTON_B had no way out of a settings
+                        // screen at all, and neither did a keyboard.
+                        Key.ButtonB, Key.Escape -> {
+                            pop()
                             true
                         }
                         else -> false
