@@ -1,5 +1,6 @@
 package dev.droidtop.library
 
+import android.content.Context
 import java.io.File
 
 /**
@@ -102,6 +103,87 @@ object ScanLog {
 
     /** The tag every scan summary goes out under. */
     const val TAG = "droidtop.ScanLog"
+
+    /**
+     * Where droidtop keeps its own copy of this log, under the app's
+     * external files directory, and why there is one at all.
+     *
+     * A rig session on 2026-09-16 (build 539) walked a whole library and
+     * could not find a single `droidtop.ScanLog` line in logcat
+     * afterwards, which made every scan defect in that session
+     * undiagnosable: "found nothing", "never ran" and "ran and its lines
+     * were evicted from a 40-minute logcat ring buffer shared with the
+     * vendored backbone's own logging" are three different bugs that look
+     * identical when the log is gone. logcat is not droidtop's to
+     * guarantee -- its buffer size, its rotation and its filters belong to
+     * the device -- so the scan log is written twice: to logcat, where it
+     * has always gone, and to a file droidtop owns, which a rig reads with
+     *
+     *     adb shell cat /sdcard/Android/data/dev.droidtop.app/files/logs/scan.log
+     *
+     * [install] also writes one line per process start, so "is droidtop
+     * logging at all" is one grep rather than an inference from silence.
+     */
+    private const val LOG_DIR = "logs"
+    private const val LOG_NAME = "scan.log"
+
+    /** Rotated at a quarter megabyte: two files, never unbounded growth. */
+    private const val MAX_LOG_BYTES = 256L * 1024L
+
+    @Volatile
+    private var logFile: File? = null
+
+    private val fileLock = Any()
+
+    /**
+     * Points the scan log at this app's own files and records that the
+     * process has started. Called once, from the Application: the log
+     * belongs to the shared core, not to a mode.
+     */
+    fun install(context: Context) {
+        val base = runCatching { context.getExternalFilesDir(null) }.getOrNull() ?: context.filesDir
+        val dir = File(base, LOG_DIR)
+        runCatching { dir.mkdirs() }
+        logFile = File(dir, LOG_NAME)
+        // The version NAME carries the build number ("0.1.0-dev-539"),
+        // so one line says which build produced everything under it.
+        val version = runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        }.getOrNull() ?: "unknown build"
+        write("droidtop $version started; this log is also at ${logFile?.absolutePath}")
+    }
+
+    /**
+     * One scan line, to logcat and to droidtop's own copy of the log.
+     * Every caller goes through here, so there is one place a line is
+     * emitted and one format (see [summary]).
+     */
+    fun write(line: String) {
+        android.util.Log.i(TAG, line)
+        val file = logFile ?: return
+        synchronized(fileLock) {
+            runCatching {
+                if (file.length() > MAX_LOG_BYTES) {
+                    val previous = File(file.parentFile, "$LOG_NAME.1")
+                    previous.delete()
+                    file.renameTo(previous)
+                }
+                file.appendText(timestamp() + " " + line + System.lineSeparator())
+            }
+        }
+    }
+
+    /** [summary]'s line, emitted. */
+    fun write(
+        label: String,
+        games: Int,
+        skippedByReason: Map<String, Int>,
+        durationMs: Long,
+        note: String? = null,
+    ) = write(summary(label, games, skippedByReason, durationMs, note))
+
+    private fun timestamp(): String =
+        java.text.SimpleDateFormat("MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date())
 
     /**
      * One folder's or one root's summary: what it found, what it did not

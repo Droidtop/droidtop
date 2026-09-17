@@ -93,8 +93,7 @@ class PcGameProvider(
                 EngineOverridePrefs.engineFor(context, folder.absolutePath)
             }
         }
-        android.util.Log.i(
-            dev.droidtop.library.ScanLog.TAG,
+        dev.droidtop.library.ScanLog.write(
             "pc library: ${allStoreGames.size} games known, ${storeGames.size} not already owned by engine detection",
         )
         val storeEntries = storeGames.map { it.toLibraryEntry() }
