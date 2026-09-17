@@ -531,6 +531,11 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
             desktopConfigured = configureDesktop && desktopImageChosen,
             gamingConfigured = configureGaming,
             gamesFound = rootReports.values.sumOf { it.total },
+            // A root whose count has not come back yet is still being
+            // walked: the summary must say so rather than report the
+            // zero it has not finished counting.
+            gamesStillCounting = roots.any { it !in rootReports.keys },
+            gamesSoFar = rootProgress.filterKeys { it !in rootReports.keys }.values.sumOf { it.gamesSoFar },
             storageGranted = storageAccessGranted,
             onFinish = {
                 val mode = chosenMode ?: dev.droidtop.library.settings.Mode.GAMING
@@ -1391,6 +1396,8 @@ private fun WhatNextStep(
     desktopConfigured: Boolean,
     gamingConfigured: Boolean,
     gamesFound: Int,
+    gamesStillCounting: Boolean,
+    gamesSoFar: Int,
     storageGranted: Boolean,
     onFinish: () -> Unit,
 ) {
@@ -1401,11 +1408,21 @@ private fun WhatNextStep(
             HomeRolePrefs.HomeImplementation.NONE -> Unit
         }
         if (gamingConfigured) {
+            // Three different facts, and the rig caught them collapsed
+            // into one: a scan that is still walking a folder said
+            // "no games found yet", which reads as a finished, empty
+            // library (build 539). A count in flight says it is counting.
+            val counted = gamesFound + gamesSoFar
             add(
-                if (gamesFound > 0) {
-                    "Gaming: $gamesFound " + (if (gamesFound == 1) "game" else "games") + " found in your folders."
-                }
-                else "Gaming: set up, with no games found yet.",
+                when {
+                    gamesStillCounting && counted > 0 ->
+                        "Gaming: still counting your folders - $counted " +
+                            (if (counted == 1) "game" else "games") + " so far."
+                    gamesStillCounting -> "Gaming: set up, still counting your folders."
+                    gamesFound > 0 ->
+                        "Gaming: $gamesFound " + (if (gamesFound == 1) "game" else "games") + " found in your folders."
+                    else -> "Gaming: set up, with no games found in your folders."
+                },
             )
         }
         if (desktopConfigured) add("Desktop: image chosen, downloaded the first time it starts.")
