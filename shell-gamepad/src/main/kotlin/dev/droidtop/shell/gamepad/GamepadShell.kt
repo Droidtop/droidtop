@@ -89,6 +89,7 @@ import dev.droidtop.library.theme.EsDeTransitionAnimation
 import dev.droidtop.library.theme.primaryListElement
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
+import dev.droidtop.shell.gamepad.input.ownPadButtons
 import dev.droidtop.shell.gamepad.theme.EsDeListItem
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import dev.droidtop.shell.gamepad.theme.EsDeSystemListView
@@ -380,6 +381,9 @@ fun GamepadShell(
         }
     }
     val tabBarFocus = remember { FocusRequester() }
+    // Where an unhandled B goes: the same dispatcher every BackHandler in
+    // this shell registers on (see Modifier.ownPadButtons).
+    val backDispatcher = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
 
     // The extra .filter is real, not redundant: Library.scanKinds(Progressive)
     // matches at the provider level (does this provider produce any
@@ -546,6 +550,10 @@ fun GamepadShell(
                     }
                 }
             }
+            // Outermost, so it sees only what nothing below wanted: the
+            // shell owns the pad, and Android's generic fallbacks never
+            // act on it (Modifier.ownPadButtons).
+            .ownPadButtons { backDispatcher?.onBackPressed() }
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown) {
                     lastInputMs = android.os.SystemClock.elapsedRealtime()

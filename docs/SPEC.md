@@ -5495,15 +5495,22 @@ state it acts on. A touch affordance therefore sends a genuine key event
 down the focused window (`rememberGamepadTouch`,
 `GamepadKeyMap.keyCodeFor`) and travels that same path, so there is
 exactly one definition of every action and touch cannot drift from the
-pad. The path includes Android's own fallback: a pad's `BUTTON_B` that no
-view consumes becomes `KEYCODE_BACK` in the input pipeline (`Generic.kcm`),
-which is how a screen that answers back only through the back dispatcher
-still closes on B. That stage sits above the window, so a press injected
-at the window replays it itself: an unconsumed touch B is re-dispatched as
-BACK into the same window, and the decor hands an unhandled BACK to the
-Activity's back dispatcher. A `BackHandler` is therefore a complete answer
-to B for touch and pad alike, and a screen with nothing focusable (an
-empty list) must have one.
+pad.
+
+**The shell owns the pad; Android's generic fallbacks never act on it.**
+`Generic.kcm` gives every pad button a fallback key (A, Start and the thumb
+clicks become DPAD_CENTER, B becomes BACK, X DEL, Y SPACE, Select MENU),
+dispatched on both edges whenever the window leaves the button unhandled.
+Every screen here acts on the UP edge, so the unhandled DOWN of A on a card
+became a DPAD_CENTER pair that pressed the primary button of the detail the
+A had just opened (build 552). The outermost node of every window
+(`Modifier.ownPadButtons`: the shell's root, the Quick Menu's dialog)
+consumes every pad button nothing below it wanted and gives B its one
+meaning explicitly, the back dispatcher. A `BackHandler` is therefore a
+complete answer to B for pad and touch alike -- a hint pill dispatches a
+real `BUTTON_B` into the window and it arrives at the root exactly as a
+pad's does -- and a screen with nothing focusable (an empty list) must have
+one. D-pad, keyboard and volume keys are not pad buttons and pass through.
 
 **That block goes AHEAD of the element's focus targets in the modifier
 chain, never behind them.** Compose dispatches a key event to the
