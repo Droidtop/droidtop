@@ -108,7 +108,28 @@ object PcLibrary {
      * row, a schema drift after a vendor sync) costs that store's games,
      * not the whole library.
      */
-    suspend fun allGames(context: Context): List<Game> {
+    suspend fun allGames(context: Context): List<Game> =
+        (storeGames(context) + folderGames(context).flatMap { it.games }).sortedBy { it.title.lowercase() }
+
+    /**
+     * One top-level folder of one games root, and the games droidtop's
+     * own folder rule ([dev.droidtop.library.PcFolderScan]) found under
+     * it.
+     *
+     * The grouping is the walk's unit of work, not a presentation
+     * choice: the library index replaces one folder's entries at a time
+     * (docs/SPEC.md 7g), so the walk has to say which folder each game
+     * came from.
+     */
+    data class FolderGroup(val root: String, val topFolder: String, val games: List<Game>)
+
+    /**
+     * Every PC game a STORE knows about, plus the folders the vendored
+     * scanner was told about by hand outside droidtop's own roots. None
+     * of these is under a games root droidtop walks, which is why they
+     * are one group rather than per folder.
+     */
+    suspend fun storeGames(context: Context): List<Game> {
         val dao = daos(context)
         return buildList {
             addAll(runCatching { dao.steamAppDao().getAllOwnedAppsAsList().map { it.toGame() } }.getOrDefault(emptyList()))
@@ -117,33 +138,17 @@ object PcLibrary {
             addAll(runCatching { dao.amazonGameDao().getAllAsList().map { it.toGame() } }.getOrDefault(emptyList()))
             addAll(
                 runCatching {
-                    // The scanner looks in its own managed folders plus
-                    // whatever roots it has been told about. droidtop
-                    // already asks the user for their games folders ONCE,
-                    // so those are the roots -- without this the folder
-                    // source could only ever see gamenative's own
-                    // CustomGames directory, which nothing in droidtop
-                    // tells anybody about.
-                    val ours = adoptScannedGameFolders(context)
-                    // droidtop's own folders are turned into items HERE,
-                    // from the list this scan just produced, and not read
-                    // back out of the preference it was also written to.
-                    // The rig proved why: `PrefManager.setPref` hands the
-                    // write to a DataStore coroutine and returns, while
-                    // `candidateFolders()` reads the value back
-                    // synchronously, so the very first scan after an
-                    // install read the EMPTY set and the PC library was
-                    // 151 engine games and not one folder game. On a
-                    // device that had scanned before, the previous run's
-                    // value hid the race completely -- which is exactly
-                    // why build 537 showed 171 games and a freshly
-                    // installed 539 showed 151.
-                    val folderItems = ours.mapNotNull { folder ->
-                        runCatching { CustomGameScanner.createLibraryItemFromFolder(folder) }.getOrNull()
-                    }
                     // Folders the user added to the vendored scanner by
-                    // hand, outside droidtop's roots, still count.
-                    (folderItems + CustomGameScanner.scanAsLibraryItems())
+                    // hand, OUTSIDE droidtop's roots, still count. Inside
+                    // them is [folderGames]' answer and only its answer:
+                    // droidtop writes its own findings into the scanner's
+                    // manual-folder list (see adoptScannedGameFolders), so
+                    // without this filter the same game would arrive twice
+                    // -- once as a store part with no root, once as its
+                    // folder's part -- and removing the root would leave
+                    // the rootless copy behind.
+                    val ourRoots = dev.droidtop.library.GamesRoots.current(context).map { it.absolutePath }
+                    CustomGameScanner.scanAsLibraryItems()
                         .distinctBy { it.appId }
                         // The scanner recognizes a Steam install sitting in a
                         // scanned folder and returns it as a STEAM item; that
@@ -151,17 +156,63 @@ object PcLibrary {
                         // both would list it twice.
                         .filter { it.gameSource == GameSource.CUSTOM_GAME }
                         .map { it.toGame() }
+                        .filterNot { game ->
+                            val path = game.installPath.orEmpty()
+                            ourRoots.any { root -> path == root || path.startsWith(root + "/") }
+                        }
                 }.getOrDefault(emptyList()),
             )
         }.sortedBy { it.title.lowercase() }
-            // Recording the installs here, in the one place every
-            // source's install directories are already known, is what
-            // keeps [knownInstalls]/[knownInstallRoots] answerable
-            // synchronously. It used to be a separate
-            // `installRoots(context)` entry point that nothing ever
-            // called, so the store half of that list stayed empty forever
-            // and only Steam's own paths reached engine detection.
-            .also { games -> storeInstalls = games.mapNotNull { it.toStoreInstall() } }
+            .also { games -> storeSourceInstalls = games.mapNotNull { it.toStoreInstall() } }
+    }
+
+    /**
+     * The games under droidtop's own roots, a top-level folder at a
+     * time.
+     */
+    suspend fun folderGames(context: Context): List<FolderGroup> {
+        // The scanner looks in its own managed folders plus whatever
+        // roots it has been told about. droidtop already asks the user
+        // for their games folders ONCE, so those are the roots -- without
+        // this the folder source could only ever see gamenative's own
+        // CustomGames directory, which nothing in droidtop tells anybody
+        // about.
+        val found = runCatching { adoptScannedGameFolders(context) }
+            .onFailure { android.util.Log.w(TAG, "Scanning droidtop's roots for PC games failed", it) }
+            .getOrDefault(emptyList())
+        val groups = found.map { group ->
+            // droidtop's own folders are turned into items HERE, from the
+            // list this scan just produced, and not read back out of the
+            // preference it was also written to. The rig proved why:
+            // `PrefManager.setPref` hands the write to a DataStore
+            // coroutine and returns, while `candidateFolders()` reads the
+            // value back synchronously, so the very first scan after an
+            // install read the EMPTY set and the PC library was 151
+            // engine games and not one folder game. On a device that had
+            // scanned before, the previous run's value hid the race
+            // completely -- which is exactly why build 537 showed 171
+            // games and a freshly installed 539 showed 151.
+            val games = group.gameFolders
+                .mapNotNull { folder -> runCatching { CustomGameScanner.createLibraryItemFromFolder(folder) }.getOrNull() }
+                .distinctBy { it.appId }
+                // The scanner recognizes a Steam install sitting in a
+                // scanned folder and returns it as a STEAM item; that
+                // game already came from the Steam DAO, so taking both
+                // would list it twice.
+                .filter { it.gameSource == GameSource.CUSTOM_GAME }
+                .map { it.toGame() }
+                .sortedBy { it.title.lowercase() }
+            FolderGroup(root = group.root, topFolder = group.topFolder, games = games)
+        }
+        // Recording the installs here, in the one place every source's
+        // install directories are already known, is what keeps
+        // [knownInstalls]/[knownInstallRoots] answerable synchronously.
+        // It used to be a separate `installRoots(context)` entry point
+        // that nothing ever called, so the store half of that list stayed
+        // empty forever and only Steam's own paths reached engine
+        // detection.
+        folderSourceInstalls = groups.flatMap { it.games }.mapNotNull { it.toStoreInstall() }
+        return groups
     }
 
 
@@ -213,8 +264,18 @@ object PcLibrary {
      */
     fun knownInstalls(): List<StoreInstall> = storeInstalls.filter { it.installDir.isDirectory }
 
+    /**
+     * The two halves are recorded separately because they are now walked
+     * separately -- the stores answer as one, the roots answer a folder
+     * at a time -- and one half completing must not erase the other's.
+     */
+    private val storeInstalls: List<StoreInstall> get() = storeSourceInstalls + folderSourceInstalls
+
     @Volatile
-    private var storeInstalls: List<StoreInstall> = emptyList()
+    private var storeSourceInstalls: List<StoreInstall> = emptyList()
+
+    @Volatile
+    private var folderSourceInstalls: List<StoreInstall> = emptyList()
 
     /**
      * Cached community compatibility only — no network call. Scanning a
@@ -309,7 +370,10 @@ object PcLibrary {
      * setting. Manual folders the user added by hand outside droidtop's
      * roots are left alone.
      */
-    private fun adoptScannedGameFolders(context: Context): List<String> {
+    /** One top-level folder of one root, and the game folders droidtop's rule found under it. */
+    private data class ScannedFolder(val root: String, val topFolder: String, val gameFolders: List<String>)
+
+    private fun adoptScannedGameFolders(context: Context): List<ScannedFolder> {
         val roots = dev.droidtop.library.GamesRoots.current(context)
         if (roots.isEmpty()) return emptyList()
         val rootPaths = roots.map { it.absolutePath }
@@ -325,9 +389,16 @@ object PcLibrary {
         // which are engine games is one question: a category folder
         // holding engine games is nobody's game (PcFolderScan rule 6).
         val defs = runCatching { dev.droidtop.library.EnginesDatabase.defs(context) }.getOrDefault(emptyList())
-        val found = roots.flatMap { dev.droidtop.library.PcFolderScan.gamesUnder(it, defs) }
-            .map { it.absolutePath }
-            .toSet()
+        val scanned = roots.flatMap { root ->
+            dev.droidtop.library.PcFolderScan.gamesByTopLevelFolder(root, defs).map { top ->
+                ScannedFolder(
+                    root = root.absolutePath,
+                    topFolder = top.folder.absolutePath,
+                    gameFolders = top.games.map { it.absolutePath },
+                )
+            }
+        }
+        val found = scanned.flatMap { it.gameFolders }.toSet()
         // A scan that finds nothing and a scan that never ran look the
         // same from the library; this line is how they are told apart.
         dev.droidtop.library.ScanLog.write(
@@ -342,7 +413,7 @@ object PcLibrary {
             val wanted = (theirs + found).toSet()
             if (wanted != current) app.gamenative.PrefManager.customGameManualFolders = wanted
         }.onFailure { android.util.Log.w(TAG, "Could not tell the folder scanner which folders are games", it) }
-        return found.toList()
+        return scanned
     }
 
     private const val TAG = "droidtop.PcLibrary"
