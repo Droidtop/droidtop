@@ -115,7 +115,12 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
         Text("Edit metadata", color = Color.White, style = MaterialTheme.typography.headlineSmall)
         Text(entry.title, color = Color.Gray, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 12.dp))
 
-        LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            // The hint bar's own room (MenuTokens.HintBarRoom).
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = MenuTokens.HintBarRoom),
+        ) {
             item { SectionLabel("Scraped fields") }
             item {
                 MetadataTextRow("Description", current.description ?: "", multiline = true) {
@@ -328,7 +333,11 @@ private fun ControllerPicker(current: String?, onPick: (String?) -> Unit, onDism
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("Controller", color = Color.White, style = MaterialTheme.typography.headlineSmall)
-        LazyColumn(modifier = Modifier.weight(1f)) {
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            // The hint bar's own room (MenuTokens.HintBarRoom).
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = MenuTokens.HintBarRoom),
+        ) {
             item {
                 ControllerRow("(None)", current == null) { onPick(null) }
             }

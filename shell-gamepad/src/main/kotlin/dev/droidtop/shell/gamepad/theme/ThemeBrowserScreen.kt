@@ -126,7 +126,13 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
                     "No themes indexed yet. Go back and run \"Sync theme index\" in Settings → Appearance first.",
                     color = Color.Gray,
                 )
-                else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                else -> LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    // The hint bar's own room (MenuTokens.HintBarRoom).
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        bottom = dev.droidtop.shell.gamepad.MenuTokens.HintBarRoom,
+                    ),
+                ) {
                     itemsIndexed(entries, key = { _, entry -> entry.reponame.ifBlank { entry.name } }) { index, entry ->
                         val dirName = entry.reponame.ifBlank { entry.name }
                         val installed = dirName in installedDirNames

@@ -107,6 +107,20 @@ object MenuTokens {
      * minimum, not a box.
      */
     val ValueColumnMinWidth = 92.dp
+
+    /**
+     * The room the hint bar takes at the bottom of the window, as CONTENT
+     * padding on every scrolling screen the shell draws.
+     *
+     * The bar is the last thing in the shell's column, so a list measured
+     * against the rest of the window ends exactly where the bar begins:
+     * its last row is sliced by the window edge and scrolling to the end
+     * never brings that row clear (rig: the settings list's own last row,
+     * build 546; a game detail's last card, build 548). As CONTENT padding
+     * the same space scrolls with the list, so the end of the list is the
+     * end of the list. One value, because it is one bar.
+     */
+    val HintBarRoom = 72.dp
 }
 
 /**
@@ -126,7 +140,7 @@ internal val MenuListContentPadding: PaddingValues
         start = LocalShellWindow.current.edgePadding,
         end = LocalShellWindow.current.edgePadding,
         top = 12.dp,
-        bottom = 72.dp,
+        bottom = MenuTokens.HintBarRoom,
     )
 
 /** A screen-level menu header: name first, explanation second, both quiet. */

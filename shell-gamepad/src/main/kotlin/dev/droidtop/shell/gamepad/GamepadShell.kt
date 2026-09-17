@@ -2548,6 +2548,10 @@ private fun GamesSection(
                     val focusManager = LocalFocusManager.current
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = 220.dp),
+                        // The hint bar's own room (MenuTokens.HintBarRoom).
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            bottom = MenuTokens.HintBarRoom,
+                        ),
                         // Real bug fix, reported directly: arrow keys couldn't
                         // actually move focus between games at all -- GameCard
                         // only ever handles A/Center/Enter/Y, never Up/Down/
@@ -2655,6 +2659,8 @@ private fun AppsSection(
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(32.dp),
+        // The hint bar's own room (MenuTokens.HintBarRoom).
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = MenuTokens.HintBarRoom),
     ) {
         items(sections, key = { it.title }) { homeSection ->
             // Native Android apps get their own dense, icon-first grid

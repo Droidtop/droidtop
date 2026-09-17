@@ -221,6 +221,11 @@ internal fun PcGameDetail(
                 .fillMaxSize()
                 .weight(1f)
                 .padding(horizontal = dev.droidtop.shell.gamepad.LocalShellWindow.current.edgePadding),
+            // The hint bar's own room at the end of the list, so the last
+            // card clears it instead of ending under it (MenuTokens.HintBarRoom).
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                bottom = dev.droidtop.shell.gamepad.MenuTokens.HintBarRoom,
+            ),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             // ONE header, artwork or not: a game's own screen opens with
