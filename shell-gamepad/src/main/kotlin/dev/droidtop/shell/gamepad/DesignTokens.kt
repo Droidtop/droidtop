@@ -88,6 +88,15 @@ object Measure {
      * size, so a run of rows does not step in and out as icons vary.
      */
     val rowIcon = 32.dp
+
+    /**
+     * A theme's own render, shown beside its name (onboarding's Appearance
+     * step). 16:9, because a theme lays itself out against a screen's
+     * aspect ratio and a preview at the wrong shape is a preview of a
+     * layout the theme never wrote.
+     */
+    val themePreviewWidth = 112.dp
+    val themePreviewHeight = 63.dp
 }
 
 /**
