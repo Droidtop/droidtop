@@ -96,6 +96,18 @@ internal fun PcSurface(
      */
     focusEntryId: String? = null,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
+    /**
+     * Whether this surface's own options screen ("Stores and folders") is
+     * up, and how to open and close it. Held by the shell's back stack
+     * rather than here (docs/SPEC.md 7i): it is a LEVEL above the grid,
+     * so B out of it has to land on the grid, on the card the user left.
+     * While this screen owned the answer itself, the shell's own drill-up
+     * took the BACK key first and dropped the user on the carousel with
+     * the system reset (rig, build 548).
+     */
+    optionsOpen: Boolean = false,
+    onOpenOptions: () -> Unit = {},
+    onCloseOptions: () -> Unit = {},
 ) {
     // ONE CARD PER GAME (docs/SPEC.md 7m). A game found in three folders
     // -- three weeks of Fetish Locator, two versions of one Godot game --
@@ -123,7 +135,11 @@ internal fun PcSurface(
     val storesScreen = remember { SettingsScreenRegistry.get(PC_STORES_SCREEN_ID) }
     // Nothing in the library is exactly the case those four actions fix,
     // so an empty surface opens on them instead of on an empty grid.
-    var options by remember(entries.isEmpty()) { mutableStateOf(entries.isEmpty()) }
+    // Once per change of emptiness: backing out of the screen must not
+    // re-open it on the next recomposition.
+    LaunchedEffect(entries.isEmpty(), storesScreen) {
+        if (entries.isEmpty() && storesScreen != null) onOpenOptions()
+    }
 
     val allSources = remember(cards) { cards.map { it.sourceLabel() }.distinct().sorted() }
     val allEngines = remember(cards) { cards.mapNotNull { it.engineLabel() }.distinct().sorted() }
@@ -156,8 +172,8 @@ internal fun PcSurface(
         runCatching { openingCard.requestFocus() }
     }
 
-    if (options && storesScreen != null) {
-        CatalogNavigator(root = storesScreen, onExit = { options = false })
+    if (optionsOpen && storesScreen != null) {
+        CatalogNavigator(root = storesScreen, onExit = onCloseOptions)
         return
     }
 
@@ -221,7 +237,7 @@ internal fun PcSurface(
                                 // The surface's options: where games come
                                 // from, on the surface they came into.
                                 GamepadAction.Y -> {
-                                    if (storesScreen != null) options = true
+                                    if (storesScreen != null) onOpenOptions()
                                     storesScreen != null
                                 }
                                 GamepadAction.UP -> focusManager.moveFocus(FocusDirection.Up)

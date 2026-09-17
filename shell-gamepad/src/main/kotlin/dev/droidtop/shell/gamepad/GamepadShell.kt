@@ -1818,7 +1818,7 @@ private fun GamesSection(
             nav.rememberFocus(systemGamesForGroup.getOrNull(focusedGameIndex)?.id)
         }
     }
-    LaunchedEffect(selectedGroup, hasThemedGamelist) {
+    LaunchedEffect(selectedGroup, hasThemedGamelist, nav.optionsOpen) {
         onDrillDownChanged(selectedGroup != null)
         if (selectedGroup != null) {
             // Real, conditional -- the themed gamelist render draws its
@@ -1835,6 +1835,11 @@ private fun GamesSection(
                     // THEME row is what let a touch-first window add the
                     // shell's bar underneath it -- two rows on the PC grid
                     // in portrait, one in landscape (rig, build 547).
+                    // The group's own options screen is a plain
+                    // droidtop screen drawn over the group: it has no row
+                    // of its own, so the shell's bar draws there -- and
+                    // its B hint is the only touch route out.
+                    nav.optionsOpen -> HelpRowClaim.NONE
                     selectedGroup is GameGroup.Pc -> HelpRowClaim.SCREEN
                     hasThemedGamelist && gamelistHasHelpSystem -> HelpRowClaim.THEME
                     else -> HelpRowClaim.NONE
@@ -1857,7 +1862,9 @@ private fun GamesSection(
         // route and the onKeyEvent branch below are the same real drill-up,
         // just different hardware paths (see this handler's own comment).
         EsDeNavigationSounds.play("back")
-        selectGroup(null)
+        // One level at a time: a group's own options screen is above the
+        // group, so back leaves THAT first.
+        nav.back()
     }
     Box(
         modifier = Modifier
@@ -1876,7 +1883,16 @@ private fun GamesSection(
                     (action == GamepadAction.BACK || action == GamepadAction.B) && group != null -> {
                         // Same real BACKSOUND as the BackHandler route above.
                         EsDeNavigationSounds.play("back")
-                        selectGroup(null)
+                        // The same one answer to "what is under this" the
+                        // dispatcher route uses: the group's options screen
+                        // is a level, so this leaves it before it leaves the
+                        // group. KEYCODE_BACK reaches the view tree as an
+                        // ordinary key event BEFORE the back dispatcher, so
+                        // this branch -- an ancestor of the options screen --
+                        // is what actually ran when the user pressed BACK in
+                        // Stores and folders, and it drilled all the way out
+                        // to the carousel (rig, build 548).
+                        nav.back()
                         true
                     }
                     // ES-DE's real, documented "General navigation" convention:
@@ -2388,6 +2404,11 @@ private fun GamesSection(
                         nav.rememberFocus(entry?.id)
                         onFocusedEntryChanged(entry)
                     },
+                    // A level of its own in the back stack, not state this
+                    // screen owns: see PcSurface's own parameter comment.
+                    optionsOpen = nav.optionsOpen,
+                    onOpenOptions = { nav.openOptions() },
+                    onCloseOptions = { nav.back() },
                 )
             } else if (hasThemedGamelist && gamelistView != null) {
                 // Real, unified theme-driven gamelist render -- ONE call into
