@@ -590,19 +590,38 @@ fun EsDeThemedView(
         // for the one thing real ES-DE gives the Window exactly one of
         // (Window.cpp:126, :884; HelpComponent.cpp:629 draws nothing when
         // help is off). See [HelpRowOwner].
-        val themeOwnsHelpRow =
-            dev.droidtop.shell.gamepad.LocalHelpRowOwner.current == dev.droidtop.shell.gamepad.HelpRowOwner.THEME
+        val helpRowOwner = dev.droidtop.shell.gamepad.LocalHelpRowOwner.current
+        val themeOwnsHelpRow = helpRowOwner == dev.droidtop.shell.gamepad.HelpRowOwner.THEME
         val helpElements = view.elements.values.filter {
-            it.type == "helpsystem" && themeOwnsHelpRow && esDeScopeAllows(it, backgroundDimmed) &&
+            it.type == "helpsystem" && esDeScopeAllows(it, backgroundDimmed) &&
                 (layer == EsDeViewLayer.ALL || layer == EsDeViewLayer.WINDOW)
         }
-        if (helpElements.isNotEmpty() && hints.isNotEmpty()) {
+        if (layer == EsDeViewLayer.ALL || layer == EsDeViewLayer.WINDOW) {
             val merged = EsDeThemeElement(
                 type = "helpsystem",
                 key = "helpsystem_merged",
                 properties = helpElements.fold(emptyMap()) { acc, element -> acc + element.properties },
             )
-            if (merged.valueOrNull<EsDeThemeValue.Bool>("visible")?.value != false) {
+            val visible = merged.valueOrNull<EsDeThemeValue.Bool>("visible")?.value != false
+            // Where the one row goes on this view, whether the theme or
+            // droidtop draws it. A theme that declares no <helpsystem> at
+            // all still has a help position -- ES-DE's own component
+            // default -- and the row still belongs ON the canvas there,
+            // which is the whole of build 548's "droidtop's bar is a
+            // strip below the themed canvas in portrait".
+            val pos = (if (backgroundDimmed) merged.pairOrNull("posDimmed") else null) ?: merged.pairOrNull("pos")
+            val origin = merged.pairOrNull("origin")
+            val helpDefault =
+                dev.droidtop.shell.gamepad.EsDeHelpRowSlot.esDeDefault(vertical = viewHeight > viewWidth)
+            val slot = dev.droidtop.shell.gamepad.EsDeHelpRowSlot(
+                posY = pos?.y ?: helpDefault.posY,
+                originY = origin?.y ?: helpDefault.originY,
+            )
+            val report = dev.droidtop.shell.gamepad.LocalHelpRowSlotReport.current
+            if (!themeOwnsHelpRow && visible) {
+                androidx.compose.runtime.LaunchedEffect(slot, report) { report(slot) }
+            }
+            if (themeOwnsHelpRow && visible && hints.isNotEmpty()) {
                 EsDeThemedHelpSystem(merged, viewWidth, viewHeight, hints, backgroundDimmed)
             }
         }
@@ -3224,8 +3243,16 @@ private fun EsDeThemedHelpSystem(
 
     // HelpComponent.cpp:97-101.
     val pos = (if (dimmed) element.pairOrNull("posDimmed") else null) ?: element.pairOrNull("pos")
-    val offsetX = viewWidth * (pos?.x ?: 0f)
-    val offsetY = viewHeight * (pos?.y ?: 0f)
+    // ES-DE's own default help position, not the top-left corner: the
+    // component has a place of its own before any theme styles it
+    // (HelpComponent.cpp:23-27 -- 0.012 of the width, 0.9515 of the
+    // height, or 0.975 in a vertical window), so a theme that declares
+    // <helpsystem> without a <pos> -- or declares none at all, now that
+    // this row is drawn for every themed view -- gets that place rather
+    // than a row over the view's own title.
+    val helpDefaultPos = dev.droidtop.shell.gamepad.EsDeHelpRowSlot.esDeDefault(vertical = viewHeight > viewWidth)
+    val offsetX = viewWidth * (pos?.x ?: 0.012f)
+    val offsetY = viewHeight * (pos?.y ?: helpDefaultPos.posY)
     // `origin` says which point of the bar `pos` names, and it was being
     // ignored here -- the ONE element type that read pos without it.
     // decaffe declares `<origin>0 0.5</origin>`, so ES-DE centres the bar
@@ -3238,7 +3265,7 @@ private fun EsDeThemedHelpSystem(
     // after measurement instead.
     val origin = element.pairOrNull("origin")
     val originX = origin?.x ?: 0f
-    val originY = origin?.y ?: 0f
+    val originY = origin?.y ?: helpDefaultPos.originY
     // Real HelpComponent.cpp defaults (0x777777FF, gray) for BOTH colors --
     // droidtop previously guessed White/Black, confirmed wrong against real
     // ES-DE source: a theme that sets only one of textColor/iconColor would

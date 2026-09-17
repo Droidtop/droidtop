@@ -132,12 +132,58 @@ enum class HelpRowClaim {
     SCREEN,
 
     /**
-     * A themed view whose theme declares a `<helpsystem>`. That row is
-     * DECORATION -- it names buttons, it does not dispatch them -- so on
-     * a touch-first window the shell's own bar takes the row instead.
+     * A themed view: the theme lays the help row out ITSELF, at its own
+     * `<helpsystem>` position (or, declaring none, at ES-DE's own default
+     * for that component). That row is DECORATION -- it names buttons, it
+     * does not dispatch them -- so on a touch-first window the shell's own
+     * bar takes the row, in that same place.
+     *
+     * The claim is about the CANVAS, not about the element: a theme that
+     * declares no `<helpsystem>` still draws the whole window and still
+     * has a help position, so shortening its canvas to put droidtop's bar
+     * in a strip underneath is wrong either way (rig, build 548).
      */
     THEME,
 }
+
+/**
+ * Where a themed view wants the one help row, as fractions of the view.
+ *
+ * Real ES-DE draws its single `HelpComponent` ON the view at this
+ * position and never shortens the view for it (Window.cpp:126, :884), so
+ * droidtop's own bar takes the same place when it takes the row. [posY]
+ * is the point in the view the row is placed at and [originY] which point
+ * of the ROW that is -- the same pair of `<pos>`/`<origin>` semantics
+ * every themed element has, applied after measurement because the row's
+ * height is whatever its hints measure to.
+ */
+data class EsDeHelpRowSlot(val posY: Float, val originY: Float) {
+    companion object {
+        /**
+         * ES-DE's own default help position, before any theme styles it:
+         * `0.012 * width, 0.9515 * height` in a landscape window and
+         * `0.975 * height` in a vertical one, origin `0 0` -- the
+         * component's own constructor (HelpComponent.cpp:23-27), which
+         * reads `Renderer::getIsVerticalOrientation()` for exactly that
+         * choice. Only the vertical half is carried here: droidtop's bar
+         * is a full-width, horizontally scrolling control surface, so its
+         * extent is the window's and only its PLACE is the theme's.
+         */
+        fun esDeDefault(vertical: Boolean) =
+            EsDeHelpRowSlot(posY = if (vertical) 0.975f else 0.9515f, originY = 0f)
+    }
+}
+
+/**
+ * How a themed view tells the shell where its help row goes, so the one
+ * bar can be drawn there rather than under a shortened canvas. Reported
+ * with the key of the screen that reported it, for exactly the reason the
+ * claim itself carries one: two themed screens cross over during the
+ * shell's crossfade and the one leaving must not answer for the one
+ * arriving.
+ */
+val LocalHelpRowSlotReport = staticCompositionLocalOf<(EsDeHelpRowSlot) -> Unit> { {} }
+
 
 /** Who actually draws the one help row for the screen on top. */
 enum class HelpRowOwner {
