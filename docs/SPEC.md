@@ -3977,6 +3977,47 @@ Pythia's own logic (`GameNaming`/`GameVersions`: same derived name, then the
 `find_candidates` do it). Removing a games root removes that root's entries
 outright; that is a choice, not a missing drive.
 
+**How it is built.** A walk narrates itself: `LibraryProvider.scanProgressive`
+emits `ScanStep`s, not growing lists. A `ScanStep.Segment` names the part it
+is the answer for (`key`: a top-level folder's absolute path for the folder
+walks, a console system's id for the ROM walk; `root`: the games root it is
+under, or null for a part that is under none, which is what a store's own
+database is) and carries everything that part holds NOW. A
+`ScanStep.RootDone` names every part a root still has, so a folder that was
+taken away can be told from one the walk has not reached: the first leaves
+its games missing, the second leaves them alone. `LibrarySlice` is the index
+entry for one provider, a list of those segments; `Library.libraryProgressive`
+merges each step into the slice as it arrives, publishes the merged slice and
+writes the file. A walk that fails or is cancelled leaves the parts it never
+reached exactly as they were.
+
+`LibraryEntry.missing` is the state, serialized with the entry, and it is NOT
+the ES-DE `broken` metadata flag beside it: `broken` is the user's own
+statement that a game does not work, `missing` is droidtop's statement that
+the folder is not there. The card's second line and the detail's identity
+line read "broken - missing"; the detail's primary button is disabled and
+says the folder is not there, with the path under it, and Play is not
+offered. Everything else on that screen stays, because its history, metadata
+and collections are exactly what the entry is being kept for.
+
+The fold is `Library.replaceMissing(missing, replacement)`, one function for
+both entry points: it moves play history (`PlayHistoryStore.moveTo`, counts
+added and the later last-played kept, Pythia's `record_ownership`
+arithmetic), the favourite (`FavoritesStore.moveTo`), and whatever a provider
+keeps of its own through `EntryFactsOwner.moveEntryFacts` -- the scraped
+`game_metadata` row and the `collection_members` rows, both owned by
+`ConsoleRomProvider`'s database for every kind of game, not only ROMs -- and
+then takes the missing entry out of the index. A metadata row moves only into
+an empty place, so a folder that has already been scraped keeps its own newer
+scrape; the favourite crosses regardless, because it is the user's word and
+not a scrape's. `MissingGames.candidates` orders the offer (same
+`GameNaming.nameKey` first, then `GameNaming.similarity` at or above 0.6,
+most alike first), and the same list is shown from both sides: "This replaces
+a missing game" on a detected game, "Find its replacement" on a missing one.
+`Library.keepOnlyRoots` is the drop: the shell calls it with the roots as
+they are now when `GamesRoots` changes, and every part under a root that is
+no longer configured goes, entries and all.
+
 **One mechanism.** The ROM provider's own `RomDatabase` remains what makes
 ITS walk fast; the index is what makes the START fast, across providers,
 and it is the only thing that decides whether a walk happens at all. Play
@@ -5390,6 +5431,17 @@ corpus says what automatic merging at 0.6 would cost:
 and are three different games; `Lust Academy` and `Lust Theory` score
 0.61; `ARTEMIS` and `RTS` score 0.60. So similar names become
 suggestions, and nothing acts on them without the user.
+
+The same naming answers a second question, added 2026-09-17: which
+detected game replaces a missing one (7g). `MissingGames.candidates`
+offers same-`nameKey` games first and 0.6-similar ones after, in that
+order, and the user chooses -- `Game v0.3` deleted and `Game v0.4`
+unpacked beside it is the case it exists for, and it is Pythia's
+`find_candidates` shape (certain, then suggested by descending ratio)
+rather than a second measure of its own. A missing folder is still one of
+the game's versions until it is folded away, so it keeps its row in
+"Parts and versions" and that row's detail is where "Find its
+replacement" lives.
 
 ### The UI this needs, and no more
 

@@ -13,6 +13,7 @@ import dev.droidtop.library.ScanSkips
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
+import dev.droidtop.library.ScanStep
 import dev.droidtop.library.withScrapedMetadata
 import dev.droidtop.library.integrations.IntegrationPlaceholders
 import dev.droidtop.library.romdetect.LibretroDatabase
@@ -29,7 +30,6 @@ import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch as coroutineLaunch
 import java.io.File
 import java.io.FileInputStream
-import java.util.Collections
 
 /**
  * Real, installed apps only -- a [KnownPlayers]/[DefaultPlayers] preset
@@ -236,7 +236,7 @@ internal fun resolveSystem(folderName: String, systemsById: Map<String, ConsoleS
  */
 class ConsoleRomProvider(
     private val context: Context,
-) : LibraryProvider {
+) : LibraryProvider, dev.droidtop.library.EntryFactsOwner {
     override val kinds: Set<LibraryEntryKind> = setOf(LibraryEntryKind.CONSOLE_ROM)
 
     private val dao by lazy { RomDatabase.get(context).romDao() }
@@ -280,14 +280,34 @@ class ConsoleRomProvider(
     // cache row the moment it finishes, independently of every other
     // folder still running -- a fast folder never waits on a slow or
     // stuck one, for the UI *or* for persistence.
-    override fun scanProgressive(): Flow<List<LibraryEntry>> = channelFlow {
+    override fun scanProgressive(): Flow<ScanStep> = channelFlow {
         val romsRoots = GamesRoots.current(context)
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         val scannedFolders = dao.getScannedSystemFolders(romsRoots.map { it.absolutePath })
             .map { it.romsRoot to it.systemFolderId }.toSet()
-        val cached = dao.getEntries(romsRoots.map { it.absolutePath }).map { it.toLibraryEntry() }
-            .filter { systemsById[it.systemId]?.canResolveFromFolder() != false }.withMetadata()
-        streamRootsProgressively(cached, romsRoots, systemsById, scannedFolders)
+        sendCachedSegments(romsRoots, systemsById)
+        streamRootsProgressively(romsRoots, systemsById, scannedFolders)
+    }
+
+    /**
+     * The cache's own rows, published as the parts they were cached
+     * under -- one [ScanStep.Segment] per system folder of each root,
+     * which is the same unit the fresh walk emits and the same unit
+     * [RomDatabase] clears and rewrites. Sending them as one flat list
+     * would say "this is the whole provider", and a folder the walk then
+     * refreshed would replace all of it.
+     */
+    private suspend fun ProducerScope<ScanStep>.sendCachedSegments(
+        romsRoots: List<File>,
+        systemsById: Map<String, ConsoleSystemDef>,
+    ) {
+        val rows = dao.getEntries(romsRoots.map { it.absolutePath })
+        for ((part, cached) in rows.groupBy { it.romsRoot to it.systemFolderId }) {
+            val entries = cached.map { it.toLibraryEntry() }
+                .filter { systemsById[it.systemId]?.canResolveFromFolder() != false }
+                .withMetadata()
+            send(ScanStep.Segment(key = part.second, root = part.first, entries = entries))
+        }
     }
 
     /**
@@ -314,74 +334,21 @@ class ConsoleRomProvider(
      * folder can no longer block every sibling folder's fresh results
      * from being saved too.
      */
-    override fun rescanProgressive(): Flow<List<LibraryEntry>> = channelFlow {
+    override fun rescanProgressive(): Flow<ScanStep> = channelFlow {
         val romsRoots = GamesRoots.current(context)
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
-        val cachedByRoot = romsRoots.associate { root ->
-            root.absolutePath to dao.getEntries(listOf(root.absolutePath)).map { it.toLibraryEntry() }
-                .filter { systemsById[it.systemId]?.canResolveFromFolder() != false }.withMetadata()
-        }
-        streamRootsRescan(cachedByRoot, systemsById)
+        sendCachedSegments(romsRoots, systemsById)
+        // No scannedFolders filter: a rescan walks every system folder,
+        // whatever the cache holds. Each folder's cached rows stay on
+        // screen until its own fresh walk replaces them.
+        streamRootsProgressively(romsRoots, systemsById, scannedFolders = emptySet())
     }
 
-    private suspend fun ProducerScope<List<LibraryEntry>>.streamRootsRescan(
-        cachedByRoot: Map<String, List<LibraryEntry>>,
-        systemsById: Map<String, ConsoleSystemDef>,
-    ) {
-        val accumulatedByRoot = Collections.synchronizedMap(cachedByRoot.mapValues { it.value.toMutableList() }.toMutableMap())
-        // Compound read-modify-write on one root's list (below) needs its
-        // own lock -- synchronizedMap only guards the map's own structure,
-        // not a get-then-replace sequence against concurrent sibling
-        // folders of the *same* root finishing at the same time.
-        val accumulatedLock = Any()
-        send(accumulatedByRoot.values.flatten())
-        coroutineScope {
-            cachedByRoot.keys.forEach { rootPath ->
-                coroutineLaunch {
-                val root = File(rootPath)
-                val rootStartedAt = System.currentTimeMillis()
-                val rootGames = java.util.concurrent.atomic.AtomicInteger(0)
-                val systemScan = systemUnitsUnder(root, systemsById)
-                coroutineScope {
-                    systemScan.units.forEach { unit ->
-                        val system = unit.system
-                        coroutineLaunch {
-                            try {
-                                val freshEntries = scanSystemUnit(unit)
-                                rootGames.addAndGet(freshEntries.size)
-                                synchronized(accumulatedLock) {
-                                    val folderList = accumulatedByRoot.getOrPut(rootPath) { mutableListOf() }
-                                    folderList.removeAll { it.systemId == system.id }
-                                    folderList += freshEntries
-                                }
-                                send(accumulatedByRoot.values.flatten())
-                                dao.clearSystemFolder(rootPath, system.id)
-                                dao.insertEntries(freshEntries.map { it.toRomEntity(rootPath, system.id) })
-                                dao.markScanned(ScanMetadataEntity(rootPath, system.id, System.currentTimeMillis()))
-                            } catch (t: Throwable) {
-                                android.util.Log.e(
-                                    "droidtop.ConsoleRomProvider",
-                                    "rescan system=${system.id} under ${root.absolutePath} FAILED",
-                                    t,
-                                )
-                            }
-                        }
-                    }
-                }
-                logRootSummary(root, systemScan, rootGames.get(), rootStartedAt)
-                }
-            }
-        }
-    }
-
-    private suspend fun ProducerScope<List<LibraryEntry>>.streamRootsProgressively(
-        cached: List<LibraryEntry>,
+    private suspend fun ProducerScope<ScanStep>.streamRootsProgressively(
         romsRoots: List<File>,
         systemsById: Map<String, ConsoleSystemDef>,
         scannedFolders: Set<Pair<String, String>>,
     ) {
-        val accumulated = Collections.synchronizedList(cached.toMutableList())
-        send(accumulated.toList())
         coroutineScope {
             romsRoots.forEach { root ->
                 coroutineLaunch {
@@ -390,7 +357,8 @@ class ConsoleRomProvider(
                 val systemScan = systemUnitsUnder(root, systemsById)
                 val units = systemScan.units
                     // Already has a real scan_metadata row for THIS system
-                    // -- its rows are already in `cached`, skip re-walking.
+                    // -- its rows were already sent as that part's own
+                    // segment, skip re-walking.
                     .filter { (root.absolutePath to it.system.id) !in scannedFolders }
                 // Each system is its own coroutine with its own per-folder
                 // budget and publishes the moment it finishes, so one slow
@@ -404,8 +372,13 @@ class ConsoleRomProvider(
                             try {
                                 val folderEntries = scanSystemUnit(unit)
                                 rootGames.addAndGet(folderEntries.size)
-                                accumulated += folderEntries
-                                send(accumulated.toList())
+                                send(
+                                    ScanStep.Segment(
+                                        key = system.id,
+                                        root = root.absolutePath,
+                                        entries = folderEntries,
+                                    ),
+                                )
                                 dao.clearSystemFolder(root.absolutePath, system.id)
                                 dao.insertEntries(folderEntries.map { it.toRomEntity(root.absolutePath, system.id) })
                                 dao.markScanned(ScanMetadataEntity(root.absolutePath, system.id, System.currentTimeMillis()))
@@ -419,6 +392,11 @@ class ConsoleRomProvider(
                         }
                     }
                 }
+                // Every system this root HAS, walked or served from cache:
+                // a system folder the index still holds and this root no
+                // longer has is a folder that was taken away, and its
+                // games are missing (see ScanStep.RootDone).
+                send(ScanStep.RootDone(root.absolutePath, systemScan.units.map { it.system.id }))
                 logRootSummary(root, systemScan, rootGames.get(), rootStartedAt)
                 }
             }
@@ -903,6 +881,18 @@ class ConsoleRomProvider(
     /** Real collectionId -> member gameIds map, for the games-list read path -- see [dev.droidtop.shell.gamepad]'s own `GameGroup.Collection` doc comment. */
     suspend fun getCollectionMembership(): Map<String, List<String>> =
         dao.getAllCollectionMembers().groupBy({ it.collectionId }, { it.gameId })
+
+    /**
+     * The metadata rows and collection memberships this provider's
+     * database holds are keyed by entry id, and the whole library's
+     * metadata lives in it -- not only ROMs' -- so folding a missing
+     * game into the game that replaced it moves them here, for whatever
+     * kind of game it was (docs/SPEC.md 7g,
+     * [dev.droidtop.library.EntryFactsOwner]).
+     */
+    override suspend fun moveEntryFacts(fromId: String, toId: String) {
+        dao.moveGameFacts(fromId, toId)
+    }
 
     // `ActivityManager.forceStopPackage()` needs the signature-level
     // FORCE_STOP_PACKAGES permission -- not grantable to a normal app, so
