@@ -376,7 +376,7 @@ interface RomDao {
      * which is the user's own word rather than a scrape's. Collection
      * membership is a union: a game in a collection stays in it.
      */
-    @Transaction
+    @androidx.room.Transaction
     suspend fun moveGameFacts(fromId: String, toId: String) {
         val from = getGameMetadataSingle(fromId)
         if (from != null) {
