@@ -2710,6 +2710,17 @@ private fun AppIconTile(
                         onLaunch()
                         true
                     }
+                    // The row over this grid promises "Y  Info", and the
+                    // long-press beside it already opens the app's own
+                    // detail -- only the button route to that same screen
+                    // was missing, so the row named an action nothing
+                    // dispatched (rig, build 548; docs/SPEC.md 7j: a hint
+                    // row promises only what dispatches). One screen, one
+                    // action, both routes.
+                    GamepadAction.Y -> {
+                        onShowDetail()
+                        true
+                    }
                     else -> false
                 }
             }
