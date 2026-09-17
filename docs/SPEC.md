@@ -5317,6 +5317,22 @@ pad. Consequences:
   surface: every hint is tappable (`TouchHintBar`), and it stays on a
   touch screen even when a theme draws its own help row, because that row
   is decoration and the bar is the only route to B/Y/Select without a pad;
+  **when it stays, the theme's own row goes.** Real ES-DE gives the
+  Window exactly ONE help bar (`Window.cpp:126`, `Window::setHelpPrompts`
+  at `:884`; `HelpComponent.cpp:629` draws nothing when help is off) and a
+  theme's `<helpsystem>` styles that one component rather than adding a
+  second. droidtop keeps that count: **one value decides who owns the
+  help row for the screen on top, and both sides read it** -- the shell's
+  `ButtonHintFooter` is drawn exactly when the shell owns it, and the
+  themed renderer suppresses the theme's `<helpsystem>` exactly then
+  (`LocalShellOwnsHelpRow`). The shell owns the row on a touch-first
+  window, always, and on any screen whose theme has no help row to draw;
+  the theme owns it otherwise, which is the console's own case. Two
+  independent conditions for the one row is what let both draw at once
+  in landscape with Slate, the theme's row sliced in half by the bar
+  sitting over it (rig, build 546); a claim is also scoped to the screen
+  that makes it, so a screen the shell is still fading out cannot answer
+  for the screen arriving;
 - actions that had no on-screen name at all are now named and reachable:
   Select for gamelist options, Y for the PC surface's stores and folders;
 - **long-press is Y** on a game card or app tile --- the same "act on
