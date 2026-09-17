@@ -982,7 +982,10 @@ class EngineGameProvider(
 
     override suspend fun scan(): List<LibraryEntry> {
         val found = mutableListOf<LibraryEntry>()
-        scanRootsByFolder { entries -> found += entries }
+        scanRootsByFolder(
+            publish = { _, _, entries -> found += entries },
+            rootDone = { _, _ -> },
+        )
         return found.finish()
     }
 
@@ -1001,21 +1004,37 @@ class EngineGameProvider(
      * over budget says so in its own log line instead of silently taking
      * the library down with it.
      */
-    override fun scanProgressive(): Flow<List<LibraryEntry>> = channelFlow {
-        val accumulated = mutableListOf<LibraryEntry>()
-        scanRootsByFolder { entries ->
-            accumulated += entries
-            send(accumulated.finish())
-        }
+    override fun scanProgressive(): Flow<ScanStep> = channelFlow {
+        scanRootsByFolder(
+            publish = { root, folder, entries ->
+                send(
+                    ScanStep.Segment(
+                        key = folder.absolutePath,
+                        root = root.absolutePath,
+                        entries = entries.finish(),
+                    ),
+                )
+            },
+            rootDone = { root, folders ->
+                send(ScanStep.RootDone(root.absolutePath, folders.map { it.absolutePath }))
+            },
+        )
     }
 
     /**
      * The one walk behind both [scan] and [scanProgressive]: every root's
      * top-level folders, each scanned under its own budget and handed to
-     * [publish] as it finishes, with one log line per folder and one per
-     * root (see [ScanLog]).
+     * [publish] as it finishes -- with the folder it is the answer FOR,
+     * since that is what makes a folder's entries replaceable on their
+     * own (docs/SPEC.md 7g) -- then [rootDone] with every folder the root
+     * has, so a folder that is no longer there can be told from one that
+     * has not been walked. One log line per folder and one per root (see
+     * [ScanLog]).
      */
-    private suspend fun scanRootsByFolder(publish: suspend (List<LibraryEntry>) -> Unit) {
+    private suspend fun scanRootsByFolder(
+        publish: suspend (root: File, folder: File, entries: List<LibraryEntry>) -> Unit,
+        rootDone: suspend (root: File, folders: List<File>) -> Unit,
+    ) {
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         val defs = EnginesDatabase.defs(context)
         val installs = storeInstalls()
@@ -1055,8 +1074,9 @@ class EngineGameProvider(
                     },
                     base = folder,
                 )
-                publish(scanned.games.map { it.toEntry(root, installsByDir) })
+                publish(root, folder, scanned.games.map { it.toEntry(root, installsByDir) })
             }
+            rootDone(root, top.folders)
             ScanLog.write(
                 label = "games root ${root.absolutePath}",
                 games = rootGames,

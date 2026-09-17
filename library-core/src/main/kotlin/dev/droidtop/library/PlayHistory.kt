@@ -27,11 +27,22 @@ data class PlayHistoryRecord(val lastPlayedEpochMs: Long, val playCount: Int)
 interface PlayHistoryStore {
     suspend fun recordPlay(id: String, epochMs: Long)
     suspend fun getAll(ids: Collection<String>): Map<String, PlayHistoryRecord>
+
+    /**
+     * Carries [fromId]'s history onto [toId] when a missing game is
+     * folded into the game that replaced it (docs/SPEC.md 7g,
+     * [Library.replaceMissing]). The two are the same game at two paths,
+     * so the counts ADD and the later last-played wins -- the same
+     * arithmetic Pythia's `record_ownership` does when a new copy of a
+     * game it already tracks is onboarded.
+     */
+    suspend fun moveTo(fromId: String, toId: String)
 }
 
 object NoOpPlayHistoryStore : PlayHistoryStore {
     override suspend fun recordPlay(id: String, epochMs: Long) {}
     override suspend fun getAll(ids: Collection<String>): Map<String, PlayHistoryRecord> = emptyMap()
+    override suspend fun moveTo(fromId: String, toId: String) {}
 }
 
 /**
@@ -47,9 +58,17 @@ object NoOpPlayHistoryStore : PlayHistoryStore {
 interface FavoritesStore {
     suspend fun setFavorite(id: String, favorite: Boolean)
     suspend fun getAll(ids: Collection<String>): Set<String>
+
+    /**
+     * Carries a favourite from the missing game to the one that replaced
+     * it (see [PlayHistoryStore.moveTo]). A favourite is a statement
+     * about the GAME, so it survives the game changing folder.
+     */
+    suspend fun moveTo(fromId: String, toId: String)
 }
 
 object NoOpFavoritesStore : FavoritesStore {
     override suspend fun setFavorite(id: String, favorite: Boolean) {}
     override suspend fun getAll(ids: Collection<String>): Set<String> = emptySet()
+    override suspend fun moveTo(fromId: String, toId: String) {}
 }

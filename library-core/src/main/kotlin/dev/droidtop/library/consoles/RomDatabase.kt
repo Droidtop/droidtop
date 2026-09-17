@@ -335,6 +335,9 @@ interface RomDao {
     @Query("SELECT DISTINCT game_id FROM collection_members")
     suspend fun getGameIdsInAnyCollection(): List<String>
 
+    @Query("SELECT collection_id FROM collection_members WHERE game_id = :gameId")
+    suspend fun getCollectionsOf(gameId: String): List<String>
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun addCollectionMember(member: CollectionMemberEntity)
 
@@ -357,6 +360,37 @@ interface RomDao {
         } else {
             addCollectionMember(CollectionMemberEntity(collectionId, gameId))
             true
+        }
+    }
+
+    /**
+     * Everything this database knows about [fromId] becomes [toId]'s,
+     * because they are one game at two paths: the missing game is being
+     * folded into the game that replaced it (docs/SPEC.md 7g,
+     * [dev.droidtop.library.Library.replaceMissing]).
+     *
+     * The metadata row moves only into an EMPTY place. A folder that has
+     * already been scraped has a row of its own about the same game, and
+     * overwriting it with an older one would lose the newer scrape; the
+     * one thing that is carried across regardless is the favourite,
+     * which is the user's own word rather than a scrape's. Collection
+     * membership is a union: a game in a collection stays in it.
+     */
+    @Transaction
+    suspend fun moveGameFacts(fromId: String, toId: String) {
+        val from = getGameMetadataSingle(fromId)
+        if (from != null) {
+            val to = getGameMetadataSingle(toId)
+            if (to == null) {
+                upsertGameMetadata(from.copy(id = toId))
+            } else if (from.favorite && !to.favorite) {
+                upsertGameMetadata(to.copy(favorite = true))
+            }
+            deleteGameMetadata(listOf(fromId))
+        }
+        for (collectionId in getCollectionsOf(fromId)) {
+            addCollectionMember(CollectionMemberEntity(collectionId, toId))
+            removeCollectionMember(collectionId, fromId)
         }
     }
 }
