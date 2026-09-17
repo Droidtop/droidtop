@@ -3025,6 +3025,16 @@ fixed, not guessed — see git history for the individual commits):
   entirely blank next to `sys.png`'s own reference screenshot. Confirmed
   fixed live: the metadata sidebar and description text both render now.
 
+**Favourites are a library fact, not a console-ROM fact.** A console
+ROM's favourite is ES-DE metadata (`GameMetadataEntity`, written back to
+its `gamelist.xml`). Every other kind — an engine game, a PC game, an
+app — has no gamelist, so its favourite lives in the library's own
+`FavoritesStore` (a `favorites` table beside play history, keyed by entry
+id) and is merged into the scanned entries the way play history is.
+`Library.toggleFavorite` picks the store by the entry's provider; the
+gamelist's `X FAVORITE`, the favourites collection and the theme's
+favourite badge read one `LibraryEntry.favorite` either way.
+
 **Done (2026-08-30)**: real ES-DE collections — droidtop's own
 `CollectionEntity`/`CollectionMemberEntity` (`RomDatabase` v5) for
 custom collections, plus real, computed-on-the-fly auto collections
@@ -5372,7 +5382,15 @@ state it acts on. A touch affordance therefore sends a genuine key event
 down the focused window (`rememberGamepadTouch`,
 `GamepadKeyMap.keyCodeFor`) and travels that same path, so there is
 exactly one definition of every action and touch cannot drift from the
-pad.
+pad. The path includes Android's own fallback: a pad's `BUTTON_B` that no
+view consumes becomes `KEYCODE_BACK` in the input pipeline (`Generic.kcm`),
+which is how a screen that answers back only through the back dispatcher
+still closes on B. That stage sits above the window, so a press injected
+at the window replays it itself: an unconsumed touch B is re-dispatched as
+BACK into the same window, and the decor hands an unhandled BACK to the
+Activity's back dispatcher. A `BackHandler` is therefore a complete answer
+to B for touch and pad alike, and a screen with nothing focusable (an
+empty list) must have one.
 
 **That block goes AHEAD of the element's focus targets in the modifier
 chain, never behind them.** Compose dispatches a key event to the

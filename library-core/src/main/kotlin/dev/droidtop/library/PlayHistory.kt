@@ -33,3 +33,23 @@ object NoOpPlayHistoryStore : PlayHistoryStore {
     override suspend fun recordPlay(id: String, epochMs: Long) {}
     override suspend fun getAll(ids: Collection<String>): Map<String, PlayHistoryRecord> = emptyMap()
 }
+
+/**
+ * Favourites for the entries that are not console ROMs. A ROM's favourite
+ * is ES-DE metadata ([dev.droidtop.library.consoles.GameMetadataEntity],
+ * written back to `gamelist.xml`) and stays there; an engine game, a PC
+ * game or an app has no gamelist, so its favourite lives here, keyed by
+ * [LibraryEntry.id] like play history. Until this existed the gamelist's
+ * "X FAVORITE" did nothing for 151 of the rig's 158 games (build 549):
+ * [Library.toggleFavorite] answered "not applicable" for every kind but
+ * one.
+ */
+interface FavoritesStore {
+    suspend fun setFavorite(id: String, favorite: Boolean)
+    suspend fun getAll(ids: Collection<String>): Set<String>
+}
+
+object NoOpFavoritesStore : FavoritesStore {
+    override suspend fun setFavorite(id: String, favorite: Boolean) {}
+    override suspend fun getAll(ids: Collection<String>): Set<String> = emptySet()
+}
