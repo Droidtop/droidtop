@@ -95,18 +95,22 @@ object QuickTiles {
     }
 
     fun tile(item: CatalogItem): QuickTile {
-        val (label, inlineValue) = splitTitle(item.title)
         val value = when (item) {
             is ChoiceItem -> item.currentLabel()
             is ToggleItem -> null
-            // The item's own value column first (CatalogItem.value: the
-            // network's connection, VPN's on/off, "Needs permission"),
-            // then the value an older row still carries inside its title.
-            else -> item.value ?: inlineValue
+            // The item's own value column, and only that: the network's
+            // connection, VPN's on/off, "Needs permission". A tile used
+            // to also split a "Name: state" title back apart for the
+            // rows that still carried their state inside their title,
+            // which meant the same fact was formatted in two places by
+            // two rules -- and the rule the LIST used was the one that
+            // was wrong (rig, build 546). The catalog says what a row is
+            // called and what it is set to; a tile just draws them.
+            else -> item.value
         }
         return QuickTile(
             item = item,
-            label = label,
+            label = item.title,
             value = value,
             on = when (item) {
                 is ToggleItem -> item.current
@@ -115,19 +119,6 @@ object QuickTiles {
             glyph = glyphFor(item),
             opens = item is NestedScreenItem,
         )
-    }
-
-    /**
-     * "Network: Wi-Fi, signal 3/4" is a row title written for a LIST,
-     * where a title is the only line that carries state. A tile has a
-     * label and a value line, so the state moves to the value and the
-     * label stays the short noun -- which is also what makes tiles the
-     * same height whatever the state says.
-     */
-    fun splitTitle(title: String): Pair<String, String?> {
-        val separator = title.indexOf(": ")
-        if (separator <= 0) return title to null
-        return title.substring(0, separator) to title.substring(separator + 2).trim().ifEmpty { null }
     }
 
     fun glyphFor(item: CatalogItem): QuickGlyph = when (item.id) {

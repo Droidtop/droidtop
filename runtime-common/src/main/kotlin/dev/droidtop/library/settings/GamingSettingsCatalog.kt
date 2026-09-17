@@ -334,23 +334,38 @@ object GamingSettingsCatalog {
                 val battery = status.batteryPercent
                     ?.let { "$it%" + if (status.charging) ", charging" else "" }
                     ?: "unknown"
-                val validation = when {
-                    status.network == dev.droidtop.runtime.systemstatus.NetworkKind.NONE -> ""
-                    status.validated -> ""
-                    // The captive-portal state, said out loud: the row's
-                    // action opens the system sheet where signing in
-                    // actually happens.
-                    else -> " -- connected but NO INTERNET (captive portal?)"
-                }
+                val noInternet = status.network != dev.droidtop.runtime.systemstatus.NetworkKind.NONE &&
+                    !status.validated
                 val vpnLine = if (status.vpnActive) " VPN active." else ""
                 add(
                     ActionItem(
                         id = ID_SYSTEM_NETWORK,
-                        title = "Network: $network$validation",
+                        // The row's NAME, and nothing else. What the
+                        // network is set to is state, and state goes in
+                        // the value column like every other row's
+                        // (CatalogItem.value) -- the list read
+                        // "Network: Wi-Fi, signal 4/4" as a title while
+                        // the row beside it put its state in the column
+                        // (rig, builds 542 and 546). The Quick Menu drew
+                        // it correctly by splitting the title back apart
+                        // again, which was a second mechanism for the
+                        // same job; the title is written right here now
+                        // and that splitter is gone.
+                        title = "Network",
+                        // The captive-portal state, said out loud: the
+                        // row's action opens the system sheet where
+                        // signing in actually happens.
+                        value = if (noInternet) "$network, no internet" else network,
                         // The system's own internet panel -- apps lost
                         // programmatic Wi-Fi toggling in API 29, and
                         // opening the real control beats faking one.
-                        subtitle = "Battery $battery.$vpnLine Select to open Wi-Fi and data controls",
+                        subtitle = "Battery $battery.$vpnLine" +
+                            if (noInternet) {
+                                " Connected but nothing gets through -- a captive portal may be waiting." +
+                                    " Select to open Wi-Fi and data controls"
+                            } else {
+                                " Select to open Wi-Fi and data controls"
+                            },
                         run = { ctx ->
                             ctx.startActivity(controls.internetPanelIntent())
                         },
