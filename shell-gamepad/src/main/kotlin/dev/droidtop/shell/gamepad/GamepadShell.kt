@@ -363,10 +363,21 @@ fun GamepadShell(
     LaunchedEffect(library, rescanTrigger) {
         // A changed root set invalidates what the providers cached about
         // the old one, so the first scan after onboarding adds a folder
-        // is a real walk and not a replay of an empty cache.
-        val rootsChanged = dev.droidtop.library.GamesRoots.rootsChangedSinceLastScan(context)
-        library.scanInBackground(GAME_KINDS, rescan = rescanTrigger != 0 || rootsChanged)
-        if (rootsChanged) dev.droidtop.library.GamesRoots.markScanned(context)
+        // is a real walk and not a replay of an empty cache. Collected
+        // for as long as this shell is composed rather than checked once:
+        // onboarding adds the folder while this composition is alive and
+        // hands back through onResume, which recomposes nothing (see
+        // GamesRoots.changes for the rig evidence).
+        dev.droidtop.library.GamesRoots.changes(context).collect {
+            val rootsChanged = dev.droidtop.library.GamesRoots.rootsChangedSinceLastScan(context)
+            library.scanInBackground(
+                GAME_KINDS,
+                rescan = rescanTrigger != 0 || rootsChanged,
+                // A walk already in flight is walking the old folders.
+                restart = rootsChanged,
+            )
+            if (rootsChanged) dev.droidtop.library.GamesRoots.markScanned(context)
+        }
     }
     LaunchedEffect(library, rescanTrigger) {
         library.scanInBackground(APP_KINDS, rescan = rescanTrigger != 0)
@@ -648,7 +659,15 @@ fun GamepadShell(
                     onClose = { detailEntry = null },
                 )
                 section == GamingSection.SETTINGS -> {
-                    canGoBack = false
+                    // Back always does something in Settings: it pops a
+                    // nested screen, or leaves Settings for the default
+                    // section. Saying otherwise took the B hint out of
+                    // the footer -- and that hint IS the touch route to B
+                    // (design language: "the help/hint row is the touch
+                    // route to pad buttons"), so on the rig a nested
+                    // settings screen had no way out that a finger could
+                    // reach at all.
+                    canGoBack = true
                     themeHandlesHints = false
                     SettingsCatalogView(
                         onBack = { section = GamingPrefs.defaultSection(context) },

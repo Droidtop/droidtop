@@ -498,8 +498,17 @@ class Library(
     fun backgroundScanState(kinds: Set<LibraryEntryKind>): StateFlow<List<LibraryEntry>?> =
         backgroundScanStates.getOrPut(kinds.toSet()) { MutableStateFlow(null) }.asStateFlow()
 
-    /** Start (or explicitly restart) a scan in [scanScope], never in a UI scope. */
-    fun scanInBackground(kinds: Set<LibraryEntryKind>, rescan: Boolean = false) {
+    /**
+     * Start (or explicitly restart) a scan in [scanScope], never in a UI
+     * scope.
+     *
+     * [restart] is for the one case where joining a running scan would be
+     * wrong: the set of folders being scanned has itself changed, so the
+     * walk in flight is walking the OLD roots and its results are stale
+     * whatever it finds. Everything else (a configuration change replaying
+     * a rescan intent) joins the running job instead.
+     */
+    fun scanInBackground(kinds: Set<LibraryEntryKind>, rescan: Boolean = false, restart: Boolean = false) {
         val key = kinds.toSet()
         val state = backgroundScanStates.getOrPut(key) { MutableStateFlow(null) }
         lateinit var job: Job
@@ -515,11 +524,18 @@ class Library(
         }
         synchronized(backgroundScanJobs) {
             val running = backgroundScanJobs[key]
+            if (running?.isActive == true && restart) {
+                // The roots changed under it: the walk in flight is
+                // walking folders that are no longer the answer.
+                running.cancel()
+                backgroundScanJobs.remove(key)
+            }
+            val stillRunning = backgroundScanJobs[key]
             // A configuration change replays the Activity's rescan intent.
             // Joining the process-owned job is what makes that harmless;
             // cancelling/restarting here would still lose the folder currently
             // being scanned even though Compose no longer owns the coroutine.
-            if (running?.isActive == true) {
+            if (stillRunning?.isActive == true) {
                 // A lazy coroutine is already attached to scanScope. Dispose
                 // of this unused child rather than retaining it indefinitely.
                 job.cancel()
