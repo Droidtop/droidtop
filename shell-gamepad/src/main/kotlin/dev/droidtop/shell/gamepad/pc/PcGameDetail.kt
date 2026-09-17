@@ -105,6 +105,7 @@ internal fun PcGameDetail(
     var viewingMedia by remember(entry) { mutableStateOf(false) }
     var pickingMatch by remember(entry) { mutableStateOf(false) }
     var editingCollections by remember(entry) { mutableStateOf(false) }
+    var pickingReplacement by remember(entry) { mutableStateOf(false) }
 
     LaunchedEffect(entry, reloadToken) {
         loaded = false
@@ -163,12 +164,34 @@ internal fun PcGameDetail(
     if (pickingMatch) {
         ManualMatchPicker(entry = entry, onApplied = { status = it }, onDismiss = { pickingMatch = false })
     }
+    if (pickingReplacement) {
+        MissingReplacementPicker(
+            entry = entry,
+            among = siblings,
+            library = library,
+            onFolded = { message ->
+                status = message
+                // The entry that is gone is gone: staying on its screen
+                // would be a detail of nothing. The one that remains is
+                // the game, and its own detail is where the user is now.
+                if (entry.missing) onClose() else pickingReplacement = false
+            },
+            onDismiss = { pickingReplacement = false },
+        )
+    }
 
+    // Who this game could be, or who could be it (docs/SPEC.md 7g). Names
+    // only, no filesystem, so it costs nothing to know before the row is
+    // drawn -- and the row is only worth drawing when there is somebody
+    // to offer.
+    val replacements = remember(entry, siblings) { replacementCandidatesFor(entry, siblings) }
     val runner = resolved
     val actions = rememberPcActions(
         group = group,
         currentId = entry.id,
         onOpenOther = onOpenOther,
+        replacements = replacements.size,
+        onReplace = { pickingReplacement = true },
         entry = entry,
         runner = runner,
         media = media.size,
@@ -238,6 +261,22 @@ internal fun PcGameDetail(
             // either way (research/ui-polish item 18).
             item { PcDetailHeader(entry, grouping) }
 
+            // A game the walk no longer finds has no runner question to
+            // answer and nothing to play: the folder it was is not there.
+            // Every row below the button still applies -- its history, its
+            // metadata, its collections and the replacement action are
+            // exactly what it is being kept FOR (docs/SPEC.md 7g).
+            if (entry.missing) {
+                item {
+                    PrimaryActionButton(
+                        label = "The folder is not there",
+                        detail = missingFolderLine(entry),
+                        enabled = false,
+                        onSelect = {},
+                    )
+                }
+            }
+
             // 1. Runs with -- WHICH runner, and how to change it. Whether
             // this game can be played is the button's sentence and only
             // the button's: the rig read "Nothing on this device can run
@@ -245,7 +284,7 @@ internal fun PcGameDetail(
             // device offers this game" immediately below it, three
             // wordings of one fact. A game with no runner option at all
             // has nothing to choose, so the row is not drawn.
-            if (!loaded || runners.options.isNotEmpty()) {
+            if (!entry.missing && (!loaded || runners.options.isNotEmpty())) {
                 item {
                     DetailRow(
                         title = "Runs with",
@@ -261,7 +300,7 @@ internal fun PcGameDetail(
             }
 
             // 2. The primary button: Play, or the one action that makes Play possible.
-            item {
+            if (!entry.missing) item {
                 val setupAction = runner?.option?.action
                 val isReady = runner?.option?.state == RunnerState.READY
                 PrimaryActionButton(
@@ -326,8 +365,12 @@ internal fun PcGameDetail(
     }
 }
 
-/** One line under the title: where it came from, what engine it is, how big it is. */
-private fun LibraryEntry.identityLine(): String = buildString {
+/**
+ * One line under the title: where it came from, what engine it is, how
+ * big it is -- or, for a game the walk no longer finds, the one fact
+ * that matters, in the words the card uses (docs/SPEC.md 7g).
+ */
+private fun LibraryEntry.identityLine(): String = if (missing) "broken - missing" else buildString {
     append(sourceLabel())
     engineLabel()?.let { append(" - ").append(it) }
     val size = pcInfo?.sizeBytes ?: 0L
@@ -351,6 +394,8 @@ private fun rememberPcActions(
     group: dev.droidtop.library.LibraryGameGroup?,
     currentId: String,
     onOpenOther: (LibraryEntry) -> Unit,
+    replacements: Int,
+    onReplace: () -> Unit,
     entry: LibraryEntry,
     runner: ResolvedRunner?,
     media: Int,
@@ -374,6 +419,33 @@ private fun rememberPcActions(
         PcActionGroup(
             "Game management",
             listOfNotNull(
+                // The fold, from whichever side the user is standing on
+                // (docs/SPEC.md 7g). On the game that is not there it is
+                // always offered, because that is the screen a person
+                // comes to in order to fix it, and it says so when there
+                // is nothing to offer yet. On a game that IS here it
+                // appears only when something is actually missing that it
+                // could be: an action with nothing behind it is not an
+                // action.
+                when {
+                    entry.missing -> PcActionRow(
+                        "Find its replacement",
+                        if (replacements == 0) {
+                            "Nothing detected looks like this game yet"
+                        } else {
+                            "$replacements detected ${if (replacements == 1) "game looks" else "games look"} " +
+                                "like it; picking one moves this game's history, favourite and collections to it"
+                        },
+                        if (replacements == 0) null else onReplace,
+                    )
+                    replacements > 0 -> PcActionRow(
+                        "This replaces a missing game",
+                        "$replacements missing ${if (replacements == 1) "game looks" else "games look"} like this one; " +
+                            "picking one moves its history, favourite and collections here",
+                        onReplace,
+                    )
+                    else -> null
+                },
                 // One row, not three: install, verify, update, DLC and
                 // delete are one screen on the store's side, and that
                 // screen is the store's own (gamenative's AppScreen for
@@ -562,6 +634,33 @@ private fun runnerGroup(
     )
     else -> null
 }
+
+/**
+ * What the disabled button says under itself: where this game was. The
+ * whole path, not its name -- the name is already the title above it,
+ * and the path is the thing the person has to go and look at.
+ */
+private fun missingFolderLine(entry: LibraryEntry): String =
+    if (entry.id.startsWith("/")) {
+        "${entry.id} is not there any more. Its history, favourite and collections are kept."
+    } else {
+        "Nothing droidtop scanned still has this game. Its history, favourite and collections are kept."
+    }
+
+/**
+ * The games [entry] could be folded with: the missing ones, when this
+ * game is here, and the detected ones when it is not. One ordering for
+ * both directions ([dev.droidtop.library.MissingGames]), because it is
+ * one question asked from two sides.
+ */
+private fun replacementCandidatesFor(
+    entry: LibraryEntry,
+    siblings: List<LibraryEntry>,
+): List<dev.droidtop.library.MissingGames.Candidate> =
+    dev.droidtop.library.MissingGames.candidates(
+        target = entry,
+        among = siblings.filter { it.missing != entry.missing },
+    )
 
 private val STORE_PREFIXES = setOf("steam", "gog", "epic", "amazon")
 

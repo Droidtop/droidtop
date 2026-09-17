@@ -118,11 +118,19 @@ internal fun PcGameCard(
             )
             Text(
                 buildString {
-                    append(entry.sourceLabel())
-                    entry.engineLabel()?.let { append(" - ").append(it) }
-                    if (pc?.installed == false) append(" - not installed")
+                    // A game the walk no longer finds says ONLY that: where
+                    // it came from and what engine it is are facts about a
+                    // folder that is not there, and reading them beside the
+                    // name would say the game is here (docs/SPEC.md 7g).
+                    if (entry.missing) {
+                        append("broken - missing")
+                    } else {
+                        append(entry.sourceLabel())
+                        entry.engineLabel()?.let { append(" - ").append(it) }
+                        if (pc?.installed == false) append(" - not installed")
+                    }
                 },
-                color = Color.LightGray,
+                color = if (entry.missing) MenuTokens.Danger else Color.LightGray,
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

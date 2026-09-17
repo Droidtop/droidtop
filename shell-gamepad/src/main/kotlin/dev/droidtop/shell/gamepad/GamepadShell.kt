@@ -406,6 +406,16 @@ fun GamepadShell(
         // GamesRoots.changes for the rig evidence).
         dev.droidtop.library.GamesRoots.changes(context).collect {
             val rootsChanged = dev.droidtop.library.GamesRoots.rootsChangedSinceLastScan(context)
+            if (rootsChanged) {
+                // A root the user took away takes its games with it --
+                // the one case where the index drops instead of marking
+                // missing (docs/SPEC.md 7g). Before the walk, so the
+                // library never shows a removed root's games while the
+                // new set is being read.
+                library.keepOnlyRoots(
+                    dev.droidtop.library.GamesRoots.current(context).map { root -> root.absolutePath }.toSet(),
+                )
+            }
             library.scanInBackground(
                 GAME_KINDS,
                 rescan = rescanTrigger != 0 || rootsChanged,
