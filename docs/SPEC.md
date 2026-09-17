@@ -2269,6 +2269,16 @@ Onboarding is one scaffold, not a set of unrelated screens. The scaffold owns:
   (Storage, Keyboard) keeps that hand-off as its primary, with the one forward action beside
   it as the skip until the hand-off has actually taken, at which point the forward action
   becomes the primary "Next" and the hand-off is done with.
+- **A step that cannot be skipped shows no forward action until it is answered**, and its own
+  answer rows are the way on (`onboardingForwardLabelWhenAnswerRequired`). The forward action
+  is always actionable or it is not drawn: a greyed "Next" is an action that says "go on"
+  while refusing to, and on a step with no other action it leaves nothing on the screen that
+  can be pressed at all (rig, build 548, step 2 of 7, "Your Android home screen"). Which
+  steps those are is decided by whether skipping has a MEANING for that question: the
+  home-screen step has a row that already means "not now" ("Neither, for now"), so a skip
+  beside it would be droidtop answering for the person in a second way; the "which launcher"
+  step has no default at all, because droidtop never picks somebody's launcher. Every other
+  step is skippable and says so.
 - Content is top-aligned and the action area is docked at the bottom in portrait, bottom-right
   in landscape. Nothing is vertically centred in a tall window.
 - One gutter, the shell's own (`ShellWindow.edgePadding`), one spacing scale, one type scale,
