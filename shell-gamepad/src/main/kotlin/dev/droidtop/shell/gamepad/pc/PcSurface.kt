@@ -159,7 +159,15 @@ internal fun PcSurface(
     val openingIndex = remember(shown, focusEntryId) {
         shown.indexOfFirst { it.id == focusEntryId }.takeIf { it >= 0 } ?: 0
     }
-    LaunchedEffect(shown.isNotEmpty()) {
+    // The options screen is drawn INSTEAD of the grid, by this same
+    // composable, so the grid leaves and comes back with `landed` still
+    // true from the first visit: it returned at the right scroll with no
+    // card under the cursor, and the next A fell through to the shell
+    // (rig, build 549). Coming back from it is a fresh landing.
+    LaunchedEffect(optionsOpen) {
+        if (!optionsOpen) landed = false
+    }
+    LaunchedEffect(shown.isNotEmpty(), landed) {
         if (shown.isEmpty() || landed) return@LaunchedEffect
         landed = true
         // Scroll first: a card outside the viewport is not composed, so

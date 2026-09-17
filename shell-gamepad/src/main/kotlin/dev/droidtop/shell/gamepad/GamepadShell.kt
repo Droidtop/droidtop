@@ -55,6 +55,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
@@ -1907,9 +1908,27 @@ private fun GamesSection(
         // group, so back leaves THAT first.
         nav.back()
     }
+    // Whether the press now in flight began while the group's options
+    // screen was up. That screen's list answers B on the DOWN edge and
+    // closes itself, so the UP edge of the very same press arrived here
+    // with the options already closed and was read as a second B: one
+    // press of the pad's B left "Stores and folders" AND the PC grid (rig,
+    // build 549). The edge that opened a press decides who it belongs to.
+    var pressBeganOverOptions by remember { mutableStateOf(false) }
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown) pressBeganOverOptions = nav.optionsOpen
+                // The shoulders mean "switch system" at this level and
+                // "switch section" above it; inside a screen opened from
+                // the group they mean nothing, and letting them through
+                // tore that screen down and changed the tab under it
+                // (rig, build 549). Both edges, before anything below
+                // sees them.
+                val action = GamepadKeyMap.actionFor(event.key)
+                nav.optionsOpen && (action == GamepadAction.L || action == GamepadAction.R)
+            }
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
                 // A screen opened FROM the group owns its own keys while
@@ -1918,6 +1937,10 @@ private fun GamesSection(
                 // BackHandler handles the system back key, and neither
                 // wants the shoulders switching the system underneath it.
                 if (nav.optionsOpen) return@onKeyEvent false
+                if (pressBeganOverOptions) {
+                    pressBeganOverOptions = false
+                    return@onKeyEvent false
+                }
                 val group = selectedGroup
                 // The PC surface is droidtop's own screen with its own
                 // focus: the themed-gamelist fallbacks below drive an
