@@ -75,13 +75,21 @@ private fun relativeLabel(file: File, scannedFolder: File): String {
  * its own name. Unlike [disambiguateTitles], which repairs a collision
  * after the fact, this is a naming rule that does not need two entries to
  * notice the problem.
+ *
+ * Which folder names are sequence markers is [GameNaming]'s answer, not a
+ * second list here: the same folders are read as a game's SEGMENTS when
+ * the library groups its entries into games (docs/SPEC.md 7m), and two
+ * lists of sequence words would be two answers to one question. This
+ * names ONE entry, which is what a surface listing entries (a themed
+ * ES-DE gamelist, by ES-DE's own schema) still needs; grouping decides
+ * how many entries a game is.
  */
 fun qualifiedFolderTitle(folder: File): String {
     val name = folder.name
-    if (!SEQUENCE_LABEL.matches(name)) return name
+    val segment = GameNaming.derive(folder.absolutePath).segment ?: return name
     val parent = folder.parentFile?.name?.takeIf { it.isNotBlank() } ?: return name
-    return "$parent - $name"
+    // Only a folder that is NOTHING but the marker takes its parent's
+    // name: a folder called `ThiefofHeartsPart3-0.0.9-pc` already says
+    // which game it is.
+    return if (segment.label.equals(name, ignoreCase = true)) "$parent - $name" else name
 }
-
-private val SEQUENCE_LABEL =
-    Regex("""(part|chapter|chap|episode|ep|week|day|season|vol|volume|disc|disk)[ _.-]*[0-9]+[+a-z]*""", RegexOption.IGNORE_CASE)
