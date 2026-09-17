@@ -304,7 +304,7 @@ fun CatalogNavigator(
                         }
                         else -> false
                     }
-                }
+                },
             contentPadding = MenuListContentPadding,
             verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
         ) {
@@ -495,7 +495,7 @@ internal fun CatalogChoicePicker(
                         }
                         else -> false
                     }
-                }
+                },
             contentPadding = MenuListContentPadding,
             verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
         ) {
