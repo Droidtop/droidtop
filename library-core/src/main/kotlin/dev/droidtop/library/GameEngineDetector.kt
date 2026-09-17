@@ -248,16 +248,16 @@ object GameEngineDetector {
      * What one walk found, what it did not walk and why, and whether a
      * budget cut it short.
      *
-     * [skippedByReason] is counts keyed by the rule that fired, never the
-     * folders it fired on, because that is what a scan's log line says
-     * (see [ScanLog]). [stoppedAt] names the folder a [ScanBudget] ran out
-     * in, and is null when the walk finished -- a scan that was cut short
-     * has to be able to SAY so, since the alternative is a library that is
-     * quietly missing games.
+     * [skipped] is the rules that fired and the folders they fired on
+     * ([ScanSkips]), which is what a scan's log line prints. [stoppedAt]
+     * names the folder a [ScanBudget] ran out in, and is null when the
+     * walk finished -- a scan that was cut short has to be able to SAY
+     * so, since the alternative is a library that is quietly missing
+     * games.
      */
     data class FolderScan(
         val games: List<DetectedGame>,
-        val skippedByReason: Map<String, Int> = emptyMap(),
+        val skipped: ScanSkips = ScanSkips(),
         val stoppedAt: File? = null,
     )
 
@@ -273,12 +273,12 @@ object GameEngineDetector {
      */
     fun topLevelFolders(root: File, systemsById: Map<String, ConsoleSystemDef>): FolderList {
         val state = WalkState(newBudget = { null })
-        val folders = candidateFolders(root, systemsById, state)
+        val folders = candidateFolders(root, systemsById, state, childDepth = 1)
         return FolderList(folders, state.skipped)
     }
 
     /** [topLevelFolders]' result: the units of work, and the root's own skips. */
-    data class FolderList(val folders: List<File>, val skippedByReason: Map<String, Int> = emptyMap())
+    data class FolderList(val folders: List<File>, val skipped: ScanSkips = ScanSkips())
 
     /**
      * Every game under ONE top-level folder (see [topLevelFolders]).
@@ -314,13 +314,13 @@ object GameEngineDetector {
     ): FolderScan {
         val top = topLevelFolders(root, systemsById)
         val games = mutableListOf<DetectedGame>()
-        val skipped = LinkedHashMap<String, Int>()
-        skipped.putAll(top.skippedByReason)
+        val skipped = ScanSkips()
+        skipped.addAll(top.skipped)
         var stoppedAt: File? = null
         for (folder in top.folders) {
             val scanned = scanFolder(folder, systemsById, defs, override) { ScanBudget.start(budgetMs) }
             games += scanned.games
-            for ((reason, count) in scanned.skippedByReason) skipped[reason] = (skipped[reason] ?: 0) + count
+            skipped.addAll(scanned.skipped)
             if (stoppedAt == null) stoppedAt = scanned.stoppedAt
         }
         return FolderScan(games, skipped, stoppedAt)
@@ -333,23 +333,27 @@ object GameEngineDetector {
      * accumulators through every return value stops being readable.
      */
     private class WalkState(val newBudget: () -> ScanBudget?) {
-        val skipped = LinkedHashMap<String, Int>()
+        val skipped = ScanSkips()
         var stoppedAt: File? = null
 
-        fun skip(reason: String) {
-            skipped[reason] = (skipped[reason] ?: 0) + 1
+        fun skip(folder: File, reason: String) {
+            skipped.add(folder, reason)
         }
 
         /**
-         * True when [folder]'s OWN listing and detection ran past the
-         * budget it was given, which means nothing below it is read. The
-         * first such folder is remembered so the scan's log line can name
-         * it; its siblings carry on with budgets of their own.
+         * True when [folder]'s own detection ran past the budget it was
+         * given, which means this folder cannot claim to be a game on
+         * evidence a rule never finished gathering. Its CHILDREN are
+         * still walked, each under a budget of its own: a budget that
+         * drops a subtree loses real games, which is exactly what the rig
+         * showed (`adult/RPGMaker`, build 540 -- six games behind one
+         * folder whose own detection step read too much). The first such
+         * folder is remembered so the scan's log line can name it.
          */
         fun tooSlow(folder: File, own: ScanBudget?): Boolean {
             if (own == null || !own.expired) return false
             if (stoppedAt == null) stoppedAt = folder
-            skip(own.reason())
+            skip(folder, own.reason())
             return true
         }
     }
@@ -363,6 +367,33 @@ object GameEngineDetector {
      */
     fun isGameRoot(folder: File, defs: List<EngineDef>): Boolean =
         detect(folder, defs) { !it.readsUnnamedSubtree } != null
+
+    /**
+     * THE "this folder is a plain PC game" rule, in one place: it holds an
+     * executable directly and carries no engine evidence of its own,
+     * precise or subtree.
+     *
+     * Every walk asks it, and that is the point. Build 540 lost
+     * `Ubisoft/Ghost Recon Breakpoint` (which holds `GRB.exe`) and
+     * `Pirated/The Movies` (`MoviesSE.exe`) from the library ENTIRELY
+     * because two walks answered it differently: [scan]'s walk stopped at
+     * the folder and returned no engine game, correctly, while
+     * [detectGame] looked one level down, found the `index.html` in
+     * `benchmark`/`Docs`, called the folder engine-owned, and so
+     * `PcGameProvider` dropped the PC entry as a duplicate of an engine
+     * entry that did not exist. A folder that holds an executable and no
+     * engine evidence is a PC game, listed once, and its subfolders are
+     * its payload however many web pages they hold.
+     */
+    fun isPlainPcGameFolder(folder: File, defs: List<EngineDef>): Boolean = isPlainPcGameFolder(
+        folder,
+        preciseHere = detect(folder, defs) { !it.readsUnnamedSubtree },
+        subtreeHere = detect(folder, defs) { it.readsUnnamedSubtree },
+    )
+
+    /** [isPlainPcGameFolder] for a caller that has already detected. */
+    private fun isPlainPcGameFolder(folder: File, preciseHere: GameEngine?, subtreeHere: GameEngine?): Boolean =
+        preciseHere == null && subtreeHere == null && GameExecutableResolver.hasExecutable(folder)
 
     /**
      * Whether [folder] holds two or more games of its own directly below
@@ -409,16 +440,48 @@ object GameEngineDetector {
         folder: File,
         systemsById: Map<String, ConsoleSystemDef>,
         state: WalkState,
+        childDepth: Int,
     ): List<File> =
         (folder.listFiles() ?: emptyArray())
             .filter { it.isDirectory }
             .filter { dir ->
                 val reason = ScanPrune.skipReason(dir)
-                    ?: CONSOLE_SYSTEM_FOLDER_REASON.takeIf { resolveSystem(dir.name, systemsById) != null }
-                if (reason != null) state.skip(reason)
+                    ?: CONSOLE_SYSTEM_FOLDER_REASON.takeIf { isConsoleSystemFolder(dir, systemsById, childDepth) }
+                if (reason != null) state.skip(dir, reason)
                 reason == null
             }
             .sortedBy { it.name }
+
+    /**
+     * Whether [dir], met at [childDepth] folders below a games root, is a ROM
+     * system folder whose contents the ROM walk owns.
+     *
+     * Two conditions beyond the name, both from the rig and both the same
+     * mistake the store roots were given a data rule for (DECISIONS
+     * 2026-09-13 12:08): a folder name only means a system where a system
+     * folder can actually be, and inside a store's install tree it never
+     * can.
+     *
+     * The depth is the ROM walk's own
+     * ([dev.droidtop.library.consoles.MAX_SYSTEM_SEARCH_DEPTH]): ES-DE's
+     * layout is `<root>/<systemId>/<rom>` and droidtop allows one
+     * container level above that (`<root>/roms/<systemId>`), so nothing
+     * deeper is a system folder however it is named. Deeper matches are
+     * game internals, and they are real: `Ubisoft/Far Cry 5/data_final/pc`
+     * and `Ghost Recon Breakpoint/sounddata/pc` both resolve to the real
+     * platform id `pc` (DOS games, `dosbox_pure`), which is what the
+     * build-540 log line `2 x it is a console system folder` was actually
+     * counting.
+     */
+    private fun isConsoleSystemFolder(
+        dir: File,
+        systemsById: Map<String, ConsoleSystemDef>,
+        childDepth: Int,
+    ): Boolean {
+        if (childDepth > dev.droidtop.library.consoles.MAX_SYSTEM_SEARCH_DEPTH) return false
+        if (ScanPrune.storeTreeRoot(dir) != null) return false
+        return resolveSystem(dir.name, systemsById) != null
+    }
 
     /**
      * One step of [scan]'s walk. [Walked.precise] records whether a game
@@ -462,27 +525,28 @@ object GameEngineDetector {
         }
 
         val subtreeHere = detect(folder, defs) { it.readsUnnamedSubtree }
-        // A folder that directly holds an executable and carries no
-        // engine evidence at all is a PC game -- [PcFolderScan] lists it
-        // -- and a PC game's own subfolders are its payload, not further
-        // games. Without this the engine walk went on down into them and
-        // the weakest rule in the database, "there is a page here",
-        // turned `Ghost Recon Breakpoint/benchmark` (an index.html and
-        // sixteen PNGs) and `The Movies/Docs` into games of their own.
-        if (preciseHere == null && subtreeHere == null &&
-            GameExecutableResolver.hasExecutable(folder) && !holdsGames
-        ) {
+        // THE rule both walks share ([isPlainPcGameFolder]): a folder that
+        // directly holds an executable and carries no engine evidence of
+        // its own is a PC game -- [PcFolderScan] lists it -- and a PC
+        // game's own subfolders are its payload, not further games,
+        // whatever sits in them.
+        if (isPlainPcGameFolder(folder, preciseHere, subtreeHere) && !holdsGames) {
             return emptyList()
         }
+        val tooSlow = state.tooSlow(folder, own)
         val below =
-            if (depth < MAX_SCAN_DEPTH && !state.tooSlow(folder, own)) {
-                candidateFolders(folder, systemsById, state)
+            if (depth < MAX_SCAN_DEPTH) {
+                candidateFolders(folder, systemsById, state, childDepth = depth + 1)
                     .flatMap { gamesUnder(it, systemsById, defs, override, depth + 1, state) }
             } else {
                 emptyList()
             }
 
-        versionWrapper(folder, below)?.let { return listOf(Walked(it, precise = true)) }
+        wrapper(folder, below)?.let { return listOf(Walked(it, precise = true)) }
+        // A folder whose own step ran past its budget cannot claim to be
+        // a game on evidence a rule never finished gathering -- but the
+        // games below it are still the games below it.
+        if (tooSlow) return below
         // The outermost folder a subtree rule matches is the game root it
         // means -- unless precise games, or more than one game, sit below.
         if (subtreeHere != null && below.size <= 1 && below.none { it.precise }) {
@@ -493,20 +557,44 @@ object GameEngineDetector {
     }
 
     /**
-     * [folder] read as a version wrapper around the single game below it --
-     * see [scan]'s doc comment for the shape and for why the name test is
-     * part of it. Null when [folder] is an ordinary container.
+     * [folder] read as the game root wrapped around the single game
+     * directly below it, or null when [folder] is an ordinary container.
+     *
+     * Two shapes, both real, both meaning "this folder is the game and the
+     * folder below it is where its files happen to live":
+     *
+     * - The VERSION wrapper, recognised by the name:
+     *   `BeingADik/BeingADIK-0.8.3-scrappy/{renpy,game}`, where a
+     *   distribution zip adds a version-named folder around the game. See
+     *   [scan]'s doc comment for why the name test is part of it.
+     * - The PAYLOAD wrapper, recognised by this folder having files of its
+     *   own: `Humble/macdows95_windows/macdows95/{PLAY.bat, files/}`,
+     *   where the engine markers sit in a folder called `files` and the
+     *   launcher sits beside it. Build 540 listed a game called `files`
+     *   for exactly this tree. It is the rule [PcFolderScan] already
+     *   states for the PC half ("own files plus games below means this
+     *   folder is the game"), asked here so that one rule decides it in
+     *   both walks -- and, as there, it does not apply inside a store
+     *   tree, where `steamapps` holding one installed game must still
+     *   yield the game and not `steamapps`.
+     *
+     * A folder holding TWO games is a container either way and never
+     * reaches this: [holdsSeveralGames] has already answered for the
+     * engine-evidence case, `below.singleOrNull()` for the rest.
      */
-    private fun versionWrapper(folder: File, below: List<Walked>): DetectedGame? {
+    private fun wrapper(folder: File, below: List<Walked>): DetectedGame? {
         val inner = below.singleOrNull()?.takeIf { it.precise }?.game ?: return null
         if (inner.displayFolder.parentFile != folder) return null
         // Not an inner wrapper result in its own right: one rename only.
         if (inner.displayFolder != inner.gameRoot) return null
-        if (!nameKey(inner.displayFolder.name).startsWith(nameKey(folder.name))) return null
+        val namedAfterThisFolder = nameKey(inner.displayFolder.name).startsWith(nameKey(folder.name))
+        val holdsOwnFiles = (folder.listFiles() ?: emptyArray()).any { it.isFile && !it.name.startsWith(".") }
+        val insideStoreTree = ScanPrune.storeTreeRoot(folder) != null
+        if (!namedAfterThisFolder && !(holdsOwnFiles && !insideStoreTree)) return null
         return DetectedGame(folder, inner.gameRoot, inner.engine)
     }
 
-    /** Folder names compared for the version-wrapper test only. */
+    /** Folder names compared for [wrapper]'s version-folder test only. */
     private fun nameKey(name: String): String =
         name.lowercase().filter { it.isLetterOrDigit() }
 
@@ -546,6 +634,13 @@ object GameEngineDetector {
         // Tier 1: evidence AT this folder that this folder is the game
         // root (renpy/ + game/, RPG_RT.ldb, project.godot, ...).
         detect(folder, defs) { !it.readsUnnamedSubtree }?.let { return DetectedGame(folder, folder, it) }
+        // Before tier 2: this folder may be a plain PC game, and then
+        // nothing below it is a game at all -- the rule [scan]'s walk
+        // applies, asked here too, because the two walks answering it
+        // differently is what deleted `Ghost Recon Breakpoint` from build
+        // 540's library entirely (see [isPlainPcGameFolder]).
+        val subtreeHere = detect(folder, defs) { it.readsUnnamedSubtree }
+        if (isPlainPcGameFolder(folder, preciseHere = null, subtreeHere = subtreeHere)) return null
         // Tier 2: the same precise question asked of each subfolder --
         // the version-folder wrapper shape. Precise there too: a
         // subtree rule matching a subfolder proves no more about that
@@ -562,7 +657,7 @@ object GameEngineDetector {
         // Tier 3: only now the subtree rules, which say an engine game
         // is somewhere below without naming where. Nothing more precise
         // was found, so this folder is the best root available.
-        return detect(folder, defs) { it.readsUnnamedSubtree }?.let { DetectedGame(folder, folder, it) }
+        return subtreeHere?.let { DetectedGame(folder, folder, it) }
     }
 
     /**
@@ -877,7 +972,7 @@ class EngineGameProvider(
         for (root in roots) {
             val rootStartedAt = System.currentTimeMillis()
             val top = GameEngineDetector.topLevelFolders(root, systemsById)
-            val rootSkips = LinkedHashMap<String, Int>(top.skippedByReason)
+            val rootSkips = ScanSkips().apply { addAll(top.skipped) }
             var rootGames = 0
             for (folder in top.folders) {
                 val folderStartedAt = System.currentTimeMillis()
@@ -888,25 +983,30 @@ class EngineGameProvider(
                     override = { candidate -> EngineOverridePrefs.engineFor(context, candidate.absolutePath) },
                     budget = { ScanBudget.start() },
                 )
-                for ((reason, count) in scanned.skippedByReason) {
-                    rootSkips[reason] = (rootSkips[reason] ?: 0) + count
-                }
+                rootSkips.addAll(scanned.skipped)
                 rootGames += scanned.games.size
                 ScanLog.write(
                     label = "engine folder ${folder.absolutePath}",
                     games = scanned.games.size,
-                    skippedByReason = scanned.skippedByReason,
+                    skipped = scanned.skipped,
                     durationMs = System.currentTimeMillis() - folderStartedAt,
-                    note = scanned.stoppedAt?.let { "stopped in ${it.absolutePath}" },
+                    // A budget no longer drops what is under the folder it
+                    // fired on, so this says where it fired and nothing
+                    // more -- see ScanBudget and the walk's own tooSlow.
+                    note = scanned.stoppedAt?.let {
+                        "read too slowly in ${it.absolutePath}, so only its own evidence was dropped"
+                    },
+                    base = folder,
                 )
                 publish(scanned.games.map { it.toEntry(root, installsByDir) })
             }
             ScanLog.write(
                 label = "games root ${root.absolutePath}",
                 games = rootGames,
-                skippedByReason = rootSkips,
+                skipped = rootSkips,
                 durationMs = System.currentTimeMillis() - rootStartedAt,
                 note = "${top.folders.size} folders scanned",
+                base = root,
             )
         }
     }

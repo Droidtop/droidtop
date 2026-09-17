@@ -9,6 +9,7 @@ import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.ScanBudget
 import dev.droidtop.library.ScanLog
 import dev.droidtop.library.ScanPrune
+import dev.droidtop.library.ScanSkips
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
@@ -189,6 +190,17 @@ private val SYSTEM_ID_ALIASES: Map<String, String> = mapOf(
     "ws" to "wonderswan",
     "wsc" to "wonderswancolor",
 )
+
+/**
+ * How many folders below a games root a ROM system folder can sit.
+ *
+ * ES-DE's layout is `<root>/<systemId>/<rom>`; droidtop allows one
+ * container level above it, because a real library keeps its systems in
+ * `<root>/roms/<systemId>`. Nothing deeper is a system folder, whatever it
+ * is named -- shared with [dev.droidtop.library.GameEngineDetector]'s walk
+ * so the two walks cannot disagree about where systems live.
+ */
+internal const val MAX_SYSTEM_SEARCH_DEPTH = 2
 
 /**
  * Resolves a ROMs subfolder name to a known [ConsoleSystemDef], checking
@@ -418,7 +430,7 @@ class ConsoleRomProvider(
         ScanLog.write(
             label = "roms root ${root.absolutePath}",
             games = games,
-            skippedByReason = systemScan.skippedByReason,
+            skipped = systemScan.skipped,
             durationMs = System.currentTimeMillis() - startedAt,
             note = systemScan.units.joinToString(", ") { unit ->
                 unit.system.id + if (unit.folders.size > 1) " (${unit.folders.size} folders)" else ""
@@ -473,7 +485,7 @@ class ConsoleRomProvider(
     private data class SystemUnit(val system: ConsoleSystemDef, val folders: List<File>)
 
     /** [systemUnitsUnder]'s result: the units of work, and what was refused. */
-    private data class SystemScan(val units: List<SystemUnit>, val skippedByReason: Map<String, Int>)
+    private data class SystemScan(val units: List<SystemUnit>, val skipped: ScanSkips)
 
     /**
      * How far below a games root a console system folder is looked for.
@@ -488,7 +500,7 @@ class ConsoleRomProvider(
      * exist. At two levels the containers are the root's own top-level
      * folders, whose children are libraries and games, not game internals.
      */
-    private val MAX_SYSTEM_SEARCH_DEPTH = 2
+    private val MAX_SYSTEM_SEARCH_DEPTH = dev.droidtop.library.consoles.MAX_SYSTEM_SEARCH_DEPTH
 
     /**
      * Every console system under [root], with the folders holding its
@@ -499,11 +511,11 @@ class ConsoleRomProvider(
      * of them knew about store trees.
      */
     private fun systemUnitsUnder(root: File, systemsById: Map<String, ConsoleSystemDef>): SystemScan {
-        val skipped = LinkedHashMap<String, Int>()
+        val skipped = ScanSkips()
         val found = mutableListOf<Pair<File, ConsoleSystemDef>>()
 
-        fun refuse(reason: String) {
-            skipped[reason] = (skipped[reason] ?: 0) + 1
+        fun refuse(folder: File, reason: String) {
+            skipped.add(folder, reason)
         }
 
         fun walk(folder: File, depth: Int) {
@@ -512,11 +524,14 @@ class ConsoleRomProvider(
                 val pruned = ScanPrune.skipReason(child)
                 val storeOwner = ScanPrune.storeRootOwner(child)
                 when {
-                    pruned != null -> refuse(pruned)
+                    pruned != null -> refuse(child, pruned)
                     // A store's install tree is the PC library's, whatever
                     // the folder is called -- see ScanPrune.storeRootOwner.
                     storeOwner != null ->
-                        refuse("$storeOwner owns this tree -- its games are the PC library's, not a ROM system")
+                        refuse(
+                            child,
+                            "$storeOwner owns this tree -- its games are the PC library's, not a ROM system",
+                        )
                     else -> {
                         val system = SystemOverridePrefs.resolveForFolder(
                             context,
@@ -657,7 +672,7 @@ class ConsoleRomProvider(
         ScanLog.write(
             label = "rom folder ${systemFolder.absolutePath}",
             games = entries.size,
-            skippedByReason = ScanLog.countByReason(romScan.skipped),
+            skipped = ScanSkips.of(romScan.skipped),
             durationMs = System.currentTimeMillis() - startedAt,
             note = romScan.stoppedAt?.let { "stopped in ${it.absolutePath}" },
         )
