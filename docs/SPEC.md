@@ -2257,6 +2257,18 @@ Onboarding is one scaffold, not a set of unrelated screens. The scaffold owns:
   window is), a **content slot**, and a **fixed action area**.
 - The action area carries the step's own advance at full weight. A step's Next is never a
   text link sitting below a louder button that does something smaller.
+- **One way forward.** A step never offers two actions that both move on. The forward action
+  is one action, and its label is the whole affordance: before the step has been answered it
+  IS the skip and says so ("Skip this step"), once it is answered it is "Next", and a step
+  entered on its own from its Settings row has nothing after it, so it is "Done"
+  (`onboardingForwardLabel`). A disabled "Next" beside a working "Skip for now", or a text
+  "Skip" beside a filled "Next", are the same fault: two ways forward, with nothing saying
+  which one moves on without answering (rig, build 547, Controller and Desktop setup).
+  A step's second action is therefore never a second way forward. It is the step's own WORK,
+  which stays on the step — and a step whose work is a hand-off to Android's own screens
+  (Storage, Keyboard) keeps that hand-off as its primary, with the one forward action beside
+  it as the skip until the hand-off has actually taken, at which point the forward action
+  becomes the primary "Next" and the hand-off is done with.
 - Content is top-aligned and the action area is docked at the bottom in portrait, bottom-right
   in landscape. Nothing is vertically centred in a tall window.
 - One gutter, the shell's own (`ShellWindow.edgePadding`), one spacing scale, one type scale,
