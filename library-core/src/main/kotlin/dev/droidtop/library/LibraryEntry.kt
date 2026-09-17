@@ -524,6 +524,7 @@ interface LibraryProvider {
 class Library(
     private val providers: List<LibraryProvider>,
     private val playHistory: PlayHistoryStore = NoOpPlayHistoryStore,
+    private val favorites: FavoritesStore = NoOpFavoritesStore,
 ) {
     private val scanScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val backgroundScanStates = ConcurrentHashMap<Set<LibraryEntryKind>, MutableStateFlow<List<LibraryEntry>?>>()
@@ -751,8 +752,13 @@ class Library(
     suspend fun toggleFavorite(entry: LibraryEntry): Boolean? = withContext(Dispatchers.IO) {
         val romProvider = providers
             .filterIsInstance<dev.droidtop.library.consoles.ConsoleRomProvider>()
-            .firstOrNull { entry.kind in it.kinds } ?: return@withContext null
-        romProvider.toggleFavorite(entry.id)
+            .firstOrNull { entry.kind in it.kinds }
+        if (romProvider != null) return@withContext romProvider.toggleFavorite(entry.id)
+        // Every other kind: the library's own favourites (see
+        // [FavoritesStore]). A game is a game whichever provider found it.
+        val next = !entry.favorite
+        favorites.setFavorite(entry.id, next)
+        next
     }
 
     /**
@@ -823,10 +829,15 @@ class Library(
 
     private suspend fun withPlayHistory(entries: List<LibraryEntry>): List<LibraryEntry> {
         if (entries.isEmpty()) return entries
-        val history = playHistory.getAll(entries.map { it.id })
-        if (history.isEmpty()) return entries
+        val ids = entries.map { it.id }
+        val history = playHistory.getAll(ids)
+        val favorite = favorites.getAll(ids)
+        if (history.isEmpty() && favorite.isEmpty()) return entries
         return entries.map { entry ->
-            history[entry.id]?.let { entry.copy(lastPlayedEpochMs = it.lastPlayedEpochMs, playCount = it.playCount) } ?: entry
+            val withHistory = history[entry.id]?.let { entry.copy(lastPlayedEpochMs = it.lastPlayedEpochMs, playCount = it.playCount) } ?: entry
+            // A ROM's favourite came from its provider already; this store
+            // only ever holds the other kinds, so a hit is authoritative.
+            if (entry.id in favorite) withHistory.copy(favorite = true) else withHistory
         }
     }
 }
