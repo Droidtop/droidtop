@@ -119,8 +119,11 @@ internal fun PcGameDetail(
 
     // The game this entry is one folder of. Cheap: names only, no
     // filesystem (see LibraryGrouping).
-    val group = remember(entry, siblings) {
-        dev.droidtop.library.LibraryGrouping.groupOf(entry, siblings)?.takeIf { it.hasChoices }
+    // What this folder is a copy OF: the game's own name for the header,
+    // whether or not there is anything to choose between.
+    val grouping = remember(entry, siblings) { dev.droidtop.library.LibraryGrouping.groupOf(entry, siblings) }
+    val group = remember(grouping) {
+        grouping?.takeIf { it.hasChoices }
     }
 
     val media = remember(entry) {
@@ -233,7 +236,7 @@ internal fun PcGameDetail(
             // no scraped art gets the same plate with the same title and
             // identity line over it, so the screen has the same shape
             // either way (research/ui-polish item 18).
-            item { PcDetailHeader(entry) }
+            item { PcDetailHeader(entry, grouping) }
 
             // 1. Runs with -- WHICH runner, and how to change it. Whether
             // this game can be played is the button's sentence and only
@@ -459,6 +462,33 @@ private fun versionsGroup(
     return PcActionGroup(if (game.segments.isEmpty()) "Versions" else "Parts and versions", rows)
 }
 
+/**
+ * Which folder of [group] the open [entry] is, in the same words a
+ * "Parts and versions" row uses for it, or null for a game that is one
+ * folder with nothing in its name to say.
+ */
+private fun copyLabel(group: dev.droidtop.library.LibraryGameGroup, entry: LibraryEntry): String? {
+    val game = group.game
+    for (segment in game.segments) {
+        for (version in segment.versions) {
+            version.copies.firstOrNull { it.path == entry.id }?.let { return partLabel(segment.label, version, it) }
+        }
+    }
+    for (version in game.versions) {
+        version.copies.firstOrNull { it.path == entry.id }?.let { return partLabel(null, version, it) }
+    }
+    return null
+}
+
+/** The one wording for "this part, this version, these mods, this language". */
+private fun partLabel(segment: String?, version: dev.droidtop.library.GameVersion, copy: dev.droidtop.library.GameCopy): String? =
+    listOfNotNull(
+        segment,
+        version.version.takeIf { it.isNotEmpty() }?.let { "v$it" },
+        copy.mods.takeIf { it.isNotEmpty() }?.joinToString(" "),
+        copy.language,
+    ).joinToString(" - ").ifEmpty { null }
+
 private fun row(
     group: dev.droidtop.library.LibraryGameGroup,
     version: dev.droidtop.library.GameVersion,
@@ -554,7 +584,14 @@ private const val EXTRA_PC_TITLE = "dev.droidtop.app.extra.PC_TITLE"
  * no stand-in cover art, because a made-up cover is a lie about a game.
  */
 @Composable
-private fun PcDetailHeader(entry: LibraryEntry) {
+private fun PcDetailHeader(entry: LibraryEntry, grouping: dev.droidtop.library.LibraryGameGroup?) {
+    // The header names the GAME and then says which folder of it is open,
+    // in the words the "Parts and versions" rows use. The card in the grid
+    // already said "BeingADIK"; this screen said "BeingADik - Chap3+", the
+    // folder's own qualified title, and the two disagreed on the same
+    // screen pair (rig, build 550).
+    val title = grouping?.game?.name ?: entry.title
+    val copyLine = grouping?.let { copyLabel(it, entry) }
     Box(modifier = Modifier.fillMaxWidth().height(220.dp).padding(top = 24.dp)) {
         if (entry.artworkUri != null) {
             AsyncImage(
@@ -575,12 +612,21 @@ private fun PcDetailHeader(entry: LibraryEntry) {
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    entry.title,
+                    title,
                     color = Color.White,
                     style = MaterialTheme.typography.headlineSmall,
                     maxLines = 2,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 )
+                if (copyLine != null) {
+                    Text(
+                        copyLine,
+                        color = Color(0xFFD7E6DC),
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                }
                 Text(
                     entry.identityLine(),
                     color = Color.LightGray,

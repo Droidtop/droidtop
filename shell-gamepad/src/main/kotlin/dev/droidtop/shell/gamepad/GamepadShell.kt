@@ -679,14 +679,21 @@ fun GamepadShell(
         // own help plate drawn empty above the bar in portrait, and gave
         // a theme a different canvas in portrait than in landscape (rig,
         // build 547).
+        // A screen drawn over the group -- a game's detail, the group's
+        // own options screen -- takes A and B and nothing else: Info,
+        // Options, the system jump and the section switch all act on the
+        // group UNDER it, and the bar promised every one of them over
+        // "Stores and folders" while none dispatched there (rig, build
+        // 550). The hint row promises only what dispatches (SPEC 7j).
+        val overlayScreen = detailEntry != null || nav.optionsOpen
         val shellHelpRow: @Composable (Color) -> Unit = { background ->
             ButtonHintFooter(
                 background = background,
-                canGoBack = canGoBack || detailEntry != null,
-                showInfo = detailEntry == null,
-                showSectionSwitch = detailEntry == null,
-                showSystemSwitch = detailEntry == null && section == GamingSection.GAMES && canGoBack,
-                showOptions = detailEntry == null && section == GamingSection.GAMES,
+                canGoBack = canGoBack || overlayScreen,
+                showInfo = !overlayScreen,
+                showSectionSwitch = !overlayScreen,
+                showSystemSwitch = !overlayScreen && section == GamingSection.GAMES && canGoBack,
+                showOptions = !overlayScreen && section == GamingSection.GAMES,
             )
         }
         Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {

@@ -511,4 +511,31 @@ class GameEngineDetectorTest {
 
         assertEquals(listOf("VN1"), GameEngineDetector.scan(tmp.root, emptyMap(), defs).map { it.displayFolder.name })
     }
+
+    /**
+     * The rig's `adult/renpy/BeingADik` (build 550): one Ren'Py game in a
+     * version folder beside a chapter folder that holds the newer version
+     * one level further down. The deeper one sits five folders below the
+     * root, one past MAX_SCAN_DEPTH, and the walk used to stop at
+     * `Chap3+`, claim it on the .rpa fallback and list a folder with no
+     * game in it. Part and version folders cost no depth.
+     */
+    @Test
+    fun `a version folder inside a part folder is the game, however deep the part sits`() {
+        for (leaf in listOf(listOf("BeingADIK-0.8.3-scrappy"), listOf("Chap3+", "12.0-scrappy"))) {
+            val base = arrayOf("adult", "renpy", "BeingADik") + leaf.toTypedArray()
+            touch(*base, "BeingADIK.exe")
+            touch(*base, "renpy", "common", "00start.rpy")
+            touch(*base, "game", "script.rpa")
+        }
+        val results = GameEngineDetector.scan(tmp.root, emptyMap(), defs)
+        assertEquals(
+            listOf(
+                "adult/renpy/BeingADik/BeingADIK-0.8.3-scrappy",
+                "adult/renpy/BeingADik/Chap3+/12.0-scrappy",
+            ),
+            results.map { it.gameRoot.toRelativeString(tmp.root).replace(File.separatorChar, '/') }.sorted(),
+        )
+        assertEquals(setOf(GameEngine.RENPY), results.map { it.engine }.toSet())
+    }
 }

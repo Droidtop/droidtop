@@ -89,12 +89,23 @@ object PcFolderScan {
         val holdsEngineGames by lazy { defs.isNotEmpty() && GameEngineDetector.holdsSeveralGames(folder, defs) }
         if (!isStoreRoot && GameExecutableResolver.hasExecutable(folder) && !holdsEngineGames) return listOf(folder)
 
-        val below =
-            if (depth < MAX_SCAN_DEPTH) childrenOf(folder).flatMap { walk(it, defs, depth + 1) } else emptyList()
+        // The engine walk's depth rule, asked of the same names: a part or
+        // version folder is one game's structure and costs no depth
+        // (GameNaming.isStructuralFolderName, docs/SPEC.md 7m).
+        val below = childrenOf(folder).flatMap { child ->
+            when {
+                GameNaming.isStructuralFolderName(child.name) -> walk(child, defs, depth)
+                depth < MAX_SCAN_DEPTH -> walk(child, defs, depth + 1)
+                else -> emptyList()
+            }
+        }
         if (below.isEmpty()) return emptyList()
         val holdsOwnFiles = (folder.listFiles() ?: emptyArray()).any { it.isFile && !it.name.startsWith(".") }
         val insideStoreTree = isStoreRoot || ScanPrune.storeTreeRoot(folder) != null
-        return if (holdsOwnFiles && !insideStoreTree && !holdsEngineGames) listOf(folder) else below
+        // A part or version folder with a stray file of its own is still
+        // not the game; the game is the folder below it that has one.
+        val structural = GameNaming.isStructuralFolderName(folder.name)
+        return if (holdsOwnFiles && !insideStoreTree && !holdsEngineGames && !structural) listOf(folder) else below
     }
 
     private fun childrenOf(folder: File): List<File> =
