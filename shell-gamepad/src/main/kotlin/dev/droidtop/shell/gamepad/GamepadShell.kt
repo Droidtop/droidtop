@@ -651,6 +651,12 @@ fun GamepadShell(
                     library = library,
                     onLaunch = { onLaunch(entry); detailEntry = null },
                     onClose = { detailEntry = null },
+                    // The game's other folders -- its versions and its
+                    // segments (docs/SPEC.md 7m) -- are reachable from
+                    // here, and picking one opens that folder's own
+                    // detail, so Play starts what the user chose.
+                    siblings = gameEntries.orEmpty(),
+                    onOpenOther = { detailEntry = it },
                 )
                 entry != null -> EntryDetailScreen(
                     entry = entry,
