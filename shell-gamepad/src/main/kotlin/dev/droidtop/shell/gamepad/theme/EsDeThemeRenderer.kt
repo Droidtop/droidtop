@@ -583,16 +583,17 @@ fun EsDeThemedView(
         // matching real ES-DE's own last-applied-wins theme application.
         // Rendered after the element loop -- help draws on top, real ES-DE's
         // own draw order for it.
-        // One help bar, and the shell's own button bar is it whenever that
-        // bar is up: on a touch-first window it is the only route to B, Y
-        // and Select, so it is drawn in addition to the theme -- and the
-        // theme's own row was then drawn UNDER it, two bars for the one
-        // thing real ES-DE gives the Window exactly one of (Window.cpp:126,
-        // :884; HelpComponent.cpp:629 draws nothing when help is off).
-        // See [LocalShellOwnsHelpRow].
-        val shellOwnsHelpRow = dev.droidtop.shell.gamepad.LocalShellOwnsHelpRow.current
+        // One help bar, and the theme draws it only when the theme OWNS
+        // it: on a touch-first window droidtop's own tappable bar takes
+        // the row, because the theme's is a legend and the only route to
+        // B, Y and Select with no pad attached. Drawing both is two bars
+        // for the one thing real ES-DE gives the Window exactly one of
+        // (Window.cpp:126, :884; HelpComponent.cpp:629 draws nothing when
+        // help is off). See [HelpRowOwner].
+        val themeOwnsHelpRow =
+            dev.droidtop.shell.gamepad.LocalHelpRowOwner.current == dev.droidtop.shell.gamepad.HelpRowOwner.THEME
         val helpElements = view.elements.values.filter {
-            it.type == "helpsystem" && !shellOwnsHelpRow && esDeScopeAllows(it, backgroundDimmed) &&
+            it.type == "helpsystem" && themeOwnsHelpRow && esDeScopeAllows(it, backgroundDimmed) &&
                 (layer == EsDeViewLayer.ALL || layer == EsDeViewLayer.WINDOW)
         }
         if (helpElements.isNotEmpty() && hints.isNotEmpty()) {

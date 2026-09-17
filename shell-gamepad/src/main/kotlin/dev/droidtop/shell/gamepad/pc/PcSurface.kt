@@ -45,6 +45,8 @@ import dev.droidtop.library.displayName
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.shell.gamepad.CatalogNavigator
 import dev.droidtop.shell.gamepad.LocalShellWindow
+import dev.droidtop.shell.gamepad.HelpRowOwner
+import dev.droidtop.shell.gamepad.LocalHelpRowOwner
 import dev.droidtop.shell.gamepad.TouchHintBar
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
@@ -277,8 +279,20 @@ private fun PcHeader(total: Int, shown: Int, entries: List<LibraryEntry>, folder
     }
 }
 
+/**
+ * This screen's own help row -- and the ONE row on it: the surface
+ * claims the row (`HelpRowClaim.SCREEN`, see docs/SPEC.md 7j) so the
+ * shell's own bar stays down and the theme's `<helpsystem>` is
+ * suppressed, in both orientations. It is a real [TouchHintBar], so
+ * every hint here dispatches its own press; nothing is lost by the
+ * shell's bar standing down on a touch screen.
+ *
+ * Drawn only while this screen actually owns the row, so switching
+ * hints off silences this one like every other.
+ */
 @Composable
 private fun PcHints() {
+    if (LocalHelpRowOwner.current != HelpRowOwner.SCREEN) return
     TouchHintBar(
         hints = listOf(
             GamepadAction.A to "Open",

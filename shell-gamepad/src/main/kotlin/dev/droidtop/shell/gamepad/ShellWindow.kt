@@ -107,8 +107,7 @@ data class ShellWindow(
 }
 
 /**
- * True while droidtop's own button bar ([ButtonHintFooter]) is on screen,
- * which makes it THE help bar for that screen.
+ * What the screen on top has of its OWN to put in the help row.
  *
  * Real ES-DE has exactly one help bar: the Window owns a single
  * `HelpComponent` (Window.cpp:126, and `Window::setHelpPrompts`,
@@ -116,33 +115,79 @@ data class ShellWindow(
  * draws nothing at all when help prompts are switched off
  * (HelpComponent.cpp:629 -- `ShowHelpPrompts` false resets the grid).
  * A themed view's own `<helpsystem>` styles that one bar; it is not a
- * second bar of its own.
- *
- * On a touch-first window droidtop draws its button bar IN ADDITION to
- * whatever the theme would draw, because the theme's row is a legend and
- * the button bar is the only route to B/Y/Select with no pad attached.
- * Two bars then stacked on top of each other (portrait capture,
- * 2026-09-11). This local is how the themed renderer learns that the
- * shell has already taken the bar, so the theme's `<helpsystem>` gives
- * way to it -- the same one-bar rule ES-DE has, decided by who owns the
- * row rather than by drawing both.
+ * second bar of its own. droidtop keeps that count, so a screen says
+ * what it HAS and [esDeHelpRowOwner] decides who draws.
  */
-val LocalShellOwnsHelpRow = staticCompositionLocalOf { false }
+enum class HelpRowClaim {
+    /** Nothing of its own: an ordinary droidtop screen. */
+    NONE,
+
+    /**
+     * The screen draws its own real [TouchHintBar], with actions that
+     * are not the shell's -- the PC surface, where A opens a game rather
+     * than launching it (docs/SPEC.md 7i). It is a control surface, not
+     * a legend, so it is tappable and a touch-first window has no reason
+     * to add the shell's bar beside it.
+     */
+    SCREEN,
+
+    /**
+     * A themed view whose theme declares a `<helpsystem>`. That row is
+     * DECORATION -- it names buttons, it does not dispatch them -- so on
+     * a touch-first window the shell's own bar takes the row instead.
+     */
+    THEME,
+}
+
+/** Who actually draws the one help row for the screen on top. */
+enum class HelpRowOwner {
+    /** droidtop's own `ButtonHintFooter`. */
+    SHELL,
+
+    /** The screen's own [TouchHintBar]. */
+    SCREEN,
+
+    /** The theme's `<helpsystem>`. */
+    THEME,
+
+    /** Nobody: hints are switched off and the screen has none of its own. */
+    NONE,
+}
 
 /**
- * Who draws the help row, as one answer both sides read: true means
- * droidtop's own [ButtonHintFooter] draws it AND the themed renderer
- * suppresses the theme's `<helpsystem>`; false means the theme draws it
- * and the footer stays down. See docs/SPEC.md 7j.
+ * Who draws the help row, as ONE answer every side reads: the shell's
+ * `ButtonHintFooter` is drawn exactly when this is [HelpRowOwner.SHELL],
+ * a screen's own bar exactly when it is [HelpRowOwner.SCREEN], and the
+ * themed renderer draws the theme's `<helpsystem>` exactly when it is
+ * [HelpRowOwner.THEME]. See docs/SPEC.md 7j.
  *
- * [themeHandlesHints] is whether the screen currently on top has a
- * theme-drawn help row to offer at all.
+ * Two independent conditions for the one row is what let both draw at
+ * once in landscape with Slate (rig, build 546); a claim that only said
+ * "a theme handles the hints" is what let the shell's bar stack under
+ * the PC grid's own in portrait, because a touch-first window overrode a
+ * claim that was never a theme's in the first place (rig, build 547).
  */
-fun esDeShellOwnsHelpRow(
+fun esDeHelpRowOwner(
     showHints: Boolean,
     touchFirst: Boolean,
-    themeHandlesHints: Boolean,
-): Boolean = showHints && (touchFirst || !themeHandlesHints)
+    claim: HelpRowClaim,
+): HelpRowOwner = when (claim) {
+    // A screen's own bar IS the control surface for that screen; there
+    // is nothing for the shell's to add. Switching hints off silences it
+    // like any other.
+    HelpRowClaim.SCREEN -> if (showHints) HelpRowOwner.SCREEN else HelpRowOwner.NONE
+    // The theme's row is a legend: with no pad attached it names buttons
+    // a finger cannot reach, so the shell's tappable bar takes the row.
+    HelpRowClaim.THEME -> if (showHints && touchFirst) HelpRowOwner.SHELL else HelpRowOwner.THEME
+    HelpRowClaim.NONE -> if (showHints) HelpRowOwner.SHELL else HelpRowOwner.NONE
+}
+
+/**
+ * The live answer, read by the themed renderer (which suppresses the
+ * theme's `<helpsystem>` unless it is [HelpRowOwner.THEME]) and by any
+ * screen that draws a bar of its own.
+ */
+val LocalHelpRowOwner = staticCompositionLocalOf { HelpRowOwner.SHELL }
 
 val LocalShellWindow = staticCompositionLocalOf {
     // Only ever seen by a preview or a test composing a screen outside

@@ -5343,18 +5343,39 @@ pad. Consequences:
   Window exactly ONE help bar (`Window.cpp:126`, `Window::setHelpPrompts`
   at `:884`; `HelpComponent.cpp:629` draws nothing when help is off) and a
   theme's `<helpsystem>` styles that one component rather than adding a
-  second. droidtop keeps that count: **one value decides who owns the
-  help row for the screen on top, and both sides read it** -- the shell's
-  `ButtonHintFooter` is drawn exactly when the shell owns it, and the
-  themed renderer suppresses the theme's `<helpsystem>` exactly then
-  (`LocalShellOwnsHelpRow`). The shell owns the row on a touch-first
-  window, always, and on any screen whose theme has no help row to draw;
-  the theme owns it otherwise, which is the console's own case. Two
-  independent conditions for the one row is what let both draw at once
-  in landscape with Slate, the theme's row sliced in half by the bar
-  sitting over it (rig, build 546); a claim is also scoped to the screen
-  that makes it, so a screen the shell is still fading out cannot answer
-  for the screen arriving;
+  second. droidtop keeps that count with one value, read by every side
+  of it. A screen says what it HAS of its own (`HelpRowClaim`: nothing,
+  a row of its OWN, or a THEME's `<helpsystem>`) and one function
+  (`esDeHelpRowOwner`) says who draws (`HelpRowOwner`, published as
+  `LocalHelpRowOwner`): the shell's `ButtonHintFooter` draws exactly when
+  it says SHELL, a screen's own `TouchHintBar` exactly when it says
+  SCREEN, and the themed renderer draws the theme's `<helpsystem>`
+  exactly when it says THEME. A theme's row is a LEGEND -- it names
+  buttons, it does not dispatch them -- so a touch-first window takes it
+  over; a screen's own row is a real control surface with this screen's
+  own actions in it (the PC surface: A opens a game, it does not launch
+  it), so it is never doubled by the shell's bar in either shape.
+  Independent conditions for the one row are how droidtop drew two,
+  twice: the theme's row sliced in half by the bar over it in landscape
+  with Slate (rig, build 546), and the shell's bar stacked under the PC
+  grid's own row in portrait but not in landscape, because the PC
+  surface claimed the row as a THEME's and a touch-first window then
+  overrode a claim that was never a theme's (rig, build 547). A claim is
+  also scoped to the screen that makes it, so a screen the shell is still
+  fading out cannot answer for the screen arriving;
+- **the one row is drawn in the one place laid out for it.** Real ES-DE
+  draws its single `HelpComponent` ON the view, at the theme's own
+  `<helpsystem>` position; the view is not shortened to make room for it.
+  So when the shell owns the row over a THEME's screen, droidtop's bar is
+  drawn over the themed canvas at its bottom rather than as a strip below
+  it, and the themed view gets the whole area in portrait that it gets in
+  landscape. Otherwise a theme was laid out into a canvas that changed
+  height with droidtop's chrome, and the plate the theme drew for its own
+  help row was left visibly empty above droidtop's bar (rig, build 547,
+  DEcaffe in portrait). That plate is the THEME's art, not its
+  `<helpsystem>`: droidtop suppresses the `<helpsystem>` element and
+  nothing else, and never guesses that some `<image>` a theme declares
+  was "really" a help-bar background;
 - actions that had no on-screen name at all are now named and reachable:
   Select for gamelist options, Y for the PC surface's stores and folders;
 - **long-press is Y** on a game card or app tile --- the same "act on
