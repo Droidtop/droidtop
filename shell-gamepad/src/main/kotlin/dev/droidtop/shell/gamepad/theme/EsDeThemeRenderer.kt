@@ -190,6 +190,31 @@ import kotlin.math.roundToInt
 val LocalEsDeThemedAreaSize = compositionLocalOf<androidx.compose.ui.unit.DpSize?> { null }
 
 /**
+ * The dimension a theme's `fontSize` fraction is a fraction OF.
+ *
+ * Real ES-DE: `Font::getFromTheme` scales every `fontSize`/`fontSizeDimmed`
+ * by `getIsVerticalOrientation() ? getScreenWidth() : getScreenHeight()`
+ * (Font.cpp:216-219), where the orientation test is the screen's own
+ * width-vs-height (Renderer.cpp:188-191). So on a screen held upright a
+ * theme's font fractions are fractions of its WIDTH, not its height --
+ * which is the only way a portrait layout written by the theme's author
+ * can keep its proportions when the long axis grows.
+ *
+ * droidtop scaled by the height always. On a 1080x1920 phone that is
+ * every themed font about half again too large: Slate's portrait
+ * gamelist had metadata labels clipped mid-word ("RELEASE", "DEVELOP")
+ * and titles that no longer fit their list (rig, build 546). The official
+ * ES-DE render of the same theme at the same size has all of them whole
+ * (reference/es-de-render, Slate 1080x1920).
+ *
+ * "Screen" here is the themed area, for the reason [LocalEsDeThemedAreaSize]
+ * gives -- droidtop's own tab bar is not part of any theme's coordinate
+ * space.
+ */
+internal fun esDeFontScreenSize(viewWidth: Dp, viewHeight: Dp): Dp =
+    if (viewHeight > viewWidth) viewWidth else viewHeight
+
+/**
  * System-level bindings for `systemdata`-bound `text` elements --
  * transcribed from real `SystemView::updateGameCount`
  * (SystemView.cpp:966-1030, the actual source of every real format
@@ -1225,9 +1250,10 @@ private fun EsDeThemedText(
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
 
     // Real ES-DE default text size convention (same as textlist rows):
-    // fontSize is a fraction of screen height.
+    // fontSize is a fraction of the screen's SHORT axis -- see
+    // [esDeFontScreenSize].
     val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
-    val fontSizeDp = (fontSizeFraction * viewHeight.value).dp
+    val fontSizeDp = (fontSizeFraction * esDeFontScreenSize(viewWidth, viewHeight).value).dp
     val fontSizeSp = with(LocalDensity.current) { fontSizeDp.toSp() }
     val lineSpacing = (element.valueOrNull<EsDeThemeValue.FloatValue>("lineSpacing")?.value ?: 1.5f).coerceIn(0.5f, 3f)
 
@@ -1308,6 +1334,12 @@ private fun EsDeThemedText(
                 lineHeight = fontSizeSp * lineSpacing,
                 textAlign = textAlign,
                 maxLines = fit.maxLines,
+                // Real ES-DE abbreviates rather than cutting: whatever
+                // does not fit the box loses glyphs until the ellipsis
+                // glyph fits (Font.cpp:1074-1078). Compose's own default
+                // is a hard clip, which is what drew "RELEASE" for
+                // "RELEASED:" on the rig.
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth().esDeTextOverflow(fit),
             )
         }
@@ -1522,6 +1554,12 @@ private fun EsDeAlignedTextBlock(
                 lineHeight = fontSizeSp * lineSpacing,
                 textAlign = textAlign,
                 maxLines = fit.maxLines,
+                // Real ES-DE abbreviates rather than cutting: whatever
+                // does not fit the box loses glyphs until the ellipsis
+                // glyph fits (Font.cpp:1074-1078). Compose's own default
+                // is a hard clip, which is what drew "RELEASE" for
+                // "RELEASED:" on the rig.
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth().esDeTextOverflow(fit),
             )
         }
@@ -2398,7 +2436,7 @@ private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // (0.045) -- droidtop previously borrowed the wrong component's
     // default for this element type, confirmed against real ES-DE source.
     val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.035f
-    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * viewHeight.value).dp.toSp() }
+    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * esDeFontScreenSize(viewWidth, viewHeight).value).dp.toSp() }
     // Real clock background box (DateTimeComponent.cpp:163-175, guarded on
     // `backgroundColor` exactly as ES-DE guards on mClockBgColor) -- see
     // EsDeBackgroundBox. Five of the ten themes measured for this pass set
@@ -2494,7 +2532,7 @@ private fun EsDeThemedDateTime(element: EsDeThemeElement, viewWidth: Dp, viewHei
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
     // Same real DateTimeComponent default (0.035) as EsDeThemedClock.
     val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.035f
-    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * viewHeight.value).dp.toSp() }
+    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * esDeFontScreenSize(viewWidth, viewHeight).value).dp.toSp() }
     // Real background box. A `datetime` is NOT in clock mode, so it takes
     // `backgroundMargins` and never the clock's own padding pair
     // (DateTimeComponent.cpp:289 gates one on `!mClockMode` and :294 the
@@ -2971,7 +3009,7 @@ private fun EsDeThemedGamelistInfo(element: EsDeThemeElement, viewWidth: Dp, vie
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
     val color = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color.White
     val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.035f
-    val fontSizeDp = (fontSizeFraction * viewHeight.value).dp
+    val fontSizeDp = (fontSizeFraction * esDeFontScreenSize(viewWidth, viewHeight).value).dp
 
     EsDeAlignedTextBlock(
         element = element,
@@ -3216,7 +3254,7 @@ private fun EsDeThemedHelpSystem(
     // Real default: HelpComponent constructs with FONT_SIZE_SMALL (0.035),
     // not 0.025 -- confirmed against real ES-DE source (Font.h/HelpComponent.h).
     val fontSizeFraction = dimmedFloat("fontSize") ?: 0.035f
-    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * viewHeight.value).dp.toSp() }
+    val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * esDeFontScreenSize(viewWidth, viewHeight).value).dp.toSp() }
     // Real ES-DE HelpComponent.cpp: entrySpacing is a fraction of screen
     // WIDTH, not height (droidtop previously used height, matching every
     // other element's own real height-based convention, but help-bar

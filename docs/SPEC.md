@@ -3723,6 +3723,28 @@ landscape layout drawn stretched over a tall screen, since theme
 coordinates are normalised to the screen. It does not letterbox and it
 does not rotate.
 
+**Type scales with the SHORT axis on a screen held upright.** Every
+`fontSize`/`fontSizeDimmed` fraction is a fraction of
+`getIsVerticalOrientation() ? getScreenWidth() : getScreenHeight()`
+(`Font.cpp:216-219`, the orientation test at `Renderer.cpp:188-191`) --
+the one place in the schema where an axis is chosen by orientation rather
+than used per-axis, and the only way a portrait layout keeps its
+proportions as its long axis grows. droidtop scaled by height in both
+orientations, which on a 1080x1920 screen made every themed font about
+half again too large: Slate's portrait gamelist lost the ends of its
+metadata labels and its titles no longer fit their list (rig, build 546).
+`esDeFontScreenSize` is that rule, applied once for every text-bearing
+element. Text that still overflows is ABBREVIATED, never cut: ES-DE
+removes glyphs until the ellipsis glyph fits (`Font.cpp:1074-1078`), and
+a textlist row is built single-line with the list's own width as its
+maximum (`TextListComponent.h:209-213`). The reference for all of this is
+the official Linux ES-DE rendering the same vendored theme at the same
+screen size, `reference/es-de-render/run.sh` (that harness needs a theme
+no newer than the AppImage it drives: a `<language>` the binary does not
+know makes `ThemeData::parseLanguages` throw for every system, and ES-DE
+then draws its own unthemed fallback while still logging the theme as
+loaded).
+
 That is a property of the theme, not a bug in the engine: no renderer can
 invent the portrait artwork and element positions an author never wrote.
 So the **default** theme on a portrait display is one that ships them.
