@@ -149,7 +149,7 @@ class ScanProgressTest {
     }
 
     @Test
-    fun `only the folder whose own step is slow is skipped, and its siblings keep their games`() {
+    fun `a slow folder costs its own evidence, not its siblings and not the games inside it`() {
         renpyGame("cat/A Game")
         renpyGame("cat/B Game")
         renpyGame("cat/slow/Hidden By Slowness")
@@ -171,9 +171,18 @@ class ScanProgressTest {
             }
         }
 
-        assertEquals(listOf("A Game", "B Game"), scanned.games.map { it.displayFolder.name }.sorted())
+        // Every game is still here, the one inside the slow folder
+        // included: `adult/RPGMaker` losing six games to its own 20 s step
+        // is exactly what a subtree-dropping budget costs (build 540).
+        assertEquals(
+            listOf("A Game", "B Game", "Hidden By Slowness"),
+            scanned.games.map { it.displayFolder.name }.sorted(),
+        )
+        // The folder is still named, and still counted as skipped, so the
+        // scan's line says where it was slow.
         assertEquals("slow", scanned.stoppedAt?.name)
         assertTrue(scanned.skipped.counts().keys.single().contains("budget"))
+        assertEquals(listOf("slow"), scanned.skipped.folders(scanned.skipped.counts().keys.single()).map { it.name })
     }
 
     @Test
