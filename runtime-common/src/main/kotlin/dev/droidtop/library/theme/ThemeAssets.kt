@@ -334,6 +334,28 @@ object ThemeAssets {
         collectionKind: EsDeCollectionKind = EsDeCollectionKind.NONE,
     ): EsDeTheme? {
         val active = resolveActiveTheme(context) ?: return null
+        return loadTheme(context, active, systemId, collectionThemeFolder, systemFullName, collectionKind)
+    }
+
+    /**
+     * [loadActiveTheme] for a theme that is NOT the active one: the same
+     * parse, the same cache, the same per-theme colour scheme, variant and
+     * aspect ratio, for a theme the person is only looking at.
+     *
+     * This exists so onboarding's Appearance step can show a REAL render
+     * of each theme rather than a picture of one or a name on its own
+     * (docs/SPEC.md 7b). There is exactly one theme loader, and a preview
+     * goes through it like everything else -- a second, simplified parse
+     * for previews would be a preview of something the shell never draws.
+     */
+    fun loadTheme(
+        context: Context,
+        active: ThemeDescriptor,
+        systemId: String? = null,
+        collectionThemeFolder: String? = null,
+        systemFullName: String? = null,
+        collectionKind: EsDeCollectionKind = EsDeCollectionKind.NONE,
+    ): EsDeTheme? {
         val cacheKey = Triple(active.name, systemId, Triple(collectionThemeFolder, systemFullName, collectionKind))
         systemThemeCache[cacheKey]?.let { return it }
 

@@ -1,7 +1,6 @@
 package dev.droidtop.shell.gamepad
 
 import android.text.format.DateFormat
-import android.view.InputDevice
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -619,12 +618,11 @@ internal fun QuickGlyphIcon(glyph: QuickGlyph, tint: Color, modifier: Modifier =
     }
 }
 
-/** Gamepads Android currently reports, minus the virtual/uinput ones. */
-private fun connectedControllerNames(): List<String> = InputDevice.getDeviceIds().toList().mapNotNull { id ->
-    val device = InputDevice.getDevice(id) ?: return@mapNotNull null
-    val sources = device.sources
-    val isPad = sources and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD ||
-        sources and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
-    if (!isPad || device.isVirtual) null else device.name
-}
+/**
+ * Gamepads Android currently reports. One detector for the whole app:
+ * [dev.droidtop.shell.gamepad.input.ControllerPrefs.attachedControllers]
+ * answers this here and in onboarding's Controller step.
+ */
+private fun connectedControllerNames(): List<String> =
+    dev.droidtop.shell.gamepad.input.ControllerPrefs.attachedControllers().map { it.name }
 

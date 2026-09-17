@@ -2319,15 +2319,45 @@ buttons and a link. The component is the shell's existing menu row anatomy
   existing folder or assignment.
 - **Controller.** Reports the attached pad by name, takes one press to confirm the mapping,
   and offers the A/B swap as an explicit question rather than a setting to discover. Skippable,
-  and says so.
-- **Appearance.** Themes as the one choice component with a real rendered preview, named by
-  display name — the theme's own `<themeName>`, never a directory id, and never a theme's own
+  and says so. Built 2026-09-17; three things decided in building it:
+  - Detection is the shell's own (`ControllerPrefs.attachedControllers`), and the Quick Menu's
+    status header asks the same function. Onboarding never gets a detector of its own.
+  - The press check names the button by POSITION ("the bottom face button"), because that is
+    what Android's key codes actually mean and the whole point of the question below it is
+    that droidtop does not know what is printed on the pad.
+  - The swap is REAL, not a note for later: `ControllerPrefs.swapConfirmCancel` is applied in
+    one place, `GamepadKeyMap.applySwap`, to the MEANING of a press. `actionFor` swaps what A
+    and B mean; `keyCodeFor` and `labelFor` answer in physical terms (which button to press,
+    which letter to draw in a hint) so a touch affordance and a help row both name the button
+    that now confirms. `BACK` is untouched: the hardware back key is not a face button, and a
+    person who swapped their face buttons did not ask for it to start confirming. The value is
+    loaded once at shell start and on every write, because `actionFor` is on every screen's key
+    path and has no `Context`.
+  - The step is not conditional on Gaming: the pad is how the shell itself is driven. The
+    Settings row that owns it is Input > Controller, which re-enters this same step.
+- **Appearance.** Built 2026-09-17. Themes as the one choice component with a real rendered
+  preview, named by display name — the theme's own `<themeName>`, never a directory id, and never a theme's own
   untranslated capability label (a `capabilities.xml` declares one `<label>` per language, so
   the label is resolved for the running language with `en_US` as the floor, as ES-DE does). On a
   portrait screen the portrait-capable theme is preselected and the reason is stated as a
   property of the themes, not as a swap to accept; choosing a landscape-only theme anyway
   restates what that will look like. The resolved default is written down the first time it
   resolves, so rotating the device never moves the theme under the person.
+
+  What "a real rendered preview" means, decided in building it: the preview is the theme's own
+  `system` view, parsed by the one theme parser and drawn by the one renderer the Gaming shell
+  itself uses (`ThemeSystemPreview` -> `EsDeThemedView`), laid out into a 16:9 thumbnail. Not a
+  screenshot, not an image shipped beside the theme, not a colour swatch someone chose. It
+  renders with NO list items: a preview shows what the THEME draws -- its background, its
+  colours, its own static art -- and a carousel of systems this device has not scanned yet
+  would be invented content shown to a person as if it were their library. The one theme
+  loader gained `ThemeAssets.loadTheme(theme)` for this, with `loadActiveTheme` delegating to
+  it, so a preview and the shell parse the same way and share the same cache; a second,
+  simplified parse for previews would be a preview of something the shell never draws.
+
+  This step replaces the earlier `PORTRAIT_THEME` step, which appeared only when droidtop had
+  already swapped the theme and offered exactly two answers, one of them hardcoded to DEcaffe.
+  A person setting droidtop up chooses their theme; they are not handed a swap to ratify.
 - **Keyboard.** Optional. droidtop cannot set the system input method itself, so it states why
   a desktop keyboard is needed, hands over to Android's own screens, and reflects what came
   back. Declining is a real answer, not a nag. A primary action always produces visible

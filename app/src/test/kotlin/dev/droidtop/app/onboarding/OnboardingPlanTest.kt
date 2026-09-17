@@ -18,7 +18,6 @@ class OnboardingPlanTest {
         configureDesktop = false,
         configureGaming = gaming,
         storageGranted = storageGranted,
-        portraitThemeSwap = null,
     )
 
     @Test
@@ -57,5 +56,20 @@ class OnboardingPlanTest {
         val steps = plan(gaming = false, storageGranted = false)
         assertTrue(OnboardingStep.STORAGE_PERMISSION !in steps)
         assertTrue(OnboardingStep.GAMES_FOLDERS !in steps)
+        // The theme is Gaming's; the pad is how the shell itself is driven.
+        assertTrue(OnboardingStep.APPEARANCE !in steps)
+        assertTrue(OnboardingStep.CONTROLLER in steps)
+    }
+
+    @Test
+    fun `input and appearance come after the games steps and before the keyboard`() {
+        val steps = plan(gaming = true, storageGranted = true)
+        val folders = steps.indexOf(OnboardingStep.GAMES_FOLDERS)
+        val controller = steps.indexOf(OnboardingStep.CONTROLLER)
+        val appearance = steps.indexOf(OnboardingStep.APPEARANCE)
+        val keyboard = steps.indexOf(OnboardingStep.KEYBOARD)
+        assertTrue(folders < controller)
+        assertTrue(controller < appearance)
+        assertTrue(appearance < keyboard)
     }
 }

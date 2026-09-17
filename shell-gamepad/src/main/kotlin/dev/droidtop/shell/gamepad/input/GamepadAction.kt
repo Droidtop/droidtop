@@ -59,7 +59,43 @@ object GamepadKeyMap {
         Key.ButtonThumbRight to GamepadAction.R3,
     )
 
-    fun actionFor(key: Key): GamepadAction? = DEFAULT[key]
+    /**
+     * Whether the two face buttons are swapped: A cancels and B confirms,
+     * the Nintendo-style layout half the pads in the world ship.
+     *
+     * Held here rather than read per press because [actionFor] is on the
+     * key path of every screen and has no Context. [load] is called when
+     * the shell starts and whenever the answer changes (onboarding's
+     * Controller step, the Settings row), which is every time it can
+     * change -- the preference is never written by anything else.
+     */
+    @Volatile
+    private var swapped: Boolean = false
+
+    fun load(context: Context) {
+        useSwap(ControllerPrefs.swapConfirmCancel(context))
+    }
+
+    /** [load] without a Context, for the unit tests that exercise the rule. */
+    internal fun useSwap(swapConfirmCancel: Boolean) {
+        swapped = swapConfirmCancel
+    }
+
+    fun actionFor(key: Key): GamepadAction? = DEFAULT[key]?.let(::applySwap)
+
+    /**
+     * The swap, in ONE place, applied to the meaning rather than to the
+     * map: A and B trade what they mean, and every other action, BACK
+     * included, is untouched. BACK stays BACK because it is the system's
+     * own back and not a face button -- a person who swapped their face
+     * buttons did not ask for the hardware back key to start confirming.
+     */
+    private fun applySwap(action: GamepadAction): GamepadAction = when {
+        !swapped -> action
+        action == GamepadAction.A -> GamepadAction.B
+        action == GamepadAction.B -> GamepadAction.A
+        else -> action
+    }
 
     /**
      * The reverse: the Android key code an on-screen touch affordance
@@ -69,7 +105,7 @@ object GamepadKeyMap {
      * `rememberGamepadTouch`). Derived from [DEFAULT] rather than written
      * out twice, so a remap that changes one changes both.
      */
-    fun keyCodeFor(action: GamepadAction): Int = when (action) {
+    fun keyCodeFor(action: GamepadAction): Int = when (applySwap(action)) {
         GamepadAction.A -> android.view.KeyEvent.KEYCODE_BUTTON_A
         GamepadAction.B -> android.view.KeyEvent.KEYCODE_BUTTON_B
         GamepadAction.X -> android.view.KeyEvent.KEYCODE_BUTTON_X
@@ -90,15 +126,47 @@ object GamepadKeyMap {
     }
 
     /**
+     * What a key IS on the pad, said by POSITION, for a person checking
+     * that droidtop reads their controller (onboarding's Controller step).
+     *
+     * Deliberately not [labelFor]: that says what a press MEANS, which is
+     * the thing the face-button question is about. Android's own gamepad
+     * key codes are positional -- `KEYCODE_BUTTON_A` is the bottom face
+     * button whatever the plastic says -- so this reads them that way and
+     * never claims to know what is printed on the pad.
+     */
+    fun positionName(key: Key): String? = when (key) {
+        Key.ButtonA, Key.DirectionCenter -> "the bottom face button"
+        Key.ButtonB -> "the right face button"
+        Key.ButtonX -> "the left face button"
+        Key.ButtonY -> "the top face button"
+        Key.ButtonL1 -> "the left shoulder"
+        Key.ButtonR1 -> "the right shoulder"
+        Key.ButtonL2 -> "the left trigger"
+        Key.ButtonR2 -> "the right trigger"
+        Key.ButtonThumbLeft -> "the left stick press"
+        Key.ButtonThumbRight -> "the right stick press"
+        Key.ButtonStart -> "Start"
+        Key.ButtonSelect -> "Select"
+        Key.DirectionUp -> "up on the d-pad"
+        Key.DirectionDown -> "down on the d-pad"
+        Key.DirectionLeft -> "left on the d-pad"
+        Key.DirectionRight -> "right on the d-pad"
+        else -> null
+    }
+
+    /**
      * Real label shown in the (currently still hand-drawn, see
      * `ButtonHintFooter`) help bar for [action] -- matches droidtop's
      * existing on-screen labels ("A", "B", "L/R", "◄/►") exactly, so
      * routing call sites through [GamepadKeyMap] doesn't change what a
-     * user sees yet. Real theme-provided button-icon glyphs
+     * user sees yet. Like [keyCodeFor] this answers in PHYSICAL terms --
+     * which button to press -- so with the face buttons swapped a hint
+     * for "confirm" names the button that now confirms. Real theme-provided button-icon glyphs
      * (`<helpsystem>`'s `iconColor`/`customButtonIcon`) are separate,
      * later work.
      */
-    fun labelFor(action: GamepadAction): String = when (action) {
+    fun labelFor(action: GamepadAction): String = when (applySwap(action)) {
         GamepadAction.A -> "A"
         GamepadAction.B -> "B"
         GamepadAction.X -> "X"
