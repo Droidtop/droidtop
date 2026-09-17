@@ -239,17 +239,17 @@ fun GamepadShell(
     // a deliberate user choice, exactly the distinction this draws.
     val selectSection: (GamingSection) -> Unit = { target -> nav.openSection(target) }
     var canGoBack by remember { mutableStateOf(false) }
-    // Which screen, if any, has claimed the help row for the THEME it is
-    // drawing (its real, loaded <helpsystem> element, see
-    // EsDeThemedHelpSystem). A screen key rather than a bare flag,
-    // because the screens cross over during the Crossfade below and the
-    // one that is leaving must not answer for the one arriving: with a
-    // flag, leaving Settings for Games put the answer back to "no theme
-    // row" AFTER the Games screen had already said there was one, and it
-    // stayed wrong until the section changed again -- droidtop's bar and
-    // Slate's own row then drew at once, the theme's sliced in half by
-    // the bar on top of it (rig, build 546, landscape).
-    var themeHintsOwner by remember { mutableStateOf<String?>(null) }
+    // What the screen on top has of its OWN to put in the help row (see
+    // [HelpRowClaim]), and WHICH screen said so. A screen key rather than
+    // a bare flag, because the screens cross over during the Crossfade
+    // below and the one that is leaving must not answer for the one
+    // arriving: with a flag, leaving Settings for Games put the answer
+    // back to "nothing of its own" AFTER the Games screen had already
+    // said otherwise, and it stayed wrong until the section changed again
+    // -- droidtop's bar and Slate's own row then drew at once, the
+    // theme's sliced in half by the bar on top of it (rig, build 546,
+    // landscape).
+    var helpRowClaimant by remember { mutableStateOf<Pair<String, HelpRowClaim>?>(null) }
     // Derived, not a second piece of state: the stack says WHICH entry is
     // open and the scan says what that entry is. An entry a rescan no
     // longer finds closes its own detail instead of showing a game that
@@ -477,28 +477,26 @@ fun GamepadShell(
     // Which screen is on top right now. One expression, read by the
     // Crossfade below as its target and by the help-row claim.
     val currentScreenKey = nav.detailId ?: "section:${section.name}"
-    // A screen claims the theme's help row only while it is the screen on
+    // A claim counts only while the screen that made it is the screen on
     // top; anything else -- a plain droidtop screen, a screen whose theme
     // declares no <helpsystem>, a stale claim from a screen that has left
     // -- leaves the row to the shell.
-    val themeHandlesHints = themeHintsOwner == currentScreenKey
-    // ONE answer to "who draws the help row", read by both sides of it:
-    // the shell's own button bar below is drawn exactly when this is
-    // true, and the themed renderer suppresses the theme's own
-    // <helpsystem> exactly when this is true -- see [LocalShellOwnsHelpRow].
-    // Real ES-DE has one help bar per window (Window.cpp:126, :884), and
-    // two independent conditions for it is how droidtop ended up drawing
-    // both at once. On a touch-first window the bar always wins, because
-    // it is the only route to B/Y/Select with no pad attached; otherwise
-    // the theme takes the row whenever it has one to draw.
-    val shellOwnsHelpRow = esDeShellOwnsHelpRow(
+    val helpRowClaim = helpRowClaimant?.takeIf { it.first == currentScreenKey }?.second ?: HelpRowClaim.NONE
+    // ONE answer to "who draws the help row", read by every side of it:
+    // the shell's own button bar is drawn exactly when this says SHELL,
+    // a screen's own bar exactly when it says SCREEN, and the themed
+    // renderer draws the theme's <helpsystem> exactly when it says THEME
+    // -- see [esDeHelpRowOwner]. Real ES-DE has one help bar per window
+    // (Window.cpp:126, :884), and independent conditions for it are how
+    // droidtop ended up drawing two at once.
+    val helpRowOwner = esDeHelpRowOwner(
         showHints = GamingPrefs.showHints(context),
         touchFirst = shellWindow.touchFirst,
-        themeHandlesHints = themeHandlesHints,
+        claim = helpRowClaim,
     )
     androidx.compose.runtime.CompositionLocalProvider(
         LocalShellWindow provides shellWindow,
-        LocalShellOwnsHelpRow provides shellOwnsHelpRow,
+        LocalHelpRowOwner provides helpRowOwner,
     ) {
     Column(
         modifier = Modifier
@@ -657,6 +655,25 @@ fun GamepadShell(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             )
         }
+        // ONE definition of the shell's help row, placed in one of two
+        // ways: over a themed screen, which laid a help row out itself,
+        // and under everything else. Real ES-DE draws its one
+        // HelpComponent ON the view at the theme's own <helpsystem>
+        // position (Window.cpp:126, :884); droidtop's own bar takes that
+        // same place rather than a strip of its own below a canvas
+        // shortened to make room for it -- which is what left DEcaffe's
+        // own help plate drawn empty above the bar in portrait, and gave
+        // a theme a different canvas in portrait than in landscape (rig,
+        // build 547).
+        val shellHelpRow: @Composable () -> Unit = {
+            ButtonHintFooter(
+                canGoBack = canGoBack || detailEntry != null,
+                showInfo = detailEntry == null,
+                showSectionSwitch = detailEntry == null,
+                showSystemSwitch = detailEntry == null && section == GamingSection.GAMES && canGoBack,
+                showOptions = detailEntry == null && section == GamingSection.GAMES,
+            )
+        }
         Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
             // ONE transition for every screen the shell itself draws.
             // Opening a game's detail out of a themed gamelist used to be
@@ -768,9 +785,9 @@ fun GamepadShell(
                                 // claim from a copy the Crossfade is
                                 // still drawing on its way out cannot
                                 // answer for the one arriving.
-                                onThemeHandlesHints = { handled ->
+                                onHelpRowClaim = { claim ->
                                     if (screenKey == currentScreenKey) {
-                                        themeHintsOwner = if (handled) screenKey else null
+                                        helpRowClaimant = screenKey to claim
                                     }
                                 },
                                 onToggleFavorite = onToggleFavorite,
@@ -793,21 +810,19 @@ fun GamepadShell(
                     }
                 }
             }
+            // Over the themed canvas, in the place the theme itself laid
+            // out for a help row, rather than under a canvas shortened to
+            // make room for it.
+            if (helpRowOwner == HelpRowOwner.SHELL && helpRowClaim == HelpRowClaim.THEME) {
+                Box(modifier = Modifier.align(Alignment.BottomCenter)) { shellHelpRow() }
+            }
         }
-        // A theme that draws its own help row replaces the LEGEND, not
-        // the controls: on a screen with no pad attached this bar is the
-        // only route to B/Y/Select at all, so it stays. On the console a
-        // theme's own help system still takes over, exactly as before.
-        // Same value the themed renderer suppresses the theme's row by,
-        // so the two can never both draw.
-        if (shellOwnsHelpRow) {
-            ButtonHintFooter(
-                canGoBack = canGoBack || detailEntry != null,
-                showInfo = detailEntry == null,
-                showSectionSwitch = detailEntry == null,
-                showSystemSwitch = detailEntry == null && section == GamingSection.GAMES && canGoBack,
-                showOptions = detailEntry == null && section == GamingSection.GAMES,
-            )
+        // Drawn below the content, in the Column, for every screen that
+        // has no place of its own for it. A themed screen DOES have one
+        // -- the theme laid the help row out itself -- so there the same
+        // bar is placed over that spot instead, above.
+        if (helpRowOwner == HelpRowOwner.SHELL && helpRowClaim != HelpRowClaim.THEME) {
+            shellHelpRow()
         }
     }
     }
@@ -1536,7 +1551,7 @@ private fun GamesSection(
     onShowDetail: (LibraryEntry) -> Unit,
     onDrillDownChanged: (Boolean) -> Unit,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
-    onThemeHandlesHints: (Boolean) -> Unit = {},
+    onHelpRowClaim: (HelpRowClaim) -> Unit = {},
     onToggleFavorite: (LibraryEntry) -> Unit = {},
     onRequestRescan: () -> Unit = {},
 ) {
@@ -1808,11 +1823,18 @@ private fun GamesSection(
             // hand-built grid (the fallback for "no active theme" / "theme
             // has no real gamelist view at all") has no theme-drawn hints
             // of its own, so ButtonHintFooter keeps drawing that case.
-            onThemeHandlesHints(
-                // The PC surface draws its own hint row, so the shell's
-                // footer would be a second copy of the same legend.
-                selectedGroup is GameGroup.Pc ||
-                    (hasThemedGamelist && gamelistHasHelpSystem),
+            onHelpRowClaim(
+                when {
+                    // The PC surface's row is droidtop's OWN, with this
+                    // screen's own actions in it (A opens, it does not
+                    // launch) and every hint tappable. Claiming it as a
+                    // THEME row is what let a touch-first window add the
+                    // shell's bar underneath it -- two rows on the PC grid
+                    // in portrait, one in landscape (rig, build 547).
+                    selectedGroup is GameGroup.Pc -> HelpRowClaim.SCREEN
+                    hasThemedGamelist && gamelistHasHelpSystem -> HelpRowClaim.THEME
+                    else -> HelpRowClaim.NONE
+                },
             )
         }
     }
@@ -2173,7 +2195,9 @@ private fun GamesSection(
                         val hasThemeHelpSystem = remember(theme) {
                             theme?.views?.get("system")?.elements?.values?.any { it.type == "helpsystem" } == true
                         }
-                        LaunchedEffect(hasThemeHelpSystem) { onThemeHandlesHints(hasThemeHelpSystem) }
+                        LaunchedEffect(hasThemeHelpSystem) {
+                            onHelpRowClaim(if (hasThemeHelpSystem) HelpRowClaim.THEME else HelpRowClaim.NONE)
+                        }
                         val systemView = theme?.views?.get("system")
                         // Real crash boundary (confirmed live with a real
                         // downloaded community theme, ES-DWEE): firstFocus only
