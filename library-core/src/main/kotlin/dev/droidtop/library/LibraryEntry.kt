@@ -413,6 +413,45 @@ enum class LibraryEntryKind {
  * (moved here from a private GamepadShell copy so both surfaces name kinds
  * identically instead of each keeping its own mapping).
  */
+/**
+ * The one line under an entry's name that says what that entry IS: what
+ * the thing itself declares (an installed app's own Android application
+ * category, a scraped game's genre) and, when it declares nothing, what
+ * one entry of its kind is called. Never the name of the group it is
+ * filed under — that is the heading directly above it.
+ */
+fun LibraryEntry.kindLine(): String = genre?.takeIf { it.isNotBlank() } ?: kind.itemName()
+
+/**
+ * What ONE entry of this kind IS, in the singular — the line under a
+ * tile's name, which has to say what the thing is rather than repeat the
+ * heading it sits under. [displayName] is the name of the GROUP ("Apps",
+ * "Visual Novels"); using it on the tile made all eighteen app tiles read
+ * "Apps" two lines below a heading that already said so (rig, build 547).
+ *
+ * Only the kinds whose group name is not already a singular statement
+ * differ; the rest are the same word either way, and are written out here
+ * rather than defaulted so a new kind has to answer both questions.
+ */
+fun LibraryEntryKind.itemName(): String = when (this) {
+    LibraryEntryKind.NATIVE_ANDROID_APP -> "Android app"
+    LibraryEntryKind.WINE_PROFILE -> "Windows game"
+    LibraryEntryKind.LINUX_CONTAINER_APP -> "Linux app"
+    LibraryEntryKind.REMOTE_STREAM -> "Remote PC"
+    LibraryEntryKind.CONSOLE_ROM -> "Console game"
+    LibraryEntryKind.RENPY, LibraryEntryKind.KIRIKIRI,
+    LibraryEntryKind.AUGUST, LibraryEntryKind.BURIKO, LibraryEntryKind.CATSYSTEM2,
+    LibraryEntryKind.CMVS, LibraryEntryKind.FLASH_AIR,
+    -> "Visual novel"
+    LibraryEntryKind.RPG_MAKER_MV, LibraryEntryKind.RPG_MAKER_MZ, LibraryEntryKind.RPG_MAKER_VX_ACE,
+    LibraryEntryKind.RPG_MAKER_VX, LibraryEntryKind.RPG_MAKER_XP,
+    LibraryEntryKind.RPG_MAKER_2000_2003,
+    -> "RPG Maker game"
+    LibraryEntryKind.GODOT, LibraryEntryKind.UNREAL, LibraryEntryKind.UNITY,
+    LibraryEntryKind.HTML,
+    -> "PC game"
+}
+
 fun LibraryEntryKind.displayName(): String = when (this) {
     LibraryEntryKind.NATIVE_ANDROID_APP -> "Apps"
     LibraryEntryKind.WINE_PROFILE -> "Windows"
