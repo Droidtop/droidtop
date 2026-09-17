@@ -1,6 +1,7 @@
 package dev.droidtop.shell.gamepad.input
 
 import android.content.Context
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.input.key.Key
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
@@ -68,9 +69,23 @@ object GamepadKeyMap {
      * the shell starts and whenever the answer changes (onboarding's
      * Controller step, the Settings row), which is every time it can
      * change -- the preference is never written by anything else.
+     *
+     * A SNAPSHOT state, not a plain `@Volatile` field, and that is the
+     * whole of build 546's "changing the confirm button does not refresh
+     * the hint row". The mapping and the legend are the same fact --
+     * [labelFor] and [keyCodeFor] are what the hint bar draws and dispatches
+     * -- but a plain field read inside a composition subscribes to nothing,
+     * so the buttons changed meaning at once while the legend kept drawing
+     * the old letters until the process was killed. Reading a snapshot
+     * state inside composition subscribes to it, and writing it invalidates
+     * every reader; reading it OFF the composition -- which is what the key
+     * path does -- is an ordinary field read with no subscription and no
+     * cost. One source of truth, observed by everything that draws it.
      */
-    @Volatile
-    private var swapped: Boolean = false
+    private val swappedState = mutableStateOf(false)
+    private var swapped: Boolean
+        get() = swappedState.value
+        set(value) { swappedState.value = value }
 
     fun load(context: Context) {
         useSwap(ControllerPrefs.swapConfirmCancel(context))
@@ -78,7 +93,10 @@ object GamepadKeyMap {
 
     /** [load] without a Context, for the unit tests that exercise the rule. */
     internal fun useSwap(swapConfirmCancel: Boolean) {
-        swapped = swapConfirmCancel
+        // Only on a real change: a write to a snapshot state invalidates
+        // every reader even when the value is identical, and `load` is
+        // called on every shell start.
+        if (swappedState.value != swapConfirmCancel) swappedState.value = swapConfirmCancel
     }
 
     fun actionFor(key: Key): GamepadAction? = DEFAULT[key]?.let(::applySwap)
