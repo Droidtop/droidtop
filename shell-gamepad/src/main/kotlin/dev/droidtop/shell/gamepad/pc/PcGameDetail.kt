@@ -613,9 +613,7 @@ private fun PrimaryActionButton(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 6.dp)
-            .onFocusChanged { focused = it.isFocused }
-            .focusable(enabled = enabled)
-            .then(if (enabled) Modifier.clickable(onClick = onSelect) else Modifier)
+            // Ahead of the focus targets, not after them: see [GameCard].
             .onKeyEvent { event ->
                 if (enabled && event.type == KeyEventType.KeyUp &&
                     GamepadKeyMap.actionFor(event.key) == GamepadAction.A
@@ -626,6 +624,9 @@ private fun PrimaryActionButton(
                     false
                 }
             }
+            .onFocusChanged { focused = it.isFocused }
+            .focusable(enabled = enabled)
+            .then(if (enabled) Modifier.clickable(onClick = onSelect) else Modifier)
             .background(background, shape)
             .border(
                 width = if (focused) 3.dp else 1.dp,
@@ -662,9 +663,7 @@ private fun DetailRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .onFocusChanged { focused = it.isFocused }
-            .focusable(enabled = enabled)
-            .then(if (enabled) Modifier.clickable(onClick = onSelect) else Modifier)
+            // Ahead of the focus targets, not after them: see [GameCard].
             .onKeyEvent { event ->
                 if (enabled && event.type == KeyEventType.KeyUp &&
                     GamepadKeyMap.actionFor(event.key) == GamepadAction.A
@@ -675,6 +674,9 @@ private fun DetailRow(
                     false
                 }
             }
+            .onFocusChanged { focused = it.isFocused }
+            .focusable(enabled = enabled)
+            .then(if (enabled) Modifier.clickable(onClick = onSelect) else Modifier)
             .background(
                 if (focused) Color(0xFF2F2F2F) else Color(0xFF141414),
                 RoundedCornerShape(10.dp),
