@@ -149,9 +149,7 @@ private fun CollectionToggleRow(label: String, isMember: Boolean?, onClick: () -
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            .clickable(onClick = onClick)
+            // Ahead of the focus targets, not after them: see [GameCard].
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp && GamepadKeyMap.actionFor(event.key) == GamepadAction.A) {
                     onClick()
@@ -160,6 +158,9 @@ private fun CollectionToggleRow(label: String, isMember: Boolean?, onClick: () -
                     false
                 }
             }
+            .onFocusChanged { focused = it.isFocused }
+            .focusable()
+            .clickable(onClick = onClick)
             .background(if (focused) MenuTokens.SurfaceSelected else Color.Transparent, RoundedCornerShape(8.dp))
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,

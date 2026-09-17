@@ -311,9 +311,7 @@ internal fun PcChip(label: String, selected: Boolean, onClick: () -> Unit) {
         color = if (selected) Color.Black else Color.White,
         style = MaterialTheme.typography.labelMedium,
         modifier = Modifier
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            .clickable(onClick = onClick)
+            // Ahead of the focus targets, not after them: see [GameCard].
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp && GamepadKeyMap.actionFor(event.key) == GamepadAction.A) {
                     onClick()
@@ -322,6 +320,9 @@ internal fun PcChip(label: String, selected: Boolean, onClick: () -> Unit) {
                     false
                 }
             }
+            .onFocusChanged { focused = it.isFocused }
+            .focusable()
+            .clickable(onClick = onClick)
             .background(
                 if (selected) Color.White else if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A),
                 RoundedCornerShape(50),

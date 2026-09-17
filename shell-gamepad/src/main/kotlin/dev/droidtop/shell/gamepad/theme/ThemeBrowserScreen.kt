@@ -194,11 +194,7 @@ private fun ThemeBrowserRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            // Same real touch-input fix used throughout this shell --
-            // .focusable() alone only covers D-pad/gamepad focus, never touch.
-            .clickable(onClick = onDownload)
+            // Ahead of the focus targets, not after them: see [GameCard].
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp && GamepadKeyMap.actionFor(event.key) == GamepadAction.A) {
                     onDownload()
@@ -207,6 +203,11 @@ private fun ThemeBrowserRow(
                     false
                 }
             }
+            .onFocusChanged { focused = it.isFocused }
+            .focusable()
+            // Same real touch-input fix used throughout this shell --
+            // .focusable() alone only covers D-pad/gamepad focus, never touch.
+            .clickable(onClick = onDownload)
             .background(if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A), RoundedCornerShape(12.dp))
             .padding(16.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
