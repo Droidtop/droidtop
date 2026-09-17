@@ -4429,6 +4429,41 @@ vendor manifest's components into the module manifest, and real entry
 points from droidtop settings into gamenative's container-config UI
 (§7c).
 
+### Back goes back, and lands where you left (rig, build 542)
+
+B from a PC game's detail put the user on the system carousel, at the top,
+having lost the grid's position; getting back to the game they had been
+looking at took B, B, Right, A.
+
+The cause was that the shell had no answer to "where am I". The section
+was one piece of state, the drilled-into group was a `remember` inside the
+games screen, and the open detail was a third; the detail was drawn as a
+sibling branch of the games screen, so opening it DESTROYED that screen
+and everything it remembered, and closing it rebuilt the screen from
+nothing.
+
+**One stack answers it** (`ShellBackStack`, `shell-gamepad`). The Gaming
+shell is three levels deep and no deeper -- a section, a group inside
+Games, one game's detail -- and the stack holds all three, plus the entry
+the user was on in each one. A screen ASKS where it is and what to focus;
+it does not own the answer and so cannot lose it.
+
+- B closes the detail, else leaves the group, else does nothing (the top
+  of the shell is a home screen).
+- Returning to a group lands on the entry that was focused there: the PC
+  grid scrolls to that card and focuses it, and a themed gamelist opens on
+  that game. A group this session has not been in opens at the top, which
+  is ES-DE's own "selection resets per gamelist".
+- Opening another version or part of a game from its own detail (SPEC 7m)
+  is a move SIDEWAYS, not a level: B from it still means "back to the grid
+  I came from".
+- Switching sections is a move at the top level and leaves no group or
+  detail open.
+
+The three levels are fixed rather than an arbitrary push-down stack,
+because a push-down stack would let one game's detail sit under another's
+and make B mean "the previous game" -- which is not what B means here.
+
 ## 10. Suggested build order
 
 1. **Prototype `:host-bridge` first**, before investing in the runtime
@@ -5017,6 +5052,42 @@ below are one set, asked by both, in this order:
    files of its own, which is what still makes `EA`, `Ubisoft`, `adult`
    and a games root containers.
 
+4. **Evidence that could have come from below only names a folder when
+   it is that engine's own root layout** (rig, build 542). A detection
+   rule that reads an unnamed subtree -- Unity's three-deep player search,
+   the compiled-Ren'Py `.rpa`/`.rpyc` fallback -- proves a game is
+   somewhere under a folder without saying where, so it matches at every
+   folder on the way down and the OUTERMOST match is taken. `Pirated`
+   holds three games (`PRAGMATA`, `The Movies`, `The Tenants Pets`); the
+   third is a plain Unity install with `UnityPlayer.dll` in its own root,
+   so Unity's probe matched at `Pirated` too, nothing below `Pirated` was
+   precise, and the container took the entry while the Unity game appeared
+   in no list at all.
+
+   So a subtree rule whose evidence is found IN a folder, in a folder that
+   also holds the executable that starts it, names that folder
+   (`GameEngineDetector.engineHere`). Unity's own root is the player
+   runtime beside the player; a folder holding the runtime and nothing to
+   run is a payload folder, and the outermost-match rule still reads it
+   correctly. This is deliberately narrower than "any subtree rule at
+   depth 0": Ren'Py keeps its archives in the game's `game/` subfolder by
+   that engine's own layout, so a depth-0 match there would name the
+   payload rather than the game.
+
+   The `.gamenative` file in `Pirated` is not what made this happen, and
+   is not evidence of anything. gamenative writes that file into every
+   folder its own scanner called a custom game
+   (`app/gamenative/utils/CustomGameScanner.writeGameIdToFile`), and that
+   scanner is the one-level rule `PcFolderScan` replaced -- so the marker
+   in a store or category root is droidtop's own stale verdict, read back.
+   Nothing in either walk reads it. It is a dotfile, so it is not "files
+   of its own" for rule 3 either.
+5. **A store's own install root is never a game**, in either walk, however
+   much evidence its client leaves in it. `PcFolderScan` already had this;
+   the engine walk did not, so a Steam library folder with one engine game
+   under `steamapps/common` could be claimed by the outermost-match rule
+   above and listed as a game called "Steam".
+
 **A folder name only means a ROM system where a system folder can be.**
 ES-DE's layout is `<root>/<systemId>/<rom>` and droidtop allows one
 container level above it (`<root>/roms/<systemId>`), so nothing deeper is
@@ -5063,9 +5134,44 @@ this section is tested against:
 - `adult/renpy/Fetish Locator/{Week 1, Week 2, Week 3}` is one game called
   **Fetish Locator with three SEGMENTS**. It was three entries that shared
   a cover and sorted apart from each other.
-- `Anomalous_Coffee_Machine_2-1.0.00_deluxe_linux.x86_64` beside
-  `Anomalous_Coffee_Machine_2_v1.2-deluxe_windows` is one game with **two
-  VERSIONS**, and `v1.2` is what Play starts.
+- `Goodbye Eternity` in two folders, `...-0.8.1-pc-animated-unc` beside one
+  with no version in its name, is one game with **two VERSIONS**, and
+  `v0.8.1` is what Play starts.
+
+### A version is a FOLDER (decided 2026-09-17)
+
+`adult/godot/Anomalous_Coffee_Machine_2-1.0.00_deluxe_linux.x86_64` is a
+2 GB Linux ELF **file** sitting beside the folder
+`Anomalous_Coffee_Machine_2_v1.2-deluxe_windows`. It is NOT a second
+version of that game, and Anomalous Coffee Machine 2 correctly shows no
+Versions section: it has one.
+
+Decided from Pythia's own behaviour, because Pythia's version logic is
+what droidtop ports. Pythia never considers a non-directory at all:
+`pythia/scanning.py` enumerates game roots as `p for p in path.iterdir()
+if p.is_dir()` in every one of its four discovery functions, and
+`pythia/onboarding.py::preview` -- the entry point behind both its CLI and
+its Qt UI, and the thing that produces the version label and the candidate
+list -- refuses the path outright with "does not exist or is not a
+directory" before any detection runs. A bare executable, an AppImage, a
+`.zip` and a loose `.x86_64` export are therefore never version
+candidates, and droidtop does the same.
+
+The rule and its consequences, stated once: a version, a copy and a
+segment are each a folder that a scan found a game in. A loose file beside
+a game is not a game, not a version and not a copy; it is a file the user
+left there. droidtop does not hide it, rename it or claim it -- it simply
+has nothing to say about it. (If a bare-file release should ever become a
+version, the change is in what a SCAN yields -- an entry for the file --
+and not a second grouping rule; nothing in this section would change.)
+
+### How a version row is named
+
+A row in the Versions section is named by what it IS: its part, its
+version, or -- when the folder name carries neither -- the folder's own
+name. Never a pronoun. Build 542 named the unversioned `Goodbye Eternity`
+folder "This version", which reads as the one you are already on in a list
+whose whole purpose is switching to another.
 
 ### The model
 

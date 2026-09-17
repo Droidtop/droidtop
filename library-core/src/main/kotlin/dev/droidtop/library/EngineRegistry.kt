@@ -208,10 +208,37 @@ object EngineRegistryParser {
 object EngineDetectRules {
     private const val FILE_HEAD_BYTES = 4096
 
-    fun matches(rules: List<DetectRule>, folder: File, builtinProbe: (String, File) -> Boolean): Boolean =
-        rules.any { rule -> rule.all.all { condition -> holds(condition, folder, builtinProbe) } }
+    /**
+     * [atThisFolderOnly] asks the narrower question "is the evidence in
+     * THIS folder", which is how a caller tells a rule that names its own
+     * folder from one that only proves a game is somewhere below (see
+     * [DetectRule.readsUnnamedSubtree]).
+     *
+     * It reaches the builtin probes and nothing else, deliberately. A
+     * probe knows its own engine's root layout -- Unity's
+     * `UnityPlayer.dll` sits beside the executable in the game's own
+     * folder, so finding it at depth 0 IS that layout, not a hit from
+     * below. [DetectCondition.AnyFileExtensionDeep] is the opposite case:
+     * Ren'Py keeps its `.rpa`/`.rpyc` archives in the game's `game/`
+     * subfolder by that engine's own layout, so a depth-0 match there
+     * would name a payload folder rather than the game, and the
+     * outermost-match rule is the right one for it. Its depth stays its
+     * own either way.
+     */
+    fun matches(
+        rules: List<DetectRule>,
+        folder: File,
+        builtinProbe: (String, File, Boolean) -> Boolean,
+        atThisFolderOnly: Boolean = false,
+    ): Boolean =
+        rules.any { rule -> rule.all.all { condition -> holds(condition, folder, builtinProbe, atThisFolderOnly) } }
 
-    private fun holds(condition: DetectCondition, folder: File, builtinProbe: (String, File) -> Boolean): Boolean =
+    private fun holds(
+        condition: DetectCondition,
+        folder: File,
+        builtinProbe: (String, File, Boolean) -> Boolean,
+        atThisFolderOnly: Boolean,
+    ): Boolean =
         when (condition) {
             is DetectCondition.DirExists -> File(folder, condition.path).isDirectory
             is DetectCondition.FileExists -> File(folder, condition.path).isFile
@@ -234,7 +261,7 @@ object EngineDetectRules {
                     condition.regex.containsMatchIn(head)
                 }.getOrDefault(false)
             }
-            is DetectCondition.Builtin -> builtinProbe(condition.name, folder)
+            is DetectCondition.Builtin -> builtinProbe(condition.name, folder, atThisFolderOnly)
         }
 
     /**

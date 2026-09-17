@@ -96,15 +96,25 @@ object GameEngineDetector {
      * (see [DetectRule.readsUnnamedSubtree]). Row order within a tier is
      * still the database's own file order.
      */
-    private fun detect(folder: File, defs: List<EngineDef>, ruleFilter: (DetectRule) -> Boolean): GameEngine? =
+    private fun detect(
+        folder: File,
+        defs: List<EngineDef>,
+        atThisFolderOnly: Boolean = false,
+        ruleFilter: (DetectRule) -> Boolean,
+    ): GameEngine? =
         defs.firstOrNull { def ->
-            def.engine != null && EngineDetectRules.matches(def.detect.filter(ruleFilter), folder, ::builtinProbe)
+            def.engine != null &&
+                EngineDetectRules.matches(def.detect.filter(ruleFilter), folder, ::builtinProbe, atThisFolderOnly)
         }?.engine
 
-    private fun builtinProbe(name: String, folder: File): Boolean = when (name) {
+    private fun builtinProbe(name: String, folder: File, atThisFolderOnly: Boolean): Boolean = when (name) {
         "godot" -> isGodot(folder)
         "html" -> isHtml(folder)
-        "unity" -> isUnity(folder)
+        // Unity's probe is the one that searches below itself, so it is
+        // the one the narrow question changes: at depth 0 it asks for
+        // Unity's own root layout, the runtime beside the executable
+        // (see [EngineDetectRules.matches]).
+        "unity" -> if (atThisFolderOnly) hasUnityPlayerRuntime(folder, maxDepth = 0) else isUnity(folder)
         // An unknown builtin fails its rule rather than matching: a
         // newer database referencing a probe this app doesn't ship must
         // not misdetect.
@@ -365,8 +375,37 @@ object GameEngineDetector {
      * both walks ask it -- the engine walk to decide a container, and
      * [PcFolderScan] to tell a category folder from a game.
      */
-    fun isGameRoot(folder: File, defs: List<EngineDef>): Boolean =
-        detect(folder, defs) { !it.readsUnnamedSubtree } != null
+    fun isGameRoot(folder: File, defs: List<EngineDef>): Boolean = engineHere(folder, defs) != null
+
+    /**
+     * The engine whose evidence NAMES this folder, or null.
+     *
+     * Two ways a rule can name a folder, and both are evidence about this
+     * folder and nothing else: a rule that never reads a subtree
+     * ([DetectRule.readsUnnamedSubtree]), and a subtree rule whose
+     * evidence turns out to be right here rather than below
+     * ([EngineDetectRules.matches]'s `atThisFolderOnly`) in a folder that
+     * also holds the executable that starts it. The executable is what
+     * makes the second half a LAYOUT rather than a coincidence: Unity's
+     * own root is the player runtime beside the player, and a folder
+     * holding the runtime and nothing to run is a payload folder, which
+     * the outermost-match rule already reads correctly.
+     *
+     * The second half is build 542's `Pirated` defect. `Pirated` is a
+     * folder holding three games (`PRAGMATA`, `The Movies`,
+     * `The Tenants Pets`); the third is a plain Unity install whose
+     * `UnityPlayer.dll` sits in its own root. Unity's probe searches three
+     * folders down, so it matched at `Pirated` too, and because nothing
+     * below `Pirated` was PRECISE, the outermost-match rule handed the
+     * whole container the entry and `The Tenants Pets` was in no list at
+     * all. A Unity game's own layout names its own folder, so it is
+     * precise there, the container sees a precise game below it, and the
+     * container goes back to being a container.
+     */
+    fun engineHere(folder: File, defs: List<EngineDef>): GameEngine? =
+        detect(folder, defs) { !it.readsUnnamedSubtree }
+            ?: detect(folder, defs, atThisFolderOnly = true) { it.readsUnnamedSubtree }
+                ?.takeIf { GameExecutableResolver.hasExecutable(folder) }
 
     /**
      * THE "this folder is a plain PC game" rule, in one place: it holds an
@@ -387,7 +426,7 @@ object GameEngineDetector {
      */
     fun isPlainPcGameFolder(folder: File, defs: List<EngineDef>): Boolean = isPlainPcGameFolder(
         folder,
-        preciseHere = detect(folder, defs) { !it.readsUnnamedSubtree },
+        preciseHere = engineHere(folder, defs),
         subtreeHere = detect(folder, defs) { it.readsUnnamedSubtree },
     )
 
@@ -517,10 +556,18 @@ object GameEngineDetector {
         // and only a folder that would otherwise END the walk needs the
         // answer -- which is one folder per game, not one per folder.
         val holdsGames by lazy { holdsSeveralGames(folder, defs, systemsById) }
+        // A store's own install root is the store's business, never a
+        // game, however much evidence its client drops in it -- the rule
+        // [PcFolderScan] already applies on the PC half, asked here so
+        // that ONE rule decides it in both walks. Without it a Steam
+        // library folder with a single engine game under
+        // `steamapps/common` is claimed by the outermost-match rule
+        // below and listed as a game called "Steam".
+        val isStoreRoot = ScanPrune.storeRootOwner(folder) != null
         // Precise evidence that THIS folder is a game root ends the
         // descent: a game's own subfolders are not further games.
-        val preciseHere = detect(folder, defs) { !it.readsUnnamedSubtree }
-        if (preciseHere != null && !holdsGames) {
+        val preciseHere = engineHere(folder, defs)
+        if (preciseHere != null && !holdsGames && !isStoreRoot) {
             return listOf(Walked(DetectedGame(folder, folder, preciseHere), precise = true))
         }
 
@@ -530,7 +577,7 @@ object GameEngineDetector {
         // its own is a PC game -- [PcFolderScan] lists it -- and a PC
         // game's own subfolders are its payload, not further games,
         // whatever sits in them.
-        if (isPlainPcGameFolder(folder, preciseHere, subtreeHere) && !holdsGames) {
+        if (isPlainPcGameFolder(folder, preciseHere, subtreeHere) && !holdsGames && !isStoreRoot) {
             return emptyList()
         }
         val tooSlow = state.tooSlow(folder, own)
@@ -549,7 +596,7 @@ object GameEngineDetector {
         if (tooSlow) return below
         // The outermost folder a subtree rule matches is the game root it
         // means -- unless precise games, or more than one game, sit below.
-        if (subtreeHere != null && below.size <= 1 && below.none { it.precise }) {
+        if (subtreeHere != null && !isStoreRoot && below.size <= 1 && below.none { it.precise }) {
             return listOf(Walked(DetectedGame(folder, folder, subtreeHere), precise = false))
         }
         // A folder holding games is a wrapper, not a game of its own.
@@ -633,7 +680,7 @@ object GameEngineDetector {
         override(folder)?.let { return DetectedGame(folder, folder, it) }
         // Tier 1: evidence AT this folder that this folder is the game
         // root (renpy/ + game/, RPG_RT.ldb, project.godot, ...).
-        detect(folder, defs) { !it.readsUnnamedSubtree }?.let { return DetectedGame(folder, folder, it) }
+        engineHere(folder, defs)?.let { return DetectedGame(folder, folder, it) }
         // Before tier 2: this folder may be a plain PC game, and then
         // nothing below it is a game at all -- the rule [scan]'s walk
         // applies, asked here too, because the two walks answering it
@@ -650,7 +697,7 @@ object GameEngineDetector {
             .filter { it.isDirectory && ScanPrune.isScannableFolder(it) }
             .sortedBy { it.name }
             .mapNotNull { nested ->
-                detect(nested, defs) { !it.readsUnnamedSubtree }?.let { DetectedGame(folder, nested, it) }
+                engineHere(nested, defs)?.let { DetectedGame(folder, nested, it) }
             }
             .firstOrNull()
             ?.let { return it }
