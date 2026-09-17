@@ -1912,6 +1912,12 @@ private fun GamesSection(
             .fillMaxSize()
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
+                // A screen opened FROM the group owns its own keys while
+                // it is up: the group's options screen is a level above
+                // this one, and its own list already handles B, its own
+                // BackHandler handles the system back key, and neither
+                // wants the shoulders switching the system underneath it.
+                if (nav.optionsOpen) return@onKeyEvent false
                 val group = selectedGroup
                 // The PC surface is droidtop's own screen with its own
                 // focus: the themed-gamelist fallbacks below drive an
@@ -1924,15 +1930,16 @@ private fun GamesSection(
                     (action == GamepadAction.BACK || action == GamepadAction.B) && group != null -> {
                         // Same real BACKSOUND as the BackHandler route above.
                         EsDeNavigationSounds.play("back")
-                        // The same one answer to "what is under this" the
-                        // dispatcher route uses: the group's options screen
-                        // is a level, so this leaves it before it leaves the
-                        // group. KEYCODE_BACK reaches the view tree as an
-                        // ordinary key event BEFORE the back dispatcher, so
-                        // this branch -- an ancestor of the options screen --
-                        // is what actually ran when the user pressed BACK in
-                        // Stores and folders, and it drilled all the way out
-                        // to the carousel (rig, build 548).
+                        // One level at a time, the same answer the
+                        // dispatcher route above uses. KEYCODE_BACK reaches
+                        // the view tree as an ordinary key event BEFORE the
+                        // back dispatcher, which is why this branch -- an
+                        // ancestor of everything drawn inside the group --
+                        // is what actually ran when the user pressed BACK
+                        // inside "Stores and folders", and drilled all the
+                        // way out to the carousel (rig, build 548). The
+                        // guard at the top of this handler is what stops
+                        // it answering for a screen above it now.
                         nav.back()
                         true
                     }
