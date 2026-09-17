@@ -29,6 +29,19 @@ internal sealed interface ShellPlace {
     data class Detail(val entryId: String) : ShellPlace {
         override val key get() = "detail:$entryId"
     }
+
+    /**
+     * A group's own options screen, opened from it and over it: the PC
+     * surface's "Stores and folders" (sign in to a store, add a games
+     * folder, set up Windows games). It is a LEVEL, not an overlay the
+     * screen under it owns, because B out of it has to land back on the
+     * grid it was opened from -- with the card the user was on still
+     * under the cursor -- and a screen that holds that answer itself
+     * loses it the moment anything is drawn instead of it.
+     */
+    data class Options(val groupKey: String) : ShellPlace {
+        override val key get() = "options:$groupKey"
+    }
 }
 
 /**
@@ -68,6 +81,10 @@ internal class ShellBackStack(initialSection: GamingSection) {
     var detailId: String? by mutableStateOf(null)
         private set
 
+    /** Whether the open group's own options screen is up. */
+    var optionsOpen: Boolean by mutableStateOf(false)
+        private set
+
     /** Per place, the entry the user was on when they left it. */
     private val focus = mutableStateMapOf<String, String>()
 
@@ -77,6 +94,7 @@ internal class ShellBackStack(initialSection: GamingSection) {
             val group = groupKey
             return when {
                 detail != null -> ShellPlace.Detail(detail)
+                group != null && optionsOpen -> ShellPlace.Options(group)
                 group != null -> ShellPlace.Group(group)
                 else -> ShellPlace.Section(section)
             }
@@ -86,6 +104,7 @@ internal class ShellBackStack(initialSection: GamingSection) {
     val under: ShellPlace?
         get() = when {
             detailId != null -> groupKey?.let { ShellPlace.Group(it) } ?: ShellPlace.Section(section)
+            groupKey != null && optionsOpen -> ShellPlace.Group(groupKey!!)
             groupKey != null -> ShellPlace.Section(section)
             else -> null
         }
@@ -97,6 +116,7 @@ internal class ShellBackStack(initialSection: GamingSection) {
         section = target
         groupKey = null
         detailId = null
+        optionsOpen = false
     }
 
     /**
@@ -107,19 +127,27 @@ internal class ShellBackStack(initialSection: GamingSection) {
     fun openGroup(key: String?) {
         groupKey = key
         detailId = null
+        optionsOpen = false
     }
 
     fun openDetail(entryId: String) {
         detailId = entryId
     }
 
+    /** Open the current group's own options screen. */
+    fun openOptions() {
+        if (groupKey != null) optionsOpen = true
+    }
+
     /**
-     * B. Closes the detail, else leaves the group, else does nothing (the
-     * shell's top level is a home screen: back goes nowhere).
+     * B. Closes the detail, else closes the group's options screen, else
+     * leaves the group, else does nothing (the shell's top level is a
+     * home screen: back goes nowhere).
      */
     fun back(): ShellPlace? {
         when {
             detailId != null -> detailId = null
+            optionsOpen -> optionsOpen = false
             groupKey != null -> groupKey = null
             else -> return null
         }
