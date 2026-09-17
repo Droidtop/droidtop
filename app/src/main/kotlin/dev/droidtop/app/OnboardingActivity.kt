@@ -657,6 +657,24 @@ private fun shouldShowStorageRationale(context: Context): Boolean {
 // ---------------------------------------------------------------------
 
 /** One action in the scaffold's action area. */
+/**
+ * The label of a step's ONE forward action (docs/SPEC.md 7b, "One way
+ * forward"). A step never offers two ways forward at once, so this one
+ * action has to say which it is: before the step has been answered it is
+ * the SKIP and says so, afterwards it is Next, and a step opened on its
+ * own from Settings has nothing after it so it is Done.
+ *
+ * Build 547 shipped a text "Skip" beside a filled "Next" on the
+ * Controller step and a disabled "Next" beside "Skip for now" on the
+ * Desktop one; in both, two actions moved forward and neither said which
+ * one moved on without answering.
+ */
+internal fun onboardingForwardLabel(reEntry: Boolean, answered: Boolean): String = when {
+    reEntry -> "Done"
+    answered -> "Next"
+    else -> "Skip this step"
+}
+
 private data class StepAction(
     val label: String,
     val enabled: Boolean = true,
@@ -1125,16 +1143,23 @@ private fun DesktopSetupStep(
         body = null,
         progress = progress,
         onBack = onBack,
+        // One forward action (docs/SPEC.md 7b): the skip, until an image
+        // has actually been chosen. A disabled "Next" beside a "Skip for
+        // now" was two ways forward with the working one greyed out.
         primary = StepAction(
-            label = if (capable) "Next" else "Continue without Desktop",
-            enabled = !capable || selectedId != null,
+            label = if (!capable) {
+                // Nothing to answer and nothing to skip: the mode cannot
+                // run here, and the step said so above.
+                "Continue without Desktop"
+            } else {
+                onboardingForwardLabel(reEntry = false, answered = selectedId != null)
+            },
         ) {
             if (capable && selectedId != null) {
                 DesktopSetupPrefs.setPreferredPrimaryImageId(context, selectedId)
             }
             onContinue(capable && selectedId != null)
         },
-        secondary = if (capable) StepAction("Skip for now") { onContinue(false) } else null,
     ) {
         when (checkResult) {
             null -> StepNote("Checking whether this device can run Desktop mode.")
@@ -1371,18 +1396,14 @@ private fun ControllerStep(
         },
         progress = progress,
         onBack = onBack,
-        // The step's OWN advance, at full weight, on every step
-        // (docs/SPEC.md 7b, "The frame every step renders into"). It is
-        // "Done" where there is nothing after this one -- a step opened
-        // from Settings -- and "Next" everywhere else. It was "Skip this"
-        // whenever no pad happened to be attached, which stayed "Skip
-        // this" after the question had been answered and read as the only
-        // way out of a step opened from Settings, where nothing is skipped.
-        primary = StepAction(if (isReEntry) "Done" else "Next", onClick = onContinue),
-        // Skipping is the SECONDARY action, and only while there is
-        // genuinely something to skip: an unanswered question inside a
-        // run. Once the question has an answer, moving on is Next.
-        secondary = if (!isReEntry && !answered) StepAction("Skip", onClick = onContinue) else null,
+        // ONE forward action, at full weight (docs/SPEC.md 7b, "One way
+        // forward"). Before the question has an answer that action IS the
+        // skip, and says so; once it is answered it is Next; a step opened
+        // on its own from Settings has nothing after it, so it is Done.
+        // A "Skip" text action beside a filled "Next" was two ways forward
+        // side by side, and neither of them said which one moved on
+        // without answering (rig, build 547).
+        primary = StepAction(onboardingForwardLabel(reEntry = isReEntry, answered = answered), onClick = onContinue),
     ) {
         StepSectionLabel("Attached")
         if (controllers.isEmpty()) {
@@ -1552,12 +1573,16 @@ private fun KeyboardStep(
         body = dev.droidtop.library.settings.Keyboards.WHY,
         progress = progress,
         onBack = onBack,
-        primary = StepAction(if (active) "Next" else "Skip this", onClick = onContinue),
-        secondary = when {
-            active -> null
+        // A hand-off step, shaped like the storage one (docs/SPEC.md 7b):
+        // the primary is the step's own work -- it opens Android's screen
+        // and comes back here -- and the ONE forward action waits beside
+        // it as the skip until the hand-off has actually taken.
+        primary = when {
+            active -> StepAction("Next", onClick = onContinue)
             !enabled -> StepAction("Turn it on in Android", onClick = onEnable)
             else -> StepAction("Switch to it", onClick = onPick)
         },
+        secondary = if (active) null else StepAction("Skip this step", onClick = onContinue),
     ) {
         when {
             active -> StepNote("Hacker's Keyboard is the active keyboard.", accent = true)
