@@ -16,6 +16,10 @@ class PcFolderScanTest {
     @get:Rule
     val temp = TemporaryFolder()
 
+    // The real shipped rules, so a registry edit that changes which
+    // folders are engine games shows up here too.
+    private val defs = EngineRegistryParser.parse(SeedAssets.read("engines-database.json"))
+
     private fun game(path: String, exe: String = "Game.exe") {
         val dir = File(temp.root, path)
         dir.mkdirs()
@@ -26,8 +30,14 @@ class PcFolderScanTest {
         File(temp.root, path).mkdirs()
     }
 
+    private fun file(path: String, contents: String = "x") {
+        val file = File(temp.root, path)
+        file.parentFile?.mkdirs()
+        file.writeText(contents)
+    }
+
     private fun found(): List<String> =
-        PcFolderScan.gamesUnder(temp.root).map { it.toRelativeString(temp.root).replace(File.separatorChar, '/') }
+        PcFolderScan.gamesUnder(temp.root, defs).map { it.toRelativeString(temp.root).replace(File.separatorChar, '/') }
 
     @Test
     fun `a container folder contributes the games below it and never itself`() {
@@ -91,5 +101,45 @@ class PcFolderScanTest {
         File(temp.root, "Steam/libraryfolder.vdf").writeText("{}")
         game("Steam/steamapps/workshop/content/1234/mod")
         assertEquals(emptyList<String>(), found())
+    }
+
+    @Test
+    fun `a game keeping its executables in payload folders is the game, not the folders`() {
+        // Every Ubisoft install on the rig: the launcher's own files sit
+        // in the game folder and the executables two levels down, in
+        // more than one payload folder. The one-game-below form of rule 4
+        // listed `bin` and `bin_plus` and never Far Cry 5.
+        file("Ubisoft/Far Cry 5/uplay_install.manifest")
+        file("Ubisoft/Far Cry 5/uplay_install.state")
+        game("Ubisoft/Far Cry 5/bin", exe = "FarCry5.exe")
+        game("Ubisoft/Far Cry 5/bin_plus", exe = "FarCry5.exe")
+        assertEquals(listOf("Ubisoft/Far Cry 5"), found())
+    }
+
+    @Test
+    fun `a store wrapper contributes the game inside it, whose own payload folders stay hidden`() {
+        // EA/SimCity: no executable in the game folder, three below it.
+        file("EA/.gamenative")
+        file("EA/SimCity/Setup.ini")
+        game("EA/SimCity/SimCity", exe = "SimCity.exe")
+        game("EA/SimCity/SimCityData", exe = "helper.exe")
+        game("EA/SimCity/Support", exe = "support.exe")
+        assertEquals(listOf("EA/SimCity"), found())
+    }
+
+    @Test
+    fun `a category folder holding engine games is not a game, whatever is loose in it`() {
+        // adult/godot on the rig: two Godot games and one Godot Linux
+        // build left loose beside them. The loose build made the folder
+        // itself look like a game and hid both.
+        file("adult/godot/Anomalous_Coffee_Machine_2-1.0.00_deluxe_linux.x86_64", contents = "ELF")
+        file("adult/godot/Anomalous/acm2.pck")
+        file("adult/godot/Anomalous/acm2.exe", contents = "MZ")
+        file("adult/godot/Goodbye Eternity/goodbye.pck")
+        file("adult/godot/Goodbye Eternity/goodbye.exe", contents = "MZ")
+        assertEquals(
+            listOf("adult/godot/Anomalous", "adult/godot/Goodbye Eternity"),
+            found(),
+        )
     }
 }

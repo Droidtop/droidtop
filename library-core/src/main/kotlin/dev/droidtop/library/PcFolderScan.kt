@@ -28,15 +28,26 @@ import java.io.File
  *     it is called: it contributes the games found below it and never
  *     itself. `EA`, `Ubisoft` and `roms` are containers; so is a games
  *     root.
- *  4. A folder that holds files of its own AND exactly one game below it
- *     is that game's root, not its container: this is the
+ *  4. A folder that holds files of its own AND games below it is those
+ *     games' root, not their container: this is the
  *     `<Game>/Binaries/Win64/Game.exe` shape, where the executable sits
- *     two levels down but the game is plainly the outer folder. It does
- *     not apply inside a store tree, where `steamapps` holding one
- *     installed game must still yield the game and not `steamapps`.
+ *     two levels down but the game is plainly the outer folder. The rig
+ *     showed why this cannot be restricted to ONE game below: every
+ *     Ubisoft install (`Far Cry 5/{bin,bin_plus}/FarCry5.exe`) keeps its
+ *     executables in two payload folders, so the one-game form listed
+ *     `bin` and `bin_plus` and never Far Cry 5. It does not apply inside
+ *     a store tree, where `steamapps` holding one installed game must
+ *     still yield the game and not `steamapps`.
  *  5. A folder with no executable anywhere below it is not a PC game.
  *     That is what makes an empty store folder contribute nothing
  *     instead of an entry a user cannot launch.
+ *  6. **A folder with two or more ENGINE games directly below it is a
+ *     container**, before any of the above is asked
+ *     ([GameEngineDetector.holdsSeveralGames]). `adult/godot` holds two
+ *     Godot games and a loose Godot Linux build left beside them, so
+ *     rule 2 read it as a game and hid both. Engine evidence is what
+ *     tells that shape from an install's payload folders: `bin` and
+ *     `bin_plus` hold an executable and no engine at all.
  *
  * Engine games are NOT this scan's business: [GameEngineDetector] finds
  * them, and `PcGameProvider` already drops a PC entry for any folder
@@ -50,23 +61,32 @@ object PcFolderScan {
     /**
      * Every PC game folder under [root], deepest-evidence-first. [root]
      * itself is treated as a container: a games root is never a game.
+     *
+     * [defs] are the engine-detection rules, used for rule 6 only -- an
+     * empty list simply means "no folder is known to hold engine games",
+     * which is what a caller with no database loaded should get.
      */
-    fun gamesUnder(root: File): List<File> =
-        if (!root.isDirectory) emptyList() else childrenOf(root).flatMap { walk(it, depth = 1) }
+    fun gamesUnder(root: File, defs: List<EngineDef> = emptyList()): List<File> =
+        if (!root.isDirectory) emptyList() else childrenOf(root).flatMap { walk(it, defs, depth = 1) }
 
-    private fun walk(folder: File, depth: Int): List<File> {
+    private fun walk(folder: File, defs: List<EngineDef>, depth: Int): List<File> {
         if (!folder.isDirectory || !ScanPrune.isScannableFolder(folder)) return emptyList()
         // A store's own install root is the store's business, never a
         // game, however many executables its client drops in it.
         val isStoreRoot = ScanPrune.storeRootOwner(folder) != null
-        if (!isStoreRoot && GameExecutableResolver.hasExecutable(folder)) return listOf(folder)
+        // Rule 6. Lazy: it costs one directory listing per child, and
+        // only a folder that would otherwise BE an entry needs the
+        // answer. A folder holding engine games is a category folder,
+        // and anything it holds of its own is a stray.
+        val holdsEngineGames by lazy { defs.isNotEmpty() && GameEngineDetector.holdsSeveralGames(folder, defs) }
+        if (!isStoreRoot && GameExecutableResolver.hasExecutable(folder) && !holdsEngineGames) return listOf(folder)
 
         val below =
-            if (depth < MAX_SCAN_DEPTH) childrenOf(folder).flatMap { walk(it, depth + 1) } else emptyList()
+            if (depth < MAX_SCAN_DEPTH) childrenOf(folder).flatMap { walk(it, defs, depth + 1) } else emptyList()
         if (below.isEmpty()) return emptyList()
         val holdsOwnFiles = (folder.listFiles() ?: emptyArray()).any { it.isFile && !it.name.startsWith(".") }
         val insideStoreTree = isStoreRoot || ScanPrune.storeTreeRoot(folder) != null
-        return if (holdsOwnFiles && below.size == 1 && !insideStoreTree) listOf(folder) else below
+        return if (holdsOwnFiles && !insideStoreTree && !holdsEngineGames) listOf(folder) else below
     }
 
     private fun childrenOf(folder: File): List<File> =
