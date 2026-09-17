@@ -354,6 +354,45 @@ object GameEngineDetector {
         }
     }
 
+    /**
+     * Precise evidence that THIS folder is a game root: the rules that
+     * name their own folder, never the ones that only prove a game is
+     * somewhere below ([DetectRule.readsUnnamedSubtree]). Public because
+     * both walks ask it -- the engine walk to decide a container, and
+     * [PcFolderScan] to tell a category folder from a game.
+     */
+    fun isGameRoot(folder: File, defs: List<EngineDef>): Boolean =
+        detect(folder, defs) { !it.readsUnnamedSubtree } != null
+
+    /**
+     * Whether [folder] holds two or more games of its own directly below
+     * it, which makes it a container rather than a game (docs/SPEC.md
+     * 7g). Two, not one: a folder with exactly one game below it is that
+     * game's own wrapper -- the version-folder shape, and the payload
+     * folder shape -- and both walks already have rules for it.
+     *
+     * Only the immediate children are looked at, with the precise rules
+     * only, so this costs one directory listing per child and never a
+     * subtree walk.
+     */
+    fun holdsSeveralGames(
+        folder: File,
+        defs: List<EngineDef>,
+        systemsById: Map<String, ConsoleSystemDef> = emptyMap(),
+    ): Boolean {
+        var found = 0
+        for (child in folder.listFiles().orEmpty()) {
+            if (!child.isDirectory) continue
+            if (!ScanPrune.isScannableFolder(child)) continue
+            if (resolveSystem(child.name, systemsById) != null) continue
+            if (isGameRoot(child, defs)) {
+                found++
+                if (found >= 2) return true
+            }
+        }
+        return false
+    }
+
     /** Why a console-system folder is not walked for engine games. */
     private const val CONSOLE_SYSTEM_FOLDER_REASON =
         "it is a console system folder, scanned for ROMs instead"
@@ -403,12 +442,38 @@ object GameEngineDetector {
         // ScanBudget's own doc comment for the rig evidence.
         val own = state.newBudget()
         override(folder)?.let { return listOf(Walked(DetectedGame(folder, folder, it), precise = true)) }
+        // A folder that holds games is a container, whatever evidence it
+        // carries of its own -- the rule [PcFolderScan] already states
+        // for the PC half (DECISIONS 2026-09-16 18:11), asked here too so
+        // that ONE rule decides it in both walks. The rig's case:
+        // `adult/godot` holds two Godot games and one loose Godot Linux
+        // build left beside them, so the precise check below matched the
+        // CATEGORY folder, listed it as a game called "godot", and the
+        // two games inside it were never walked at all.
+        // Lazy deliberately: this costs one directory listing per child,
+        // and only a folder that would otherwise END the walk needs the
+        // answer -- which is one folder per game, not one per folder.
+        val holdsGames by lazy { holdsSeveralGames(folder, defs, systemsById) }
         // Precise evidence that THIS folder is a game root ends the
         // descent: a game's own subfolders are not further games.
-        detect(folder, defs) { !it.readsUnnamedSubtree }
-            ?.let { return listOf(Walked(DetectedGame(folder, folder, it), precise = true)) }
+        val preciseHere = detect(folder, defs) { !it.readsUnnamedSubtree }
+        if (preciseHere != null && !holdsGames) {
+            return listOf(Walked(DetectedGame(folder, folder, preciseHere), precise = true))
+        }
 
         val subtreeHere = detect(folder, defs) { it.readsUnnamedSubtree }
+        // A folder that directly holds an executable and carries no
+        // engine evidence at all is a PC game -- [PcFolderScan] lists it
+        // -- and a PC game's own subfolders are its payload, not further
+        // games. Without this the engine walk went on down into them and
+        // the weakest rule in the database, "there is a page here",
+        // turned `Ghost Recon Breakpoint/benchmark` (an index.html and
+        // sixteen PNGs) and `The Movies/Docs` into games of their own.
+        if (preciseHere == null && subtreeHere == null &&
+            GameExecutableResolver.hasExecutable(folder) && !holdsGames
+        ) {
+            return emptyList()
+        }
         val below =
             if (depth < MAX_SCAN_DEPTH && !state.tooSlow(folder, own)) {
                 candidateFolders(folder, systemsById, state)
@@ -827,27 +892,21 @@ class EngineGameProvider(
                     rootSkips[reason] = (rootSkips[reason] ?: 0) + count
                 }
                 rootGames += scanned.games.size
-                android.util.Log.i(
-                    ScanLog.TAG,
-                    ScanLog.summary(
-                        label = "engine folder ${folder.absolutePath}",
-                        games = scanned.games.size,
-                        skippedByReason = scanned.skippedByReason,
-                        durationMs = System.currentTimeMillis() - folderStartedAt,
-                        note = scanned.stoppedAt?.let { "stopped in ${it.absolutePath}" },
-                    ),
+                ScanLog.write(
+                    label = "engine folder ${folder.absolutePath}",
+                    games = scanned.games.size,
+                    skippedByReason = scanned.skippedByReason,
+                    durationMs = System.currentTimeMillis() - folderStartedAt,
+                    note = scanned.stoppedAt?.let { "stopped in ${it.absolutePath}" },
                 )
                 publish(scanned.games.map { it.toEntry(root, installsByDir) })
             }
-            android.util.Log.i(
-                ScanLog.TAG,
-                ScanLog.summary(
-                    label = "games root ${root.absolutePath}",
-                    games = rootGames,
-                    skippedByReason = rootSkips,
-                    durationMs = System.currentTimeMillis() - rootStartedAt,
-                    note = "${top.folders.size} folders scanned",
-                ),
+            ScanLog.write(
+                label = "games root ${root.absolutePath}",
+                games = rootGames,
+                skippedByReason = rootSkips,
+                durationMs = System.currentTimeMillis() - rootStartedAt,
+                note = "${top.folders.size} folders scanned",
             )
         }
     }
