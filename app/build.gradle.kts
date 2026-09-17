@@ -208,6 +208,13 @@ dependencies {
     // transitively via lifecycle-runtime-ktx alone, needs the base artifacts explicitly.
     implementation("androidx.lifecycle:lifecycle-runtime:2.8.4")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.4")
+    // OnboardingActivity's own OnboardingRun (androidx.lifecycle.ViewModel
+    // + `by viewModels()`): the onboarding run's answers have to outlive
+    // the Activity across a rotation. Both artifacts arrive transitively
+    // through androidx.activity, and both are named here for the same
+    // reason the lifecycle-runtime base artifacts above are -- a
+    // transitive version is not a dependency declaration.
+    implementation("androidx.lifecycle:lifecycle-viewmodel:2.8.4")
     implementation("androidx.savedstate:savedstate:1.2.1")
     implementation("androidx.savedstate:savedstate-ktx:1.2.1")
 
