@@ -4523,13 +4523,24 @@ and everything it remembered, and closing it rebuilt the screen from
 nothing.
 
 **One stack answers it** (`ShellBackStack`, `shell-gamepad`). The Gaming
-shell is three levels deep and no deeper -- a section, a group inside
-Games, one game's detail -- and the stack holds all three, plus the entry
+shell is a section, a group inside Games, that group's own options screen
+and one game's detail -- and the stack holds all of them, plus the entry
 the user was on in each one. A screen ASKS where it is and what to focus;
 it does not own the answer and so cannot lose it.
 
-- B closes the detail, else leaves the group, else does nothing (the top
-  of the shell is a home screen).
+- B closes the detail, else closes the group's own options screen, else
+  leaves the group, else does nothing (the top of the shell is a home
+  screen).
+- **A screen opened from a level is a level**, not state the screen under
+  it holds. The PC surface's "Stores and folders" was a `remember` inside
+  the PC surface -- which stops being composed the moment that screen is
+  drawn instead of it -- and the group's own drill-up sits ABOVE it in the
+  tree, so the drill-up answered for it: `KEYCODE_BACK` reaches the view
+  tree as an ordinary key event before it reaches the back dispatcher, so
+  B out of Stores and folders left the group outright and landed on the
+  carousel with the system reset (rig, build 548). Both back routes -- the
+  dispatcher and the B/BACK key -- go through `nav.back()`, which leaves
+  one level at a time.
 - Returning to a group lands on the entry that was focused there: the PC
   grid scrolls to that card and focuses it, and a themed gamelist opens on
   that game. A group this session has not been in opens at the top, which
@@ -5361,7 +5372,33 @@ state it acts on. A touch affordance therefore sends a genuine key event
 down the focused window (`rememberGamepadTouch`,
 `GamepadKeyMap.keyCodeFor`) and travels that same path, so there is
 exactly one definition of every action and touch cannot drift from the
-pad. Consequences:
+pad.
+
+**That block goes AHEAD of the element's focus targets in the modifier
+chain, never behind them.** Compose dispatches a key event to the
+key-input modifiers between the ACTIVE focus target and the root:
+`FocusOwnerImpl.dispatchKeyEvent` takes `activeFocusTarget
+.lastLocalKeyInputNode()`, and that helper stops at the next `FocusTarget`
+in the same chain (compose ui 1.7.2). `Modifier.clickable` delegates a
+`FocusableNode` of its own, so in `.focusable().clickable { }
+.onKeyEvent { }` the handler is behind a focus target and is never
+dispatched at all -- only ancestors get the event. What hides it is
+Android's own key-character-map fallback: an unhandled `BUTTON_A` is
+re-sent as `DPAD_CENTER` (`Generic.kcm`), which `clickable` treats as a
+click, so A appears to work through the click path while every other
+action written the same way (X for favourite, Y for a detail) is dead,
+and every hint-bar tap -- a direct `dispatchKeyEvent`, which gets no
+fallback -- does nothing (rig, build 548: the PC grid's own `A Open` hint
+inert while `B` and `Y`, handled on ancestors, worked).
+
+**A hint row promises only what dispatches.** A row is this shell's touch
+control surface, so a hint that names an action nothing handles is a
+promise the screen does not keep: either the action exists by every route
+the row implies, or the hint is not drawn. The Apps grid drew `Y  Info`
+over tiles that handled only A, while the long-press beside them already
+opened the app's own detail (rig, build 548).
+
+Consequences:
 
 - the persistent help bar stops being a legend and becomes the control
   surface: every hint is tappable (`TouchHintBar`), and it stays on a
@@ -5391,13 +5428,24 @@ pad. Consequences:
   overrode a claim that was never a theme's (rig, build 547). A claim is
   also scoped to the screen that makes it, so a screen the shell is still
   fading out cannot answer for the screen arriving;
-- **the one row is drawn in the one place laid out for it.** Real ES-DE
-  draws its single `HelpComponent` ON the view, at the theme's own
-  `<helpsystem>` position; the view is not shortened to make room for it.
-  So when the shell owns the row over a THEME's screen, droidtop's bar is
-  drawn over the themed canvas at its bottom rather than as a strip below
-  it, and the themed view gets the whole area in portrait that it gets in
-  landscape. Otherwise a theme was laid out into a canvas that changed
+- **the one row is drawn in the one place laid out for it, and paints
+  nothing there.** Real ES-DE draws its single `HelpComponent` ON the
+  view, at the theme's own `<helpsystem>` position and with no background
+  of its own; the view is not shortened to make room for it. So when the
+  shell owns the row over a THEME's screen, droidtop's bar is drawn at
+  that same position (`EsDeHelpRowSlot`, reported by the renderer from the
+  merged element's `pos`/`origin` and applied after the row is measured,
+  exactly as the theme's own bar is) with a transparent background, and
+  the themed view gets the whole area in portrait that it gets in
+  landscape. An opaque plate there covers the plate the theme drew for
+  this row, which is what still read as "a strip below the canvas" after
+  the bar had already moved onto it (rig, build 548). The claim is about
+  the CANVAS, not about the element: a theme that declares no
+  `<helpsystem>` still draws the whole window and still has a help
+  position -- ES-DE's own component default, `0.012` of the width and
+  `0.9515` of the height, `0.975` when the window is vertical, origin
+  `0 0` (`HelpComponent.cpp:23-27`) -- so its canvas is not shortened
+  either. Otherwise a theme was laid out into a canvas that changed
   height with droidtop's chrome, and the plate the theme drew for its own
   help row was left visibly empty above droidtop's bar (rig, build 547,
   DEcaffe in portrait). That plate is the THEME's art, not its
@@ -5423,6 +5471,14 @@ pad. Consequences:
   targets, because a touch screen has no Left/Right and a slider has no
   "open" to tap: it was otherwise pad-only, in the settings list a phone
   user has to use;
+- **every scrolling screen the shell draws ends above the hint bar.** The
+  bar is the last thing in the window, so a list measured against the rest
+  of it ends exactly where the bar begins: the last row is sliced by the
+  window edge and scrolling to the end never brings it clear (rig, build
+  546, the settings list; build 548, a game detail's last card). The room
+  is CONTENT padding, not a padding modifier -- a modifier shrinks the
+  viewport and the row still ends against the bar -- and it is one value,
+  `MenuTokens.HintBarRoom`, because it is one bar;
 - the Quick Menu's notifications are rows, not a read-out: a tap moves
   the cursor and opens one, and dismiss/clear-all are on the hint bar
   instead of a legend naming buttons that were not there;
