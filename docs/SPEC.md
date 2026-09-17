@@ -3962,6 +3962,21 @@ vanish or shrink to a partial. `LibraryProvider.indexed` is false only for
 the package manager's app list, which answers in milliseconds and changes
 outside droidtop; everything that reads a filesystem is indexed.
 
+**The index is updated incrementally, and nothing is dropped on the walk's
+say-so (directed 2026-09-17).** A walk finishing one top-level folder of a
+root replaces that folder's entries in the provider's slice at once; the
+slice is not held back for the whole provider. A game the walk no longer
+finds stays in the index in its own state, **missing** (shown as "broken -
+missing"), with its favourite, play history, metadata and collection
+memberships intact: a card is not thrown away because a drive was not
+mounted this morning. A detected game can be marked as the REPLACEMENT of a
+missing one from its detail; the missing entry folds into it (its facts move
+to the new path) and disappears. Which detected game to offer first is
+Pythia's own logic (`GameNaming`/`GameVersions`: same derived name, then the
+0.6 similarity suggestion, as `_merge_version` / `record_ownership` /
+`find_candidates` do it). Removing a games root removes that root's entries
+outright; that is a choice, not a missing drive.
+
 **One mechanism.** The ROM provider's own `RomDatabase` remains what makes
 ITS walk fast; the index is what makes the START fast, across providers,
 and it is the only thing that decides whether a walk happens at all. Play
