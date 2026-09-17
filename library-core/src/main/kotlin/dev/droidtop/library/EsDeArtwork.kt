@@ -31,6 +31,7 @@ import java.io.File
  * Android app, a store PC game whose art is a remote URL). Those keep
  * working exactly as before through [LibraryEntry.artworkUri].
  */
+@kotlinx.serialization.Serializable
 data class GameMediaLocator(
     /** The folder directly containing the per-system game folders, as [EsDeArtwork.resolve] means it. */
     val gamesRoot: String,

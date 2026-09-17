@@ -4,6 +4,7 @@ import android.content.Context
 import dev.droidtop.library.EngineGameProvider
 import dev.droidtop.library.Library
 import dev.droidtop.library.NativeAppProvider
+import dev.droidtop.library.FileLibraryIndexStore
 import dev.droidtop.library.RoomFavoritesStore
 import dev.droidtop.library.RoomPlayHistoryStore
 import dev.droidtop.library.consoles.ConsoleRomProvider
@@ -78,6 +79,7 @@ object LibraryCore {
             ),
             playHistory = RoomPlayHistoryStore(app),
             favorites = RoomFavoritesStore(app),
+            index = FileLibraryIndexStore(java.io.File(app.filesDir, "library-index")),
         )
     }
 }
