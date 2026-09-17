@@ -99,7 +99,10 @@ object QuickTiles {
         val value = when (item) {
             is ChoiceItem -> item.currentLabel()
             is ToggleItem -> null
-            else -> inlineValue
+            // The item's own value column first (CatalogItem.value: the
+            // network's connection, VPN's on/off, "Needs permission"),
+            // then the value an older row still carries inside its title.
+            else -> item.value ?: inlineValue
         }
         return QuickTile(
             item = item,
