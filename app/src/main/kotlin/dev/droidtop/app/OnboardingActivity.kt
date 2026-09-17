@@ -486,6 +486,7 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
 
         OnboardingStep.CONTROLLER -> ControllerStep(
             progress, back,
+            isReEntry = isReEntry,
             onContinue = { advanceFrom(OnboardingStep.CONTROLLER) },
         )
 
@@ -1212,7 +1213,7 @@ private fun GamesFoldersStep(
 }
 
 /**
- * CONTROLLER. Skippable, and it says so.
+ * CONTROLLER. Answerable, and skippable until it is answered.
  *
  * Two things a person cannot be expected to find in Settings, and one
  * thing droidtop cannot work out on its own:
@@ -1234,32 +1235,53 @@ private fun GamesFoldersStep(
 private fun ControllerStep(
     progress: Pair<Int, Int>?,
     onBack: (() -> Unit)?,
+    isReEntry: Boolean,
     onContinue: () -> Unit,
 ) {
     val context = LocalContext.current
     val controllers = remember { ControllerPrefs.attachedControllers() }
     var swapped by remember { mutableStateOf(ControllerPrefs.swapConfirmCancel(context)) }
+    // Whether the question has an ANSWER, which is not the same as which
+    // answer is marked: `swapConfirmCancel` has a default, so one row is
+    // always marked Selected and a person who has never answered would
+    // otherwise look at a step that says it is already decided.
+    var answered by remember { mutableStateOf(ControllerPrefs.asked(context)) }
     var pressed by remember { mutableStateOf<String?>(null) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
 
     fun choose(value: Boolean) {
         swapped = value
+        answered = true
         ControllerPrefs.setSwapConfirmCancel(context, value)
     }
 
     OnboardingScaffold(
         title = "Controller",
-        body = if (controllers.isEmpty()) {
-            "No controller is attached right now. droidtop works by touch either way, and " +
-                "this step is here again in Settings when you plug one in."
-        } else {
-            "Press a button to check droidtop is reading your controller, then tell it which " +
+        body = when {
+            // Re-entered from Settings > Input > Controller: there is no
+            // run to skip ahead of and nowhere later to be sent to.
+            isReEntry -> "Press a button to check droidtop is reading your controller, and tell it " +
+                "which face button means yes."
+            controllers.isEmpty() -> "No controller is attached right now. droidtop works by touch " +
+                "either way, and this step is here again in Settings when you plug one in."
+            else -> "Press a button to check droidtop is reading your controller, then tell it which " +
                 "face button means yes. You can skip this and change it later in Settings."
         },
         progress = progress,
         onBack = onBack,
-        primary = StepAction(if (controllers.isEmpty()) "Skip this" else "Next", onClick = onContinue),
+        // The step's OWN advance, at full weight, on every step
+        // (docs/SPEC.md 7b, "The frame every step renders into"). It is
+        // "Done" where there is nothing after this one -- a step opened
+        // from Settings -- and "Next" everywhere else. It was "Skip this"
+        // whenever no pad happened to be attached, which stayed "Skip
+        // this" after the question had been answered and read as the only
+        // way out of a step opened from Settings, where nothing is skipped.
+        primary = StepAction(if (isReEntry) "Done" else "Next", onClick = onContinue),
+        // Skipping is the SECONDARY action, and only while there is
+        // genuinely something to skip: an unanswered question inside a
+        // run. Once the question has an answer, moving on is Next.
+        secondary = if (!isReEntry && !answered) StepAction("Skip", onClick = onContinue) else null,
     ) {
         StepSectionLabel("Attached")
         if (controllers.isEmpty()) {
@@ -1300,16 +1322,21 @@ private fun ControllerStep(
             "Android tells droidtop where a button IS, not what is printed on it, so this is " +
                 "the one thing it cannot work out for you.",
         )
+        // Marked only once the question HAS an answer. The preference
+        // behind it has a default, so drawing that default as "Selected"
+        // would tell a person they had already chosen something they were
+        // never asked about -- and would make the Skip beside it a skip of
+        // a question that looks answered.
         SelectableRow(
             title = "The bottom button confirms",
             supporting = "A confirms and B goes back. Xbox-style pads and most Android controllers.",
-            selected = !swapped,
+            selected = answered && !swapped,
             onClick = { choose(false) },
         )
         SelectableRow(
             title = "The right button confirms",
             supporting = "B confirms and A goes back. Nintendo-style pads, where the bottom button is the one labelled B.",
-            selected = swapped,
+            selected = answered && swapped,
             onClick = { choose(true) },
         )
     }
