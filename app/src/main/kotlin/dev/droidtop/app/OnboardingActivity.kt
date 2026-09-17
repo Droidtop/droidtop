@@ -12,6 +12,7 @@ import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -118,11 +119,23 @@ import java.io.File
  * one step and finishes instead of continuing through the rest.
  */
 class OnboardingActivity : AppCompatActivity() {
+    /**
+     * The run's own answers, held where a configuration change cannot
+     * reach them (see [OnboardingRun]). Rotating the device on step 7
+     * used to restart onboarding at step 1 with the mode choices gone.
+     */
+    private val onboardingRun: OnboardingRun by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         val startStep = intent.getStringExtra(EXTRA_START_STEP)
             ?.let { name -> OnboardingStep.entries.firstOrNull { it.name == name } }
+        // Seeded once per run, not once per Activity instance: both the
+        // starting step and the storage answer the PLAN is built from
+        // are facts about the run, and re-reading them after a rotation
+        // is what made the plan differ by orientation.
+        onboardingRun.start(startStep, hasStorageAccess(this))
         setContent {
             // Onboarding is dark, like the shell it hands over to. It used
             // to follow the system setting, so a device in light mode got
@@ -130,8 +143,8 @@ class OnboardingActivity : AppCompatActivity() {
             // shell at the end of it (SPEC 7b).
             dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
                 OnboardingScreen(
-                    startStep = startStep,
-                    isReEntry = startStep != null,
+                    run = onboardingRun,
+                    isReEntry = onboardingRun.startStep != null,
                     onDone = { finish() },
                 )
             }
@@ -141,6 +154,92 @@ class OnboardingActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_START_STEP = "dev.droidtop.app.EXTRA_START_STEP"
     }
+}
+
+/**
+ * ONE run of onboarding, and everything that run has answered.
+ *
+ * Held in a [androidx.lifecycle.ViewModel] rather than in the
+ * composition, because a configuration change destroys the Activity and
+ * everything remembered inside it. On the rig (build 546) rotating the
+ * device on "Step 7 of 10 -- Appearance" came back at "Step 1 of 7": the
+ * walk position and the history were gone, the mode choices were gone
+ * with them, and the COUNT changed too, because [plannedSteps] is built
+ * from those answers and from whether the storage permission was held
+ * when the run started -- which by then it was, so the permission step
+ * dropped out of the plan as well.
+ *
+ * So the plan is a property of the RUN, not of the Activity instance
+ * drawing it: [start] seeds the run once and every later call is a
+ * no-op, and everything the plan and the walk are built from lives here.
+ * The things that are NOT answers -- what a games root turned out to
+ * hold, what the theme list is -- are derived from the device and stay
+ * out of it, except the two caches that would otherwise re-walk the
+ * whole library on every rotation.
+ */
+internal class OnboardingRun : androidx.lifecycle.ViewModel() {
+    private var started = false
+
+    /** The step this run opened on; null for a full first-run walk. */
+    var startStep: OnboardingStep? = null
+        private set
+
+    /**
+     * Whether "All files access" was already held when the RUN started.
+     *
+     * The plan asks this once, for the reason [plannedSteps] gives: a
+     * plan that changes under the user's feet cannot say where to go
+     * next. Asking it once per Activity instead of once per run is what
+     * made "Step 7 of 10" become "Step 1 of 7".
+     */
+    var storageGrantedAtEntry: Boolean = false
+        private set
+
+    fun start(startStep: OnboardingStep?, storageGranted: Boolean) {
+        if (started) return
+        started = true
+        this.startStep = startStep
+        this.storageGrantedAtEntry = storageGranted
+        storageAccessGranted.value = storageGranted
+        step.value = startStep ?: OnboardingStep.WELCOME
+    }
+
+    // Each answer is a MutableState the screen delegates to (`var step by
+    // run.step`), so the step functions below read exactly as they did
+    // when these were `remember`ed -- the only thing that changed is
+    // WHERE they live.
+    val step = mutableStateOf(OnboardingStep.WELCOME)
+
+    /**
+     * The path actually taken, which is what Back walks: a person who
+     * answered "a launcher I already have" goes back to that list, not to
+     * a step the plan says comes before this one on paper.
+     */
+    val history = mutableStateListOf<OnboardingStep>()
+
+    val homeChoice = mutableStateOf<HomeRolePrefs.HomeImplementation?>(null)
+    val configureDesktop = mutableStateOf(false)
+    val configureGaming = mutableStateOf(false)
+    val desktopImageChosen = mutableStateOf(false)
+    val desktopCapable = mutableStateOf(false)
+    val unresolvedFolderWarning = mutableStateOf(false)
+    val pathEntry = mutableStateOf("")
+    val pathError = mutableStateOf<String?>(null)
+    val storageAccessGranted = mutableStateOf(false)
+    val storageDenied = mutableStateOf(false)
+    val storagePermanentlyDenied = mutableStateOf(false)
+    val chosenMode = mutableStateOf<dev.droidtop.library.settings.Mode?>(null)
+    val confirmLeaving = mutableStateOf(false)
+    val structureReport = mutableStateOf<String?>(null)
+    val rootsVersion = mutableStateOf(0)
+
+    /**
+     * What each root turned out to hold. Kept with the run rather than
+     * recomputed: walking a real games root takes minutes, and a
+     * rotation is not a reason to walk it again.
+     */
+    val rootReports = mutableStateMapOf<String, GamesRootReport.Report>()
+    val rootProgress = mutableStateMapOf<String, GamesRootReport.Progress>()
 }
 
 internal enum class OnboardingStep {
@@ -237,38 +336,39 @@ private fun hasStorageAccess(context: Context): Boolean =
 private const val LEGACY_STORAGE_PERMISSION = android.Manifest.permission.READ_EXTERNAL_STORAGE
 
 @Composable
-private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onDone: () -> Unit) {
+private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var step by remember { mutableStateOf(startStep ?: OnboardingStep.WELCOME) }
-    // The path actually taken, which is what Back walks: a person who
-    // answered "a launcher I already have" goes back to that list, not to
-    // a step the plan says comes before this one on paper.
-    val history = remember { mutableStateListOf<OnboardingStep>() }
+    // Every answer this run has given lives in `run` (see [OnboardingRun]),
+    // not in this composition: the Activity is destroyed and rebuilt on
+    // every rotation, and a walk remembered inside it does not survive
+    // that. These are aliases onto the same state, so the steps below read
+    // exactly as they did.
+    var step by run.step
+    val history = run.history
+    var homeChoice by run.homeChoice
+    var configureDesktop by run.configureDesktop
+    var configureGaming by run.configureGaming
+    var desktopImageChosen by run.desktopImageChosen
+    var desktopCapable by run.desktopCapable
+    var unresolvedFolderWarning by run.unresolvedFolderWarning
+    var pathEntry by run.pathEntry
+    var pathError by run.pathError
+    var storageAccessGranted by run.storageAccessGranted
+    var storageDenied by run.storageDenied
+    var storagePermanentlyDenied by run.storagePermanentlyDenied
+    var chosenMode by run.chosenMode
+    var confirmLeaving by run.confirmLeaving
+    var structureReport by run.structureReport
+    var rootsVersion by run.rootsVersion
 
-    var homeChoice by remember { mutableStateOf<HomeRolePrefs.HomeImplementation?>(null) }
-    var configureDesktop by remember { mutableStateOf(false) }
-    var configureGaming by remember { mutableStateOf(false) }
-    var desktopImageChosen by remember { mutableStateOf(false) }
-    var desktopCapable by remember { mutableStateOf(false) }
-    var unresolvedFolderWarning by remember { mutableStateOf(false) }
-    var pathEntry by remember { mutableStateOf("") }
-    var pathError by remember { mutableStateOf<String?>(null) }
-    var storageAccessGranted by remember { mutableStateOf(hasStorageAccess(context)) }
-    var storageDenied by remember { mutableStateOf(false) }
-    var storagePermanentlyDenied by remember { mutableStateOf(false) }
-    var chosenMode by remember { mutableStateOf<dev.droidtop.library.settings.Mode?>(null) }
-    var confirmLeaving by remember { mutableStateOf(false) }
-    var structureReport by remember { mutableStateOf<String?>(null) }
-
-    var rootsVersion by remember { mutableStateOf(0) }
     val roots = remember(rootsVersion) { GamesRootPrefs.gamesRootPaths(context) }
     // What each root turned out to hold. Filled in off the main thread as
     // roots appear; a root with no report yet shows "Looking…" rather
     // than a number it has not counted.
-    val rootReports = remember { mutableStateMapOf<String, GamesRootReport.Report>() }
-    val rootProgress = remember { mutableStateMapOf<String, GamesRootReport.Progress>() }
+    val rootReports = run.rootReports
+    val rootProgress = run.rootProgress
 
     LaunchedEffect(rootsVersion, roots) {
         roots.forEach { path ->
@@ -309,11 +409,12 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
     }
 
 
-    // The plan's storage question is asked once, at entry, for the reason
-    // plannedSteps gives: a plan that changes under the user's feet
-    // cannot say where to go next.
-    val storageGrantedAtEntry = remember { storageAccessGranted }
-    val plan = plannedSteps(homeChoice, configureDesktop, configureGaming, storageGrantedAtEntry)
+    // ONE plan per run. Its storage question is answered once, when the
+    // run starts (see OnboardingRun.storageGrantedAtEntry), for the
+    // reason plannedSteps gives: a plan that changes under the user's
+    // feet cannot say where to go next -- and a plan rebuilt from a
+    // fresh reading after every rotation is exactly that.
+    val plan = plannedSteps(homeChoice, configureDesktop, configureGaming, run.storageGrantedAtEntry)
 
     fun goTo(next: OnboardingStep) {
         history.add(step)
