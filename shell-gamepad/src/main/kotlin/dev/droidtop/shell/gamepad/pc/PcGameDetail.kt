@@ -1,6 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +49,7 @@ import dev.droidtop.library.RunnerState
 import dev.droidtop.library.scraper.PcScraper
 import dev.droidtop.shell.gamepad.CollectionMembershipEditor
 import dev.droidtop.shell.gamepad.ManualMatchPicker
+import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.MediaViewer
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
@@ -221,56 +223,41 @@ internal fun PcGameDetail(
                 .padding(horizontal = dev.droidtop.shell.gamepad.LocalShellWindow.current.edgePadding),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            item {
-                if (entry.artworkUri != null) {
-                    Box(modifier = Modifier.fillMaxWidth().height(220.dp).padding(top = 24.dp)) {
-                        AsyncImage(
-                            model = entry.artworkUri,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize().background(Color(0xFF1A1A1A), RoundedCornerShape(16.dp)),
-                        )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .align(Alignment.BottomStart)
-                                .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000))))
-                                .padding(12.dp),
-                        ) {
-                            Text(entry.identityLine(), color = Color.White, style = MaterialTheme.typography.labelMedium)
-                        }
-                    }
-                }
-            }
-            item {
-                Column(modifier = Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(entry.title, color = Color.White, style = MaterialTheme.typography.headlineMedium)
-                    if (entry.artworkUri == null) {
-                        Text(entry.identityLine(), color = Color.Gray, style = MaterialTheme.typography.titleMedium)
-                    }
-                }
-            }
+            // ONE header, artwork or not: a game's own screen opens with
+            // the game, never straight into a column of rows. A game with
+            // no scraped art gets the same plate with the same title and
+            // identity line over it, so the screen has the same shape
+            // either way (research/ui-polish item 18).
+            item { PcDetailHeader(entry) }
 
-            // 1. Runs with — the resolved runner and the reason it won.
-            item {
-                DetailRow(
-                    title = "Runs with",
-                    detail = when {
-                        !loaded -> "Working out what can run this…"
-                        runner == null -> "Nothing on this device can run this game yet"
-                        else -> "${runner.label} - ${runner.reason}"
-                    },
-                    enabled = loaded && runners.options.isNotEmpty(),
-                    onSelect = { picking = true },
-                )
+            // 1. Runs with -- WHICH runner, and how to change it. Whether
+            // this game can be played is the button's sentence and only
+            // the button's: the rig read "Nothing on this device can run
+            // this game yet" here and "Can't play yet / No runner on this
+            // device offers this game" immediately below it, three
+            // wordings of one fact. A game with no runner option at all
+            // has nothing to choose, so the row is not drawn.
+            if (!loaded || runners.options.isNotEmpty()) {
+                item {
+                    DetailRow(
+                        title = "Runs with",
+                        detail = when {
+                            !loaded -> "Working out what can run this…"
+                            runner == null -> "Not chosen -- ${runners.options.size} to choose from"
+                            else -> "${runner.label} - ${runner.reason}"
+                        },
+                        enabled = loaded && runners.options.isNotEmpty(),
+                        onSelect = { picking = true },
+                    )
+                }
             }
 
             // 2. The primary button: Play, or the one action that makes Play possible.
             item {
                 val setupAction = runner?.option?.action
                 val isReady = runner?.option?.state == RunnerState.READY
-                DetailRow(
-                    title = when {
+                PrimaryActionButton(
+                    label = when {
                         !loaded -> "…"
                         isReady -> "Play"
                         setupAction != null -> runner.option.reason ?: "Set up"
@@ -283,7 +270,6 @@ internal fun PcGameDetail(
                         else -> runner?.option?.reason ?: "No runner on this device offers this game"
                     },
                     enabled = loaded && (isReady || setupAction != null),
-                    primary = true,
                     onSelect = {
                         if (isReady) {
                             onLaunch()
@@ -552,12 +538,124 @@ private const val PC_CONTAINER_CONFIG_ACTIVITY = "dev.droidtop.app.PcContainerCo
 private const val EXTRA_PC_ENTRY_ID = "dev.droidtop.app.extra.PC_ENTRY_ID"
 private const val EXTRA_PC_TITLE = "dev.droidtop.app.extra.PC_TITLE"
 
+/**
+ * A game's own screen opens with the game: its artwork when something has
+ * scraped some, and the same plate with the same two lines when nothing
+ * has. One anatomy either way -- the rig's detail screen started straight
+ * into rows, with nothing of the game on its own screen at all.
+ *
+ * Nothing is invented here: the plate is the title and the identity line
+ * this entry already carries, on the shell's own surface colour. There is
+ * no stand-in cover art, because a made-up cover is a lie about a game.
+ */
+@Composable
+private fun PcDetailHeader(entry: LibraryEntry) {
+    Box(modifier = Modifier.fillMaxWidth().height(220.dp).padding(top = 24.dp)) {
+        if (entry.artworkUri != null) {
+            AsyncImage(
+                model = entry.artworkUri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().background(Color(0xFF1A1A1A), RoundedCornerShape(16.dp)),
+            )
+        } else {
+            Box(modifier = Modifier.fillMaxSize().background(Color(0xFF1A1A1A), RoundedCornerShape(16.dp)))
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomStart)
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000))))
+                .padding(16.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    entry.title,
+                    color = Color.White,
+                    style = MaterialTheme.typography.headlineSmall,
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                )
+                Text(
+                    entry.identityLine(),
+                    color = Color.LightGray,
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The one thing this screen is FOR, as a button rather than as another
+ * row in the list of rows. It says what pressing it does and what will
+ * happen; when nothing can be done it is a disabled button that says why,
+ * which is the only honest shape for "this game has no runner here"
+ * (research/ui-polish item 18).
+ */
+@Composable
+private fun PrimaryActionButton(
+    label: String,
+    detail: String,
+    enabled: Boolean,
+    onSelect: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(12.dp)
+    val background = when {
+        !enabled -> Color(0xFF232323)
+        focused -> Color(0xFF3D7A52)
+        else -> Color(0xFF2B5C3C)
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp)
+            .onFocusChanged { focused = it.isFocused }
+            .focusable(enabled = enabled)
+            .then(if (enabled) Modifier.clickable(onClick = onSelect) else Modifier)
+            .onKeyEvent { event ->
+                if (enabled && event.type == KeyEventType.KeyUp &&
+                    GamepadKeyMap.actionFor(event.key) == GamepadAction.A
+                ) {
+                    onSelect()
+                    true
+                } else {
+                    false
+                }
+            }
+            .background(background, shape)
+            .border(
+                width = if (focused) 3.dp else 1.dp,
+                color = if (focused) MenuTokens.Accent else Color(0x1FFFFFFF),
+                shape = shape,
+            )
+            .padding(horizontal = 20.dp, vertical = 18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            label,
+            color = if (enabled) Color.White else Color(0xFF8A8A8A),
+            style = MaterialTheme.typography.headlineSmall,
+        )
+        if (detail.isNotBlank()) {
+            Text(
+                detail,
+                color = if (enabled) Color(0xFFD7E6DC) else Color(0xFF6F6F6F),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
 @Composable
 private fun DetailRow(
     title: String,
     detail: String,
     enabled: Boolean,
-    primary: Boolean = false,
     onSelect: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -578,11 +676,7 @@ private fun DetailRow(
                 }
             }
             .background(
-                when {
-                    focused -> Color(0xFF2F2F2F)
-                    primary && enabled -> Color(0xFF1F3B2A)
-                    else -> Color(0xFF141414)
-                },
+                if (focused) Color(0xFF2F2F2F) else Color(0xFF141414),
                 RoundedCornerShape(10.dp),
             )
             .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -591,7 +685,7 @@ private fun DetailRow(
         Text(
             title,
             color = if (enabled) Color.White else Color(0xFF7A7A7A),
-            style = if (primary) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleMedium,
         )
         if (detail.isNotBlank()) {
             Text(detail, color = if (enabled) Color.LightGray else Color(0xFF5F5F5F), style = MaterialTheme.typography.bodySmall)

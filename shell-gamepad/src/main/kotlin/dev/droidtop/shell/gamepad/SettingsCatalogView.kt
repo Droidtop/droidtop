@@ -305,7 +305,7 @@ fun CatalogNavigator(
                         else -> false
                     }
                 }
-                .padding(MenuListPadding),
+            contentPadding = MenuListContentPadding,
             verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
         ) {
             itemsIndexed(rows) { index, row ->
@@ -435,7 +435,10 @@ private fun CatalogRowView(
         is SliderItem -> item.current.toString()
         is TextInputItem -> if (item.secret && item.value.isNotEmpty()) "••••" else item.value.ifEmpty { null }
         is NestedScreenItem -> item.valueLabel?.invoke(context)
-        else -> null
+        // The kinds with no state of their own carry it themselves
+        // (CatalogItem.value): Network's connection, VPN's on/off, a
+        // quick setting that is waiting on a permission.
+        else -> item.value
     }
     val placeholder = value == null && item is TextInputItem
     MenuRow(
@@ -493,7 +496,7 @@ internal fun CatalogChoicePicker(
                         else -> false
                     }
                 }
-                .padding(MenuListPadding),
+            contentPadding = MenuListContentPadding,
             verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
         ) {
             itemsIndexed(item.options) { index, option ->
