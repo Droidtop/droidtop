@@ -2342,6 +2342,12 @@ buttons and a link. The component is the shell's existing menu row anatomy
 
 ### Copy
 
+A summary states what it knows, and says so when it does not know yet:
+"You're set up" reported `Gaming: set up, with no games found yet.` while
+the folder it had just been given was still being walked (rig, build 539).
+A count in flight says it is counting, and says how far it has got; only a
+finished count with nothing in it says nothing was found.
+
 Sentence case. One dash convention. One name per concept — "game folders" is never also "ROM
 folders". No developer notation in a user-facing string (no `<folder>/<system>/<romFile>`, no
 package or class names, no backend error text). Button labels are the verb of what happens.
@@ -3930,6 +3936,33 @@ folder` lines and bury the one line that mattered. The duration is in
 every line because "is the scan bounded" is a question the log has to be
 able to answer.
 
+**"The roots changed" is a subscription, not a check.** Which folders are
+scanned is a preference, and the event that invalidates every provider's
+cache is a write to it -- so the shell SUBSCRIBES to that write
+(`GamesRoots.changes`) and walks when it arrives, rather than asking once
+when a screen happens to compose. Build 539 is why: onboarding runs as an
+Activity stacked on top of the Gaming shell and adds the games folder
+while the shell's composition is alive; finishing it resumes the shell
+through `onResume`, which recomposes nothing, so the one-shot check had
+already run against no roots and never ran again. The library sat on "No
+games detected yet." for eleven minutes with 151 games in the folder the
+person had just named, and only the settings rescan intent could start a
+walk. The same subscription also makes the restart honest: a walk already
+in flight is walking the OLD folders, so a roots change cancels it and
+starts the new one (`Library.scanInBackground(restart = true)`) instead of
+joining a scan whose answer is stale.
+
+**The scan log has two sinks, because logcat is the device's and not
+droidtop's.** Every line still goes to `droidtop.ScanLog`, and the same
+line is appended to a rolling file droidtop owns,
+`<external files>/logs/scan.log` (256 KB, one rotation), with one line per
+process start naming the build. A rig session on build 539 walked a whole
+library and could not find a single scan line in logcat afterwards, which
+made every scan defect in that session undiagnosable -- "found nothing",
+"never ran" and "ran, and its lines were evicted from a shared ring
+buffer" look identical when the log is gone. A rig reads it with
+`adb shell cat /sdcard/Android/data/dev.droidtop.app/files/logs/scan.log`.
+
 And because the screen that changes *which* folders are scanned should be
 able to act on that change, ROM folders offers the same "Rescan library"
 action Gaming settings does — the same item, by id, so the in-shell
@@ -4923,6 +4956,47 @@ of that walk and could disagree about what a game is; they now share
 Every skipped directory is logged with its reason, so this never loses
 files silently.
 
+### A folder that holds games is a container, in both walks (rig, 2026-09-16)
+
+droidtop has two walks over a games root -- engine detection
+(`GameEngineDetector`) and the PC folder scan (`PcFolderScan`) -- and the
+rig showed what happens when only one of them knows the rule. The rules
+below are one set, asked by both, in this order:
+
+1. **A folder with two or more ENGINE games directly below it is a
+   container**, whatever evidence it carries of its own. `adult/godot`
+   holds two Godot games and one loose Godot Linux build left beside them;
+   the loose build is precise Godot evidence, so the category folder
+   became a game called "godot" and both games inside it were never
+   walked. Two, not one: a folder with exactly one game below it is that
+   game's wrapper or its payload, and both walks already have rules for
+   that shape. Only the immediate children are tested, with the precise
+   rules only, so this costs one directory listing per child.
+2. **A folder that directly holds an executable and no engine evidence at
+   all is a PC game, and its subfolders are its payload.** The engine walk
+   stops there instead of descending: `Ghost Recon Breakpoint/benchmark`
+   (an index.html and sixteen PNGs) and `The Movies/Docs` were listed as
+   games by the database's weakest row, "there is a page here", while the
+   games they sit inside were not listed at all.
+3. **A folder that holds files of its own AND games below it is those
+   games' root**, however many there are. The one-game form of this rule
+   could not see a Ubisoft install: `Far Cry 5` keeps its launcher files
+   in the game folder and its executables in `bin` and `bin_plus`, so the
+   list got `bin` and `bin_plus` and never Far Cry 5. `EA/SimCity` is the
+   same shape with three payload folders. A container proper holds no
+   files of its own, which is what still makes `EA`, `Ubisoft`, `adult`
+   and a games root containers.
+
+**droidtop's own answer is not read back out of a vendored preference.**
+The folders `PcFolderScan` finds are turned into library items directly,
+in the same pass, and only written to gamenative's `customGameManualFolders`
+as a side effect for its own screens. They used to be written there and
+read straight back: `PrefManager.setPref` hands the write to a DataStore
+coroutine and returns, while `candidateFolders()` reads synchronously, so
+the first scan after an install read the EMPTY set. That is why build 537
+(upgraded, with a previous run's value in the preference) listed 171 games
+and a freshly installed 539 listed 151 with every folder game missing.
+
 
 ## 7j. Portrait and touch-first chrome (directed 2026-09-10)
 
@@ -4991,6 +5065,17 @@ pad. Consequences:
   pinned beside it. Four tab names do not fit across a 411dp phone, and a
   plain row pushes the last one --- in desktop mode, a tab with no other
   touch route --- silently off the edge.
+
+**Every screen states its own way out, and the hint bar tells the truth
+about it (rig, build 539).** The Gaming shell's Settings section declared
+"no back available" while a nested settings screen was open, which took
+the B hint out of the hint bar -- and that hint IS the touch route to B,
+so a person on a touch screen had no way out of "Windows games" at all and
+Game folders, Rescan library and Software updates became unreachable. Two
+rules follow: a section that can go back says so, always; and a menu takes
+B by every route it can arrive on -- the back dispatcher (what KEYCODE_BACK
+and the hint bar's own tap become), and `KEYCODE_BUTTON_B`/Escape as
+ordinary key events, which never reach that dispatcher at all.
 
 The pad keeps everything. Touch affordances are additions; no key route
 was changed or removed, and a pad plugged into a portrait phone behaves
