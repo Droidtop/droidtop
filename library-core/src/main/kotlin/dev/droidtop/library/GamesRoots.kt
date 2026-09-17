@@ -1,8 +1,12 @@
 package dev.droidtop.library
 
 import android.content.Context
+import android.content.SharedPreferences
 import java.io.File
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 
 /**
  * Real, current ROM/game root folders -- reads the same
@@ -54,6 +58,35 @@ object GamesRoots {
     fun rootsChangedSinceLastScan(context: Context): Boolean {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return prefs.getString(KEY_SCANNED_ROOTS, null) != signature(context)
+    }
+
+    /**
+     * Emits once immediately and again every time the configured roots
+     * change, so "the roots changed, walk them" is ONE mechanism with one
+     * subscriber rather than a check each screen happens to run at a
+     * moment of its own choosing.
+     *
+     * The rig showed why a one-shot check at composition is not enough
+     * (build 539): onboarding runs as an Activity stacked ON TOP of the
+     * shell and adds the games folder while the shell's composition is
+     * alive, and finishing it resumes the shell through `onResume`, not a
+     * recomposition -- so the shell's own "have the roots changed?" check
+     * had already run, against no roots, and never ran again. The library
+     * stayed on "No games detected yet." with 151 games in the folder the
+     * person had just named, and only the Settings rescan intent could
+     * start a walk. A preference listener sees the write itself, whatever
+     * the screen on top is doing.
+     */
+    fun changes(context: Context): Flow<Unit> = callbackFlow {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            // A null key is a clear() of the whole file, which changes the
+            // roots too.
+            if (key == null || key == KEY_GAMES_ROOT_PATHS) trySend(Unit)
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        trySend(Unit)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
 
     /** Records that a scan has covered the roots as they are now. */
