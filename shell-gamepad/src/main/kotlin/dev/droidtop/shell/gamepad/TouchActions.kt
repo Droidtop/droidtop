@@ -56,14 +56,36 @@ fun rememberGamepadTouch(): (GamepadAction) -> Unit {
             val code = GamepadKeyMap.keyCodeFor(action)
             if (code != KeyEvent.KEYCODE_UNKNOWN) {
                 val target = view.rootView ?: view
-                val now = android.os.SystemClock.uptimeMillis()
-                // A real DOWN/UP pair: the shell's handlers read
-                // KeyUp, and the Quick Menu's R2 toggle reads KeyDown.
-                target.dispatchKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, code, 0))
-                target.dispatchKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, code, 0))
+                val handled = dispatchPress(target, code)
+                // What the pad gets for free and the touch route did not:
+                // Android's Generic.kcm gives BUTTON_B a fallback of BACK,
+                // applied by the input pipeline ABOVE the window when the
+                // view tree leaves the B unhandled. A press injected at the
+                // window skips that stage, so a screen that answers back
+                // only through the dispatcher (a game detail with nothing
+                // focused in it, Browse themes with an empty list) took the
+                // pad's B and ignored the pill (rig, build 549). Replaying
+                // the same fallback here is the pad's path, not a second
+                // one: the window's decor hands an unhandled BACK to the
+                // Activity, whose onKeyUp runs the back dispatcher.
+                if (!handled && action == GamepadAction.B && code != KeyEvent.KEYCODE_BACK) {
+                    dispatchPress(target, KeyEvent.KEYCODE_BACK)
+                }
             }
         }
     }
+}
+
+/**
+ * A real DOWN/UP pair into [target]'s window: the shell's handlers read
+ * KeyUp, and the Quick Menu's R2 toggle reads KeyDown. True when either
+ * edge was consumed by something in that window.
+ */
+private fun dispatchPress(target: android.view.View, code: Int): Boolean {
+    val now = android.os.SystemClock.uptimeMillis()
+    val down = target.dispatchKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, code, 0))
+    val up = target.dispatchKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, code, 0))
+    return down || up
 }
 
 /**

@@ -26,6 +26,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -98,6 +99,13 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
     LaunchedEffect(entries) {
         if (entries.isNotEmpty()) firstFocus.requestFocus()
     }
+    // The dispatcher route out, which is the only route when the list is
+    // empty: with no row focused there is nothing for a key event to
+    // bubble from, so the onKeyEvent below never ran and BACK, B and the
+    // "B Back" pill were all inert on a rig with no theme index (build
+    // 549). This screen replaces the settings navigator, whose own
+    // BackHandler left with it.
+    BackHandler { onDismiss() }
 
     Box(
         modifier = Modifier.fillMaxSize().background(Color.Black)
