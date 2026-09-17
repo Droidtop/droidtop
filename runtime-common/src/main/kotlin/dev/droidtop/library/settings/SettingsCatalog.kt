@@ -99,7 +99,9 @@ class TextInputItem(
     override val id: String,
     override val title: String,
     override val subtitle: String? = null,
-    val value: String,
+    // The text IS this setting's value column (CatalogItem.value), so it
+    // overrides rather than shadowing it under the same name.
+    override val value: String,
     val secret: Boolean = false,
     val multiline: Boolean = false,
     val onChange: (Context, String) -> Unit,
