@@ -54,9 +54,16 @@ class ScanBudget private constructor(
     /** Whether the walk must stop descending now. */
     val expired: Boolean get() = budgetMs > 0 && elapsedMs >= budgetMs
 
-    /** What a log line says when this budget cut a folder short. */
+    /**
+     * What a log line says when this budget cut a folder's own step
+     * short. Deliberately says nothing about what the walk does next:
+     * the ROM walk stops at such a directory (reading it again would cost
+     * the same again), while the engine walk drops only this folder's own
+     * evidence and still walks its children, each under a budget of its
+     * own -- see [dev.droidtop.library.GameEngineDetector]'s walk.
+     */
     fun reason(): String =
-        "reading this folder itself ran past its ${budgetMs} ms budget, so nothing below it was read"
+        "reading this folder's own contents ran past its ${budgetMs} ms budget"
 
     companion object {
         /**
@@ -81,6 +88,87 @@ class ScanBudget private constructor(
     }
 }
 
+
+/**
+ * What one walk did NOT read, by reason, with the folders each reason
+ * fired on.
+ *
+ * Counts alone were the whole of this until 2026-09-16, deliberately:
+ * the rig's logcat had several hundred `Not listing games in ...` lines
+ * and the one line that mattered was buried, so [ScanLog] prints one line
+ * per folder and per root with counts by reason instead. The rig then
+ * showed what a bare count cannot do: `engine folder .../Ubisoft: 0 games,
+ * 2 folders skipped (2 x it is a console system folder, scanned for ROMs
+ * instead)` gives a person no way to tell WHICH two folders were passed
+ * over, and the games missing from that root could not be traced from the
+ * log at all. So the folders are kept beside the count and the line names
+ * them, capped at [MAX_NAMED] per reason so one rule firing on a thousand
+ * hidden folders still costs one short line.
+ *
+ * Names are printed relative to the folder the line is about, because
+ * "Far Cry 5/data_final/pc" is the fact a person needs and "pc" is not.
+ */
+class ScanSkips {
+
+    private val byReason = LinkedHashMap<String, MutableList<File>>()
+
+    /** Records that [folder] was not read, because of [reason]. */
+    fun add(folder: File, reason: String) {
+        byReason.getOrPut(reason) { mutableListOf() }.add(folder)
+    }
+
+    /** Folds another walk's skips into this one, reason by reason. */
+    fun addAll(other: ScanSkips) {
+        for ((reason, folders) in other.byReason) byReason.getOrPut(reason) { mutableListOf() }.addAll(folders)
+    }
+
+    /** How many folders were skipped in total. */
+    val total: Int get() = byReason.values.sumOf { it.size }
+
+    val isEmpty: Boolean get() = byReason.isEmpty()
+
+    /** Counts by reason -- what a caller that only wants the numbers asks for. */
+    fun counts(): Map<String, Int> = byReason.mapValues { it.value.size }
+
+    /** The folders one reason fired on, in the order they were met. */
+    fun folders(reason: String): List<File> = byReason[reason].orEmpty().toList()
+
+    /**
+     * `2 x it is a console system folder, ... (Far Cry 5/data_final/pc,
+     * Far Cry New Dawn/data_final/pc)`, reasons in descending count order.
+     * [base] is the folder the summary line is about; a folder outside it
+     * keeps its absolute path.
+     */
+    fun describe(base: File?): String =
+        byReason.entries
+            .sortedByDescending { it.value.size }
+            .joinToString("; ") { (reason, folders) ->
+                val shown = folders.take(MAX_NAMED).joinToString(", ") { relativeTo(base, it) }
+                val more = folders.size - MAX_NAMED
+                val names = if (more > 0) "$shown, +$more more" else shown
+                "${folders.size} x $reason ($names)"
+            }
+
+    private fun relativeTo(base: File?, folder: File): String {
+        val basePath = base?.absolutePath ?: return folder.absolutePath
+        val path = folder.absolutePath
+        return if (path.startsWith(basePath + File.separator)) {
+            path.substring(basePath.length + 1)
+        } else {
+            path
+        }
+    }
+
+    companion object {
+        /** How many folders one reason names before the line says "+N more". */
+        const val MAX_NAMED = 6
+
+        /** Every skip of [skipped], as this type -- for walks that collect pairs. */
+        fun of(skipped: List<Pair<File, String>>): ScanSkips =
+            ScanSkips().apply { for ((folder, reason) in skipped) add(folder, reason) }
+    }
+}
+
 /**
  * The one shape of a library-scan log line: one line per folder and one
  * per root, with counts, never one line per skipped directory.
@@ -93,7 +181,12 @@ class ScanBudget private constructor(
  * seeing what the scan actually did. Counts by reason say the same thing
  * in one line and say it better, because a count is the fact a person
  * wants: "1434 skipped, all of them Steam's own tree" is information;
- * 1434 identical lines are not.
+ * 1434 identical lines are not. The count alone was not enough either,
+ * for the opposite reason: build 540's `2 x it is a console system
+ * folder` never said WHICH two folders a root's missing games were behind
+ * (INBOX, 2026-09-16). Each reason now names the folders it fired on, up
+ * to [ScanSkips.MAX_NAMED] of them, so the line stays one line either
+ * way.
  *
  * Pure string formatting, deliberately — the callers pass it to
  * `android.util.Log`, so the format is testable on the JVM without a
@@ -177,10 +270,11 @@ object ScanLog {
     fun write(
         label: String,
         games: Int,
-        skippedByReason: Map<String, Int>,
+        skipped: ScanSkips,
         durationMs: Long,
         note: String? = null,
-    ) = write(summary(label, games, skippedByReason, durationMs, note))
+        base: File? = null,
+    ) = write(summary(label, games, skipped, durationMs, note, base))
 
     private fun timestamp(): String =
         java.text.SimpleDateFormat("MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date())
@@ -189,50 +283,40 @@ object ScanLog {
      * One folder's or one root's summary: what it found, what it did not
      * read and why, and how long it took.
      *
-     * [skippedByReason] is counts keyed by the reason
-     * [ScanPrune.skipReason] (or the ROM walk's own rules) gave, so the
-     * line names the rule that fired rather than the folders it fired on.
-     * [note] carries the one thing a count cannot say — that a budget cut
-     * this folder short, and which folder it stopped at.
+     * [skipped] names the rule that fired AND the folders it fired on
+     * ([ScanSkips]), capped so the line stays one line: a count alone
+     * ("2 x it is a console system folder") left the rig unable to say
+     * which two folders a root's missing games were behind. [base] is the
+     * folder the names are printed relative to -- the folder or root this
+     * line is about. [note] carries the one thing a count cannot say --
+     * that a budget cut this folder short, and which folder it stopped at.
      */
     fun summary(
         label: String,
         games: Int,
-        skippedByReason: Map<String, Int>,
+        skipped: ScanSkips,
         durationMs: Long,
         note: String? = null,
-    ): String {
-        val skipped = skippedByReason.values.sum()
-        return buildString {
-            append(label)
-            append(": ")
-            append(games)
-            append(if (games == 1) " game, " else " games, ")
-            append(skipped)
-            append(if (skipped == 1) " folder skipped" else " folders skipped")
-            if (skippedByReason.isNotEmpty()) {
-                append(" (")
-                append(
-                    skippedByReason.entries
-                        .sortedByDescending { it.value }
-                        .joinToString("; ") { (reason, count) -> "$count x $reason" },
-                )
-                append(")")
-            }
-            append(", ")
-            append(durationMs)
-            append(" ms")
-            if (note != null) {
-                append(" -- ")
-                append(note)
-            }
+        base: File? = null,
+    ): String = buildString {
+        append(label)
+        append(": ")
+        append(games)
+        append(if (games == 1) " game, " else " games, ")
+        append(skipped.total)
+        append(if (skipped.total == 1) " folder skipped" else " folders skipped")
+        if (!skipped.isEmpty) {
+            append(" (")
+            append(skipped.describe(base))
+            append(")")
+        }
+        append(", ")
+        append(durationMs)
+        append(" ms")
+        if (note != null) {
+            append(" -- ")
+            append(note)
         }
     }
 
-    /** [skipped] as counts by reason, for [summary]. */
-    fun countByReason(skipped: List<Pair<File, String>>): Map<String, Int> {
-        val counts = LinkedHashMap<String, Int>()
-        for ((_, reason) in skipped) counts[reason] = (counts[reason] ?: 0) + 1
-        return counts
-    }
 }

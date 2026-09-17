@@ -333,7 +333,7 @@ object PcLibrary {
         dev.droidtop.library.ScanLog.write(
             label = "pc folders under " + rootPaths.joinToString(", "),
             games = found.size,
-            skippedByReason = emptyMap(),
+            skipped = dev.droidtop.library.ScanSkips(),
             durationMs = android.os.SystemClock.elapsedRealtime() - startedAt,
         )
         runCatching {

@@ -250,7 +250,7 @@ class GameEngineDetectorTest {
     }
 
     @Test
-    fun `the walk skips console system folders at every level`() {
+    fun `the walk skips console system folders where systems can live, and no deeper`() {
         val n3ds = dev.droidtop.library.consoles.ConsoleSystemDef(
             id = "n3ds",
             displayName = "Nintendo 3DS",
@@ -270,6 +270,66 @@ class GameEngineDetectorTest {
         val results = GameEngineDetector.scan(tmp.root, mapOf("n3ds" to n3ds), defs)
 
         assertEquals(listOf("VN1"), results.map { it.displayFolder.name })
+    }
+
+    @Test
+    fun `a folder named after a system deep inside a game is part of the game, not a ROM folder`() {
+        // `Ubisoft/Far Cry 5/data_final/pc` and `Ghost Recon Breakpoint/
+        // sounddata/pc` are what build 540's log line `2 x it is a console
+        // system folder, scanned for ROMs instead` was actually counting:
+        // `pc` is a real platform id (DOS games, dosbox_pure), and the rule
+        // fired four folders down inside a game. A system folder lives at
+        // <root>/<system> or <root>/roms/<system>; nothing deeper is one.
+        val pc = dev.droidtop.library.consoles.ConsoleSystemDef(
+            id = "pc",
+            displayName = "PC",
+            extensions = setOf("exe"),
+            retroArchCore = "dosbox_pure",
+        )
+        File(tmp.root, "Ubisoft/Far Cry 5/data_final/pc").mkdirs()
+        File(tmp.root, "Ubisoft/Far Cry 5/data_final/pc/renpy").mkdirs()
+        File(tmp.root, "Ubisoft/Far Cry 5/data_final/pc/game").mkdirs()
+        File(tmp.root, "Ubisoft/Far Cry 5/data_final/pc/game/.keep").createNewFile()
+
+        val scanned = GameEngineDetector.scanRoot(tmp.root, mapOf("pc" to pc), defs)
+
+        assertEquals(listOf("pc"), scanned.games.map { it.displayFolder.name })
+        assertEquals(emptyMap<String, Int>(), scanned.skipped.counts())
+    }
+
+    @Test
+    fun `a payload folder holding the engine markers is the game's root, not a game called files`() {
+        // Humble/macdows95_windows/macdows95: PLAY.bat beside a folder
+        // called `files` holding the whole AIR package. Build 540 listed a
+        // game called `files`. The folder with its own files is the game;
+        // `files` is where its files happen to live.
+        File(tmp.root, "macdows95_windows/macdows95/files/META-INF").mkdirs()
+        File(tmp.root, "macdows95_windows/macdows95/files/mimetype").writeText("application/vnd.adobe.air-application-installer-package+zip")
+        File(tmp.root, "macdows95_windows/macdows95/files/macdows95.swf").writeText("FWS")
+        File(tmp.root, "macdows95_windows/macdows95/PLAY.bat").writeText("@echo off")
+
+        val results = GameEngineDetector.scan(tmp.root, emptyMap(), defs)
+
+        assertEquals(listOf("macdows95"), results.map { it.displayFolder.name })
+        assertEquals("files", results.single().gameRoot.name)
+        assertEquals(GameEngine.FLASH_AIR, results.single().engine)
+    }
+
+    @Test
+    fun `a PC game with a web payload is claimed by neither walk, so the PC list keeps it`() {
+        // The whole of the build-540 defect, in one assertion pair: the
+        // walk must find no engine game AND detectGame must not claim the
+        // folder, or PcGameProvider drops the PC entry as a duplicate of
+        // an engine entry that does not exist.
+        File(tmp.root, "The Movies/Docs").mkdirs()
+        File(tmp.root, "The Movies/MoviesSE.exe").writeText("MZ")
+        File(tmp.root, "The Movies/Docs/index.html").writeText("<html>")
+        val game = File(tmp.root, "The Movies")
+
+        assertEquals(emptyList<DetectedGame>(), GameEngineDetector.scan(tmp.root, emptyMap(), defs))
+        assertNull(GameEngineDetector.detectGame(game, defs))
+        org.junit.Assert.assertFalse(GameEngineDetector.engineOwnsInstall(game, defs))
+        org.junit.Assert.assertTrue(GameEngineDetector.isPlainPcGameFolder(game, defs))
     }
 
     @Test

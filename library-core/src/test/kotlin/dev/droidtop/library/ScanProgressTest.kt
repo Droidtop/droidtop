@@ -68,19 +68,36 @@ class ScanProgressTest {
     // --- the budget inside the engine walk -------------------------------
 
     @Test
-    fun `an over-budget folder stops being walked and says where`() {
-        val folder = File(temp.root, "Steam").apply { mkdirs() }
-        renpyGame("Steam/steamapps/common/Some Game")
+    fun `an over-budget folder keeps the games below it, and says where it was slow`() {
+        // The rig's `adult/RPGMaker` (build 540): the folder's OWN step --
+        // its listing plus the subtree-reading detection rules asked of
+        // it -- ran past 20 s over the shared folder, and the six games
+        // inside it were dropped with it. A budget that drops a subtree
+        // loses real games, so it now costs this folder its own evidence
+        // and nothing else: the walk still goes below it, and every
+        // folder below gets a budget of its own.
+        val folder = File(temp.root, "RPGMaker").apply { mkdirs() }
+        renpyGame("RPGMaker/Some Game")
+        renpyGame("RPGMaker/Another Game")
         var now = 0L
         val budget = ScanBudget.start(budgetMs = 10L, clock = { now })
         now = 100L
 
-        val scanned = GameEngineDetector.scanFolder(folder, emptyMap(), defs, budget = { budget })
+        var handed = 0
+        val scanned = GameEngineDetector.scanFolder(folder, emptyMap(), defs) {
+            // Only the folder's own budget is exhausted; its children get
+            // honest ones, exactly as a real walk hands them out.
+            handed++
+            if (handed == 1) budget else ScanBudget.unlimited()
+        }
 
-        assertEquals(emptyList<DetectedGame>(), scanned.games)
+        assertEquals(
+            listOf("Another Game", "Some Game"),
+            scanned.games.map { it.displayFolder.name }.sorted(),
+        )
         assertEquals(folder, scanned.stoppedAt)
-        assertEquals(1, scanned.skippedByReason.values.sum())
-        assertTrue(scanned.skippedByReason.keys.single().contains("budget"))
+        assertEquals(1, scanned.skipped.total)
+        assertTrue(scanned.skipped.counts().keys.single().contains("budget"))
     }
 
     @Test
@@ -112,7 +129,8 @@ class ScanProgressTest {
 
         // Each unit of work is its own folder, so one slow one costs one.
         assertEquals(listOf("Manual", "Steam", "adult"), top.folders.map { it.name })
-        assertEquals(mapOf("it is a hidden folder" to 1), top.skippedByReason)
+        assertEquals(mapOf("it is a hidden folder" to 1), top.skipped.counts())
+        assertEquals(listOf(".stfolder"), top.skipped.folders("it is a hidden folder").map { it.name })
 
         // And every folder's games are found, the store one included
         // (SPEC 7g, yardstick item 5) while the workshop tree is not walked.
@@ -125,7 +143,8 @@ class ScanProgressTest {
         )
         val steamSkips = GameEngineDetector
             .scanFolder(File(root, "Steam"), emptyMap(), defs, budget = { ScanBudget.unlimited() })
-            .skippedByReason
+            .skipped
+            .counts()
         assertTrue(steamSkips.keys.toString(), steamSkips.keys.any { it.contains("Steam owns this tree") })
     }
 
@@ -154,7 +173,7 @@ class ScanProgressTest {
 
         assertEquals(listOf("A Game", "B Game"), scanned.games.map { it.displayFolder.name }.sorted())
         assertEquals("slow", scanned.stoppedAt?.name)
-        assertTrue(scanned.skippedByReason.keys.single().contains("budget"))
+        assertTrue(scanned.skipped.counts().keys.single().contains("budget"))
     }
 
     @Test
@@ -179,7 +198,7 @@ class ScanProgressTest {
 
         assertEquals(listOf("a.iso", "b.iso"), result.files.map { it.name })
         assertEquals("slow", result.stoppedAt?.name)
-        val reasons = ScanLog.countByReason(result.skipped)
+        val reasons = ScanSkips.of(result.skipped).counts()
         assertEquals(1, reasons.count { it.key.contains("add-on content") })
         assertEquals(1, reasons.count { it.key.contains("budget") })
     }
@@ -187,22 +206,44 @@ class ScanProgressTest {
     // --- the log line ----------------------------------------------------
 
     @Test
-    fun `a scan logs one line per folder with counts, not one line per skip`() {
+    fun `a scan logs one line per folder, naming the folders each rule fired on`() {
+        val base = File("/mnt/windows/BstSharedFolder/Ubisoft")
+        val skips = ScanSkips()
+        // The build-540 line a person could not act on: "2 x it is a
+        // console system folder" without ever saying which two folders.
+        skips.add(File(base, "Far Cry 5/data_final/pc"), CONSOLE)
+        skips.add(File(base, "Far Cry New Dawn/data_final/pc"), CONSOLE)
+        skips.add(File(base, ".gamenative"), "it is a hidden folder")
+
         val line = ScanLog.summary(
-            label = "rom folder /mnt/windows/BstSharedFolder/Steam",
-            games = 0,
-            skippedByReason = mapOf(
-                "Steam owns this tree -- its games are listed from steamapps/common" to 1434,
-                "it is a hidden folder" to 3,
-            ),
-            durationMs = 812,
+            label = "engine folder ${base.path}",
+            games = 3,
+            skipped = skips,
+            durationMs = 1690,
+            base = base,
         )
+
         assertEquals(
-            "rom folder /mnt/windows/BstSharedFolder/Steam: 0 games, 1437 folders skipped " +
-                "(1434 x Steam owns this tree -- its games are listed from steamapps/common; " +
-                "3 x it is a hidden folder), 812 ms",
+            "engine folder /mnt/windows/BstSharedFolder/Ubisoft: 3 games, 3 folders skipped " +
+                "(2 x $CONSOLE (Far Cry 5/data_final/pc, Far Cry New Dawn/data_final/pc); " +
+                "1 x it is a hidden folder (.gamenative)), 1690 ms",
             line,
         )
+    }
+
+    @Test
+    fun `one rule firing on a thousand folders still costs one short line`() {
+        val base = File("/games/Steam")
+        val store = "Steam owns this tree -- its games are listed from steamapps/common"
+        val skips = ScanSkips()
+        repeat(1434) { skips.add(File(base, "steamapps/workshop/content/$it"), store) }
+
+        val line = ScanLog.summary(label = "rom folder ${base.path}", games = 0, skipped = skips, durationMs = 812, base = base)
+
+        assertTrue(line, line.startsWith("rom folder /games/Steam: 0 games, 1434 folders skipped (1434 x $store ("))
+        assertTrue(line, line.contains("steamapps/workshop/content/0, "))
+        assertTrue(line, line.contains("+1428 more"))
+        assertEquals(1, line.lines().size)
     }
 
     @Test
@@ -210,30 +251,35 @@ class ScanProgressTest {
         val line = ScanLog.summary(
             label = "engine folder /games/Steam",
             games = 1,
-            skippedByReason = emptyMap(),
+            skipped = ScanSkips(),
             durationMs = 20_003,
-            note = "stopped in /games/Steam/steamapps/common",
+            note = "read too slowly in /games/Steam/steamapps/common, so only its own evidence was dropped",
         )
         assertEquals(
             "engine folder /games/Steam: 1 game, 0 folders skipped, 20003 ms " +
-                "-- stopped in /games/Steam/steamapps/common",
+                "-- read too slowly in /games/Steam/steamapps/common, so only its own evidence was dropped",
             line,
         )
     }
 
     @Test
-    fun `skips are counted by the rule that fired, not by folder`() {
+    fun `skips are grouped by the rule that fired, and keep every folder it fired on`() {
         val hidden = "it is a hidden folder"
         val store = "Steam owns this tree"
-        val counted = ScanLog.countByReason(
+        val skips = ScanSkips.of(
             listOf(
                 File("/a/.stfolder") to hidden,
                 File("/a/.gamenative") to hidden,
                 File("/a/Steam/steamapps/workshop") to store,
             ),
         )
-        assertEquals(mapOf(hidden to 2, store to 1), counted)
+
+        assertEquals(mapOf(hidden to 2, store to 1), skips.counts())
+        assertEquals(listOf(".stfolder", ".gamenative"), skips.folders(hidden).map { it.name })
+        assertEquals(3, skips.total)
     }
+
+    private val CONSOLE = "it is a console system folder, scanned for ROMs instead"
 
     // --- the incremental publish -----------------------------------------
 

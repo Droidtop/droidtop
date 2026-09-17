@@ -23,7 +23,15 @@ import java.io.File
  *     ([ScanPrune]): hidden and marker folders, a store's non-game tree.
  *  2. **A folder that directly holds an executable is the game.** Its own
  *     subfolders are not further games -- that is what listed
- *     `Ghost Recon Breakpoint/benchmark` as a game of its own.
+ *     `Ghost Recon Breakpoint/benchmark` as a game of its own. The
+ *     engine walk states the same rule from its own side
+ *     ([GameEngineDetector.isPlainPcGameFolder]): a folder holding an
+ *     executable and no engine evidence is a PC game and the engine walk
+ *     neither claims it nor descends into it. This scan lists a folder
+ *     that holds an executable AND engine evidence too; `PcGameProvider`
+ *     drops that entry through the same shared rule
+ *     ([GameEngineDetector.engineOwnsInstall]), so the folder is listed
+ *     once, by the walk that knows what it is.
  *  3. **A folder that only holds other folders is a container**, whatever
  *     it is called: it contributes the games found below it and never
  *     itself. `EA`, `Ubisoft` and `roms` are containers; so is a games
