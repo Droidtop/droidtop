@@ -341,4 +341,48 @@ class GameEngineDetectorTest {
             org.junit.Assert.assertTrue("seed row ${def.id} has no detection rules", def.detect.isNotEmpty())
         }
     }
+
+    @Test
+    fun `a PC game's own subfolders are not engine games`() {
+        // Ghost Recon Breakpoint on the rig: the game folder holds its
+        // executables, and its benchmark folder holds an index.html --
+        // which the database's last row, "there is a page here", read as
+        // a game called "benchmark", while the game it sits inside was
+        // never listed at all.
+        File(tmp.root, "Ghost Recon Breakpoint/benchmark").mkdirs()
+        File(tmp.root, "Ghost Recon Breakpoint/GRB.exe").writeText("MZ")
+        File(tmp.root, "Ghost Recon Breakpoint/benchmark/index.html").writeText("<html>")
+
+        assertEquals(emptyList<String>(), GameEngineDetector.scan(tmp.root, emptyMap(), defs).map { it.displayFolder.name })
+    }
+
+    @Test
+    fun `a category folder holding two engine games is a container, not a game`() {
+        // adult/godot: a loose Godot Linux build beside two Godot games
+        // made the category folder itself the precise match, so it was
+        // listed as a game called "godot" and both games vanished.
+        File(tmp.root, "godot/Anomalous").mkdirs()
+        File(tmp.root, "godot/Goodbye Eternity").mkdirs()
+        File(tmp.root, "godot/loose_linux.x86_64").writeText("ELF")
+        File(tmp.root, "godot/Anomalous/acm2.pck").writeText("pck")
+        File(tmp.root, "godot/Goodbye Eternity/goodbye.pck").writeText("pck")
+
+        val results = GameEngineDetector.scan(tmp.root, emptyMap(), defs)
+
+        assertEquals(listOf("Anomalous", "Goodbye Eternity"), results.map { it.displayFolder.name }.sorted())
+        org.junit.Assert.assertTrue(results.all { it.engine == GameEngine.GODOT })
+    }
+
+    @Test
+    fun `a game folder with one payload folder below it is still the game`() {
+        // The other side of the container rule: ONE game below is a
+        // wrapper or a payload folder, never a container, so a Ren'Py
+        // game whose own game/ folder detects stays one entry.
+        File(tmp.root, "VN1/renpy").mkdirs()
+        File(tmp.root, "VN1/game").mkdirs()
+        File(tmp.root, "VN1/game/.keep").createNewFile()
+        File(tmp.root, "VN1/VN1.exe").writeText("MZ")
+
+        assertEquals(listOf("VN1"), GameEngineDetector.scan(tmp.root, emptyMap(), defs).map { it.displayFolder.name })
+    }
 }

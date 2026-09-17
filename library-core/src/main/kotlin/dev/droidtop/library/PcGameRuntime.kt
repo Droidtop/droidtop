@@ -150,11 +150,16 @@ object GameExecutableResolver {
      * plausible `.exe` files IS a game, it just cannot be launched
      * without the user naming one.
      */
-    fun hasExecutable(gameRoot: File): Boolean =
-        candidates(gameRoot) { it.extension.equals("exe", ignoreCase = true) }.isNotEmpty() ||
-            candidates(gameRoot) { it.extension.equals("sh", ignoreCase = true) }.isNotEmpty() ||
-            candidates(gameRoot) { it.extension.lowercase() in LINUX_ELF_EXTENSIONS }.isNotEmpty() ||
-            candidates(gameRoot) { it.extension.isEmpty() && it.canExecute() }.isNotEmpty()
+    fun hasExecutable(gameRoot: File): Boolean = candidates(gameRoot) { file ->
+        val extension = file.extension.lowercase()
+        extension == "exe" ||
+            extension == "sh" ||
+            extension in LINUX_ELF_EXTENSIONS ||
+            (extension.isEmpty() && file.canExecute())
+        // One listing, not four: both walks ask this of every folder
+        // they touch, and a directory listing over a slow share is the
+        // expensive part of a scan.
+    }.isNotEmpty()
 
     fun windowsExecutable(gameRoot: File): File? = pickOne(
         candidates(gameRoot) { it.extension.equals("exe", ignoreCase = true) },
