@@ -87,7 +87,12 @@ internal fun CollectionMembershipEditor(entry: LibraryEntry, library: Library, o
         if (!loaded) {
             Text("Loading...", color = Color.White, style = MaterialTheme.typography.titleMedium)
         } else {
-            LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                // The hint bar's own room (MenuTokens.HintBarRoom).
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = MenuTokens.HintBarRoom),
+            ) {
                 items(collections) { collection ->
                     val isMember = collection.id in membership
                     CollectionToggleRow(collection.name, isMember) {
