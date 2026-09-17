@@ -1,6 +1,9 @@
 package dev.droidtop.library
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -125,6 +128,29 @@ class PcFolderScanTest {
         game("EA/SimCity/SimCityData", exe = "helper.exe")
         game("EA/SimCity/Support", exe = "support.exe")
         assertEquals(listOf("EA/SimCity"), found())
+    }
+
+    @Test
+    fun `a game whose only subfolder is a web payload is still listed, once`() {
+        // Build 540 listed NEITHER of these anywhere: the engine walk
+        // correctly stopped at the game folder, and detectGame then read
+        // the payload's index.html one level down, called the folder
+        // engine-owned, and PcGameProvider dropped the PC entry as a
+        // duplicate of an engine entry that was never created.
+        game("Ubisoft/Ghost Recon Breakpoint", exe = "GRB.exe")
+        file("Ubisoft/Ghost Recon Breakpoint/benchmark/index.html", contents = "<html>")
+        game("Pirated/The Movies", exe = "MoviesSE.exe")
+        file("Pirated/The Movies/Docs/index.html", contents = "<html>")
+
+        assertEquals(listOf("Pirated/The Movies", "Ubisoft/Ghost Recon Breakpoint"), found())
+        // ...and nothing suppresses them, because engine detection does
+        // not claim a folder whose only engine evidence is its payload's.
+        for (path in listOf("Ubisoft/Ghost Recon Breakpoint", "Pirated/The Movies")) {
+            val folder = File(temp.root, path)
+            assertTrue(path, GameEngineDetector.isPlainPcGameFolder(folder, defs))
+            assertFalse(path, GameEngineDetector.engineOwnsInstall(folder, defs))
+            assertNull(path, GameEngineDetector.detectGame(folder, defs))
+        }
     }
 
     @Test
