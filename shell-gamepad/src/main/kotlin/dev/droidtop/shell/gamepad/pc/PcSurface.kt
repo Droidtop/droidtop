@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,6 +24,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +48,7 @@ import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.TouchHintBar
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
+import kotlinx.coroutines.flow.first
 
 /** ES-DE's own system id for the PC category -- the card this surface opens from. */
 internal const val PC_SYSTEM_ID = "pc"
@@ -84,6 +87,12 @@ private const val PC_STORES_SCREEN_ID = "pc_stores"
 internal fun PcSurface(
     entries: List<LibraryEntry>,
     onOpen: (LibraryEntry) -> Unit,
+    /**
+     * The card to land on: the one the user was on when they last left
+     * this grid (docs/SPEC.md 7i). Null -- never been here -- lands on the
+     * first card, which is what this surface always did.
+     */
+    focusEntryId: String? = null,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
 ) {
     // ONE CARD PER GAME (docs/SPEC.md 7m). A game found in three folders
@@ -97,7 +106,10 @@ internal fun PcSurface(
     var sources by remember { mutableStateOf<Set<String>>(emptySet()) }
     var engines by remember { mutableStateOf<Set<String>>(emptySet()) }
     var installedOnly by remember { mutableStateOf(false) }
-    val firstCard = remember { FocusRequester() }
+    // The card the grid opens on. One requester, moved to whichever card
+    // that is, rather than a second one for the restored case.
+    val openingCard = remember { FocusRequester() }
+    val gridState = rememberLazyGridState()
 
     // "Stores and folders": sign in to a store, add a games folder, set up
     // Windows games, see the downloads queue. It is :app's own settings
@@ -122,8 +134,24 @@ internal fun PcSurface(
             .sortedWith(sort.comparator)
     }
 
+    // Landing on a card is a ONE-SHOT: after this the user owns the focus,
+    // and re-running it on every filter change would pull focus out of the
+    // chip row the user is standing in.
+    var landed by remember { mutableStateOf(false) }
+    val openingIndex = remember(shown, focusEntryId) {
+        shown.indexOfFirst { it.id == focusEntryId }.takeIf { it >= 0 } ?: 0
+    }
     LaunchedEffect(shown.isNotEmpty()) {
-        if (shown.isNotEmpty()) runCatching { firstCard.requestFocus() }
+        if (shown.isEmpty() || landed) return@LaunchedEffect
+        landed = true
+        // Scroll first: a card outside the viewport is not composed, so
+        // its focus requester is attached to nothing and the request
+        // would be dropped. Waiting for the item to actually appear is
+        // what makes this work for a card 90 rows down.
+        if (openingIndex > 0) runCatching { gridState.scrollToItem(openingIndex) }
+        snapshotFlow { gridState.layoutInfo.visibleItemsInfo.any { it.index == openingIndex } }
+            .first { it }
+        runCatching { openingCard.requestFocus() }
     }
 
     if (options && storesScreen != null) {
@@ -177,6 +205,7 @@ internal fun PcSurface(
                 )
             } else {
                 LazyVerticalGrid(
+                    state = gridState,
                     columns = GridCells.Adaptive(minSize = window.gridItemMinWidth),
                     modifier = Modifier
                         .fillMaxSize()
@@ -206,7 +235,7 @@ internal fun PcSurface(
                     itemsIndexed(shown, key = { _, entry -> entry.id }) { index, entry ->
                         PcGameCard(
                             entry = entry,
-                            modifier = if (index == 0) Modifier.focusRequester(firstCard) else Modifier,
+                            modifier = if (index == openingIndex) Modifier.focusRequester(openingCard) else Modifier,
                             onOpen = { onOpen(entry) },
                             onFocused = { onFocusedEntryChanged(entry) },
                         )

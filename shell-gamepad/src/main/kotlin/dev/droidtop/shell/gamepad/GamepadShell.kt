@@ -198,7 +198,15 @@ fun GamepadShell(
     // only way to force a fresh scan was clearing app data by hand over
     // adb; a real user has no such option.
     var rescanTrigger by remember { mutableStateOf(0) }
-    var section by remember { mutableStateOf(GamingPrefs.defaultSection(context)) }
+    // ONE answer to "where is the shell" (see ShellBackStack): the
+    // section, the group drilled into inside Games, the open detail, and
+    // what was focused in each. Held out here, outside the screens that
+    // draw them, because a screen that owns its own place in the tree
+    // loses it the moment something else is drawn instead -- which is
+    // exactly what build 542's "B from a game detail does not return to
+    // the PC grid" was.
+    val nav = remember { ShellBackStack(GamingPrefs.defaultSection(context)) }
+    val section = nav.section
     // Bumps whenever a real "Browse themes" deep-link arrives (see
     // deepLinkToken's own doc comment) -- SettingsCatalogView opens its
     // inline ThemeBrowserScreen off this token.
@@ -211,11 +219,11 @@ fun GamepadShell(
     LaunchedEffect(deepLinkToken) {
         if (triggerRescan) rescanTrigger++
         if (triggerBrowseThemes) {
-            section = GamingSection.SETTINGS
+            nav.openSection(GamingSection.SETTINGS)
             browseThemesRequest++
         }
         startSectionName?.let { name ->
-            GamingSection.entries.firstOrNull { it.name == name }?.let { section = it }
+            GamingSection.entries.firstOrNull { it.name == name }?.let { nav.openSection(it) }
         }
     }
     // Settings is a real in-shell section again -- cycling to it with L/R
@@ -228,7 +236,7 @@ fun GamepadShell(
     // navigation item inside it (Global settings, another shell's
     // settings, Console systems) still opens those real surfaces -- that's
     // a deliberate user choice, exactly the distinction this draws.
-    val selectSection: (GamingSection) -> Unit = { target -> section = target }
+    val selectSection: (GamingSection) -> Unit = { target -> nav.openSection(target) }
     var canGoBack by remember { mutableStateOf(false) }
     // True only while GamesSection's own themed system-view render (the
     // real, loaded theme's <helpsystem> element, see EsDeThemedHelpSystem)
@@ -236,7 +244,15 @@ fun GamepadShell(
     // ButtonHintFooter below step aside instead of drawing a second,
     // redundant, differently-styled hint bar on top of the theme's own.
     var themeHandlesHints by remember { mutableStateOf(false) }
-    var detailEntry by remember { mutableStateOf<LibraryEntry?>(null) }
+    // Derived, not a second piece of state: the stack says WHICH entry is
+    // open and the scan says what that entry is. An entry a rescan no
+    // longer finds closes its own detail instead of showing a game that
+    // is not there any more.
+    val detailEntry = remember(nav.detailId, gameEntries, appEntries) {
+        nav.detailId?.let { id ->
+            gameEntries.orEmpty().firstOrNull { it.id == id } ?: appEntries.orEmpty().firstOrNull { it.id == id }
+        }
+    }
     val scope = rememberCoroutineScope()
     // Real user-visible launch-failure state -- see launchError's render
     // site. A failed launch must inform, never kill.
@@ -263,7 +279,7 @@ fun GamepadShell(
     val screensaverMode = remember { ScreensaverPrefs.mode(context) }
     LaunchedEffect(uiMode) {
         if (uiMode.hidesSettings && section == GamingSection.SETTINGS) {
-            section = GamingSection.GAMES
+            nav.openSection(GamingSection.GAMES)
         }
     }
     LaunchedEffect(lastInputMs, screensaverMode, launching) {
@@ -446,7 +462,7 @@ fun GamepadShell(
     }
     // Real dispatcher-route for closing the detail screen with B/back --
     // same reason as the drill-up BackHandler in GamesSection.
-    androidx.activity.compose.BackHandler(enabled = detailEntry != null) { detailEntry = null }
+    androidx.activity.compose.BackHandler(enabled = detailEntry != null) { nav.back() }
     // The shell's own button bar is drawn on every touch-first window
     // where hints are enabled at all (see the ButtonHintFooter call at the
     // bottom of this Column), and while it is up it IS the help bar -- see
@@ -649,20 +665,23 @@ fun GamepadShell(
                 entry != null && entry.isPcOrEngineGame -> PcGameDetail(
                     entry = entry,
                     library = library,
-                    onLaunch = { onLaunch(entry); detailEntry = null },
-                    onClose = { detailEntry = null },
+                    onLaunch = { onLaunch(entry); nav.back() },
+                    onClose = { nav.back() },
                     // The game's other folders -- its versions and its
                     // segments (docs/SPEC.md 7m) -- are reachable from
                     // here, and picking one opens that folder's own
                     // detail, so Play starts what the user chose.
                     siblings = gameEntries.orEmpty(),
-                    onOpenOther = { detailEntry = it },
+                    // Sideways, not deeper: another folder of the same
+                    // game replaces this detail, so B from it still means
+                    // "back to the grid I came from".
+                    onOpenOther = { nav.openDetail(it.id) },
                 )
                 entry != null -> EntryDetailScreen(
                     entry = entry,
                     library = library,
-                    onLaunch = { onLaunch(entry); detailEntry = null },
-                    onClose = { detailEntry = null },
+                    onLaunch = { onLaunch(entry); nav.back() },
+                    onClose = { nav.back() },
                 )
                 section == GamingSection.SETTINGS -> {
                     // Back always does something in Settings: it pops a
@@ -676,7 +695,7 @@ fun GamepadShell(
                     canGoBack = true
                     themeHandlesHints = false
                     SettingsCatalogView(
-                        onBack = { section = GamingPrefs.defaultSection(context) },
+                        onBack = { nav.openSection(GamingPrefs.defaultSection(context)) },
                         onRescan = { rescanTrigger++ },
                         browseThemesToken = browseThemesRequest,
                     )
@@ -694,7 +713,8 @@ fun GamepadShell(
                         },
                         library = library,
                         onLaunch = onLaunch,
-                        onShowDetail = { detailEntry = it },
+                        nav = nav,
+                        onShowDetail = { nav.rememberFocus(it.id); nav.openDetail(it.id) },
                         onDrillDownChanged = { canGoBack = it },
                         onFocusedEntryChanged = onFocusedEntryChanged,
                         onThemeHandlesHints = { themeHandlesHints = it },
@@ -707,7 +727,7 @@ fun GamepadShell(
                         AppsSection(
                             entries = appEntries.orEmpty(),
                             onLaunch = onLaunch,
-                            onShowDetail = { detailEntry = it },
+                            onShowDetail = { nav.openDetail(it.id) },
                             onFocusedEntryChanged = onFocusedEntryChanged,
                             onToggleFavorite = onToggleFavorite,
                         )
@@ -1443,6 +1463,7 @@ internal fun gameGroupKey(entry: LibraryEntry): String = entry.gameGroup().key
 private fun GamesSection(
     entries: List<LibraryEntry>,
     library: Library,
+    nav: ShellBackStack,
     onLaunch: (LibraryEntry) -> Unit,
     onShowDetail: (LibraryEntry) -> Unit,
     onDrillDownChanged: (Boolean) -> Unit,
@@ -1451,7 +1472,6 @@ private fun GamesSection(
     onToggleFavorite: (LibraryEntry) -> Unit = {},
     onRequestRescan: () -> Unit = {},
 ) {
-    var selectedGroup by remember { mutableStateOf<GameGroup?>(null) }
     var recentOnly by remember { mutableStateOf(false) }
     // The in-gamelist options overlay (sort, scrape, import) -- see
     // GamelistOptionsMenu. sortVersion invalidates the games ordering
@@ -1505,6 +1525,41 @@ private fun GamesSection(
             }
         }
     }
+    // Present-and-non-empty groups -- engines first (in GAME_KINDS'
+    // declaration order), then real console systems (alphabetical by
+    // display name) -- hoisted so both the system-list view and the
+    // per-system grid view share one ordering (needed for ES-DE-style
+    // Left/Right sibling-system switching below).
+    val byGroup = entries.groupBy { it.gameGroup() }
+    // Keyed on the platform database's load version as well as the
+    // groups: labels resolve through its cache, which warms on a
+    // background thread -- sorting before the warm lands used raw
+    // system ids and froze "switch" at the end of the carousel
+    // (observed live) instead of "Nintendo Switch" among the Nintendos.
+    val platformsLoadVersion by dev.droidtop.library.consoles.PlatformsDatabase.loadVersion.collectAsState()
+    // The PC card sorts among the console systems by its own label, the
+    // same as every other card: it is a category of the library, not a
+    // section of chrome.
+    val orderedSystemGroups = remember(byGroup, platformsLoadVersion) {
+        byGroup.keys
+            .filterNot { it is GameGroup.Collection }
+            .sortedBy { it.label.lowercase() }
+    }
+    // Carousel order, per direction (2026-08-31): "All games" leads
+    // straight into the real systems -- Favorites/Last played/custom
+    // collections were wedged between them, which meant scrolling past
+    // chrome to reach content. They trail at the end instead.
+    val leadingCollections = collectionGroups.filter { it.id == AutoCollections.ALL_GAMES_ID }
+    val trailingCollections = collectionGroups.filterNot { it.id == AutoCollections.ALL_GAMES_ID }
+    val orderedGroups: List<GameGroup> =
+        leadingCollections + orderedSystemGroups + trailingCollections
+
+    // WHERE the shell is, asked rather than owned (see ShellBackStack):
+    // this screen is rebuilt from scratch every time something else is
+    // drawn over it, so a group it remembered itself would be lost every
+    // time a game detail opened.
+    val selectedGroup = orderedGroups.firstOrNull { it.key == nav.groupKey }
+    val selectGroup: (GameGroup?) -> Unit = { group -> nav.openGroup(group?.key) }
     // Real per-game navigation index for the drilled-into-a-system
     // "gamelist" screen, ONLY used when the active theme's own real
     // gamelist view has no <carousel>/<grid>/<textlist> of its own to
@@ -1513,7 +1568,6 @@ private fun GamesSection(
     // updated doc comment). Reset whenever the drilled-into system
     // changes, matching real ES-DE's own "selection resets per gamelist"
     // convention.
-    var focusedGameIndex by remember(selectedGroup) { mutableStateOf(0) }
     val selectedGroupSystemId = selectedGroup?.systemThemeFolder
     val selectedGroupThemeFolder = (selectedGroup as? GameGroup.Collection)?.themeFolder
     val selectedGroupLabel = selectedGroup?.label
@@ -1567,6 +1621,13 @@ private fun GamesSection(
                     .sortedWith(GamelistSortPrefs.comparator(GamelistSortPrefs.get(context, group.label)))
             }
         }
+    }
+    // Which game the gamelist is on. Restored from the stack, so coming
+    // back from a game's detail lands on that game rather than at the top
+    // of the list; 0 -- ES-DE's own "selection resets per gamelist" -- for
+    // a group this session has not been in.
+    var focusedGameIndex by remember(selectedGroup) {
+        mutableStateOf(systemGamesForGroup.indexOfFirst { it.id == nav.focusHere }.coerceAtLeast(0))
     }
     if (gamelistOptionsOpen) {
         val group = selectedGroup
@@ -1653,40 +1714,22 @@ private fun GamesSection(
             )
         }
     }
-    // Present-and-non-empty groups -- engines first (in GAME_KINDS'
-    // declaration order), then real console systems (alphabetical by
-    // display name) -- hoisted so both the system-list view and the
-    // per-system grid view share one ordering (needed for ES-DE-style
-    // Left/Right sibling-system switching below).
-    val byGroup = entries.groupBy { it.gameGroup() }
-    // Keyed on the platform database's load version as well as the
-    // groups: labels resolve through its cache, which warms on a
-    // background thread -- sorting before the warm lands used raw
-    // system ids and froze "switch" at the end of the carousel
-    // (observed live) instead of "Nintendo Switch" among the Nintendos.
-    val platformsLoadVersion by dev.droidtop.library.consoles.PlatformsDatabase.loadVersion.collectAsState()
-    // The PC card sorts among the console systems by its own label, the
-    // same as every other card: it is a category of the library, not a
-    // section of chrome.
-    val orderedSystemGroups = remember(byGroup, platformsLoadVersion) {
-        byGroup.keys
-            .filterNot { it is GameGroup.Collection }
-            .sortedBy { it.label.lowercase() }
-    }
-    // Carousel order, per direction (2026-08-31): "All games" leads
-    // straight into the real systems -- Favorites/Last played/custom
-    // collections were wedged between them, which meant scrolling past
-    // chrome to reach content. They trail at the end instead.
-    val leadingCollections = collectionGroups.filter { it.id == AutoCollections.ALL_GAMES_ID }
-    val trailingCollections = collectionGroups.filterNot { it.id == AutoCollections.ALL_GAMES_ID }
-    val orderedGroups: List<GameGroup> =
-        leadingCollections + orderedSystemGroups + trailingCollections
     LaunchedEffect(selectedGroup, hasThemedGamelist, focusedGameIndex) {
         // Real regardless of whether the theme's gamelist has its own
         // list widget -- a widget's onFocusedIndexChanged (wired at the
         // render call site below) updates the exact same focusedGameIndex
         // state the headless case's own Up/Down handling uses.
-        if (hasThemedGamelist) onFocusedEntryChanged(systemGamesForGroup.getOrNull(focusedGameIndex))
+        // The PC surface draws its own grid and reports its own focus
+        // (see the PcSurface call below); this index addresses the themed
+        // gamelist only, so it must not answer for a screen it does not
+        // drive.
+        if (hasThemedGamelist && selectedGroup !is GameGroup.Pc) {
+            onFocusedEntryChanged(systemGamesForGroup.getOrNull(focusedGameIndex))
+            // What to come back to. Recorded as the user moves, not only
+            // when they open something, so B out of a detail and B out of
+            // the gamelist agree about where they were.
+            nav.rememberFocus(systemGamesForGroup.getOrNull(focusedGameIndex)?.id)
+        }
     }
     LaunchedEffect(selectedGroup, hasThemedGamelist) {
         onDrillDownChanged(selectedGroup != null)
@@ -1720,7 +1763,7 @@ private fun GamesSection(
         // route and the onKeyEvent branch below are the same real drill-up,
         // just different hardware paths (see this handler's own comment).
         EsDeNavigationSounds.play("back")
-        selectedGroup = null
+        selectGroup(null)
     }
     Box(
         modifier = Modifier
@@ -1739,7 +1782,7 @@ private fun GamesSection(
                     (action == GamepadAction.BACK || action == GamepadAction.B) && group != null -> {
                         // Same real BACKSOUND as the BackHandler route above.
                         EsDeNavigationSounds.play("back")
-                        selectedGroup = null
+                        selectGroup(null)
                         true
                     }
                     // ES-DE's real, documented "General navigation" convention:
@@ -1760,7 +1803,7 @@ private fun GamesSection(
                         val index = orderedGroups.indexOf(group)
                         val step = if (action == GamepadAction.L) -1 else 1
                         EsDeNavigationSounds.play("quicksysselect")
-                        selectedGroup = orderedGroups[(index + step + orderedGroups.size) % orderedGroups.size]
+                        selectGroup(orderedGroups[(index + step + orderedGroups.size) % orderedGroups.size])
                         true
                     }
                     // Gamelist options (sort/scrape/import) right where
@@ -1782,13 +1825,13 @@ private fun GamesSection(
                         // call sites, both in its Left/Right system jump).
                         EsDeNavigationSounds.play("quicksysselect")
                         val index = orderedGroups.indexOf(group)
-                        selectedGroup = orderedGroups[(index - 1 + orderedGroups.size) % orderedGroups.size]
+                        selectGroup(orderedGroups[(index - 1 + orderedGroups.size) % orderedGroups.size])
                         true
                     }
                     action == GamepadAction.RIGHT && group != null && orderedGroups.size > 1 -> {
                         EsDeNavigationSounds.play("quicksysselect")
                         val index = orderedGroups.indexOf(group)
-                        selectedGroup = orderedGroups[(index + 1) % orderedGroups.size]
+                        selectGroup(orderedGroups[(index + 1) % orderedGroups.size])
                         true
                     }
                     // Real, headless per-game navigation -- only when the
@@ -1996,7 +2039,7 @@ private fun GamesSection(
                                     // SELECTSOUND (SystemView.cpp:129).
                                     onSelect = {
                                         EsDeNavigationSounds.play("select")
-                                        selectedGroup = entryGroup
+                                        selectGroup(entryGroup)
                                     },
                                 )
                             }
@@ -2242,7 +2285,13 @@ private fun GamesSection(
                     // say "1 game" over a surface that said "No PC games yet".
                     entries = systemGamesForGroup,
                     onOpen = onShowDetail,
-                    onFocusedEntryChanged = onFocusedEntryChanged,
+                    // Same two facts as the themed gamelist above: which
+                    // card to come back to, and which card the user is on.
+                    focusEntryId = nav.focusHere,
+                    onFocusedEntryChanged = { entry ->
+                        nav.rememberFocus(entry?.id)
+                        onFocusedEntryChanged(entry)
+                    },
                 )
             } else if (hasThemedGamelist && gamelistView != null) {
                 // Real, unified theme-driven gamelist render -- ONE call into
