@@ -673,10 +673,35 @@ internal fun onboardingForwardLabel(reEntry: Boolean, answered: Boolean): String
     else -> "Skip this step"
 }
 
-/** One action in the scaffold's action area. */
+/**
+ * The other half of the same rule, for a step that cannot be skipped
+ * (docs/SPEC.md 7b): it has NO forward action until it is answered, and
+ * its own answer rows are the way on. A greyed "Next" is neither -- it is
+ * an action that says "go on" while refusing to, and it leaves the step
+ * with nothing that can be pressed at all (rig, build 548: step 2 of 7,
+ * "Your Android home screen").
+ *
+ * Which steps those are is decided by whether skipping has a meaning.
+ * Picking a home-screen behaviour has one row that MEANS "not now"
+ * ("Neither, for now"), so a skip beside it would be a second way to say
+ * the same thing and droidtop would be choosing it for the person;
+ * picking WHICH launcher to hand Home to has no default at all. Both are
+ * answered on the step or not at all.
+ */
+internal fun onboardingForwardLabelWhenAnswerRequired(answered: Boolean): String? =
+    if (answered) "Next" else null
+
+private fun onboardingForwardWhenAnswered(answered: Boolean, onContinue: () -> Unit): StepAction? =
+    onboardingForwardLabelWhenAnswerRequired(answered)?.let { StepAction(it, onClick = onContinue) }
+
+/**
+ * One action in the scaffold's action area. It has no disabled state:
+ * an onboarding step's actions are always actionable, and a step with
+ * nothing to press yet shows nothing (see [onboardingForwardLabel] and
+ * [onboardingForwardWhenAnswered]).
+ */
 private data class StepAction(
     val label: String,
-    val enabled: Boolean = true,
     val onClick: () -> Unit,
 )
 
@@ -775,14 +800,12 @@ private fun OnboardingScaffold(
             secondary?.let {
                 TextButton(
                     onClick = it.onClick,
-                    enabled = it.enabled,
                     modifier = Modifier.heightIn(min = window.minTouchTarget),
                 ) { Text(it.label, style = TypeRole.button) }
             }
             primary?.let {
                 Button(
                     onClick = it.onClick,
-                    enabled = it.enabled,
                     modifier = Modifier
                         .heightIn(min = window.minTouchTarget)
                         // On a phone the primary fills the row; at TV
@@ -942,7 +965,10 @@ private fun HomeChoiceStep(
             "this later in Settings.",
         progress = progress,
         onBack = onBack,
-        primary = StepAction("Next", enabled = selected != null, onClick = onContinue),
+        // No way past this step until it is answered, and the three rows
+        // below ARE the answer: one of them means "not now", so there is
+        // nothing a skip could say that they do not (7b).
+        primary = onboardingForwardWhenAnswered(selected != null, onContinue),
     ) {
         SelectableRow(
             title = "droidtop's own launcher",
@@ -1033,7 +1059,9 @@ private fun AlternativeSetupStep(
             "handles switching between its own modes.",
         progress = progress,
         onBack = onBack,
-        primary = StepAction("Next", enabled = selected != null) { selected?.let(onPicked) },
+        // Same rule as the step before it: the list is the answer, and
+        // droidtop picks nobody's launcher for them (7b).
+        primary = onboardingForwardWhenAnswered(selected != null) { selected?.let(onPicked) },
     ) {
         when {
             current == null -> StepNote("Looking for installed launchers.")
