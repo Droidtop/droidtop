@@ -4,6 +4,10 @@ plugins {
     // Real use: RomDatabase (persistent ROM-scan cache, see
     // consoles/RomDatabase.kt's own doc comment).
     alias(libs.plugins.google.ksp)
+    // The library index (LibraryIndex.kt) is the last scan's entries
+    // written to disk; LibraryEntry and its nested types are @Serializable
+    // for exactly that file and nothing else.
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -124,6 +128,7 @@ dependencies {
     api(libs.androidx.room.runtime)
     api(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
+    implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
     // The registry parser (EngineRegistryParser) runs in JVM unit tests

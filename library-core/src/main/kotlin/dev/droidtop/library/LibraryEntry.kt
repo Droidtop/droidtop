@@ -2,6 +2,7 @@ package dev.droidtop.library
 
 import android.util.Log
 import java.io.File
+import kotlinx.serialization.Serializable
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +32,7 @@ import kotlinx.coroutines.withContext
  * (metadata, artwork, playtime) so bolting on a gamepad-console UI later is
  * a new shell module, not a rearchitecture.
  */
+@Serializable
 data class LibraryEntry(
     val id: String,
     val title: String,
@@ -188,6 +190,7 @@ data class LibraryEntry(
  * Produced by `:runtime-windows`'s `PcLibrary` from the vendored
  * gamenative-tux data layer. Null for everything that is not a PC game.
  */
+@Serializable
 data class PcInfo(
     /** Display name of where it came from: "Steam", "GOG", "Epic", "Amazon", "Folder". */
     val source: String,
@@ -223,6 +226,7 @@ data class PcInfo(
 )
 
 /** @see PcInfo.compatibility — reference only. */
+@Serializable
 data class PcCompatibility(
     val averageRating: Float,
     val playableReports: Int,
@@ -492,6 +496,20 @@ interface LibraryProvider {
     suspend fun launch(entry: LibraryEntry)
 
     /**
+     * Whether this provider's last complete result is kept in the library
+     * index ([LibraryIndexStore]) and shown at the next start instead of
+     * walking again. True for everything that reads a filesystem: a games
+     * root does not change between two starts of droidtop often enough to
+     * pay a full walk every time, and the walk took two minutes on the
+     * rig. False only for a source that is instant AND changes behind
+     * droidtop's back -- the package manager's app list.
+     */
+    val indexed: Boolean get() = true
+
+    /** The index key for this provider's slice; one provider, one slice. */
+    val indexKey: String get() = this::class.java.simpleName
+
+    /**
      * Real, optional progressive variant of [scan] -- emits growing
      * snapshots as results actually become available, instead of forcing
      * the caller to wait for the single slowest part of a scan before
@@ -525,6 +543,7 @@ class Library(
     private val providers: List<LibraryProvider>,
     private val playHistory: PlayHistoryStore = NoOpPlayHistoryStore,
     private val favorites: FavoritesStore = NoOpFavoritesStore,
+    private val index: LibraryIndexStore = NoOpLibraryIndexStore,
 ) {
     private val scanScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val backgroundScanStates = ConcurrentHashMap<Set<LibraryEntryKind>, MutableStateFlow<List<LibraryEntry>?>>()
@@ -628,7 +647,7 @@ class Library(
                 .awaitAll()
                 .flatten()
         }
-        withPlayHistory(scanned)
+        withLibraryFacts(scanned)
     }
 
     /**
@@ -647,52 +666,81 @@ class Library(
      * [scanKinds]' own per-provider isolation.
      */
     fun scanKindsProgressive(kinds: Set<LibraryEntryKind>): Flow<List<LibraryEntry>> =
-        mergedProgressive(kinds) { it.scanProgressive() }
+        libraryProgressive(kinds, rescan = false)
 
     /**
-     * Real, streaming counterpart to a plain rescan -- same growing-
-     * snapshot behavior as [scanKindsProgressive], but calling each
-     * matching provider's [LibraryProvider.rescanProgressive] instead,
-     * so a provider with its own persistent cache (see that method's own
-     * doc comment) actually re-walks instead of trusting stale cached
-     * rows. The real action behind shell-gamepad's Settings "Rescan
-     * library" -- see that link's own doc comment for why a real,
-     * user-facing trigger for this matters (previously the only way to
-     * force a fresh scan was clearing app data via adb by hand).
+     * The same, but every matching provider walks again, whatever the
+     * index holds -- the action behind Settings' "Rescan library" and the
+     * one a changed root set forces. The index stays on screen while the
+     * walk runs and is replaced slice by slice as each provider completes,
+     * so a rescan never makes the library vanish or shrink to a partial.
      */
     fun rescanKindsProgressive(kinds: Set<LibraryEntryKind>): Flow<List<LibraryEntry>> =
-        mergedProgressive(kinds) { it.rescanProgressive() }
+        libraryProgressive(kinds, rescan = true)
 
-    private fun mergedProgressive(
+    /**
+     * THE LIBRARY IS AN INDEX; A WALK IS WHAT REFRESHES IT (docs/SPEC.md
+     * 7g). Until 2026-09-17 nothing outside the console-ROM provider kept
+     * a scan result, so every start of the process walked every games
+     * root again and showed "No games detected yet." until it had: two
+     * minutes on the rig, for a library that had not changed.
+     *
+     * Per matching provider: the index's slice is published at once when
+     * there is one; a provider with no slice, a provider that is not
+     * [LibraryProvider.indexed], or every provider on a [rescan] walks.
+     * A walk that had no slice streams progressively (the first-run
+     * fill); a walk that replaces a slice publishes only when it has
+     * finished, because its partials are smaller than what is already on
+     * screen. A completed walk becomes the new slice. A walk that fails
+     * or is cancelled leaves the old slice alone.
+     */
+    private fun libraryProgressive(
         kinds: Set<LibraryEntryKind>,
-        streamFor: (LibraryProvider) -> Flow<List<LibraryEntry>>,
+        rescan: Boolean,
     ): Flow<List<LibraryEntry>> = channelFlow {
         val matchingProviders = providers.filter { provider -> provider.kinds.any { it in kinds } }
-        val perProviderResults = MutableList(matchingProviders.size) { emptyList<LibraryEntry>() }
+        val slots = MutableList(matchingProviders.size) { emptyList<LibraryEntry>() }
+        val indexedSlot = BooleanArray(matchingProviders.size)
+        matchingProviders.forEachIndexed { i, provider ->
+            if (!provider.indexed) return@forEachIndexed
+            val known = index.load(provider.indexKey) ?: return@forEachIndexed
+            slots[i] = known
+            indexedSlot[i] = true
+            ScanLog.write("index: ${provider.indexKey} ${known.size} entries" + if (rescan) ", walking again" else "")
+        }
+        if (indexedSlot.any { it }) send(withLibraryFacts(slots.flatten()))
         coroutineScope {
             matchingProviders.forEachIndexed { index, provider ->
+                if (indexedSlot[index] && !rescan) return@forEachIndexed
                 coroutineLaunch {
                     // No whole-provider timeout, deliberately. There was
                     // one (60 s), and the rig showed exactly what it cost
                     // (build 523): one slow subtree under a games root ran
                     // past it and every game the provider had already
-                    // found was discarded -- "ConsoleRomProvider timed out
-                    // scanning", 11 games in the library. A budget belongs
-                    // to the unit of work it can bound, which is one
-                    // folder, not one provider: see ScanBudget, and the
-                    // per-folder budgets in ConsoleRomProvider and
-                    // EngineGameProvider. A provider that genuinely never
-                    // returns now costs its own results and nothing else,
-                    // which is the same isolation every other failure here
-                    // already gets.
+                    // found was discarded. A budget belongs to the unit of
+                    // work it can bound, which is one folder, not one
+                    // provider: see ScanBudget. A provider that never
+                    // returns costs its own slice and nothing else.
+                    var last: List<LibraryEntry>? = null
                     try {
-                        streamFor(provider).collect { partial ->
-                            perProviderResults[index] = partial
-                            send(withPlayHistory(perProviderResults.flatten()))
+                        val stream = if (rescan) provider.rescanProgressive() else provider.scanProgressive()
+                        stream.collect { partial ->
+                            last = partial
+                            if (!indexedSlot[index]) {
+                                slots[index] = partial
+                                send(withLibraryFacts(slots.flatten()))
+                            }
                         }
+                    } catch (t: kotlinx.coroutines.CancellationException) {
+                        throw t
                     } catch (t: Throwable) {
                         Log.e("droidtop.Library", "Provider ${provider::class.simpleName} failed to scan", t)
+                        return@coroutineLaunch
                     }
+                    val complete = last ?: return@coroutineLaunch
+                    slots[index] = complete
+                    if (provider.indexed) this@Library.index.save(provider.indexKey, complete)
+                    if (indexedSlot[index]) send(withLibraryFacts(slots.flatten()))
                 }
             }
         }
@@ -827,7 +875,12 @@ class Library(
     suspend fun getCollectionMembership(): Map<String, List<String>> =
         withContext(Dispatchers.IO) { romProvider?.getCollectionMembership() ?: emptyMap() }
 
-    private suspend fun withPlayHistory(entries: List<LibraryEntry>): List<LibraryEntry> {
+    /**
+     * What the library itself knows about an entry, over what its provider
+     * (or the index) reported: play history and, for non-ROM kinds,
+     * favourites. Applied to every list this class hands out.
+     */
+    private suspend fun withLibraryFacts(entries: List<LibraryEntry>): List<LibraryEntry> {
         if (entries.isEmpty()) return entries
         val ids = entries.map { it.id }
         val history = playHistory.getAll(ids)
