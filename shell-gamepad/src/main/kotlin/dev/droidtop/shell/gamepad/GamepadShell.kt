@@ -1110,10 +1110,6 @@ internal fun ActionChip(label: String, highlighted: Boolean, modifier: Modifier 
         color = if (highlighted) Color.Black else Color.White,
         style = MaterialTheme.typography.titleMedium,
         modifier = modifier
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            // Same real touch-input fix as GameCard -- see its own comment.
-            .clickable(onClick = onClick)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp &&
                     GamepadKeyMap.actionFor(event.key) == GamepadAction.A
@@ -1124,6 +1120,10 @@ internal fun ActionChip(label: String, highlighted: Boolean, modifier: Modifier 
                     false
                 }
             }
+            .onFocusChanged { focused = it.isFocused }
+            .focusable()
+            // Same real touch-input fix as GameCard -- see its own comment.
+            .clickable(onClick = onClick)
             .background(
                 if (highlighted) Color.White else if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A),
                 RoundedCornerShape(50),
@@ -1258,11 +1258,8 @@ private fun SectionTabBar(
                     style = MaterialTheme.typography.titleMedium,
                     modifier = (if (entrySection == current) Modifier.focusRequester(currentTabFocus) else Modifier)
                         .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
-                        .focusable()
-                        // Same real touch-input fix as GameCard -- see its own
-                        // comment. This is the top-level Games/Apps/Settings
-                        // tab bar, the very first thing a user taps.
-                        .clickable(onClick = { onSelect(entrySection) })
+                        // Ahead of the focus targets, not after them: see
+                        // [GameCard].
                         .onKeyEvent { event ->
                             if (event.type == KeyEventType.KeyUp &&
                                 GamepadKeyMap.actionFor(event.key) == GamepadAction.A
@@ -1272,7 +1269,12 @@ private fun SectionTabBar(
                             } else {
                                 false
                             }
-                        },
+                        }
+                        .focusable()
+                        // Same real touch-input fix as GameCard -- see its own
+                        // comment. This is the top-level Games/Apps/Settings
+                        // tab bar, the very first thing a user taps.
+                        .clickable(onClick = { onSelect(entrySection) }),
                 )
             }
         }
@@ -2542,10 +2544,6 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
         color = if (selected) Color.Black else Color.White,
         style = MaterialTheme.typography.labelMedium,
         modifier = Modifier
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            // Same real touch-input fix as GameCard -- see its own comment.
-            .clickable(onClick = onClick)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp &&
                     GamepadKeyMap.actionFor(event.key) == GamepadAction.A
@@ -2556,6 +2554,10 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
                     false
                 }
             }
+            .onFocusChanged { focused = it.isFocused }
+            .focusable()
+            // Same real touch-input fix as GameCard -- see its own comment.
+            .clickable(onClick = onClick)
             .background(
                 if (selected) Color.White else if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A),
                 RoundedCornerShape(50),
@@ -2700,10 +2702,7 @@ private fun AppIconTile(
                 focused = it.isFocused
                 if (it.isFocused) onFocused()
             }
-            .focusable()
-            // Same real touch-input fix as GameCard -- see its own
-            // comment -- and the same long-press-is-Y convention.
-            .combinedClickable(onClick = onLaunch, onLongClick = onShowDetail)
+            // Ahead of the focus targets, not after them: see [GameCard].
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
                 when (GamepadKeyMap.actionFor(event.key)) {
@@ -2714,6 +2713,10 @@ private fun AppIconTile(
                     else -> false
                 }
             }
+            .focusable()
+            // Same real touch-input fix as GameCard -- see its own
+            // comment -- and the same long-press-is-Y convention.
+            .combinedClickable(onClick = onLaunch, onLongClick = onShowDetail)
             // The shell's ONE selection idiom, the same one [GameCard]
             // and the menus draw: the accent ring over a brightened
             // surface. This tile kept a third one -- a thin white
@@ -2874,24 +2877,20 @@ private fun GameCard(
                 focused = it.isFocused
                 if (it.isFocused) onFocused()
             }
-            .focusable()
-            // Real bug fix, reported directly: touch input didn't work
-            // anywhere in Gaming mode -- .clickable() was never actually
-            // applied here (an older comment claimed it was, but it wasn't;
-            // .focusable() alone doesn't respond to taps, only to real
-            // focus + the onKeyEvent below). This also gives DPAD_CENTER/
-            // Enter clickable's own default key handling on a focused node
-            // "for free" — a controller's face button (A / cross) still
-            // reports as a distinct keycode on most Android gamepad
-            // mappings, so it's still handled explicitly below rather than
-            // relying on clickable() to cover it. Y opens the detail screen
-            // (§7).
-            // Long-press is the touch equivalent of Y: the same
-            // "tell me more / act on this one" the pad reaches with a
-            // second button, on a surface that only has one gesture.
-            // Android's own list convention, and the one Daijisho and
-            // the platform launchers already train.
-            .combinedClickable(onClick = onLaunch, onLongClick = onShowDetail)
+            // A screen's own key handling goes AHEAD of the focus
+            // targets in the chain, never behind them. Compose
+            // dispatches a key event to the key-input modifiers that
+            // sit between the ACTIVE focus target and the root
+            // (FocusOwnerImpl.dispatchKeyEvent; lastLocalKeyInputNode
+            // stops at the next FocusTarget in the same chain), and
+            // `clickable` brings a focus target of its own -- so a
+            // handler written after it is never reached. What hid
+            // that for two years is Android's own key-character-map
+            // fallback: an unhandled BUTTON_A is re-sent as
+            // DPAD_CENTER (Generic.kcm), which `clickable` treats as
+            // a click, so A looked like it worked while X, Y and
+            // every hint-bar tap -- a direct dispatchKeyEvent, which
+            // gets no fallback -- did nothing (rig, build 548).
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
                 when (GamepadKeyMap.actionFor(event.key)) {
@@ -2915,6 +2914,24 @@ private fun GameCard(
                     else -> false
                 }
             }
+            .focusable()
+            // Real bug fix, reported directly: touch input didn't work
+            // anywhere in Gaming mode -- .clickable() was never actually
+            // applied here (an older comment claimed it was, but it wasn't;
+            // .focusable() alone doesn't respond to taps, only to real
+            // focus + the onKeyEvent below). This also gives DPAD_CENTER/
+            // Enter clickable's own default key handling on a focused node
+            // "for free" — a controller's face button (A / cross) still
+            // reports as a distinct keycode on most Android gamepad
+            // mappings, so it's still handled explicitly below rather than
+            // relying on clickable() to cover it. Y opens the detail screen
+            // (§7).
+            // Long-press is the touch equivalent of Y: the same
+            // "tell me more / act on this one" the pad reaches with a
+            // second button, on a surface that only has one gesture.
+            // Android's own list convention, and the one Daijisho and
+            // the platform launchers already train.
+            .combinedClickable(onClick = onLaunch, onLongClick = onShowDetail)
             // ONE selection idiom across the shell: the menus' own
             // accent border over a brightened surface (MenuTokens), not a
             // third one. The rig counted three at once -- this card's 1px

@@ -66,8 +66,7 @@ internal fun PcGameCard(
                 focused = it.isFocused
                 if (it.isFocused) onFocused()
             }
-            .focusable()
-            .clickable(onClick = onOpen)
+            // Ahead of the focus targets, not after them: see [GameCard].
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
                 if (GamepadKeyMap.actionFor(event.key) == GamepadAction.A) {
@@ -77,6 +76,8 @@ internal fun PcGameCard(
                     false
                 }
             }
+            .focusable()
+            .clickable(onClick = onOpen)
             // The shell's ONE selection idiom (MenuTokens), the same
             // ring the menus, the game cards and the app tiles draw. This
             // card kept its own white rectangle over a hand-picked grey,

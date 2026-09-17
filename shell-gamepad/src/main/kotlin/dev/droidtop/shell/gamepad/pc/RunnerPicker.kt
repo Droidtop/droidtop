@@ -141,9 +141,7 @@ private fun RunnerRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .onFocusChanged { focused = it.isFocused }
-            .focusable(enabled = enabled)
-            .then(if (enabled) Modifier.clickable(onClick = onSelect) else Modifier)
+            // Ahead of the focus targets, not after them: see [GameCard].
             .onKeyEvent { event ->
                 if (enabled && event.type == KeyEventType.KeyUp &&
                     GamepadKeyMap.actionFor(event.key) == GamepadAction.A
@@ -154,6 +152,9 @@ private fun RunnerRow(
                     false
                 }
             }
+            .onFocusChanged { focused = it.isFocused }
+            .focusable(enabled = enabled)
+            .then(if (enabled) Modifier.clickable(onClick = onSelect) else Modifier)
             .background(if (focused) Color(0xFF2A2A2A) else Color(0xFF141414), RoundedCornerShape(8.dp))
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
