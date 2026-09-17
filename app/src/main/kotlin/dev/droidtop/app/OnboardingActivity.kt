@@ -1504,9 +1504,10 @@ private fun AppearanceStep(
                 leading = {
                     ThemeSystemPreview(
                         themeId = theme.name,
-                        modifier = Modifier
-                            .size(width = Measure.themePreviewWidth, height = Measure.themePreviewHeight)
-                            .clip(MenuTokens.RowShape),
+                        // The preview takes the screen's own shape from
+                        // the display; this is only how big it is.
+                        longEdge = Measure.themePreviewLongEdge,
+                        modifier = Modifier.clip(MenuTokens.RowShape),
                     )
                 },
                 onClick = {
