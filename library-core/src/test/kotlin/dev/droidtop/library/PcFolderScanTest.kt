@@ -168,4 +168,14 @@ class PcFolderScanTest {
             found(),
         )
     }
+
+    @Test
+    fun `a Windows game in a version folder under a part folder is found past the depth bound`() {
+        // Five folders down: category, series, game, part, version. Only
+        // the first three are levels of the library.
+        game("Adult/unity/Story/Chapter 2/1.0", "Story.exe")
+        // A stray readme in the part folder does not make the part the game.
+        file("Adult/unity/Story/Chapter 2/readme.txt")
+        assertEquals(listOf("Adult/unity/Story/Chapter 2/1.0"), found())
+    }
 }

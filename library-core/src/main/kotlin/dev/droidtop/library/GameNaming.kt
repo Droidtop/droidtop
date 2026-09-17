@@ -97,6 +97,16 @@ object GameNaming {
      * "no title of its own", which is the half they share; the library
      * shows them differently, so they are told apart here.
      */
+    /**
+     * Whether a folder named [name] is the structure of ONE game rather
+     * than a game or a library level of its own: a part marker
+     * (`Chap3+`, `Week 2`) or a bare version (`12.0-scrappy`, `1.0`).
+     * Both walks ask this to decide what a folder costs them in depth
+     * (docs/SPEC.md 7m): such a folder costs nothing, because the game it
+     * belongs to is the level, not the folder.
+     */
+    fun isStructuralFolderName(name: String): Boolean = leafKind(name) != LeafKind.TITLE
+
     private fun leafKind(name: String): LeafKind {
         if (BARE_VERSION_LEAF.containsMatchIn(name)) return LeafKind.BARE_VERSION
         val stripped = GENERIC_PART_PREFIX.replaceFirst(name, "")

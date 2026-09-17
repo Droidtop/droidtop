@@ -5263,6 +5263,17 @@ and a freshly installed 539 listed 151 with every folder game missing.
 
 ## 7m. One game, its versions and its segments (directed 2026-09-16)
 
+**Part and version folders are structure, not depth.** Both walks bound
+themselves to `MAX_SCAN_DEPTH` title folders below a root so a mistakenly
+added root is never walked whole. A folder whose name is a part marker or a
+bare version (`GameNaming.isStructuralFolderName`: `Chap3+`, `Week 2`,
+`12.0-scrappy`, `1.0`) is the structure of one game and costs the walk no
+depth, and it is never itself the game when a game sits directly below it.
+The rig's `adult/renpy/BeingADik/Chap3+/12.0-scrappy` is the case: five
+folders down, one past the bound, and the walk stopped at `Chap3+`, claimed
+it on the `.rpa` fallback and handed enginehost a folder with no game in it
+(build 550).
+
 A game is ONE entry in the library, however many folders it occupies. Two
 real shapes in the user's own library, and they are the normative examples
 this section is tested against:

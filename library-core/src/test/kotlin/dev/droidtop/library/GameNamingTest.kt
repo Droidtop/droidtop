@@ -1,6 +1,7 @@
 package dev.droidtop.library
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -111,5 +112,15 @@ class GameNamingTest {
         assertEquals(0.9677, GameNaming.similarity("goodbye eternity", "goodbyeeternity"), 0.0001)
         assertEquals(1.0, GameNaming.similarity("same", "same"), 0.0)
         assertEquals(0.0, GameNaming.similarity("abc", "xyz"), 0.0)
+    }
+
+    @Test
+    fun `a part or version folder is structure, a title folder is a level`() {
+        for (name in listOf("Chap3+", "Chapter 3", "Week 2", "Part 1", "12.0-scrappy", "1.0", "0.8.3-pc")) {
+            assertTrue(name, GameNaming.isStructuralFolderName(name))
+        }
+        for (name in listOf("BeingADik", "Goodbye Eternity", "Fetish Locator", "renpy", "adult", "Class of '09")) {
+            assertFalse(name, GameNaming.isStructuralFolderName(name))
+        }
     }
 }
