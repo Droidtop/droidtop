@@ -41,6 +41,7 @@ import androidx.compose.ui.window.DialogProperties
 import dev.droidtop.runtime.systemstatus.NotificationsStore
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
+import dev.droidtop.shell.gamepad.input.ownPadButtons
 
 /**
  * The Quick Menu: press R2 anywhere in the Gaming shell (docs/
@@ -228,6 +229,9 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
             .fillMaxSize()
             .focusRequester(focusRequester)
             .focusable()
+            // A dialog is its own window with its own fallbacks: the same
+            // ownership as the shell's root (Modifier.ownPadButtons).
+            .ownPadButtons(onBack = onDismiss)
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
                 val action = GamepadKeyMap.actionFor(event.key)
