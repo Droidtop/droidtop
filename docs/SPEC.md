@@ -4320,6 +4320,18 @@ What droidtop adds on top is what gamenative has no concept of at all:
 engine games, enginehost routing, availability across four runners, the
 per-game override, and the carousel entry point.
 
+### One runner section, for the runner the game uses
+
+The detail's sections are the actions on this game, and a section for a
+runner it does not use is worse than nothing: it reads as a setting that
+applies. A game running on enginehost gets enginehost's saves, controls
+and engine settings; a game taking the Windows route gets its prefix, and
+where saves and controls live inside it; a game with neither gets no
+runner section at all, because the primary button already says a game
+cannot run and a section of dead rows repeating that is not information.
+No section is titled like its own first row -- "Prefix and graphics" over
+a row called "Prefix and graphics" says one thing twice.
+
 ## 8. Licensing
 
 `vendor/gamenative` and `vendor/droidspaces` are GPL-3.0. Winlator itself
@@ -4978,14 +4990,58 @@ below are one set, asked by both, in this order:
    (an index.html and sixteen PNGs) and `The Movies/Docs` were listed as
    games by the database's weakest row, "there is a page here", while the
    games they sit inside were not listed at all.
+
+   The rule is ONE function, `GameEngineDetector.isPlainPcGameFolder`, and
+   every walk asks it. Build 540 is why that is written down: the walk
+   applied it and `detectGame` did not, so the walk correctly returned no
+   engine game for `Ghost Recon Breakpoint` while `detectGame` read the
+   payload's `index.html` one level down, called the folder engine-owned,
+   and `PcGameProvider` dropped its PC entry as a duplicate of an engine
+   entry that was never created. Both folders vanished from the library
+   entirely. A folder that holds an executable and no engine evidence of
+   its own is a PC game, listed once, whatever sits beneath it.
 3. **A folder that holds files of its own AND games below it is those
-   games' root**, however many there are. The one-game form of this rule
+   games' root**, however many there are, and when exactly one game sits
+   below it, that game's own markers are this folder's
+   (`Humble/macdows95_windows/macdows95/{PLAY.bat, files/}` is the game
+   `macdows95`, whose root is `files`; build 540 listed a game called
+   `files`). The version-named wrapper
+   (`BeingADik/BeingADIK-0.8.3-scrappy/{renpy,game}`) is the same rule
+   recognised by the name instead of by the files. Neither applies inside
+   a store tree, where `steamapps` holding one installed game must still
+   yield the game. The one-game form of this rule
    could not see a Ubisoft install: `Far Cry 5` keeps its launcher files
    in the game folder and its executables in `bin` and `bin_plus`, so the
    list got `bin` and `bin_plus` and never Far Cry 5. `EA/SimCity` is the
    same shape with three payload folders. A container proper holds no
    files of its own, which is what still makes `EA`, `Ubisoft`, `adult`
    and a games root containers.
+
+**A folder name only means a ROM system where a system folder can be.**
+ES-DE's layout is `<root>/<systemId>/<rom>` and droidtop allows one
+container level above it (`<root>/roms/<systemId>`), so nothing deeper is
+a system folder however it is named, and nothing inside a store's install
+tree is one at all. `Ubisoft/Far Cry 5/data_final/pc` and
+`Ghost Recon Breakpoint/sounddata/pc` are game data four levels down that
+match the real platform id `pc` (DOS games, `dosbox_pure`); they are what
+build 540's log line `2 x it is a console system folder, scanned for ROMs
+instead` was counting, and that line named neither of them.
+
+**A scan line names the folders each rule fired on.** Counts by reason
+replaced one line per skipped folder (several hundred on the rig) and are
+still the shape of the line; the folders are now named beside the count,
+up to six per reason and then `+N more`, relative to the folder the line
+is about. A count alone cannot be acted on: "2 folders skipped" gives a
+person no way to find the games behind them.
+
+**A budget costs a folder its own evidence, never its subtree.** The
+per-folder budget (SPEC 7g) bounds one folder's own step. When that step
+runs over, the folder cannot claim to be a game on evidence a rule never
+finished gathering -- but its children are still walked, each under a
+budget of its own. `adult/RPGMaker` ran past 20 s on a cold scan of the
+rig's shared folder and all six games under it were dropped with it. A
+budget that drops a subtree loses real games, which is worse than the slow
+scan it exists to bound; bigness is not pathology.
 
 **droidtop's own answer is not read back out of a vendored preference.**
 The folders `PcFolderScan` finds are turned into library items directly,
@@ -4997,6 +5053,94 @@ the first scan after an install read the EMPTY set. That is why build 537
 (upgraded, with a previous run's value in the preference) listed 171 games
 and a freshly installed 539 listed 151 with every folder game missing.
 
+
+## 7m. One game, its versions and its segments (directed 2026-09-16)
+
+A game is ONE entry in the library, however many folders it occupies. Two
+real shapes in the user's own library, and they are the normative examples
+this section is tested against:
+
+- `adult/renpy/Fetish Locator/{Week 1, Week 2, Week 3}` is one game called
+  **Fetish Locator with three SEGMENTS**. It was three entries that shared
+  a cover and sorted apart from each other.
+- `Anomalous_Coffee_Machine_2-1.0.00_deluxe_linux.x86_64` beside
+  `Anomalous_Coffee_Machine_2_v1.2-deluxe_windows` is one game with **two
+  VERSIONS**, and `v1.2` is what Play starts.
+
+### The model
+
+`GroupedGame` is a name, a list of `GameVersion`, and a list of
+`GameSegment` (which each hold versions of their own). A `GameVersion` is
+a version string plus every `GameCopy` of it -- one install, with its
+path, mods, language, platforms, source and whether it is installed --
+because two copies of one version that differ by mods or language are two
+copies, not two versions. The version/copy split is Pythia's
+(`versions[] -> variants[]`), and so is the per-copy state
+(installed / latest known / update available).
+
+A **segment** is a part of a game: a week, a chapter, a part, an act, an
+episode, a season, a volume, a day or a disc. The default is the newest
+version of the first segment; `LibraryGameGroup` maps the model back onto
+the `LibraryEntry` each folder actually is, so launching, artwork,
+scraped metadata and runner resolution are unchanged and a themed ES-DE
+gamelist (which lists entries, by ES-DE's own schema) still works.
+
+### Where the logic comes from
+
+Name, version, mods, language and segment are derived from folder names by
+`GameNaming`, a rewrite of the user's own Pythia project's naming logic
+(`pythia/onboarding.py`: `_NAME_VERSION_RE`, `_GENERIC_PART_PREFIX_RE`,
+`_is_generic_part_leaf`, `_find_meaningful_ancestor_name`,
+`_extract_version_only`, `_derive_name_version_mods_language`,
+`_merge_version`; `pythia/datadir.py: classify_variant_tokens`). Pythia is
+the user's own GPL-3 project and the reasoning is reused under droidtop's
+licence as a rewrite with tests, not a file copy. Two rules carry most of
+the value and both are Pythia's own corrections against a real library:
+
+- A bare trailing number is part of the NAME, not a version (`Far Cry 5`,
+  `Cyberpunk 2077`); only `v`-prefixed or dotted numbers are versions.
+- A folder whose whole name is a part marker takes its name from the
+  nearest titled ancestor, so `Week 1` never becomes a game.
+
+droidtop adds two things Pythia has nowhere to put: a title that ENDS in a
+part marker is that part of the game the rest of it names
+(`ThiefofHeartsPart3-0.0.9-pc` sits beside `Part1` and `Part2`), and a
+part-marker folder passed on the way up to the title is kept as the
+segment (`BeingADik/Chap3+/10.0-sancho` is version 10.0 of chapter 3).
+
+### What merges, and what only suggests
+
+Two folders are the same game when their derived names are equal once case
+and punctuation are dropped (`GoodbyeEternity` = `Goodbye Eternity`).
+Similarity does NOT merge. Pythia's `NAME_SIMILARITY_THRESHOLD` of 0.6
+(difflib's `SequenceMatcher.ratio`, ported exactly, because the threshold
+was chosen against that measure) decides what Pythia SUGGESTS to the
+person onboarding a folder -- only an exact path, a sync marker or a store
+id is ever `certain` there. droidtop's scan has nobody to ask, and the
+corpus says what automatic merging at 0.6 would cost:
+`love_of_magic_book1`, `book2` and `book3` score 0.94 against each other
+and are three different games; `Lust Academy` and `Lust Theory` score
+0.61; `ARTEMIS` and `RTS` score 0.60. So similar names become
+suggestions, and nothing acts on them without the user.
+
+### The UI this needs, and no more
+
+The PC surface draws one card per game and says how many folders it stands
+for when the two numbers differ. The game detail gains one section --
+"Parts and versions", or "Versions" when the game has no parts -- with a
+row per part and per version saying what it carries (language, mods, an
+available update) and marking the one that is open. Choosing a row opens
+that folder's detail, so Play starts what the user chose. That is the
+whole surface: the model's job is that a game is one entry, so what the
+detail needs is a way to reach the other folders of it.
+
+### The corpus
+
+`library-core/src/test/resources/adult-folder-names-2026-09-16.txt` is the
+real list of the user's game folders taken off the rig on 2026-09-16, and
+`GameGroupingTest` runs every line of it through the grouping, prints the
+result and asserts it: 79 folders become 76 games, three of which have two
+versions, and no two different games are merged.
 
 ## 7j. Portrait and touch-first chrome (directed 2026-09-10)
 
