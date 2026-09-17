@@ -91,12 +91,14 @@ object Measure {
 
     /**
      * A theme's own render, shown beside its name (onboarding's Appearance
-     * step). 16:9, because a theme lays itself out against a screen's
-     * aspect ratio and a preview at the wrong shape is a preview of a
-     * layout the theme never wrote.
+     * step): the length of its LONGER side. The other side comes from the
+     * screen, because a theme lays itself out against a screen's aspect
+     * ratio and a preview at the wrong shape is a preview of a layout the
+     * theme never wrote -- which is what a fixed 16:9 plate made of a
+     * theme's portrait layout on a phone held upright (rig, build 546).
+     * See [dev.droidtop.shell.gamepad.theme.ThemeSystemPreview].
      */
-    val themePreviewWidth = 112.dp
-    val themePreviewHeight = 63.dp
+    val themePreviewLongEdge = 112.dp
 }
 
 /**
