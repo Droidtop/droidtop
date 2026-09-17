@@ -64,6 +64,18 @@ class NativeAppProvider(private val context: Context) : LibraryProvider {
                 // whose icon fails is still an app; it lists without one
                 // (writeIconFile's own null-artwork path already renders).
                 val packageName = activityInfo.componentName.packageName
+                // What this ONE app is, said by the app itself: Android's
+                // own application category (`android:appCategory`, API
+                // 26+), which is what a store shows it under. Null when
+                // the manifest declares none (CATEGORY_UNDEFINED), and
+                // the entry then falls back to what its kind is called.
+                // Never invented: an app that says nothing gets nothing.
+                val category = runCatching {
+                    android.content.pm.ApplicationInfo
+                        .getCategoryTitle(context, activityInfo.applicationInfo.category)
+                        ?.toString()
+                        ?.takeIf { it.isNotBlank() }
+                }.getOrNull()
                 val titled = runCatching {
                     val appInfo = AppInfo(context, activityInfo, activityInfo.user)
                     iconCache.getTitleAndIcon(appInfo, activityInfo, CacheLookupFlag.DEFAULT_LOOKUP_FLAG)
@@ -78,21 +90,33 @@ class NativeAppProvider(private val context: Context) : LibraryProvider {
                     Log.w("droidtop.NativeAppProvider", "Icon/title failed for $packageName; listing it without an icon", t)
                     AppLabels.labelFor(activityInfo.label, packageName) to null
                 }
-                Triple(packageName, titled.first, titled.second)
+                ScannedApp(packageName, titled.first, titled.second, category)
             }
         }
 
         return entries
-            .map { (packageName, title, bitmap) ->
+            .map { app ->
                 LibraryEntry(
-                    id = packageName,
-                    title = title,
+                    id = app.packageName,
+                    title = app.title,
                     kind = LibraryEntryKind.NATIVE_ANDROID_APP,
-                    artworkUri = bitmap?.let { writeIconFile(iconDir, packageName, it) },
+                    artworkUri = app.icon?.let { writeIconFile(iconDir, app.packageName, it) },
+                    // The same field a scraped game's genre lands in: on
+                    // an installed app the platform is the source, and
+                    // the shell reads one field either way.
+                    genre = app.category,
                 )
             }
             .distinctBy { it.id }
     }
+
+    /** One app as the scan read it, before it becomes a [LibraryEntry]. */
+    private data class ScannedApp(
+        val packageName: String,
+        val title: String,
+        val icon: Bitmap?,
+        val category: String?,
+    )
 
     /**
      * A drawable as a software bitmap.

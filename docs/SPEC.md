@@ -5378,6 +5378,16 @@ pad. Consequences:
   was "really" a help-bar background;
 - actions that had no on-screen name at all are now named and reachable:
   Select for gamelist options, Y for the PC surface's stores and folders;
+- **a card says what IT is, never the heading it sits under.** The line
+  under a tile's or card's name is what the thing itself declares -- an
+  installed app's own Android application category, a scraped game's
+  genre -- and, when it declares nothing, what one entry of its kind is
+  called in the singular (`LibraryEntry.kindLine`, `LibraryEntryKind
+  .itemName`; `displayName` is the name of the GROUP and belongs to the
+  heading). Filling it from the group name made all eighteen Apps tiles
+  read "Apps", two lines below a heading that already said so (rig,
+  build 547). Nothing is invented for it: an app that declares no
+  category gets "Android app", not a guess;
 - **long-press is Y** on a game card or app tile --- the same "act on
   this one" the pad reaches with a second button;
 - a value that is **stepped** rather than opened --- a slider, a small
