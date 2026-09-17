@@ -38,7 +38,7 @@ class QuickTilesTest {
                 CatalogGroup(
                     "g", null,
                     listOf(
-                        ActionItem(id = "a", title = "Network: Wi-Fi", run = {}),
+                        ActionItem(id = "a", title = "Network", value = "Wi-Fi", run = {}),
                         slider(GamingSettingsCatalog.ID_SYSTEM_VOLUME, 0, 15, 7),
                         slider(GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS, 0, 255, 128),
                         toggle(GamingSettingsCatalog.ID_SYSTEM_DND, true),
@@ -55,10 +55,28 @@ class QuickTilesTest {
     }
 
     @Test
-    fun `a list title becomes a tile label and a value line`() {
-        assertEquals("Network" to "Wi-Fi, signal 3/4", QuickTiles.splitTitle("Network: Wi-Fi, signal 3/4"))
-        assertEquals("Bluetooth" to null, QuickTiles.splitTitle("Bluetooth"))
-        assertEquals("VPN" to "active", QuickTiles.splitTitle("VPN: active"))
+    fun `a tile draws the catalog's own label and value, and never splits a title`() {
+        // The catalog says what a row is CALLED and what it is SET TO;
+        // there is no second rule here that reads state back out of a
+        // title. A title that still contains a colon is a title.
+        val stateful = QuickTiles.tile(
+            ActionItem(
+                id = GamingSettingsCatalog.ID_SYSTEM_NETWORK,
+                title = "Network",
+                value = "Wi-Fi, signal 3/4",
+                run = {},
+            ),
+        )
+        assertEquals("Network", stateful.label)
+        assertEquals("Wi-Fi, signal 3/4", stateful.value)
+
+        val plain = QuickTiles.tile(ActionItem(id = GamingSettingsCatalog.ID_SYSTEM_BLUETOOTH, title = "Bluetooth", run = {}))
+        assertEquals("Bluetooth", plain.label)
+        assertNull(plain.value)
+
+        val colonInName = QuickTiles.tile(ActionItem(id = "x", title = "Wine: a compatibility layer", run = {}))
+        assertEquals("Wine: a compatibility layer", colonInName.label)
+        assertNull(colonInName.value)
     }
 
     @Test
