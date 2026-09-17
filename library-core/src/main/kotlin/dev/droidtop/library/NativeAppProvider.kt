@@ -33,6 +33,11 @@ import java.io.FileOutputStream
 class NativeAppProvider(private val context: Context) : LibraryProvider {
     override val kinds = setOf(LibraryEntryKind.NATIVE_ANDROID_APP)
 
+    // The package manager answers in milliseconds and apps are installed
+    // and removed outside droidtop; an index of them would only ever be
+    // stale. See LibraryProvider.indexed.
+    override val indexed: Boolean get() = false
+
     override suspend fun scan(): List<LibraryEntry> {
         val launcherApps = context.getSystemService(LauncherApps::class.java)
         val iconCache = LauncherAppState.getInstance(context).iconCache

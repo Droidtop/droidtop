@@ -3934,6 +3934,41 @@ Two consequences worth stating, because both are deliberate:
   refused by the same entry check as a path that does not exist, because
   from the library's point of view they are the same fact.
 
+### The library is an index; a walk is what refreshes it (directed 2026-09-17)
+
+Until this rule nothing outside the console-ROM provider kept a scan result.
+Every start of the process walked every games root again and drew "No games
+detected yet." until it had, two minutes on the rig for a library that had
+not changed. That was accumulation, not design: the progressive scan hid the
+wait, the ROM cache fixed the provider that was slow at the time, and the
+engine and PC providers that became most of the library got neither.
+
+**The index.** `LibraryIndexStore` keeps each provider's last COMPLETE scan
+result as one slice per `LibraryProvider.indexKey` (one JSON file each under
+`files/library-index/`, written whole and renamed into place; a file this
+build cannot read is a walk, never an error). `Library` reads the index
+first and publishes every slice it has at once; that is what the shell
+draws at start. A provider whose slice is missing walks, streaming
+progressively as a first run always did. A completed walk becomes the new
+slice; a failed or cancelled walk leaves the old one alone.
+
+**What walks.** A walk runs when a provider has no slice, when the root set
+changed (`GamesRoots.rootsChangedSinceLastScan`, already detected and
+already forcing a restart), and when the user asks (Settings › Rescan
+library). Nothing else: a start of the process is not an event. On a
+rescan the index stays on screen and each provider's slice is replaced only
+when that provider's walk has finished, so a rescan never makes the library
+vanish or shrink to a partial. `LibraryProvider.indexed` is false only for
+the package manager's app list, which answers in milliseconds and changes
+outside droidtop; everything that reads a filesystem is indexed.
+
+**One mechanism.** The ROM provider's own `RomDatabase` remains what makes
+ITS walk fast; the index is what makes the START fast, across providers,
+and it is the only thing that decides whether a walk happens at all. Play
+history and favourites are applied to whatever list the library hands out,
+index or walk (`withLibraryFacts`), so nothing about an entry differs by
+where it came from.
+
 ### The scan's unit of work is a folder (directed by the rig, 2026-09-11)
 
 Pointing droidtop at a whole-library root — the rig's games root is the
