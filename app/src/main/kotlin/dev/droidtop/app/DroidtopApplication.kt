@@ -42,6 +42,11 @@ import com.android.launcher3.LauncherApplication
 class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
+        // The scan log goes to logcat AND to a file droidtop owns, and
+        // says which build is writing it -- shared core, every mode, so
+        // a scan is diagnosable from a rig whatever the device's logcat
+        // buffer did with the lines (see ScanLog).
+        dev.droidtop.library.ScanLog.install(this)
         // Everything mode-specific this process starts, and nothing else:
         // the mode snapshot was already taken by
         // SettingsCatalogInitProvider (a ContentProvider's onCreate runs
