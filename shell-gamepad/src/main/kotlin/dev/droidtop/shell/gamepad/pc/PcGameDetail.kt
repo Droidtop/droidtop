@@ -477,9 +477,14 @@ private fun row(
 ): PcActionRow {
     val copy = version.playable
     val target = copy?.let { group.entryFor(it) }
+    // A row is named by what it IS: its part, its version, or -- when the
+    // folder name carries neither -- the folder's own name (docs/SPEC.md
+    // 7m). It used to read "This version", which names the row you are
+    // being asked to switch TO after the one you are already on.
+    val folderName = copy?.path?.trimEnd('/')?.substringAfterLast('/')?.takeIf { it.isNotEmpty() }
     val title = listOfNotNull(label, version.version.takeIf { it.isNotEmpty() }?.let { "v$it" })
         .joinToString(" - ")
-        .ifEmpty { "This version" }
+        .ifEmpty { folderName ?: target?.title ?: "" }
     val detail = buildString {
         append(if (target?.id == currentId) "Open now" else "Open this one")
         copy?.language?.let { append(" - ").append(it) }

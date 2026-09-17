@@ -24,6 +24,72 @@ class GameEngineDetectorTest {
         file.createNewFile()
     }
 
+    /**
+     * Build 542's `Pirated` defect, folder for folder as the rig had it:
+     * a container holding two plain Windows games, one plain Unity game
+     * and gamenative's own `.gamenative` metadata file. The container was
+     * listed as a game and the Unity game was in no list at all, because
+     * Unity's three-deep probe matched at the container and nothing below
+     * it was precise.
+     */
+    private fun piratedTree() {
+        touch("Pirated", ".gamenative")
+        touch("Pirated", "PRAGMATA", "PRAGMATA.exe")
+        touch("Pirated", "The Movies", "MoviesSE.exe")
+        touch("Pirated", "The Movies", "StarMaker.exe")
+        touch("Pirated", "The Tenants Pets", "The Tenants.exe")
+        touch("Pirated", "The Tenants Pets", "UnityPlayer.dll")
+        touch("Pirated", "The Tenants Pets", "The Tenants_Data", "resources.assets")
+        touch("Pirated", "The Tenants Pets", "MonoBleedingEdge", "EmbedRuntime", "mono.dll")
+    }
+
+    @Test
+    fun `a loose executable beside a game folder is not a game or a version of one`() {
+        // The rig's `adult/godot`: two Godot games and a 2 GB Linux export
+        // left loose beside them. A version of a game is a FOLDER
+        // (docs/SPEC.md 7m) -- Pythia, whose version logic droidtop ports,
+        // refuses a path that is not a directory outright
+        // (pythia/onboarding.py::preview, scanning.py's `p.is_dir()`), so
+        // the file is neither an entry nor a second version of one.
+        touch("godot", "Anomalous_Coffee_Machine_2_v1.2-deluxe_windows", "game.pck")
+        touch("godot", "Goodbye Eternity", "game.pck")
+        touch("godot", "Anomalous_Coffee_Machine_2-1.0.00_deluxe_linux.x86_64")
+        val results = GameEngineDetector.scan(tmp.root, emptyMap(), defs)
+        assertEquals(
+            listOf("Anomalous_Coffee_Machine_2_v1.2-deluxe_windows", "Goodbye Eternity"),
+            results.map { it.displayFolder.name }.sorted(),
+        )
+    }
+
+    @Test
+    fun `a Unity install names its own folder, not the container above it`() {
+        piratedTree()
+        val results = GameEngineDetector.scan(tmp.root, emptyMap(), defs)
+        assertEquals(listOf("The Tenants Pets"), results.map { it.displayFolder.name })
+        assertEquals(GameEngine.UNITY, results.single().engine)
+    }
+
+    @Test
+    fun `the container above three games is not a PC game either`() {
+        piratedTree()
+        assertEquals(
+            listOf("Pirated/PRAGMATA", "Pirated/The Movies", "Pirated/The Tenants Pets"),
+            PcFolderScan.gamesUnder(tmp.root, defs)
+                .map { it.toRelativeString(tmp.root).replace(File.separatorChar, '/') },
+        )
+    }
+
+    @Test
+    fun `Unity found only below a folder still names the folder it is under`() {
+        // The shape the three-deep probe exists for: the runtime is
+        // packaged a level down, and there is no game beside it. The
+        // outermost match is still the game.
+        touch("Packaged Game", "start.bat")
+        touch("Packaged Game", "runtime", "UnityPlayer.dll")
+        val results = GameEngineDetector.scan(tmp.root, emptyMap(), defs)
+        assertEquals(listOf("Packaged Game"), results.map { it.displayFolder.name })
+    }
+
     @Test
     fun `detects RenPy via renpy plus game directories`() {
         touch("renpy", ".keep")

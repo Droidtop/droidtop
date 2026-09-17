@@ -53,15 +53,18 @@ class GameGroupingTest {
     fun `two folders of one game are one game with two versions, newest first`() {
         val games = GameGrouping.group(
             found(
-                "/games/adult/godot/Anomalous_Coffee_Machine_2-1.0.00_deluxe_linux.x86_64",
-                "/games/adult/godot/Anomalous_Coffee_Machine_2_v1.2-deluxe_windows",
+                "/games/adult/renpy/GoodbyeEternity-0.8.1-pc-animated-unc",
+                "/games/adult/renpy/Goodbye Eternity",
             ),
         )
 
         val game = games.single()
-        assertEquals("Anomalous_Coffee_Machine_2", game.name)
-        assertEquals(listOf("1.2", "1.0.00"), game.versions.map { it.version })
-        assertEquals("/games/adult/godot/Anomalous_Coffee_Machine_2_v1.2-deluxe_windows", game.defaultVersion?.playable?.path)
+        assertEquals("Goodbye Eternity", game.name)
+        assertEquals(listOf("0.8.1", ""), game.versions.map { it.version })
+        assertEquals(
+            "/games/adult/renpy/GoodbyeEternity-0.8.1-pc-animated-unc",
+            game.defaultVersion?.playable?.path,
+        )
         assertTrue(game.segments.isEmpty())
     }
 
@@ -144,7 +147,17 @@ class GameGroupingTest {
         assertEquals(corpus.size, paths.size)
         assertEquals(corpus.size, paths.distinct().size)
 
-        // The only merges in this corpus, both of them right: the same
+        // The corpus is a listing of NAMES, one per line, exactly as the
+        // rig printed them, and one of those lines
+        // (`Anomalous_Coffee_Machine_2-1.0.00_deluxe_linux.x86_64`) is a
+        // loose 2 GB file rather than a folder. Grouping is a rule about
+        // names and never touches a filesystem, so it groups that line
+        // like any other; the SCAN is what never yields an entry for a
+        // file, which is why Anomalous Coffee Machine 2 shows one version
+        // on the device and two here (docs/SPEC.md 7m, "A version is a
+        // FOLDER").
+        //
+        // The only merges in this corpus, all of them right: the same
         // game found twice under two spellings of one name.
         val merged = games.filter { it.allVersions.sumOf { version -> version.copies.size } > 1 }
         assertEquals(
