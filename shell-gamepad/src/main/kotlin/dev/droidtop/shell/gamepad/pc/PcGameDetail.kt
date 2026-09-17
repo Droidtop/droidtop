@@ -354,7 +354,7 @@ private fun rememberPcActions(
     val runsOnEnginehost = runner?.option?.strategy == GameLaunchStrategy.ENGINEHOST
     val isStoreGame = entry.pcInfo?.storeId != null || entry.id.substringBefore(':') in STORE_PREFIXES
 
-    return listOf(
+    return listOfNotNull(
         PcActionGroup(
             "Game management",
             listOfNotNull(
@@ -387,57 +387,24 @@ private fun rememberPcActions(
                 },
             ),
         ),
-        PcActionGroup(
-            "Prefix and graphics",
-            listOf(
-                PcActionRow(
-                    "Prefix and graphics",
-                    if (hasWindowsRoute) {
-                        "The Windows prefix this game runs in: graphics driver, DXVK, Box64 and FEX, " +
-                            "components, drives and the rest"
-                    } else {
-                        "Only for a game with a Windows build -- this one runs natively"
-                    },
-                    if (hasWindowsRoute) {
-                        {
-                            onOpenAppScreen(
-                                PC_CONTAINER_CONFIG_ACTIVITY,
-                                mapOf(EXTRA_PC_ENTRY_ID to entry.id, EXTRA_PC_TITLE to entry.title),
-                            )
-                        }
-                    } else {
-                        null
-                    },
-                ),
-            ),
-        ),
-        PcActionGroup(
-            "Saves and controls",
-            listOfNotNull(
-                PcActionRow(
-                    "Saves",
-                    if (runsOnEnginehost) "Opens enginehost's own save settings" else "A Windows game's saves live in its prefix, under Prefix and graphics",
-                    if (runsOnEnginehost) ({ onEnginehost(EngineHost.savesSettingsIntent()) }) else null,
-                ),
-                PcActionRow(
-                    "Controls",
-                    if (runsOnEnginehost) {
-                        "Opens enginehost's own per-engine controls for this game"
-                    } else {
-                        "A Windows game's controls are its prefix's controller tab, under Prefix and graphics"
-                    },
-                    if (runsOnEnginehost) ({ onEnginehost(EngineHost.settingsIntent()) }) else null,
-                ),
-                if (isEngineGame) {
-                    PcActionRow(
-                        "Engine settings",
-                        if (runsOnEnginehost) "Opens enginehost's own settings" else "Available while this game runs on enginehost",
-                        if (runsOnEnginehost) ({ onEnginehost(EngineHost.settingsIntent()) }) else null,
-                    )
-                } else {
-                    null
-                },
-            ),
+        // ONE runner section, for the runner this game actually uses.
+        // Until build 540 every game got both: a Ren'Py game running on
+        // enginehost carried a Wine "Prefix and graphics" section it can
+        // do nothing with, under a section label that repeated the name
+        // of its only row. A section titled like its row says one thing
+        // twice; a section for a runner the game does not use is worse
+        // than nothing, because it reads as a setting that applies.
+        runnerGroup(
+            runsOnEnginehost = runsOnEnginehost,
+            hasWindowsRoute = hasWindowsRoute,
+            isEngineGame = isEngineGame,
+            onEnginehost = onEnginehost,
+            onOpenPrefix = {
+                onOpenAppScreen(
+                    PC_CONTAINER_CONFIG_ACTIVITY,
+                    mapOf(EXTRA_PC_ENTRY_ID to entry.id, EXTRA_PC_TITLE to entry.title),
+                )
+            },
         ),
         PcActionGroup(
             "Metadata and media",
@@ -449,6 +416,54 @@ private fun rememberPcActions(
             ),
         ),
     )
+}
+
+/**
+ * The one section that depends on HOW this game runs: enginehost's own
+ * settings for a game enginehost runs, the Wine prefix for a game that
+ * takes the Windows route, and nothing at all for a game whose runner is
+ * neither (a native Linux build, or a game with no runner on this device
+ * -- the primary button above already says so, and a section of dead rows
+ * repeating it is not information).
+ *
+ * The section is named for the runner, never for its own first row.
+ */
+private fun runnerGroup(
+    runsOnEnginehost: Boolean,
+    hasWindowsRoute: Boolean,
+    isEngineGame: Boolean,
+    onEnginehost: (android.content.Intent) -> Unit,
+    onOpenPrefix: () -> Unit,
+): PcActionGroup? = when {
+    runsOnEnginehost -> PcActionGroup(
+        "Runs on enginehost",
+        listOfNotNull(
+            PcActionRow("Saves", "Opens enginehost's own save settings", { onEnginehost(EngineHost.savesSettingsIntent()) }),
+            PcActionRow(
+                "Controls",
+                "Opens enginehost's own per-engine controls for this game",
+                { onEnginehost(EngineHost.settingsIntent()) },
+            ),
+            if (isEngineGame) {
+                PcActionRow("Engine settings", "Opens enginehost's own settings", { onEnginehost(EngineHost.settingsIntent()) })
+            } else {
+                null
+            },
+        ),
+    )
+    hasWindowsRoute -> PcActionGroup(
+        "Runs on Windows",
+        listOf(
+            PcActionRow(
+                "Prefix and graphics",
+                "The Windows prefix this game runs in: graphics driver, DXVK, Box64 and FEX, components, drives and the rest",
+                onOpenPrefix,
+            ),
+            PcActionRow("Saves", "This game's saves live inside its prefix, under Prefix and graphics", null),
+            PcActionRow("Controls", "This game's controls are its prefix's controller tab, under Prefix and graphics", null),
+        ),
+    )
+    else -> null
 }
 
 private val STORE_PREFIXES = setOf("steam", "gog", "epic", "amazon")
