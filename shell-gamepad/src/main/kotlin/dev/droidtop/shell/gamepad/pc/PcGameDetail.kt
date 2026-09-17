@@ -423,7 +423,7 @@ private fun rememberPcActions(
             "Metadata and media",
             listOfNotNull(
                 PcActionRow("Scrape", "Looks this game up in the PC sources", onScrape),
-                PcActionRow("Choose match", "Pick the right game by hand when the scrape guessed wrong", onChooseMatch),
+                PcActionRow("Choose match", "Pick the right game by hand when the scraper guessed wrong", onChooseMatch),
                 if (media > 1) PcActionRow("View media", "$media images and videos scraped for this game", onViewMedia) else null,
                 PcActionRow("Collections", "Which of your collections this game is in", onCollections),
             ),
