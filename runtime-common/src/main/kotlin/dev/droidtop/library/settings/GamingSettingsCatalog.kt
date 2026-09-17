@@ -34,6 +34,7 @@ object GamingSettingsCatalog {
     const val GROUP_APPEARANCE = "gaming_appearance"
     const val GROUP_SCREENS = "gaming_screens"
     const val GROUP_INPUT = "gaming_input"
+    const val ID_CONTROLLER = "pref_gaming_controller"
     const val GROUP_OTHER_SHELLS = "other_shells"
 
     const val ID_GLOBAL_SETTINGS = "pref_global_settings"
@@ -234,6 +235,20 @@ object GamingSettingsCatalog {
             id = GROUP_INPUT,
             title = "Input",
             items = buildList {
+                // Onboarding's own Controller step, re-entered (docs/SPEC.md
+                // 7b: every step is re-enterable from the Settings row that
+                // owns it). Not a second screen asking the same question.
+                add(
+                    ActionItem(
+                        id = ID_CONTROLLER,
+                        title = "Controller",
+                        subtitle = "Which pad is attached, whether droidtop reads it, and which face button confirms",
+                        run = launchComponent(
+                            "dev.droidtop.app.OnboardingActivity",
+                            "dev.droidtop.app.EXTRA_START_STEP" to "CONTROLLER",
+                        ),
+                    ),
+                )
                 // Keyboard. droidtop ships Hacker's Keyboard because a
                 // device meant to replace a computer needs Ctrl/Alt/Esc/
                 // Tab/arrows/function keys, and it cannot silently set the

@@ -272,6 +272,11 @@ fun GamepadShell(
     // when the Quick Menu changes it (UiModeRefresh).
     val uiMode by dev.droidtop.library.settings.UiModeRefresh.mode.collectAsState()
     LaunchedEffect(Unit) { dev.droidtop.library.settings.UiModeRefresh.load(context) }
+    // The face-button layout the person answered for (onboarding's
+    // Controller step, or the Settings row that re-opens it). Loaded once
+    // here because GamepadKeyMap.actionFor is on every screen's key path
+    // and has no Context of its own.
+    LaunchedEffect(Unit) { GamepadKeyMap.load(context) }
     // Idle tracking for the screensaver: every key press the shell sees
     // bumps this, and the timer below restarts from it. A launch counts
     // as activity too (the shell is not idle, it is behind a game).

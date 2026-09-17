@@ -19,6 +19,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -55,7 +56,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import dev.droidtop.library.GamesRootReport
@@ -71,6 +79,9 @@ import dev.droidtop.shell.gamepad.Measure
 import dev.droidtop.shell.gamepad.Space
 import dev.droidtop.shell.gamepad.TypeRole
 import dev.droidtop.shell.gamepad.currentShellWindow
+import dev.droidtop.shell.gamepad.input.ControllerPrefs
+import dev.droidtop.shell.gamepad.input.GamepadKeyMap
+import dev.droidtop.shell.gamepad.theme.ThemeSystemPreview
 import dev.droidtop.shell.standard.BackButtonMenu
 import dev.droidtop.shell.standard.HomeRolePrefs
 import kotlinx.coroutines.Dispatchers
@@ -135,7 +146,7 @@ class OnboardingActivity : AppCompatActivity() {
 internal enum class OnboardingStep {
     WELCOME, HOME_CHOICE, STANDARD_SETUP, ALTERNATIVE_SETUP,
     CONFIGURE_MORE, DESKTOP_SETUP, STORAGE_PERMISSION, GAMES_FOLDERS,
-    PORTRAIT_THEME, KEYBOARD, DEFAULT_MODE_CHOICE, WHAT_NEXT,
+    CONTROLLER, APPEARANCE, KEYBOARD, DEFAULT_MODE_CHOICE, WHAT_NEXT,
 }
 
 /**
@@ -153,7 +164,6 @@ internal fun plannedSteps(
     configureDesktop: Boolean,
     configureGaming: Boolean,
     storageGranted: Boolean,
-    portraitThemeSwap: String?,
 ): List<OnboardingStep> = buildList {
     add(OnboardingStep.WELCOME)
     add(OnboardingStep.HOME_CHOICE)
@@ -178,8 +188,13 @@ internal fun plannedSteps(
         // install finished with no games root at all.
         if (!storageGranted) add(OnboardingStep.STORAGE_PERMISSION)
         add(OnboardingStep.GAMES_FOLDERS)
-        if (portraitThemeSwap != null) add(OnboardingStep.PORTRAIT_THEME)
     }
+    // The input and the appearance they will be used through (docs/SPEC.md
+    // 7b). The pad is asked about whatever modes are being set up -- it is
+    // how the shell itself is driven -- while the theme is Gaming's, so a
+    // person who is not setting Gaming up is not asked to pick one.
+    add(OnboardingStep.CONTROLLER)
+    if (configureGaming) add(OnboardingStep.APPEARANCE)
     add(OnboardingStep.KEYBOARD)
     add(OnboardingStep.DEFAULT_MODE_CHOICE)
     add(OnboardingStep.WHAT_NEXT)
@@ -293,28 +308,12 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
         unresolvedFolderWarning = resolved == null
     }
 
-    // Portrait devices: the theme droidtop would otherwise default to
-    // (DEcaffe) ships no vertical variant, so ES-DE's aspect-ratio
-    // selection can only stretch its closest landscape layout over the
-    // screen (EsDeAspectRatio.select). Non-null = this device is
-    // portrait AND droidtop is defaulting to a different theme because
-    // of it; the step below says so rather than quietly swapping.
-    val portraitThemeSwap: String? = remember {
-        if (!ThemeAssets.isPortraitScreen(context)) {
-            null
-        } else {
-            val chosen = ThemeAssets.activeThemeName(context)
-            val landscapeDefault = ThemeAssets.discoverThemes(context)
-                .firstOrNull { it.name == "decaffe-es-de" }?.name
-            if (chosen != null && chosen != landscapeDefault) chosen else null
-        }
-    }
 
     // The plan's storage question is asked once, at entry, for the reason
     // plannedSteps gives: a plan that changes under the user's feet
     // cannot say where to go next.
     val storageGrantedAtEntry = remember { storageAccessGranted }
-    val plan = plannedSteps(homeChoice, configureDesktop, configureGaming, storageGrantedAtEntry, portraitThemeSwap)
+    val plan = plannedSteps(homeChoice, configureDesktop, configureGaming, storageGrantedAtEntry)
 
     fun goTo(next: OnboardingStep) {
         history.add(step)
@@ -485,20 +484,14 @@ private fun OnboardingScreen(startStep: OnboardingStep?, isReEntry: Boolean, onD
             onContinue = { advanceFrom(OnboardingStep.GAMES_FOLDERS) },
         )
 
-        OnboardingStep.PORTRAIT_THEME -> PortraitThemeStep(
+        OnboardingStep.CONTROLLER -> ControllerStep(
             progress, back,
-            themeName = portraitThemeSwap.orEmpty(),
-            onKeep = {
-                // Write the resolved default down as a real choice, so
-                // rotating the device later does not silently move the
-                // theme under the person.
-                portraitThemeSwap?.let { LibraryThemePrefs.set(context, it) }
-                advanceFrom(OnboardingStep.PORTRAIT_THEME)
-            },
-            onUseLandscapeTheme = {
-                LibraryThemePrefs.set(context, "decaffe-es-de")
-                advanceFrom(OnboardingStep.PORTRAIT_THEME)
-            },
+            onContinue = { advanceFrom(OnboardingStep.CONTROLLER) },
+        )
+
+        OnboardingStep.APPEARANCE -> AppearanceStep(
+            progress, back,
+            onContinue = { advanceFrom(OnboardingStep.APPEARANCE) },
         )
 
         OnboardingStep.KEYBOARD -> KeyboardStep(
@@ -703,6 +696,10 @@ private fun SelectableRow(
     supporting: String? = null,
     selected: Boolean = false,
     icon: android.graphics.drawable.Drawable? = null,
+    // A leading slot the caller draws itself, for a choice whose icon is
+    // not a drawable: onboarding's Appearance step puts a live render of
+    // the theme here.
+    leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
     // Null for a row that is information with its own action beside it (a
     // games folder and its Remove), rather than a choice to be made.
@@ -722,6 +719,7 @@ private fun SelectableRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.Md),
     ) {
+        leading?.invoke()
         icon?.let { drawable ->
             val bitmap = remember(drawable) {
                 runCatching { drawable.toBitmap(width = 96, height = 96).asImageBitmap() }.getOrNull()
@@ -1214,51 +1212,186 @@ private fun GamesFoldersStep(
 }
 
 /**
- * Portrait devices get a theme that was actually laid out for one.
- * Said out loud rather than swapped silently: the person is about to see
- * a different theme from the one the docs and the console screenshots
- * show, and the reason is a property of the theme, not a preference.
+ * CONTROLLER. Skippable, and it says so.
+ *
+ * Two things a person cannot be expected to find in Settings, and one
+ * thing droidtop cannot work out on its own:
+ *
+ * - WHICH pad is attached, by the name it reports. droidtop uses the one
+ *   detector it already has ([ControllerPrefs.attachedControllers], which
+ *   is also what the Quick Menu's status header asks) -- a second
+ *   detection mechanism for onboarding would be a second answer.
+ * - That the mapping WORKS, confirmed by one press rather than asserted.
+ *   Android reports a pad's buttons by POSITION, so the press names the
+ *   button by position too.
+ * - Which face button confirms. This is the one question, because it is
+ *   the one thing no detection can answer: KEYCODE_BUTTON_A is the bottom
+ *   face button whatever is printed on it, so on a Nintendo-style pad the
+ *   button that confirms is the one labelled B. Asked as a question, not
+ *   left as a setting to discover.
  */
 @Composable
-private fun PortraitThemeStep(
+private fun ControllerStep(
     progress: Pair<Int, Int>?,
     onBack: (() -> Unit)?,
-    themeName: String,
-    onKeep: () -> Unit,
-    onUseLandscapeTheme: () -> Unit,
+    onContinue: () -> Unit,
 ) {
-    var keepPortrait by remember { mutableStateOf(true) }
-    val portraitLabel = themeDisplayName(themeName)
+    val context = LocalContext.current
+    val controllers = remember { ControllerPrefs.attachedControllers() }
+    var swapped by remember { mutableStateOf(ControllerPrefs.swapConfirmCancel(context)) }
+    var pressed by remember { mutableStateOf<String?>(null) }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+
+    fun choose(value: Boolean) {
+        swapped = value
+        ControllerPrefs.setSwapConfirmCancel(context, value)
+    }
+
     OnboardingScaffold(
-        title = "A theme built for a tall screen",
-        body = "This screen is taller than it is wide. droidtop's usual theme, " +
-            "DEcaffe, only ships landscape layouts, so on a phone it is stretched " +
-            "sideways to fit. You can change this any time in Settings.",
+        title = "Controller",
+        body = if (controllers.isEmpty()) {
+            "No controller is attached right now. droidtop works by touch either way, and " +
+                "this step is here again in Settings when you plug one in."
+        } else {
+            "Press a button to check droidtop is reading your controller, then tell it which " +
+                "face button means yes. You can skip this and change it later in Settings."
+        },
         progress = progress,
         onBack = onBack,
-        primary = StepAction("Next") { if (keepPortrait) onKeep() else onUseLandscapeTheme() },
+        primary = StepAction(if (controllers.isEmpty()) "Skip this" else "Next", onClick = onContinue),
     ) {
-        SelectableRow(
-            title = portraitLabel,
-            supporting = "Ships portrait layouts of its own. Recommended on this screen.",
-            selected = keepPortrait,
-            onClick = { keepPortrait = true },
+        StepSectionLabel("Attached")
+        if (controllers.isEmpty()) {
+            StepNote("Nothing reporting as a controller.")
+        } else {
+            controllers.forEach { controller -> SelectableRow(title = controller.name) }
+        }
+
+        StepSectionLabel("Check it reads")
+        // A real key event, caught where it lands: the box takes focus and
+        // reports the button by position. Nothing is remapped here -- this
+        // only answers "is droidtop seeing your pad at all".
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = currentShellWindow().minTouchTarget + Space.Lg)
+                .background(MenuTokens.Surface, MenuTokens.RowShape)
+                .focusRequester(focus)
+                .focusable()
+                .onKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
+                    val name = GamepadKeyMap.positionName(event.key) ?: return@onKeyEvent false
+                    pressed = name
+                    true
+                }
+                .padding(Space.Lg),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Text(
+                pressed?.let { "droidtop read $it." } ?: "Press any button on your controller.",
+                color = if (pressed != null) MenuTokens.Accent else MenuTokens.OnSurfaceMuted,
+                style = TypeRole.supporting,
+            )
+        }
+
+        StepSectionLabel("Which button means yes")
+        StepNote(
+            "Android tells droidtop where a button IS, not what is printed on it, so this is " +
+                "the one thing it cannot work out for you.",
         )
         SelectableRow(
-            title = "DEcaffe",
-            supporting = "Landscape only: its layout will be stretched sideways here.",
-            selected = !keepPortrait,
-            onClick = { keepPortrait = false },
+            title = "The bottom button confirms",
+            supporting = "A confirms and B goes back. Xbox-style pads and most Android controllers.",
+            selected = !swapped,
+            onClick = { choose(false) },
+        )
+        SelectableRow(
+            title = "The right button confirms",
+            supporting = "B confirms and A goes back. Nintendo-style pads, where the bottom button is the one labelled B.",
+            selected = swapped,
+            onClick = { choose(true) },
         )
     }
 }
 
-/** A theme's display name, never its directory id, in a user-facing string. */
-private fun themeDisplayName(directoryId: String): String =
-    directoryId.removeSuffix("-es-de")
-        .split('-', '_')
-        .filter { it.isNotBlank() }
-        .joinToString(" ") { part -> part.replaceFirstChar { it.uppercase() } }
+/**
+ * APPEARANCE. Every theme droidtop has, each with a REAL render of itself
+ * (docs/SPEC.md 7b): the theme's own system view, parsed by the one theme
+ * parser and drawn by the one renderer the Gaming shell uses
+ * ([ThemeSystemPreview]). Not a screenshot, not a swatch.
+ *
+ * The portrait rule is stated as a property of the THEMES, not as a swap
+ * to accept: on a tall screen the theme that ships portrait layouts is
+ * preselected, every row says which kind of layouts its theme ships, and
+ * choosing a landscape-only theme anyway restates what that will look
+ * like. The choice is written down as soon as it is made, so rotating the
+ * device later never moves the theme under the person.
+ */
+@Composable
+private fun AppearanceStep(
+    progress: Pair<Int, Int>?,
+    onBack: (() -> Unit)?,
+    onContinue: () -> Unit,
+) {
+    val context = LocalContext.current
+    val themes = remember { ThemeAssets.discoverThemes(context) }
+    val portraitScreen = remember { ThemeAssets.isPortraitScreen(context) }
+    val vertical = remember(themes) { themes.associate { it.name to ThemeAssets.hasVerticalVariant(context, it) } }
+    var chosen by remember {
+        mutableStateOf(
+            LibraryThemePrefs.get(context)
+                ?: ThemeAssets.defaultThemeFor(context, themes)?.name,
+        )
+    }
+
+    OnboardingScaffold(
+        title = "Appearance",
+        body = if (portraitScreen) {
+            "Gaming mode draws itself with a real ES-DE theme. This screen is taller than it " +
+                "is wide, so themes that lay out a tall screen are marked -- the others will be " +
+                "stretched sideways to fit."
+        } else {
+            "Gaming mode draws itself with a real ES-DE theme. Every one droidtop has is here, " +
+                "drawing itself."
+        },
+        progress = progress,
+        onBack = onBack,
+        primary = StepAction("Next", onClick = onContinue),
+    ) {
+        if (themes.isEmpty()) {
+            StepNote("No themes are installed. Gaming mode will use its own plain layout.")
+        }
+        themes.forEach { theme ->
+            val hasVertical = vertical[theme.name] == true
+            SelectableRow(
+                title = ThemeAssets.displayName(context, theme),
+                supporting = when {
+                    hasVertical && portraitScreen -> "Lays out a tall screen of its own. Recommended here."
+                    hasVertical -> "Lays out both a wide and a tall screen."
+                    portraitScreen -> "Wide layouts only: it will be stretched sideways on this screen."
+                    else -> "Wide layouts only."
+                },
+                selected = chosen == theme.name,
+                leading = {
+                    ThemeSystemPreview(
+                        themeId = theme.name,
+                        modifier = Modifier
+                            .size(width = Measure.themePreviewWidth, height = Measure.themePreviewHeight)
+                            .clip(MenuTokens.RowShape),
+                    )
+                },
+                onClick = {
+                    chosen = theme.name
+                    // Written down the moment it is chosen: a resolved
+                    // default that stays unwritten moves under the person
+                    // the first time they rotate the device.
+                    LibraryThemePrefs.set(context, theme.name)
+                },
+            )
+        }
+    }
+}
 
 /**
  * OPTIONAL step. droidtop runs fine without its own keyboard; what it
