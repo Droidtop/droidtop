@@ -59,6 +59,34 @@ interface PlayHistoryDao {
         ensureRow(id, epochMs)
         bumpPlay(id, epochMs)
     }
+
+    @androidx.room.Insert(onConflict = androidx.room.OnConflictStrategy.REPLACE)
+    suspend fun put(row: PlayHistoryEntity)
+
+    @Query("DELETE FROM play_history WHERE id = :id")
+    suspend fun delete(id: String)
+
+    /**
+     * The missing game's history becomes the replacing game's: the counts
+     * add and the later last-played wins, because they are one game at
+     * two paths (see [PlayHistoryStore.moveTo]). A row is written for
+     * [toId] even when it had none, which is the normal case -- a folder
+     * that has just been detected has never been launched from.
+     */
+    @Transaction
+    suspend fun moveTo(fromId: String, toId: String) {
+        val rows = getAll(listOf(fromId, toId)).associateBy { it.id }
+        val from = rows[fromId] ?: return
+        val to = rows[toId]
+        put(
+            PlayHistoryEntity(
+                id = toId,
+                lastPlayedEpochMs = maxOf(from.lastPlayedEpochMs, to?.lastPlayedEpochMs ?: 0L),
+                playCount = from.playCount + (to?.playCount ?: 0),
+            ),
+        )
+        delete(fromId)
+    }
 }
 
 /** One row per favourite non-ROM entry; absence is "not a favourite". See [FavoritesStore]. */
@@ -75,6 +103,14 @@ interface FavoritesDao {
 
     @Query("DELETE FROM favorites WHERE id = :id")
     suspend fun remove(id: String)
+
+    /** See [FavoritesStore.moveTo]. A game that was not a favourite does not become one. */
+    @Transaction
+    suspend fun moveTo(fromId: String, toId: String) {
+        if (getAll(listOf(fromId)).isEmpty()) return
+        add(toId)
+        remove(fromId)
+    }
 }
 
 @Database(entities = [PlayHistoryEntity::class, FavoriteEntity::class], version = 2, exportSchema = false)
@@ -116,6 +152,8 @@ class RoomFavoritesStore(context: Context) : FavoritesStore {
         if (ids.isEmpty()) return emptySet()
         return dao.getAll(ids).toSet()
     }
+
+    override suspend fun moveTo(fromId: String, toId: String) = dao.moveTo(fromId, toId)
 }
 
 class RoomPlayHistoryStore(context: Context) : PlayHistoryStore {
@@ -127,4 +165,6 @@ class RoomPlayHistoryStore(context: Context) : PlayHistoryStore {
         if (ids.isEmpty()) return emptyMap()
         return dao.getAll(ids).associate { it.id to PlayHistoryRecord(it.lastPlayedEpochMs, it.playCount) }
     }
+
+    override suspend fun moveTo(fromId: String, toId: String) = dao.moveTo(fromId, toId)
 }

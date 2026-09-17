@@ -292,19 +292,19 @@ class ScanProgressTest {
 
     // --- the incremental publish -----------------------------------------
 
-    /** A provider that emits growing snapshots, optionally failing partway. */
+    /** A provider that finishes one folder at a time, optionally failing partway. */
     private class StreamingProvider(
         kind: LibraryEntryKind,
         private val batches: List<List<LibraryEntry>>,
         private val failAfterBatches: Int = -1,
     ) : LibraryProvider {
         override val kinds = setOf(kind)
-        override suspend fun scan(): List<LibraryEntry> = batches.lastOrNull() ?: emptyList()
+        override suspend fun scan(): List<LibraryEntry> = batches.flatten()
         override suspend fun launch(entry: LibraryEntry) = Unit
-        override fun scanProgressive(): Flow<List<LibraryEntry>> = flow {
+        override fun scanProgressive(): Flow<ScanStep> = flow {
             batches.forEachIndexed { index, batch ->
                 if (index == failAfterBatches) error("this folder blew up")
-                emit(batch)
+                emit(ScanStep.Segment(key = "folder$index", root = "/games", entries = batch))
             }
         }
     }
@@ -317,7 +317,7 @@ class ScanProgressTest {
         val second = entry("b", LibraryEntryKind.RENPY)
         val provider = StreamingProvider(
             LibraryEntryKind.RENPY,
-            listOf(listOf(first), listOf(first, second)),
+            listOf(listOf(first), listOf(second)),
         )
         val library = Library(listOf(provider))
 
@@ -333,7 +333,7 @@ class ScanProgressTest {
         val other = entry("other", LibraryEntryKind.CONSOLE_ROM)
         val failing = StreamingProvider(
             LibraryEntryKind.RENPY,
-            listOf(listOf(kept), listOf(kept, entry("never", LibraryEntryKind.RENPY))),
+            listOf(listOf(kept), listOf(entry("never", LibraryEntryKind.RENPY))),
             failAfterBatches = 1,
         )
         val healthy = StreamingProvider(LibraryEntryKind.CONSOLE_ROM, listOf(listOf(other)))
@@ -363,11 +363,11 @@ class ScanProgressTest {
             override val kinds = setOf(LibraryEntryKind.RENPY)
             override suspend fun scan() = emptyList<LibraryEntry>()
             override suspend fun launch(entry: LibraryEntry) = Unit
-            override fun rescanProgressive(): Flow<List<LibraryEntry>> = flow {
+            override fun rescanProgressive(): Flow<ScanStep> = flow {
                 starts.incrementAndGet()
-                emit(listOf(first))
+                emit(ScanStep.Segment(key = "first", root = "/games", entries = listOf(first)))
                 continueScan.await()
-                emit(listOf(first, second))
+                emit(ScanStep.Segment(key = "second", root = "/games", entries = listOf(second)))
             }
         }
         val library = Library(listOf(provider))

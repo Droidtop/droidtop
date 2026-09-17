@@ -2,6 +2,7 @@ package dev.droidtop.library
 
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -32,6 +33,15 @@ private class FakePlayHistoryStore : PlayHistoryStore {
 
     override suspend fun getAll(ids: Collection<String>): Map<String, PlayHistoryRecord> =
         records.filterKeys { it in ids }
+
+    override suspend fun moveTo(fromId: String, toId: String) {
+        val from = records.remove(fromId) ?: return
+        val to = records[toId]
+        records[toId] = PlayHistoryRecord(
+            lastPlayedEpochMs = maxOf(from.lastPlayedEpochMs, to?.lastPlayedEpochMs ?: 0L),
+            playCount = from.playCount + (to?.playCount ?: 0),
+        )
+    }
 }
 
 private class FakeFavoritesStore : FavoritesStore {
@@ -40,6 +50,9 @@ private class FakeFavoritesStore : FavoritesStore {
         if (favorite) ids += id else ids -= id
     }
     override suspend fun getAll(ids: Collection<String>): Set<String> = this.ids.filter { it in ids }.toSet()
+    override suspend fun moveTo(fromId: String, toId: String) {
+        if (ids.remove(fromId)) ids += toId
+    }
 }
 
 class LibraryTest {
@@ -134,5 +147,74 @@ class LibraryTest {
         val entries = library.scanAll()
 
         assertEquals(nativeEntry, entries.single())
+    }
+
+    // --- folding a missing game into the game that replaced it (7g) ------
+
+    private val missing = LibraryEntry(
+        id = "/games/adult/Game v0.3",
+        title = "Game",
+        kind = LibraryEntryKind.RENPY,
+        missing = true,
+    )
+    private val replacement = LibraryEntry(id = "/games/adult/Game v0.4", title = "Game", kind = LibraryEntryKind.RENPY)
+
+    @Test
+    fun `the fold moves play history, the favourite and what a provider knows`() = runBlocking {
+        val provider = FoldingProvider(LibraryEntryKind.RENPY, listOf(replacement))
+        val playHistory = FakePlayHistoryStore()
+        val favorites = FakeFavoritesStore()
+        val index = FakeFoldIndexStore(
+            mutableMapOf(
+                provider.indexKey to LibrarySlice(
+                    listOf(ScanStep.Segment("/games/adult", "/games", listOf(missing, replacement))),
+                ),
+            ),
+        )
+        val library = Library(listOf(provider), playHistory, favorites, index)
+        playHistory.recordPlay(missing.id, 1_000L)
+        playHistory.recordPlay(missing.id, 2_000L)
+        favorites.setFavorite(missing.id, true)
+
+        assertTrue(library.replaceMissing(missing, replacement))
+
+        // Everything the library knew about the old path is now known
+        // about the new one, and the old entry is out of the index.
+        assertEquals(2, playHistory.getAll(listOf(replacement.id))[replacement.id]?.playCount)
+        assertEquals(2_000L, playHistory.getAll(listOf(replacement.id))[replacement.id]?.lastPlayedEpochMs)
+        assertTrue(playHistory.getAll(listOf(missing.id)).isEmpty())
+        assertEquals(setOf(replacement.id), favorites.ids)
+        assertEquals(listOf(missing.id to replacement.id), provider.moved)
+        assertEquals(listOf(replacement.id), index.slices[provider.indexKey]?.entries()?.map { it.id })
+    }
+
+    @Test
+    fun `an entry that is not missing is never folded away`() = runBlocking {
+        val provider = FoldingProvider(LibraryEntryKind.RENPY, listOf(replacement))
+        val library = Library(listOf(provider), FakePlayHistoryStore(), FakeFavoritesStore())
+
+        assertFalse(library.replaceMissing(replacement, missing.copy(missing = false)))
+        assertTrue(provider.moved.isEmpty())
+    }
+}
+
+/** A provider that keeps facts of its own, like the ROM provider's database does. */
+private class FoldingProvider(
+    kind: LibraryEntryKind,
+    private val entries: List<LibraryEntry>,
+) : LibraryProvider, EntryFactsOwner {
+    override val kinds = setOf(kind)
+    val moved = mutableListOf<Pair<String, String>>()
+    override suspend fun scan(): List<LibraryEntry> = entries
+    override suspend fun launch(entry: LibraryEntry) {}
+    override suspend fun moveEntryFacts(fromId: String, toId: String) {
+        moved += fromId to toId
+    }
+}
+
+private class FakeFoldIndexStore(val slices: MutableMap<String, LibrarySlice>) : LibraryIndexStore {
+    override suspend fun load(providerKey: String): LibrarySlice? = slices[providerKey]
+    override suspend fun save(providerKey: String, slice: LibrarySlice) {
+        slices[providerKey] = slice
     }
 }

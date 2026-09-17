@@ -75,7 +75,25 @@ object PcFolderScan {
      * which is what a caller with no database loaded should get.
      */
     fun gamesUnder(root: File, defs: List<EngineDef> = emptyList()): List<File> =
-        if (!root.isDirectory) emptyList() else childrenOf(root).flatMap { walk(it, defs, depth = 1) }
+        gamesByTopLevelFolder(root, defs).flatMap { it.games }
+
+    /** One top-level folder of a games root, and the PC games under it. */
+    data class TopLevelFolder(val folder: File, val games: List<File>)
+
+    /**
+     * The same walk, kept in the shape the index merges in: one entry per
+     * top-level folder of [root], so the caller can replace that folder's
+     * games on their own and say which folders the root still has
+     * (docs/SPEC.md 7g). A folder with no games under it is still listed,
+     * with none: "this folder is here and holds no games" and "this
+     * folder is gone" are different answers.
+     */
+    fun gamesByTopLevelFolder(root: File, defs: List<EngineDef> = emptyList()): List<TopLevelFolder> =
+        if (!root.isDirectory) {
+            emptyList()
+        } else {
+            childrenOf(root).map { child -> TopLevelFolder(child, walk(child, defs, depth = 1)) }
+        }
 
     private fun walk(folder: File, defs: List<EngineDef>, depth: Int): List<File> {
         if (!folder.isDirectory || !ScanPrune.isScannableFolder(folder)) return emptyList()

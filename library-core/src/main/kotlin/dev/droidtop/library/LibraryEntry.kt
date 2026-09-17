@@ -157,6 +157,20 @@ data class LibraryEntry(
     // Set only for PC games (store-owned or folder-scanned); null for
     // ROMs, native apps and engine games. See [PcInfo].
     val pcInfo: PcInfo? = null,
+    /**
+     * The walk that used to find this game no longer does, and the
+     * library kept it anyway (docs/SPEC.md 7g): shown as "broken -
+     * missing", with its favourite, play history, metadata and
+     * collection memberships intact, and no Play offered. It clears the
+     * moment a walk finds the same path again.
+     *
+     * NOT [broken], which is real ES-DE `broken` metadata -- the user's
+     * own statement that a game does not work. This is droidtop's own
+     * statement that the folder is not there. A game can be both, and
+     * conflating them would let a walk overwrite something only the user
+     * can say.
+     */
+    val missing: Boolean = false,
 ) {
     /**
      * The image file this entry should show for a themed element that
@@ -510,20 +524,25 @@ interface LibraryProvider {
     val indexKey: String get() = this::class.java.simpleName
 
     /**
-     * Real, optional progressive variant of [scan] -- emits growing
-     * snapshots as results actually become available, instead of forcing
-     * the caller to wait for the single slowest part of a scan before
-     * showing anything at all. Default implementation just wraps [scan]
-     * as one single final emission, so every provider keeps working with
-     * zero changes required; the two providers that walk the filesystem
-     * ([dev.droidtop.library.consoles.ConsoleRomProvider] per system
-     * folder, [EngineGameProvider] per top-level folder of a games root)
-     * override it for real, since they are the ones whose scan can take
-     * meaningfully long (a real SD card, a real folder with thousands of
-     * files) -- see their own doc comments, and ScanBudget for why the
-     * time limit lives per folder inside them rather than around them.
+     * The walk, narrating what it finishes as it finishes it: one
+     * [ScanStep.Segment] per part of the provider (a top-level folder of
+     * a games root, a console system), and a [ScanStep.RootDone] when a
+     * root has no more parts to walk.
+     *
+     * A [ScanStep.Segment] is a STATEMENT ABOUT THAT PART, not a growing
+     * snapshot: it is everything that part holds now. That is what lets
+     * [Library] replace one folder's entries in the index and leave the
+     * rest alone, and what lets it tell a game the walk no longer finds
+     * from a folder the walk has not reached yet (docs/SPEC.md 7g). The
+     * providers that walk a filesystem emit per folder for the same
+     * reason they always did -- a slow folder costs that folder -- see
+     * their own doc comments and ScanBudget.
+     *
+     * The default wraps [scan] as one whole-provider segment, which is
+     * the honest shape for a source that has no parts to answer in
+     * (the package manager's app list).
      */
-    fun scanProgressive(): Flow<List<LibraryEntry>> = flow { emit(scan()) }
+    fun scanProgressive(): Flow<ScanStep> = flow { emit(ScanStep.Segment(key = ScanStep.WHOLE, entries = scan())) }
 
     /**
      * Real, optional explicit "my ROMs/apps changed, look again" action --
@@ -536,7 +555,24 @@ interface LibraryProvider {
      * The real, user-facing "Rescan library" Settings action calls this,
      * not [scanProgressive] -- see shell-gamepad's SettingsSection.
      */
-    fun rescanProgressive(): Flow<List<LibraryEntry>> = scanProgressive()
+    fun rescanProgressive(): Flow<ScanStep> = scanProgressive()
+}
+
+/**
+ * A provider that keeps facts of its own about an entry id, and can move
+ * them when a missing game is folded into the game that replaced it
+ * (docs/SPEC.md 7g).
+ *
+ * The fold moves everything the library knows about the old path to the
+ * new one. Play history and favourites belong to [Library] itself and it
+ * moves those; scraped metadata rows and collection memberships live in
+ * the provider that owns that database
+ * ([dev.droidtop.library.consoles.ConsoleRomProvider]), which is what
+ * this asks for rather than [Library] reaching into a Room DAO it should
+ * not know about.
+ */
+interface EntryFactsOwner {
+    suspend fun moveEntryFacts(fromId: String, toId: String)
 }
 
 class Library(
@@ -672,8 +708,8 @@ class Library(
      * The same, but every matching provider walks again, whatever the
      * index holds -- the action behind Settings' "Rescan library" and the
      * one a changed root set forces. The index stays on screen while the
-     * walk runs and is replaced slice by slice as each provider completes,
-     * so a rescan never makes the library vanish or shrink to a partial.
+     * walk runs and is updated one finished folder at a time, so a rescan
+     * never makes the library vanish or shrink to a partial.
      */
     fun rescanKindsProgressive(kinds: Set<LibraryEntryKind>): Flow<List<LibraryEntry>> =
         libraryProgressive(kinds, rescan = true)
@@ -688,30 +724,40 @@ class Library(
      * Per matching provider: the index's slice is published at once when
      * there is one; a provider with no slice, a provider that is not
      * [LibraryProvider.indexed], or every provider on a [rescan] walks.
-     * A walk that had no slice streams progressively (the first-run
-     * fill); a walk that replaces a slice publishes only when it has
-     * finished, because its partials are smaller than what is already on
-     * screen. A completed walk becomes the new slice. A walk that fails
-     * or is cancelled leaves the old slice alone.
+     *
+     * THE WALK UPDATES THE INDEX A PART AT A TIME (directed 2026-09-17).
+     * Every [ScanStep] a provider emits is merged into its slice the
+     * moment it arrives -- that folder's entries replace that folder's
+     * previous entries and nothing else changes -- and the merged slice
+     * is both published and written. A game a walked folder no longer
+     * holds is kept, marked [LibraryEntry.missing]; it is never dropped
+     * because a walk did not see it. A walk that fails or is cancelled
+     * leaves everything it had not reached alone, which is now most of
+     * the slice rather than all of it.
      */
     private fun libraryProgressive(
         kinds: Set<LibraryEntryKind>,
         rescan: Boolean,
     ): Flow<List<LibraryEntry>> = channelFlow {
         val matchingProviders = providers.filter { provider -> provider.kinds.any { it in kinds } }
-        val slots = MutableList(matchingProviders.size) { emptyList<LibraryEntry>() }
+        val slices = MutableList(matchingProviders.size) { LibrarySlice() }
         val indexedSlot = BooleanArray(matchingProviders.size)
         matchingProviders.forEachIndexed { i, provider ->
             if (!provider.indexed) return@forEachIndexed
             val known = index.load(provider.indexKey) ?: return@forEachIndexed
-            slots[i] = known
+            slices[i] = known
             indexedSlot[i] = true
-            ScanLog.write("index: ${provider.indexKey} ${known.size} entries" + if (rescan) ", walking again" else "")
+            ScanLog.write(
+                "index: ${provider.indexKey} ${known.entries().size} entries in ${known.segments.size} parts" +
+                    if (rescan) ", walking again" else "",
+            )
         }
-        if (indexedSlot.any { it }) send(withLibraryFacts(slots.flatten()))
+        val lock = Any()
+        fun published(): List<LibraryEntry> = synchronized(lock) { slices.flatMap { it.entries() } }
+        if (indexedSlot.any { it }) send(withLibraryFacts(published()))
         coroutineScope {
-            matchingProviders.forEachIndexed { index, provider ->
-                if (indexedSlot[index] && !rescan) return@forEachIndexed
+            matchingProviders.forEachIndexed { slot, provider ->
+                if (indexedSlot[slot] && !rescan) return@forEachIndexed
                 coroutineLaunch {
                     // No whole-provider timeout, deliberately. There was
                     // one (60 s), and the rig showed exactly what it cost
@@ -720,31 +766,91 @@ class Library(
                     // found was discarded. A budget belongs to the unit of
                     // work it can bound, which is one folder, not one
                     // provider: see ScanBudget. A provider that never
-                    // returns costs its own slice and nothing else.
-                    var last: List<LibraryEntry>? = null
+                    // returns costs the parts it never reached and
+                    // nothing else.
                     try {
                         val stream = if (rescan) provider.rescanProgressive() else provider.scanProgressive()
-                        stream.collect { partial ->
-                            last = partial
-                            if (!indexedSlot[index]) {
-                                slots[index] = partial
-                                send(withLibraryFacts(slots.flatten()))
+                        stream.collect { step ->
+                            val merged = synchronized(lock) {
+                                val next = slices[slot].merge(step)
+                                slices[slot] = next
+                                next
                             }
+                            if (provider.indexed) this@Library.index.save(provider.indexKey, merged)
+                            send(withLibraryFacts(published()))
                         }
                     } catch (t: kotlinx.coroutines.CancellationException) {
                         throw t
                     } catch (t: Throwable) {
                         Log.e("droidtop.Library", "Provider ${provider::class.simpleName} failed to scan", t)
-                        return@coroutineLaunch
                     }
-                    val complete = last ?: return@coroutineLaunch
-                    slots[index] = complete
-                    if (provider.indexed) this@Library.index.save(provider.indexKey, complete)
-                    if (indexedSlot[index]) send(withLibraryFacts(slots.flatten()))
                 }
             }
         }
     }.flowOn(Dispatchers.IO)
+
+    /**
+     * The user removed a games root, so its entries go: that is a choice
+     * about what the library covers, not a drive that failed to mount,
+     * and it is the one case where the index drops instead of marking
+     * missing (docs/SPEC.md 7g).
+     *
+     * Called with the roots as they are NOW, by whoever noticed they
+     * changed, rather than with the ones that went: the index knows which
+     * root each part it holds belongs to, so "keep these" is the whole
+     * instruction. A part under no root (a store's own database) is
+     * never touched by it.
+     */
+    suspend fun keepOnlyRoots(rootPaths: Set<String>) = withContext(Dispatchers.IO) {
+        val dropped = mutableSetOf<String>()
+        for (provider in providers.filter { it.indexed }) {
+            val slice = index.load(provider.indexKey) ?: continue
+            val kept = slice.keepOnlyRoots(rootPaths)
+            if (kept == slice) continue
+            dropped += slice.entries().map { it.id } - kept.entries().map { it.id }.toSet()
+            index.save(provider.indexKey, kept)
+            ScanLog.write("index: ${provider.indexKey} dropped the parts of roots that are no longer configured")
+        }
+        if (dropped.isNotEmpty()) {
+            backgroundScanStates.values.forEach { state ->
+                state.value = state.value?.filterNot { it.id in dropped }
+            }
+        }
+    }
+
+    /**
+     * This detected game IS that missing one: fold the missing entry into
+     * it (docs/SPEC.md 7g).
+     *
+     * Everything the library knows about the old path moves to the new
+     * one -- play history, favourite, and whatever a provider keeps of
+     * its own (scraped metadata rows, collection memberships, see
+     * [EntryFactsOwner]) -- and the missing entry leaves the index. One
+     * mechanism for both directions the UI offers it from: "this replaces
+     * a missing game" on the game that is here, and "find its
+     * replacement" on the game that is not.
+     *
+     * Returns false for a fold that is not one (an entry onto itself, or
+     * an entry that is not missing), so a caller cannot quietly delete a
+     * game that is present.
+     */
+    suspend fun replaceMissing(missing: LibraryEntry, replacement: LibraryEntry): Boolean = withContext(Dispatchers.IO) {
+        if (!missing.missing || missing.id == replacement.id) return@withContext false
+        playHistory.moveTo(missing.id, replacement.id)
+        favorites.moveTo(missing.id, replacement.id)
+        providers.filterIsInstance<EntryFactsOwner>().forEach { it.moveEntryFacts(missing.id, replacement.id) }
+        for (provider in providers.filter { it.indexed }) {
+            val slice = index.load(provider.indexKey) ?: continue
+            val without = slice.without(missing.id)
+            if (without != slice) index.save(provider.indexKey, without)
+        }
+        backgroundScanStates.values.forEach { state ->
+            val current = state.value ?: return@forEach
+            state.value = withLibraryFacts(current.filterNot { it.id == missing.id })
+        }
+        ScanLog.write("index: ${missing.id} folded into ${replacement.id}")
+        true
+    }
 
     private suspend fun scanProviderSafely(provider: LibraryProvider): List<LibraryEntry> = try {
         // Failures are isolated per provider; slowness is bounded per
