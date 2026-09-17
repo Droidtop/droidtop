@@ -84,6 +84,12 @@ internal fun PcGameDetail(
     library: Library,
     onLaunch: () -> Unit,
     onClose: () -> Unit,
+    // Every game entry the shell has, so this screen can offer the OTHER
+    // folders of the same game -- its versions and its segments (docs/
+    // SPEC.md 7m). Empty means "nothing to group with", which is what a
+    // caller that has no list passes.
+    siblings: List<LibraryEntry> = emptyList(),
+    onOpenOther: (LibraryEntry) -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -107,6 +113,12 @@ internal fun PcGameDetail(
         runners = computed.first
         resolved = computed.second
         loaded = true
+    }
+
+    // The game this entry is one folder of. Cheap: names only, no
+    // filesystem (see LibraryGrouping).
+    val group = remember(entry, siblings) {
+        dev.droidtop.library.LibraryGrouping.groupOf(entry, siblings)?.takeIf { it.hasChoices }
     }
 
     val media = remember(entry) {
@@ -149,6 +161,9 @@ internal fun PcGameDetail(
 
     val runner = resolved
     val actions = rememberPcActions(
+        group = group,
+        currentId = entry.id,
+        onOpenOther = onOpenOther,
         entry = entry,
         runner = runner,
         media = media.size,
@@ -339,6 +354,9 @@ private data class PcActionRow(val title: String, val detail: String, val onSele
 
 @Composable
 private fun rememberPcActions(
+    group: dev.droidtop.library.LibraryGameGroup?,
+    currentId: String,
+    onOpenOther: (LibraryEntry) -> Unit,
     entry: LibraryEntry,
     runner: ResolvedRunner?,
     media: Int,
@@ -355,6 +373,10 @@ private fun rememberPcActions(
     val isStoreGame = entry.pcInfo?.storeId != null || entry.id.substringBefore(':') in STORE_PREFIXES
 
     return listOfNotNull(
+        // The game's other folders, when it has any: its parts, and the
+        // versions of each. The row that is open says so instead of
+        // offering to open itself again.
+        group?.let { versionsGroup(it, currentId, onOpenOther) },
         PcActionGroup(
             "Game management",
             listOfNotNull(
@@ -416,6 +438,55 @@ private fun rememberPcActions(
             ),
         ),
     )
+}
+
+/**
+ * Every folder this one game is: a row per segment and a row per version,
+ * each saying what it carries, with the one that is open marked.
+ *
+ * Minimum by design (docs/SPEC.md 7m): the model's whole job is that a
+ * game is one entry, so what the detail needs is a way to reach the other
+ * folders of it, which is a list of rows -- the same rows every other
+ * action on this screen is.
+ */
+private fun versionsGroup(
+    group: dev.droidtop.library.LibraryGameGroup,
+    currentId: String,
+    onOpenOther: (LibraryEntry) -> Unit,
+): PcActionGroup? {
+    val rows = mutableListOf<PcActionRow>()
+    val game = group.game
+    for (segment in game.segments) {
+        for (version in segment.versions) {
+            rows += row(group, version, currentId, onOpenOther, label = segment.label)
+        }
+    }
+    for (version in game.versions) {
+        rows += row(group, version, currentId, onOpenOther, label = null)
+    }
+    if (rows.size < 2) return null
+    return PcActionGroup(if (game.segments.isEmpty()) "Versions" else "Parts and versions", rows)
+}
+
+private fun row(
+    group: dev.droidtop.library.LibraryGameGroup,
+    version: dev.droidtop.library.GameVersion,
+    currentId: String,
+    onOpenOther: (LibraryEntry) -> Unit,
+    label: String?,
+): PcActionRow {
+    val copy = version.playable
+    val target = copy?.let { group.entryFor(it) }
+    val title = listOfNotNull(label, version.version.takeIf { it.isNotEmpty() }?.let { "v$it" })
+        .joinToString(" - ")
+        .ifEmpty { "This version" }
+    val detail = buildString {
+        append(if (target?.id == currentId) "Open now" else "Open this one")
+        copy?.language?.let { append(" - ").append(it) }
+        if (copy?.mods?.isNotEmpty() == true) append(" - ").append(copy.mods.joinToString(" "))
+        if (version.updateAvailable) append(" - ").append(version.latestKnown).append(" is available")
+    }
+    return PcActionRow(title, detail, if (target == null || target.id == currentId) null else ({ onOpenOther(target) }))
 }
 
 /**

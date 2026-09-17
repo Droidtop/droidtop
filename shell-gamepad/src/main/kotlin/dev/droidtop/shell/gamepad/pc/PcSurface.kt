@@ -86,6 +86,13 @@ internal fun PcSurface(
     onOpen: (LibraryEntry) -> Unit,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
 ) {
+    // ONE CARD PER GAME (docs/SPEC.md 7m). A game found in three folders
+    // -- three weeks of Fetish Locator, two versions of one Godot game --
+    // is one entry here, and the folders behind it are reachable from its
+    // detail. Filters and sort run over the cards, which is the list the
+    // user sees.
+    val cards = remember(entries) { dev.droidtop.library.LibraryGrouping.group(entries).map { it.displayEntry } }
+
     var sort by remember { mutableStateOf(PcSort.NAME) }
     var sources by remember { mutableStateOf<Set<String>>(emptySet()) }
     var engines by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -104,11 +111,11 @@ internal fun PcSurface(
     // so an empty surface opens on them instead of on an empty grid.
     var options by remember(entries.isEmpty()) { mutableStateOf(entries.isEmpty()) }
 
-    val allSources = remember(entries) { entries.map { it.sourceLabel() }.distinct().sorted() }
-    val allEngines = remember(entries) { entries.mapNotNull { it.engineLabel() }.distinct().sorted() }
+    val allSources = remember(cards) { cards.map { it.sourceLabel() }.distinct().sorted() }
+    val allEngines = remember(cards) { cards.mapNotNull { it.engineLabel() }.distinct().sorted() }
 
-    val shown = remember(entries, sort, sources, engines, installedOnly) {
-        entries
+    val shown = remember(cards, sort, sources, engines, installedOnly) {
+        cards
             .filter { sources.isEmpty() || it.sourceLabel() in sources }
             .filter { engines.isEmpty() || it.engineLabel() in engines }
             .filter { !installedOnly || it.pcInfo?.installed != false }
@@ -131,7 +138,7 @@ internal fun PcSurface(
     // A second handler would be a second mechanism for one job.
     val window = LocalShellWindow.current
     Column(modifier = Modifier.fillMaxSize()) {
-        PcHeader(total = entries.size, shown = shown.size, entries = entries)
+        PcHeader(total = cards.size, shown = shown.size, entries = cards, folders = entries.size)
 
         // The filter chips outgrow a phone's width long before they
         // outgrow the console's, and a chip that runs off the edge is a
@@ -218,7 +225,7 @@ internal fun PcSurface(
 
 /** Plain facts, not a verdict: how much is here and how much of it is on this device. */
 @Composable
-private fun PcHeader(total: Int, shown: Int, entries: List<LibraryEntry>) {
+private fun PcHeader(total: Int, shown: Int, entries: List<LibraryEntry>, folders: Int) {
     val installed = entries.count { it.pcInfo?.installed != false }
     val engineGames = entries.count { it.kind != LibraryEntryKind.WINE_PROFILE }
     val edge = LocalShellWindow.current.edgePadding
@@ -229,6 +236,11 @@ private fun PcHeader(total: Int, shown: Int, entries: List<LibraryEntry>) {
                 append(if (shown == total) "$total games" else "$shown of $total games")
                 append(", $installed installed")
                 if (engineGames > 0) append(", $engineGames with a detected engine")
+                // A game found in more than one folder is one card, so
+                // the folder count and the game count differ, and a
+                // person comparing this with their own folder tree needs
+                // to be told which number is which (docs/SPEC.md 7m).
+                if (folders > total) append(", in $folders folders")
             },
             color = Color.Gray,
             style = MaterialTheme.typography.bodyMedium,
