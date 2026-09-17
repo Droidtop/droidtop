@@ -2601,7 +2601,12 @@ private fun AppIconGrid(
             userScrollEnabled = false,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(120.dp * rowCount.coerceAtLeast(1))
+                // One tile's whole anatomy, measured rather than guessed:
+                // 8dp of focus-ring padding, the 64dp icon, 6dp, the name
+                // and the kind line under it, and 8dp again. The grid has
+                // no scroll of its own, so a height that is short by a
+                // line clips the line rather than scrolling to it.
+                .height(APP_TILE_HEIGHT * rowCount.coerceAtLeast(1))
                 .padding(horizontal = LocalShellWindow.current.edgePadding),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -2618,6 +2623,8 @@ private fun AppIconGrid(
         }
     }
 }
+
+private val APP_TILE_HEIGHT = 136.dp
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -2650,10 +2657,20 @@ private fun AppIconTile(
                     else -> false
                 }
             }
+            // The shell's ONE selection idiom, the same one [GameCard]
+            // and the menus draw: the accent ring over a brightened
+            // surface. This tile kept a third one -- a thin white
+            // rectangle over an unchanged card -- after the cards were
+            // fixed (rig, build 546), which is two answers to "what does
+            // selected look like" on two grids of the same shell.
             .border(
-                width = if (focused) 3.dp else 0.dp,
-                color = if (focused) Color.White else Color.Transparent,
+                width = if (focused) 3.dp else 1.dp,
+                color = if (focused) MenuTokens.Accent else Color(0x1FFFFFFF),
                 shape = RoundedCornerShape(16.dp),
+            )
+            .background(
+                if (focused) MenuTokens.SurfaceSelected else Color.Transparent,
+                RoundedCornerShape(16.dp),
             )
             .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -2672,12 +2689,26 @@ private fun AppIconTile(
                 )
             }
         }
+        // The tile's own anatomy, the same one every card in this shell
+        // has: the name, then the one line that says what the thing IS.
+        // The second line was dropped outright when the labels were
+        // fixed (rig, build 546), which left a grid of names with no
+        // statement of kind -- and this grid does hold more than one
+        // (`REMOTE_STREAM` is an Apps kind too).
         Text(
             entry.title,
             color = Color.White,
             style = MaterialTheme.typography.labelMedium,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 6.dp),
+        )
+        Text(
+            entry.kind.displayName(),
+            color = Color.Gray,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

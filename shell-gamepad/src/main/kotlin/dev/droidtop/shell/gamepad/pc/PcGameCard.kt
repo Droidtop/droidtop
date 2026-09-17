@@ -29,9 +29,11 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 
@@ -75,12 +77,20 @@ internal fun PcGameCard(
                     false
                 }
             }
+            // The shell's ONE selection idiom (MenuTokens), the same
+            // ring the menus, the game cards and the app tiles draw. This
+            // card kept its own white rectangle over a hand-picked grey,
+            // which read as a different kind of selection on the surface
+            // a phone user spends most of their time in (rig, build 546).
             .border(
-                width = if (focused) 4.dp else 1.dp,
-                color = if (focused) Color.White else Color.DarkGray,
+                width = if (focused) 3.dp else 1.dp,
+                color = if (focused) MenuTokens.Accent else Color(0x1FFFFFFF),
                 shape = RoundedCornerShape(12.dp),
             )
-            .background(if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A), RoundedCornerShape(12.dp)),
+            .background(
+                if (focused) MenuTokens.SurfaceSelected else MenuTokens.Surface,
+                RoundedCornerShape(12.dp),
+            ),
     ) {
         if (entry.artworkUri != null) {
             AsyncImage(
@@ -98,7 +108,13 @@ internal fun PcGameCard(
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Text(entry.title, color = Color.White, style = MaterialTheme.typography.titleMedium)
+            Text(
+                entry.title,
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
             Text(
                 buildString {
                     append(entry.sourceLabel())
@@ -107,6 +123,8 @@ internal fun PcGameCard(
                 },
                 color = Color.LightGray,
                 style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             pc?.compatibility?.takeIf { it.hasBeenTried }?.let {
                 Text(it.summary(), color = Color(0xFFB0BEC5), style = MaterialTheme.typography.labelSmall)
