@@ -1155,7 +1155,10 @@ private fun DesktopSetupStep(
         checkMessage = when {
             result == null ->
                 "Desktop mode needs root on this device (Magisk, KernelSU or APatch). " +
-                    "This device reports: ${rootAccess.description.lowercase()}. " +
+                    // RootAccess.description is a whole sentence and ends
+                    // in its own full stop, so this one does not add a
+                    // second (rig, build 548: "...root access..").
+                    "This device reports: ${rootAccess.description.lowercase()} " +
                     "You can finish setup without it and turn Desktop on later."
             result.succeeded -> "Root access works. Desktop mode can run here."
             else ->
