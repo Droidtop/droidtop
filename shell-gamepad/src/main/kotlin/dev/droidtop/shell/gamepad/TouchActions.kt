@@ -76,11 +76,19 @@ fun rememberGamepadTouch(): (GamepadAction) -> Unit {
  * and dropping hints to make them fit would drop actions a touch user
  * has no other route to.
  */
+/**
+ * The bar's own plate, where it has one. It has none over a themed view:
+ * real ES-DE's HelpComponent draws its text ON the view and paints no
+ * background of its own, and an opaque strip there covers the plate the
+ * theme drew for exactly this row (rig, build 548).
+ */
+val TouchHintBarBackground = Color(0xFF111111)
+
 @Composable
 fun TouchHintBar(
     hints: List<Pair<GamepadAction, String>>,
     modifier: Modifier = Modifier,
-    background: Color = Color(0xFF111111),
+    background: Color = TouchHintBarBackground,
 ) {
     if (hints.isEmpty()) return
     val window = LocalShellWindow.current
