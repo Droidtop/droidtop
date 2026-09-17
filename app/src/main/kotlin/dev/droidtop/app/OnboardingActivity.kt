@@ -22,7 +22,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -656,7 +655,6 @@ private fun shouldShowStorageRationale(context: Context): Boolean {
 // The frame every step renders into
 // ---------------------------------------------------------------------
 
-/** One action in the scaffold's action area. */
 /**
  * The label of a step's ONE forward action (docs/SPEC.md 7b, "One way
  * forward"). A step never offers two ways forward at once, so this one
@@ -675,6 +673,7 @@ internal fun onboardingForwardLabel(reEntry: Boolean, answered: Boolean): String
     else -> "Skip this step"
 }
 
+/** One action in the scaffold's action area. */
 private data class StepAction(
     val label: String,
     val enabled: Boolean = true,
@@ -910,23 +909,23 @@ private fun WelcomeStep(progress: Pair<Int, Int>?, onBack: (() -> Unit)?, onCont
  * The first screen of a launcher was pure text on black. This is
  * droidtop's own mark, drawn rather than shipped as another asset: the
  * three surfaces it puts on one device, in the shell's own accent.
+ *
+ * Prose, not a control. Welcome SAYS what droidtop can turn this device
+ * into (docs/SPEC.md 7b); the choice of what to set up is its own step,
+ * with the one choice component in it. Drawn as filled, accent-coloured
+ * chips these three words looked exactly like a selector that ignored
+ * every tap and could not be reached by the D-pad, because there was
+ * nothing there to reach (rig, build 547). A shape that says "pick one"
+ * belongs only where one can be picked.
  */
 @Composable
 private fun DroidtopMark() {
-    Row(
+    Text(
+        "Android  ·  Gaming  ·  Desktop",
+        color = MenuTokens.Accent,
+        style = TypeRole.rowTitle,
         modifier = Modifier.padding(top = Space.Md),
-        horizontalArrangement = Arrangement.spacedBy(Space.Sm),
-    ) {
-        listOf("Android", "Gaming", "Desktop").forEach { label ->
-            Box(
-                modifier = Modifier
-                    .background(MenuTokens.Surface, RoundedCornerShape(Space.Sm))
-                    .padding(horizontal = Space.Lg, vertical = Space.Md),
-            ) {
-                Text(label, color = MenuTokens.Accent, style = TypeRole.rowTitle)
-            }
-        }
-    }
+    )
 }
 
 @Composable

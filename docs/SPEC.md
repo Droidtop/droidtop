@@ -2290,7 +2290,13 @@ buttons and a link. The component is the shell's existing menu row anatomy
 ### The steps
 
 - **Welcome.** Says what droidtop can turn this device into and that every choice is
-  changeable later. Carries droidtop's own mark.
+  changeable later. Carries droidtop's own mark. It SAYS it: the three surfaces are prose,
+  not controls. Nothing on this step is selectable, because nothing here is a choice — what
+  to set up is asked two steps later, by the one choice component, and setting the default
+  mode is asked at the end. Drawn as filled accent chips, those three words were a selector
+  that ignored every tap and could not be reached by the D-pad, because there was nothing
+  behind them to reach (rig, build 547). The rule this states generally: a shape that says
+  "pick one" appears only where one can be picked.
 - **Home screen.** How the home screen behaves when Home is pressed: droidtop's own Standard
   launcher, Alternative (droidtop holds the HOME role and forwards to a launcher the person
   already has), or neither, in which case droidtop claims no `CATEGORY_HOME` role and its
