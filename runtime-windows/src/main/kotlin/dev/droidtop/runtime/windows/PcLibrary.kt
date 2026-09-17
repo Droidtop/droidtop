@@ -124,8 +124,27 @@ object PcLibrary {
                     // source could only ever see gamenative's own
                     // CustomGames directory, which nothing in droidtop
                     // tells anybody about.
-                    adoptScannedGameFolders(context)
-                    CustomGameScanner.scanAsLibraryItems()
+                    val ours = adoptScannedGameFolders(context)
+                    // droidtop's own folders are turned into items HERE,
+                    // from the list this scan just produced, and not read
+                    // back out of the preference it was also written to.
+                    // The rig proved why: `PrefManager.setPref` hands the
+                    // write to a DataStore coroutine and returns, while
+                    // `candidateFolders()` reads the value back
+                    // synchronously, so the very first scan after an
+                    // install read the EMPTY set and the PC library was
+                    // 151 engine games and not one folder game. On a
+                    // device that had scanned before, the previous run's
+                    // value hid the race completely -- which is exactly
+                    // why build 537 showed 171 games and a freshly
+                    // installed 539 showed 151.
+                    val folderItems = ours.mapNotNull { folder ->
+                        runCatching { CustomGameScanner.createLibraryItemFromFolder(folder) }.getOrNull()
+                    }
+                    // Folders the user added to the vendored scanner by
+                    // hand, outside droidtop's roots, still count.
+                    (folderItems + CustomGameScanner.scanAsLibraryItems())
+                        .distinctBy { it.appId }
                         // The scanner recognizes a Steam install sitting in a
                         // scanned folder and returns it as a STEAM item; that
                         // game already came from the Steam DAO above, so taking
@@ -290,9 +309,9 @@ object PcLibrary {
      * setting. Manual folders the user added by hand outside droidtop's
      * roots are left alone.
      */
-    private fun adoptScannedGameFolders(context: Context) {
+    private fun adoptScannedGameFolders(context: Context): List<String> {
         val roots = dev.droidtop.library.GamesRoots.current(context)
-        if (roots.isEmpty()) return
+        if (roots.isEmpty()) return emptyList()
         val rootPaths = roots.map { it.absolutePath }
         runCatching {
             val currentRoots = app.gamenative.PrefManager.customGameScanRoots
@@ -302,19 +321,20 @@ object PcLibrary {
             }
         }.onFailure { android.util.Log.w(TAG, "Could not take droidtop's roots out of the folder scanner", it) }
         val startedAt = android.os.SystemClock.elapsedRealtime()
-        val found = roots.flatMap { dev.droidtop.library.PcFolderScan.gamesUnder(it) }
+        // The engine rules go in because which folders are PC games and
+        // which are engine games is one question: a category folder
+        // holding engine games is nobody's game (PcFolderScan rule 6).
+        val defs = runCatching { dev.droidtop.library.EnginesDatabase.defs(context) }.getOrDefault(emptyList())
+        val found = roots.flatMap { dev.droidtop.library.PcFolderScan.gamesUnder(it, defs) }
             .map { it.absolutePath }
             .toSet()
         // A scan that finds nothing and a scan that never ran look the
         // same from the library; this line is how they are told apart.
-        android.util.Log.i(
-            dev.droidtop.library.ScanLog.TAG,
-            dev.droidtop.library.ScanLog.summary(
-                label = "pc folders under " + rootPaths.joinToString(", "),
-                games = found.size,
-                skippedByReason = emptyMap(),
-                durationMs = android.os.SystemClock.elapsedRealtime() - startedAt,
-            ),
+        dev.droidtop.library.ScanLog.write(
+            label = "pc folders under " + rootPaths.joinToString(", "),
+            games = found.size,
+            skippedByReason = emptyMap(),
+            durationMs = android.os.SystemClock.elapsedRealtime() - startedAt,
         )
         runCatching {
             val current = app.gamenative.PrefManager.customGameManualFolders
@@ -322,6 +342,7 @@ object PcLibrary {
             val wanted = (theirs + found).toSet()
             if (wanted != current) app.gamenative.PrefManager.customGameManualFolders = wanted
         }.onFailure { android.util.Log.w(TAG, "Could not tell the folder scanner which folders are games", it) }
+        return found.toList()
     }
 
     private const val TAG = "droidtop.PcLibrary"
