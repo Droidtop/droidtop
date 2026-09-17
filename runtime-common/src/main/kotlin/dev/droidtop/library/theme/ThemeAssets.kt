@@ -280,7 +280,28 @@ object ThemeAssets {
         )
     }
 
-    private val systemThemeCache = mutableMapOf<Triple<String, String?, Triple<String?, String?, EsDeCollectionKind>>, EsDeTheme>()
+    /**
+     * What makes one parse of a theme different from another.
+     *
+     * [screenAspectRatio] is in here for the same reason the parse takes
+     * it at all: a theme's aspect-ratio axis is resolved against the LIVE
+     * screen shape, so the landscape parse and the portrait parse of one
+     * theme are two different documents. Without it the first parse of
+     * the session kept being served after a rotation, and a device turned
+     * upright went on drawing the layout its author wrote for a wide
+     * screen (rig, build 546: Slate's own vertical variant never appeared
+     * until the process was restarted).
+     */
+    private data class ThemeCacheKey(
+        val themeName: String,
+        val systemId: String?,
+        val collectionThemeFolder: String?,
+        val systemFullName: String?,
+        val collectionKind: EsDeCollectionKind,
+        val screenAspectRatio: Float,
+    )
+
+    private val systemThemeCache = mutableMapOf<ThemeCacheKey, EsDeTheme>()
 
     init {
         // A theme selection change -- or a theme re-downloaded/updated in
@@ -356,7 +377,25 @@ object ThemeAssets {
         systemFullName: String? = null,
         collectionKind: EsDeCollectionKind = EsDeCollectionKind.NONE,
     ): EsDeTheme? {
-        val cacheKey = Triple(active.name, systemId, Triple(collectionThemeFolder, systemFullName, collectionKind))
+        // Real device screen ratio (landscape width/height, matching
+        // ES_DE_ASPECT_RATIO_MAP's own convention) -- resolves a real
+        // theme's own "automatic" aspectRatio capability to whichever
+        // declared ratio is actually closest to THIS device, instead of a
+        // droidtop-invented fallback. See parseWithCapabilities' own doc
+        // comment for why skipping this silently breaks any theme using
+        // that common real convention. Read BEFORE the cache is consulted
+        // because it is part of what identifies a parse -- see
+        // [ThemeCacheKey].
+        val metrics = context.resources.displayMetrics
+        val screenAspectRatio = metrics.widthPixels.toFloat() / metrics.heightPixels.toFloat()
+        val cacheKey = ThemeCacheKey(
+            themeName = active.name,
+            systemId = systemId,
+            collectionThemeFolder = collectionThemeFolder,
+            systemFullName = systemFullName,
+            collectionKind = collectionKind,
+            screenAspectRatio = screenAspectRatio,
+        )
         systemThemeCache[cacheKey]?.let { return it }
 
         val themeDir = when {
@@ -368,15 +407,6 @@ object ThemeAssets {
         val collectionThemeFile = collectionThemeFolder?.let { File(themeDir, "$it/theme.xml") }?.takeIf { it.isFile }
         val themeFile = collectionThemeFile ?: File(themeDir, "theme.xml")
         val theme = try {
-            // Real device screen ratio (landscape width/height, matching
-            // ES_DE_ASPECT_RATIO_MAP's own convention) -- resolves a real
-            // theme's own "automatic" aspectRatio capability to whichever
-            // declared ratio is actually closest to THIS device, instead
-            // of a droidtop-invented fallback. See parseWithCapabilities'
-            // own doc comment for why skipping this silently breaks any
-            // theme using that common real convention.
-            val metrics = context.resources.displayMetrics
-            val screenAspectRatio = metrics.widthPixels.toFloat() / metrics.heightPixels.toFloat()
             // Real device locale, "language_COUNTRY" format matching real
             // capabilities.xml entries -- see parseWithCapabilities' own
             // doc comment for why this needs real resolution instead of

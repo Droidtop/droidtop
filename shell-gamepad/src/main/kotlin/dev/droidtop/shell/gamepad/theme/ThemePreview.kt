@@ -3,6 +3,7 @@ package dev.droidtop.shell.gamepad.theme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -10,11 +11,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import dev.droidtop.library.theme.ThemeAssets
 
 /**
- * A REAL render of a theme, at thumbnail size.
+ * A REAL render of a theme, at thumbnail size and at the SCREEN'S OWN
+ * SHAPE ([longEdge] gives the longer side; the shorter one follows the
+ * display).
  *
  * Not a screenshot, not a picture shipped beside the theme, and not a
  * colour swatch someone chose: this is the theme's own `system` view,
@@ -33,15 +40,36 @@ import dev.droidtop.library.theme.ThemeAssets
  * of them, cost one parse per theme.
  */
 @Composable
-fun ThemeSystemPreview(themeId: String, modifier: Modifier = Modifier) {
+fun ThemeSystemPreview(themeId: String, longEdge: Dp, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val theme = remember(themeId, ThemePrefs.version) {
+    // Rotating the device changes both of the facts below -- which layout
+    // the theme resolves to, and what shape this frame is -- so the
+    // configuration is a key here, not just an ambient value.
+    val configuration = LocalConfiguration.current
+    val theme = remember(themeId, ThemePrefs.version, configuration) {
         ThemeAssets.discoverThemes(context)
             .firstOrNull { it.name == themeId }
             ?.let { ThemeAssets.loadTheme(context, it) }
     }
+    // The frame is the screen's own shape, scaled down: the theme is
+    // already parsed against the live screen (ThemeAssets.loadTheme reads
+    // the display metrics), so on a phone held upright the layout inside
+    // this frame is the theme's own portrait layout, and a 16:9 plate
+    // would squash it into a shape its author never wrote.
+    val size = remember(configuration, longEdge) {
+        val metrics = context.resources.displayMetrics
+        val (width, height) = esDePreviewFrame(
+            longEdge = longEdge.value,
+            screenWidth = metrics.widthPixels.toFloat(),
+            screenHeight = metrics.heightPixels.toFloat(),
+        )
+        DpSize(width.dp, height.dp)
+    }
     val view = theme?.views?.get("system")
-    Box(modifier = modifier.background(Color(0xFF101010)), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = modifier.size(size).background(Color(0xFF101010)),
+        contentAlignment = Alignment.Center,
+    ) {
         if (view != null) {
             EsDeThemedView(
                 view = view,
@@ -59,4 +87,24 @@ fun ThemeSystemPreview(themeId: String, modifier: Modifier = Modifier) {
             )
         }
     }
+}
+
+/**
+ * The preview frame's two sides: [longEdge] along the screen's own long
+ * axis, and the short side in the screen's own proportion. Pure, so the
+ * rule the frame states -- "this is the theme drawing itself on THIS
+ * screen" -- is testable without a device.
+ *
+ * A screen that reports no size at all (never seen on a device, possible
+ * in a preview or a test harness) gets a square rather than a division by
+ * zero.
+ */
+internal fun esDePreviewFrame(
+    longEdge: Float,
+    screenWidth: Float,
+    screenHeight: Float,
+): kotlin.Pair<Float, Float> = when {
+    screenWidth <= 0f || screenHeight <= 0f -> longEdge to longEdge
+    screenHeight > screenWidth -> longEdge * (screenWidth / screenHeight) to longEdge
+    else -> longEdge to longEdge * (screenHeight / screenWidth)
 }
