@@ -22,7 +22,18 @@ import dev.droidtop.library.theme.ThemePrefs
 object GamingSettingsCatalog {
 
     const val GROUP_GLOBAL = "global"
+    /**
+     * The shell's own group. It used to be the ONLY group besides System:
+     * sixteen unrelated rows in one undifferentiated column, with the
+     * section label component already written and nothing using it
+     * (research/ui-polish item 16). The rows are the same rows in the
+     * same order; they are now under labels that say what they are for.
+     */
     const val GROUP_GAMING = "gaming"
+    const val GROUP_LIBRARY = "gaming_library"
+    const val GROUP_APPEARANCE = "gaming_appearance"
+    const val GROUP_SCREENS = "gaming_screens"
+    const val GROUP_INPUT = "gaming_input"
     const val GROUP_OTHER_SHELLS = "other_shells"
 
     const val ID_GLOBAL_SETTINGS = "pref_global_settings"
@@ -100,7 +111,7 @@ object GamingSettingsCatalog {
         ),
         CatalogGroup(
             id = GROUP_GAMING,
-            title = null,
+            title = "Shell",
             items = buildList {
                 add(defaultSectionItem(context))
                 add(showHintsItem(context))
@@ -145,6 +156,12 @@ object GamingSettingsCatalog {
                         },
                     ),
                 )
+            },
+        ),
+        CatalogGroup(
+            id = GROUP_LIBRARY,
+            title = "Library",
+            items = buildList {
                 add(
                     NestedScreenItem(
                         id = ID_SCRAPER,
@@ -180,6 +197,13 @@ object GamingSettingsCatalog {
                         registryId = "windows_games",
                     ),
                 )
+                add(rescanLibraryItem())
+            },
+        ),
+        CatalogGroup(
+            id = GROUP_SCREENS,
+            title = "Screens",
+            items = buildList {
                 add(displayShellTargetItem(context))
                 add(displayGameLaunchTargetItem(context))
                 add(secondScreenRoleItem(context, MODE_GAMING))
@@ -196,6 +220,20 @@ object GamingSettingsCatalog {
                         run = { ctx, _ -> dev.droidtop.runtime.DisplayArrangement.swap(ctx) },
                     ),
                 )
+                add(
+                    ActionItem(
+                        id = ID_DISPLAY_REINIT,
+                        title = "Reinitialize displays",
+                        subtitle = "Detect connected screens again and re-place the shell",
+                        run = { _ -> dev.droidtop.runtime.DisplayArrangement.reinitialize() },
+                    ),
+                )
+            },
+        ),
+        CatalogGroup(
+            id = GROUP_INPUT,
+            title = "Input",
+            items = buildList {
                 // Keyboard. droidtop ships Hacker's Keyboard because a
                 // device meant to replace a computer needs Ctrl/Alt/Esc/
                 // Tab/arrows/function keys, and it cannot silently set the
@@ -220,15 +258,12 @@ object GamingSettingsCatalog {
                         ),
                     )
                 }
-                add(
-                    ActionItem(
-                        id = ID_DISPLAY_REINIT,
-                        title = "Reinitialize displays",
-                        subtitle = "Detect connected screens again and re-place the shell",
-                        run = { _ -> dev.droidtop.runtime.DisplayArrangement.reinitialize() },
-                    ),
-                )
-                add(rescanLibraryItem())
+            },
+        ),
+        CatalogGroup(
+            id = GROUP_APPEARANCE,
+            title = "Appearance",
+            items = buildList {
                 add(themeItem(context))
                 themeColorSchemeItem(context)?.let { add(it) }
                 themeVariantItem(context)?.let { add(it) }
@@ -331,8 +366,13 @@ object GamingSettingsCatalog {
                     add(
                         ActionItem(
                             id = ID_SYSTEM_BRIGHTNESS_GRANT,
-                            title = "Allow brightness control",
+                            // The quick setting this row IS, named as
+                            // itself rather than as the permission behind
+                            // it; what is missing goes in the value column
+                            // like any other state (ui-polish item 15).
+                            title = "Brightness",
                             subtitle = "Opens the system screen where droidtop can be granted Modify system settings",
+                            value = "Needs permission",
                             run = { ctx -> ctx.startActivity(controls.brightnessGrantIntent(ctx)) },
                         ),
                     )
@@ -353,8 +393,9 @@ object GamingSettingsCatalog {
                     add(
                         ActionItem(
                             id = ID_SYSTEM_DND_GRANT,
-                            title = "Allow Do Not Disturb control",
-                            subtitle = "One-time grant on the system screen this opens; afterwards DND is a toggle right here",
+                            title = "Do Not Disturb",
+                            subtitle = "One-time grant on the system screen this opens; afterwards this is a toggle right here",
+                            value = "Needs permission",
                             run = { ctx -> ctx.startActivity(controls.dndGrantIntent()) },
                         ),
                     )
@@ -405,8 +446,9 @@ object GamingSettingsCatalog {
                 add(
                     ActionItem(
                         id = ID_SYSTEM_VPN,
-                        title = if (status.vpnActive) "VPN: active" else "VPN: off",
+                        title = "VPN",
                         subtitle = "Opens the system VPN screen to connect, disconnect, or configure",
+                        value = if (status.vpnActive) "Active" else "Off",
                         run = { ctx ->
                             ctx.startActivity(
                                 android.content.Intent(android.provider.Settings.ACTION_VPN_SETTINGS)

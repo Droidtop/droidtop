@@ -58,6 +58,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.library.settings.GamingSettingsCatalog
@@ -629,112 +630,133 @@ fun GamepadShell(
             )
         }
         Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
-            val entry = detailEntry
-            when {
-                // Starting a game owns the content area until the game's
-                // own window arrives. Checked FIRST so it covers the
-                // detail screen the launch was triggered from.
-                screensaverOn -> {
-                    Screensaver(gameEntries.orEmpty()) {
-                        screensaverOn = false
-                        lastInputMs = android.os.SystemClock.elapsedRealtime()
-                    }
-                    androidx.activity.compose.BackHandler(enabled = true) { screensaverOn = false }
-                }
-                launching != null -> {
-                    val starting = launching
-                    if (starting != null) {
-                        LaunchScreen(starting)
-                        // A launch that never produces a window must
-                        // never trap the shell behind this.
-                        androidx.activity.compose.BackHandler(enabled = true) { launching = null }
-                    }
-                }
-                // Real bug this fixes: the loading spinner used to gate this
-                // entire content area unconditionally, before `section` was
-                // ever checked -- Settings (which needs zero scan data) was
-                // stuck behind the same load state as Games/Apps, showing as
-                // "empty" even though it's a plain static list with nothing
-                // to wait for. detailEntry is also section-independent, so
-                // it stays checked before the loading gate too.
-                // A PC or engine game gets the PC surface's own detail
-                // screen (docs/SPEC.md 7i): runner availability, the
-                // per-game override and the actions that go with them are
-                // not a console ROM's concerns, and putting both on one
-                // screen is what made the old one grow two personalities.
-                entry != null && entry.isPcOrEngineGame -> PcGameDetail(
-                    entry = entry,
-                    library = library,
-                    onLaunch = { onLaunch(entry); nav.back() },
-                    onClose = { nav.back() },
-                    // The game's other folders -- its versions and its
-                    // segments (docs/SPEC.md 7m) -- are reachable from
-                    // here, and picking one opens that folder's own
-                    // detail, so Play starts what the user chose.
-                    siblings = gameEntries.orEmpty(),
-                    // Sideways, not deeper: another folder of the same
-                    // game replaces this detail, so B from it still means
-                    // "back to the grid I came from".
-                    onOpenOther = { nav.openDetail(it.id) },
-                )
-                entry != null -> EntryDetailScreen(
-                    entry = entry,
-                    library = library,
-                    onLaunch = { onLaunch(entry); nav.back() },
-                    onClose = { nav.back() },
-                )
-                section == GamingSection.SETTINGS -> {
-                    // Back always does something in Settings: it pops a
-                    // nested screen, or leaves Settings for the default
-                    // section. Saying otherwise took the B hint out of
-                    // the footer -- and that hint IS the touch route to B
-                    // (design language: "the help/hint row is the touch
-                    // route to pad buttons"), so on the rig a nested
-                    // settings screen had no way out that a finger could
-                    // reach at all.
-                    canGoBack = true
-                    themeHandlesHints = false
-                    SettingsCatalogView(
-                        onBack = { nav.openSection(GamingPrefs.defaultSection(context)) },
-                        onRescan = { rescanTrigger++ },
-                        browseThemesToken = browseThemesRequest,
-                    )
-                }
-                // Each section now gates on its own scan only (see
-                // gameEntries/appEntries' own comment) -- Games' spinner no
-                // longer has anything to do with whether Apps is ready, and
-                // vice versa.
-                section == GamingSection.GAMES && gameEntries == null -> CircularProgressIndicator(color = Color.White)
-                section == GamingSection.APPS && appEntries == null -> CircularProgressIndicator(color = Color.White)
-                else -> when (section) {
-                    GamingSection.GAMES -> GamesSection(
-                        entries = gameEntries.orEmpty().let { all ->
-                            if (uiMode.kidGamesOnly) all.filter { it.kidGame } else all
-                        },
-                        library = library,
-                        onLaunch = onLaunch,
-                        nav = nav,
-                        onShowDetail = { nav.rememberFocus(it.id); nav.openDetail(it.id) },
-                        onDrillDownChanged = { canGoBack = it },
-                        onFocusedEntryChanged = onFocusedEntryChanged,
-                        onThemeHandlesHints = { themeHandlesHints = it },
-                        onToggleFavorite = onToggleFavorite,
-                        onRequestRescan = { rescanTrigger++ },
-                    )
-                    GamingSection.APPS -> {
-                        canGoBack = false
-                        themeHandlesHints = false
-                        AppsSection(
-                            entries = appEntries.orEmpty(),
-                            onLaunch = onLaunch,
-                            onShowDetail = { nav.openDetail(it.id) },
-                            onFocusedEntryChanged = onFocusedEntryChanged,
-                            onToggleFavorite = onToggleFavorite,
+            // ONE transition for every screen the shell itself draws.
+            // Opening a game's detail out of a themed gamelist used to be
+            // a cut straight into droidtop's own chrome, while moving
+            // between the theme's own views faded (research/ui-polish item
+            // 18). The theme's own inter-view transitions stay the
+            // theme's: this is keyed on the section and the open detail,
+            // not on the group, so a move between systems is still ES-DE's
+            // own animation and not two animations at once.
+            androidx.compose.animation.Crossfade(
+                targetState = nav.detailId ?: "section:${section.name}",
+                animationSpec = androidx.compose.animation.core.tween(SHELL_SCREEN_TRANSITION_MS),
+                label = "shell screen",
+                modifier = Modifier.fillMaxSize(),
+            ) { screenKey ->
+                // Read out of the KEY, not out of the live state: the copy
+                // that is leaving has to keep drawing the screen it was, or
+                // this is a dim rather than a transition.
+                val entry = detailEntry?.takeIf { it.id == screenKey }
+                val shownSection = GamingSection.entries.firstOrNull { "section:${it.name}" == screenKey } ?: section
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    when {
+                        // Starting a game owns the content area until the game's
+                        // own window arrives. Checked FIRST so it covers the
+                        // detail screen the launch was triggered from.
+                        screensaverOn -> {
+                            Screensaver(gameEntries.orEmpty()) {
+                                screensaverOn = false
+                                lastInputMs = android.os.SystemClock.elapsedRealtime()
+                            }
+                            androidx.activity.compose.BackHandler(enabled = true) { screensaverOn = false }
+                        }
+                        launching != null -> {
+                            val starting = launching
+                            if (starting != null) {
+                                LaunchScreen(starting)
+                                // A launch that never produces a window must
+                                // never trap the shell behind this.
+                                androidx.activity.compose.BackHandler(enabled = true) { launching = null }
+                            }
+                        }
+                        // Real bug this fixes: the loading spinner used to gate this
+                        // entire content area unconditionally, before `section` was
+                        // ever checked -- Settings (which needs zero scan data) was
+                        // stuck behind the same load state as Games/Apps, showing as
+                        // "empty" even though it's a plain static list with nothing
+                        // to wait for. detailEntry is also section-independent, so
+                        // it stays checked before the loading gate too.
+                        // A PC or engine game gets the PC surface's own detail
+                        // screen (docs/SPEC.md 7i): runner availability, the
+                        // per-game override and the actions that go with them are
+                        // not a console ROM's concerns, and putting both on one
+                        // screen is what made the old one grow two personalities.
+                        entry != null && entry.isPcOrEngineGame -> PcGameDetail(
+                            entry = entry,
+                            library = library,
+                            onLaunch = { onLaunch(entry); nav.back() },
+                            onClose = { nav.back() },
+                            // The game's other folders -- its versions and its
+                            // segments (docs/SPEC.md 7m) -- are reachable from
+                            // here, and picking one opens that folder's own
+                            // detail, so Play starts what the user chose.
+                            siblings = gameEntries.orEmpty(),
+                            // Sideways, not deeper: another folder of the same
+                            // game replaces this detail, so B from it still means
+                            // "back to the grid I came from".
+                            onOpenOther = { nav.openDetail(it.id) },
                         )
+                        entry != null -> EntryDetailScreen(
+                            entry = entry,
+                            library = library,
+                            onLaunch = { onLaunch(entry); nav.back() },
+                            onClose = { nav.back() },
+                        )
+                        shownSection == GamingSection.SETTINGS -> {
+                            // Back always does something in Settings: it pops a
+                            // nested screen, or leaves Settings for the default
+                            // section. Saying otherwise took the B hint out of
+                            // the footer -- and that hint IS the touch route to B
+                            // (design language: "the help/hint row is the touch
+                            // route to pad buttons"), so on the rig a nested
+                            // settings screen had no way out that a finger could
+                            // reach at all.
+                            canGoBack = true
+                            themeHandlesHints = false
+                            SettingsCatalogView(
+                                onBack = { nav.openSection(GamingPrefs.defaultSection(context)) },
+                                onRescan = { rescanTrigger++ },
+                                browseThemesToken = browseThemesRequest,
+                            )
+                        }
+                        // Each section now gates on its own scan only (see
+                        // gameEntries/appEntries' own comment) -- Games' spinner no
+                        // longer has anything to do with whether Apps is ready, and
+                        // vice versa.
+                        shownSection == GamingSection.GAMES && gameEntries == null -> CircularProgressIndicator(color = Color.White)
+                        shownSection == GamingSection.APPS && appEntries == null -> CircularProgressIndicator(color = Color.White)
+                        else -> when (shownSection) {
+                            GamingSection.GAMES -> GamesSection(
+                                entries = gameEntries.orEmpty().let { all ->
+                                    if (uiMode.kidGamesOnly) all.filter { it.kidGame } else all
+                                },
+                                library = library,
+                                onLaunch = onLaunch,
+                                nav = nav,
+                                onShowDetail = { nav.rememberFocus(it.id); nav.openDetail(it.id) },
+                                onDrillDownChanged = { canGoBack = it },
+                                onFocusedEntryChanged = onFocusedEntryChanged,
+                                onThemeHandlesHints = { themeHandlesHints = it },
+                                onToggleFavorite = onToggleFavorite,
+                                onRequestRescan = { rescanTrigger++ },
+                            )
+                            GamingSection.APPS -> {
+                                canGoBack = false
+                                themeHandlesHints = false
+                                AppsSection(
+                                    entries = appEntries.orEmpty(),
+                                    onLaunch = onLaunch,
+                                    onShowDetail = { nav.openDetail(it.id) },
+                                    onFocusedEntryChanged = onFocusedEntryChanged,
+                                    onToggleFavorite = onToggleFavorite,
+                                )
+                            }
+                            // SETTINGS is handled above, before the loading gate --
+                            // unreachable here, kept only so `when` stays exhaustive.
+                            GamingSection.SETTINGS -> Unit
+                        }
                     }
-                    // SETTINGS is handled above, before the loading gate --
-                    // unreachable here, kept only so `when` stays exhaustive.
-                    GamingSection.SETTINGS -> Unit
                 }
             }
         }
@@ -1102,6 +1124,16 @@ private fun ButtonHintFooter(
 }
 
 internal enum class GamingSection { GAMES, APPS, SETTINGS }
+
+/**
+ * How long one shell-drawn screen takes to become another. ES-DE's own
+ * inter-view fade is 500 ms at its slowest and 160 ms at its fastest
+ * (ViewController.cpp's transition durations); the shell's own screens
+ * are not theme content, so they take the short end of that -- long
+ * enough not to be a cut, short enough that a pad user pressing B twice
+ * is never waiting on it.
+ */
+private const val SHELL_SCREEN_TRANSITION_MS = 160
 
 /**
  * The sections a given UI mode allows. Kiosk and Kid hide Settings --
@@ -2784,13 +2816,18 @@ private fun GameCard(
                     else -> false
                 }
             }
+            // ONE selection idiom across the shell: the menus' own
+            // accent border over a brightened surface (MenuTokens), not a
+            // third one. The rig counted three at once -- this card's 1px
+            // white rectangle, the menus' brightened card, and the
+            // theme's own highlight.
             .border(
-                width = if (focused) 4.dp else 1.dp,
-                color = if (focused) Color.White else Color.DarkGray,
+                width = if (focused) 3.dp else 1.dp,
+                color = if (focused) MenuTokens.Accent else Color(0x1FFFFFFF),
                 shape = RoundedCornerShape(12.dp),
             )
             .background(
-                if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A),
+                if (focused) MenuTokens.SurfaceSelected else MenuTokens.Surface,
                 RoundedCornerShape(12.dp),
             ),
     ) {
@@ -2812,14 +2849,42 @@ private fun GameCard(
                     .padding(12.dp),
             ) {
                 Column {
-                    Text(entry.title, color = Color.White, style = MaterialTheme.typography.titleMedium)
-                    Text(entry.kind.name, color = Color.LightGray, style = MaterialTheme.typography.labelSmall)
+                    // Constrained to the tile: a long name (and an app
+                    // named after its own class is the longest of all)
+                    // used to run past the card and nearly collide with
+                    // its neighbour's.
+                    Text(
+                        entry.title,
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        entry.kind.displayName(),
+                        color = Color.LightGray,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         } else {
             Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.Bottom) {
-                Text(entry.title, color = Color.White, style = MaterialTheme.typography.titleMedium)
-                Text(entry.kind.name, color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+                Text(
+                    entry.title,
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    entry.kind.displayName(),
+                    color = Color.Gray,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
         if (entry.favorite) {

@@ -67,10 +67,16 @@ class NativeAppProvider(private val context: Context) : LibraryProvider {
                 val titled = runCatching {
                     val appInfo = AppInfo(context, activityInfo, activityInfo.user)
                     iconCache.getTitleAndIcon(appInfo, activityInfo, CacheLookupFlag.DEFAULT_LOOKUP_FLAG)
-                    (appInfo.title ?: activityInfo.label).toString() to drawableToBitmap(appInfo.bitmap.newIcon(context))
+                    // An app that declares no label on its launcher
+                    // activity gives its own class name back
+                    // (`com.bluestacks.bsxlauncher.Main` on the rig);
+                    // [AppLabels] is the one rule for what it is called
+                    // instead.
+                    AppLabels.labelFor(appInfo.title ?: activityInfo.label, packageName) to
+                        drawableToBitmap(appInfo.bitmap.newIcon(context))
                 }.getOrElse { t ->
                     Log.w("droidtop.NativeAppProvider", "Icon/title failed for $packageName; listing it without an icon", t)
-                    activityInfo.label.toString() to null
+                    AppLabels.labelFor(activityInfo.label, packageName) to null
                 }
                 Triple(packageName, titled.first, titled.second)
             }

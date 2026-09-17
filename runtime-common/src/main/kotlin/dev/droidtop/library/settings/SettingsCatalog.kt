@@ -34,6 +34,18 @@ sealed interface CatalogItem {
     val id: String
     val title: String
     val subtitle: String?
+
+    /**
+     * What this setting is SET TO, for the value column every surface
+     * draws (a settings row's right-hand column, a Quick Menu tile's
+     * second line). A choice, a toggle and a slider each derive it from
+     * their own state; the kinds that have no state of their own carry
+     * it here, because state belongs in the value column and not inside
+     * the title. The rig read "Network: Wi-Fi, signal 4/4" and
+     * "VPN: off" as TITLES while every other row put its state in the
+     * column beside it.
+     */
+    val value: String? get() = null
 }
 
 data class ChoiceOption(val value: String, val label: String)
@@ -102,6 +114,7 @@ class ActionItem(
     override val id: String,
     override val title: String,
     override val subtitle: String? = null,
+    override val value: String? = null,
     val confirmTitle: String? = null,
     val run: (Context) -> Unit,
 ) : CatalogItem
@@ -115,6 +128,7 @@ class AsyncActionItem(
     override val id: String,
     override val title: String,
     override val subtitle: String? = null,
+    override val value: String? = null,
     val run: suspend (Context, onStatus: (String) -> Unit) -> String,
 ) : CatalogItem
 

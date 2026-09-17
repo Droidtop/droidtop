@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
@@ -89,13 +91,43 @@ object MenuTokens {
     val RowShape = RoundedCornerShape(10.dp)
     val OverlayShape = RoundedCornerShape(14.dp)
     val RowSpacing = 6.dp
+
+    /**
+     * ONE row height rule: every row is at least this tall, whatever it
+     * says, and a row with a subtitle grows from it. The rig measured
+     * three different heights down one settings screen (100 / 130 / 160
+     * px) because the box was whatever its text happened to need.
+     */
+    val RowMinHeight = 56.dp
+
+    /**
+     * The value column's own width, so the values down a screen line up
+     * as a column instead of each one starting where its label stopped.
+     * A value longer than this still gets the room it needs -- it is a
+     * minimum, not a box.
+     */
+    val ValueColumnMinWidth = 92.dp
 }
 
-/** List padding shared by every full-screen menu list. */
-internal val MenuListPadding: PaddingValues
+/**
+ * List padding shared by every full-screen menu list, as a LazyColumn's
+ * own `contentPadding` -- with the room the hint bar takes at the bottom.
+ *
+ * A padding MODIFIER on a lazy list shrinks its viewport, so its last row
+ * ends exactly where the hint bar begins and the bar draws over it (rig:
+ * "the bottom row is clipped under the hint bar with no fade"). As
+ * CONTENT padding the same space scrolls with the list and the last row
+ * comes clear.
+ */
+internal val MenuListContentPadding: PaddingValues
     @androidx.compose.runtime.Composable
     @androidx.compose.runtime.ReadOnlyComposable
-    get() = PaddingValues(horizontal = LocalShellWindow.current.edgePadding, vertical = 12.dp)
+    get() = PaddingValues(
+        start = LocalShellWindow.current.edgePadding,
+        end = LocalShellWindow.current.edgePadding,
+        top = 12.dp,
+        bottom = 72.dp,
+    )
 
 /** A screen-level menu header: name first, explanation second, both quiet. */
 @Composable
@@ -163,7 +195,10 @@ internal fun MenuRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
+            // The one height rule, plus a touch target where fingers are
+            // the input: a 56dp row is uniform everywhere, and on a
+            // touch-first window it is at least one touch target tall.
+            .heightIn(min = if (window.touchFirst) window.minTouchTarget else MenuTokens.RowMinHeight)
             .clip(MenuTokens.RowShape)
             .background(if (selected) MenuTokens.SurfaceSelected else MenuTokens.Surface)
             // Touch works on every row, always -- the shell is
@@ -224,8 +259,10 @@ internal fun MenuRow(
                     if (selected && adjustable) "‹ $value ›" else value,
                     color = valueColor,
                     style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.End,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(min = MenuTokens.ValueColumnMinWidth),
                 )
             }
         }
