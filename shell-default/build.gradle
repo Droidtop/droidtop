@@ -80,23 +80,24 @@ android {
         // is only ever consumed by :app (applicationId "dev.droidtop.app" —
         // see app/build.gradle.kts) in this repo.
         buildConfigField "String", "APPLICATION_ID", "\"dev.droidtop.app\""
+        // The launcher's feature switches. They were declared on the debug
+        // build type alone, from when debug was the only variant built, so
+        // the release variant CI now publishes did not compile
+        // (Unresolved reference 'IS_STUDIO_BUILD', ...). None of them is
+        // about debugging; the values are the same for every build type.
+        buildConfigField "boolean", "IS_STUDIO_BUILD", "false"
+        buildConfigField "boolean", "QSB_ON_FIRST_SCREEN", "false"
+        buildConfigField "boolean", "IS_DEBUG_DEVICE", "false"
+        buildConfigField "boolean", "WIDGET_ON_FIRST_SCREEN", "true"
+        buildConfigField "boolean", "WIDGETS_ENABLED", "true"
+        buildConfigField "boolean", "NOTIFICATION_DOTS_ENABLED", "true"
+        buildConfigField "boolean", "ANIMATE_ALL_APPS_SEARCH", "false"
     }
 
     buildFeatures {
         buildConfig = true
     }
 
-    buildTypes {
-        debug {
-            buildConfigField "boolean", "IS_STUDIO_BUILD", "false"
-            buildConfigField "boolean", "QSB_ON_FIRST_SCREEN", "false"
-            buildConfigField "boolean", "IS_DEBUG_DEVICE", "false"
-            buildConfigField "boolean", "WIDGET_ON_FIRST_SCREEN", "true"
-            buildConfigField "boolean", "WIDGETS_ENABLED", "true"
-            buildConfigField "boolean", "NOTIFICATION_DOTS_ENABLED", "true"
-            buildConfigField "boolean", "ANIMATE_ALL_APPS_SEARCH", "false"
-        }
-    }
 
     sourceSets {
         main {
