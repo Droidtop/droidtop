@@ -90,6 +90,25 @@ android {
                 signingConfig = signingConfigs.getByName("droidtop")
             }
         }
+        // What CI publishes and people install (SPEC 10b). Until build 556
+        // that was the debug variant, and on the console everything was
+        // slow: a debuggable app is never compiled ahead of time (the
+        // installed package sat at dexopt status=extract), ART runs it
+        // without inlining so a debugger can attach anywhere, and the
+        // baseline profiles Compose ships are not installed. None of that is
+        // about droidtop's code; it is what "debug" means on Android.
+        // Signed with the same key, so it installs over a debug "latest".
+        // Code shrinking stays off for now: R8 over the vendored launcher,
+        // gamenative and keyboard trees needs its keep rules proven on a
+        // device first, and is the next step, not this one.
+        release {
+            isMinifyEnabled = false
+            signingConfig = if (signingKeystorePath != null) {
+                signingConfigs.getByName("droidtop")
+            } else {
+                signingConfigs.getByName("debug")
+            }
+        }
     }
 
     packaging {
@@ -140,9 +159,10 @@ android {
         checkDependencies = true
         abortOnError = true
         warningsAsErrors = false
-        // The gate runs on the debug variant in CI; there is no release
-        // build in this repo yet, and letting lint chase one doubles the
-        // work for nothing.
+        // The gate runs on the debug variant, in its own workflow
+        // (android-checks.yml). The release build CI publishes must not run
+        // lint a second time (lintVitalRelease): it would double the work
+        // and put a check back in front of the artifact (SPEC 10b).
         checkReleaseBuilds = false
         // Scope, one mechanism: a baseline that holds ONLY the findings in
         // trees droidtop vendors rather than writes -- the gamenative tree
@@ -222,6 +242,11 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.activity.compose)
+    // Installs the baseline profiles that Compose and the other AndroidX
+    // libraries ship inside their AARs, so their hot paths are compiled at
+    // install time instead of interpreted on first use. Release builds only
+    // benefit; a debuggable app is never compiled from a profile.
+    implementation(libs.androidx.profileinstaller)
 
     // Real fix (DroidtopApplication.kt): coil-svg was already a
     // shell-gamepad dependency, but nothing ever registered
