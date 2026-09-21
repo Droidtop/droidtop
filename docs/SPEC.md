@@ -4778,6 +4778,25 @@ versionName, apkName, apkSha256, commit -- published by the same workflow
 run that built the APK. Enginehost mirrors this exactly (its
 `codex/engine-bundles` line publishes the same shape of rolling release).
 
+**What is published is a release build (2026-09-21).** Through build 556 CI
+published the `debug` variant, the only build type the app had, and on the
+console everything was slow: startup, menus, seconds between a press and its
+effect. A debuggable package is never compiled ahead of time (the installed
+app's dexopt state was `extract`), ART runs it without inlining so that a
+debugger can attach anywhere, and the baseline profiles Compose ships are not
+installed for it. CI now builds `:app:assembleRelease`: not debuggable, signed
+with the same persistent key so it installs over any earlier `latest`,
+`androidx.profileinstaller` on the classpath so library baseline profiles are
+installed, and `<profileable android:shell="true">` so the shell's profilers
+still attach to the build people actually run. The asset is
+`droidtop-latest.apk`; the updater reads the name from `release-info.json`,
+so installed debug builds update to it by themselves. Code shrinking (R8) is
+deliberately the next step and not this one: the vendored launcher,
+gamenative and keyboard trees load classes by name and through JNI, and their
+keep rules have to be proven on a device before a shrunk build is published.
+The debug variant still exists for local work and is what lint and the unit
+tests run on.
+
 **The minSdk gate in CI.** droidtop's minSdk is 26 and every module
 declares it, but until 2026-09-11 nothing checked it, and two calls that do
 not exist on API 26 shipped and crashed the app on an Android 9 rig. CI now

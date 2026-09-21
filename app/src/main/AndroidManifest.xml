@@ -103,6 +103,16 @@
         tools:replace="android:label,android:icon,android:roundIcon,android:name">
 
         <!--
+          The published build is not debuggable, which is what makes it fast,
+          and also what stops adb from looking inside it. This lets the
+          shell's profilers (simpleperf, method traces, dumpsys gfxinfo
+          framestats) attach to the release build anyway, so performance is
+          measured on the thing people actually run. API 29 and up; older
+          releases ignore the element.
+        -->
+        <profileable android:shell="true" tools:targetApi="q" />
+
+        <!--
           The real HOME/LAUNCHER entry point is :shell-default's own
           com.android.launcher3.Launcher (forked-in Murine Launcher - see
           shell-default/README.md), declared in that library module's own
