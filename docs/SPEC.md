@@ -4025,6 +4025,87 @@ history and favourites are applied to whatever list the library hands out,
 index or walk (`withLibraryFacts`), so nothing about an entry differs by
 where it came from.
 
+### One file per game is the truth; the index is a light layer over it (directed 2026-09-21)
+
+The user, on the console's performance and on what the index should be: "We
+can build the index from the actual game files, rebuild it slowly over time
+(or force a faster rebuild when needed), and use that index on startup." "I
+propose separate databases." "The JSON files are lovely, because we can build
+one file per game, reference the index, check the file when we actually need
+to check a game, and update the index when needed... the JSON files mean
+database format changes don't hurt as bad, and make exports/backups more
+trivial. Plus, the JSON file should contain the actual launch information and
+stuff, enginehost flags, etc. That makes the index database even faster, less
+to load." And: "we also need to optimize the scanning, JSON reads/updates...
+we're just layering an index on TOP of those fixes. The index can sit in ram,
+even, which is the point."
+
+This replaces the storage half of the section above (one JSON slice per
+provider). What that section says about WHEN a walk runs, parts, and missing
+games stands.
+
+**What was wrong underneath (read from the code, 2026-09-21).** Costs that
+grow with the square of the library, all inside a walk:
+`Library.libraryProgressive` rewrote the provider's WHOLE slice file after
+every finished folder; after every finished folder it re-sent the ENTIRE
+library list to the shell; and for each of those sends `withLibraryFacts`
+queried play history and favourites for EVERY id again. Separately, nothing
+an entry needs at launch was kept: `EngineGameProvider.launch` calls
+`resolveEntry`, which detects the engine and the game root again from the
+folder, and the ROM launch resolves its system again. These are fixed first;
+the index does not paper over them.
+
+**The game record.** One JSON file per game, the source of truth for
+everything droidtop knows about that game: identity (id, provider, kind,
+system), where it came from (games root, the part of the walk that found it),
+what is shown (title, sort names, metadata, media), its state flags (missing,
+hidden, ...), and its LAUNCH FACTS, which until now were re-derived on every
+launch: for an engine game the game root, the engine and its version, the
+executable, the Enginehost target and requirements; for a ROM the file, the
+system and any per-game emulator choice; for a PC game its store install.
+Records carry their own `formatVersion`; an unreadable record is a game to
+detect again, never an error. They live under `files/library/games/`, named
+by a hash of the id and sharded by its first byte so no directory grows
+without bound and no game's own filename ever reaches the filesystem (the
+j2me lesson, 7g). A record is written when a walk finds or changes that game,
+and at no other time; it is read when that ONE game is needed: opened,
+focused in a view that shows its metadata, launched.
+
+**The index.** A separate database (`library-index.db`, its own file, not the
+play-history database), holding only what a LIST needs for every game: id,
+provider, root, part, kind, system, title and sort names, the flags lists
+filter on (missing, hidden, favourite, completed, kid game, broken), the
+short metadata lists sort and filter on (genre, players, rating, release
+date), the artwork a grid shows, and where the record is. Plus one row per
+part: its folder's modification time and when it was last walked. It is
+DERIVED: every column comes from a record, so a schema change is "drop and
+rebuild from the records", which touches no games root and takes seconds;
+that is what "format changes don't hurt" means. It is small enough to read
+once at start and keep in memory, and that in-memory index is what the shell
+draws from; the database is its persistence.
+
+**Updates are the size of the change.** A finished part replaces that part's
+rows in one transaction and writes only the records that differ; the shell is
+told what changed (these ids added, changed, gone missing), not handed the
+library again; play history and favourites are joined once at start and then
+per changed id.
+
+**Rebuilding over time.** After the first walk the index is kept honest by a
+slow pass, not by the user remembering to rescan: at low priority, a part at
+a time with pauses between them, compare each part's folder modification time
+with the index and walk only the parts that changed; a root that is not
+mounted is skipped, never emptied. "Rescan library" is the same pass with no
+pauses and no modification-time shortcut. Removing a root still drops its
+rows and records (7g, above); nothing else deletes a record.
+
+**Backups and exports** are the `files/library/` tree: the records are the
+data, and any index can be rebuilt from them.
+
+**Order of work.** (1) the three quadratic costs; (2) records, with launch
+facts, and launch reading them; (3) the index database and the in-memory
+index, with lists drawing from it and single-game views reading the record;
+(4) the slow pass and the forced rebuild.
+
 ### The scan's unit of work is a folder (directed by the rig, 2026-09-11)
 
 Pointing droidtop at a whole-library root — the rig's games root is the
