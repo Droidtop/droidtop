@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch as coroutineLaunch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -583,6 +585,9 @@ class Library(
 ) {
     private val scanScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val backgroundScanStates = ConcurrentHashMap<Set<LibraryEntryKind>, MutableStateFlow<List<LibraryEntry>?>>()
+
+    /** Ids whose play history or favourite changed; a publishing scan asks about them again (see LibraryFacts). */
+    private val changedFactIds: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val backgroundScanJobs = mutableMapOf<Set<LibraryEntryKind>, Job>()
 
     /**
@@ -754,7 +759,35 @@ class Library(
         }
         val lock = Any()
         fun published(): List<LibraryEntry> = synchronized(lock) { slices.flatMap { it.entries() } }
-        if (indexedSlot.any { it }) send(withLibraryFacts(published()))
+        // Play history and favourites are asked about ONCE for what the
+        // index holds, and after that only for the ids a finished part
+        // brings. Every finished part used to ask about every id in the
+        // library again: a walk of F folders over N games made F queries of
+        // N ids each (docs/SPEC.md 7g, "what was wrong underneath").
+        val facts = LibraryFacts()
+        facts.learn(published())
+        // A walk finishes parts far faster than a person reads a list, and
+        // every publication is the whole list for the shell to diff and
+        // draw. Publish at most a few times a second while parts arrive,
+        // and always once more when the walk ends, so the last state is
+        // never the one that was skipped.
+        var lastPublishedAt = 0L
+        var unpublished = false
+        val publishLock = Mutex()
+        suspend fun publish(force: Boolean) = publishLock.withLock {
+            val now = System.nanoTime() / 1_000_000
+            if (!force && now - lastPublishedAt < PUBLISH_INTERVAL_MS) {
+                unpublished = true
+                return@withLock
+            }
+            if (!force || unpublished || lastPublishedAt == 0L) {
+                facts.relearn(changedFactIds)
+                send(facts.apply(published()))
+                lastPublishedAt = now
+                unpublished = false
+            }
+        }
+        if (indexedSlot.any { it }) publish(force = true)
         coroutineScope {
             matchingProviders.forEachIndexed { slot, provider ->
                 if (indexedSlot[slot] && !rescan) return@forEachIndexed
@@ -777,7 +810,8 @@ class Library(
                                 next
                             }
                             if (provider.indexed) this@Library.index.save(provider.indexKey, merged)
-                            send(withLibraryFacts(published()))
+                            if (step is ScanStep.Segment) facts.learn(step.entries)
+                            publish(force = false)
                         }
                     } catch (t: kotlinx.coroutines.CancellationException) {
                         throw t
@@ -787,7 +821,49 @@ class Library(
                 }
             }
         }
+        publish(force = true)
     }.flowOn(Dispatchers.IO)
+
+    /**
+     * What the play-history and favourites stores say about the ids seen so
+     * far in one progressive scan, so that publishing the library again is
+     * a pass over a list in memory and not two database queries over every
+     * id it holds.
+     */
+    private inner class LibraryFacts {
+        private val history = java.util.concurrent.ConcurrentHashMap<String, PlayHistoryRecord>()
+        private val favorite = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+        private val asked = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+        /**
+         * Ids whose history or favourite changed since they were asked
+         * about (a launch, a favourite toggled, a replacement folded in,
+         * all possible while a walk is still publishing) are asked again.
+         */
+        suspend fun relearn(changed: MutableSet<String>) {
+            val ids = changed.toList()
+            if (ids.isEmpty()) return
+            changed.removeAll(ids.toSet())
+            val played = playHistory.getAll(ids)
+            val favourites = favorites.getAll(ids)
+            for (id in ids) {
+                played[id]?.let { history[id] = it } ?: history.remove(id)
+                if (id in favourites) favorite.add(id) else favorite.remove(id)
+            }
+        }
+
+        suspend fun learn(entries: List<LibraryEntry>) {
+            val ids = entries.map { it.id }.filter { asked.add(it) }
+            if (ids.isEmpty()) return
+            history.putAll(playHistory.getAll(ids))
+            favorite.addAll(favorites.getAll(ids))
+        }
+
+        fun apply(entries: List<LibraryEntry>): List<LibraryEntry> {
+            if (history.isEmpty() && favorite.isEmpty()) return entries
+            return entries.map { entry -> entry.withFacts(history[entry.id], entry.id in favorite) }
+        }
+    }
 
     /**
      * The user removed a games root, so its entries go: that is a choice
@@ -838,6 +914,7 @@ class Library(
         if (!missing.missing || missing.id == replacement.id) return@withContext false
         playHistory.moveTo(missing.id, replacement.id)
         favorites.moveTo(missing.id, replacement.id)
+        changedFactIds += listOf(missing.id, replacement.id)
         providers.filterIsInstance<EntryFactsOwner>().forEach { it.moveEntryFacts(missing.id, replacement.id) }
         for (provider in providers.filter { it.indexed }) {
             val slice = index.load(provider.indexKey) ?: continue
@@ -890,6 +967,7 @@ class Library(
                 LaunchDisplay.launchContext = null
             }
             playHistory.recordPlay(entry.id, System.currentTimeMillis())
+            changedFactIds += entry.id
         }
     }
 
@@ -912,6 +990,7 @@ class Library(
         // [FavoritesStore]). A game is a game whichever provider found it.
         val next = !entry.favorite
         favorites.setFavorite(entry.id, next)
+        changedFactIds += entry.id
         next
     }
 
@@ -992,11 +1071,18 @@ class Library(
         val history = playHistory.getAll(ids)
         val favorite = favorites.getAll(ids)
         if (history.isEmpty() && favorite.isEmpty()) return entries
-        return entries.map { entry ->
-            val withHistory = history[entry.id]?.let { entry.copy(lastPlayedEpochMs = it.lastPlayedEpochMs, playCount = it.playCount) } ?: entry
-            // A ROM's favourite came from its provider already; this store
-            // only ever holds the other kinds, so a hit is authoritative.
-            if (entry.id in favorite) withHistory.copy(favorite = true) else withHistory
-        }
+        return entries.map { entry -> entry.withFacts(history[entry.id], entry.id in favorite) }
+    }
+
+    private fun LibraryEntry.withFacts(played: PlayHistoryRecord?, isFavorite: Boolean): LibraryEntry {
+        val withHistory = played?.let { copy(lastPlayedEpochMs = it.lastPlayedEpochMs, playCount = it.playCount) } ?: this
+        // A ROM's favourite came from its provider already; this store
+        // only ever holds the other kinds, so a hit is authoritative.
+        return if (isFavorite) withHistory.copy(favorite = true) else withHistory
+    }
+
+    private companion object {
+        /** The most often a walk in progress hands the shell the library again. */
+        const val PUBLISH_INTERVAL_MS = 250L
     }
 }
