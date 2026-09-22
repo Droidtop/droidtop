@@ -238,6 +238,20 @@ class LibraryIndexTest {
     }
 
     @Test
+    fun `a provider that does not override slowRebuildProgressive behaves like rescanProgressive`() = runBlocking {
+        val provider = FolderProvider(LibraryEntryKind.RENPY, root, listOf(adult to listOf(found)))
+        val rescanSteps = provider.rescanProgressive().toList()
+        val slowSteps = provider.slowRebuildProgressive(emptyMap(), 0L).toList()
+        assertEquals(rescanSteps, slowSteps)
+    }
+
+    @Test
+    fun `a store that does not track folder mtimes reports none`() = runBlocking {
+        val store = FakeIndexStore()
+        assertEquals(emptyMap<String, Long>(), store.folderMtimes("anything"))
+    }
+
+    @Test
     fun `the background scan publishes the index at once`() = runBlocking {
         val provider = CountingProvider(LibraryEntryKind.RENPY, listOf(found))
         val store = FakeIndexStore(mapOf(provider.indexKey to sliceOf(ScanStep.Segment(ScanStep.WHOLE, entries = listOf(known)))))
