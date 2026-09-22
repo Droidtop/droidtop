@@ -644,11 +644,16 @@ class Library(
     fun scanInBackground(kinds: Set<LibraryEntryKind>, rescan: Boolean = false, restart: Boolean = false) {
         // "A low-priority pass after start" (docs/SPEC.md 7g, step 4):
         // hooked onto the first ordinary (non-rescan) scan a shell ever
-        // asks for, rather than a new call site in :app -- the shell
-        // already calls this once its Games/Apps screen composes, which
-        // IS "after start" for this process, and a real "Rescan library"
-        // never re-arms it (see [startSlowRebuildOnce]'s own guard).
-        if (!rescan) startSlowRebuildOnce(kinds)
+        // asks for, rather than a new call site in :app. Deliberately
+        // NOT scoped to [kinds]: shell-gamepad's Games and Apps sections
+        // each run their own LaunchedEffect and race to be first (real,
+        // confirmed on the rig -- APP_KINDS' effect has no Flow
+        // indirection in front of it and consistently wins), so scoping
+        // the slow pass to whichever kinds happened to call first would
+        // silently leave the OTHER section's providers -- on a real
+        // library, usually EngineGameProvider/ConsoleRomProvider, the
+        // ones this step exists for -- never rebuilt at all.
+        if (!rescan) startSlowRebuildOnce()
         val key = kinds.toSet()
         val state = backgroundScanStates.getOrPut(key) { MutableStateFlow(null) }
         lateinit var job: Job
@@ -738,7 +743,10 @@ class Library(
      * again every [SLOW_REBUILD_INTERVAL_MS] for as long as the process
      * lives, so a games root someone edits while droidtop keeps running
      * (adds a game, deletes one) is picked up without the user ever
-     * pressing "Rescan library."
+     * pressing "Rescan library." Covers every [LibraryEntryKind], not
+     * just whichever kinds the FIRST [scanInBackground] call happened to
+     * ask about -- see that call site's own doc comment for the real
+     * race this avoids.
      *
      * Every indexed provider is re-walked each round, but
      * [LibraryProvider.slowRebuildProgressive]'s own mtime check (fed
@@ -749,9 +757,12 @@ class Library(
      * normal scan of [kinds] would -- the slow pass keeps the index
      * honest, it does not add a second, separate view of it.
      */
-    private fun startSlowRebuildOnce(kinds: Set<LibraryEntryKind>) {
+    private fun startSlowRebuildOnce() {
         if (!slowRebuildStarted.compareAndSet(false, true)) return
-        val key = kinds.toSet()
+        // The whole library, not whichever kinds happened to trigger
+        // this call -- see the doc comment above and [scanInBackground]'s
+        // own call site for why.
+        val key = LibraryEntryKind.entries.toSet()
         scanScope.coroutineLaunch {
             delay(SLOW_REBUILD_START_DELAY_MS)
             while (true) {
