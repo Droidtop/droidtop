@@ -123,12 +123,20 @@ interface GameRecordStore {
     fun put(record: GameRecord)
     /** Only ever called for a game whose root was removed (docs/SPEC.md 7g) -- nothing else deletes a record. */
     fun delete(id: String)
+    /**
+     * Every readable record -- the whole point of "one file per game is
+     * the truth": rebuilding the index (step 3) is a read of these, never
+     * a games-root walk. Best-effort: a record this build can't read is
+     * skipped, same convention as [get].
+     */
+    fun all(): List<GameRecord>
 }
 
 object NoOpGameRecordStore : GameRecordStore {
     override fun get(id: String): GameRecord? = null
     override fun put(record: GameRecord) {}
     override fun delete(id: String) {}
+    override fun all(): List<GameRecord> = emptyList()
 }
 
 /**
@@ -158,15 +166,7 @@ class FileGameRecordStore(private val dir: File) : GameRecordStore {
         classDiscriminator = "kind"
     }
 
-    private fun hashOf(id: String): String {
-        val bytes = MessageDigest.getInstance("SHA-256").digest(id.toByteArray(Charsets.UTF_8))
-        return bytes.joinToString("") { "%02x".format(it) }
-    }
-
-    private fun fileFor(id: String): File {
-        val hash = hashOf(id)
-        return File(File(dir, hash.substring(0, 2)), "$hash.json")
-    }
+    private fun fileFor(id: String): File = File(dir, recordPathFor(id))
 
     override fun get(id: String): GameRecord? {
         val file = fileFor(id)
@@ -210,4 +210,32 @@ class FileGameRecordStore(private val dir: File) : GameRecordStore {
     override fun delete(id: String) {
         fileFor(id).delete()
     }
+
+    override fun all(): List<GameRecord> {
+        val shards = dir.listFiles()?.filter { it.isDirectory } ?: return emptyList()
+        return shards.flatMap { shard ->
+            val files = shard.listFiles { f -> f.isFile && f.name.endsWith(".json") } ?: emptyArray()
+            files.mapNotNull { file ->
+                try {
+                    val record = json.decodeFromString(GameRecord.serializer(), file.readText())
+                    record.takeIf { it.formatVersion == GameRecord.FORMAT_VERSION }
+                } catch (t: Throwable) {
+                    ScanLog.write("record: ${file.name} could not be read (${t.javaClass.simpleName}: ${t.message}); skipped rebuilding the index")
+                    null
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Where [FileGameRecordStore] keeps a game's record, relative to its own
+ * directory -- shared with [GameIndexEntity.recordPath] (docs/SPEC.md 7g,
+ * step 3) so the index can say where a record is without duplicating the
+ * hashing/sharding scheme.
+ */
+fun recordPathFor(id: String): String {
+    val hash = MessageDigest.getInstance("SHA-256").digest(id.toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(it) }
+    return "${hash.substring(0, 2)}/$hash.json"
 }

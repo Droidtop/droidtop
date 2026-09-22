@@ -1,6 +1,5 @@
 package dev.droidtop.library
 
-import java.nio.file.Files
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -250,44 +249,5 @@ class LibraryIndexTest {
             while (state.value != listOf(known)) delay(1)
         }
         assertEquals(0, provider.scans)
-    }
-
-    @Test
-    fun `the file store round-trips an entry with every nested type and treats a torn file as no slice`() = runBlocking {
-        val dir = Files.createTempDirectory("droidtop-index").toFile()
-        val store = FileLibraryIndexStore(dir)
-        val entry = LibraryEntry(
-            id = "pc:steam:440",
-            title = "Team Fortress 2",
-            kind = LibraryEntryKind.WINE_PROFILE,
-            mediaLocator = GameMediaLocator(gamesRoot = "/roots/games", system = "pc", baseName = "tf2"),
-            rating = 0.8f,
-            favorite = true,
-            missing = true,
-            pcInfo = PcInfo(
-                source = "steam",
-                storeId = "440",
-                installed = true,
-                sizeBytes = 12_345L,
-                installPath = "/roots/games/Steam/steamapps/common/Team Fortress 2",
-                compatibility = PcCompatibility(
-                    averageRating = 4.5f,
-                    playableReports = 3,
-                    gpuPlayableReports = 2,
-                    hasBeenTried = true,
-                    reportedNotWorking = false,
-                ),
-            ),
-        )
-        val slice = sliceOf(ScanStep.Segment(key = "/roots/games/Steam", root = "/roots/games", entries = listOf(entry)))
-
-        assertNull(store.load("EngineGameProvider"))
-        store.save("EngineGameProvider", slice)
-        assertEquals(slice, store.load("EngineGameProvider"))
-
-        // A torn write is not an error the user sees: it is a walk.
-        java.io.File(dir, "EngineGameProvider.json").writeText("{\"formatVersion\": 2, \"slice\": {")
-        assertNull(store.load("EngineGameProvider"))
-        assertTrue(dir.deleteRecursively())
     }
 }

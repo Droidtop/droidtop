@@ -1,8 +1,6 @@
 package dev.droidtop.library
 
-import java.io.File
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 
 /**
  * What a walk says it has finished (docs/SPEC.md 7g, "the index is
@@ -161,71 +159,4 @@ interface LibraryIndexStore {
 object NoOpLibraryIndexStore : LibraryIndexStore {
     override suspend fun load(providerKey: String): LibrarySlice? = null
     override suspend fun save(providerKey: String, slice: LibrarySlice) {}
-}
-
-/**
- * One JSON file per slice under [dir], written whole and renamed into
- * place so a crash mid-write leaves the previous slice, never a torn one.
- * Rewritten on every merge -- once per folder the walk finishes rather
- * than once per walk -- because a slice is a list of names and paths and
- * the walk of the folder it describes took orders of magnitude longer
- * than writing it.
- *
- * A file this build cannot read (an older shape, a corrupt write) is
- * treated as no slice, which makes the next start a walk -- the same
- * thing a first run is -- and never an error the user sees.
- */
-class FileLibraryIndexStore(private val dir: File) : LibraryIndexStore {
-
-    @Serializable
-    private data class Stored(val formatVersion: Int, val slice: LibrarySlice)
-
-    private val json = Json {
-        ignoreUnknownKeys = true
-        encodeDefaults = false
-    }
-
-    private fun fileFor(providerKey: String) = File(dir, providerKey.replace(Regex("[^A-Za-z0-9._-]"), "_") + ".json")
-
-    override suspend fun load(providerKey: String): LibrarySlice? {
-        val file = fileFor(providerKey)
-        if (!file.isFile) return null
-        return try {
-            val stored = json.decodeFromString(Stored.serializer(), file.readText())
-            if (stored.formatVersion != FORMAT_VERSION) {
-                ScanLog.write("index: ${file.name} is format ${stored.formatVersion}, this build reads $FORMAT_VERSION; walking")
-                null
-            } else {
-                stored.slice
-            }
-        } catch (t: Throwable) {
-            ScanLog.write("index: ${file.name} could not be read (${t.javaClass.simpleName}: ${t.message}); walking")
-            null
-        }
-    }
-
-    override suspend fun save(providerKey: String, slice: LibrarySlice) {
-        dir.mkdirs()
-        val file = fileFor(providerKey)
-        val tmp = File(dir, file.name + ".tmp")
-        tmp.writeText(json.encodeToString(Stored.serializer(), Stored(FORMAT_VERSION, slice)))
-        if (!tmp.renameTo(file)) {
-            // A rename across the same directory does not fail on any
-            // filesystem droidtop runs on; if it ever does, the old slice
-            // is still intact and the walk simply repeats next start.
-            file.delete()
-            tmp.renameTo(file)
-        }
-    }
-
-    companion object {
-        /**
-         * Bump when [LibraryEntry]'s or [LibrarySlice]'s shape changes in
-         * a way a reader cannot absorb. 2 is the segmented slice: version
-         * 1 held a provider's entries as one flat list, which cannot say
-         * which folder an entry came from and so cannot be merged a
-         * folder at a time.
-         */
-        const val FORMAT_VERSION = 2
-    }
 }
