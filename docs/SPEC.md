@@ -4106,6 +4106,51 @@ facts, and launch reading them; (3) the index database and the in-memory
 index, with lists drawing from it and single-game views reading the record;
 (4) the slow pass and the forced rebuild.
 
+**Implementation decisions from steps 2–4 (2026-09-21/22), recorded here
+per this file's own standing rule that a real decision lives in the spec,
+not only in a commit message.**
+
+- `GameRecord.launch` is a closed `LaunchFacts` union (`Engine`/`Rom`/`Pc`/
+  `None`) rather than one loosely-typed bag, matching `LibraryEntryKind`'s
+  own per-mechanism split. `Engine` carries the whole `EnginehostTarget`
+  (now `@Serializable`) alongside its own `runtimeRequirements` copy, so a
+  launch reads one record and never calls back into `EnginesDatabase`.
+- The index database (`library-index.db`, `RoomLibraryIndexStore`) keeps
+  `LibraryIndexStore`'s existing `load`/`save` shape rather than replacing
+  it with a new interface: `Library`'s own walk/merge/publish loop
+  (`libraryProgressive`) is unchanged, only what's underneath one call is
+  now a real, columned database instead of one JSON file per provider.
+  `save` receives the whole merged slice each time (that's what `Library`
+  already hands it) and diffs it against what it last wrote, so only the
+  segments that actually changed become a `replacePart` transaction --
+  "updates are the size of the change" without a second public API.
+- "Lists never read the record" means the *published* list never does:
+  `RoomLibraryIndexStore.load()` hydrates each row's full `LibraryEntry`
+  from its record ONCE, when a part is loaded or replaced, and caches the
+  hydrated entry; every subsequent publish of the `Flow<List<LibraryEntry>>`
+  serves that cache. This keeps every `LibraryEntry` field (media
+  locators, scraped metadata, `pcInfo`, ...) exactly as before for the
+  shell with zero edits, at the cost of one record read per game at
+  load/merge time rather than zero -- still no games-root walk, and
+  still far cheaper than re-detecting anything.
+- "Publish CHANGES (added/changed/gone-missing ids) plus the current
+  list" is satisfied at the PERSISTENCE layer (only changed parts are
+  written to the database or the record store) rather than as a new
+  shell-facing Flow, per this same section's explicit instruction to
+  keep the existing `Flow<List<LibraryEntry>>` API so shell consumers
+  need minimal edits. A changed-ids stream for the shell itself is not
+  built.
+- `parts.folderMtime` is 0 for any part whose key is not itself a
+  directory (a console system's part is several folders, not one --
+  see `ConsoleRomProvider`'s own doc comment). Step 4's slow pass must
+  read 0 as "unknown, walk it," never "unchanged since forever."
+- Removing a root (`Library.keepOnlyRoots`) is the one case where a
+  segment disappears from a slice entirely rather than being replaced;
+  `RoomLibraryIndexStore.save` detects a previously-known segment that
+  is no longer present and deletes both its index rows and its
+  records there, matching "removing a root still drops its rows and
+  records; nothing else deletes a record."
+
 ### The scan's unit of work is a folder (directed by the rig, 2026-09-11)
 
 Pointing droidtop at a whole-library root — the rig's games root is the

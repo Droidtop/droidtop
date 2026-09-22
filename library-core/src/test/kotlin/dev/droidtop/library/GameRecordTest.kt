@@ -117,6 +117,16 @@ class GameRecordTest {
     }
 
     @Test
+    fun `recordPathFor is stable and sharded by the first byte of the hash`() {
+        val path = recordPathFor("/games/some game.exe")
+        assertEquals(path, recordPathFor("/games/some game.exe"))
+        val parts = path.split("/")
+        assertEquals(2, parts.size)
+        assertEquals(2, parts[0].length)
+        assertTrue(parts[1].endsWith(".json"))
+    }
+
+    @Test
     fun `NoOpGameRecordStore never remembers anything`() {
         val store = NoOpGameRecordStore
         store.put(engineRecord())

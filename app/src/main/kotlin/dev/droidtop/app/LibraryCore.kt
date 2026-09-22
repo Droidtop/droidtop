@@ -4,8 +4,9 @@ import android.content.Context
 import dev.droidtop.library.EngineGameProvider
 import dev.droidtop.library.Library
 import dev.droidtop.library.NativeAppProvider
-import dev.droidtop.library.FileLibraryIndexStore
 import dev.droidtop.library.FileGameRecordStore
+import dev.droidtop.library.LibraryIndexDatabase
+import dev.droidtop.library.RoomLibraryIndexStore
 import dev.droidtop.library.RoomFavoritesStore
 import dev.droidtop.library.RoomPlayHistoryStore
 import dev.droidtop.library.consoles.ConsoleRomProvider
@@ -84,7 +85,10 @@ object LibraryCore {
             ),
             playHistory = RoomPlayHistoryStore(app),
             favorites = RoomFavoritesStore(app),
-            index = FileLibraryIndexStore(java.io.File(app.filesDir, "library-index")),
+            // The index database, in RAM (docs/SPEC.md 7g, step 3) --
+            // derived entirely from `records`, so this never needs to
+            // hold anything the record files don't already have.
+            index = RoomLibraryIndexStore(LibraryIndexDatabase.get(app), records),
         )
     }
 }
