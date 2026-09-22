@@ -116,6 +116,9 @@ class RoomLibraryIndexStore(
         lastWritten[providerKey] = slice
     }
 
+    override suspend fun folderMtimes(providerKey: String): Map<String, Long> =
+        db.dao().partsFor(providerKey).associate { it.key to it.folderMtime }
+
     /**
      * Drops and rebuilds the WHOLE index from every readable record --
      * no games-root walk (docs/SPEC.md 7g, step 3: "takes seconds").

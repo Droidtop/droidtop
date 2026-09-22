@@ -4150,6 +4150,33 @@ not only in a commit message.**
   is no longer present and deletes both its index rows and its
   records there, matching "removing a root still drops its rows and
   records; nothing else deletes a record."
+- Step 4's slow pass is real per-folder skipping for
+  `EngineGameProvider` (each part genuinely is one folder, so its own
+  modification time is meaningful) and a plain full re-walk for
+  `ConsoleRomProvider`, which does not override `slowRebuildProgressive`:
+  its parts are several folders each, its own `folderMtime` is
+  therefore always 0 ("unknown"), and the interface's own default
+  reads that as "walk it," the same safe default every other
+  non-folder-shaped provider gets. `ConsoleRomProvider` already has
+  its own separate, permanent "already scanned" cache
+  (`RomDatabase`'s `scan_metadata`), which the pass's `rescanProgressive()`
+  fallback deliberately bypasses -- correct (never stale), not free.
+- The slow pass is a recurring loop, not a one-shot: it starts once,
+  5 seconds after the first ordinary scan a shell asks for, and then
+  repeats every 30 minutes for the life of the process (`Library`'s
+  `SLOW_REBUILD_START_DELAY_MS`/`SLOW_REBUILD_INTERVAL_MS`), because
+  "kept honest ... over time" describes an ongoing process, not a
+  single pass after start. It runs on its own dedicated,
+  `Thread.MIN_PRIORITY` single-thread dispatcher (`Library.slowDispatcher`)
+  rather than the shared `Dispatchers.IO` pool every ordinary scan
+  uses, so "low thread priority" is a property of the thread the walk
+  work itself runs on, not just whichever coroutine collects the
+  result. "A root that is not mounted is skipped, never emptied" is a
+  real check (`EngineGameProvider`'s new `rootMounted` parameter,
+  `scanRootsByFolder`) that only the slow pass supplies -- an
+  ordinary scan/rescan keeps its pre-existing behavior (an unmounted
+  root there already reads as zero folders) since changing that was
+  out of this step's scope.
 
 ### The scan's unit of work is a folder (directed by the rig, 2026-09-11)
 

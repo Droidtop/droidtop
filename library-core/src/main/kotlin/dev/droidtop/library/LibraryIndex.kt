@@ -154,6 +154,17 @@ interface LibraryIndexStore {
     /** The slice for [providerKey], or null when nothing was ever saved for it. */
     suspend fun load(providerKey: String): LibrarySlice?
     suspend fun save(providerKey: String, slice: LibrarySlice)
+
+    /**
+     * Each part's own folder modification time, as of the last save
+     * (docs/SPEC.md 7g, step 4) -- what the slow rebuild pass compares
+     * a part's CURRENT folder mtime against to decide "changed" from
+     * "unchanged." Empty by default: a store that doesn't track this
+     * (or a provider whose parts aren't one folder each) makes every
+     * part look unknown, which [LibraryProvider.slowRebuildProgressive]'s
+     * own default already treats as "walk it" -- safe, just not faster.
+     */
+    suspend fun folderMtimes(providerKey: String): Map<String, Long> = emptyMap()
 }
 
 object NoOpLibraryIndexStore : LibraryIndexStore {
