@@ -760,11 +760,10 @@ object AppSettingsCatalogs {
                             id = "updates_debug_builds",
                             title = "Install debug builds",
                             subtitle = if (update.debugBuilds(context)) {
-                                "WARNING: debug builds are for inspecting droidtop, not for playing on. Android " +
-                                    "never compiles a debuggable build ahead of time and runs it without inlining, " +
-                                    "so startup and menus are several times slower (build 556 started in 1535 ms, " +
-                                    "the release build of the same code in 450 ms). Turn this off and check again " +
-                                    "to get back to the normal build"
+                                "WARNING: debug builds exist to be inspected with adb, not played on. Android " +
+                                    "never compiles one ahead of time, so it is several times slower -- build 567 " +
+                                    "started in 3.9 s as a debug build and 0.7 s as the normal one, same device. " +
+                                    "Turn this off and check again to go back"
                             } else {
                                 "Follows the debug APK of the channel above instead of the normal one. Debug " +
                                     "builds are much slower, and exist so a build can be inspected with adb; " +
