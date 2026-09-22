@@ -84,10 +84,9 @@ sealed interface LaunchFacts {
  * came from, and its launch facts.
  *
  * [formatVersion] is this record's own shape version -- see
- * [GameRecord.FORMAT_VERSION] -- separate from
- * [dev.droidtop.library.FileLibraryIndexStore]'s slice format, since a
- * record and the index that is built from it can change shape on
- * different schedules.
+ * [GameRecord.FORMAT_VERSION] -- separate from the index database's own
+ * schema version, since a record and the index that is built from it can
+ * change shape on different schedules.
  */
 @Serializable
 data class GameRecord(
@@ -147,9 +146,10 @@ object NoOpGameRecordStore : GameRecordStore {
  * characters illegal on exFAT but legal on ext4, and an id-derived
  * filename can carry the same kind of character a games root can.
  *
- * Written to a temp file and renamed into place, same crash-safety as
- * [FileLibraryIndexStore]. Written only when the record differs from
- * what is already stored -- a walk that finds the same game again writes
+ * Written to a temp file and renamed into place, so a crash mid-write
+ * leaves the previous record rather than a torn one. Written only when
+ * the record differs from what is already stored -- a walk that finds
+ * the same game again writes
  * nothing, which is what makes "a record is written when a walk finds or
  * changes that game, and at no other time" (docs/SPEC.md 7g) true rather
  * than aspirational.
@@ -199,9 +199,8 @@ class FileGameRecordStore(private val dir: File) : GameRecordStore {
         val tmp = File(file.parentFile, file.name + ".tmp")
         tmp.writeText(encoded)
         if (!tmp.renameTo(file)) {
-            // Same fallback FileLibraryIndexStore.save uses: the old
-            // record is still intact if this also fails, and the game is
-            // simply written again next time it is found.
+            // The old record is still intact if this also fails, and the
+            // game is simply written again next time it is found.
             file.delete()
             tmp.renameTo(file)
         }
