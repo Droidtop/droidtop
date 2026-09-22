@@ -4971,9 +4971,10 @@ debuggable build has to remain installable on demand. `release-info.json`
 gains `debugApkName`/`debugApkSha256` as ADDED keys at the same
 `formatVersion: 1`: a build from before this change reads the same document
 and sees the release APK it always did. The "Install debug builds" switch
-carries a warning naming the cost in the numbers that were measured (build
-556 debug started in 1535 ms, the release build of the same code in 450 ms),
-because a person who leaves it on has quietly chosen the slow build.
+carries a warning naming the cost in the numbers that were measured, the same
+build both ways on the same device and library (build 567 on the BlueStacks
+rig: 3955/3765/4023 ms debug against 685/738/728 ms release), because a person
+who leaves it on has quietly chosen a build that starts five times slower.
 
 **The minSdk gate in CI.** droidtop's minSdk is 26 and every module
 declares it, but until 2026-09-11 nothing checked it, and two calls that do
