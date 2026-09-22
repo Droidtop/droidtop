@@ -5,6 +5,7 @@ import dev.droidtop.library.EngineGameProvider
 import dev.droidtop.library.Library
 import dev.droidtop.library.NativeAppProvider
 import dev.droidtop.library.FileLibraryIndexStore
+import dev.droidtop.library.FileGameRecordStore
 import dev.droidtop.library.RoomFavoritesStore
 import dev.droidtop.library.RoomPlayHistoryStore
 import dev.droidtop.library.consoles.ConsoleRomProvider
@@ -34,6 +35,9 @@ object LibraryCore {
     }
 
     private fun build(app: Context): Library {
+        // One store behind every provider's records (docs/SPEC.md 7g,
+        // step 2) -- files/library/games/, per that section's own layout.
+        val records = FileGameRecordStore(java.io.File(app.filesDir, "library/games"))
         // Fills library-core's PcGameRuntime seam, which is what makes the
         // WINE_PREFIX / LINUX_CONTAINER launch strategies real rather than
         // error() stubs. The session supplier is only for the native-Linux
@@ -65,12 +69,13 @@ object LibraryCore {
                     // detection owning a store game does not also lose its
                     // store, size, compatibility and cover art.
                     storeInstalls = { dev.droidtop.runtime.windows.PcLibrary.knownInstalls() },
+                    records = records,
                 ),
                 // Same roots as EngineGameProvider -- a folder can hold real
                 // console ROMs (<root>/<systemId>/<romFile>), engine games
                 // (<root>/<gameFolder>/...), or both; each provider only ever
                 // matches what is actually its own shape.
-                ConsoleRomProvider(app),
+                ConsoleRomProvider(app, records = records),
                 // Real discovery (com.winlator.container.ContainerManager's own
                 // shortcut scan), themed as ES-DE's "pc" system like any other.
                 // It launches through the WineEngine seam, so it needs no
