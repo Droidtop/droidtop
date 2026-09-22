@@ -4,8 +4,11 @@ import android.util.Log
 import java.io.File
 import kotlinx.serialization.Serializable
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
@@ -558,6 +561,21 @@ interface LibraryProvider {
      * not [scanProgressive] -- see shell-gamepad's SettingsSection.
      */
     fun rescanProgressive(): Flow<ScanStep> = scanProgressive()
+
+    /**
+     * The slow rebuild pass (docs/SPEC.md 7g, step 4): like
+     * [rescanProgressive], but a provider that can tell one part's own
+     * folder apart from another (see [EngineGameProvider]) skips a part
+     * whose folder's modification time still matches [knownMtimes], and
+     * pauses [pauseMs] between the parts it does not skip -- "walk only
+     * changed parts." The default, for every provider with no cheaper way
+     * to tell changed from unchanged (a part that isn't one directory,
+     * see [GameIndexEntity]'s own doc comment), is a plain
+     * [rescanProgressive]: always correct, never wrongly skips, so a
+     * provider that does not override this just costs what a full
+     * rescan already costs -- never less, never wrong.
+     */
+    fun slowRebuildProgressive(knownMtimes: Map<String, Long>, pauseMs: Long): Flow<ScanStep> = rescanProgressive()
 }
 
 /**
@@ -590,6 +608,21 @@ class Library(
     private val changedFactIds: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val backgroundScanJobs = mutableMapOf<Set<LibraryEntryKind>, Job>()
 
+    // The slow rebuild pass' own dispatcher (docs/SPEC.md 7g, step 4):
+    // a dedicated, single, MIN_PRIORITY thread rather than the shared
+    // Dispatchers.IO pool every ordinary scan uses -- "run on
+    // Dispatchers.IO at low thread priority" only means something real
+    // if the walk work itself lands on a low-priority thread, not just
+    // whichever coroutine happens to call collect() on the result.
+    private val slowDispatcher: CoroutineDispatcher =
+        java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "droidtop-slow-rebuild").apply {
+                priority = Thread.MIN_PRIORITY
+                isDaemon = true
+            }
+        }.asCoroutineDispatcher()
+    private val slowRebuildStarted = java.util.concurrent.atomic.AtomicBoolean(false)
+
     /**
      * Process-owned scan results. The Library instance belongs to LibraryCore and
      * outlives every Activity/Compose screen, so collectors may come and go
@@ -609,6 +642,13 @@ class Library(
      * a rescan intent) joins the running job instead.
      */
     fun scanInBackground(kinds: Set<LibraryEntryKind>, rescan: Boolean = false, restart: Boolean = false) {
+        // "A low-priority pass after start" (docs/SPEC.md 7g, step 4):
+        // hooked onto the first ordinary (non-rescan) scan a shell ever
+        // asks for, rather than a new call site in :app -- the shell
+        // already calls this once its Games/Apps screen composes, which
+        // IS "after start" for this process, and a real "Rescan library"
+        // never re-arms it (see [startSlowRebuildOnce]'s own guard).
+        if (!rescan) startSlowRebuildOnce(kinds)
         val key = kinds.toSet()
         val state = backgroundScanStates.getOrPut(key) { MutableStateFlow(null) }
         lateinit var job: Job
@@ -692,6 +732,44 @@ class Library(
     }
 
     /**
+     * Starts the slow rebuild pass' recurring loop, once per process
+     * (docs/SPEC.md 7g, step 4: "kept honest ... over time," not a
+     * one-shot): a short delay after the FIRST ordinary scan starts, then
+     * again every [SLOW_REBUILD_INTERVAL_MS] for as long as the process
+     * lives, so a games root someone edits while droidtop keeps running
+     * (adds a game, deletes one) is picked up without the user ever
+     * pressing "Rescan library."
+     *
+     * Every indexed provider is re-walked each round, but
+     * [LibraryProvider.slowRebuildProgressive]'s own mtime check (fed
+     * from [LibraryIndexStore.folderMtimes]) is what makes a round cheap
+     * in the common case: a part whose folder has not changed is not
+     * re-detected at all, only the parts that changed since the index
+     * last saw them are. Publishes into the SAME [backgroundScanState] a
+     * normal scan of [kinds] would -- the slow pass keeps the index
+     * honest, it does not add a second, separate view of it.
+     */
+    private fun startSlowRebuildOnce(kinds: Set<LibraryEntryKind>) {
+        if (!slowRebuildStarted.compareAndSet(false, true)) return
+        val key = kinds.toSet()
+        scanScope.coroutineLaunch {
+            delay(SLOW_REBUILD_START_DELAY_MS)
+            while (true) {
+                try {
+                    libraryProgressive(key, rescan = false, slow = true).collect { entries ->
+                        backgroundScanStates.getOrPut(key) { MutableStateFlow(null) }.value = entries
+                    }
+                } catch (t: kotlinx.coroutines.CancellationException) {
+                    throw t
+                } catch (t: Throwable) {
+                    Log.e("droidtop.Library", "Slow rebuild pass failed", t)
+                }
+                delay(SLOW_REBUILD_INTERVAL_MS)
+            }
+        }
+    }
+
+    /**
      * Real, streaming counterpart to [scanKinds] -- emits a growing
      * combined snapshot every time ANY matching provider produces more
      * results, instead of making the whole section wait for every
@@ -743,6 +821,12 @@ class Library(
     private fun libraryProgressive(
         kinds: Set<LibraryEntryKind>,
         rescan: Boolean,
+        // The slow rebuild pass (docs/SPEC.md 7g, step 4): re-walks every
+        // indexed provider even though it already has a slice (an
+        // ordinary scan never does -- see the indexedSlot check below),
+        // but through slowRebuildProgressive rather than scanProgressive,
+        // so a provider that supports it skips its own unchanged parts.
+        slow: Boolean = false,
     ): Flow<List<LibraryEntry>> = channelFlow {
         val matchingProviders = providers.filter { provider -> provider.kinds.any { it in kinds } }
         val slices = MutableList(matchingProviders.size) { LibrarySlice() }
@@ -790,7 +874,7 @@ class Library(
         if (indexedSlot.any { it }) publish(force = true)
         coroutineScope {
             matchingProviders.forEachIndexed { slot, provider ->
-                if (indexedSlot[slot] && !rescan) return@forEachIndexed
+                if (indexedSlot[slot] && !rescan && !slow) return@forEachIndexed
                 coroutineLaunch {
                     // No whole-provider timeout, deliberately. There was
                     // one (60 s), and the rig showed exactly what it cost
@@ -802,7 +886,14 @@ class Library(
                     // returns costs the parts it never reached and
                     // nothing else.
                     try {
-                        val stream = if (rescan) provider.rescanProgressive() else provider.scanProgressive()
+                        val stream = when {
+                            rescan -> provider.rescanProgressive()
+                            slow -> provider.slowRebuildProgressive(
+                                this@Library.index.folderMtimes(provider.indexKey),
+                                SLOW_REBUILD_PAUSE_MS,
+                            )
+                            else -> provider.scanProgressive()
+                        }
                         stream.collect { step ->
                             val merged = synchronized(lock) {
                                 val next = slices[slot].merge(step)
@@ -822,7 +913,7 @@ class Library(
             }
         }
         publish(force = true)
-    }.flowOn(Dispatchers.IO)
+    }.flowOn(if (slow) slowDispatcher else Dispatchers.IO)
 
     /**
      * What the play-history and favourites stores say about the ids seen so
@@ -1084,5 +1175,14 @@ class Library(
     private companion object {
         /** The most often a walk in progress hands the shell the library again. */
         const val PUBLISH_INTERVAL_MS = 250L
+
+        /** docs/SPEC.md 7g, step 4: how long the slow pass waits after the first ordinary scan starts before it begins. */
+        const val SLOW_REBUILD_START_DELAY_MS = 5_000L
+
+        /** docs/SPEC.md 7g, step 4: how long the slow pass waits between rounds once it has run -- "kept honest ... over time." */
+        const val SLOW_REBUILD_INTERVAL_MS = 30 * 60_000L
+
+        /** docs/SPEC.md 7g, step 4: the pause between parts the slow pass takes and "Rescan library" deliberately does not. */
+        const val SLOW_REBUILD_PAUSE_MS = 500L
     }
 }

@@ -6,6 +6,7 @@ import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.consoles.resolveSystem
 import java.io.File
 import java.io.RandomAccessFile
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 
@@ -1028,6 +1029,39 @@ class EngineGameProvider(
     }
 
     /**
+     * The slow rebuild pass (docs/SPEC.md 7g, step 4): the same walk as
+     * [scanProgressive], except a folder whose OWN modification time
+     * still matches [knownMtimes] is left alone entirely -- not
+     * re-detected, not re-published -- and every folder that IS walked
+     * is followed by a [pauseMs] delay. [knownMtimes] missing an entry,
+     * or holding 0 (docs/SPEC.md 7g: a part that isn't one directory),
+     * both mean "unknown," which this reads as "walk it" -- the same
+     * safe default [LibraryProvider.slowRebuildProgressive] documents.
+     */
+    override fun slowRebuildProgressive(knownMtimes: Map<String, Long>, pauseMs: Long): Flow<ScanStep> = channelFlow {
+        scanRootsByFolder(
+            publish = { root, folder, entries ->
+                send(
+                    ScanStep.Segment(
+                        key = folder.absolutePath,
+                        root = root.absolutePath,
+                        entries = entries.finish(),
+                    ),
+                )
+            },
+            rootDone = { root, folders ->
+                send(ScanStep.RootDone(root.absolutePath, folders.map { it.absolutePath }))
+            },
+            skip = { folder ->
+                val known = knownMtimes[folder.absolutePath]
+                known != null && known != 0L && folder.exists() && folder.lastModified() == known
+            },
+            pauseMs = pauseMs,
+            rootMounted = { root -> root.isDirectory },
+        )
+    }
+
+    /**
      * The one walk behind both [scan] and [scanProgressive]: every root's
      * top-level folders, each scanned under its own budget and handed to
      * [publish] as it finishes -- with the folder it is the answer FOR,
@@ -1040,6 +1074,26 @@ class EngineGameProvider(
     private suspend fun scanRootsByFolder(
         publish: suspend (root: File, folder: File, entries: List<LibraryEntry>) -> Unit,
         rootDone: suspend (root: File, folders: List<File>) -> Unit,
+        // The slow rebuild pass' own two knobs (docs/SPEC.md 7g, step 4):
+        // a folder [skip] says to leave alone entirely -- no [publish] for
+        // it, so the index keeps exactly what it already had -- and a
+        // pause after every folder that was NOT skipped, so an automatic
+        // background pass never reads the disk back-to-back the way a
+        // deliberate "Rescan library" is allowed to. Defaulted to "skip
+        // nothing, pause nothing" so scan()/scanProgressive() -- every
+        // call site before step 4 existed -- are unchanged.
+        skip: (folder: File) -> Boolean = { false },
+        pauseMs: Long = 0L,
+        // "A root that is not mounted is skipped, never emptied"
+        // (docs/SPEC.md 7g, step 4): defaulted to "always mounted" so
+        // scan()/scanProgressive()/rescanProgressive() keep their exact
+        // existing behavior (an unmounted root there already reads as
+        // zero folders -- out of scope to change here). The slow pass is
+        // the one caller that supplies a real check, because it is also
+        // the one caller allowed to run unattended for a long time, when
+        // a removable root going away and coming back is a real event
+        // rather than a one-off "look now" the user is present for.
+        rootMounted: (root: File) -> Boolean = { true },
     ) {
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         val defs = EnginesDatabase.defs(context)
@@ -1052,11 +1106,16 @@ class EngineGameProvider(
         val roots = (GamesRoots.current(context) + extraRoots() + installs.mapNotNull { it.installDir.parentFile })
             .distinctBy { it.absolutePath }
         for (root in roots) {
+            if (!rootMounted(root)) {
+                ScanLog.write("engine root ${root.absolutePath}: not mounted right now, left as-is")
+                continue
+            }
             val rootStartedAt = System.currentTimeMillis()
             val top = GameEngineDetector.topLevelFolders(root, systemsById)
             val rootSkips = ScanSkips().apply { addAll(top.skipped) }
             var rootGames = 0
             for (folder in top.folders) {
+                if (skip(folder)) continue
                 val folderStartedAt = System.currentTimeMillis()
                 val scanned = GameEngineDetector.scanFolder(
                     folder,
@@ -1081,6 +1140,7 @@ class EngineGameProvider(
                     base = folder,
                 )
                 publish(root, folder, scanned.games.map { it.toEntry(root, folder, installsByDir) })
+                if (pauseMs > 0) delay(pauseMs)
             }
             rootDone(root, top.folders)
             ScanLog.write(
