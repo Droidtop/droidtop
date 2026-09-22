@@ -61,7 +61,7 @@ class GameRecordTest {
         val store = FileGameRecordStore(d)
         val record = engineRecord()
         store.put(record)
-        val file = File(d).walkTopDown().first { it.isFile }
+        val file = d.walkTopDown().first { it.isFile }
         val before = file.lastModified()
         Thread.sleep(5)
         store.put(record)
@@ -129,7 +129,7 @@ class GameRecordTest {
         val store = FileGameRecordStore(d)
         val record = engineRecord(id = "/games/some game with spaces & \$ymbols.exe")
         store.put(record)
-        val written = File(d).walkTopDown().filter { it.isFile }.toList()
+        val written = d.walkTopDown().filter { it.isFile }.toList()
         assertEquals(1, written.size)
         assertFalse(written.single().name.contains("some game"))
         assertEquals(2, written.single().parentFile.name.length)
