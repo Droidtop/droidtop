@@ -29,6 +29,12 @@ on:
       - "NOTICE.md"
       - "LICENSE"
   workflow_dispatch:
+    inputs:
+      channel:
+        description: "Release channel to publish this build to"
+        type: choice
+        default: latest
+        options: [latest, testing, stable]
 
 env:
   NDK_VERSION: "27.0.12077973"
@@ -259,7 +265,7 @@ jobs:
             echo "No SIGNING_KEYSTORE_BASE64 secret available (e.g. a fork PR) — building with Android's default debug signing instead."
           fi
 
-      - name: Build release APK
+      - name: Build release and debug APKs
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/${{ env.NDK_VERSION }}
           # github.run_number: a plain incrementing integer (per workflow
@@ -269,13 +275,20 @@ jobs:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-        run: ./gradlew :app:assembleRelease --stacktrace
+        # Both variants every time, so a channel always carries the pair
+        # the in-app "Install debug builds" switch chooses between. The
+        # debug APK exists to be inspectable (run-as, a debugger), never to
+        # play on: it is not compiled ahead of time and Android runs it
+        # without inlining, which is what made droidtop slow before 558.
+        run: ./gradlew :app:assembleRelease :app:assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: droidtop-apk
-          path: app/build/outputs/apk/release/app-release.apk
+          path: |
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
       - name: Class-load API gate (minSdk)
@@ -294,18 +307,27 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 build-scripts/check_class_load_api.py app/build/outputs/apk/release/app-release.apk
 
-      - name: Publish rolling "latest" release
+      - name: Publish to the release channel
         # Workflow artifacts (the step above) are ephemeral — ~90-day
         # retention, buried under the Actions tab, awkward to hand someone
         # a direct link to. A GitHub Release is the actual "give this to
         # someone to install" mechanism: permanent, listed on the repo's
         # main page, one clean download URL. Only publish from real pushes
         # to main, not PRs — a PR's build isn't something to hand out yet.
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        #
+        # A push publishes the "latest" channel, which is what the in-app
+        # updater calls Unstable. Running this workflow by hand publishes
+        # the chosen channel instead, which is how a build reaches Testing
+        # or Stable: it is the current main built again, not a copy of an
+        # earlier artifact, so what a channel carries is always a build
+        # whose own CI run is on record.
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         env:
           GH_TOKEN: ${{ github.token }}
+          CHANNEL: ${{ github.event.inputs.channel || 'latest' }}
         run: |
           cp app/build/outputs/apk/release/app-release.apk droidtop-latest.apk
+          cp app/build/outputs/apk/debug/app-debug.apk droidtop-latest-debug.apk
 
           # release-info.json is the in-app update check's one probe
           # (app/.../update/AppSelfUpdate.kt): the app downloads this small
@@ -315,14 +337,21 @@ jobs:
           # Android installer.
           python3 - <<'PY'
           import hashlib, json
-          digest = hashlib.sha256(open("droidtop-latest.apk", "rb").read()).hexdigest().upper()
+          def sha256(name):
+              return hashlib.sha256(open(name, "rb").read()).hexdigest().upper()
+
           json.dump(
               {
                   "formatVersion": 1,
                   "versionCode": ${{ github.run_number }},
                   "versionName": "0.1.0-dev-${{ github.run_number }}",
                   "apkName": "droidtop-latest.apk",
-                  "apkSha256": digest,
+                  "apkSha256": sha256("droidtop-latest.apk"),
+                  # Added keys, not a new formatVersion: a build from before
+                  # the debug channel existed reads this same document and
+                  # sees exactly the release APK it always did.
+                  "debugApkName": "droidtop-latest-debug.apk",
+                  "debugApkSha256": sha256("droidtop-latest-debug.apk"),
                   "commit": "${{ github.sha }}",
               },
               open("release-info.json", "w"),
@@ -336,7 +365,7 @@ jobs:
           # than accumulating dozens of stale per-commit releases. Delete
           # + recreate rather than `gh release upload --clobber` onto an
           # existing release, so the notes/timestamp stay accurate too.
-          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create latest droidtop-latest.apk release-info.json \
-            --title "DroidTop — latest build" \
-            --notes "Automatically built from commit ${{ github.sha }}. Release build, not debuggable, no code shrinking yet (signed with a persistent DroidTop dev key — see .signing/ / SIGNING_KEYSTORE_BASE64, so it installs over a previous \"latest\" without uninstalling first; arm64-v8a + x86_64 fat APK) — not for production use, and functionality is still early: see docs/SPEC.md for current status."
+          gh release delete "$CHANNEL" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$CHANNEL" droidtop-latest.apk droidtop-latest-debug.apk release-info.json \
+            --title "DroidTop $CHANNEL channel" \
+            --notes "Automatically built from commit ${{ github.sha }} to the $CHANNEL channel. Two APKs: droidtop-latest.apk is the build to use (release, not debuggable, no code shrinking yet) and droidtop-latest-debug.apk is the same code built debuggable, for inspecting droidtop with adb and several times slower to start and to navigate. Both are signed with the persistent DroidTop dev key, so either installs over an earlier build of this channel without uninstalling first; arm64-v8a + x86_64 fat APKs. Not for production use, and functionality is still early: see docs/SPEC.md for current status."latest\" without uninstalling first; arm64-v8a + x86_64 fat APK) — not for production use, and functionality is still early: see docs/SPEC.md for current status."

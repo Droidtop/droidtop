@@ -743,11 +743,43 @@ object AppSettingsCatalogs {
                             current = update.unmeteredOnly(context),
                             onToggle = { ctx, value -> update.setUnmeteredOnly(ctx, value) },
                         ),
+                        ChoiceItem(
+                            id = "updates_channel",
+                            title = "Build channel",
+                            subtitle = "Which line of builds this device follows. \"Unstable\" is every build CI " +
+                                "publishes from main; the other channels carry builds promoted to them, and a " +
+                                "channel nothing has been promoted to yet reports that there is nothing there",
+                            options = dev.droidtop.app.update.AppSelfUpdate.Channel.entries
+                                .map { ChoiceOption(it.name, it.label) },
+                            current = update.channel(context).name,
+                            onSelect = { ctx, value ->
+                                update.setChannel(ctx, dev.droidtop.app.update.AppSelfUpdate.Channel.valueOf(value))
+                            },
+                        ),
+                        ToggleItem(
+                            id = "updates_debug_builds",
+                            title = "Install debug builds",
+                            subtitle = if (update.debugBuilds(context)) {
+                                "WARNING: debug builds are for inspecting droidtop, not for playing on. Android " +
+                                    "never compiles a debuggable build ahead of time and runs it without inlining, " +
+                                    "so startup and menus are several times slower (build 556 started in 1535 ms, " +
+                                    "the release build of the same code in 450 ms). Turn this off and check again " +
+                                    "to get back to the normal build"
+                            } else {
+                                "Follows the debug APK of the channel above instead of the normal one. Debug " +
+                                    "builds are much slower, and exist so a build can be inspected with adb; " +
+                                    "leave this off unless you are debugging droidtop itself"
+                            },
+                            current = update.debugBuilds(context),
+                            onToggle = { ctx, value -> update.setDebugBuilds(ctx, value) },
+                        ),
                         AsyncActionItem(
                             id = "updates_check_now",
                             title = "Check for a droidtop update",
                             subtitle = "Installed: ${update.installedVersionName(context)} " +
-                                "(build ${update.installedVersionCode(context)}). " +
+                                "(build ${update.installedVersionCode(context)}), following " +
+                                "${update.channel(context).label}" +
+                                (if (update.debugBuilds(context)) " debug builds" else "") + ". " +
                                 (update.lastAttempt(context)?.let { last ->
                                     "Last checked " + android.text.format.DateUtils.getRelativeDateTimeString(
                                         context, last, android.text.format.DateUtils.MINUTE_IN_MILLIS,
@@ -757,9 +789,10 @@ object AppSettingsCatalogs {
                             run = { ctx, onStatus ->
                                 onStatus("Checking...")
                                 update.noteAttempt(ctx)
-                                val info = withContext(Dispatchers.IO) { update.fetch() }
+                                val info = withContext(Dispatchers.IO) { update.fetch(ctx) }
                                 if (info.versionCode > update.installedVersionCode(ctx)) {
-                                    "${info.versionName} (build ${info.versionCode}) is available -- " +
+                                    "${info.versionName} (build ${info.versionCode}) is available on " +
+                                        "${info.channel.label}${if (info.debug) ", debug build" else ""} -- " +
                                         "use \"Download and install\" below."
                                 } else {
                                     "This is the newest published build."

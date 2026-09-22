@@ -4950,6 +4950,31 @@ keep rules have to be proven on a device before a shrunk build is published.
 The debug variant still exists for local work and is what lint and the unit
 tests run on.
 
+**Channels, and the debug APK beside the release one (directed 2026-09-22).**
+The user: "add two toggles to the update and etc checker: branch (so, stable,
+unstable, etc), and a debug checkbox, along with a warning if it's enabled."
+A channel is a GitHub release tag carrying its own `release-info.json` and
+both APKs: `latest` (what the updater calls Unstable, published by every push
+to main), `testing` and `stable` (published by running the workflow by hand
+and choosing the channel, which builds the current main again rather than
+copying an earlier artifact, so every channel carries a build with its own CI
+run on record). The device picks a channel in Settings; the default is
+Unstable, because it is the only channel droidtop has ever had, and a channel
+nothing has been promoted to yet simply reports that there is nothing there.
+
+Every build publishes BOTH variants: `droidtop-latest.apk` (release) and
+`droidtop-latest-debug.apk` (the same code, debuggable). The debug APK exists
+because making the published build a release build took `adb shell run-as`
+and on-device inspection away with it -- the storage-redesign agent could not
+list `files/library/games/` on the rig for exactly this reason -- so the
+debuggable build has to remain installable on demand. `release-info.json`
+gains `debugApkName`/`debugApkSha256` as ADDED keys at the same
+`formatVersion: 1`: a build from before this change reads the same document
+and sees the release APK it always did. The "Install debug builds" switch
+carries a warning naming the cost in the numbers that were measured (build
+556 debug started in 1535 ms, the release build of the same code in 450 ms),
+because a person who leaves it on has quietly chosen the slow build.
+
 **The minSdk gate in CI.** droidtop's minSdk is 26 and every module
 declares it, but until 2026-09-11 nothing checked it, and two calls that do
 not exist on API 26 shipped and crashed the app on an Android 9 rig. CI now

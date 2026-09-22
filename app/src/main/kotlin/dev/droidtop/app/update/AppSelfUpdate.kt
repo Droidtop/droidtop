@@ -34,8 +34,7 @@ import java.security.MessageDigest
  * library is ever sent. Offline or failed checks are silent.
  */
 object AppSelfUpdate {
-    private const val RELEASES = "https://github.com/Droidtop/droidtop/releases/download/latest"
-    private const val RELEASE_INFO_URL = "$RELEASES/release-info.json"
+    private const val DOWNLOADS = "https://github.com/Droidtop/droidtop/releases/download"
     private const val PREFS = "app_update_check"
     private const val KEY_CHECK_DAILY = "updates_check_daily"
     private const val KEY_FREQUENCY = "updates_frequency"
@@ -43,6 +42,8 @@ object AppSelfUpdate {
     private const val KEY_LAST_ATTEMPT = "last_attempt_ms"
     private const val KEY_SEEN_CODE = "newest_seen_version_code"
     private const val KEY_SEEN_NAME = "newest_seen_version_name"
+    private const val KEY_CHANNEL = "updates_channel"
+    private const val KEY_DEBUG_BUILDS = "updates_debug_builds"
 
     /** How often the background probe may run. [OFF] means only when asked. */
     enum class Frequency(val intervalMs: Long, val label: String) {
@@ -52,8 +53,40 @@ object AppSelfUpdate {
         MONTHLY(30 * 24L * 60 * 60 * 1000, "Every month"),
     }
 
-    data class Info(val versionCode: Long, val versionName: String, val apkName: String, val apkSha256: String) {
-        val apkUrl: String get() = "$RELEASES/$apkName"
+    /**
+     * Which line of builds to follow. Each is its own GitHub release tag
+     * carrying its own `release-info.json`, so switching channel changes
+     * which build "newer" is measured against -- nothing else.
+     *
+     * [UNSTABLE] is every push to main and is the default, because it is
+     * the only channel droidtop has ever published; the other two exist
+     * once a build has been promoted to them, and a channel with no
+     * release yet simply reports that there is nothing there.
+     */
+    enum class Channel(val tag: String, val label: String) {
+        STABLE("stable", "Stable"),
+        TESTING("testing", "Testing"),
+        UNSTABLE("latest", "Unstable (every build)"),
+    }
+
+    /**
+     * What a channel currently offers, and which of its two APKs this
+     * device asked for.
+     *
+     * [debug] is true only when the debug build was both wanted and
+     * published; a channel that carries no debug APK falls back to the
+     * release one rather than failing, and says so through this flag so
+     * the caller can tell the person what they are actually installing.
+     */
+    data class Info(
+        val versionCode: Long,
+        val versionName: String,
+        val apkName: String,
+        val apkSha256: String,
+        val channel: Channel,
+        val debug: Boolean,
+    ) {
+        val apkUrl: String get() = "$DOWNLOADS/${channel.tag}/$apkName"
     }
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -75,6 +108,25 @@ object AppSelfUpdate {
 
     fun setFrequency(context: Context, value: Frequency) =
         prefs(context).edit().putString(KEY_FREQUENCY, value.name).remove(KEY_CHECK_DAILY).apply()
+
+    fun channel(context: Context): Channel =
+        prefs(context).getString(KEY_CHANNEL, null)?.let { name -> Channel.entries.firstOrNull { it.name == name } }
+            ?: Channel.UNSTABLE
+
+    fun setChannel(context: Context, value: Channel) =
+        prefs(context).edit().putString(KEY_CHANNEL, value.name).apply()
+
+    /**
+     * Follow the debug build of the chosen channel instead of the release
+     * one. A debug APK is not compiled ahead of time and Android runs it
+     * without inlining, which is what made droidtop slow on the console
+     * before build 558 (SPEC 10b): it is for making a build inspectable
+     * (`adb shell run-as`, a debugger), never for playing on.
+     */
+    fun debugBuilds(context: Context): Boolean = prefs(context).getBoolean(KEY_DEBUG_BUILDS, false)
+
+    fun setDebugBuilds(context: Context, value: Boolean) =
+        prefs(context).edit().putBoolean(KEY_DEBUG_BUILDS, value).apply()
 
     /** Skip the probe on metered connections (mobile data, tethering). */
     fun unmeteredOnly(context: Context): Boolean = prefs(context).getBoolean(KEY_UNMETERED_ONLY, false)
@@ -121,7 +173,7 @@ object AppSelfUpdate {
             // and validate-before-replace means a bad download changes
             // nothing. The manual button in Settings runs the same call.
             runCatching { dev.droidtop.library.consoles.PlatformDatabases.refresh(application) }
-            runCatching { fetch() }.onSuccess { info ->
+            runCatching { fetch(application) }.onSuccess { info ->
                 prefs(application).edit()
                     .putLong(KEY_SEEN_CODE, info.versionCode)
                     .putString(KEY_SEEN_NAME, info.versionName)
@@ -161,9 +213,15 @@ object AppSelfUpdate {
         prefs(context.applicationContext).edit().putLong(KEY_LAST_ATTEMPT, System.currentTimeMillis()).apply()
     }
 
-    /** Fetches what the rolling release currently is. Throws on any failure. */
-    fun fetch(): Info {
-        val connection = URL(RELEASE_INFO_URL).openConnection() as HttpURLConnection
+    /**
+     * Fetches what the chosen channel currently offers. Throws on any
+     * failure, including a channel that has never been published (its
+     * release-info.json is simply not there).
+     */
+    fun fetch(context: Context): Info {
+        val channel = channel(context)
+        val wantDebug = debugBuilds(context)
+        val connection = URL("$DOWNLOADS/${channel.tag}/release-info.json").openConnection() as HttpURLConnection
         connection.connectTimeout = 15_000
         connection.readTimeout = 30_000
         connection.instanceFollowRedirects = true
@@ -172,13 +230,20 @@ object AppSelfUpdate {
             require(connection.responseCode in 200..299) { "Release info returned HTTP ${connection.responseCode}" }
             val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
             require(json.getInt("formatVersion") == 1) { "Unsupported release info" }
-            val digest = json.getString("apkSha256").uppercase()
+            // The debug APK is an added key, not a new format: a build from
+            // before it existed reads the same document and sees the release
+            // APK it always did.
+            val debug = wantDebug && json.optString("debugApkName").isNotBlank()
+            val name = if (debug) json.getString("debugApkName") else json.getString("apkName")
+            val digest = (if (debug) json.getString("debugApkSha256") else json.getString("apkSha256")).uppercase()
             require(digest.matches(Regex("[A-F0-9]{64}"))) { "Release info carries no valid APK digest" }
             return Info(
                 json.getLong("versionCode"),
                 json.getString("versionName"),
-                json.getString("apkName"),
+                name,
                 digest,
+                channel,
+                debug,
             )
         } finally {
             connection.disconnect()

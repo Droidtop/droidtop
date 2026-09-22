@@ -48,7 +48,7 @@ object UpdateNow {
         onStatus("Checking for a newer build...")
         AppSelfUpdate.noteAttempt(application)
         val info = try {
-            AppSelfUpdate.fetch()
+            AppSelfUpdate.fetch(application)
         } catch (error: Exception) {
             return log("Update check failed: " + (error.message ?: error.javaClass.simpleName))
         }
