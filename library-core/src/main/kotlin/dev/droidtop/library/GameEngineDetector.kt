@@ -977,6 +977,12 @@ class EngineGameProvider(
     // [GameEngineDetector.engineOwnsInstall]) would silently delete every
     // store-side fact about the game.
     private val storeInstalls: () -> List<StoreInstall> = { emptyList() },
+    // Where this provider's game records are written and read from
+    // (docs/SPEC.md 7g, step 2) -- [NoOpGameRecordStore] by default so
+    // this provider stays constructible in a JVM test with zero real
+    // storage behind it, same convention as [Library]'s own
+    // [LibraryIndexStore] default.
+    private val records: GameRecordStore = NoOpGameRecordStore,
 ) : LibraryProvider {
     override val kinds: Set<LibraryEntryKind> = GameEngine.entries.map { it.toLibraryEntryKind() }.toSet()
 
@@ -1074,7 +1080,7 @@ class EngineGameProvider(
                     },
                     base = folder,
                 )
-                publish(root, folder, scanned.games.map { it.toEntry(root, installsByDir) })
+                publish(root, folder, scanned.games.map { it.toEntry(root, folder, installsByDir) })
             }
             rootDone(root, top.folders)
             ScanLog.write(
@@ -1088,8 +1094,8 @@ class EngineGameProvider(
         }
     }
 
-    private fun DetectedGame.toEntry(root: File, installsByDir: Map<String, StoreInstall>): LibraryEntry =
-        LibraryEntry(
+    private fun DetectedGame.toEntry(root: File, part: File, installsByDir: Map<String, StoreInstall>): LibraryEntry {
+        val entry = LibraryEntry(
             id = displayFolder.absolutePath,
             title = qualifiedFolderTitle(displayFolder),
             kind = engine.toLibraryEntryKind(),
@@ -1102,6 +1108,37 @@ class EngineGameProvider(
                 displayFolder.name,
             ),
         ).withStoreInstall(installsByDir.forFolder(displayFolder))
+        writeRecord(this, root, part, entry)
+        return entry
+    }
+
+    /**
+     * The record write side of detection (docs/SPEC.md 7g, step 2):
+     * everything [launch] used to re-derive by calling [resolveEntry]
+     * and `resolveEngineVersion` again is computed here, ONCE, at the
+     * same moment `scan()` already walks this folder -- not at launch.
+     * [GameRecord.part]/[GameRecord.root] mirror the [ScanStep.Segment]
+     * this game was published under, so the record and the index built
+     * from records (step 3) agree about which part found this game.
+     */
+    private fun writeRecord(detected: DetectedGame, root: File, part: File, entry: LibraryEntry) {
+        val enginehostTarget = EnginesDatabase.enginehostTargetFor(context, detected.engine)
+        records.put(
+            GameRecord(
+                entry = entry,
+                provider = indexKey,
+                root = root.absolutePath,
+                part = part.absolutePath,
+                launch = LaunchFacts.Engine(
+                    gameRoot = detected.gameRoot.absolutePath,
+                    engine = detected.engine.name,
+                    engineVersion = resolveEngineVersion(context, detected.gameRoot, detected.engine),
+                    enginehostTarget = enginehostTarget,
+                    runtimeRequirements = enginehostTarget?.runtimeRequirements ?: emptyMap(),
+                ),
+            ),
+        )
+    }
 
     /**
      * What every published snapshot passes through: roots can overlap now
@@ -1123,23 +1160,54 @@ class EngineGameProvider(
                 alsoUnderId = { it.pcInfo?.storeId },
             )
 
-    /** [gameRoot] to [detectedEngine] -- see [GameEngineDetector.scan]'s own doc comment for why [gameRoot] isn't always [entry]'s own [LibraryEntry.id] folder. */
-    private data class ResolvedEntry(val gameRoot: File, val detectedEngine: GameEngine)
+    /**
+     * [gameRoot] to [detectedEngine] -- see [GameEngineDetector.scan]'s
+     * own doc comment for why [gameRoot] isn't always [entry]'s own
+     * [LibraryEntry.id] folder. [engineVersion]/[enginehostTarget] travel
+     * alongside so a launch never has to ask for them a second time.
+     */
+    private data class ResolvedEntry(
+        val gameRoot: File,
+        val detectedEngine: GameEngine,
+        val engineVersion: String?,
+        val enginehostTarget: EnginehostTarget?,
+    )
 
+    /**
+     * Reads this game's own record first (docs/SPEC.md 7g, step 2): the
+     * SAME facts `scan()`/[writeRecord] already computed at detection
+     * time, so a launch is a file read, not a folder walk. Only a record
+     * with no engine facts at all -- a game whose record predates this
+     * build, or one this build could not read -- falls back to the full
+     * re-detection [resolveEntry] used to do unconditionally, and says so
+     * in the log, matching docs/SPEC.md 7g ("only fall back to
+     * re-detection when the record has none").
+     */
     private fun resolveEntry(entry: LibraryEntry): ResolvedEntry {
+        val facts = records.get(entry.id)?.launch as? LaunchFacts.Engine
+        if (facts != null) {
+            val engine = runCatching { GameEngine.valueOf(facts.engine) }.getOrNull()
+            if (engine != null) {
+                return ResolvedEntry(File(facts.gameRoot), engine, facts.engineVersion, facts.enginehostTarget)
+            }
+        }
+        ScanLog.write("record: ${entry.id} has no engine launch facts; detecting again from the folder")
         val displayFolder = File(entry.id)
-        // Re-detect rather than caching gameRoot on LibraryEntry -- cheap
-        // (a handful of listFiles() calls), and keeps LibraryEntry's shape
-        // shared/uniform across every provider rather than growing an
-        // engine-games-only field. Through GameEngineDetector.detectGame,
-        // the same call scan() itself uses, so a launch can never resolve
-        // a different folder than the scan that listed the entry did.
+        // Through GameEngineDetector.detectGame, the same call scan()
+        // itself uses, so this can never resolve a different folder than
+        // the scan that listed the entry did.
         val detected = GameEngineDetector.detectGame(
             displayFolder,
             EnginesDatabase.defs(context),
             override = { folder -> EngineOverridePrefs.engineFor(context, folder.absolutePath) },
         ) ?: error("Couldn't re-detect an engine for ${displayFolder.absolutePath}")
-        return ResolvedEntry(detected.gameRoot, detected.engine)
+        val enginehostTarget = EnginesDatabase.enginehostTargetFor(context, detected.engine)
+        return ResolvedEntry(
+            detected.gameRoot,
+            detected.engine,
+            resolveEngineVersion(context, detected.gameRoot, detected.engine),
+            enginehostTarget,
+        )
     }
 
     /**
@@ -1152,21 +1220,27 @@ class EngineGameProvider(
      * stays real and selectable via [LaunchStrategyOverridePrefs.set].
      */
     fun availableStrategies(entry: LibraryEntry): List<GameLaunchStrategy> {
-        val (gameRoot, engine) = resolveEntry(entry)
+        val resolved = resolveEntry(entry)
         return GameLaunchStrategyResolver.resolve(
-            engine = engine,
-            folder = gameRoot,
+            engine = resolved.detectedEngine,
+            folder = resolved.gameRoot,
             kirikiroid2Installed = Kirikiroid2.isInstalled(context),
             engineHostInstalled = EngineHost.isInstalled(context),
-            engineHostEngineVersion = resolveEngineVersion(context, gameRoot, engine),
-            engineHostCanReachFolder = EngineHost.canReachGameFolder(context, gameRoot),
-            preferredOrder = EnginesDatabase.priorityFor(context, engine),
-            enginehostSupported = EnginesDatabase.enginehostTargetFor(context, engine) != null,
+            engineHostEngineVersion = resolved.engineVersion,
+            engineHostCanReachFolder = EngineHost.canReachGameFolder(context, resolved.gameRoot),
+            preferredOrder = EnginesDatabase.priorityFor(context, resolved.detectedEngine),
+            enginehostSupported = resolved.enginehostTarget != null,
         )
     }
 
     override suspend fun launch(entry: LibraryEntry) {
-        val (gameRoot, engine) = resolveEntry(entry)
+        // Two resolveEntry() calls (here, and inside availableStrategies)
+        // stayed as they were before this pass -- both are now a record
+        // read, not a folder walk, in the common case, so the duplicate
+        // cost this used to have (two filesystem re-detections per
+        // launch) is gone even though the call shape is unchanged.
+        val resolved = resolveEntry(entry)
+        val gameRoot = resolved.gameRoot
         val available = availableStrategies(entry)
         val overrideStrategy = LaunchStrategyOverridePrefs.get(context, entry.id)
         val strategy = available.firstOrNull { it.name == overrideStrategy } ?: available.firstOrNull()
@@ -1185,9 +1259,9 @@ class EngineGameProvider(
                 EngineHost.launch(
                     context,
                     gameRoot,
-                    EnginesDatabase.enginehostTargetFor(context, engine)
-                        ?: error("engines-database has no enginehost mapping for $engine"),
-                    resolveEngineVersion(context, gameRoot, engine),
+                    resolved.enginehostTarget
+                        ?: error("engines-database has no enginehost mapping for ${resolved.detectedEngine}"),
+                    resolved.engineVersion,
                     title = entry.title,
                 )
             }

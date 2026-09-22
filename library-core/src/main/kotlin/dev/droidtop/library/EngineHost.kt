@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import org.json.JSONObject
 import java.io.File
+import kotlinx.serialization.Serializable
 
 /**
  * `dev.enginehost` (`bi0shacker001/enginehost`) — a standalone, separately
@@ -270,6 +271,7 @@ object EngineHost {
  * which line a game belongs to; that nullness is meaningful (see
  * [EngineHost.launch], which refuses to auto-install on it).
  */
+@Serializable
 data class EnginehostTarget(
     val engine: String,
     val engineContext: String?,
