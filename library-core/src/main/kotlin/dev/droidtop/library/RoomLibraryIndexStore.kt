@@ -11,9 +11,8 @@ import java.util.concurrent.atomic.AtomicBoolean
  * never a games-root walk, only a read of the records
  * ([rebuildFromRecords]).
  *
- * Implements the same [LibraryIndexStore] interface
- * [dev.droidtop.library.FileLibraryIndexStore] used to (the JSON slice
- * file this replaces): [Library]'s own walk/merge/publish loop is
+ * Implements the same [LibraryIndexStore] interface the JSON slice file
+ * this replaces did: [Library]'s own walk/merge/publish loop is
  * unchanged, and only the persistence underneath one call
  * ([load]/[save]) is now a real database instead of one JSON file per
  * provider.
