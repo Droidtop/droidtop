@@ -236,6 +236,10 @@ internal fun resolveSystem(folderName: String, systemsById: Map<String, ConsoleS
  */
 class ConsoleRomProvider(
     private val context: Context,
+    // Where this provider's game records are written and read from
+    // (docs/SPEC.md 7g, step 2) -- see [dev.droidtop.library.GameEngineDetector]'s
+    // EngineGameProvider constructor for the same convention.
+    private val records: dev.droidtop.library.GameRecordStore = dev.droidtop.library.NoOpGameRecordStore,
 ) : LibraryProvider, dev.droidtop.library.EntryFactsOwner {
     override val kinds: Set<LibraryEntryKind> = setOf(LibraryEntryKind.CONSOLE_ROM)
 
@@ -371,6 +375,7 @@ class ConsoleRomProvider(
                         coroutineLaunch {
                             try {
                                 val folderEntries = scanSystemUnit(unit)
+                                writeRomRecords(folderEntries, root, system.id)
                                 rootGames.addAndGet(folderEntries.size)
                                 send(
                                     ScanStep.Segment(
@@ -443,6 +448,7 @@ class ConsoleRomProvider(
         }.map { (root, unit) ->
             async {
                 val entries = scanSystemUnit(unit)
+                writeRomRecords(entries, root, unit.system.id)
                 dao.clearSystemFolder(root.absolutePath, unit.system.id)
                 dao.insertEntries(entries.map { it.toRomEntity(root.absolutePath, unit.system.id) })
                 dao.markScanned(ScanMetadataEntity(root.absolutePath, unit.system.id, System.currentTimeMillis()))
@@ -679,6 +685,33 @@ class ConsoleRomProvider(
     }
 
     /**
+     * The record write side of a ROM scan (docs/SPEC.md 7g, step 2).
+     * [entry.systemId]/[entry.altEmulator] already sit directly on
+     * [LibraryEntry] (they always did -- a ROM's launch never had the
+     * quadratic re-detection cost engine games had), so this exists to
+     * give a single-game view a record to read, and to keep every kind
+     * of game backed by the same one-file-per-game mechanism rather than
+     * ROMs being a second, unwritten case.
+     */
+    private fun writeRomRecords(entries: List<LibraryEntry>, root: File, systemId: String) {
+        for (entry in entries) {
+            records.put(
+                dev.droidtop.library.GameRecord(
+                    entry = entry,
+                    provider = indexKey,
+                    root = root.absolutePath,
+                    part = systemId,
+                    launch = dev.droidtop.library.LaunchFacts.Rom(
+                        file = entry.id,
+                        systemId = entry.systemId ?: systemId,
+                        altEmulator = entry.altEmulator,
+                    ),
+                ),
+            )
+        }
+    }
+
+    /**
      * Real content-based system detection for the disc-image extensions
      * [SerialScanner] actually supports (iso/bin/pbp/3ds) -- returns null
      * (meaning "keep looking") for every other extension, and also null
@@ -769,8 +802,17 @@ class ConsoleRomProvider(
         // with the wrong system's player.
         val parentFolder = romFile.parentFile
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
+        // The record's own launch facts before falling back to folder
+        // re-detection (docs/SPEC.md 7g, step 2) -- entry.systemId is
+        // usually already set (scan() always fills it), so this mostly
+        // matters for a single-game view that has only the record, not a
+        // full LibraryEntry from a fresh scan.
         val system = entry.systemId?.let { systemsById[it] }
-            ?: SystemOverridePrefs.resolveForFolder(context, parentFolder?.absolutePath ?: "", parentFolder?.name ?: "", systemsById)
+            ?: (records.get(entry.id)?.launch as? dev.droidtop.library.LaunchFacts.Rom)?.systemId?.let { systemsById[it] }
+            ?: run {
+                ScanLog.write("record: ${entry.id} has no ROM launch facts; resolving its system from the folder")
+                SystemOverridePrefs.resolveForFolder(context, parentFolder?.absolutePath ?: "", parentFolder?.name ?: "", systemsById)
+            }
             ?: error("Couldn't resolve a console system for ${entry.id}")
         val player = resolvePlayer(context, system, entry.altEmulator)
             ?: throw NoEmulatorInstalled(
