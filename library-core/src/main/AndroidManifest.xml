@@ -1,5 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- A normal install-time permission: lets ConsoleRomProvider end an
+         emulator's leftover background process before relaunching it
+         (players with killPackageProcesses set), without root. -->
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
+
     <!-- Package visibility (API 30+) so EngineHost.isInstalled()/Kirikiroid2.isInstalled() actually work. -->
     <queries>
         <package android:name="dev.enginehost" />

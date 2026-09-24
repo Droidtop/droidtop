@@ -91,11 +91,12 @@ object ProcessRunner {
 
 /**
  * Runs a command as root via `su -c`, the standard interface every common
- * Android root solution (Magisk, KernelSU, APatch) provides. Lives in
- * runtime-common because more than one consumer needs it: droidspaces
- * (namespace/cgroup/mount operations, see vendor/droidspaces' `check`
- * command) and the GameNative migration in :runtime-windows, which
- * reads another app's data directory with the user's consent.
+ * Android root solution (Magisk, KernelSU, APatch) provides. Its only
+ * consumers are Desktop mode's rooted container stack: droidspaces in
+ * :runtime-linux-root (namespace/cgroup/mount operations, see
+ * vendor/droidspaces' `check` command) and the runtime selection in
+ * :app that asks whether that stack can run. Nothing in Gaming or the
+ * launcher may call it (docs/SPEC.md 7i, "Root never gates a Gaming game").
  *
  * UNVERIFIED against a real device: written against the documented `su -c`
  * contract every root solution follows, but never actually run against
