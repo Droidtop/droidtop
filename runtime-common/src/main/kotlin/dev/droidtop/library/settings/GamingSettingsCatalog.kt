@@ -221,11 +221,23 @@ object GamingSettingsCatalog {
                         run = { ctx, _ -> dev.droidtop.runtime.DisplayArrangement.swap(ctx) },
                     ),
                 )
+                // A second screen stuck in its low safe mode (docs/SPEC.md
+                // section 4) is named here, where the fix is finished.
+                val degraded = dev.droidtop.runtime.DisplayOutputRepository(context)
+                    .currentOutputsSnapshot()
+                    .firstOrNull {
+                        it.kind == dev.droidtop.runtime.DisplayOutputKind.SECOND_SCREEN && it.isInFallbackMode
+                    }
                 add(
                     ActionItem(
                         id = ID_DISPLAY_REINIT,
                         title = "Reinitialize displays",
-                        subtitle = "Detect connected screens again and re-place the shell",
+                        subtitle = if (degraded != null) {
+                            "The second screen is in a low-resolution mode: turn it off and on again, then reinitialize"
+                        } else {
+                            "Detect connected screens again and re-place the shell"
+                        },
+                        value = degraded?.modeSummary(),
                         run = { _ -> dev.droidtop.runtime.DisplayArrangement.reinitialize() },
                     ),
                 )
