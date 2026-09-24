@@ -508,7 +508,10 @@ object ThemeAssets {
         // extraction race on first launch was the real, confirmed case)
         // would otherwise poison this name-keyed cache for the whole
         // process lifetime, long after the underlying files became fine.
-        if (theme != null) systemThemeCache[cacheKey] = theme
+        if (theme != null) {
+            theme.checkPaths()
+            systemThemeCache[cacheKey] = theme
+        }
         return theme
     }
 
