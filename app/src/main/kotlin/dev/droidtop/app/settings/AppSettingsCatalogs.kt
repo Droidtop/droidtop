@@ -15,6 +15,7 @@ import dev.droidtop.library.consoles.PlayerOverridePrefs
 import dev.droidtop.library.consoles.PlatformDatabaseSnapshot
 import dev.droidtop.library.consoles.PlatformDatabaseSource
 import dev.droidtop.library.consoles.PlatformDatabases
+import dev.droidtop.library.consoles.SystemFolders
 import dev.droidtop.library.consoles.SystemOverridePrefs
 import dev.droidtop.library.consoles.BiosDatabase
 import dev.droidtop.library.consoles.KnownPlayers
@@ -98,23 +99,19 @@ object AppSettingsCatalogs {
     private fun consoleSystemsScreen() = CatalogScreen(
         id = SCREEN_CONSOLE_SYSTEMS,
         title = "Console systems",
-        subtitle = "Each folder's system is guessed from its name; open a folder to change its system, pick its emulator, or scrape artwork",
+        subtitle = "Each folder's system comes from its name; open a folder to change its system, pick its emulator, or scrape artwork",
         groups = { context -> consoleSystemsGroups(context) },
     )
 
     private suspend fun consoleSystemsGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
-        val knownExtensions = systemsById.values.flatMap { it.extensions }.toSet()
-        // Same real folder discovery the old screen used (kept 1:1): every
-        // immediate subfolder of every games root that either resolves to a
-        // system by name/override or genuinely contains ROM-like files.
-        val folders = GamesRootPrefs.gamesRootPaths(context)
-            .map(::File)
-            .flatMap { root -> (root.listFiles() ?: emptyArray()).filter { it.isDirectory }.toList() }
-            .filter { folder ->
-                SystemOverridePrefs.resolveForFolder(context, folder.absolutePath, folder.name, systemsById) != null ||
-                    folder.walkTopDown().maxDepth(ROM_LOOKALIKE_MAX_DEPTH).any { it.isFile && it.extension.lowercase() in knownExtensions }
-            }
+        // The library's own answer (SystemFolders), not a second walk:
+        // the folders it scans as console systems, plus the ones the person
+        // picked to choose a system for. A folder the library reads as PC
+        // or engine games is not a console system folder and is not here.
+        val folders = SystemFolders.all(context, systemsById).map { it.first }
+            .plus(SystemFolders.awaitingSystem(context))
+            .distinctBy { it.absolutePath }
             .sortedBy { it.name.lowercase() }
 
         listOf(
@@ -242,25 +239,25 @@ object AppSettingsCatalogs {
             ),
             CatalogGroup(
                 id = "console_systems_folders",
-                title = "Game folders",
-                items = if (folders.isEmpty()) {
-                    listOf(
+                title = "System folders",
+                items = (if (folders.isEmpty()) {
+                    listOf<CatalogItem>(
                         ActionItem(
                             id = "console_systems_no_folders",
-                            title = "No game folders found",
-                            subtitle = "Add a ROM folder above, then put <system>/<romFile> folders inside it",
+                            title = "No console system folders found",
+                            subtitle = "Name a folder after its system (snes, psx, ...) inside a games folder, or choose one below",
                             run = {},
                         ),
                     )
                 } else {
-                    folders.map { folder ->
+                    folders.map<File, CatalogItem> { folder ->
                         val resolved = SystemOverridePrefs.resolveForFolder(context, folder.absolutePath, folder.name, systemsById)
                         NestedScreenItem(
                             id = "console_folder_${folder.absolutePath}",
                             title = folder.name,
                             subtitle = when {
-                                resolved == null -> "Unrecognized -- open to assign a system"
-                                resolvePlayer(context, resolved) == null -> "${resolved.displayName} -- no installed emulator yet"
+                                resolved == null -> "Not set: open to choose its system"
+                                resolvePlayer(context, resolved) == null -> "${resolved.displayName}: no emulator installed yet"
                                 else -> resolved.displayName
                             },
                             inline = folderScreen(folder),
@@ -270,29 +267,39 @@ object AppSettingsCatalogs {
                             accent = resolved?.let { SystemThemeColors.forSystem(context, it.id) },
                         )
                     }
-                },
+                }) + FolderPickItem(
+                    id = "console_systems_choose_folder",
+                    title = "Choose a system for another folder",
+                    subtitle = "For a folder whose name is not a system's",
+                    onPicked = { ctx, uri: Uri ->
+                        val picked = GamesRootPrefs.resolveStoragePath(uri)
+                        val roots = GamesRootPrefs.gamesRootPaths(ctx).map { it.trimEnd('/') + "/" }
+                        when {
+                            picked == null -> "Couldn't resolve that folder to a real path on this device"
+                            roots.none { picked.absolutePath.startsWith(it) } -> "That folder is not inside one of your game folders"
+                            else -> {
+                                if (SystemOverridePrefs.get(ctx, picked.absolutePath) == null) {
+                                    SystemOverridePrefs.set(ctx, picked.absolutePath, SystemOverridePrefs.NOT_SET)
+                                }
+                                null
+                            }
+                        }
+                    },
+                ),
             ),
         )
     }
 
     /**
-     * Every game folder that resolves to a real system, paired with it --
-     * the same roots-then-subfolders walk the console-systems screen
-     * lists, narrowed to the resolvable ones because a scrape needs a
-     * system to scrape AS. Used by "Scrape all systems".
+     * Every console system folder, paired with its system: the library's
+     * own walk ([SystemFolders]), because a scrape needs a system to
+     * scrape AS. Used by "Scrape all systems".
      */
     private fun scrapeTargets(
         context: Context,
         systemsById: Map<String, ConsoleSystemDef>,
     ): List<Pair<File, ConsoleSystemDef>> =
-        GamesRootPrefs.gamesRootPaths(context)
-            .map(::File)
-            .flatMap { root -> (root.listFiles() ?: emptyArray()).filter { it.isDirectory }.toList() }
-            .mapNotNull { folder ->
-                SystemOverridePrefs.resolveForFolder(context, folder.absolutePath, folder.name, systemsById)
-                    ?.let { folder to it }
-            }
-            .sortedBy { it.first.name.lowercase() }
+        SystemFolders.all(context, systemsById).sortedBy { it.first.name.lowercase() }
 
     private fun folderScreen(folder: File) = CatalogScreen(
         id = "console_folder_${folder.absolutePath}",
@@ -490,7 +497,11 @@ object AppSettingsCatalogs {
         id = "folder_system_${folder.absolutePath}",
         title = "System",
         subtitle = "Which platform this folder's games belong to",
-        options = listOf(ChoiceOption("", "(automatic, from the folder name)")) +
+        options = listOf(ChoiceOption("", "From the folder name")) +
+            listOfNotNull(
+                ChoiceOption(SystemOverridePrefs.NOT_SET, "Not set")
+                    .takeIf { SystemOverridePrefs.get(context, folder.absolutePath) == SystemOverridePrefs.NOT_SET },
+            ) +
             systems.filter { it.canResolveFromFolder() }.sortedBy { it.displayName.lowercase() }.map { ChoiceOption(it.id, "${it.displayName} (${it.id})") },
         current = SystemOverridePrefs.get(context, folder.absolutePath) ?: "",
         onSelect = { ctx, value ->

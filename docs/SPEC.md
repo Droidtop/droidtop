@@ -4435,6 +4435,16 @@ not exist. Two folders that resolve to the same system under one root
 (`ps2/` beside `roms/ps2/`) are ONE unit of work, because the scan cache
 is keyed on (root, system id).
 
+**Where the system folders are is one walk, `SystemFolders`.** The scan,
+the Console systems settings page, both "Scrape all systems" actions, a
+gamelist's own scrape and the orphaned-media check all ask it. Each of the
+others used to walk one level by itself, so on the rig they found no
+system; the settings page guessed from file extensions instead and listed
+every store folder as "Unrecognized" (UI pass 2026-09-24). A folder whose
+name is no system's gets one only by the person's choice: "Choose a system
+for another folder" marks it Not set (`SystemOverridePrefs.NOT_SET`), and
+the system chosen on its page counts wherever the folder sits.
+
 **A time limit belongs to the unit of work it can bound, which is one
 folder's own step.** The whole-provider timeouts (60 s streaming, 15 s not) are gone,
 and what replaces them is `ScanBudget`: per folder, and checked *inside*

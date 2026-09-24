@@ -8,7 +8,6 @@ import dev.droidtop.library.GameMediaLocator
 import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.ScanBudget
 import dev.droidtop.library.ScanLog
-import dev.droidtop.library.ScanPrune
 import dev.droidtop.library.ScanSkips
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
@@ -472,73 +471,16 @@ class ConsoleRomProvider(
     private data class SystemScan(val units: List<SystemUnit>, val skipped: ScanSkips)
 
     /**
-     * How far below a games root a console system folder is looked for.
-     *
-     * Two, because the rig's root IS the user's whole library
-     * (`/mnt/windows/BstSharedFolder`, stores and ROMs side by side) and
-     * their ROMs live at `<root>/roms/<system>`: at one level droidtop saw
-     * no systems at all. Not deeper, deliberately -- platform ids are
-     * ordinary words (`android`, `pc`, `windows`, `flash`), and a folder
-     * three levels down is inside a game, where a subfolder that happens
-     * to be named like a platform would invent a system that does not
-     * exist. At two levels the containers are the root's own top-level
-     * folders, whose children are libraries and games, not game internals.
-     */
-    private val MAX_SYSTEM_SEARCH_DEPTH = dev.droidtop.library.consoles.MAX_SYSTEM_SEARCH_DEPTH
-
-    /**
      * Every console system under [root], with the folders holding its
-     * ROMs, plus counts of what was refused and why.
-     *
-     * The one place all four scan paths get their system folders from;
-     * there used to be four copies of a one-level `listFiles()` and none
-     * of them knew about store trees.
+     * ROMs, plus counts of what was refused and why. The folders come
+     * from [SystemFolders], the one walk every caller shares.
      */
     private fun systemUnitsUnder(root: File, systemsById: Map<String, ConsoleSystemDef>): SystemScan {
-        val skipped = ScanSkips()
-        val found = mutableListOf<Pair<File, ConsoleSystemDef>>()
-
-        fun refuse(folder: File, reason: String) {
-            skipped.add(folder, reason)
-        }
-
-        fun walk(folder: File, depth: Int) {
-            val children = (folder.listFiles() ?: emptyArray()).filter { it.isDirectory }.sortedBy { it.name }
-            for (child in children) {
-                val pruned = ScanPrune.skipReason(child)
-                val storeOwner = ScanPrune.storeRootOwner(child)
-                when {
-                    pruned != null -> refuse(child, pruned)
-                    // A store's install tree is the PC library's, whatever
-                    // the folder is called -- see ScanPrune.storeRootOwner.
-                    storeOwner != null ->
-                        refuse(
-                            child,
-                            "$storeOwner owns this tree -- its games are the PC library's, not a ROM system",
-                        )
-                    else -> {
-                        val system = SystemOverridePrefs.resolveForFolder(
-                            context,
-                            child.absolutePath,
-                            child.name,
-                            systemsById,
-                        )
-                        when {
-                            // A system folder's contents are ROMs, so the
-                            // search stops here and the walk takes over.
-                            system != null -> found += child to system
-                            depth < MAX_SYSTEM_SEARCH_DEPTH -> walk(child, depth + 1)
-                        }
-                    }
-                }
-            }
-        }
-
-        walk(root, 1)
-        val units = found
+        val scan = SystemFolders.under(context, root, systemsById)
+        val units = scan.found
             .groupBy { it.second.id }
             .map { (_, pairs) -> SystemUnit(pairs.first().second, pairs.map { it.first }) }
-        return SystemScan(units, skipped)
+        return SystemScan(units, scan.skipped)
     }
 
     /** Every ROM of [unit]'s system under [unit]'s folders, each folder budgeted on its own. */
