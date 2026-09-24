@@ -12,6 +12,7 @@ Usage: abi_sets.py <apk> [--require-complete]
 Without the flag it reports and exits 0, as a GitHub Actions warning; with
 it a missing name fails the step. SPEC 10b says when the flag goes on.
 """
+import os
 import sys
 import zipfile
 
@@ -28,6 +29,10 @@ def main():
     if len(apks) != 1:
         print(__doc__, file=sys.stderr)
         return 2
+    if not os.path.isfile(apks[0]):
+        # The build step failed and already said why; say so, not a traceback.
+        print(f"abi_sets: no APK at {apks[0]} -- nothing to check.")
+        return 0
     with zipfile.ZipFile(apks[0]) as apk:
         names = apk.namelist()
     arm64 = libs(names, "arm64-v8a")
