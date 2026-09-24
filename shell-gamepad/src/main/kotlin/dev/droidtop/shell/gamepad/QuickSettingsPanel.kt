@@ -438,7 +438,7 @@ private fun QuickTileView(
             .height(104.dp)
             .clip(shape)
             .background(background)
-            .border(if (focused) MenuTokens.FocusRingWidth else 0.dp, MenuTokens.Accent, shape)
+            .border(MenuTokens.FocusRingWidth, if (focused) MenuTokens.Accent else Color.Transparent, shape)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
