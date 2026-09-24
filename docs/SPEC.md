@@ -454,6 +454,14 @@ starts exactly those and stops the rest. It runs from
 turned off mid-session stops contributing immediately rather than at the
 next process start.
 
+The library's own background work follows the same rule even though the
+library is core: the slow index pass (§7g) runs only while some surface
+observes the library (a Gaming shell on screen, the Launcher's Games grid
+open, a companion drawing library entries) and stops when the last
+observer goes, rather than for the life of the process. A process whose
+every mode is off, or whose only live mode is Launcher with the Games grid
+closed, walks no games root.
+
 Components the SYSTEM starts on its own — a bound
 `NotificationListenerService`, an accessibility service, a broadcast
 receiver the platform fires — cannot be gated by any Activity of ours, so
