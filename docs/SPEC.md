@@ -503,6 +503,12 @@ system-bound service loses its grant when its component is disabled, so
 re-enabling the mode means granting notification or accessibility access
 again.
 
+A piece a mode STARTED is stopped by the same switch: `ModeStartup.apply`
+stops every running piece whose owning modes are all off, the vendored
+`SteamService` included (started by the Windows backbone for Gaming's PC
+surface and Desktop's containers, it must not outlive both), so "runs no
+code" holds mid-session and not only at the next process start.
+
 Deliberately not component-gated, with reasons: a device-admin receiver
 (disabling an active admin is not droidtop's call behind the user's
 back), exported Activities the HOME role already gates, and the
