@@ -6,7 +6,6 @@ import org.apache.commons.compress.archivers.tar.TarConstants
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayInputStream
@@ -144,13 +143,5 @@ class RootfsTarExtractorTest {
 
         assertEquals("ok", File(rootfs, "after").readText())
         assertEquals(1, result.skipped.size)
-    }
-
-    @Test
-    fun `entry paths are normalised or rejected`() {
-        assertEquals("usr/bin", RootfsTarExtractor.entryPath("./usr/bin/")!!.toString())
-        assertEquals("etc", RootfsTarExtractor.entryPath("/etc")!!.toString())
-        assertEquals("", RootfsTarExtractor.entryPath("./")!!.toString())
-        assertNull(RootfsTarExtractor.entryPath("a/../../b"))
     }
 }

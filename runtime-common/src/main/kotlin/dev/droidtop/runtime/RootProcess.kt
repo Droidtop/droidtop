@@ -1,9 +1,13 @@
 package dev.droidtop.runtime
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
+import java.io.OutputStream
 
 data class RootProcessResult(val exitCode: Int, val stdout: String, val stderr: String) {
     val succeeded: Boolean get() = exitCode == 0
@@ -54,7 +58,21 @@ object ProcessRunner {
     /** [RootProcessResult.exitCode] when the process never started. */
     const val NOT_LAUNCHED = -1
 
-    suspend fun run(command: List<String>, workingDir: File? = null): RootProcessResult =
+    /** [RootProcessResult.exitCode] when the process exited cleanly but its input could not all be written. */
+    const val INPUT_FAILED = -2
+
+    /**
+     * Runs [command]. With [stdin], the process's standard input is what
+     * [stdin] writes (on this coroutine) while stdout and stderr are read
+     * on their own threads, so neither a full output pipe nor a slow
+     * consumer can deadlock the write. If [stdin] throws, the process is
+     * killed and the failure is reported in stderr, never thrown.
+     */
+    suspend fun run(
+        command: List<String>,
+        workingDir: File? = null,
+        stdin: ((OutputStream) -> Unit)? = null,
+    ): RootProcessResult =
         withContext(Dispatchers.IO) {
             // ProcessBuilder.start() indexes the command array before it
             // validates it, so an empty list is an
@@ -74,11 +92,25 @@ object ProcessRunner {
                 return@withContext notLaunched(command, e)
             }
 
-            val stdout = process.inputStream.bufferedReader().readText()
-            val stderr = process.errorStream.bufferedReader().readText()
-            val exitCode = process.waitFor()
-
-            RootProcessResult(exitCode, stdout, stderr)
+            try {
+                coroutineScope {
+                    val stdout = async { process.inputStream.bufferedReader().readText() }
+                    val stderr = async { process.errorStream.bufferedReader().readText() }
+                    val inputFailure = runCatching { process.outputStream.use { out -> stdin?.invoke(out) } }.exceptionOrNull()
+                    if (inputFailure != null && inputFailure !is IOException) process.destroy()
+                    val exitCode = process.waitFor()
+                    val errors = stderr.await()
+                    RootProcessResult(
+                        exitCode = if (inputFailure != null && exitCode == 0) INPUT_FAILED else exitCode,
+                        stdout = stdout.await(),
+                        stderr = if (inputFailure == null) errors else listOf(errors, "input failed: ${inputFailure.message ?: inputFailure}")
+                            .filter { it.isNotBlank() }.joinToString("\n"),
+                    )
+                }
+            } catch (e: CancellationException) {
+                process.destroy()
+                throw e
+            }
         }
 
     private fun notLaunched(command: List<String>, cause: Exception): RootProcessResult =
@@ -104,9 +136,10 @@ object ProcessRunner {
  * environment. See runtime-linux-root/README.md.
  */
 object RootProcess {
-    suspend fun run(vararg args: String, workingDir: File? = null): RootProcessResult {
+    /** [stdin] as for [ProcessRunner.run]: `su` hands its standard input to the command. */
+    suspend fun run(vararg args: String, workingDir: File? = null, stdin: ((OutputStream) -> Unit)? = null): RootProcessResult {
         val shellCommand = args.joinToString(" ") { shellQuote(it) }
-        return ProcessRunner.run(listOf("su", "-c", shellCommand), workingDir)
+        return ProcessRunner.run(listOf("su", "-c", shellCommand), workingDir, stdin)
     }
 
     /** What root this device offers -- the question callers ask instead of inferring it from a failed command. */

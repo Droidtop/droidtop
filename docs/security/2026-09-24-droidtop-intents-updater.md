@@ -15,7 +15,7 @@ could be compromised.
 | 4 | Onboarding and Console systems screens were exported with no need | Low | Fixed |
 | 5 | Root shell scripts spliced paths and digests into single quotes | Low | Fixed |
 | 6 | Update feed's `apkName` was used as a URL path unchecked | Low | Fixed |
-| 7 | Root `tar -x` of a registry image into the rootfs | Medium | Open: needs a device |
+| 7 | Root `tar -x` of a registry image into the rootfs | Medium | Fixed (rig check pending) |
 | 8 | `GameLaunchActivity` is exported: any app can launch a library entry | Low | Accepted |
 | 9 | `MainActivity` is exported with mode extras | Info | Accepted |
 | 10 | ScreenScraper credentials in plain private SharedPreferences, password in the query string | Low | Accepted |
@@ -111,17 +111,49 @@ at another path on github.com. The digest check and Android's signature
 check would still have rejected a foreign APK, so this was defence in
 depth. The name must now be a bare `*.apk` file name.
 
-## 7. Root extraction of registry images (Medium, open)
+## 7. Root extraction of registry images (Medium, fixed)
 
-`RootTarUnpacker.extract` runs `tar -xf <image> -C <rootfs>` as root. The
-image is an off-the-shelf OCI image from a registry the person picks (or
-types, in the Containers screen). Whether Android's `tar` (toybox) refuses
-members with `..`, absolute paths, or writes through a symlink created
-earlier in the same archive decides whether a hostile image can write
-outside the rootfs as root. Not fixed here because it cannot be verified
-without a rooted device; the fix is either to confirm toybox's behaviour or
-to extract as the app user first (as the proot backend does) and only then
-hand the tree to root. Scope: rooted Desktop mode only.
+`RootTarUnpacker.extract` ran `tar -xf <image> -C <rootfs>` as root on
+`crane export`'s flattened tarball. The image is an off-the-shelf OCI image
+from a registry the person picks (or types, in the Containers screen), so
+its member names and link targets are attacker-controlled.
+
+What toybox does with that, read from its `toys/posix/tar.c` and run
+off-device (toybox 0.8.14 built from source, extracting as root):
+`dirflush()` resolves each member name, following symlinks, and refuses one
+that lands outside `-C`, so `../` names and writes through a symlink
+planted earlier in the archive were refused. A hard link's target is not
+checked at all: `link(link_target, name)` is followed by `lchown` and
+`chmod` of the new name, which is the target's inode. A member `hl` linked
+to `../../../<outside>/victim` gave the victim a second link and changed its
+mode from 0600 to the member's 0644. As root, that is a chmod and chown of
+any file on the same filesystem as the rootfs (`/data`), including other
+apps' private files. Older toybox versions, and a root manager's busybox
+that `su` may find first on `PATH`, were not examined and did not need to
+be (below).
+
+Fixed by not giving root's `tar` the image at all. Images are now kept as
+an OCI image layout and flattened by droidtop itself (`OciFlattener`,
+docs/SPEC.md §3 "How a container is made"), as the app. It emits only
+names relative to the rootfs with no `..`, nothing beneath a symlink or
+other non-directory, each path once, and hard links only to a regular file
+of the same layer that is in the final tree. It writes no user or group
+names and no pax headers. That stream is piped into `su -c tar -xf - -C
+<empty rootfs>`, so whichever `tar` runs is only ever given names and link
+targets that stay inside the rootfs through real directories. Root still
+writes the files (droidspaces needs the image's real ownership and setuid
+bits), and root use stays in `:runtime-linux-root`. The proot backend writes
+the same flattened entries in-process.
+
+Verified off-device: the hostile layers above (a `../` name, a symlink then
+a member through it, a lower layer's symlink with an upper layer's member
+beneath it, a hard link out of the rootfs), flattened and extracted by
+toybox as root, changed nothing outside the rootfs, and the lower symlink
+became a real directory. Real images (alpine, debian:bookworm-slim,
+python:3.12-slim) flattened this way matched `crane export` path for path.
+Not verified yet: `su`'s standard input reaching `tar` under KernelSU,
+Magisk and APatch, and a sibling container booting from the new store, on a
+rooted device.
 
 ## 8. `GameLaunchActivity` exported (Low, accepted)
 

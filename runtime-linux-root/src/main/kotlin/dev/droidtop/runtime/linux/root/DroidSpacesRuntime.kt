@@ -9,7 +9,6 @@ import dev.droidtop.runtime.ContainerExecResult
 import dev.droidtop.runtime.ContainerLayout
 import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.ContainerRuntime
-import dev.droidtop.runtime.ImageCache
 import dev.droidtop.runtime.ImageCachePolicy
 import dev.droidtop.runtime.PrimaryProvisioning
 import dev.droidtop.runtime.RootfsImage
@@ -70,7 +69,6 @@ import java.util.UUID
 class DroidSpacesRuntime(
     private val context: Context,
     private val rootfsPuller: RootfsPuller,
-    private val imageCache: ImageCache,
     private val cachePolicy: ImageCachePolicy,
 ) : ContainerRuntime {
     override val backend: ContainerBackend = ContainerBackend.DROIDSPACES
@@ -127,7 +125,7 @@ class DroidSpacesRuntime(
         // leaked 08-27 processes were still mounted over.
         RootProcess.run(binaryPath, "--name=$name", "stop")
         val rootfsPath = File(rootfsDir, name).absolutePath
-        rootfsPuller.pullAndUnpack(image, rootfsPath, imageCache, cachePolicy)
+        rootfsPuller.pullAndUnpack(image, rootfsPath, cachePolicy)
         writeInit(rootfsPath, provisioning)
 
         writeConfig(name, rootfsPath)

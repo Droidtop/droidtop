@@ -31,10 +31,6 @@ dependencies {
     implementation(project(":runtime-common"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
-    // Reads the flat image tarball crane exports (RootfsTarExtractor).
-    // The same library gamenative's own archive code uses, so the APK
-    // carries one copy of it.
-    implementation(libs.commons.compress)
 
     testImplementation(libs.junit)
 }

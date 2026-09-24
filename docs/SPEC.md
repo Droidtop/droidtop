@@ -599,22 +599,64 @@ its loaders are packaged as `lib*.so` for that reason, and so is `crane`
 extracted into `filesDir` and only worked where root ran it. Only
 droidspaces, which always runs through `su`, remains an extracted asset.
 
-**How a container is made.** Both backends pull through one
-`CraneRootfsPuller` (`runtime-common`) and one `FileImageCache`; they
-differ only in the `RootfsUnpacker` that writes the tree. droidspaces
-extracts as root with `tar` (`RootTarUnpacker`), keeping the image's real
-ownership. proot extracts in-process (`RootfsTarExtractor`): the tree is
-owned by the app, the image's ownership is dropped because `--root-id`
-presents everything as root's to the guest, permission bits are kept plus
-owner read/write, hard links become hard links where Android allows the
-app one and copies otherwise, device nodes and FIFOs are skipped (the
-guest's `/dev` is the host's). Nothing is written through a symlink:
-every parent component is checked with lstat and an entry beneath a
-symlink is skipped, because an image's absolute links (Debian's
-`/var/run -> /run`) point into Android's own filesystem on the host.
-Removal (`TreeDelete`) walks without following links and refuses any path
-outside the backend's containers directory — the defect class of the
-2026-09-02 storage wipe (§5b).
+**How a container is made (images kept as OCI, 2026-09-24).** Both
+backends pull through one `CraneRootfsPuller` (`runtime-common`) into one
+`OciImageStore`, and the image is flattened by one `OciFlattener`; they
+differ only in the `RootfsUnpacker` that writes the tree.
+
+- *The store is an OCI image layout* (`files/oci`: `index.json`,
+  `blobs/sha256/`), which `crane pull --format=oci --platform <this ABI>`
+  appends to. Blobs are content-addressed, so a layer shared by two images
+  is downloaded and stored once, and the image config (Env, User,
+  Entrypoint) is kept; nothing reads it yet. It replaced a `.tar` per image
+  from `crane export`, which duplicated every shared layer and threw the
+  config away; the old `files/image-cache` is deleted on first use. Each
+  `index.json` entry is annotated with the digest it was pulled by (for a
+  multi-platform image the index's, while the stored manifest is the
+  platform's) and the reference, for the cache UI. `--platform` is always
+  passed: without it crane stores every architecture of a multi-platform
+  image. Eviction removes least recently used images to the policy's cap
+  (2 GB by default) and deletes every blob no remaining image references,
+  including an interrupted pull's leftovers; all layout changes run under
+  one process-wide lock, since a collection beside a pull would delete the
+  layers it just wrote.
+- *The flattener* reads the layers top first, so the first time a path is
+  seen is its final version, and applies whiteouts (`.wh.<name>`, and
+  `.wh..wh..opq` for an opaque directory) to the layers below theirs. What
+  it emits is clean by construction: no name with `..` (`TarPaths`, the one
+  rule), nothing beneath a symlink or other non-directory (a path with
+  anything emitted beneath it stays a directory, so a lower layer's symlink
+  of that name is dropped), each path once into an empty destination, hard
+  links last and only to a regular file of their own layer that survived,
+  numeric ids and permission bits only (no user or group names, which
+  toybox would look up in Android's own user table; no pax headers; no
+  extended attributes, so file capabilities are not carried). Each layer is
+  hashed as it is read and a mismatch fails the unpack and deletes the blob.
+  Off-device, alpine, debian:bookworm-slim and python:3.12-slim flattened
+  through it and extracted by toybox 0.8.14 as root matched `crane export`
+  extracted by GNU tar path for path (mode, uid, link count, symlink
+  target, content).
+- *droidspaces* streams the flattened image into `su -c tar -xf - -C
+  <rootfs>` (`RootTarUnpacker`, through `ProcessRunner`'s standard input),
+  keeping the image's real ownership and setuid bits. Root never reads the
+  image itself, so which `tar` `su` finds and how it treats hostile names no
+  longer matters: it is only ever given the flattener's stream. This closed
+  finding 7 of `docs/security/2026-09-24-droidtop-intents-updater.md`; the
+  old root `tar -x` of crane's export let a hard link out of the rootfs
+  chmod and chown a file outside it.
+- *proot* writes the flattener's entries in-process (`RootfsTarExtractor`,
+  no tar stream in between): the tree is owned by the app, the image's
+  ownership is dropped because `--root-id` presents everything as root's to
+  the guest, permission bits are kept plus owner read/write, hard links
+  become hard links where Android allows the app one and copies otherwise,
+  device nodes and FIFOs are skipped (the guest's `/dev` is the host's). It
+  checks again against the filesystem before each write: every parent
+  component is checked with lstat and an entry beneath a symlink is
+  skipped, because an image's absolute links (Debian's `/var/run -> /run`)
+  point into Android's own filesystem on the host. Removal (`TreeDelete`)
+  walks without following links and refuses any path outside the backend's
+  containers directory — the defect class of the 2026-09-02 storage wipe
+  (§5b).
 
 **How a process runs.** Every guest process is one proot session:
 `--kill-on-exit --root-id --link2symlink --sysvipc --ashmem-memfd`, the
@@ -796,10 +838,10 @@ Rootfs images for both backends are OCI image references
 OCI registry client fetching layer blobs. This applies to the primary
 container's base+sway image and to any sibling's distro image alike, and
 means users aren't limited to a bespoke image format we maintain — any OCI
-image works. Pulled layers are cached on-device by digest via `ImageCache`,
-**as an explicit user-facing setting** (on/off, size cap, clear-cache
-action) rather than an invisible always-on cache, since it trades storage
-for avoiding re-downloads when containers are recreated.
+image works. Pulled images are kept on-device by digest in `OciImageStore`
+(above), **meant as an explicit user-facing setting** (on/off, size cap,
+clear-cache action) rather than an invisible always-on cache, since it
+trades storage for avoiding re-downloads when containers are recreated.
 
 ## 3a. Image index — populated live, not a pinned/prepopulated catalog
 
@@ -2196,7 +2238,7 @@ class -- a delete that can leave the tree it was pointed at:
   traversal and writes routed through a symlink an earlier entry
   planted) and unlinks a symlink sitting where a regular file is about
   to be written. Archives keep their legitimate internal symlinks.
-- **Safe by construction, left as they are**: `FileImageCache.clear` (flat `.tar`s in cache), `ThemeAssets`
+- **Safe by construction, left as they are**: `FileImageCache.clear` (flat `.tar`s in cache; since replaced by `OciImageStore.clear`, whose layout holds only crane-written plain files), `ThemeAssets`
   (APK-asset extraction -- assets cannot be symlinks),
   `BackupHelper` (entry names whitelisted to exact known filenames,
   staging dirs hold only droidtop-written flat files), and test-only

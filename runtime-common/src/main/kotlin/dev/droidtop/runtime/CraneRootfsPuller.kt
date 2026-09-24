@@ -1,15 +1,12 @@
 package dev.droidtop.runtime
 
-import android.content.Context
-import java.io.File
-
 /**
  * The half of turning an image into a rootfs that depends on who owns the
- * tree. Pulling is the same for every backend ([CraneRootfsPuller]);
- * writing the files is not: droidspaces needs a root-owned tree with real
- * ownership (extracted by root), while proot needs a tree the app itself
- * owns and can later remove (extracted in-process, with proot faking root
- * ownership at run time).
+ * tree. Pulling and flattening are the same for every backend
+ * ([CraneRootfsPuller], [OciFlattener]); writing the files is not:
+ * droidspaces needs a root-owned tree with real ownership (written by
+ * root's `tar`), while proot needs a tree the app itself owns and can later
+ * remove (written in-process, with proot faking root ownership at run time).
  *
  * Every method is handed the destination directory the puller chose;
  * implementations must never follow a symlink out of it.
@@ -21,44 +18,49 @@ interface RootfsUnpacker {
     /** Removes whatever is at [destinationPath]: a partial extraction, or a different image. */
     suspend fun wipe(destinationPath: String)
 
-    /** Extracts the flat filesystem tarball [tarPath] into the empty [destinationPath], creating it. */
-    suspend fun extract(tarPath: String, destinationPath: String)
+    /**
+     * Writes [content] into the empty [destinationPath], creating it. The
+     * entries [content] feeds are already clean ([OciFlattener]); what
+     * each implementation adds is only how they reach the filesystem.
+     */
+    suspend fun extract(content: RootfsContent, destinationPath: String)
 
     /** Records that [destinationPath] holds [digest]. Called last, so a failure never leaves a tree claiming to be complete. */
     suspend fun markComplete(destinationPath: String, digest: String)
 }
 
+/** A flattened image, fed entry by entry to whichever sink writes it. Blocking: call it off the main thread. */
+fun interface RootfsContent {
+    fun writeTo(sink: RootfsEntrySink): OciFlattener.Result
+}
+
 /**
- * [RootfsPuller] backed by [Crane], shared by both container backends,
- * which differ only in their [unpacker]. Two crane subcommands cover
- * everything:
+ * [RootfsPuller] backed by [Crane] and [OciImageStore], shared by both
+ * container backends, which differ only in their [unpacker]:
  *
  *  - `crane digest <reference>` resolves a tag to its immutable digest
- *    ([resolve]), the thing [ImageCache] keys on, since a tag like
+ *    ([resolve]), the key the store is kept by, since a tag like
  *    `:bookworm` can move but a digest can't.
- *  - `crane export <reference> <tarball>` pulls every layer and flattens
- *    them into one filesystem tarball (like `docker export`): exactly the
- *    "get me a rootfs" shape this needs, with whiteouts already applied.
+ *  - `crane pull --format=oci` puts the image into the store (an OCI image
+ *    layout), layers shared with images already there not downloaded again.
+ *  - [OciFlattener] applies the layers and whiteouts and checks every
+ *    entry, and the [unpacker] writes what it emits. Nothing is staged on
+ *    disk between the store and the rootfs.
  *
- * Both run as the app itself: registry calls writing into app-private
- * storage need no privilege on either backend.
+ * All of it runs as the app, but for droidspaces' final write: registry
+ * calls into app-private storage need no privilege on either backend.
  */
 class CraneRootfsPuller(
-    private val context: Context,
+    private val binaryPath: () -> String,
+    private val store: OciImageStore,
     private val unpacker: RootfsUnpacker,
 ) : RootfsPuller {
-    private val binaryPath: String by lazy { Crane.binaryPath(context) }
-
     override suspend fun resolve(reference: String): RootfsImage =
-        RootfsImage(reference = reference, digest = Crane.digest(binaryPath, reference))
+        RootfsImage(reference = reference, digest = Crane.digest(binaryPath(), reference))
 
-    override suspend fun pullAndUnpack(
-        image: RootfsImage,
-        destinationPath: String,
-        cache: ImageCache,
-        policy: ImageCachePolicy,
-    ) {
-        val digest = image.digest ?: resolve(image.reference).digest!!
+    override suspend fun pullAndUnpack(image: RootfsImage, destinationPath: String, policy: ImageCachePolicy) {
+        val resolved = if (image.digest != null) image else resolve(image.reference)
+        val digest = resolved.digest!!
 
         // Idempotence + no image mixing: a destination already extracted
         // from THIS digest is left alone (fast session restarts); one
@@ -70,31 +72,12 @@ class CraneRootfsPuller(
         // touches the registry.
         if (unpacker.isCurrent(destinationPath, digest)) return
 
-        val cachedTarPath = if (policy.enabled) cache.get(digest) else null
-        val tarPath = cachedTarPath ?: run {
-            // Always pulls into our own scratch location, never into the
-            // cache's internal storage directly -- ImageCache.put() owns
-            // where a cached blob actually lives, not this class.
-            val scratchPath = File(context.cacheDir, "rootfs-pull-$digest.tar").absolutePath
-            val pullResult = ProcessRunner.run(listOf(binaryPath, "export", "${image.reference}@$digest", scratchPath))
-            check(pullResult.succeeded) {
-                "crane export failed for ${image.reference}@$digest: ${pullResult.stderr}"
-            }
-            if (policy.enabled) {
-                cache.put(digest, scratchPath, label = image.reference)
-                cache.get(digest) ?: error("ImageCache.put($digest, ...) didn't make it available via get()")
-            } else {
-                scratchPath
-            }
-        }
-
+        val stored = store.pull(resolved)
         unpacker.wipe(destinationPath)
-        unpacker.extract(tarPath, destinationPath)
+        unpacker.extract(RootfsContent { sink -> OciFlattener.flatten(store, stored, sink) }, destinationPath)
         unpacker.markComplete(destinationPath, digest)
 
-        if (!policy.enabled) {
-            File(tarPath).delete()
-        }
+        if (policy.enabled) store.evictToFit(policy, keep = digest) else store.remove(digest)
     }
 
     companion object {
