@@ -37,6 +37,7 @@ import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
+import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.FolderPickItem
 import dev.droidtop.library.settings.GamingSettingsCatalog
 import dev.droidtop.library.settings.NestedScreenItem
@@ -111,6 +112,8 @@ object AppSettingsCatalogs {
             .plus(SystemFolders.awaitingSystem(context))
             .distinctBy { it.absolutePath }
             .sortedBy { it.name.lowercase() }
+        // Read here, on IO: a value label is drawn on the main thread.
+        val activeIntegrations = IntegrationStore.available(context).size
 
         listOf(
             CatalogGroup(
@@ -134,10 +137,7 @@ object AppSettingsCatalogs {
                         title = "App integrations",
                         subtitle = "Hook other installed apps into droidtop, e.g. a downloader for a system's games",
                         registryId = SCREEN_INTEGRATIONS,
-                        valueLabel = { ctx ->
-                            val n = IntegrationStore.available(ctx).size
-                            if (n == 0) "none" else "$n active"
-                        },
+                        valueLabel = { if (activeIntegrations == 0) "none" else "$activeIntegrations active" },
                     ),
                     NestedScreenItem(
                         id = "console_systems_scraper",
@@ -377,18 +377,17 @@ object AppSettingsCatalogs {
                                     val bios = BiosDatabase.forSystem(context, resolved.id)
                                     if (bios != null) {
                                         val gamesRoot = folder.parentFile ?: folder
+                                        // Presence only, counted here on IO (a value
+                                        // label is drawn on the main thread); md5
+                                        // hashing happens inside the screen.
+                                        val biosPresent = bios.files.count { File(gamesRoot, it.file).isFile }
                                         add(
                                             NestedScreenItem(
                                                 id = "folder_bios_${resolved.id}",
                                                 title = "BIOS files",
                                                 subtitle = "Firmware ${resolved.displayName} emulators may need, looked for in ${gamesRoot.name}/bios",
                                                 inline = biosScreen(gamesRoot, bios),
-                                                valueLabel = { _ ->
-                                                    // Presence only here -- md5 hashing happens
-                                                    // inside the screen, off the main thread.
-                                                    val present = bios.files.count { File(gamesRoot, it.file).isFile }
-                                                    "$present/${bios.files.size}"
-                                                },
+                                                valueLabel = { _ -> "$biosPresent/${bios.files.size}" },
                                             ),
                                         )
                                     }
@@ -1118,42 +1117,61 @@ object AppSettingsCatalogs {
     private fun integrationsScreen() = CatalogScreen(
         id = SCREEN_INTEGRATIONS,
         title = "App integrations",
-        subtitle = "Declared as .json files in droidtop's own storage, never bundled or synced -- which apps you hook in is yours alone",
+        subtitle = "Declared as .json files you add, never bundled or synced -- which apps you hook in is yours alone",
         groups = { context ->
-            withContext(Dispatchers.IO) { IntegrationStore.seedExampleIfEmpty(context) }
-            val declared = IntegrationStore.all(context)
+            val declared = withContext(Dispatchers.IO) {
+                IntegrationStore.seedExampleIfEmpty(context)
+                IntegrationStore.all(context).map { it to IntegrationStore.isInstalled(context, it.packageName) }
+            }
+            val folderLabel = IntegrationStore.userDirLabel(context)
             listOf(
                 CatalogGroup(
                     id = "integrations_list",
                     title = null,
-                    items = if (declared.isEmpty()) {
-                        listOf(
-                            ActionItem(
-                                id = "integrations_none",
-                                title = "No integrations declared",
-                                subtitle = "Drop a .json file in ${IntegrationStore.userDir(context).absolutePath} -- example.json.txt there shows the format",
-                                run = {},
-                            ),
-                        )
-                    } else {
-                        declared.map { integration ->
-                            val installed = IntegrationStore.isInstalled(context, integration.packageName)
-                            ActionItem(
-                                id = "integration_${integration.id}",
-                                title = integration.label,
-                                subtitle = buildString {
-                                    append(integration.capability.display)
-                                    append(" on ")
-                                    append(integration.capability.surface)
-                                    append(" - ")
-                                    append(if (installed) integration.packageName else "${integration.packageName} is NOT installed, so this is hidden elsewhere")
-                                    IntegrationPlaceholders.usedIn(integration.argumentsTemplate)
-                                        .takeIf { it.isNotEmpty() }
-                                        ?.let { append("  |  uses ").append(it.joinToString(" ")) }
-                                },
-                                run = {},
+                    items = buildList {
+                        if (declared.isEmpty()) {
+                            add(
+                                ActionItem(
+                                    id = "integrations_none",
+                                    title = "No integrations yet",
+                                    subtitle = "Add an integration file below, or copy one into $folderLabel " +
+                                        "over USB or a file manager -- example.json.txt there shows the format",
+                                    run = {},
+                                ),
                             )
                         }
+                        declared.forEach { (integration, installed) ->
+                            add(
+                                ActionItem(
+                                    id = "integration_${integration.id}",
+                                    title = integration.label,
+                                    subtitle = buildString {
+                                        append(integration.capability.display)
+                                        append(" on ")
+                                        append(integration.capability.surface)
+                                        append(" - ")
+                                        append(if (installed) integration.packageName else "${integration.packageName} is NOT installed, so this is hidden elsewhere")
+                                        IntegrationPlaceholders.usedIn(integration.argumentsTemplate)
+                                            .takeIf { it.isNotEmpty() }
+                                            ?.let { append("  |  uses ").append(it.joinToString(" ")) }
+                                    },
+                                    run = {},
+                                ),
+                            )
+                        }
+                        add(
+                            DocumentPickItem(
+                                id = "integrations_add",
+                                title = "Add integration file",
+                                subtitle = "Pick a .json integration; it is copied into $folderLabel",
+                                // Not application/json: many file managers
+                                // label a .json as octet-stream, which a
+                                // narrower filter would hide. The file is
+                                // parsed before it is kept.
+                                mimeType = "*/*",
+                                onPicked = IntegrationStore::import,
+                            ),
+                        )
                     },
                 ),
             )

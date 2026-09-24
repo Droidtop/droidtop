@@ -2,6 +2,7 @@ package dev.droidtop.library.integrations
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.net.Uri
 import dev.droidtop.library.LaunchDisplay
 import dev.droidtop.library.consoles.AmStartCommandToIntentConverter
 import java.io.File
@@ -11,13 +12,14 @@ import org.json.JSONObject
  * Loads and runs the user's own [Integration] declarations (docs/SPEC.md
  * §12).
  *
- * Integrations live as individual `.json` files in [userDir], a plain
- * folder in droidtop's own storage. Nothing here is bundled, downloaded,
- * or synced: an integration names a specific third-party app the user
- * chose to install, and which apps someone hooks into their own launcher
- * is their business, not something droidtop should ship a public
- * catalogue of. Adding one is dropping a file in; removing one is
- * deleting it.
+ * Integrations live as individual `.json` files in [userDir], droidtop's
+ * external files folder -- the one a person without root can reach over
+ * USB, adb or a file manager -- or arrive there through [import] from the
+ * system file picker. Nothing here is bundled, downloaded, or synced: an
+ * integration names a specific third-party app the user chose to install,
+ * and which apps someone hooks into their own launcher is their business,
+ * not something droidtop should ship a public catalogue of. Adding one is
+ * dropping a file in; removing one is deleting it.
  *
  * Unparseable or incomplete files are skipped rather than failing the
  * whole load, the same defensive posture the player and theme databases
@@ -26,8 +28,67 @@ import org.json.JSONObject
  */
 object IntegrationStore {
 
-    /** Where a user's own integration files live. */
-    fun userDir(context: Context): File = File(context.filesDir, "integrations")
+    /**
+     * Where a user's own integration files live:
+     * `Android/data/<package>/files/integrations`. Not `filesDir`, which
+     * nobody without root can open (rig, 2026-09-24). Falls back to
+     * `filesDir` only while shared storage is unmounted, so a read never
+     * throws.
+     */
+    fun userDir(context: Context): File =
+        File(context.getExternalFilesDir(null) ?: context.filesDir, "integrations")
+
+    /** The folder as a person finds it in a file manager, for the screen that names it. */
+    fun userDirLabel(context: Context): String = "Android/data/${context.packageName}/files/integrations"
+
+    /**
+     * The folder integrations used to live in. Its files are moved into
+     * [userDir] on the next load, so an integration written by someone who
+     * could reach it keeps working after the move.
+     */
+    private fun legacyDir(context: Context): File = File(context.filesDir, "integrations")
+
+    private fun migrateLegacy(context: Context) {
+        val legacy = legacyDir(context)
+        val dir = userDir(context)
+        if (!legacy.isDirectory || legacy == dir) return
+        if (!dir.isDirectory && !dir.mkdirs()) return
+        legacy.listFiles()?.forEach { file ->
+            val target = File(dir, file.name)
+            // A same-named file already in the new folder is the newer
+            // one; the old copy stays put rather than overwriting it.
+            if (file.isFile && !target.exists() && runCatching { file.copyTo(target) }.isSuccess) file.delete()
+        }
+        legacy.delete() // only succeeds once it is empty
+    }
+
+    /**
+     * Copies an integration file the person picked into [userDir], named
+     * after its id so adding a newer copy replaces the old one. Returns
+     * what happened, for the settings screen to show. A file that is not
+     * a complete integration is refused rather than copied, so the folder
+     * never collects files the loader would silently skip.
+     */
+    fun import(context: Context, uri: Uri): String {
+        val text = runCatching {
+            context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
+        }.getOrNull() ?: return "Couldn't read that file"
+        val integration = runCatching { Integration.fromJson(JSONObject(text)) }.getOrNull()
+            ?: return "That file isn't an integration: it needs id, package, capability " +
+                "(acquire_content or open_with) and argumentsTemplate"
+        migrateLegacy(context)
+        val dir = userDir(context)
+        if (!dir.isDirectory && !dir.mkdirs()) return "Couldn't create ${userDirLabel(context)}"
+        val safeId = integration.id.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val target = File(dir, "$safeId.json")
+        val replaced = target.exists()
+        return runCatching {
+            target.writeText(text)
+            (if (replaced) "Replaced " else "Added ") + integration.label +
+                if (isInstalled(context, integration.packageName)) "" else
+                    " (hidden until ${integration.packageName} is installed)"
+        }.getOrElse { "Couldn't save it: ${it.message}" }
+    }
 
     /**
      * Every declared integration whose target app is actually installed.
@@ -45,6 +106,7 @@ object IntegrationStore {
 
     /** Everything declared, installed or not — for a settings screen that must explain why one is unavailable. */
     fun all(context: Context): List<Integration> {
+        migrateLegacy(context)
         val dir = userDir(context)
         val files = dir.listFiles { f -> f.isFile && f.extension.equals("json", ignoreCase = true) }
             ?: return emptyList()
@@ -125,9 +187,10 @@ object IntegrationStore {
     }
 
     private val EXAMPLE = """
-        Drop .json files in this folder to hook other installed apps into
-        droidtop (docs/SPEC.md section 12). Rename a copy of this to
-        something like "my-downloader.json" to activate it.
+        Put .json files in this folder to hook other installed apps into
+        droidtop (docs/SPEC.md section 12), or use "Add integration file"
+        in Settings > Console systems > App integrations. Rename a copy of
+        this to something like "my-downloader.json" to activate it.
 
         {
           "id": "my-downloader",

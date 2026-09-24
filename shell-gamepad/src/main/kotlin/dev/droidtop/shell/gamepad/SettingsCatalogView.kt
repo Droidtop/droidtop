@@ -156,8 +156,12 @@ fun CatalogNavigator(
         pendingDocumentPick = null
         val uri = result.data?.data
         if (uri == null || item == null) return@rememberLauncherForActivityResult
-        statusById[item.id] = item.onPicked(context, uri)
-        refresh()
+        // onPicked reads or writes the document: never on the main thread.
+        statusById[item.id] = "Working..."
+        scope.launch {
+            statusById[item.id] = withContext(Dispatchers.IO) { item.onPicked(context, uri) }
+            refresh()
+        }
     }
 
     val folderPickLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->

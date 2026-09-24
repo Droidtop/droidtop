@@ -75,8 +75,12 @@ class CatalogPreferenceNavigator(
             val uri = result.data?.data
             if (uri == null || item == null) return@registerForActivityResult
             val context = fragment.requireContext()
-            android.widget.Toast.makeText(context, item.onPicked(context, uri), android.widget.Toast.LENGTH_LONG).show()
-            rebuild()
+            // onPicked reads or writes the document: never on the main thread.
+            fragment.lifecycleScope.launch {
+                val outcome = withContext(Dispatchers.IO) { item.onPicked(context, uri) }
+                android.widget.Toast.makeText(context, outcome, android.widget.Toast.LENGTH_LONG).show()
+                rebuild()
+            }
         }
 
     private val backCallback = object : androidx.activity.OnBackPressedCallback(false) {

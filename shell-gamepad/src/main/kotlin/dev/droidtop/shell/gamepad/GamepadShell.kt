@@ -989,7 +989,7 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
 
     // The user's own "open with" hooks (docs/SPEC.md section 12), paired
     // with the real files on this entry droidtop itself cannot open.
-    // Resolved off the main thread: this reads filesDir and asks the
+    // Resolved off the main thread: this reads the integrations folder and asks the
     // PackageManager whether each declared target app is installed.
     val openWithTargets = remember(entry) { openWithTargetsFor(entry) }
     var openWith by remember(entry) { mutableStateOf<List<Integration>>(emptyList()) }
