@@ -35,7 +35,8 @@ class RootTarUnpacker : RootfsUnpacker {
 
     override suspend fun markComplete(destinationPath: String, digest: String) {
         val marker = "$destinationPath/${CraneRootfsPuller.DIGEST_MARKER}"
-        val markResult = RootProcess.run("sh", "-c", "printf %s '$digest' > '$marker'")
+        // Values as positional parameters, not spliced into root's script.
+        val markResult = RootProcess.run("sh", "-c", "printf %s \"\$1\" > \"\$2\"", "sh", digest, marker)
         check(markResult.succeeded) { "Writing $marker failed: ${markResult.stderr}" }
     }
 }

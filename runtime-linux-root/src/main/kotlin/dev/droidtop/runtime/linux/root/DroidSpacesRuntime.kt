@@ -186,11 +186,12 @@ class DroidSpacesRuntime(
         val script = provisioning?.let { ContainerLayout.primaryInitScript(it) }
             ?: "#!/bin/sh\nexec sleep infinity\n"
 
-        val initPath = "$rootfsPath/sbin/init"
-        val writeCommand = "mkdir -p '$rootfsPath/sbin' && cat > '$initPath' <<'DROIDTOP_INIT_EOF'\n" +
+        // The rootfs path rides in as "$1", never spliced into the script:
+        // this runs as root, and a quote in the path must stay a quote.
+        val writeCommand = "mkdir -p \"\$1/sbin\" && cat > \"\$1/sbin/init\" <<'DROIDTOP_INIT_EOF'\n" +
             script +
-            "DROIDTOP_INIT_EOF\nchmod 755 '$initPath'"
-        val result = RootProcess.run("sh", "-c", writeCommand)
+            "DROIDTOP_INIT_EOF\nchmod 755 \"\$1/sbin/init\""
+        val result = RootProcess.run("sh", "-c", writeCommand, "sh", rootfsPath)
         check(result.succeeded) { "Writing /sbin/init into $rootfsPath failed: ${result.stderr}" }
     }
 
