@@ -5792,46 +5792,59 @@ implementation work beyond scaffolding.
 
 ## 9. Module map
 
-See [settings.gradle.kts](../settings.gradle.kts) for the authoritative list
-and dependency rationale; each module also has its own README. Summary:
+[settings.gradle.kts](../settings.gradle.kts) is the authoritative list and
+carries each module's rationale; each module also has its own README. The
+dependencies below are the `project(...)` lines in each module's build file.
 
 ```
-app                    → depends on everything; owns DesktopSessionService + MainActivity
-host-bridge             → native Wayland client + JNI; frame passthrough, input injection,
-                          and the host<->container clipboard bridge (§6d)
-runtime-common          → shared types (Container, DisplayOutput, RootfsImage); no deps
-runtime-windows         → Wine/Box64 (fork: vendor/gamenative), no display code of its own
-runtime-linux-root      → DroidSpaces fork (vendor/droidspaces), namespaces/cgroups, needs root
-runtime-linux-noroot    → proot-based (vendor/proot, Termux's PRoot, packaged in
-                          nativeLibraryDir; see §3), no root required
-input-seat              → unified seat; depends on host-bridge
-library-core            → Playnite-style unified library/metadata; depends on runtime-common
-display                 → secondary-display behavior for every mode, in one place (the
+app                    → the application: DesktopSessionService, MainActivity, onboarding,
+                          and the host for the second-screen keyboard and trackpad
+                          (SecondScreenInput); depends on every module below
+host-bridge            → native Wayland client + JNI: frame passthrough, input injection,
+                          and the host<->container clipboard bridge (§6d);
+                          depends on runtime-common
+runtime-common         → shared types and interfaces (Container, DisplayOutput,
+                          RootfsImage, ProotRuntime's layout, …); depends on nothing
+runtime-windows        → Wine/Box64, compiling the whole vendored gamenative tree
+                          (vendor/gamenative, see below); no display code of its own;
+                          depends on runtime-common and library-core (it supplies the
+                          "pc" library entries)
+runtime-linux-root     → DroidSpaces (vendor/droidspaces), namespaces/cgroups, needs root;
+                          used only by Desktop mode's container stack; depends on
+                          runtime-common
+runtime-linux-noroot   → proot-based (vendor/proot, Termux's PRoot, packaged in
+                          nativeLibraryDir; see §3), no root; depends on runtime-common
+input-seat             → unified input seat; depends on host-bridge, runtime-common
+library-core           → the unified library and its metadata (§7g); depends on
+                          runtime-common, and on shell-default + IconLoader for the
+                          launcher's own app-icon machinery
+display                → secondary-display behaviour for every mode, in one place (the
                           single SECONDARY_HOME activity + mode registry, §4c); depends
                           only on runtime-common
-shell-default           → "Standard" shell: forked-in Murine Launcher (real AOSP
-                          Launcher3-derived UI, not from-scratch); depends on
-                          runtime-common
-shell-desktop           → "Desktop" shell's Android-side half (§2a): cross-container
-                          task manager + frame passthrough, NOT the taskbar/app
-                          launcher (that's container-side); depends on library-core,
-                          host-bridge, runtime-common
-shell-gamepad           → "Gaming" shell: optional gamepad console UI, multiple
-                          selectable paradigms — see §7; depends on library-core.
-                          The best-developed module in the repo (~8,000 lines)
-input-keyboard          → second-screen persistent keyboard (§4/§6/§6c), forked
-                          from Hacker's Keyboard; shipping (~17,600 lines) as a
-                          real Android IME, surfaced in :app's onboarding, and
-                          since §6c also hosted as an ordinary window on the
-                          second screen, its keys routed either into a container
-                          (through :input-seat) or into Android's focused editor
-                          (through its own InputConnection)
+shell-default          → Launcher mode: forked-in Murine Launcher (AOSP Launcher3-derived);
+                          depends on runtime-common and the forked sub-projects under
+                          shell-default/ that settings.gradle.kts includes: IconLoader,
+                          Animation, Shared, WMShared, msdl, flags, systemUIPluginCore
+                          and the SettingsLib-* modules (HiddenApi is included too,
+                          but no module depends on it)
+shell-desktop          → Desktop mode's Android-side half (§2a): cross-container task
+                          manager + frame passthrough, NOT the taskbar/app launcher
+                          (that's container-side); depends on host-bridge, input-seat,
+                          library-core, runtime-common
+shell-gamepad          → Gaming mode: the ES-DE-themed gamepad shell (§7f); depends on
+                          library-core, runtime-common
+input-keyboard         → forked Hacker's Keyboard: a real Android IME, and (§6c) the
+                          second-screen keyboard hosted as an ordinary window on the
+                          second screen; no project dependencies
 
-runtime-remote-stream   → DELETED (2026-09-01). Never in settings.gradle.kts,
-                          zero sources. Streaming is windowcast's alone — see §7a.
-pc-helper/               → separate Go program, runs on the remote gaming PC, not an
-                            Android module — Sunshine REST API client + (limited) Steam
-                            install trigger; see §7a
+Outside the Gradle build:
+pc-helper/             → separate Go program for the remote gaming PC, not an Android
+                          module — Sunshine REST API client + (limited) Steam install
+                          trigger; see §7a
+build-scripts/         → build-vendor-deps.sh (cross-compiles the native vendor code),
+                          proot patches, and the CI checks (XML comments, class-load API)
+vendor/                → upstream trees, as git submodules (.gitmodules); see NOTICE.md
+reference/             → screenshots used as visual references
 ```
 
 ### `:runtime-windows` consumes ALL of gamenative (decided 2026-08-31)

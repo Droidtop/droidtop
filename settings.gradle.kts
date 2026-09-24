@@ -170,22 +170,19 @@ project(":SettingsLib-MainSwitchPreference").projectDir = file("shell-default/Se
 include(":systemUIPluginCore")
 project(":systemUIPluginCore").projectDir = file("shell-default/systemUIPluginCore")
 
-// Optional gamepad-console-style launcher shell — the Handheld shell.
-// The best-developed module in the repo (~8,000 lines): real ES-DE theme
-// rendering, gamepad navigation, and the full library/settings surface.
+// Gaming mode's shell (docs/SPEC.md §7f): real ES-DE theme rendering,
+// gamepad navigation, and the full library/settings surface.
 include(":shell-gamepad")
 
 // Second-screen persistent keyboard (docs/SPEC.md §4/§6) — forked from
-// Hacker's Keyboard (Apache-2.0), not built from scratch. Shipping
-// (~17,600 lines) as a real Android IME, surfaced as an optional step in
-// :app's own onboarding (OnboardingActivity's KeyboardStep). The
-// second-screen persistent surface / :input-seat integration this module
-// was originally forked in for is still TODO — see its own
-// build.gradle.kts.
+// Hacker's Keyboard (Apache-2.0), not built from scratch. Ships as a real
+// Android IME, and also as the second-screen keyboard hosted by :app as an
+// ordinary window on the second screen (docs/SPEC.md §6c; see its own
+// build.gradle.kts).
 include(":input-keyboard")
 
-// Optional desktop-style shell: taskbar + start-menu chrome around the
-// primary container's compositor output (presented via :host-bridge).
-// Depends on :host-bridge for HostBridge/HostBridgeInput and :runtime-common
-// for DisplayOutput.
+// Desktop mode's Android-side half (docs/SPEC.md §2a): the cross-container
+// task manager and frame passthrough for the primary container's compositor
+// output (presented via :host-bridge). The taskbar and app launcher are
+// container-side, not here.
 include(":shell-desktop")
