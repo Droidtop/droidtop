@@ -6235,9 +6235,11 @@ language and not of the code. Plurals use plural resources. A translation is a s
 resources in another language; a string with no translation falls back to English per string,
 never to a blank or an id. Themed views are excluded, as in ES-DE: a theme's own labels are the
 theme's, resolved for the running language with `en_US` as the floor (§7b Appearance). Vendored
-trees keep their own resources. The rule is enforced the way the API-level gate is (§10b): lint's
-hardcoded-text check is strict for every module droidtop writes, and the vendored trees sit in
-the baseline.
+trees keep their own resources. Lint cannot be the gate for this rule: its `HardcodedText` check
+reads XML layouts only and never sees a Compose `Text("...")`, which is where droidtop's chrome
+writes its strings, and the app's lint block runs `checkOnly` NewApi/InlinedApi (the API-level
+gate, §10b). The gate is a check over the Kotlin sources of the modules droidtop writes, with
+the vendored trees excluded by path, as the API gate's baseline excludes them.
 
 **Accessibility is part of the system.** droidtop's chrome is driven by a pad, a finger or a
 screen reader through one focus order: every focusable is reachable by D-pad and by linear
