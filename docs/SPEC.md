@@ -3357,8 +3357,10 @@ validate-before-replace:
   never downgraded to no match -- only to a later tier.
 - `bios-database.json` — §7e4's firmware registry.
 
-One user action refreshes all four ("Update platform databases" in the
-console-systems catalog screen).
+One call refreshes all four (`PlatformDatabases.refresh`), and every
+"Update platform databases" runs it: the console-systems settings row,
+the Gaming gamelist menu's item, each BIOS screen's row, and the update
+schedule. None of them refreshes a single database on its own.
 
 ### Which system a ROM belongs to (2026-08-31)
 
