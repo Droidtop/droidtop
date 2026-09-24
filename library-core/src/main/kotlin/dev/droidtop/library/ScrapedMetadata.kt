@@ -41,7 +41,10 @@ suspend fun List<LibraryEntry>.withScrapedMetadata(
 ): List<LibraryEntry> {
     if (isEmpty()) return this
     val ids = flatMap { listOfNotNull(it.id, alsoUnderId(it)) }.distinct()
-    val metadataById = dao.getGameMetadata(ids).associateBy { it.id }
+    // In chunks: Room binds one variable per id, and SQLite before 3.32
+    // (Android 11 and older) refuses more than 999 in one statement, which
+    // one console system's folder easily passes.
+    val metadataById = ids.chunked(500).flatMap { dao.getGameMetadata(it) }.associateBy { it.id }
     if (metadataById.isEmpty()) return this
     return map { entry ->
         val meta = metadataById[entry.id]
