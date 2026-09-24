@@ -6972,8 +6972,7 @@ reports while the splits exist and becomes a failing gate
 (build of `ce75426`) 24 of the 39 arm64 libraries were missing, all
 gamenative's. `:runtime-windows` builds their x86_64 half with AGP's
 CMake, restricted to x86_64 so arm64 stays upstream's prebuilt set
-(`runtime-windows/native/CMakeLists.txt`, shims in `native/shims/`); the
-upstream projects in the list below are the ones not built yet.
+(`runtime-windows/native/CMakeLists.txt`, shims in `native/shims/`).
 
 **The x86_64 Windows runtime (user, 2026-09-24).** arm64 keeps upstream
 GameNative's binaries untouched. An x86_64 device runs real x86_64 Wine,
@@ -6999,10 +6998,12 @@ gamenative's code actually calls:
   `VortekRendererComponent` never starts; x86_64 Wine reaches Vulkan
   directly.
 - `libsteambootstrap`: see Steam below.
-- upstream projects: PulseAudio 13.0 (`libpulse`, `libpulseaudio`,
+- upstream projects: lsfg-vk (`liblsfg-vk-layer`, the fork's submodule),
+  `libevshim` (the fork's source against `vendor/SDL2`'s headers; it
+  dlopens SDL at run time), the OpenXR loader (`vendor/OpenXR-SDK` at a
+  release tag), and PulseAudio 13.0 (`libpulse`, `libpulseaudio`,
   `libpulsecommon-13.0`, `libpulsecore-13.0`) with libsndfile 1.0.28 and
-  libltdl, the OpenXR loader, lsfg-vk (`liblsfg-vk-layer`), and
-  `libevshim` (with the SDL2 headers), built for x86_64.
+  libltdl, built for x86_64.
 
 **Steam on x86_64 is the Linux client in proot (user, 2026-09-24).** On
 arm64, `libsteambootstrap` brings up Valve's Android arm64
