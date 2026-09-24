@@ -113,7 +113,7 @@ class RunnerAvailabilityTest {
     }
 
     @Test
-    fun `a game whose only route needs root says so instead of resolving nothing`() {
+    fun `a game whose only route needs the Linux container says so instead of resolving nothing`() {
         val options = RunnerAvailability.evaluate(
             facts(engine = GameEngine.GODOT, hasLinuxBuild = true, linuxContainerAvailable = false, enginehostSupported = false),
         )
@@ -217,6 +217,22 @@ class RunnerAvailabilityTest {
         val resolved = RunnerAvailability.resolve(options, override = GameLaunchStrategy.LINUX_CONTAINER.name)
         assertEquals(GameLaunchStrategy.WINE_PREFIX, resolved!!.option.strategy)
         assertEquals("the only runner for this game", resolved.reason)
+    }
+
+    @Test
+    fun `a PC game with both builds runs its native Linux build when this device can`() {
+        val options = RunnerAvailability.evaluate(
+            facts(engine = null, hasWindowsExecutable = true, hasLinuxBuild = true),
+        )
+        assertEquals(GameLaunchStrategy.LINUX_CONTAINER, RunnerAvailability.resolve(options, override = null)!!.option.strategy)
+    }
+
+    @Test
+    fun `a PC game with both builds falls back to Wine where Linux cannot run`() {
+        val options = RunnerAvailability.evaluate(
+            facts(engine = null, hasWindowsExecutable = true, hasLinuxBuild = true, linuxContainerAvailable = false),
+        )
+        assertEquals(GameLaunchStrategy.WINE_PREFIX, RunnerAvailability.resolve(options, override = null)!!.option.strategy)
     }
 
     @Test

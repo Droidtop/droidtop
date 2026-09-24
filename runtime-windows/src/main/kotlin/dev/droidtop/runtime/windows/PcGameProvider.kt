@@ -6,14 +6,19 @@ import com.winlator.container.Shortcut
 import dev.droidtop.library.EngineOverridePrefs
 import dev.droidtop.library.EnginesDatabase
 import dev.droidtop.library.GameEngineDetector
+import dev.droidtop.library.GameLaunchStrategy
 import dev.droidtop.library.GameExecutableResolver
 import dev.droidtop.library.PcGameRuntimeRegistry
+import dev.droidtop.library.PcRunnerOptions
 import dev.droidtop.library.PcInfo
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
+import dev.droidtop.library.RunnerState
 import dev.droidtop.library.withScrapedMetadata
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Real "PC" games -- ES-DE's own `"pc"` system id (per direction: "PC", not
@@ -214,6 +219,16 @@ class PcGameProvider(
      * from GOG launches exactly the way one detected in a games folder
      * does -- one launch path, not one per store.
      *
+     * WHICH runner is the "Runs with" row's answer
+     * ([dev.droidtop.library.PcRunnerOptions]), not a second rule kept
+     * here. This used to pick a native Linux build whenever the folder
+     * had one, whatever the device could do, so on a console with no
+     * Linux container a game shipping both builds failed with "no live
+     * container session" while its detail screen said it ran with Wine.
+     * The availability model already knows both: a native Linux build
+     * wins when it can actually run (docs/SPEC.md 5a), Wine otherwise,
+     * and the user's per-game choice beats either.
+     *
      * Every failure names something the user can act on: not installed,
      * no runtime, or an executable that could not be identified.
      */
@@ -226,25 +241,40 @@ class PcGameProvider(
         val runtime = PcGameRuntimeRegistry.runtime
             ?: error("Can't launch ${entry.title}: no PC runtime is registered in this build.")
 
-        // "PC is a list of games, and each game is run according to its
-        // configuration" (directed 2026-09-10): a store or folder game
-        // honours the same per-game runner override an engine game does,
-        // rather than the override applying to half the library.
-        val override = dev.droidtop.library.LaunchStrategyOverridePrefs.get(context, entry.id)
-        // A native Linux build beats Wine plus CPU translation whenever
-        // one exists (docs/SPEC.md 5a), so it is what wins when the user
-        // has expressed no preference.
-        val linux = GameExecutableResolver.linuxExecutable(gameRoot)
-            ?.takeIf { override != dev.droidtop.library.GameLaunchStrategy.WINE_PREFIX.name }
-        val result = if (linux != null) {
-            runtime.launchLinux(linux, gameRoot)
-        } else {
-            val windows = GameExecutableResolver.windowsExecutable(gameRoot)
-                ?: error(
-                    "Can't launch ${entry.title}: couldn't identify which executable to run in " +
-                        "${gameRoot.absolutePath}. Pick one explicitly for this game.",
-                )
-            runtime.launchWindows(windows, gameRoot)
+        // Folder listings, the package manager and enginehost's provider:
+        // never on whatever thread the launch was asked from.
+        val resolved = withContext(Dispatchers.IO) {
+            PcRunnerOptions.resolvedFor(context, entry, PcRunnerOptions.forEntry(context, entry))
+        } ?: error(
+            "Can't launch ${entry.title}: there's no Windows executable or native Linux build in " +
+                "${gameRoot.absolutePath}.",
+        )
+        val option = resolved.option
+        check(option.state != RunnerState.NOT_ON_THIS_DEVICE) {
+            "Can't launch ${entry.title}. ${option.reason ?: "${resolved.label} isn't available on this device"}."
+        }
+
+        val result = when (option.strategy) {
+            GameLaunchStrategy.LINUX_CONTAINER -> {
+                val linux = GameExecutableResolver.linuxExecutable(gameRoot)
+                    ?: error(
+                        "Can't launch ${entry.title}: couldn't identify which Linux launcher to run in " +
+                            "${gameRoot.absolutePath}. Pick one explicitly for this game.",
+                    )
+                runtime.launchLinux(linux, gameRoot)
+            }
+            GameLaunchStrategy.WINE_PREFIX -> {
+                val windows = GameExecutableResolver.windowsExecutable(gameRoot)
+                    ?: error(
+                        "Can't launch ${entry.title}: couldn't identify which executable to run in " +
+                            "${gameRoot.absolutePath}. Pick one explicitly for this game.",
+                    )
+                runtime.launchWindows(windows, gameRoot)
+            }
+            // An engine this provider does not own (see
+            // notOwnedByAnEngine) cannot resolve here; saying so beats
+            // launching it through a runner it was never shown with.
+            else -> error("Can't launch ${entry.title} with ${resolved.label} from the PC library.")
         }
         check(result.succeeded) { "Launching ${entry.title} failed: ${result.detail}" }
     }

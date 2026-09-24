@@ -94,7 +94,7 @@ data class RunnerFacts(
     val windowsEnvironmentReady: Boolean = true,
     /** Whether a renderer is actually attached to the Wine X server — see [RunnerAvailability.WINE_RENDERER_WIRED]. */
     val wineRendererWired: Boolean = true,
-    /** Whether a container runtime that can really exec a Linux binary is present. Root-only today. */
+    /** Whether Desktop mode's Linux container is live, the only place a native Linux build can run (docs/SPEC.md 5a). */
     val linuxContainerAvailable: Boolean = true,
     /** Whether x86 binaries are registered for translation (`binfmt_misc` + FEX, docs/SPEC.md §3c). */
     val x86TranslationRegistered: Boolean = true,
@@ -136,18 +136,32 @@ object RunnerAvailability {
      * declared priority, then the dimmed device rows, then the hidden
      * game rows.
      */
-    fun evaluate(facts: RunnerFacts): List<RunnerOption> = listOf(
-        enginehost(facts),
-        kirikiroid2(facts),
-        wine(facts),
-        linuxContainer(facts),
-    ).sortedWith(
-        compareBy(
-            { it.state.ordinal },
-            { facts.preferredOrder.indexOf(it.strategy).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE },
-            { it.strategy.ordinal },
-        ),
-    )
+    fun evaluate(facts: RunnerFacts): List<RunnerOption> {
+        val order = facts.preferredOrder.ifEmpty { if (facts.engine == null) PC_GAME_ORDER else emptyList() }
+        return listOf(
+            enginehost(facts),
+            kirikiroid2(facts),
+            wine(facts),
+            linuxContainer(facts),
+        ).sortedWith(
+            compareBy(
+                { it.state.ordinal },
+                { order.indexOf(it.strategy).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE },
+                { it.strategy.ordinal },
+            ),
+        )
+    }
+
+    /**
+     * The order for a PC game no engine claims (a store or folder game),
+     * where there is no engines-database row to declare one: a native
+     * Linux build before Wine, because running the game's own Linux
+     * build is strictly better than Wine plus CPU translation whenever
+     * both can run (docs/SPEC.md 5a). It only ranks rows already sorted
+     * by state, so a Linux row this device cannot run never beats a Wine
+     * row it can.
+     */
+    private val PC_GAME_ORDER = listOf(GameLaunchStrategy.LINUX_CONTAINER, GameLaunchStrategy.WINE_PREFIX)
 
     private fun enginehost(facts: RunnerFacts): RunnerOption {
         val strategy = GameLaunchStrategy.ENGINEHOST
@@ -235,11 +249,16 @@ object RunnerAvailability {
         if (!facts.hasLinuxBuild) {
             return RunnerOption(strategy, RunnerState.NOT_FOR_THIS_GAME, "No native Linux build in this game's folder")
         }
-        // Root is desktop-only, and a Gaming game is never gated on it:
-        // this row states the reason instead of offering a launch that
+        // A native build runs inside Desktop mode's container, root or
+        // proot (docs/SPEC.md 3, 5a), and a Gaming game is never gated on
+        // it: this row states the reason instead of offering a launch that
         // cannot work, and every other runner for the game stays offered.
         if (!facts.linuxContainerAvailable) {
-            return RunnerOption(strategy, RunnerState.NOT_ON_THIS_DEVICE, "Running a native Linux build needs root")
+            return RunnerOption(
+                strategy,
+                RunnerState.NOT_ON_THIS_DEVICE,
+                "Start Desktop mode to run this game's native Linux build",
+            )
         }
         if (!facts.x86TranslationRegistered) {
             // Also no action id: registering x86 binaries for translation

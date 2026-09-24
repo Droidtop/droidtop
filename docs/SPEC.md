@@ -1667,7 +1667,7 @@ AVF/pKVM is Pixel-only in practice and built for paravirtualized Linux
 guests, not general-purpose Windows VMs.
 
 **Conclusion: Wine + userspace x86 binary translation (`:runtime-windows`,
-forked from [vendor/gamenative](../vendor/gamenative)) is the only Windows
+which compiles [vendor/gamenative](../vendor/gamenative) in) is the only Windows
 path.** Revisit hardware virtualization only if targeting Snapdragon 8
 Gen 2+/Dimensity 9000+ devices specifically, and even then only as a path
 to running a *Linux* guest, not Windows. See §5a for which translation
@@ -1675,40 +1675,56 @@ backend and for the native-Linux-build alternative to Wine entirely.
 
 ## 5a. CPU-translation backend choice, and preferring a native Linux build over Wine
 
-Two corrections to §5's "Wine + Box64" framing, both from real gamenative
-source already in [vendor/gamenative](../vendor/gamenative):
+Two corrections to §5's "Wine + Box64" framing, both from gamenative
+source in [vendor/gamenative](../vendor/gamenative):
 
-- **Backend choice is the user's, not fixed to Box64** — gamenative
-  already ships both `Box64PresetsDialog.kt` and `FEXCorePresetsDialog.kt`
-  as selectable CPU-translation backends for the same Wine prefix (see
-  `SettingsGroupEmulation.kt`). Once `WineSession.launch()` is actually
-  ported from gamenative (§10, still `TODO()`), droidtop inherits this
-  choice for free — no new work needed to offer it. FEX also brings real,
-  distinct value beyond Wine itself — see §3c.
-- **Prefer a native Linux build over Wine+translation when one exists**:
-  some Steam titles ship a genuine Linux depot alongside (or instead of)
-  Windows, and gamenative's own `DepotInfo` (`vendor/gamenative/app/src/
-  main/java/app/gamenative/data/DepotInfo.kt`) already models this —
-  `osList: EnumSet<OS>` (`OS.windows`/`OS.linux`/`OS.macos`) and
-  `isWindowsCompatible` per depot. droidtop should prefer a Linux depot
-  when `osList` contains it, running it as a normal process inside a
-  Linux sibling/primary container (§3) with no Wine/translation involved
-  at all — strictly better than translation when it's available, not a
-  new capability to build so much as a selection-order change: check for
-  a Linux depot first, fall back to Wine+Box64/FEX only when there isn't
-  one.
-  - **Real, undocumented gap, not solved by the above**: gamenative's
-    `OSArch` enum only distinguishes 32-bit vs. 64-bit
-    (`vendor/gamenative/app/src/main/java/app/gamenative/enums/OSArch.kt`)
-    — it has no CPU-family signal (x86 vs. ARM). A Linux depot's *binary*
-    could still be x86/x86-64 needing FEX/Box64 translation (the common
-    case) or, rarely, genuinely ARM64-native (which some titles do ship,
-    per this session's research prompt, though standard Steam depot
-    metadata doesn't cleanly flag it) — telling those apart isn't
-    something the existing fork provides, and isn't designed here either.
-    Detecting a truly native-ARM64 Linux depot (best case: no translation
-    layer needed at all) is an open problem, not assumed solved just
-    because `osList` says "linux."
+- **Backend choice is the user's, per prefix, not fixed to Box64.** The
+  backend is the prefix's own `emulator` field, and the vendored
+  `BionicProgramLauncherComponent` is what honours it: an **arm64ec** Wine
+  build loads `wowbox64.dll` or `libwow64fex.dll` as its `HODLL` according
+  to that field, while an **x86_64** Wine build always runs as
+  `box64 <guest>`. droidtop's launch (`WineXSession`) hands the launcher
+  the prefix's own Box64 version and preset and FEXCore preset, and the
+  per-game Wine configuration screen (gamenative's `ContainerConfigDialog`,
+  opened through `PcContainerConfigActivity`) is where a person changes
+  them. droidtop provisions `proton-9.0-x86_64` (the one build that
+  installs without a hand-installed `.wcp`, see `DroidtopPcGameRuntime.
+  WINE_VERSION`), so the **default is Box64**; FEX applies once a prefix
+  is switched to an arm64ec build with FEXCore as its emulator. FEX's
+  separate value for Linux software is §3c.
+- **Prefer a native Linux build over Wine+translation when one exists
+  and can run.** Some games ship a genuine Linux build alongside (or
+  instead of) Windows. Running it as a normal process inside a Linux
+  container (§3) with no Wine involved is strictly better when it is
+  available, so it is a selection-order rule, applied **at launch** by the
+  one runner model (`RunnerAvailability`, §7i): for a PC game no engine
+  claims, the native Linux row ranks above the Wine row whenever both are
+  in the same state, and the store/folder launch
+  (`PcGameProvider.launchStoreGame`) runs whatever that model resolves --
+  the same answer the game's "Runs with" row shows, and the user's
+  per-game choice beats it. Engine games take their order from the
+  engines database (§7e2) instead. The Linux row is ready only when
+  Desktop mode's primary container is live -- droidspaces with root,
+  proot without (§3) -- and, for an `.x86_64`/`.x86` launcher, when FEX
+  is registered through `binfmt_misc` (§3c, not built). Anywhere that
+  does not hold, Wine wins and the Linux row says why.
+  - **Downloads stay on Windows depots (decided 2026-09-24).** The fork
+    can fetch a Linux depot instead (`SteamService.
+    resolveDownloadableDepots(preferLinux)`, gated on gamenative's
+    `PrefManager.preferLinuxDepots`, default off and not surfaced by
+    droidtop). droidtop leaves it off: a Linux-only install cannot run
+    wherever Desktop mode's container is not up, which on a handheld is
+    most of the time, while a Windows install runs everywhere through
+    Wine. Native-first is applied among the builds actually on disk,
+    where the device's facts are known; a depot rule would decide it
+    before them. (An earlier droidtop-side depot picker,
+    `selectBestDepot`, was never called and has been removed.)
+  - **Open: which CPU a Linux build targets.** Steam's depot metadata
+    (`OSArch`) says 32- or 64-bit, never x86 or ARM, so an ARM64-native
+    Linux build cannot be recognised before download. On disk the ELF
+    header's machine field would answer it; droidtop reads the launcher's
+    extension instead (`.x86_64`/`.x86` means x86), so an ARM64 build
+    shipped under another name is not yet told apart from an x86 one.
 
 ### PC launch wiring: the `PcGameRuntime` seam (directed 2026-08-31)
 
@@ -1720,8 +1736,9 @@ picked it. They are now real launches, through a seam:
 - `library-core` declares `PcGameRuntime` + `PcGameRuntimeRegistry` —
   the same swappable-seam pattern `LaunchDisplay.chooser` and
   gamenative-tux's own `LinuxContainerBackend` already use. It exists
-  because `library-core` cannot depend on the runtime modules, and both
-  runtimes need a live container session only the app layer can obtain.
+  because `library-core` cannot depend on the runtime modules, and the
+  native-Linux half needs Desktop mode's container session, which only
+  the app layer can obtain. The Wine half needs no session (§5b).
 - The implementation lives in **`:runtime-windows`, not `:app`** — that
   is the module compiling the vendored `com.winlator` tree, so
   `ContainerManager` (the real owner of Wine-prefix state) is visible
@@ -1739,63 +1756,29 @@ picked it. They are now real launches, through a seam:
   configured, and spawning multi-hundred-megabyte prefixes per title
   uninvited would be its own bug.
 - Per-game choice is exposed as a "Runs with: <backend>" chip in the game
-  detail screen, backed by the previously-unwired
-  `LaunchStrategyOverridePrefs`.
+  detail screen, backed by `LaunchStrategyOverridePrefs`. Engine games
+  and store/folder games launch with what that row resolves, not with a
+  second rule (§5a).
 
-**Status (corrected 2026-09-01): no longer a blocker in code.**
-`DroidtopPcGameRuntime.provision()` now really does create the container,
-download the imagefs via `SteamService.fetchFileWithFallback`, install it
-through `ImageFsInstaller`, and activate it, and the Steam library offers
-it at the point of need ("Set up Windows games") rather than hiding it in
-settings. It has still never been *run* on a device, so the paragraph
-below describes what was true before that work and what remains unproven
-hands-on. Originally: droidtop had no flow to *create*
-a Wine container at all — `files/imagefs/home` does not exist on a real
-install, so `ContainerManager.containers` is empty and every Wine launch
-correctly reports "no Wine container exists yet". The gamenative
-machinery to build one (container-pattern download via
-`ContainerFilesDownloader`, `ImageFsInstaller` extraction,
-`ContainerManager.createContainer`) is all compiled in and unused. Until
-that is surfaced, the Wine path is wired but unreachable. This is the
-next real step for PC gaming, and it is also what blocks testing whether
-Wine can run a game from external storage through droidtop's own stack
-rather than through Winlator.
+The pieces behind the seam:
 
-**Implementation status (first slice, real but partial):**
-
-- `ContainerRuntime.exec(container, command, env)` — the actual missing
-  primitive both launch paths below needed (there was no "run a process
-  inside an already-running container" operation at all before this;
-  `create*`/`start`/`stop`/`destroy` are lifecycle, not execution).
-  `DroidSpacesRuntime`'s implementation drives droidspaces' own documented
-  `--name=<id> run <cmd...>` subcommand (Documentation/Linux-CLI.md);
-  per-invocation env vars aren't a `run` flag droidspaces exposes, so
-  they're prepended as inline POSIX shell assignments instead (matches
-  droidspaces' own CLI-doc examples, e.g. `run sh -c "id && env"`).
-  `ProotRuntime.exec()` runs the command as its own proot session in the
-  container's rootfs (§3).
-- `runtime-common`'s `GameDepotPlatform`/`GameDepotOption`/
-  `selectBestDepot()` implement this section's actual decision rule
-  (Linux > Windows, never macOS) as small, pure, unit-tested logic —
-  droidtop's own copy, not a dependency on gamenative's `DepotInfo`/`OS`
-  (`:runtime-windows` builds from ported gamenative code, not a Gradle
-  dependency on its module — see that module's build.gradle.kts).
-- `WineSession.launch()` now actually calls `ContainerRuntime.exec()` —
-  no longer `TODO()` — but only for a bare `wine <executable>` invocation.
-  **Still not ported**: Box64/FEXCore wrapper-flag selection, DXVK/VKD3D
-  environment setup, ImageFS-tracked component state — all real,
-  separate porting work from gamenative, not done in this pass.
-- `NativeLinuxGameSession` — the actual "no Wine at all" path this
-  section describes, also built on `ContainerRuntime.exec()`. Depends on
-  §3c's FEX `binfmt_misc` registration (not implemented yet) to actually
-  run an x86/x86-64 Linux binary transparently; a genuinely ARM64-native
-  binary would already work through this class today.
-- **Not done yet, the real remaining integration work**: wiring
-  `selectBestDepot()` into gamenative's actual depot-download/launch
-  pipeline — the `isWindowsCompatible`-filtering call sites in
-  `vendor/gamenative/.../service/SteamService.kt` (several, always assumes
-  Windows today) would need real changes, which is deep surgery into a
-  large vendored file not attempted here.
+- **Provisioning** is `DroidtopPcGameRuntime.provision()`: it fetches
+  the Wine build and the bionic ImageFs through gamenative's own
+  instance-free downloader, installs them with `ImageFsInstaller`,
+  creates and activates one droidtop container with the games roots
+  mapped as drives, and is offered where it is needed ("Set up Windows
+  games" on a Wine row) rather than hidden in settings. Its order and its
+  on-device history are §5b.
+- **Windows launches** go through the sealed `WineEngine` seam
+  (`BionicWineEngine`, §5b), never through `ContainerRuntime`.
+- **Native Linux launches** go through `NativeLinuxGameSession`, which
+  runs the launcher with `ContainerRuntime.exec` in Desktop mode's primary
+  container. `DroidSpacesRuntime.exec` drives droidspaces' own
+  `--name=<id> run <cmd...>` subcommand (Documentation/Linux-CLI.md),
+  with per-invocation env vars prepended as inline POSIX assignments
+  because `run` has no env flag; `ProotRuntime.exec` runs the command as
+  its own proot session in the container's rootfs (§3). An x86 Linux
+  binary additionally needs §3c's FEX registration, which is not built.
 
 ## 5b. One Wine engine, one prefix store, whichever backend is live (assessed 2026-09-02)
 
@@ -1803,7 +1786,7 @@ Re-derived from the code rather than from any earlier summary, because
 two descriptions of this path were in circulation and both were partly
 wrong.
 
-### What the code actually does today
+### What the code did when this was assessed (2026-09-02)
 
 - `DroidtopPcGameRuntime.provision()` builds the Wine environment through
   gamenative's own `ContainerManager` + `ImageFs` + `ImageFsInstaller`.
@@ -1816,12 +1799,14 @@ wrong.
   is literally `primarySession() != null`.
 - `ContainerRuntimeFactory.select` probes for root and returns
   `DroidSpacesRuntime` when it finds it and `ProotRuntime` otherwise, and
-  `ProotRuntime` is seven `TODO()`s including `exec`.
+  `ProotRuntime` was seven `TODO()`s including `exec`.
 
-Those three facts compose into the real defect: **Windows games are
-root-only today**, not by design but because the only backend whose
-`exec` is implemented is the one that needs root. The prefix is
-provisioned into a rootfs the launch path never runs in.
+Those three facts composed into the real defect: **Windows games were
+root-only**, not by design but because the only backend whose `exec`
+was implemented was the one that needs root. The prefix was provisioned
+into a rootfs the launch path never ran in. The shape below removed
+`ContainerRuntime` from the Wine path altogether, so `ProotRuntime`
+since being built (§3) changes nothing for Windows games.
 
 ### The correction that matters most
 
@@ -1849,17 +1834,16 @@ So the no-root Windows path does not need proot at all. It needs the
 bionic direct-exec model that gamenative already uses everywhere modern
 Android is the target.
 
-### The blocker that makes all of it inert right now
+### The blocker that made all of it inert (fixed, see below)
 
-`runtime-windows`'s `sourceSets` pull `java`, `res` and `assets` from the
-vendor tree and **not `jniLibs`**, and no droidtop module declares a
+`runtime-windows`'s `sourceSets` pulled `java`, `res` and `assets` from
+the vendor tree and **not `jniLibs`**, and no droidtop module declared a
 `jniLibs` source dir anywhere. None of gamenative's native payload
 (`libwinlator.so`, `libpatchelf.so`, `libc++_shared.so`, the pulse
-libraries) ships in the APK. Confirmed on the device: `files/imagefs`
-contains a single `.winlator/.container_migration_version` marker, no
-rootfs, and `ContainerManager` has never held a container. Provisioning
-has therefore never completed on real hardware, which is why no Windows
-game has ever launched through droidtop.
+libraries) shipped in the APK. Confirmed on the device: `files/imagefs`
+contained a single `.winlator/.container_migration_version` marker, no
+rootfs, and `ContainerManager` had never held a container. Provisioning
+had therefore never completed on real hardware.
 
 ### The shape this settles on
 
@@ -1883,9 +1867,9 @@ launch it. Execution is a **runtime** choice, not a structural one:
   implementation touching `RootProcess`/`ContainerRuntime` is a
   boundary violation by definition. Provisioning is separate from
   execution: laying out the ImageFs is droidtop's own work on its own
-  directories and needs no root either (the only root use in
-  `:runtime-windows` is the optional GameNative data import, which
-  reads another app's database and never executes a guest).
+  directories and needs no root either (`:runtime-windows` has no root
+  use at all: the GameNative data import that once read another app's
+  database as root has been removed).
   `RootfsDelete` (root, `:runtime-linux-root`) is droidspaces container
   lifecycle only; `:runtime-windows` does not depend on that module, so
   the Wine path cannot reach a root-capable delete, and a Wine prefix
