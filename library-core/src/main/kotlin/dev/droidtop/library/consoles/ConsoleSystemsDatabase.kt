@@ -10,6 +10,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.Update
 
 /**
  * Real, persistent, user-editable console-platform database -- replaces
@@ -55,6 +56,11 @@ interface ConsoleSystemDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(entities: List<ConsoleSystemEntity>)
+
+    // Edits an existing platform only: a row deleted meanwhile stays
+    // deleted (0 rows changed), where upsert would insert it again.
+    @Update
+    suspend fun update(entity: ConsoleSystemEntity): Int
 
     @Query("DELETE FROM console_systems WHERE id = :id")
     suspend fun delete(id: String)

@@ -1638,7 +1638,7 @@ object AppSettingsCatalogs {
                                     value = entity?.displayName ?: newName,
                                     onChange = { ctx, v ->
                                         if (entity != null) {
-                                            ConsoleSystemsDatabase.get(ctx).consoleSystemDao().upsert(entity.copy(displayName = v.trim().ifBlank { entity.id }))
+                                            ConsoleSystemsDatabase.get(ctx).consoleSystemDao().update(entity.copy(displayName = v.trim().ifBlank { entity.id }))
                                         } else {
                                             newName = v
                                         }
@@ -1654,7 +1654,7 @@ object AppSettingsCatalogs {
                                     onChange = { ctx, v ->
                                         val cleaned = v.split(",").map { it.trim() }.filter { it.isNotEmpty() }.joinToString(",")
                                         if (entity != null) {
-                                            ConsoleSystemsDatabase.get(ctx).consoleSystemDao().upsert(entity.copy(extensionsCsv = cleaned))
+                                            ConsoleSystemsDatabase.get(ctx).consoleSystemDao().update(entity.copy(extensionsCsv = cleaned))
                                         } else {
                                             newExtensions = cleaned
                                         }
@@ -1669,7 +1669,7 @@ object AppSettingsCatalogs {
                                     value = entity?.retroArchCore ?: newCore,
                                     onChange = { ctx, v ->
                                         if (entity != null) {
-                                            ConsoleSystemsDatabase.get(ctx).consoleSystemDao().upsert(entity.copy(retroArchCore = v.trim().ifBlank { null }))
+                                            ConsoleSystemsDatabase.get(ctx).consoleSystemDao().update(entity.copy(retroArchCore = v.trim().ifBlank { null }))
                                         } else {
                                             newCore = v
                                         }
