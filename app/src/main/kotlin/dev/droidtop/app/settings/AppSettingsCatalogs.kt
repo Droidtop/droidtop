@@ -405,7 +405,14 @@ object AppSettingsCatalogs {
                                     // registry, when this system needs any.
                                     val bios = BiosDatabase.forSystem(context, resolved.id)
                                     if (bios != null) {
-                                        val gamesRoot = folder.parentFile ?: folder
+                                        // The games folder this system folder sits in,
+                                        // which is not always its parent: a system
+                                        // folder may be <root>/roms/<system>.
+                                        val gamesRoot = GamesRootPrefs.gamesRootPaths(context)
+                                            .map { File(it) }
+                                            .filter { folder.absolutePath.startsWith(it.absolutePath.trimEnd('/') + "/") }
+                                            .maxByOrNull { it.absolutePath.length }
+                                            ?: folder.parentFile ?: folder
                                         // Presence only, counted here on IO (a value
                                         // label is drawn on the main thread); md5
                                         // hashing happens inside the screen.
@@ -486,14 +493,13 @@ object AppSettingsCatalogs {
                         id = "bios_tools",
                         title = null,
                         items = listOf(
+                            // The one refresh (SPEC 7e2): the BIOS registry is
+                            // one of the four databases it brings up to date.
                             AsyncActionItem(
                                 id = "bios_update_db",
-                                title = "Update BIOS database",
-                                subtitle = "Refresh the registry from droidtop-platforms on GitHub",
-                                run = { ctx, _ ->
-                                    val count = BiosDatabase.update(ctx)
-                                    "BIOS database updated ($count systems)"
-                                },
+                                title = "Update platform databases",
+                                subtitle = "Refresh the BIOS registry, with players, platforms and engine routing, from droidtop-platforms on GitHub",
+                                run = { ctx, onStatus -> PlatformDatabases.refresh(ctx, onStatus) },
                             ),
                         ),
                     ),

@@ -239,11 +239,11 @@ internal fun GamelistOptionsMenu(
                 if (busy) return
                 busy = true
                 scope.launch {
+                    // The same call as the settings row and the update
+                    // schedule (SPEC 7e2): index-driven, all four databases.
                     status = withContext(Dispatchers.IO) {
                         runCatching {
-                            val players = dev.droidtop.library.consoles.PlayersDatabaseUpdater.update(context)
-                            val engines = dev.droidtop.library.EnginesDatabase.update(context)
-                            "Updated: $players players, $engines engines."
+                            dev.droidtop.library.consoles.PlatformDatabases.refresh(context) { status = it }
                         }.getOrElse { "Update failed: ${it.message}" }
                     }
                     busy = false
