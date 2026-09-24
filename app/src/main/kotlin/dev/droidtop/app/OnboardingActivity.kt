@@ -52,6 +52,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -1593,15 +1594,16 @@ private fun AppearanceStep(
     onContinue: () -> Unit,
 ) {
     val context = LocalContext.current
-    val themes = remember { ThemeAssets.discoverThemes(context) }
     val portraitScreen = remember { ThemeAssets.isPortraitScreen(context) }
-    val vertical = remember(themes) { themes.associate { it.name to ThemeAssets.hasVerticalVariant(context, it) } }
-    var chosen by remember {
-        mutableStateOf(
-            LibraryThemePrefs.get(context)
-                ?: ThemeAssets.defaultThemeFor(context, themes)?.name,
-        )
+    // Listing the themes and reading each one's capabilities.xml is asset
+    // and file I/O: read off the main thread, and nothing is listed until
+    // it is known (an empty list would read as "no themes installed").
+    val catalog by produceState<AppearanceCatalog?>(initialValue = null) {
+        value = withContext(Dispatchers.IO) { AppearanceCatalog.read(context) }
     }
+    val stored = remember { LibraryThemePrefs.get(context) }
+    var picked by remember { mutableStateOf<String?>(null) }
+    val chosen = picked ?: stored ?: catalog?.defaultTheme
 
     OnboardingScaffold(
         title = "Appearance",
@@ -1617,13 +1619,14 @@ private fun AppearanceStep(
         onBack = onBack,
         primary = StepAction("Next", onClick = onContinue),
     ) {
-        if (themes.isEmpty()) {
+        val themes = catalog?.themes
+        if (themes != null && themes.isEmpty()) {
             StepNote("No themes are installed. Gaming mode will use its own plain layout.")
         }
-        themes.forEach { theme ->
-            val hasVertical = vertical[theme.name] == true
+        themes?.forEach { theme ->
+            val hasVertical = theme.hasVertical
             SelectableRow(
-                title = ThemeAssets.displayName(context, theme),
+                title = theme.displayName,
                 supporting = when {
                     hasVertical && portraitScreen -> "Lays out a tall screen of its own. Recommended here."
                     hasVertical -> "Lays out both a wide and a tall screen."
@@ -1641,12 +1644,33 @@ private fun AppearanceStep(
                     )
                 },
                 onClick = {
-                    chosen = theme.name
+                    picked = theme.name
                     // Written down the moment it is chosen: a resolved
                     // default that stays unwritten moves under the person
                     // the first time they rotate the device.
                     LibraryThemePrefs.set(context, theme.name)
                 },
+            )
+        }
+    }
+}
+
+/** What the Appearance step lists, read once off the main thread. */
+private class AppearanceCatalog(val themes: List<Theme>, val defaultTheme: String?) {
+    class Theme(val name: String, val displayName: String, val hasVertical: Boolean)
+
+    companion object {
+        fun read(context: android.content.Context): AppearanceCatalog {
+            val discovered = ThemeAssets.discoverThemes(context)
+            return AppearanceCatalog(
+                themes = discovered.map { theme ->
+                    Theme(
+                        name = theme.name,
+                        displayName = ThemeAssets.displayName(context, theme),
+                        hasVertical = ThemeAssets.hasVerticalVariant(context, theme),
+                    )
+                },
+                defaultTheme = ThemeAssets.defaultThemeFor(context, discovered)?.name,
             )
         }
     }
