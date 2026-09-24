@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
@@ -50,7 +51,9 @@ import dev.droidtop.shell.gamepad.LocalHelpRowOwner
 import dev.droidtop.shell.gamepad.TouchHintBar
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 
 /** ES-DE's own system id for the PC category -- the card this surface opens from. */
 internal const val PC_SYSTEM_ID = "pc"
@@ -114,7 +117,19 @@ internal fun PcSurface(
     // is one entry here, and the folders behind it are reachable from its
     // detail. Filters and sort run over the cards, which is the list the
     // user sees.
-    val cards = remember(entries) { dev.droidtop.library.LibraryGrouping.group(entries).map { it.displayEntry } }
+    //
+    // Grouping derives a name from every folder by regex, and a walk
+    // republishes the list every 250 ms, so it runs on the Default
+    // dispatcher and composition only reads the answer (docs/SPEC.md 7g,
+    // "no per-item work where a list is drawn"). Null is "not worked out
+    // yet", which draws nothing rather than a false "No PC games"; a
+    // republish keeps the cards already shown until the new ones are ready.
+    val grouped by produceState<List<LibraryEntry>?>(initialValue = null, entries) {
+        value = withContext(Dispatchers.Default) {
+            dev.droidtop.library.LibraryGrouping.group(entries).map { it.displayEntry }
+        }
+    }
+    val cards = grouped.orEmpty()
 
     var sort by remember { mutableStateOf(PcSort.NAME) }
     var sources by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -218,7 +233,9 @@ internal fun PcSurface(
         }
 
         Box(modifier = Modifier.fillMaxSize().weight(1f)) {
-            if (shown.isEmpty()) {
+            if (grouped == null && entries.isNotEmpty()) {
+                // Still grouping the first list: nothing to say yet.
+            } else if (shown.isEmpty()) {
                 Text(
                     if (entries.isEmpty()) {
                         "No PC games yet. Press Y for stores and folders."
@@ -293,7 +310,10 @@ private fun PcHeader(total: Int, shown: Int, entries: List<LibraryEntry>, folder
     Column(modifier = Modifier.fillMaxWidth().padding(start = edge, end = edge, top = 20.dp, bottom = 4.dp)) {
         Text("PC", color = Color.White, style = MaterialTheme.typography.headlineMedium)
         Text(
-            buildString {
+            // No games from some folders only while the grouping of the
+            // first list is still being worked out; a count of zero then
+            // would be a false statement for the moment it shows.
+            if (total == 0 && folders > 0) "Counting games…" else buildString {
                 append(if (shown == total) "$total games" else "$shown of $total games")
                 append(", $installed installed")
                 if (engineGames > 0) append(", $engineGames with a detected engine")

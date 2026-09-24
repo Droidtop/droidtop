@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -118,23 +119,43 @@ internal fun PcGameDetail(
         loaded = true
     }
 
-    // The game this entry is one folder of. Cheap: names only, no
-    // filesystem (see LibraryGrouping).
-    // What this folder is a copy OF: the game's own name for the header,
-    // whether or not there is anything to choose between.
-    val grouping = remember(entry, siblings) { dev.droidtop.library.LibraryGrouping.groupOf(entry, siblings) }
-    val group = remember(grouping) {
-        grouping?.takeIf { it.hasChoices }
+    // The game this entry is one folder of: the game's own name for the
+    // header, whether or not there is anything to choose between. And who
+    // this game could be, or who could be it (docs/SPEC.md 7g). Both are
+    // names only, no filesystem, but they derive a name for and compare
+    // against every sibling -- the whole Games list -- so they are worked
+    // out on the Default dispatcher, never in composition (docs/SPEC.md
+    // 7g, "no per-item work where a list is drawn"). Until they are, the
+    // header names the game from this folder alone and no row offers a
+    // version or a replacement.
+    val worked by produceState(DetailNames.NONE, entry, siblings) {
+        value = withContext(Dispatchers.Default) {
+            DetailNames(
+                forId = entry.id,
+                grouping = dev.droidtop.library.LibraryGrouping.groupOf(entry, siblings),
+                replacements = replacementCandidatesFor(entry, siblings),
+            )
+        }
     }
+    // A state kept across a move to another folder of the game answers
+    // for the folder it was worked out for, not this one.
+    val names = worked.takeIf { it.forId == entry.id } ?: DetailNames.NONE
+    val grouping = names.grouping
+    val group = grouping?.takeIf { it.hasChoices }
 
-    val media = remember(entry) {
-        val folder = PcRunnerOptions.gameFolderFor(entry)
-        val roots = dev.droidtop.library.GamesRoots.current(context)
-        val root = folder?.let { f -> roots.firstOrNull { f.absolutePath.startsWith(it.absolutePath) } }
-        if (root != null && folder != null) {
-            dev.droidtop.library.EsDeArtwork.allMedia(root, "pc", folder.name)
-        } else {
-            emptyList()
+    // Media is a folder listing (EsDeArtwork), which is disk work: IO
+    // dispatcher, and "no media" until it answers.
+    val media by produceState(emptyList<Pair<String, String>>(), entry) {
+        value = emptyList()
+        value = withContext(Dispatchers.IO) {
+            val folder = PcRunnerOptions.gameFolderFor(entry)
+            val roots = dev.droidtop.library.GamesRoots.current(context)
+            val root = folder?.let { f -> roots.firstOrNull { f.absolutePath.startsWith(it.absolutePath) } }
+            if (root != null && folder != null) {
+                dev.droidtop.library.EsDeArtwork.allMedia(root, "pc", folder.name)
+            } else {
+                emptyList()
+            }
         }
     }
 
@@ -167,7 +188,7 @@ internal fun PcGameDetail(
     if (pickingReplacement) {
         MissingReplacementPicker(
             entry = entry,
-            among = siblings,
+            candidates = names.replacements,
             library = library,
             onFolded = { message ->
                 status = message
@@ -180,11 +201,8 @@ internal fun PcGameDetail(
         )
     }
 
-    // Who this game could be, or who could be it (docs/SPEC.md 7g). Names
-    // only, no filesystem, so it costs nothing to know before the row is
-    // drawn -- and the row is only worth drawing when there is somebody
-    // to offer.
-    val replacements = remember(entry, siblings) { replacementCandidatesFor(entry, siblings) }
+    // The replacement row is only worth drawing when there is somebody to offer.
+    val replacements = names.replacements
     val runner = resolved
     val actions = rememberPcActions(
         group = group,
@@ -647,6 +665,17 @@ private fun missingFolderLine(entry: LibraryEntry): String =
         "Nothing droidtop scanned still has this game. Its history, favourite and collections are kept."
     }
 
+/** What the detail knows of [PcGameDetail]'s entry from names alone, worked out off the main thread. */
+private data class DetailNames(
+    val forId: String?,
+    val grouping: dev.droidtop.library.LibraryGameGroup?,
+    val replacements: List<dev.droidtop.library.MissingGames.Candidate>,
+) {
+    companion object {
+        val NONE = DetailNames(forId = null, grouping = null, replacements = emptyList())
+    }
+}
+
 /**
  * The games [entry] could be folded with: the missing ones, when this
  * game is here, and the detected ones when it is not. One ordering for
@@ -689,7 +718,13 @@ private fun PcDetailHeader(entry: LibraryEntry, grouping: dev.droidtop.library.L
     // already said "BeingADIK"; this screen said "BeingADik - Chap3+", the
     // folder's own qualified title, and the two disagreed on the same
     // screen pair (rig, build 550).
-    val title = grouping?.game?.name ?: entry.title
+    // Until the grouping is worked out (off the main thread), the name
+    // this one folder derives is the game's name as the grouping will say
+    // it, bar casing; a store row keeps the title its store gave.
+    val ownName = remember(entry) {
+        if (entry.id.startsWith("/")) dev.droidtop.library.GameNaming.derive(entry.id).name.ifEmpty { entry.title } else entry.title
+    }
+    val title = grouping?.game?.name ?: ownName
     val copyLine = grouping?.let { copyLabel(it, entry) }
     Box(modifier = Modifier.fillMaxWidth().height(220.dp).padding(top = 24.dp)) {
         if (entry.artworkUri != null) {

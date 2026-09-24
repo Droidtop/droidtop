@@ -53,15 +53,16 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun MissingReplacementPicker(
     entry: LibraryEntry,
-    among: List<LibraryEntry>,
+    /**
+     * [MissingGames.candidates] for [entry], worked out by the detail off
+     * the main thread: it compares names against every game in the list.
+     */
+    candidates: List<MissingGames.Candidate>,
     library: Library,
     onFolded: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val candidates = remember(entry, among) {
-        MissingGames.candidates(target = entry, among = among.filter { it.missing != entry.missing })
-    }
     var focusIndex by remember(entry) { mutableIntStateOf(0) }
     var folding by remember(entry) { mutableStateOf(false) }
 
