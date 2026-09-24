@@ -3,8 +3,6 @@ package dev.droidtop.app
 import android.content.Context
 import android.os.Bundle
 import android.view.Display
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -87,7 +85,7 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(savedStateOwner)
             setContent {
-                val entry by CompanionState.focusedEntry.collectAsState()
+                val entry = settledFocusedEntry()
                 // darkTheme = true: an ambient always-dark companion
                 // surface (black ground is the design, like an idle
                 // screen) -- see DroidtopTheme's own doc comment.

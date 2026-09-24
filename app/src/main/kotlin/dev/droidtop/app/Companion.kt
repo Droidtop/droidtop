@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -104,6 +105,30 @@ object CompanionState {
      */
     val launchError = MutableStateFlow<String?>(null)
 }
+
+/**
+ * [CompanionState.focusedEntry] once browsing settles: a new focus is
+ * drawn only after it has held for [FOCUS_SETTLE_MS], so a fast scroll
+ * down a gamelist does not repaint the companion's artwork at every row
+ * (docs/SPEC.md 4d, from iiSU's "post-idle delay before hero, title, and
+ * backdrop artwork commits"). Clearing the focus is drawn at once: going
+ * back to the idle rotation is not a scroll. Every companion host reads
+ * this rather than the raw flow.
+ */
+@Composable
+internal fun settledFocusedEntry(): LibraryEntry? {
+    val focused by CompanionState.focusedEntry.collectAsState()
+    var settled by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(focused) }
+    androidx.compose.runtime.LaunchedEffect(focused) {
+        if (focused != null) kotlinx.coroutines.delay(FOCUS_SETTLE_MS)
+        settled = focused
+    }
+    return settled
+}
+
+// Long enough to skip rows passed at D-pad repeat rate, short enough that
+// stopping on a game feels immediate.
+private const val FOCUS_SETTLE_MS = 350L
 
 @Composable
 internal fun CompanionContent(entry: LibraryEntry?) {

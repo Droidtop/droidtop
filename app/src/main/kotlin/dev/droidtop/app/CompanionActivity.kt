@@ -65,7 +65,7 @@ class CompanionActivity : AppCompatActivity() {
                     SecondScreenInputSurface(mode)
                     return@DroidtopTheme
                 }
-                val entry by CompanionState.focusedEntry.collectAsState()
+                val entry = settledFocusedEntry()
                 CompanionSurface(
                     entry = entry,
                     widgetIds = widgetIds,

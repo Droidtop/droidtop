@@ -1080,9 +1080,11 @@ the `ContainerRuntime` interface that already exists (§3):
   controls, calendars, whatever's installed) laid over droidtop's own
   focused-game/info backdrop, plus resizable/floating apps (launched to
   that display via the same launch-display targeting; freeform
-  windowing per §2a's native-apps plan). Widget layout persists
-  per-display-role. droidtop's info stays the BACKGROUND layer; user
-  content composites above it.
+  windowing per §2a's native-apps plan). The widget set persists once
+  and every companion host shows the same set (`CompanionWidgets`, one
+  `AppWidgetHost`): the companion is one surface wherever it lands, so
+  there is one layout, not one per display role. droidtop's info stays
+  the BACKGROUND layer; user content composites above it.
 - **Gaming Quick Menu (directed 2026-08-31, iiSU-inspired)**: a
   trigger-opened overlay with a Notifications tab and a System tab.
   Paradigm survey behind the design (knowledge-based; no iiSU decompile
@@ -1607,10 +1609,12 @@ Top to bottom, each layer earning its space:
    and for a PC entry its `PcInfo` (source, install size, and community
    compatibility as REFERENCE, never a verdict — §7g). This is the Wii U
    lesson: the detail you would otherwise open a submenu for.
-3. **Idle state** (to build): when nothing is focused, a slow hero/marquee
+3. **Idle state** (built): when nothing is focused, a slow hero/marquee
    rotation drawn from the library plus the clock — calm, ambient, never a
-   wordmark. A post-idle delay before artwork commits, so fast scrolling
-   does not thrash.
+   wordmark (`CompanionIdle`). A post-idle delay before artwork commits, so
+   fast scrolling does not thrash: every companion host reads the focused
+   entry through `settledFocusedEntry`, which draws a new focus only once
+   it has held for 350 ms and a cleared focus at once.
 4. **Notifications** (built).
 5. **droidtop-native widgets** (to build): library stats, playtime,
    recently played, and live scan/scrape/download progress — the things
