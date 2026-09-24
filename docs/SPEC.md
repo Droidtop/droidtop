@@ -1470,20 +1470,34 @@ not settled designs):
 - **"Open with droidtop"** is one Activity in `:app`, `OpenWithActivity`,
   declared for `VIEW` and `SEND` on the MIME types and path patterns of
   `.exe`, `.msi`, `.AppImage`, `.deb` and `.rpm`, and enabled as a component
-  only while Desktop mode is on (§2c). It resolves the content URI to a
-  real path on a volume droidtop can read (a file in Downloads is one; a
-  file only a provider serves is not, and the Activity says the file has
-  to be saved to a folder first, naming one). It then shows the chooser,
-  which is the one choice component (§7b): for `.exe`/`.msi`, droidtop's
-  provisioned Wine environment plus every per-game prefix (§7i), launched
-  through the same `WineEngine` a library game uses; for `.deb`/`.rpm`,
-  each container whose package manager matches, running the install as
-  an `exec` of that manager in the provisioned terminal so its output
-  and prompts are visible; for `.AppImage`, each container, marking the
-  file executable and running it in place. The last choice per extension
-  is remembered and offered first, with "always" as an explicit row in the
-  chooser, iiSU-style (§4c), never a silent default. Nothing is copied:
-  the file runs, or installs, from where it is.
+  only while Desktop mode is on (`ModePiece.DESKTOP_OPEN_WITH`, §2c). It
+  resolves the content URI to a real path on a volume droidtop can read (a
+  `file://` path, the system picker's external-storage documents, the
+  Downloads provider's `raw:` ids, or a provider's `_data` column; a file
+  only a provider serves is not one, and the Activity says the file has to
+  be saved to the Download folder first). It then shows the chooser, which
+  is the one choice component (§7b, `ui/SelectableRow`, shared with
+  onboarding): for `.exe`/`.msi`, droidtop's provisioned Wine environment
+  plus every per-game prefix (§7i, `WinePrefixes`), launched through the
+  same `WineEngine` path a library game uses (an `.msi` as Wine's own
+  `start /unix <path>`, which opens it with the prefix's registered
+  installer); for `.deb`/`.rpm`, each container whose package manager
+  (`apt-get`, `dnf`, `zypper`, found by running a probe in it) takes the
+  file; for `.AppImage`, each container, run in place with
+  `APPIMAGE_EXTRACT_AND_RUN=1` because no container has FUSE. Container
+  choices need the desktop session, since a program runs as long as the
+  session and not as long as the chooser (`DesktopSessionService.runInPrimary`);
+  with the desktop stopped the chooser says so and offers to start it. An
+  install is an `exec` of the manager with its own non-interactive flag,
+  and its outcome (installed, or the exit code and the last lines of
+  output) is shown on the chooser and, on failure, on the desktop's
+  launch-failure banner: the terminal exists only in the primary (§3d), so
+  running installs in it would have been a second mechanism for siblings.
+  The last choice per extension is remembered and offered first, with
+  "always" as an explicit row in the chooser, iiSU-style (§4c), never a
+  silent default; with "always" on, the file opens straight away and the
+  chooser stays up with the way back. Nothing is copied: the file runs, or
+  installs, from where it is.
 
 ## 4c. Multi-display: what iiSU does, and why droidtop fights the platform (2026-09-01)
 

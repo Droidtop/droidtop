@@ -310,8 +310,10 @@ class DesktopSessionService : Service() {
         }
 
         /**
-         * Runs a program in the primary container for as long as the
-         * desktop session lives. A program's `exec` lasts as long as its
+         * Runs a program in the desktop session's containers (the primary
+         * handed to [block], or a sibling through the same runtime, which
+         * is how "Open with droidtop" installs a package) for as long as
+         * the desktop session lives. A program's `exec` lasts as long as its
          * window, and ending that wait ends the program (under proot the
          * session is killed), so the wait belongs to the session, not to a
          * screen: waiting in the desktop shell's own composition would have

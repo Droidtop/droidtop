@@ -101,6 +101,7 @@ class WineGameActivity : Activity() {
         val target = intent.getStringExtra(EXTRA_TARGET)
         val containerId = intent.getStringExtra(EXTRA_CONTAINER_ID)
         val workingDir = intent.getStringExtra(EXTRA_WORKING_DIR)?.let(::File)
+        val arguments = intent.getStringArrayListExtra(EXTRA_ARGUMENTS).orEmpty()
         val prefix = containerId?.let { id ->
             runCatching { ContainerManager(this).getContainerById(id) }.getOrNull()
         }
@@ -187,7 +188,7 @@ class WineGameActivity : Activity() {
         root.addView(touchpad, matchParent())
         setContentView(root)
 
-        val session = WineXSession(this, prefix, target, workingDir, xServer)
+        val session = WineXSession(this, prefix, target, workingDir, xServer, arguments)
         this.session = session
         startupExecutor.execute {
             runCatching { session.start(::onGuestTerminated) }
@@ -314,6 +315,7 @@ class WineGameActivity : Activity() {
         private const val EXTRA_CONTAINER_ID = "dev.droidtop.wine.CONTAINER_ID"
         private const val EXTRA_TARGET = "dev.droidtop.wine.TARGET"
         private const val EXTRA_WORKING_DIR = "dev.droidtop.wine.WORKING_DIR"
+        private const val EXTRA_ARGUMENTS = "dev.droidtop.wine.ARGUMENTS"
         private const val FAILURE_DETAIL_CHARS = 1200
         private const val FAILURE_PADDING_PX = 48
 
@@ -323,12 +325,19 @@ class WineGameActivity : Activity() {
          * from the same [ContainerManager] that owns it, so there is one
          * source of prefix state and no copy to fall out of date.
          */
-        fun intent(context: Context, prefix: Container, target: String, workingDir: File): Intent =
+        fun intent(
+            context: Context,
+            prefix: Container,
+            target: String,
+            workingDir: File,
+            arguments: List<String> = emptyList(),
+        ): Intent =
             Intent(context, WineGameActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 putExtra(EXTRA_CONTAINER_ID, prefix.id)
                 putExtra(EXTRA_TARGET, target)
                 putExtra(EXTRA_WORKING_DIR, workingDir.absolutePath)
+                putStringArrayListExtra(EXTRA_ARGUMENTS, ArrayList(arguments))
             }
     }
 }

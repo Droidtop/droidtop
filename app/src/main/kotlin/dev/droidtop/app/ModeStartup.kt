@@ -81,6 +81,10 @@ object ModeStartup {
         // MainActivity onto nothing, so it is not offered.
         setComponentEnabled(app, APP_SHELLS_ICON, on(ModePiece.APP_SHELLS_ICON))
 
+        // Other apps' "Open with" lists offer droidtop only while Desktop
+        // mode, which runs what it opens, is on.
+        setComponentEnabled(app, OpenWithActivity::class.java.name, on(ModePiece.DESKTOP_OPEN_WITH))
+
         if (on(ModePiece.WINDOWS_BACKBONE)) ensureGamenative(app)
     }
 

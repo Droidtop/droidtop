@@ -16,10 +16,7 @@ import androidx.activity.viewModels
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.drawable.toBitmap
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -35,7 +32,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -58,7 +54,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.focus.onFocusChanged
@@ -66,6 +61,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import dev.droidtop.app.ui.SelectableRow
 import dev.droidtop.library.GamesRootReport
 import dev.droidtop.library.consoles.EsDeFolderStructure
 import dev.droidtop.library.theme.ThemeAssets
@@ -890,72 +886,6 @@ private fun OnboardingScaffold(
                 ) { Text(it.label, style = TypeRole.button) }
             }
         }
-    }
-}
-
-/**
- * The ONE choice component (docs/SPEC.md 7b, "The one choice
- * component"): every question with mutually exclusive answers is a run of
- * these. Full width, at least the window's own minimum touch target, an
- * optional leading icon, a title, one supporting line, and a real
- * selected state — the shell's own menu row anatomy rather than a third
- * one invented here.
- *
- * What it replaces: three equal answers rendered as two filled buttons
- * and a text link, with no selection semantics at all.
- */
-@Composable
-private fun SelectableRow(
-    title: String,
-    supporting: String? = null,
-    selected: Boolean = false,
-    icon: android.graphics.drawable.Drawable? = null,
-    // A leading slot the caller draws itself, for a choice whose icon is
-    // not a drawable: onboarding's Appearance step puts a live render of
-    // the theme here.
-    leading: (@Composable () -> Unit)? = null,
-    trailing: (@Composable () -> Unit)? = null,
-    // Null for a row that is information with its own action beside it (a
-    // games folder and its Remove), rather than a choice to be made.
-    onClick: (() -> Unit)? = null,
-) {
-    val window = currentShellWindow()
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = window.minTouchTarget + Space.Sm)
-            .background(
-                if (selected) MenuTokens.SurfaceSelected else MenuTokens.Surface,
-                MenuTokens.RowShape,
-            )
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = Space.Lg, vertical = Space.Md),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Space.Md),
-    ) {
-        leading?.invoke()
-        icon?.let { drawable ->
-            val bitmap = remember(drawable) {
-                runCatching { drawable.toBitmap(width = 96, height = 96).asImageBitmap() }.getOrNull()
-            }
-            bitmap?.let { Image(bitmap = it, contentDescription = null, modifier = Modifier.size(Measure.rowIcon)) }
-        }
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Hair)) {
-            Text(
-                title,
-                color = if (selected) MenuTokens.OnSurface else MenuTokens.OnSurface,
-                style = TypeRole.rowTitle,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            supporting?.let {
-                Text(it, color = MenuTokens.OnSurfaceMuted, style = TypeRole.supporting)
-            }
-        }
-        if (selected && trailing == null) {
-            Text("Selected", color = MenuTokens.Accent, style = TypeRole.supporting)
-        }
-        trailing?.invoke()
     }
 }
 
