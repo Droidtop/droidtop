@@ -5161,6 +5161,8 @@ for users" above promises more than the store services hold:
   and nothing droidtop draws may pretend otherwise: last played and play
   count are droidtop's own (`PlayHistoryDatabase`), and real playtime waits
   on droidtop measuring a session itself, one mechanism per launch path.
+  The PC surface therefore offers no playtime sort (7i): a sort on a number
+  that is 0 for every game is a control that does nothing.
 - **Cloud saves** are not reached from droidtop. **`gamefixes/`** is left
   out of droidtop's prefix preparation on purpose (`WinePrefixPreparation`
   lists it with the other store-specific steps it does not run).

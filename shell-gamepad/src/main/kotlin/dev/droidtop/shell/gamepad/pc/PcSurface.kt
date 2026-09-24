@@ -220,7 +220,7 @@ internal fun PcSurface(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             // Sort is one chip that cycles rather than a menu: it is a
-            // single-choice setting with four values, and a menu for that
+            // single-choice setting with three values, and a menu for that
             // is a screen the pad has to walk into and back out of.
             PcChip("Sort: ${sort.label}", selected = false, onClick = { sort = sort.next() })
             PcChip("Installed", selected = installedOnly, onClick = { installedOnly = !installedOnly })
@@ -381,11 +381,14 @@ internal fun PcChip(label: String, selected: Boolean, onClick: () -> Unit) {
     )
 }
 
-/** Sorts the one list; never a filter, and never reordered by anything the user did not ask for. */
+/**
+ * Sorts the one list; never a filter, and never reordered by anything the
+ * user did not ask for. No playtime: nothing measures it yet, so it is 0
+ * for every game and a sort on it would do nothing (docs/SPEC.md 7g).
+ */
 internal enum class PcSort(val label: String, val comparator: Comparator<LibraryEntry>) {
     NAME("Name", compareBy<LibraryEntry> { it.title.lowercase() }),
     LAST_PLAYED("Last played", compareByDescending<LibraryEntry> { it.lastPlayedEpochMs ?: 0L }.thenBy { it.title.lowercase() }),
-    PLAYTIME("Playtime", compareByDescending<LibraryEntry> { it.playtimeSeconds }.thenBy { it.title.lowercase() }),
     SIZE("Size", compareByDescending<LibraryEntry> { it.pcInfo?.sizeBytes ?: 0L }.thenBy { it.title.lowercase() }),
     ;
 
