@@ -3198,80 +3198,58 @@ for droidtop's own scope beyond gaming (§1): a second-screen "info" role
 that's just as at home showing Discord/Spotify/system status during
 desktop use as it is showing contextual art while browsing Games.
 
-The second screen's "info" role has several real tenants, switching based
-on what's happening rather than competing for one fixed layout:
+**The surface is the companion (§4d), and there is one of it.** The
+tenants this section once named as separate things — a focus companion,
+a presence panel, routed notifications — are the companion's own layers:
+the focused entry and the idle rotation (`CompanionState`, `CompanionIdle`),
+the notifications list (the `NotificationListenerService` in `:app`
+feeding `runtime-common`'s `NotificationsStore`, the same grant and store
+the Quick Menu's tab reads), and the widget layer where presence lives.
+Nothing here is a second screen-owning surface beside the companion.
 
-- **`FocusCompanion`** — a live, ambient reflection of whatever's focused
-  on the primary screen (e.g. contextual art while browsing a platform or
-  game list), registered per-context by whichever shell/screen owns
-  primary-screen focus at the time. Not built this session.
-- **`PresencePanel`** — a deliberate, always-visible panel a user opens,
-  hosting now-playing state and controls for linked media apps and
-  (eventually) Discord's friends/voice presence, one card per connected
-  app. Not built this session.
-- **Routed notifications** — real Android notifications (Discord already
-  posts real ones for DMs/mentions; media apps post a real persistent
-  now-playing notification) plus per-display-aware heads-up/toast routing,
-  on top of whatever `WindowPlacement` (§4) has assigned to each physical
-  output. This gets ambient presence "for free" from the platform without
-  a custom polling overlay, complementary to the `PresencePanel` rather
-  than a replacement for it.
-
-**Media app control — real, local, no credentials handled by droidtop.**
-Per explicit direction: droidtop must never hold a streaming service's own
+**Media control — real, local, no credentials handled by droidtop.** Per
+explicit direction: droidtop must never hold a streaming service's own
 credentials (no OAuth, no developer app registration, no stored tokens),
-and control needs to be real — search, playlist/library browsing, and
-transport control (play/pause/skip/seek) against whatever's actually
-running in the installed app, not just a read-only now-playing display.
-An initial design scaffolded a Spotify-specific OAuth/Web-API client for
-this; removed once a better real option was confirmed: the standard
-Android `android.media.browse.MediaBrowserService` API (`MediaBrowserCompat`
-/`MediaControllerCompat`, `androidx.media`) — exactly the mechanism Android
-Auto, Wear OS, and Google Assistant use to browse and control a media app
-without ever seeing its login. droidtop binds directly to the target app's
-own exported service over local IPC; no network calls, no credentials, the
-user's session stays entirely inside that app's own process.
+and control needs to be real — transport control and browsing against
+whatever is actually running in the installed app, not a read-only
+readout. The platform provides exactly that, twice over, and droidtop uses
+both halves without naming any app:
 
-Generalized beyond Spotify per direction, since this is a standard Android
-API any compliant app can implement, not a Spotify-specific integration.
-`library-core/.../presence/MediaAppBrowserClient.kt` is the one client
-(package/service-agnostic, parameterized by a `KnownMediaApps.Target`);
-`KnownMediaApps` holds the real, **device-verified** targets found this
-session (`adb shell dumpsys package <pkg>`, filtered for `android.media.
-browse.MediaBrowserService` on this project's own real test device, not
-guessed):
-- **Spotify** (`com.spotify.music`) — verified.
-- **YouTube** — verified against this device's actual installed build,
-  which happens to be a ReVanced-patched APK; not yet confirmed whether
-  the official `com.google.android.youtube` package uses an identical
-  service class name.
-- **Jellyfin** (`org.jellyfin.mobile`) — verified.
-- Tidal and YouTube Music were asked about too, but neither is installed
-  on the test device, so — same standard as everything else in this spec —
-  they're deliberately left out of `KnownMediaApps` rather than guessed at;
-  add once confirmed against a real install.
+- **Now playing** is a droidtop-native companion widget (§4d layer 5)
+  over `MediaSessionManager.getActiveSessions`, which the notification
+  access grant droidtop already holds for its Notifications tab unlocks:
+  the active session's title, artist and art, with play/pause, previous,
+  next and a seek bar through that session's `MediaController`. It shows
+  whichever app is playing — Spotify, YouTube, Jellyfin, a podcast app —
+  and shows nothing when none is, never a placeholder card for an app
+  that is not running.
+- **Browse and search** open from that widget into the same app's
+  `MediaBrowserService` through `MediaBrowserCompat` (the mechanism
+  Android Auto and Wear use), found by resolving that service in the
+  session owner's package at the moment it is asked for. There is no
+  bundled list of known media apps: the earlier `KnownMediaApps` table
+  of device-verified targets is replaced by that lookup, because a list
+  of packages is a list that goes stale, and the session already says
+  which app is playing. An app whose service refuses the bind, or which
+  exposes no content tree, gets the transport controls and no Browse row.
 
-Real remaining work: browse/search/playback-control behavior hasn't been
-run end-to-end against a real connected session of any of these three
-apps yet (the component names are verified real, but what each app's
-content tree actually looks like, and whether each really implements
-`onPlayFromSearch`, isn't confirmed), plus the `PresencePanel` surface
-itself.
+The session stays inside the media app's own process; droidtop makes no
+network call and sees no login. `library-core/.../presence/` holds the
+one client for the browse half; the widget renders through the companion's
+tile model like every other droidtop-native tile.
 
 **Discord — real, official, self-service: the Discord Social SDK, not a
-bot.** Discord publishes an official Social SDK for embedding real social/
-voice features (friends, presence, voice, guild/channel access) into a
-third-party app, with a native login/consent flow — a materially better
-fit than the Gateway-bot-relay workaround this section originally assumed
-was necessary before that SDK's existence was confirmed. Setup is
-self-service like Spotify's: register a free Discord application at the
-Discord Developer Portal, get a client ID, and the SDK's own auth flow
-handles user login/consent. Not implemented this session (it's a native/
-C++ library with its own download + JNI integration, more setup than
-Spotify's plain REST client) — real next step: pull the SDK's own public
-integration docs from Discord and scope a `library-core/.../presence/
-DiscordPresenceClient` wrapper, same shape as the Spotify client, feeding
-the same `PresencePanel`.
+bot.** Discord publishes an official Social SDK for embedding real social
+and voice features (friends, presence, voice) into a third-party app, with
+a native login and consent flow of its own, which is what keeps the
+no-credentials rule: droidtop registers a free application id and the
+SDK's own flow handles the person's login, with nothing stored by
+droidtop. It arrives as a second companion widget ("Friends": presence,
+voice state, and rich presence for the game the shell is on), through a
+`DiscordPresenceClient` beside the media client, shaped the same way and
+rendered as the same tile. It is a native library with its own JNI
+integration, so it is the last of the companion's widgets to land and
+nothing else in this section waits on it.
 
 ## 7e2. Data-driven player/platform database (directed 2026-08-30)
 
