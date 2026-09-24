@@ -11,7 +11,10 @@ import com.android.launcher3.LauncherAppState
 import com.android.launcher3.icons.cache.CacheLookupFlag
 import com.android.launcher3.model.data.AppInfo
 import com.android.launcher3.util.Executors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -38,12 +41,30 @@ class NativeAppProvider(private val context: Context) : LibraryProvider {
     // stale. See LibraryProvider.indexed.
     override val indexed: Boolean get() = false
 
-    override suspend fun scan(): List<LibraryEntry> {
-        val launcherApps = context.getSystemService(LauncherApps::class.java)
-        val iconCache = LauncherAppState.getInstance(context).iconCache
-        val iconDir = File(context.cacheDir, "app_icons").apply { mkdirs() }
+    override suspend fun scan(): List<LibraryEntry> = scanLock.withLock { scanLocked() }
 
-        val activities = launcherApps.getActivityList(null, Process.myUserHandle())
+    private suspend fun scanLocked(): List<LibraryEntry> {
+        val launcherApps = context.getSystemService(LauncherApps::class.java)
+        val appState = LauncherAppState.getInstance(context)
+        val iconCache = appState.iconCache
+        val iconProvider = appState.iconProvider
+
+        // Everything that touches the disk or asks the package manager
+        // happens here, before the model thread is borrowed: the folder is
+        // listed once (not a `stat` per app) and each package's update
+        // time read once. Two launcher activities of one package are one
+        // entry (the id is the package), so the second is never resolved.
+        val iconDir = File(context.cacheDir, "app_icons")
+        val (activities, updateTimes, cachedNames) = withContext(Dispatchers.IO) {
+            iconDir.mkdirs()
+            val activities = launcherApps.getActivityList(null, Process.myUserHandle())
+                .distinctBy { it.componentName.packageName }
+            val updateTimes = activities.associate { activity ->
+                val pkg = activity.componentName.packageName
+                pkg to runCatching { context.packageManager.getPackageInfo(pkg, 0).lastUpdateTime }.getOrDefault(0L)
+            }
+            Triple(activities, updateTimes, iconDir.list()?.toHashSet() ?: hashSetOf())
+        }
 
         // IconCache asserts it's only ever touched from Launcher3's own
         // worker thread -- a real, confirmed crash caught via logcat
@@ -52,12 +73,13 @@ class NativeAppProvider(private val context: Context) : LibraryProvider {
         // than Launcher3's MODEL_EXECUTOR. SettingsHiddenAppsFragment (the
         // real, working precedent this class mirrors) avoids this the same
         // way, via Executors.MODEL_EXECUTOR.execute { ... }.
-        // Every appInfo.bitmap/iconCache touch (including .newIcon(), which
-        // reads the cache-owned BitmapInfo) stays inside this block, same
-        // as SettingsHiddenAppsFragment's real working precedent -- only
-        // the resulting title string and a plain Bitmap (safe to touch from
-        // any thread) leave this dispatcher.
-        val entries = withContext(Executors.MODEL_EXECUTOR.asCoroutineDispatcher()) {
+        // Only the cache-owned calls stay inside this block: the title and
+        // icon lookup, the icon state, and .newIcon() (which reads the
+        // cache-owned BitmapInfo) -- and newIcon only for an app whose file
+        // for this exact state is not already on disk. Drawing and PNG
+        // encoding happen after, on Dispatchers.IO: the model thread also
+        // loads Standard's workspace and must not wait on them.
+        val scanned = withContext(Executors.MODEL_EXECUTOR.asCoroutineDispatcher()) {
             activities.map { activityInfo ->
                 // PER APP, not per scan: one app's icon must never cost
                 // every other app its entry. Under software rendering the
@@ -81,47 +103,77 @@ class NativeAppProvider(private val context: Context) : LibraryProvider {
                         ?.toString()
                         ?.takeIf { it.isNotBlank() }
                 }.getOrNull()
-                val titled = runCatching {
+                runCatching {
                     val appInfo = AppInfo(context, activityInfo, activityInfo.user)
                     iconCache.getTitleAndIcon(appInfo, activityInfo, CacheLookupFlag.DEFAULT_LOOKUP_FLAG)
+                    val iconName = AppIconFiles.fileName(
+                        packageName,
+                        updateTimes[packageName] ?: 0L,
+                        iconProvider.getStateForApp(activityInfo.applicationInfo),
+                    )
                     // An app that declares no label on its launcher
                     // activity gives its own class name back
                     // (`com.bluestacks.bsxlauncher.Main` on the rig);
                     // [AppLabels] is the one rule for what it is called
                     // instead.
-                    AppLabels.labelFor(appInfo.title ?: activityInfo.label, packageName) to
-                        drawableToBitmap(appInfo.bitmap.newIcon(context))
+                    ScannedApp(
+                        packageName = packageName,
+                        title = AppLabels.labelFor(appInfo.title ?: activityInfo.label, packageName),
+                        iconName = iconName,
+                        icon = if (iconName in cachedNames) null else appInfo.bitmap.newIcon(context),
+                        category = category,
+                    )
                 }.getOrElse { t ->
                     Log.w("droidtop.NativeAppProvider", "Icon/title failed for $packageName; listing it without an icon", t)
-                    AppLabels.labelFor(activityInfo.label, packageName) to null
+                    ScannedApp(packageName, AppLabels.labelFor(activityInfo.label, packageName), null, null, category)
                 }
-                ScannedApp(packageName, titled.first, titled.second, category)
             }
         }
 
-        return entries
-            .map { app ->
+        return withContext(Dispatchers.IO) {
+            val entries = scanned.map { app ->
                 LibraryEntry(
                     id = app.packageName,
                     title = app.title,
                     kind = LibraryEntryKind.NATIVE_ANDROID_APP,
-                    artworkUri = app.icon?.let { writeIconFile(iconDir, app.packageName, it) },
+                    artworkUri = iconPath(iconDir, app, cachedNames),
                     // The same field a scraped game's genre lands in: on
                     // an installed app the platform is the source, and
                     // the shell reads one field either way.
                     genre = app.category,
                 )
             }
-            .distinctBy { it.id }
+            // Only a finished scan prunes: a cancelled one throws before
+            // this, and its partial view of the apps deletes nothing.
+            val current = scanned.mapNotNullTo(HashSet()) { it.iconName }
+            AppIconFiles.stale(iconDir.list()?.toList().orEmpty(), current).forEach { File(iconDir, it).delete() }
+            entries
+        }
     }
 
-    /** One app as the scan read it, before it becomes a [LibraryEntry]. */
-    private data class ScannedApp(
+    /**
+     * One app as the scan read it, before it becomes a [LibraryEntry].
+     * [iconName] is its file under the current state (null when the
+     * lookup failed); [icon] is set only when that file must be drawn.
+     */
+    private class ScannedApp(
         val packageName: String,
         val title: String,
-        val icon: Bitmap?,
+        val iconName: String?,
+        val icon: android.graphics.drawable.Drawable?,
         val category: String?,
     )
+
+    private fun iconPath(iconDir: File, app: ScannedApp, cachedNames: Set<String>): String? {
+        val name = app.iconName ?: return null
+        if (name in cachedNames) return File(iconDir, name).absolutePath
+        val drawable = app.icon ?: return null
+        val bitmap = runCatching { drawableToBitmap(drawable) }.getOrElse { t ->
+            Log.w("droidtop.NativeAppProvider", "Icon draw failed for ${app.packageName}; listing it without an icon", t)
+            return null
+        }
+        return writeIconFile(iconDir, name, app.packageName, bitmap)
+    }
 
     /**
      * A drawable as a software bitmap.
@@ -149,13 +201,18 @@ class NativeAppProvider(private val context: Context) : LibraryProvider {
     // returns null and the entry just renders with no artwork (Coil's
     // existing AsyncImage null-model handling), rather than caching a
     // broken/empty file that would then stick around across scans.
-    private fun writeIconFile(iconDir: File, packageName: String, bitmap: Bitmap): String? {
-        val file = File(iconDir, "$packageName.png")
+    // Written to a temporary name and renamed, so a reader (or the next
+    // scan's "already cached" check) never sees half a PNG.
+    private fun writeIconFile(iconDir: File, name: String, packageName: String, bitmap: Bitmap): String? {
+        val file = File(iconDir, name)
+        val temp = File(iconDir, ".$name.tmp")
         return try {
-            FileOutputStream(file).use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
+            FileOutputStream(temp).use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
+            if (!temp.renameTo(file)) error("rename to $name failed")
             file.absolutePath
         } catch (t: Throwable) {
             Log.e("droidtop.NativeAppProvider", "Failed to cache icon for $packageName", t)
+            temp.delete()
             null
         }
     }
@@ -165,5 +222,11 @@ class NativeAppProvider(private val context: Context) : LibraryProvider {
         val intent = pm.getLaunchIntentForPackage(entry.id) ?: return
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         LaunchDisplay.start(context, intent)
+    }
+
+    private companion object {
+        // One scan at a time owns the icon folder: a second scan's prune
+        // must not delete the file (or temporary file) the first is writing.
+        val scanLock = Mutex()
     }
 }

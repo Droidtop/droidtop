@@ -4495,6 +4495,29 @@ system, one current slice per provider, rounds that yield to ordinary
 walks and publish into the observed lists) is recorded with the rest of
 step 4's decisions in "One file per game is the truth" above.
 
+**A key press recomposes nothing but what shows it.** The Gaming shell's
+screensaver idle time was Compose state read as a `LaunchedEffect` key
+in the shell body, so every key press and every touch recomposed the
+whole shell to restart one timer. It is now a `MutableStateFlow` that
+only the timer observes (`collectLatest`: each input cancels the pending
+delay and starts a new one); writing it recomposes nothing.
+
+**App icons are drawn once per version, never on the model thread.** The
+Apps scan borrows Launcher3's `MODEL_EXECUTOR` (the icon cache refuses
+any other thread), and it used to draw and PNG-encode every app's icon
+there at every scan, stalling Standard's own model work behind it. Now
+only the cache-owned calls stay on that thread (title and icon lookup,
+Launcher3's icon state, `newIcon`); drawing, encoding and writing run on
+the IO dispatcher. The file is named by package, `lastUpdateTime` and a
+hash of Launcher3's own icon state for the app (`AppIconFiles`: locale,
+SDK, themed-icon setting, resource hash, the day for a dynamic
+calendar), so an app whose file already exists costs no drawing at all,
+and a changed icon is a new path rather than a stale picture under an
+old one. Files are written to a temporary name and renamed, and a
+finished scan deletes every file no current app names (uninstalled
+apps, older versions, the old `<package>.png` names, unfinished
+writes); one scan at a time owns the folder.
+
 ### The scan's unit of work is a folder (directed by the rig, 2026-09-11)
 
 Pointing droidtop at a whole-library root — the rig's games root is the

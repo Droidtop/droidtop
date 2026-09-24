@@ -109,6 +109,7 @@ import dev.droidtop.shell.gamepad.theme.esDeViewTransition
 import dev.droidtop.shell.gamepad.theme.ThemePrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
@@ -292,7 +293,12 @@ fun GamepadShell(
     // Idle tracking for the screensaver: every key press the shell sees
     // bumps this, and the timer below restarts from it. A launch counts
     // as activity too (the shell is not idle, it is behind a game).
-    var lastInputMs by remember { mutableStateOf(android.os.SystemClock.elapsedRealtime()) }
+    // A flow, not Compose state: only the timer observes it, so a key
+    // press no longer recomposes the whole shell body (it was a
+    // LaunchedEffect key here). See SPEC "Performance on the console".
+    val lastInputMs = remember {
+        kotlinx.coroutines.flow.MutableStateFlow(android.os.SystemClock.elapsedRealtime())
+    }
     var screensaverOn by remember { mutableStateOf(false) }
     val screensaverMode = remember { ScreensaverPrefs.mode(context) }
     LaunchedEffect(uiMode) {
@@ -300,10 +306,12 @@ fun GamepadShell(
             nav.openSection(GamingSection.GAMES)
         }
     }
-    LaunchedEffect(lastInputMs, screensaverMode, launching) {
+    LaunchedEffect(screensaverMode, launching) {
         if (screensaverMode == ScreensaverMode.OFF || launching != null) return@LaunchedEffect
-        kotlinx.coroutines.delay(screensaverMode.idleSeconds * 1000L)
-        screensaverOn = true
+        lastInputMs.collectLatest {
+            kotlinx.coroutines.delay(screensaverMode.idleSeconds * 1000L)
+            screensaverOn = true
+        }
     }
     // Never-crash boundary: a launch failure (bad emulator preset, missing
     // app, malformed template) must NEVER kill the shell -- confirmed
@@ -543,7 +551,7 @@ fun GamepadShell(
                 awaitPointerEventScope {
                     while (true) {
                         awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
-                        lastInputMs = android.os.SystemClock.elapsedRealtime()
+                        lastInputMs.value = android.os.SystemClock.elapsedRealtime()
                     }
                 }
             }
@@ -553,7 +561,7 @@ fun GamepadShell(
             .ownPadButtons { backDispatcher?.onBackPressed() }
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown) {
-                    lastInputMs = android.os.SystemClock.elapsedRealtime()
+                    lastInputMs.value = android.os.SystemClock.elapsedRealtime()
                     if (screensaverOn) {
                         // The press that wakes the shell belongs to the
                         // screensaver, not to whatever it was over.
@@ -739,7 +747,7 @@ fun GamepadShell(
                         screensaverOn -> {
                             Screensaver(gameEntries.orEmpty()) {
                                 screensaverOn = false
-                                lastInputMs = android.os.SystemClock.elapsedRealtime()
+                                lastInputMs.value = android.os.SystemClock.elapsedRealtime()
                             }
                             androidx.activity.compose.BackHandler(enabled = true) { screensaverOn = false }
                         }
