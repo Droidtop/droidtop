@@ -77,8 +77,20 @@ object PcFolderScan {
     fun gamesUnder(root: File, defs: List<EngineDef> = emptyList()): List<File> =
         gamesByTopLevelFolder(root, defs).flatMap { it.games }
 
-    /** One top-level folder of a games root, and the PC games under it. */
-    data class TopLevelFolder(val folder: File, val games: List<File>)
+    /**
+     * One top-level folder of a games root, and the PC games under it.
+     * [mtime] is the folder's own modification time, read before its walk
+     * (a change during the walk then moves it past the stamp the index
+     * keeps, and the next slow round walks the folder again). [skipped]
+     * is a folder the caller's `skip` left unwalked: [games] is empty
+     * because nobody looked, not because it holds none.
+     */
+    data class TopLevelFolder(
+        val folder: File,
+        val games: List<File>,
+        val mtime: Long = 0L,
+        val skipped: Boolean = false,
+    )
 
     /**
      * The same walk, kept in the shape the index merges in: one entry per
@@ -87,12 +99,26 @@ object PcFolderScan {
      * (docs/SPEC.md 7g). A folder with no games under it is still listed,
      * with none: "this folder is here and holds no games" and "this
      * folder is gone" are different answers.
+     *
+     * [skip] is the slow pass' knob (docs/SPEC.md 7g): a folder it names,
+     * given its modification time, is listed but not walked.
      */
-    fun gamesByTopLevelFolder(root: File, defs: List<EngineDef> = emptyList()): List<TopLevelFolder> =
+    fun gamesByTopLevelFolder(
+        root: File,
+        defs: List<EngineDef> = emptyList(),
+        skip: (folder: File, mtime: Long) -> Boolean = { _, _ -> false },
+    ): List<TopLevelFolder> =
         if (!root.isDirectory) {
             emptyList()
         } else {
-            childrenOf(root).map { child -> TopLevelFolder(child, walk(child, defs, depth = 1)) }
+            childrenOf(root).map { child ->
+                val mtime = child.lastModified()
+                if (skip(child, mtime)) {
+                    TopLevelFolder(child, emptyList(), mtime, skipped = true)
+                } else {
+                    TopLevelFolder(child, walk(child, defs, depth = 1), mtime)
+                }
+            }
         }
 
     private fun walk(folder: File, defs: List<EngineDef>, depth: Int): List<File> {

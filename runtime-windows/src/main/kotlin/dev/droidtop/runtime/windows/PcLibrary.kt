@@ -121,7 +121,15 @@ object PcLibrary {
      * (docs/SPEC.md 7g), so the walk has to say which folder each game
      * came from.
      */
-    data class FolderGroup(val root: String, val topFolder: String, val games: List<Game>)
+    data class FolderGroup(
+        val root: String,
+        val topFolder: String,
+        val games: List<Game>,
+        /** The folder's modification time before its walk: its change stamp in the index. */
+        val mtime: Long = 0L,
+        /** Left unwalked by the caller's `skip`; [games] is empty because nobody looked. */
+        val skipped: Boolean = false,
+    )
 
     /**
      * Every PC game a STORE knows about, plus the folders the vendored
@@ -168,16 +176,22 @@ object PcLibrary {
 
     /**
      * The games under droidtop's own roots, a top-level folder at a
-     * time.
+     * time. A folder [skip] names (the slow pass' unchanged folders,
+     * docs/SPEC.md 7g) comes back listed but unwalked, and what the last
+     * walk recorded for it (its installs, its games in the scanner's
+     * folder list) is kept.
      */
-    suspend fun folderGames(context: Context): List<FolderGroup> {
+    suspend fun folderGames(
+        context: Context,
+        skip: (folder: File, mtime: Long) -> Boolean = { _, _ -> false },
+    ): List<FolderGroup> {
         // The scanner looks in its own managed folders plus whatever
         // roots it has been told about. droidtop already asks the user
         // for their games folders ONCE, so those are the roots -- without
         // this the folder source could only ever see gamenative's own
         // CustomGames directory, which nothing in droidtop tells anybody
         // about.
-        val found = runCatching { adoptScannedGameFolders(context) }
+        val found = runCatching { adoptScannedGameFolders(context, skip) }
             .onFailure { android.util.Log.w(TAG, "Scanning droidtop's roots for PC games failed", it) }
             .getOrDefault(emptyList())
         val groups = found.map { group ->
@@ -202,7 +216,13 @@ object PcLibrary {
                 .filter { it.gameSource == GameSource.CUSTOM_GAME }
                 .map { it.toGame() }
                 .sortedBy { it.title.lowercase() }
-            FolderGroup(root = group.root, topFolder = group.topFolder, games = games)
+            FolderGroup(
+                root = group.root,
+                topFolder = group.topFolder,
+                games = games,
+                mtime = group.mtime,
+                skipped = group.skipped,
+            )
         }
         // Recording the installs here, in the one place every source's
         // install directories are already known, is what keeps
@@ -211,7 +231,9 @@ object PcLibrary {
         // that nothing ever called, so the store half of that list stayed
         // empty forever and only Steam's own paths reached engine
         // detection.
-        folderSourceInstalls = groups.flatMap { it.games }.mapNotNull { it.toStoreInstall() }
+        val unwalked = groups.filter { it.skipped }.map { it.topFolder }
+        folderSourceInstalls = folderSourceInstalls.filter { install -> install.installDir.absolutePath.isUnder(unwalked) } +
+            groups.flatMap { it.games }.mapNotNull { it.toStoreInstall() }
         return groups
     }
 
@@ -371,9 +393,21 @@ object PcLibrary {
      * roots are left alone.
      */
     /** One top-level folder of one root, and the game folders droidtop's rule found under it. */
-    private data class ScannedFolder(val root: String, val topFolder: String, val gameFolders: List<String>)
+    private data class ScannedFolder(
+        val root: String,
+        val topFolder: String,
+        val gameFolders: List<String>,
+        val mtime: Long,
+        val skipped: Boolean,
+    )
 
-    private fun adoptScannedGameFolders(context: Context): List<ScannedFolder> {
+    private fun String.isUnder(folders: Collection<String>): Boolean =
+        folders.any { folder -> this == folder || startsWith("$folder/") }
+
+    private fun adoptScannedGameFolders(
+        context: Context,
+        skip: (folder: File, mtime: Long) -> Boolean,
+    ): List<ScannedFolder> {
         val roots = dev.droidtop.library.GamesRoots.current(context)
         if (roots.isEmpty()) return emptyList()
         val rootPaths = roots.map { it.absolutePath }
@@ -390,11 +424,13 @@ object PcLibrary {
         // holding engine games is nobody's game (PcFolderScan rule 6).
         val defs = runCatching { dev.droidtop.library.EnginesDatabase.defs(context) }.getOrDefault(emptyList())
         val scanned = roots.flatMap { root ->
-            dev.droidtop.library.PcFolderScan.gamesByTopLevelFolder(root, defs).map { top ->
+            dev.droidtop.library.PcFolderScan.gamesByTopLevelFolder(root, defs, skip).map { top ->
                 ScannedFolder(
                     root = root.absolutePath,
                     topFolder = top.folder.absolutePath,
                     gameFolders = top.games.map { it.absolutePath },
+                    mtime = top.mtime,
+                    skipped = top.skipped,
                 )
             }
         }
@@ -409,7 +445,13 @@ object PcLibrary {
         )
         runCatching {
             val current = app.gamenative.PrefManager.customGameManualFolders
-            val theirs = current.filterNot { manual -> rootPaths.any { manual.startsWith(it + "/") } }
+            // A folder this walk skipped keeps the games the last walk
+            // named under it; everything else under the roots is this
+            // walk's answer.
+            val unwalked = scanned.filter { it.skipped }.map { it.topFolder }
+            val theirs = current.filterNot { manual ->
+                rootPaths.any { manual.startsWith(it + "/") } && !manual.isUnder(unwalked)
+            }
             val wanted = (theirs + found).toSet()
             if (wanted != current) app.gamenative.PrefManager.customGameManualFolders = wanted
         }.onFailure { android.util.Log.w(TAG, "Could not tell the folder scanner which folders are games", it) }

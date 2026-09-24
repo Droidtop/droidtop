@@ -5113,6 +5113,19 @@ data, and any index can be rebuilt from them.
   under every root that holds that system. This replaced a full re-walk
   of every system folder every round (headers re-read, media re-resolved)
   for a library that had not changed.
+  `PcGameProvider` stamps its two kinds of part too: each top-level
+  folder of a root by its own modification time, read before the folder
+  is walked, and the store part by one number over what that part reads
+  (gamenative's store database and its write-ahead log, each Wine
+  prefix's Desktop folder, the scanner's folders outside droidtop's
+  roots, and the roots themselves). When the store stamp moved the whole
+  provider is walked, because the store part suppresses Wine shortcuts
+  against every folder game's install directory; the first round in a
+  process walks it whole as well, because the walk is what records the
+  install directories engine detection reads (`PcLibrary.knownInstalls`).
+  A skipped folder keeps the installs and the scanner folders the last
+  walk recorded for it. A changed compatibility cache or engine rule is
+  not seen by the stamp; "Rescan library" is the answer there.
 - The slow pass is a recurring loop, not a one-shot: it starts once,
   5 seconds after the first ordinary scan a shell asks for, and then
   repeats every 30 minutes (`Library`'s

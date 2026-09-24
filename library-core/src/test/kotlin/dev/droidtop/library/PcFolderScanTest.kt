@@ -52,6 +52,23 @@ class PcFolderScanTest {
     }
 
     @Test
+    fun `a folder the slow pass skips is listed, unwalked, with the stamp it was skipped on`() {
+        game("EA/SimCity")
+        game("Ubisoft/Far Cry 5")
+        val ea = File(temp.root, "EA")
+        val tops = PcFolderScan.gamesByTopLevelFolder(temp.root, defs) { folder, mtime ->
+            folder == ea && mtime == ea.lastModified()
+        }
+        val byName = tops.associateBy { it.folder.name }
+        assertEquals(setOf("EA", "Ubisoft"), byName.keys)
+        assertTrue(byName.getValue("EA").skipped)
+        assertEquals(emptyList<File>(), byName.getValue("EA").games)
+        assertEquals(ea.lastModified(), byName.getValue("EA").mtime)
+        assertFalse(byName.getValue("Ubisoft").skipped)
+        assertEquals(listOf("Far Cry 5"), byName.getValue("Ubisoft").games.map { it.name })
+    }
+
+    @Test
     fun `a store folder holding no games contributes nothing`() {
         dir("Epic/.gamenative")
         dir("GamePass/.gamenative")
