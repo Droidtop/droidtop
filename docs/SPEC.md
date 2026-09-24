@@ -4433,6 +4433,19 @@ without a rescan. droidtop's own media writers (the scrapers, the
 miximage generator, orphan cleanup) tell the lookup directly
 (`EsDeArtwork.mediaWritten`) instead of waiting for that.
 
+**The themed gamelist never resolves images in composition.** A
+gamelist's carousel or grid runs the `imageType` chain for every game in
+the list, and the list is the whole list ("All games" is the whole
+library), republished every 250 ms while a walk runs. It used to do that
+in `remember` on the main thread, for every game, at every publish. Now
+each game's answer is worked out on the IO dispatcher, in chunks, and kept
+per media locator across publishes; composition only reads answers
+already known, and a game not yet worked out draws what a miss draws (the
+element's default image, else its name) for the moment it takes. The
+answers are worked out again only when `EsDeArtwork.mediaGeneration`
+says a media folder actually changed, so a publish during a walk costs
+the games it added and nothing else.
+
 ### The scan's unit of work is a folder (directed by the rig, 2026-09-11)
 
 Pointing droidtop at a whole-library root — the rig's games root is the

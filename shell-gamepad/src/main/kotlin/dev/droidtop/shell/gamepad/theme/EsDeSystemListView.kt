@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -98,6 +99,8 @@ import dev.droidtop.library.theme.layoutEsDeTextList
 import dev.droidtop.shell.gamepad.esDeSwipeSteps
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * One item [EsDeSystemListView] can browse -- deliberately generic (not
@@ -218,6 +221,24 @@ internal fun EsDeListItem.esDePrimaryImage(
     return resolved ?: defaultImage
 }
 
+/** One game's worked-out image for a gamelist: [path] null is a real miss. */
+private class ResolvedImage(val path: String?)
+
+/**
+ * [EsDeSystemListView]'s per-game answers, filled off the main thread and
+ * read in composition. [generation] is the [EsDeArtwork.mediaGeneration]
+ * the whole map was last worked out against.
+ */
+private class ResolvedImages {
+    val paths = java.util.concurrent.ConcurrentHashMap<GameMediaLocator, ResolvedImage>()
+
+    @Volatile
+    var generation = -1L
+}
+
+/** How many games one IO hop resolves before the list is redrawn with them. */
+private const val RESOLVE_CHUNK = 256
+
 /**
  * Renders [items] using whichever real shape the loaded theme's
  * [element] actually declares (carousel/grid/textlist), or a sensible
@@ -298,11 +319,53 @@ fun EsDeSystemListView(
     // `defaultImage` declared, because the implicit list is `marquee`
     // there and a miss must reach text rather than the pre-resolved
     // artwork. A system list only has work to do when the theme declared
-    // a `defaultImage` for its logo-less systems.
-    val typedItems = remember(items, imageTypes, defaultImage, gamelist) {
-        if (!gamelist && defaultImage == null) items
-        else items.map { item ->
-            item.copy(logoPath = item.esDePrimaryImage(imageTypes, defaultImage, gamelist))
+    // a `defaultImage` for its logo-less systems, and that work touches
+    // no disk.
+    //
+    // A gamelist's chain is a media lookup per game, and the list is the
+    // WHOLE list ("All games" is the whole library), republished every
+    // 250 ms while a walk runs. So it never runs in composition: each
+    // game's answer is worked out once, on the IO dispatcher, kept in
+    // [images] under its media locator, and composition only reads what
+    // is already known. A game not worked out yet draws what a miss
+    // draws (the default image, else its name) for the moment it takes.
+    // The answers are kept across republishes and worked out again only
+    // when the media folders themselves changed (EsDeArtwork's
+    // mediaGeneration), so a walk's republish costs the new games alone.
+    val images = remember(imageTypes, defaultImage) { ResolvedImages() }
+    var imagesVersion by remember(images) { mutableIntStateOf(0) }
+    if (gamelist) {
+        LaunchedEffect(items, images) {
+            val generation = EsDeArtwork.mediaGeneration
+            val stale = images.generation != generation
+            val pending = items.asSequence()
+                .filter { it.mediaLocator != null && (stale || it.mediaLocator !in images.paths) }
+                .distinctBy { it.mediaLocator }
+                .toList()
+            // In chunks, each drawn as it lands: a cancelled run (the
+            // list changed again) keeps every chunk it finished.
+            for (chunk in pending.chunked(RESOLVE_CHUNK)) {
+                withContext(Dispatchers.IO) {
+                    for (item in chunk) {
+                        images.paths[item.mediaLocator!!] =
+                            ResolvedImage(item.esDePrimaryImage(imageTypes, defaultImage, gamelist = true))
+                    }
+                }
+                imagesVersion++
+            }
+            images.generation = generation
+        }
+    }
+    val typedItems = remember(items, imageTypes, defaultImage, gamelist, imagesVersion) {
+        when {
+            gamelist -> items.map { item ->
+                val known = item.mediaLocator?.let { images.paths[it] }
+                item.copy(logoPath = known?.path ?: defaultImage)
+            }
+            defaultImage == null -> items
+            else -> items.map { item ->
+                item.copy(logoPath = item.esDePrimaryImage(imageTypes, defaultImage, gamelist = false))
+            }
         }
     }
     when (element?.type) {
