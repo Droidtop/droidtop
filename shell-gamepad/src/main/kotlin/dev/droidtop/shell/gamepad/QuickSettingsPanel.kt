@@ -163,6 +163,11 @@ internal fun QuickSettingsPanel(
             }
             QuickPress.RUN_ASYNC -> {
                 val action = item as AsyncActionItem
+                if (action.confirmTitle != null && confirmArmedId != action.id) {
+                    confirmArmedId = action.id
+                    return
+                }
+                confirmArmedId = null
                 statusById[action.id] = "Working..."
                 scope.launch {
                     statusById[action.id] = withContext(Dispatchers.IO) {

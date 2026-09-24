@@ -52,6 +52,11 @@ class CatalogPreferenceNavigator(
     private val skipGroupIds: Set<String> = emptySet(),
 ) {
     private val stack = ArrayDeque<CatalogScreen>()
+
+    // Last outcome per async item id, so the rebuild that follows an
+    // AsyncActionItem keeps its result on the row (the gamepad renderer's
+    // statusById does the same).
+    private val statusById = HashMap<String, String>()
     private var pendingFolderPick: FolderPickItem? = null
     private val folderPickLauncher: ActivityResultLauncher<android.net.Uri?> =
         fragment.registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -130,6 +135,19 @@ class CatalogPreferenceNavigator(
         rebuild()
     }
 
+    /** Runs [action] at once, or after an OK when [confirmTitle] asks for one. */
+    private fun confirmThen(context: Context, confirmTitle: String?, action: () -> Unit) {
+        if (confirmTitle == null) {
+            action()
+            return
+        }
+        AlertDialog.Builder(context)
+            .setMessage(confirmTitle)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok) { _, _ -> action() }
+            .show()
+    }
+
     private fun toPreference(context: Context, item: CatalogItem): Preference = when (item) {
         is ChoiceItem -> ListPreference(context).apply {
             key = item.id
@@ -188,8 +206,11 @@ class CatalogPreferenceNavigator(
                 else -> "(not set)"
             }
             setOnPreferenceChangeListener { _, newValue ->
-                item.onChange(context, newValue as String)
-                rebuild()
+                // Rebuild after the write returns, so the re-read sees it.
+                this@CatalogPreferenceNavigator.fragment.lifecycleScope.launch {
+                    item.onChange(context, newValue as String)
+                    rebuild()
+                }
                 true
             }
         }
@@ -221,16 +242,7 @@ class CatalogPreferenceNavigator(
             summary = item.subtitle
             isIconSpaceReserved = false
             setOnPreferenceClickListener {
-                if (item.confirmTitle != null) {
-                    AlertDialog.Builder(context)
-                        .setMessage(item.confirmTitle)
-                        .setNegativeButton(android.R.string.cancel, null)
-                        .setPositiveButton(android.R.string.ok) { _, _ ->
-                            item.run(context)
-                            rebuild()
-                        }
-                        .show()
-                } else {
+                confirmThen(context, item.confirmTitle) {
                     item.run(context)
                     rebuild()
                 }
@@ -240,23 +252,27 @@ class CatalogPreferenceNavigator(
         is AsyncActionItem -> Preference(context).apply {
             key = item.id
             title = item.title
-            summary = item.subtitle
+            summary = statusById[item.id] ?: item.subtitle
             isIconSpaceReserved = false
             setOnPreferenceClickListener { pref ->
-                pref.summary = "Working..."
-                // this@... qualification: inside Preference.apply {},
-                // a bare `fragment` is the Preference's own String
-                // fragment-route property, not the hosting fragment.
-                val host = this@CatalogPreferenceNavigator.fragment
-                host.viewLifecycleOwner.lifecycleScope.launch {
-                    val outcome = withContext(Dispatchers.IO) {
-                        runCatching {
-                            item.run(context) { status ->
-                                host.activity?.runOnUiThread { pref.summary = status }
-                            }
-                        }.getOrElse { "Failed: ${it.message}" }
+                confirmThen(context, item.confirmTitle) {
+                    pref.summary = "Working..."
+                    // this@... qualification: inside Preference.apply {},
+                    // a bare `fragment` is the Preference's own String
+                    // fragment-route property, not the hosting fragment.
+                    val host = this@CatalogPreferenceNavigator.fragment
+                    host.viewLifecycleOwner.lifecycleScope.launch {
+                        val outcome = withContext(Dispatchers.IO) {
+                            runCatching {
+                                item.run(context) { status ->
+                                    host.activity?.runOnUiThread { pref.summary = status }
+                                }
+                            }.getOrElse { "Failed: ${it.message}" }
+                        }
+                        statusById[item.id] = outcome
+                        // The action may have changed what the screen lists.
+                        rebuild()
                     }
-                    pref.summary = outcome
                 }
                 true
             }
