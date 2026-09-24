@@ -282,7 +282,8 @@ object GameNaming {
      * `love_of_magic_book1`, `book2` and `book3` score 0.94 against each
      * other and are three different games, as do `Lust Academy` and
      * `Lust Theory` at 0.75. Equal names merge ([sameGame]); similar names
-     * become [GameGrouping.Suggestion]s a person can accept.
+     * are only offered, to a person choosing a missing game's replacement
+     * ([MissingGames.candidates]).
      */
     const val NAME_SIMILARITY_THRESHOLD = 0.6
 

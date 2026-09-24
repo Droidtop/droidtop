@@ -5952,8 +5952,11 @@ id is ever `certain` there. droidtop's scan has nobody to ask, and the
 corpus says what automatic merging at 0.6 would cost:
 `love_of_magic_book1`, `book2` and `book3` score 0.94 against each other
 and are three different games; `Lust Academy` and `Lust Theory` score
-0.61; `ARTEMIS` and `RTS` score 0.60. So similar names become
-suggestions, and nothing acts on them without the user.
+0.61; `ARTEMIS` and `RTS` score 0.60. So similar names never merge, and
+droidtop does not keep a library-wide list of "these two look alike"
+pairs either: comparing every game with every other grows with the square
+of the library and no screen asks for it. Similarity is used only where a
+person is already choosing, which is the question below.
 
 The same naming answers a second question, added 2026-09-17: which
 detected game replaces a missing one (7g). `MissingGames.candidates`

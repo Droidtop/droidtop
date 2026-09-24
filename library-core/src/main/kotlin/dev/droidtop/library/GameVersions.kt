@@ -136,8 +136,9 @@ data class GameCopy(
  * anything weaker is a SUGGESTION its user accepts or rejects
  * (`find_candidates` returns `{"certain", "suggested"}`). droidtop's scan
  * has nobody to ask, so only names that are equal once punctuation and
- * case are dropped merge on their own; a name that is merely SIMILAR
- * becomes a [Suggestion]. The corpus says why in three lines:
+ * case are dropped merge on their own; a name that is merely SIMILAR is
+ * never merged, and is offered to a person only where one is already
+ * choosing ([MissingGames.candidates]). The corpus says why in three lines:
  * `love_of_magic_book1`, `book2` and `book3` are 0.94 similar and are
  * three different games.
  */
@@ -153,9 +154,6 @@ object GameGrouping {
         val latestKnown: String? = null,
     )
 
-    /** Two games whose names are similar enough to be worth asking about. See [suggestions]. */
-    data class Suggestion(val name: String, val other: String, val score: Double)
-
     /**
      * Every game in [found], in name order, each with its versions and
      * segments. Folder order does not change the result: a game is keyed
@@ -169,25 +167,6 @@ object GameGrouping {
             games.getOrPut(key) { Builder(derived.name) }.merge(derived, folder)
         }
         return games.values.map { it.build() }.sortedBy { it.name.lowercase() }
-    }
-
-    /**
-     * Pairs of games whose names are at least
-     * [GameNaming.NAME_SIMILARITY_THRESHOLD] alike -- Pythia's `suggested`
-     * list, for a person to accept or reject. Nothing in the scan acts on
-     * these; they exist so "these two look like one game" is answerable
-     * without guessing on the user's behalf.
-     */
-    fun suggestions(games: List<GroupedGame>): List<Suggestion> {
-        val names = games.map { it.name }
-        val out = mutableListOf<Suggestion>()
-        for (i in names.indices) {
-            for (j in i + 1 until names.size) {
-                val score = GameNaming.similarity(names[i].lowercase(), names[j].lowercase())
-                if (score >= GameNaming.NAME_SIMILARITY_THRESHOLD) out += Suggestion(names[i], names[j], score)
-            }
-        }
-        return out.sortedByDescending { it.score }
     }
 
     /**
