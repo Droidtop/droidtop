@@ -6216,9 +6216,14 @@ it is drawn on, not only the menu overlay.
 **One anatomy per thing.** One row (title, optional supporting line, optional value, optional
 chevron; a chevron means "this opens", a value means "this is set to", and neither stands in
 for the other). One selectable choice row. One tile. One section label. One empty state. One
-selection idiom — a brightened card — across every droidtop-drawn surface; a focus rectangle
-in one place and a card in another is two answers to one question. One help/hint bar per
-screen, positioned inside the window.
+selection idiom — an accent ring over a raised fill (`Modifier.selectionFrame`, ring width
+`MenuTokens.FocusRingWidth`) — on every droidtop-drawn focusable: rows, chips, tabs, buttons,
+cards and tiles alike; a focus rectangle in one place and a card in another is two answers to
+one question, and a brightened card alone is too faint to find at arm's length (UI pass
+2026-09-24, M1). The ring means "the pad is here" and nothing else: a current tab keeps only
+the raised fill, and a filter that is on is filled with the accent and carries a check, so
+neither reads as focus. One chip (`ShellChip`). One help/hint bar per screen, positioned
+inside the window.
 
 **Copy is part of the system.** Sentence case, one dash convention, one name per concept, verb
 labels on buttons, no developer notation and no backend error strings in a user-facing string.

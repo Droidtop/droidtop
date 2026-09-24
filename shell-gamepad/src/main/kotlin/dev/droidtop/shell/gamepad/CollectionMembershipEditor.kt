@@ -120,7 +120,7 @@ internal fun CollectionMembershipEditor(entry: LibraryEntry, library: Library, o
                                 modifier = Modifier.fillMaxWidth(),
                             )
                             Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                ActionChip("Create", highlighted = true, onClick = {
+                                ShellChip("Create", primary = true, onClick = {
                                     val name = newName.trim()
                                     if (name.isNotEmpty()) {
                                         scope.launch {
@@ -133,7 +133,7 @@ internal fun CollectionMembershipEditor(entry: LibraryEntry, library: Library, o
                                         }
                                     }
                                 })
-                                ActionChip("Cancel", highlighted = false, onClick = { creatingNew = false; newName = "" })
+                                ShellChip("Cancel", onClick = { creatingNew = false; newName = "" })
                             }
                         }
                     } else {
@@ -143,7 +143,7 @@ internal fun CollectionMembershipEditor(entry: LibraryEntry, library: Library, o
             }
         }
 
-        ActionChip("Back", highlighted = false, modifier = Modifier.padding(top = 16.dp), onClick = onDismiss)
+        ShellChip("Back", modifier = Modifier.padding(top = 16.dp), onClick = onDismiss)
     }
 }
 
@@ -166,7 +166,7 @@ private fun CollectionToggleRow(label: String, isMember: Boolean?, onClick: () -
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             .clickable(onClick = onClick)
-            .background(if (focused) MenuTokens.SurfaceSelected else Color.Transparent, RoundedCornerShape(8.dp))
+            .selectionFrame(focused, RoundedCornerShape(8.dp), rest = Color.Transparent)
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {

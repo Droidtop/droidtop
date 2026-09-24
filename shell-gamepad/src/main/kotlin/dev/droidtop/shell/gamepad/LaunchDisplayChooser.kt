@@ -118,7 +118,7 @@ internal fun LaunchDisplayChooserDialog(
                         // big as a finger on a screen without a pad.
                         .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (index == selected) MenuTokens.SurfaceSelected else Color.Transparent)
+                        .selectionFrame(index == selected, RoundedCornerShape(8.dp), rest = Color.Transparent)
                         .clickable { onPick(row.option, row.remember) }
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                 )
