@@ -296,6 +296,39 @@ Enablement follows the HOME role rather than a switch of its own —
 neither), and `Modes` reads that component state rather than a second
 flag.
 
+**Games in the Launcher (built 2026-09-24).** Until this change the
+Launcher could not show or launch a single library game: droidtop's
+package had no launcher activity, and the fork hid everything in its own
+package from the drawer. It now works like this:
+
+- A **Games** icon in the drawer (`LauncherGamesActivity`, `:app`) opens a
+  plain grid of the library's games — the same `LibraryKinds.GAMES` scan
+  the Gaming shell's Games section reads, so with both on there is one
+  scan, and hidden or missing games are left out. No themes, no scraped
+  detail views, no Quick Menu: those are Gaming's.
+- A tap launches through `GameLaunchActivity.dispatch`, which is
+  `Library.launch` (play history and launch-screen memory included).
+- A long press pins the game to the home screen as an ordinary icon: a
+  launcher shortcut whose intent is `GameLaunchActivity` with the entry's
+  id, so a pinned game keeps working with Gaming off. Its icon is the
+  entry's local artwork cropped square, or droidtop's icon when there is
+  none (a remote cover would mean a network fetch to build an icon).
+- The fork's `AppFilter` still hides droidtop's own package except this
+  one component, and `NativeAppProvider` leaves droidtop's own package out
+  of the Apps list, so the Games icon never shows as an "app" in Gaming or
+  Desktop.
+
+It is not mode-gated, deliberately. It runs nothing until someone opens
+it, and it is the package's only MAIN/LAUNCHER activity, which Android
+requires before it will accept a pinned shortcut from droidtop at all;
+disabling it with the fork would take the pinned games with it. With
+"Alternative" set as home, it is the same Games icon in the other
+launcher's drawer — one more entry point onto the shared library, which
+is what "with Gaming off, games still launch" needs. Every game is not
+put in the drawer as its own icon: the drawer is `LauncherApps`, which
+lists installed activities only, and faking entries into it would mean
+rewriting the fork's app model.
+
 ### Gaming mode — the gaming-focused shell (renamed from Handheld)
 
 The mode was never about the form factor; it is the gaming shell, and it
@@ -323,7 +356,8 @@ program a first-class window rather than a game launch.
 
 ### Integration points (named, so nothing is re-implemented)
 
-- **One library, three surfaces.** Launcher shows entries as icons,
+- **One library, three surfaces.** Launcher shows games as a Games grid
+  and as pinned home-screen icons,
   Gaming as themed rows, Desktop as desktop objects (§2b). One scan.
 - **One launch resolution.** Every surface launches through the same
   strategy selection; only placement differs (fullscreen on a display vs

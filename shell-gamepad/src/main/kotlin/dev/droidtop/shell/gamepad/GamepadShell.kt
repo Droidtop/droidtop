@@ -66,6 +66,7 @@ import coil3.compose.AsyncImage
 import dev.droidtop.library.settings.GamingSettingsCatalog
 import dev.droidtop.library.EngineGameProvider
 import dev.droidtop.library.Library
+import dev.droidtop.library.LibraryKinds
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.shell.gamepad.pc.PC_SYSTEM_ID
@@ -1271,26 +1272,11 @@ internal fun sectionsFor(mode: dev.droidtop.library.settings.UiMode): List<Gamin
         GamingSection.entries
     }
 
-// Apps are what is NOT a game. A Wine profile and a Linux-container game
-// used to live here, which is why the PC surface -- the declared home of
-// "every PC and engine game" (DECISIONS 2026-09-10 17:05) -- could never
-// be handed a store or Wine title: the Games section never saw one. They
-// are games; the PC card is where they belong.
-private val APP_KINDS = setOf(
-    LibraryEntryKind.NATIVE_ANDROID_APP,
-    LibraryEntryKind.REMOTE_STREAM,
-)
-
-/**
- * Emulated/interpreted content — droidtop's equivalent of ES-DE's
- * "systems." Everything else (native/Wine/Linux/remote) is Apps, not a
- * system. THE COMPLEMENT on purpose: this used to be a hand-kept list
- * of four engine kinds, which silently dropped every OTHER engine
- * (KiriKiri, RM2000/2003, Buriko, CatSystem2, CMVS, Flash, Godot,
- * HTML, ...) from both sections — a new engine kind now lands in
- * Games automatically instead of nowhere.
- */
-private val GAME_KINDS = LibraryEntryKind.entries.toSet() - APP_KINDS
+// Which kinds are Apps and which are Games is the library's split, not
+// this shell's: the Launcher's Games screen reads the same two sets
+// (LibraryEntry.kt, LibraryKinds).
+private val APP_KINDS = LibraryKinds.APPS
+private val GAME_KINDS = LibraryKinds.GAMES
 
 @Composable
 private fun SectionTabBar(

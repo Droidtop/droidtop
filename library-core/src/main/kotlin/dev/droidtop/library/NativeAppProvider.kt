@@ -57,7 +57,10 @@ class NativeAppProvider(private val context: Context) : LibraryProvider {
         val iconDir = File(context.cacheDir, "app_icons")
         val (activities, updateTimes, cachedNames) = withContext(Dispatchers.IO) {
             iconDir.mkdirs()
+            // droidtop's own drawer icon (the Launcher's Games screen) is a
+            // way into this library, not an app in it.
             val activities = launcherApps.getActivityList(null, Process.myUserHandle())
+                .filter { it.componentName.packageName != context.packageName }
                 .distinctBy { it.componentName.packageName }
             val updateTimes = activities.associate { activity ->
                 val pkg = activity.componentName.packageName
