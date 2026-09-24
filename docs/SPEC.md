@@ -4735,8 +4735,10 @@ controller family) are what these rows write, and the renderer reads
 them.
 
 **Browse themes** opens on the index and, when the index is empty or
-older than a week, fetches it in place first, showing the count as it
-grows; there is no separate "Sync theme index" row, and the screen uses
+older than a week (its clone's `FETCH_HEAD`), fetches it in place first
+(a git fetch reports no count while it runs, so the screen says it is
+fetching, then shows the list; a failed fetch with no list says so and A
+retries); there is no separate "Sync theme index" row, and the screen uses
 the shell's gutter and palette tokens like every other screen.
 
 **Gamelists are flat, by decision.** ES-DE lets a gamelist enter

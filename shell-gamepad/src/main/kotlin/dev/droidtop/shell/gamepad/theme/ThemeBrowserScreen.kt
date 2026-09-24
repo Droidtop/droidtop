@@ -50,14 +50,12 @@ import java.io.File
 import kotlinx.coroutines.withContext
 
 /**
- * Real browse/download UI for the theme-downloader stack built earlier
- * this session (`ThemeDownloader`, `ThemeAssets`) -- until now that whole
- * real, working backend had no UI beyond Settings' own "Sync theme
- * index" action (which only fetches the real index, never installs a
- * theme). Reads real parsed entries from the already-synced
- * `themes-list.git` clone (`ThemeDownloader.parseThemesList`) -- if
- * that's empty, the real fix is going back and running the sync action
- * first, not a bug in this screen.
+ * Browse and download ES-DE community themes (`ThemeDownloader`,
+ * `ThemeAssets`). Reads the parsed `themes-list.git` clone
+ * (`ThemeDownloader.parseThemesList`), and fetches that index itself when
+ * it is missing or more than a week old (docs/SPEC.md 7f, "Browse
+ * themes"): the empty state used to send the person back to a separate
+ * "Sync theme index" row in Settings (UI pass 2026-09-24, M3).
  *
  * Downloading/updating a theme (`ThemeDownloader.downloadOrUpdateTheme`)
  * writes into `ThemeAssets.userThemesDir`, the exact same directory
@@ -73,7 +71,12 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
     var installedDirNames by remember { mutableStateOf<Set<String>>(emptySet()) }
     var statusByDirName by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var loading by remember { mutableStateOf(true) }
+    // What the index fetch is doing, or why it failed; null once there is
+    // a list to show.
+    var fetchStatus by remember { mutableStateOf<String?>(null) }
+    var fetchFailed by remember { mutableStateOf(false) }
     val firstFocus = remember { FocusRequester() }
+    val emptyFocus = remember { FocusRequester() }
 
     suspend fun refresh() {
         withContext(Dispatchers.IO) {
@@ -81,10 +84,33 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
             installedDirNames = ThemeAssets.discoverThemes(context).map { it.name }.toSet()
         }
     }
+    suspend fun fetchIndex() {
+        fetchFailed = false
+        fetchStatus = "Fetching the theme list\u2026"
+        val result = withContext(Dispatchers.IO) {
+            ThemeDownloader.syncThemesList(ThemeAssets.userThemesDir(context))
+        }
+        refresh()
+        fetchFailed = result.status == ThemeDownloader.ThemeSyncStatus.FAILED && entries.isEmpty()
+        fetchStatus = when {
+            fetchFailed -> "Could not fetch the theme list. Check the connection, then press A to try again."
+            entries.isEmpty() -> "The theme list is empty."
+            else -> null
+        }
+    }
     LaunchedEffect(Unit) {
         loading = true
         refresh()
         loading = false
+        val stale = withContext(Dispatchers.IO) {
+            val dir = ThemeDownloader.themesListDir(ThemeAssets.userThemesDir(context))
+            val stamp = File(dir, ".git/FETCH_HEAD").takeIf { it.exists() } ?: dir
+            System.currentTimeMillis() - stamp.lastModified() > INDEX_MAX_AGE_MS
+        }
+        if (entries.isEmpty() || stale) fetchIndex()
+    }
+    LaunchedEffect(entries.isEmpty(), loading) {
+        if (entries.isEmpty() && !loading) runCatching { emptyFocus.requestFocus() }
     }
     // Real, confirmed-live crash this fixes: requesting focus in the SAME
     // LaunchedEffect that just set `entries` raced ahead of Compose actually
@@ -121,19 +147,44 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
                 }
             },
     ) {
-        Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = dev.droidtop.shell.gamepad.LocalShellWindow.current.edgePadding, vertical = 24.dp),
+        ) {
             Text("Browse themes", color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineSmall)
             Text(
-                "The real ES-DE community theme index. Selecting an entry downloads or updates it.",
+                "Themes from the ES-DE community's theme list. Select one to download it, or to update it if you have it.",
                 color = MenuTokens.OnSurfaceMuted,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
             )
+            // A refresh of a stale list runs under the list it already has,
+            // and says so above it.
+            if (entries.isNotEmpty()) {
+                fetchStatus?.let { Text(it, color = MenuTokens.OnSurfaceMuted, modifier = Modifier.padding(bottom = 8.dp)) }
+            }
             when {
-                loading -> Text("Loading...", color = MenuTokens.OnSurfaceMuted)
+                loading -> Text("Loading\u2026", color = MenuTokens.OnSurfaceMuted)
                 entries.isEmpty() -> Text(
-                    "No themes indexed yet. Go back and run \"Sync theme index\" in Settings → Appearance first.",
+                    fetchStatus ?: "Fetching the theme list\u2026",
                     color = MenuTokens.OnSurfaceMuted,
+                    // The one thing on screen when the fetch failed, so A
+                    // on it is the retry.
+                    modifier = Modifier
+                        .focusRequester(emptyFocus)
+                        .onKeyEvent { event ->
+                            if (fetchFailed && event.type == KeyEventType.KeyUp &&
+                                GamepadKeyMap.actionFor(event.key) == GamepadAction.A
+                            ) {
+                                coroutineScope.launch { fetchIndex() }
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                        .focusable()
+                        .clickable(enabled = fetchFailed) { coroutineScope.launch { fetchIndex() } },
                 )
                 else -> LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -173,8 +224,8 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
                                         ThemeDownloader.ThemeSyncStatus.CLONED -> "Downloaded"
                                         ThemeDownloader.ThemeSyncStatus.UPDATED -> "Updated"
                                         ThemeDownloader.ThemeSyncStatus.UP_TO_DATE -> "Already up to date"
-                                        ThemeDownloader.ThemeSyncStatus.DIVERGED -> "Has local changes -- skipped"
-                                        ThemeDownloader.ThemeSyncStatus.FAILED -> "Failed: ${result.error?.message ?: "unknown error"}"
+                                        ThemeDownloader.ThemeSyncStatus.DIVERGED -> "Not updated: your copy has local changes"
+                                        ThemeDownloader.ThemeSyncStatus.FAILED -> "Download failed. Check the connection and select it again."
                                     })
                                     // A theme UPDATED in place keeps its name -- the
                                     // name-keyed parse cache would silently keep
@@ -253,3 +304,6 @@ private fun ThemeBrowserRow(
         }
     }
 }
+
+/** How old the theme list may get before opening this screen fetches it again. */
+private const val INDEX_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
