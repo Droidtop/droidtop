@@ -6805,10 +6805,15 @@ bundle offline against the key document committed at the run's own commit,
 requires an `--evidence` statement of what was seen on-device (written
 verbatim into the release notes, never invented), assembles a draft, and
 publishes only when every asset is up. Published releases are permanent
-(older games may pin older builds). As of this writing only Ren'Py 8.2 has
-met the bar (8.2/8.3 releases exist on enginehost-renpy-plugin); everything
-else stays a CI artifact until proven, and proving it makes publishing a
-one-command act.
+(older games may pin older builds). A line's channels mean the same as
+droidtop's: every push publishes `unstable`, a rig pass on a real game
+promotes that exact build to `testing`, and nothing goes to `stable`
+before the line's 1.0. A `testing` build is never older than the fix a
+rig found (a line whose loader fix landed on `unstable` is re-promoted,
+not left with the bug on the channel people are told to use), and a
+promotion never publishes a bundle missing one of the two ABIs. The
+promotion command refuses `stable` for a 0.x plugin version, so a
+mis-click cannot publish one.
 
 ## 10c. Diagnostics, crash recovery and privacy
 
