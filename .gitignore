@@ -43,4 +43,7 @@ Thumbs.db
 .vscode/
 
 # Local Claude Code tooling config, not project source
-.claude/
+# Local Claude Code state stays out; the shared settings every agent
+# working here starts from (attribution off) is committed.
+.claude/*
+!.claude/settings.json
