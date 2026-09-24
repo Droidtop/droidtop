@@ -3290,7 +3290,11 @@ validate-before-replace:
   carries no detection rules at all is rejected as a legacy v3
   database. Users can pin a folder to an engine explicitly
   (`EngineOverridePrefs`, the engine twin of `SystemOverridePrefs` —
-  stored by database id, wins over every rule). RPG Maker XP/VX joined
+  stored by database id, wins over every rule), from the Engine row on a
+  PC game's own detail screen; a pin also outranks the engine already
+  written in the game's record, so a launch re-detects rather than run as
+  the engine just corrected, and the library's label follows on its next
+  scan. RPG Maker XP/VX joined
   the engine set with the v4 registry (enginehost contract contexts
   `xp`/`vx`, detected via their real archive/project/Game.ini RGSS
   signatures). The unit tests parse the SHIPPED seed file, so registry
