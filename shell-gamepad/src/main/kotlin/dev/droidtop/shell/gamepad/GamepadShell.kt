@@ -1063,7 +1063,7 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
                 }
             }
         }
-        Text(entry.title, color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineMedium)
+        Text(dev.droidtop.library.GameNaming.displayName(entry.title), color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineMedium)
         if (entry.artworkUri == null) {
             Text(entry.kind.itemName(), color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.titleMedium)
         }
@@ -3072,7 +3072,7 @@ private fun GameCard(
                     // used to run past the card and nearly collide with
                     // its neighbour's.
                     Text(
-                        entry.title,
+                        dev.droidtop.library.GameNaming.displayName(entry.title),
                         color = MenuTokens.OnSurface,
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 2,
@@ -3090,7 +3090,7 @@ private fun GameCard(
         } else {
             Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.Bottom) {
                 Text(
-                    entry.title,
+                    dev.droidtop.library.GameNaming.displayName(entry.title),
                     color = MenuTokens.OnSurface,
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 2,

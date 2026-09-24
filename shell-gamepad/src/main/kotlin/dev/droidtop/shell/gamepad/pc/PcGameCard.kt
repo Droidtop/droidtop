@@ -108,7 +108,7 @@ internal fun PcGameCard(
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
-                entry.title,
+                dev.droidtop.library.GameNaming.displayName(entry.title),
                 color = MenuTokens.OnSurface,
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 2,

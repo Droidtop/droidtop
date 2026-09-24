@@ -123,4 +123,15 @@ class GameNamingTest {
             assertFalse(name, GameNaming.isStructuralFolderName(name))
         }
     }
+
+    @Test
+    fun `a slug is drawn as words, a title is left alone`() {
+        assertEquals("Anomalous Coffee Machine 2", GameNaming.displayName("Anomalous_Coffee_Machine_2"))
+        assertEquals("LUST ACADEMY BOOK1", GameNaming.displayName("LUST-ACADEMY-BOOK1"))
+        assertEquals("Half-Life", GameNaming.displayName("Half-Life"))
+        assertEquals("Goodbye Eternity", GameNaming.displayName("Goodbye Eternity"))
+        assertEquals("My_Game - Deluxe", GameNaming.displayName("My_Game - Deluxe"))
+        assertEquals("DIVINEDAWN", GameNaming.displayName("DIVINEDAWN"))
+        assertEquals("_", GameNaming.displayName("_"))
+    }
 }

@@ -6414,8 +6414,12 @@ the raised fill, and a filter that is on is filled with the accent and carries a
 neither reads as focus. One chip (`ShellChip`). One help/hint bar per screen, positioned
 inside the window.
 
-**Copy is part of the system.** Sentence case, one dash convention, one name per concept, verb
-labels on buttons, no developer notation and no backend error strings in a user-facing string.
+**Copy is part of the system.** Sentence case, one dash convention (a spaced em dash, never
+`--`), one name per concept, verb labels on buttons, no developer notation and no backend error
+strings in a user-facing string. Ids, package names, URLs and paths sit behind a Details page,
+never in a list row. A title that is a folder slug is drawn as words (`GameNaming.displayName`:
+underscores, and dashes when there are two or more, become spaces in a name with no spaces);
+the stored title is untouched, so matching and keys do not move.
 
 **Language is part of the system.** Every user-facing string in droidtop's own chrome is a
 string resource, and English is the source language. A sentence is one resource with
