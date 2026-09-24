@@ -2839,6 +2839,12 @@ detail.
 `vendor/moonlight-common-c` and `vendor/mbedtls` were removed along with
 `:runtime-remote-stream` (nothing else in droidtop used either).
 
+What droidtop owns is the integration only: `REMOTE_STREAM` entries sit
+with the apps (`LibraryKinds.APPS`) and render like any other entry. No
+code produces one yet; they come from windowcast's own client, and
+launching one hands off to it, the way a console game hands off to its
+emulator. No droidtop module encodes, decodes or transports a stream.
+
 ### No PC-side helper in droidtop
 
 droidtop carries no program for the gaming PC. The Go scaffold that once
@@ -3321,67 +3327,61 @@ so neither app assumes the other:
 
 ## 7e. Second-screen / ambient integrations (Spotify now-playing, Discord presence)
 
-Useful both on the Dual-Screen Add-On (a second physical display, per §4)
-and as an idle-screen/status-bar widget on a single-screen device.
-droidtop's dual-screen model splits interaction and context the way the
-Nintendo 3DS's own dual-screen convention works: navigation/interaction on
-the primary screen, ambient context/status on the second — generalized
-for droidtop's own scope beyond gaming (§1): a second-screen "info" role
-that's just as at home showing Discord/Spotify/system status during
-desktop use as it is showing contextual art while browsing Games.
+Useful both on the Dual-Screen Add-On (a second physical display, §4) and
+as an idle-screen widget on a single-screen device. droidtop's dual-screen
+model splits interaction and context the way the Nintendo 3DS does:
+navigation on the primary screen, ambient context on the second, and not
+only for games: the same "info" role shows media and presence during
+desktop use.
 
-**The surface is the companion (§4d), and there is one of it.** The
-tenants this section once named as separate things — a focus companion,
-a presence panel, routed notifications — are the companion's own layers:
-the focused entry and the idle rotation (`CompanionState`, `CompanionIdle`),
-the notifications list (the `NotificationListenerService` in `:app`
-feeding `runtime-common`'s `NotificationsStore`, the same grant and store
-the Quick Menu's tab reads), and the widget layer where presence lives.
-Nothing here is a second screen-owning surface beside the companion.
+What holds that role is the companion (§4d, `CompanionActivity` and the
+`SECONDARY_HOME` host in `:display`), and its tenants are §4d's layers:
 
-**Media control — real, local, no credentials handled by droidtop.** Per
-explicit direction: droidtop must never hold a streaming service's own
-credentials (no OAuth, no developer app registration, no stored tokens),
-and control needs to be real — transport control and browsing against
-whatever is actually running in the installed app, not a read-only
-readout. The platform provides exactly that, twice over, and droidtop uses
-both halves without naming any app:
+- **The focused-entry reflection** (the role this section first called
+  `FocusCompanion`) is `CompanionState.focusedEntry`, written by the shell
+  that owns primary-screen focus and read, settled, by every companion
+  host; with nothing focused the companion shows its idle rotation.
+- **Routed notifications** are the platform's own, shown by the
+  companion's notifications layer: Discord already posts DMs and mentions,
+  and a media app posts its persistent now-playing notification, so
+  ambient presence comes from the platform with no polling overlay.
+- **Now-playing today** is the media app's own Android widget, placed on
+  the companion like any other (`CompanionWidgets`, one shared host).
+- **`PresencePanel`**, a deliberate panel with one card per linked media
+  app (and later Discord), is not built.
 
-- **Now playing** is a droidtop-native companion widget (§4d layer 5)
-  over `MediaSessionManager.getActiveSessions`, which the notification
-  access grant droidtop already holds for its Notifications tab unlocks:
-  the active session's title, artist and art, with play/pause, previous,
-  next and a seek bar through that session's `MediaController`. It shows
-  whichever app is playing — Spotify, YouTube, Jellyfin, a podcast app —
-  and shows nothing when none is, never a placeholder card for an app
-  that is not running.
-- **Browse and search** open from that widget into the same app's
-  `MediaBrowserService` through `MediaBrowserCompat` (the mechanism
-  Android Auto and Wear use), found by resolving that service in the
-  session owner's package at the moment it is asked for. There is no
-  bundled list of known media apps: the earlier `KnownMediaApps` table
-  of device-verified targets is replaced by that lookup, because a list
-  of packages is a list that goes stale, and the session already says
-  which app is playing. An app whose service refuses the bind, or which
-  exposes no content tree, gets the transport controls and no Browse row.
+**Media app control: local, no credentials held by droidtop.** droidtop
+never holds a streaming service's credentials (no OAuth, no developer app
+registration, no stored tokens), and control must be real: search,
+library browsing and transport, against whatever is running in the
+installed app. The mechanism is Android's `MediaBrowserService` API
+(`MediaBrowserCompat`/`MediaControllerCompat`, `androidx.media`), which
+Android Auto, Wear OS and Assistant use to browse and control a media app
+without seeing its login; droidtop binds to the app's exported service over
+local IPC. An earlier Spotify-specific OAuth client was removed for this.
 
-The session stays inside the media app's own process; droidtop makes no
-network call and sees no login. `library-core/.../presence/` holds the
-one client for the browse half; the widget renders through the companion's
-tile model like every other droidtop-native tile.
+The client written for it (`library-core/.../presence/MediaAppBrowserClient`)
+was constructed by nothing and was deleted with its `androidx.media`
+dependency (audit 2026-09-24); it is written again together with the
+`PresencePanel` that uses it. Two facts carry over. The targets verified
+on the test device (`adb shell dumpsys package <pkg>`, filtered for
+`android.media.browse.MediaBrowserService`) are Spotify
+(`com.spotify.music`), Jellyfin (`org.jellyfin.mobile`) and the device's
+YouTube, which is a ReVanced build, so the official
+`com.google.android.youtube` component name is unconfirmed; Tidal and
+YouTube Music were not installed and are not listed until confirmed. And
+nothing has been run end to end: whether each app accepts droidtop as a
+browser client (an app may refuse callers it does not know), what its
+content tree looks like, and whether it implements `onPlayFromSearch` are
+open until the panel is tried on the rig.
 
-**Discord — real, official, self-service: the Discord Social SDK, not a
-bot.** Discord publishes an official Social SDK for embedding real social
-and voice features (friends, presence, voice) into a third-party app, with
-a native login and consent flow of its own, which is what keeps the
-no-credentials rule: droidtop registers a free application id and the
-SDK's own flow handles the person's login, with nothing stored by
-droidtop. It arrives as a second companion widget ("Friends": presence,
-voice state, and rich presence for the game the shell is on), through a
-`DiscordPresenceClient` beside the media client, shaped the same way and
-rendered as the same tile. It is a native library with its own JNI
-integration, so it is the last of the companion's widgets to land and
-nothing else in this section waits on it.
+**Discord: the official Discord Social SDK, not a bot.** Discord publishes
+a Social SDK for embedding friends, presence and voice in a third-party
+app, with Discord's own login and consent flow; setup is a free
+application on the Discord Developer Portal and its client id. It is a
+native library with its own download and JNI integration and is not
+integrated; when it is, it is a `DiscordPresenceClient` in the same place
+as the media client, feeding the same `PresencePanel`.
 
 ## 7e2. Data-driven player/platform database (directed 2026-08-30)
 
