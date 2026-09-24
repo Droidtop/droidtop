@@ -2758,6 +2758,33 @@ folders". No developer notation in a user-facing string (no `<folder>/<system>/<
 package or class names, no backend error text). Button labels are the verb of what happens.
 A sentence that describes a consequence belongs where the consequence is chosen.
 
+### Permissions are asked at the feature, once, with the reason first
+
+Onboarding asks for exactly one grant, storage, because the library cannot
+exist without it. Every other grant Android makes special is asked where
+the feature that needs it is first used, never at start and never in a
+list on the Welcome step, with the reason stated before the system prompt
+and a row that stays until it is given (§7: "take me to the grant"). A
+declined grant disables the one feature, says which, and is not asked
+again until the person opens that feature. The complete set, and where
+each is asked:
+
+| Grant | Feature that needs it | Where it is asked |
+| --- | --- | --- |
+| All files access (API 30+) / read storage (API 26-29) | reading game folders | onboarding Storage step; Game folders |
+| Notification access | the Quick Menu's Notifications tab, the companion's notifications | the tab itself, when opened |
+| Usage access | recents beyond droidtop's own launches (§4) | the recents surface's "show all apps" row |
+| Install unknown apps | self-update (§10b) | the first in-app update, from the update row |
+| Modify system settings | brightness, adaptive brightness, screen timeout, auto-rotate tiles | the tile, on first use |
+| Notification policy | the Do Not Disturb tile | the tile, on first use |
+| Post notifications (API 33+) | the desktop session's foreground notification, download progress | starting the desktop session; the first download |
+| Draw over other apps | nothing; droidtop draws no overlay over another app | never asked |
+
+A grant that Android revokes behind droidtop's back (a system-bound
+service disabled with its mode, §2c; an unused-app reset) is detected the
+next time the feature is opened, and the same row asks again. Grants are
+never requested from a Service or at boot.
+
 ### Import and library sync (design; separate from the flow above)
 
 Two real mechanisms exist to build import on rather than invent from scratch:
