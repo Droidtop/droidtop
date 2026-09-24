@@ -150,7 +150,7 @@ class RoomFavoritesStore(context: Context) : FavoritesStore {
 
     override suspend fun getAll(ids: Collection<String>): Set<String> {
         if (ids.isEmpty()) return emptySet()
-        return dao.getAll(ids).toSet()
+        return ids.chunked(MAX_IDS_PER_QUERY).flatMapTo(HashSet()) { dao.getAll(it) }
     }
 
     override suspend fun moveTo(fromId: String, toId: String) = dao.moveTo(fromId, toId)
@@ -163,8 +163,18 @@ class RoomPlayHistoryStore(context: Context) : PlayHistoryStore {
 
     override suspend fun getAll(ids: Collection<String>): Map<String, PlayHistoryRecord> {
         if (ids.isEmpty()) return emptyMap()
-        return dao.getAll(ids).associate { it.id to PlayHistoryRecord(it.lastPlayedEpochMs, it.playCount) }
+        return ids.chunked(MAX_IDS_PER_QUERY)
+            .flatMap { dao.getAll(it) }
+            .associate { it.id to PlayHistoryRecord(it.lastPlayedEpochMs, it.playCount) }
     }
 
     override suspend fun moveTo(fromId: String, toId: String) = dao.moveTo(fromId, toId)
 }
+
+/**
+ * The most ids one `IN (:ids)` query binds. Room gives each id its own
+ * variable, and SQLite before 3.32 (Android 11 and older, the Android 9
+ * rig included) refuses a statement with more than 999; the library asks
+ * about every game it holds at once when it first loads.
+ */
+private const val MAX_IDS_PER_QUERY = 500
