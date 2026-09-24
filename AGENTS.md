@@ -7,9 +7,9 @@ another emulator. Read `docs/SPEC.md` (use its headings) before changing behavio
 
 ## Rules (the owner's, not suggestions)
 
-- **Mainline is `main`.** Work on a branch and open a pull request against `main`.
+- **Mainline is `main`.** Commit straight to `main` as ordinary commits (no pull requests): fetch, rebase onto the remote `main`, push. Keep each commit one coherent change.
 - **Builds are CI.** `.github/workflows/android-build.yml` builds the release and debug APKs;
-  `android-checks.yml` runs lint and unit tests. A change is done when both are green on the PR.
+  `android-checks.yml` runs lint and unit tests. A change is done when both are green on its commit.
   Do not claim something works because it compiles: say what was and was not verified.
 - **No AI attribution anywhere.** No `Co-Authored-By`, no "Generated with", in commits or PRs. The review workflow `commit-hygiene.yml` fails any commit that carries it.
 - **Commit messages** are plain prose saying why, citing evidence (file:line, a log line, a rig run).
@@ -27,6 +27,6 @@ another emulator. Read `docs/SPEC.md` (use its headings) before changing behavio
 
 ## What you cannot do from a cloud session
 
-You cannot reach the test device. When a change needs checking on a device, say so in the PR
+You cannot reach the test device. When a change needs checking on a device, say so in the commit message
 description under a heading **Needs a rig check**, with exact steps (what to open, what to press,
-what to look for). The coordinator runs it on the test rig and reports back on the PR.
+what to look for). The coordinator runs it on the test rig and reports back.
