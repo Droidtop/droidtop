@@ -5773,7 +5773,9 @@ four forked-in `romdetect` files and the bundled `libretro-db.sqlite`.
 Neither is vendored as a submodule. `vendor/sway`, `vendor/wlroots` (protocol definitions only — not
 compiled for Android, see `:host-bridge`), and `vendor/wayland`/`vendor/
 wayland-protocols` (same — codegen/headers only) are MIT. `vendor/
-go-containerregistry` is Apache-2.0. `shell-default`'s fork source (Murine
+go-containerregistry` is Apache-2.0. `vendor/proot` (Termux's PRoot) is
+GPL-2.0-or-later, and the talloc it links is LGPL-3.0-or-later. NOTICE.md
+lists every vendored and forked-in source with its licence. `shell-default`'s fork source (Murine
 Launcher, itself derived from AOSP Launcher3) is also Apache-2.0.
 `input-keyboard`'s fork source (Hacker's Keyboard) is also Apache-2.0.
 labwc (§2's second compositor preset alongside sway — installed as a package
