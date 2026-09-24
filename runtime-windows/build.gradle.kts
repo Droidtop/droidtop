@@ -157,8 +157,6 @@ android {
 dependencies {
     implementation(project(":runtime-common"))
 
-    // GameNativeMigrationSchemaTest pins the migration's supported Room
-    // version to the vendored database's own.
     testImplementation(libs.junit)
     // PcGameProvider.kt's own real LibraryProvider/LibraryEntry/
     // LibraryEntryKind implementation — this module supplying "pc"-system

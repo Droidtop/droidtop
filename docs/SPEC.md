@@ -1800,9 +1800,7 @@ class -- a delete that can leave the tree it was pointed at:
   traversal and writes routed through a symlink an earlier entry
   planted) and unlinks a symlink sitting where a regular file is about
   to be written. Archives keep their legitimate internal symlinks.
-- **Safe by construction, left as they are**: `GameNativeMigration`
-  staging (flat files droidtop itself writes into its own cache),
-  `FileImageCache.clear` (flat `.tar`s in cache), `ThemeAssets`
+- **Safe by construction, left as they are**: `FileImageCache.clear` (flat `.tar`s in cache), `ThemeAssets`
   (APK-asset extraction -- assets cannot be symlinks),
   `BackupHelper` (entry names whitelisted to exact known filenames,
   staging dirs hold only droidtop-written flat files), and test-only
@@ -4803,7 +4801,9 @@ resolves identically every scan.
    `CustomGameScanner`; point `PcGameProvider.scan()` at it. One change
    surfaces GOG, Epic, Amazon and loose Windows games at once.
 2. Compatibility rating, installed state and size onto library entries.
-3. Widen the gamenative migration to all four stores' tables.
+3. (Dropped 2026-09-24: the GameNative migration read another app's
+   private data directory, which only root can do, and root is
+   desktop-only. Signing in to each store is the route.)
 4. Per-platform launch settings + in-context per-game override.
 5. Playtime/last-played from `LibraryPlayHistoryDao`.
 6. Cloud saves across the four stores.
@@ -4917,6 +4917,26 @@ needs root today and is therefore "not on this device" on an unrooted
 console. It is never the only route offered for a game that has another;
 where it genuinely is the only one, the game says so with the reason
 instead of offering a launch that cannot work. Root remains desktop-only.
+
+**Root is used by Desktop mode's container stack and nothing else**
+(directed 2026-09-24). Two older uses were removed rather than kept as
+"optional on rooted devices":
+
+- *Ending an emulator before relaunching it.* Players whose preset sets
+  `killPackageProcesses` (7e2) were `su -c am force-stop`ped. They now get
+  `ActivityManager.killBackgroundProcesses` (the normal
+  `KILL_BACKGROUND_PROCESSES` permission, declared by `library-core`),
+  which ends the emulator's processes while they are in the background,
+  as they are when droidtop is in front launching. It cannot stop a
+  foreground service, and on Android 14+ an app targeting 34 may only
+  end its own processes, so there the call does nothing and the emulator
+  is relaunched as it is, the same as it already was on every unrooted
+  device.
+- *Importing an upstream GameNative install.* It copied GameNative's
+  Room database and DataStore out of `/data/data/app.gamenative`, which
+  no non-root app can read, and Android offers no sanctioned hand-off of
+  another app's private data. It is deleted, with its settings rows.
+  Signing in to Steam/GOG/Epic/Amazon in droidtop rebuilds the library.
 
 ### Views
 

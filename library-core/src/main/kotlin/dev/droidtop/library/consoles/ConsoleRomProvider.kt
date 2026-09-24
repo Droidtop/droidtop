@@ -963,19 +963,20 @@ class ConsoleRomProvider(
         dao.moveGameFacts(fromId, toId)
     }
 
-    // `ActivityManager.forceStopPackage()` needs the signature-level
-    // FORCE_STOP_PACKAGES permission -- not grantable to a normal app, so
-    // this real Daijishō-preset flag (several of KnownPlayers' real
-    // entries, e.g. DuckStation, set it -- a workaround for emulators that
-    // don't reset their own state cleanly on a repeat launch) can only
-    // actually do anything on a rooted device. Best-effort and silent on
-    // failure (debug-level log only) rather than erroring the whole
-    // launch over a real, expected no-root case.
+    // Players with this Daijishō-preset flag (DuckStation among them) do
+    // not reset their own state cleanly on a repeat launch, so a leftover
+    // process is ended first. `killBackgroundProcesses` is the non-root
+    // form: it ends the package's processes only while they are in the
+    // background, which they are here, because droidtop is in front
+    // launching. Android 14+ restricts it to the caller's own processes
+    // for apps targeting 34, so there it does nothing and the emulator is
+    // simply relaunched as it is (docs/SPEC.md 7i). Never fails a launch.
     private fun killPackageProcessesBestEffort(packageName: String) {
         try {
-            Runtime.getRuntime().exec(arrayOf("su", "-c", "am force-stop $packageName")).waitFor()
+            (context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager)
+                .killBackgroundProcesses(packageName)
         } catch (t: Throwable) {
-            android.util.Log.d("droidtop.ConsoleRomProvider", "Couldn't force-stop $packageName (likely no root)", t)
+            android.util.Log.d("droidtop.ConsoleRomProvider", "Couldn't end $packageName's background processes", t)
         }
     }
 }
