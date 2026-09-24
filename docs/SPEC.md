@@ -7016,7 +7016,10 @@ ways. Over adb:
 
     adb shell am broadcast -a dev.droidtop.UPDATE_NOW -n dev.droidtop.app/.UpdateNowReceiver
 
-and from Settings > Software updates, the row "Check and install now". It
+and from Settings > Software updates, the row "Check now", which is the
+page's only check (its value is the installed version, its line when it
+last checked; a check-only row beside it was a second way to do one job
+and was removed, UI pass 2026-09-24 L4). It
 checks the release feed immediately, and when the published `versionCode`
 is higher it downloads, verifies and hands the APK to PackageInstaller
 straight away -- the system's own confirmation is the only prompt that
