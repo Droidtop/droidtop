@@ -47,5 +47,11 @@ dependencies {
     // history), matching real ES-DE's own theme.xml parser having no
     // dependency on the rest of ES-DE's app logic either.
     implementation(libs.jgit)
+    // Reads image layers and writes the flattened rootfs stream
+    // (OciFlattener). api, not implementation: RootfsEntrySink hands both
+    // container backends commons-compress's TarArchiveEntry. The same
+    // library gamenative's own archive code uses, so the APK carries one
+    // copy of it.
+    api(libs.commons.compress)
     testImplementation(libs.junit)
 }
