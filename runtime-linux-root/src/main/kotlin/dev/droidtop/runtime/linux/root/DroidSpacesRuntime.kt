@@ -16,6 +16,8 @@ import dev.droidtop.runtime.RootfsImage
 import dev.droidtop.runtime.SharedVolume
 import dev.droidtop.runtime.RootfsPuller
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 /**
@@ -154,7 +156,14 @@ class DroidSpacesRuntime(
             bindMounts = listOf(
                 socketsDir.absolutePath to ContainerLayout.SOCKET_DIR,
                 appStorageDir.absolutePath to ContainerLayout.APP_STORAGE_DIR,
-            ) + ContainerLayout.sharedStorageBinds(SharedVolume.mounted(context)),
+            ) + ContainerLayout.sharedStorageBinds(SharedVolume.mounted(context)) +
+                // Device nodes the person chose on the container's Devices
+                // row, each at its own path. One that is gone (unplugged)
+                // is skipped by droidspaces with a warning (mount.c, "Failed
+                // to bind mount ... (skipping)"), not a failed start.
+                devicesFile(name).takeIf { it.isFile }?.readLines().orEmpty()
+                    .filter { it.isNotBlank() }
+                    .map { it to it },
             envFilePath = envFile.absolutePath,
         )
         config.writeTo(File(configsDir, "$name.config"))
@@ -303,6 +312,22 @@ class DroidSpacesRuntime(
             .absolutePath
 
     override fun hostSocketDir(): File = socketsDir
+
+    override val deviceSharingUnavailableReason: String? = null
+
+    private fun devicesFile(name: String) = File(configsDir, "$name.devices")
+
+    override suspend fun sharedDevices(container: Container): List<String> = withContext(Dispatchers.IO) {
+        devicesFile(container.id).takeIf { it.isFile }?.readLines()?.filter { it.isNotBlank() }.orEmpty()
+    }
+
+    /** Written beside the container's config; [writeConfig] binds each on the next start. */
+    override suspend fun setSharedDevices(container: Container, devicePaths: List<String>) = withContext(Dispatchers.IO) {
+        require(devicePaths.all { it.startsWith("/dev/") && !it.contains("..") && !it.contains(',') && !it.contains(':') }) {
+            "not a device node path: $devicePaths"
+        }
+        devicesFile(container.id).apply { parentFile?.mkdirs() }.writeText(devicePaths.joinToString("") { "$it\n" })
+    }
 
     override fun hostStorageToContainerPath(hostPath: File): String =
         ContainerLayout.hostStorageToContainerPath(appStorageDir, hostPath)

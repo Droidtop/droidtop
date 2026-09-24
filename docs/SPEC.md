@@ -1484,10 +1484,15 @@ not settled designs):
   to Android as a `PrintService`: Android apps already print through the
   platform's framework and IPP Everywhere, and a second print path with
   its own driver model is duplication for no case the standing test names.
-- **USB peripherals.** A "Devices" row on a container's page (§3d) lists
-  the device nodes Android currently exposes and lets each be bound into
-  that container, one at a time; under `DroidSpacesRuntime` that is a real
-  bind of the node, under `ProotRuntime` the row states, with the reason,
+- **USB peripherals.** A "Devices" row on each container's entry in the
+  container manager (§3d, `ContainerDevicesRow`) lists the USB devices
+  Android enumerates now (`UsbManager.deviceList`, which needs no
+  permission; each device's name is its node path) and lets each be bound
+  into that container at the same path, from its next start. Under
+  `DroidSpacesRuntime` that is a real bind of the node through the
+  container's config (`<name>.devices` beside it; droidspaces skips a node
+  that is gone rather than failing the start). Under `ProotRuntime` the row
+  states, with the reason (`ContainerRuntime.deviceSharingUnavailableReason`),
   that a device cannot be shared without root and offers nothing to tick.
   Storage is the one exception with a no-root story: a USB drive mounted
   by Android is a storage volume, and volumes are reachable through the

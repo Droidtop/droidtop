@@ -322,6 +322,22 @@ class ProotRuntime(
 
     override fun hostSocketDir(): File = socketsDir
 
+    /**
+     * proot binds what droidtop's uid can open, and Android gives an app a
+     * USB device only through `UsbManager`, as a file descriptor from a
+     * permission prompt, never as a node a Linux program opens by path.
+     */
+    override val deviceSharingUnavailableReason: String =
+        "Sharing a USB device needs root. Without it Android hands a device only to an app's own USB code, " +
+            "which a Linux program in a container cannot use. USB drives are the exception: they appear " +
+            "under ${ContainerLayout.SHARED_STORAGE_DIR} like the device's own storage."
+
+    override suspend fun sharedDevices(container: Container): List<String> = emptyList()
+
+    override suspend fun setSharedDevices(container: Container, devicePaths: List<String>) {
+        error(deviceSharingUnavailableReason)
+    }
+
     override fun hostStorageToContainerPath(hostPath: File): String =
         ContainerLayout.hostStorageToContainerPath(appStorageDir, hostPath)
 

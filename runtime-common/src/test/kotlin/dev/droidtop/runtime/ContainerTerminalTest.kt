@@ -42,6 +42,9 @@ class ContainerTerminalTest {
         override suspend fun destroy(container: Container) = error("not used")
         override fun primaryWaylandSocketPath(): String = error("not used")
         override fun hostSocketDir(): File = error("not used")
+        override val deviceSharingUnavailableReason: String? = null
+        override suspend fun sharedDevices(container: Container): List<String> = error("not used")
+        override suspend fun setSharedDevices(container: Container, devicePaths: List<String>) = error("not used")
         override fun hostStorageToContainerPath(hostPath: File): String = error("not used")
     }
 
