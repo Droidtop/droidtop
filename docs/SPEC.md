@@ -511,6 +511,27 @@ next start.
 trivial program run under proot against the device's root), instead of
 treating an unrooted device as unable to run Desktop mode.
 
+**The installed ABI must be the kernel's own.** An app's native libraries
+are one ABI's, picked by the package manager at install time, and proot is
+an executable. Android-x86 derivatives with ARM translation pick arm64-v8a
+when an APK's arm64 set is the fuller one, and droidtop's is (gamenative's
+prebuilt natives exist for arm64 only): on the BlueStacks rig
+(`abilist x86_64,x86,arm64-v8a,...`) builds 571 and 572 installed as
+arm64-v8a, and exec'ing the ARM proot on the x86_64 kernel fell through to
+`/system/bin/sh` reading the ELF as a script ("libproot.so[1]: syntax
+error"). Translation covers libraries loaded into the app, never programs
+it runs. The picker's rule, read from Android-x86's
+`core/jni/abipicker/ABIPicker.cpp` (BlueStacks logs its
+"selected abi ... for ..." line): take the x86_64 set only if it holds
+every arm64 library name, or the APK has no arm64 set at all; an x86_64
+set holding an ELF of another machine type counts as invalid. Forcing the
+ABI at install (`pm install --abi x86_64`) crashed the rig's package
+installer instead (AIOOBE in `NativeLibraryHelper.copyNativeBinariesWithOverride`,
+dq-desktop-03). So the build also produces per-ABI APKs (§10b): such a
+device installs the x86_64-only one. The proot check names this case
+outright (installed ABI versus `Build.SUPPORTED_64_BIT_ABIS[0]`) and says
+which APK to install. A real arm64 device (the Retroid) is unaffected.
+
 Both expose the same `ContainerRole` split — exactly one `PRIMARY` container
 per device (boots the compositor + base desktop), everything else `SIBLING`
 — and both must stop doing what their upstream/reference patterns do by
@@ -5129,6 +5150,19 @@ carries a warning naming the cost in the numbers that were measured, the same
 build both ways on the same device and library (build 567 on the BlueStacks
 rig: 3955/3765/4023 ms debug against 685/738/728 ms release), because a person
 who leaves it on has quietly chosen a build that starts five times slower.
+
+**Per-ABI APKs beside the universal one (2026-09-24).** The channel still
+publishes the universal APK (arm64-v8a + x86_64) as `droidtop-latest.apk`.
+The build additionally produces x86_64-only APKs (release and debug, AGP ABI
+`splits`) and uploads them with the run's `droidtop-apk` artifact, NOT to the
+channel: an Android-x86 device with ARM translation installs the universal
+APK as arm64-v8a (§3, "The installed ABI must be the kernel's own"), and
+then Desktop mode's executables cannot run. The BlueStacks rig installs the
+x86_64 APK from the artifact. Whether the channel should publish per-ABI
+APKs and the updater pick by device ABI is open (a question for the user,
+since the channel's shape was directed); until then an x86 user of the
+channel gets a working droidtop without Desktop mode, and the proot check
+says why.
 
 **The minSdk gate in CI.** droidtop's minSdk is 26 and every module
 declares it, but until 2026-09-11 nothing checked it, and two calls that do

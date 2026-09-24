@@ -259,6 +259,7 @@ class ProotRuntime(
      * a program, without needing any image.
      */
     override suspend fun checkSystemRequirements(): ContainerExecResult = withContext(Dispatchers.IO) {
+        installedAbiMismatch()?.let { return@withContext ContainerExecResult(126, "", it) }
         val proot = File(nativeLibraryDir, PROOT)
         if (!proot.isFile) {
             return@withContext ContainerExecResult(127, "", "proot is not packaged for this device's ABI (${proot.path} is missing)")
@@ -281,6 +282,38 @@ class ProotRuntime(
         val ok = code == 0 && out.contains(CHECK_TOKEN)
         log.line("proot check: exit $code, ${if (ok) "ok" else "failed: ${err.trim()}"}")
         ContainerExecResult(if (ok) 0 else maxOf(code, 1), out, err)
+    }
+
+    /**
+     * Why the packaged proot cannot run here, when the reason is the ABI
+     * droidtop was installed as rather than anything proot does.
+     *
+     * An app's native libraries are those of ONE ABI, chosen by the
+     * package manager at install time, and proot and its loaders are
+     * executables: they only run when that ABI is the kernel's own.
+     * Android-x86 derivatives with ARM translation (BlueStacks is one:
+     * abilist x86_64,x86,arm64-v8a,...) install an APK as arm64-v8a when
+     * its arm64 library set is the fuller one, which droidtop's is
+     * (gamenative's prebuilt natives exist for arm64 only). Translation
+     * covers libraries loaded into the app, not programs it executes, so
+     * exec'ing the ARM proot on that x86_64 kernel falls through to
+     * `/system/bin/sh` reading the ELF as a script (rig, dq-desktop-01:
+     * "libproot.so[1]: syntax error: unexpected '('"). Said as what it is,
+     * with the remedy that works: the per-ABI APK (app/build.gradle.kts
+     * `splits`). Forcing the ABI at install (`pm install --abi`) crashed
+     * the rig's package installer (dq-desktop-03).
+     */
+    private fun installedAbiMismatch(): String? {
+        val installedAbi = when (File(nativeLibraryDir).name) {
+            "arm64" -> "arm64-v8a"
+            "arm" -> "armeabi-v7a"
+            else -> File(nativeLibraryDir).name
+        }
+        val deviceAbi = android.os.Build.SUPPORTED_64_BIT_ABIS.firstOrNull() ?: return null
+        if (installedAbi == deviceAbi) return null
+        return "droidtop is installed as $installedAbi, but this device's own ABI is $deviceAbi: Android " +
+            "chose to run droidtop's native code through ARM translation, which cannot start the Linux " +
+            "container tools. Install droidtop's $deviceAbi-only APK instead of the universal one."
     }
 
     override fun primaryWaylandSocketPath(): String =

@@ -38,7 +38,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_APK = os.path.join(REPO, "app", "build", "outputs", "apk", "debug", "app-debug.apk")
+DEFAULT_APK = os.path.join(REPO, "app", "build", "outputs", "apk", "debug", "app-universal-debug.apk")
 ALLOWLIST = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                          "class_load_api_allowlist.txt")
 DEFAULT_MIN_SDK = 26
