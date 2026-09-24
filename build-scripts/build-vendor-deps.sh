@@ -396,6 +396,10 @@ echo "=== PulseAudio 13.0, libsndfile, libltdl ($ABI) ==="
 #                ac_cv_header_glob_h=no: bionic has glob() only from
 #                API 28, and PulseAudio uses it only for scache
 #                directories, behind HAVE_GLOB_H.
+#                ac_cv_header_execinfo_h=no: likewise backtrace() only
+#                from API 33 (the header exists, its declarations are
+#                hidden below that); log.c uses it only behind
+#                HAVE_EXECINFO_H, for optional log backtraces.
 #
 # libtool versions sonames (libpulse.so.0); Android loads only lib*.so
 # out of nativeLibraryDir, so every output's soname and NEEDED entries
@@ -445,7 +449,7 @@ if [ "$ABI" = "x86_64" ]; then (
         --disable-orc --disable-webrtc-aec --disable-tests --disable-manpages --disable-hal-compat \
         --disable-oss-output --disable-oss-wrapper --disable-gconf --disable-asyncns --disable-nls \
         --without-fftw --disable-default-build-tests \
-        ax_cv_PTHREAD_PRIO_INHERIT=no ac_cv_header_glob_h=no
+        ax_cv_PTHREAD_PRIO_INHERIT=no ac_cv_header_glob_h=no ac_cv_header_execinfo_h=no
     make -C src -j"$(nproc)" \
         libpulsecommon-13.0.la libpulse.la libpulsecore-13.0.la pulseaudio pactl \
         libprotocol-native.la module-native-protocol-unix.la module-aaudio-sink.la
