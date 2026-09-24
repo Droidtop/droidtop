@@ -33,7 +33,6 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
@@ -48,6 +47,7 @@ import dev.droidtop.shell.gamepad.CatalogNavigator
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.HelpRowOwner
 import dev.droidtop.shell.gamepad.LocalHelpRowOwner
+import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.TouchHintBar
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
@@ -242,7 +242,7 @@ internal fun PcSurface(
                     } else {
                         "Nothing matches these filters."
                     },
-                    color = Color.Gray,
+                    color = MenuTokens.OnSurfaceMuted,
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.align(Alignment.Center).padding(LocalShellWindow.current.edgePadding),
                 )
@@ -308,7 +308,7 @@ private fun PcHeader(total: Int, shown: Int, entries: List<LibraryEntry>, folder
     val engineGames = entries.count { it.kind != LibraryEntryKind.WINE_PROFILE }
     val edge = LocalShellWindow.current.edgePadding
     Column(modifier = Modifier.fillMaxWidth().padding(start = edge, end = edge, top = 20.dp, bottom = 4.dp)) {
-        Text("PC", color = Color.White, style = MaterialTheme.typography.headlineMedium)
+        Text("PC", color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineMedium)
         Text(
             // No games from some folders only while the grouping of the
             // first list is still being worked out; a count of zero then
@@ -323,7 +323,7 @@ private fun PcHeader(total: Int, shown: Int, entries: List<LibraryEntry>, folder
                 // to be told which number is which (docs/SPEC.md 7m).
                 if (folders > total) append(", in $folders folders")
             },
-            color = Color.Gray,
+            color = MenuTokens.OnSurfaceMuted,
             style = MaterialTheme.typography.bodyMedium,
         )
     }
@@ -358,7 +358,7 @@ internal fun PcChip(label: String, selected: Boolean, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     Text(
         label,
-        color = if (selected) Color.Black else Color.White,
+        color = if (selected) MenuTokens.OnSelected else MenuTokens.OnSurface,
         style = MaterialTheme.typography.labelMedium,
         modifier = Modifier
             // Ahead of the focus targets, not after them: see [GameCard].
@@ -374,7 +374,7 @@ internal fun PcChip(label: String, selected: Boolean, onClick: () -> Unit) {
             .focusable()
             .clickable(onClick = onClick)
             .background(
-                if (selected) Color.White else if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A),
+                if (selected) MenuTokens.Selected else if (focused) MenuTokens.CardFocused else MenuTokens.Card,
                 RoundedCornerShape(50),
             )
             .padding(horizontal = 14.dp, vertical = 6.dp),

@@ -20,7 +20,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,7 +48,7 @@ internal fun LaunchScreen(entry: LibraryEntry, via: String? = null) {
         label = "launch-pulse-alpha",
     )
 
-    Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().background(MenuTokens.Ground), contentAlignment = Alignment.Center) {
         entry.artworkUri?.let { art ->
             AsyncImage(
                 model = art,
@@ -69,7 +68,7 @@ internal fun LaunchScreen(entry: LibraryEntry, via: String? = null) {
         ) {
             Text(
                 entry.title,
-                color = Color.White,
+                color = MenuTokens.OnSurface,
                 style = MaterialTheme.typography.headlineSmall,
                 textAlign = TextAlign.Center,
                 maxLines = 2,

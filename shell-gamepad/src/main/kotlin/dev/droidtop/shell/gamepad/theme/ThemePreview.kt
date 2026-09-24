@@ -10,13 +10,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import dev.droidtop.library.theme.ThemeAssets
+import dev.droidtop.shell.gamepad.MenuTokens
 
 /**
  * A REAL render of a theme, at thumbnail size and at the SCREEN'S OWN
@@ -67,7 +67,7 @@ fun ThemeSystemPreview(themeId: String, longEdge: Dp, modifier: Modifier = Modif
     }
     val view = theme?.views?.get("system")
     Box(
-        modifier = modifier.size(size).background(Color(0xFF101010)),
+        modifier = modifier.size(size).background(MenuTokens.CardInset),
         contentAlignment = Alignment.Center,
     ) {
         if (view != null) {
@@ -82,7 +82,7 @@ fun ThemeSystemPreview(themeId: String, longEdge: Dp, modifier: Modifier = Modif
             // empty frame that reads as a theme with nothing in it.
             Text(
                 "No preview",
-                color = Color(0xFF6B7480),
+                color = MenuTokens.Placeholder,
                 style = MaterialTheme.typography.labelSmall,
             )
         }

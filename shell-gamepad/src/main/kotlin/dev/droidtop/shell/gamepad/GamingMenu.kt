@@ -40,8 +40,10 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
 
-/**
- * The Gaming shell's shared menu language, in one place.
+/*
+ * The Gaming shell's shared menu language, in one place. Its colours
+ * and measures are [MenuTokens], in DesignTokens.kt with the rest of the
+ * design system (docs/SPEC.md 7k); the row anatomy is here.
  *
  * Every menu-ish surface in this shell (settings catalogs, the gamelist
  * options overlay, the Quick Menu, the metadata and collection editors,
@@ -61,67 +63,6 @@ import androidx.compose.ui.unit.dp
  *   in a value's place.
  * - Unset reads as a dim placeholder, never as loud as a real value.
  */
-/**
- * The shell's own colour palette, and the only one its menus may use.
- *
- * These are ABSOLUTE values against [OverlaySurface], not a theme-aware
- * scheme: the fills are white at low alpha and the text is white, which
- * is legible over this surface and over nothing else. So any surface
- * that hosts them has to be painted from this same object -- a panel
- * painted with `MaterialTheme.colorScheme.surface` is white wherever the
- * platform is in a light colour state, and these tokens then render
- * white on white (the Quick Menu's System tab did exactly that; see
- * QuickMenu.kt). One palette for the shell, not a platform scheme
- * underneath a hand-picked one.
- */
-object MenuTokens {
-    val Surface = Color(0x0DFFFFFF)
-    val SurfaceSelected = Color(0x2BFFFFFF)
-    val OverlaySurface = Color(0xFF1C2027)
-    val OnSurface = Color.White
-    val OnSurfaceMuted = Color(0xFF8A93A1)
-    val Value = Color(0xFFAEB7C4)
-    val Placeholder = Color(0xFF6B7480)
-    val Accent = Color(0xFF8AB4FF)
-    val Danger = Color(0xFFFFB4AB)
-    /** "This is on / included" -- the one affirmative in the menus. */
-    val Affirmative = Color(0xFF7FE08A)
-    val SectionLabel = Color(0xFF7D8794)
-
-    val RowShape = RoundedCornerShape(10.dp)
-    val OverlayShape = RoundedCornerShape(14.dp)
-    val RowSpacing = 6.dp
-
-    /**
-     * ONE row height rule: every row is at least this tall, whatever it
-     * says, and a row with a subtitle grows from it. The rig measured
-     * three different heights down one settings screen (100 / 130 / 160
-     * px) because the box was whatever its text happened to need.
-     */
-    val RowMinHeight = 56.dp
-
-    /**
-     * The value column's own width, so the values down a screen line up
-     * as a column instead of each one starting where its label stopped.
-     * A value longer than this still gets the room it needs -- it is a
-     * minimum, not a box.
-     */
-    val ValueColumnMinWidth = 92.dp
-
-    /**
-     * The room the hint bar takes at the bottom of the window, as CONTENT
-     * padding on every scrolling screen the shell draws.
-     *
-     * The bar is the last thing in the shell's column, so a list measured
-     * against the rest of the window ends exactly where the bar begins:
-     * its last row is sliced by the window edge and scrolling to the end
-     * never brings that row clear (rig: the settings list's own last row,
-     * build 546; a game detail's last card, build 548). As CONTENT padding
-     * the same space scrolls with the list, so the end of the list is the
-     * end of the list. One value, because it is one bar.
-     */
-    val HintBarRoom = 72.dp
-}
 
 /**
  * List padding shared by every full-screen menu list, as a LazyColumn's
@@ -354,5 +295,5 @@ internal fun MenuPanel(
 /** Shared full-screen menu ground, so a menu never shows the themed view bleeding through. */
 @Composable
 internal fun MenuScreen(content: @Composable () -> Unit) {
-    Box(Modifier.fillMaxSize().background(Color.Black)) { content() }
+    Box(Modifier.fillMaxSize().background(MenuTokens.Ground)) { content() }
 }

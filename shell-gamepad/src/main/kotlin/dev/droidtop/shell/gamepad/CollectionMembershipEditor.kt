@@ -70,7 +70,7 @@ internal fun CollectionMembershipEditor(entry: LibraryEntry, library: Library, o
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(MenuTokens.Ground)
             .padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 32.dp)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp && GamepadKeyMap.actionFor(event.key) == GamepadAction.BACK) {
@@ -81,11 +81,11 @@ internal fun CollectionMembershipEditor(entry: LibraryEntry, library: Library, o
                 }
             },
     ) {
-        Text("Collections", color = Color.White, style = MaterialTheme.typography.headlineSmall)
-        Text(entry.title, color = Color.Gray, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 12.dp))
+        Text("Collections", color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineSmall)
+        Text(entry.title, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 12.dp))
 
         if (!loaded) {
-            Text("Loading...", color = Color.White, style = MaterialTheme.typography.titleMedium)
+            Text("Loading...", color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
         } else {
             LazyColumn(
                 modifier = Modifier.weight(1f),
@@ -112,10 +112,10 @@ internal fun CollectionMembershipEditor(entry: LibraryEntry, library: Library, o
                                 label = { Text("Collection name") },
                                 singleLine = true,
                                 colors = TextFieldDefaults.colors(
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
-                                    focusedLabelColor = Color.White,
-                                    unfocusedLabelColor = Color.Gray,
+                                    focusedTextColor = MenuTokens.OnSurface,
+                                    unfocusedTextColor = MenuTokens.OnSurface,
+                                    focusedLabelColor = MenuTokens.OnSurface,
+                                    unfocusedLabelColor = MenuTokens.OnSurfaceMuted,
                                 ),
                                 modifier = Modifier.fillMaxWidth(),
                             )
@@ -170,9 +170,9 @@ private fun CollectionToggleRow(label: String, isMember: Boolean?, onClick: () -
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(label, color = Color.White, style = MaterialTheme.typography.bodyLarge)
+        Text(label, color = MenuTokens.OnSurface, style = MaterialTheme.typography.bodyLarge)
         if (isMember != null) {
-            Text(if (isMember) "In collection" else "Not in collection", color = if (isMember) MenuTokens.Affirmative else Color.Gray, style = MaterialTheme.typography.bodyLarge)
+            Text(if (isMember) "In collection" else "Not in collection", color = if (isMember) MenuTokens.Affirmative else MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyLarge)
         }
     }
 }

@@ -57,7 +57,7 @@ internal fun MediaViewer(title: String, media: List<Pair<String, String>>, onClo
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(MenuTokens.Ground)
             .focusRequester(focus)
             .focusable()
             .onKeyEvent { event ->
@@ -92,7 +92,7 @@ internal fun MediaViewer(title: String, media: List<Pair<String, String>>, onClo
             modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(top = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(title, color = Color.White, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+            Text(title, color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
         }
         Column(
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 20.dp),

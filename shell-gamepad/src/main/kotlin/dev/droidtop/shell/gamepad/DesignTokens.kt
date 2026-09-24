@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -247,4 +248,115 @@ object ChromeColors {
         onTertiary = LightOnTertiary,
         outline = LightOutline,
     )
+}
+
+/**
+ * The shell's own colour palette, and the only one its menus may use.
+ *
+ * These are ABSOLUTE values against [OverlaySurface], not a theme-aware
+ * scheme: the fills are white at low alpha and the text is white, which
+ * is legible over this surface and over nothing else. So any surface
+ * that hosts them has to be painted from this same object -- a panel
+ * painted with `MaterialTheme.colorScheme.surface` is white wherever the
+ * platform is in a light colour state, and these tokens then render
+ * white on white (the Quick Menu's System tab did exactly that; see
+ * QuickMenu.kt). One palette for the shell, not a platform scheme
+ * underneath a hand-picked one.
+ *
+ * The shell's own PAGES -- the game grid and a game's detail, the PC
+ * surface, the editors and pickers the shell opens full-screen -- are the
+ * same family on a different ground: they sit on [Ground], and their
+ * cards, plates and text are the roles below [Ground]. Every one of them
+ * is absolute too, and `MenuTokensContrastTest` holds each text role to a
+ * floor over every surface it is drawn on.
+ */
+object MenuTokens {
+    val Surface = Color(0x0DFFFFFF)
+    val SurfaceSelected = Color(0x2BFFFFFF)
+    val OverlaySurface = Color(0xFF1C2027)
+    val OnSurface = Color.White
+    val OnSurfaceMuted = Color(0xFF8A93A1)
+    val Value = Color(0xFFAEB7C4)
+    val Placeholder = Color(0xFF6B7480)
+    val Accent = Color(0xFF8AB4FF)
+    val Danger = Color(0xFFFFB4AB)
+    /** "This is on / included" -- the one affirmative in the menus. */
+    val Affirmative = Color(0xFF7FE08A)
+    val SectionLabel = Color(0xFF7D8794)
+
+    /** Behind every page the shell draws: the grid, a detail, the PC surface. */
+    val Ground = Color.Black
+    /** A card or plate on [Ground]: a game card, a detail's artwork plate. */
+    val Card = Color(0xFF1A1A1A)
+    /** The brightened card: the one selection idiom on a page. */
+    val CardFocused = Color(0xFF2A2A2A)
+    /** A row sunk into a page (a detail's action rows, the runner picker). */
+    val CardInset = Color(0xFF141414)
+    /** The hairline edge of a card that is not focused; focused, it is [Accent]. */
+    val CardOutline = Color(0x1FFFFFFF)
+    /** A chosen chip or tab, drawn solid, and the label on it. */
+    val Selected = Color.White
+    val OnSelected = Color.Black
+    /** Under text laid over artwork: the gradient's dark end. */
+    val Scrim = Color(0xCC000000)
+    /** The favourite mark. */
+    val Favourite = Color(0xFFFFD700)
+    /** The plate behind a [Danger] message that sits over the page. */
+    val DangerPlate = Color(0xCC330E0B)
+    /** The one primary action on a detail (Play), and its states. */
+    val Launch = Color(0xFF2B5C3C)
+    val LaunchFocused = Color(0xFF3D7A52)
+    val LaunchDisabled = Color(0xFF232323)
+    /** The supporting line on [Launch]. */
+    val OnLaunchMuted = Color(0xFFD7E6DC)
+    /**
+     * Every label on a control that is not available, its title and its
+     * supporting line alike. Faded by the one value droidtop's chrome
+     * fades by, never by a grey of its own; a faded [Value] falls under
+     * 3:1 on [CardFocused], which is where a disabled row is looked at.
+     */
+    val OnSurfaceDisabled = OnSurface.copy(alpha = ChromeColors.DisabledAlpha)
+    /**
+     * The hint bar's own plate, where it has one, and a hint pill's
+     * outline. It has none over a themed view: real ES-DE's HelpComponent
+     * draws its text ON the view and paints no background of its own, and
+     * an opaque strip there covers the plate the theme drew for exactly
+     * this row (rig, build 548).
+     */
+    val HintBar = Color(0xFF111111)
+    val HintPillOutline = Color(0x33FFFFFF)
+
+    val RowShape = RoundedCornerShape(10.dp)
+    val OverlayShape = RoundedCornerShape(14.dp)
+    val RowSpacing = 6.dp
+
+    /**
+     * ONE row height rule: every row is at least this tall, whatever it
+     * says, and a row with a subtitle grows from it. The rig measured
+     * three different heights down one settings screen (100 / 130 / 160
+     * px) because the box was whatever its text happened to need.
+     */
+    val RowMinHeight = 56.dp
+
+    /**
+     * The value column's own width, so the values down a screen line up
+     * as a column instead of each one starting where its label stopped.
+     * A value longer than this still gets the room it needs -- it is a
+     * minimum, not a box.
+     */
+    val ValueColumnMinWidth = 92.dp
+
+    /**
+     * The room the hint bar takes at the bottom of the window, as CONTENT
+     * padding on every scrolling screen the shell draws.
+     *
+     * The bar is the last thing in the shell's column, so a list measured
+     * against the rest of the window ends exactly where the bar begins:
+     * its last row is sliced by the window edge and scrolling to the end
+     * never brings that row clear (rig: the settings list's own last row,
+     * build 546; a game detail's last card, build 548). As CONTENT padding
+     * the same space scrolls with the list, so the end of the list is the
+     * end of the list. One value, because it is one bar.
+     */
+    val HintBarRoom = 72.dp
 }

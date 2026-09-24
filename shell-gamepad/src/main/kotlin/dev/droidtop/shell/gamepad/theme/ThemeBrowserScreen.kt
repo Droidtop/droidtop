@@ -30,7 +30,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
@@ -41,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.library.theme.ThemeAssets
 import dev.droidtop.library.theme.ThemeDownloader
+import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import kotlinx.coroutines.Dispatchers
@@ -108,7 +108,7 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
     BackHandler { onDismiss() }
 
     Box(
-        modifier = Modifier.fillMaxSize().background(Color.Black)
+        modifier = Modifier.fillMaxSize().background(MenuTokens.Ground)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp &&
                     (GamepadKeyMap.actionFor(event.key) == GamepadAction.BACK || GamepadKeyMap.actionFor(event.key) == GamepadAction.B)
@@ -121,18 +121,18 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
             },
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-            Text("Browse themes", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+            Text("Browse themes", color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineSmall)
             Text(
                 "The real ES-DE community theme index. Selecting an entry downloads or updates it.",
-                color = Color.Gray,
+                color = MenuTokens.OnSurfaceMuted,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
             )
             when {
-                loading -> Text("Loading...", color = Color.Gray)
+                loading -> Text("Loading...", color = MenuTokens.OnSurfaceMuted)
                 entries.isEmpty() -> Text(
                     "No themes indexed yet. Go back and run \"Sync theme index\" in Settings → Appearance first.",
-                    color = Color.Gray,
+                    color = MenuTokens.OnSurfaceMuted,
                 )
                 else -> LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -222,7 +222,7 @@ private fun ThemeBrowserRow(
             // Same real touch-input fix used throughout this shell --
             // .focusable() alone only covers D-pad/gamepad focus, never touch.
             .clickable(onClick = onDownload)
-            .background(if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A), RoundedCornerShape(12.dp))
+            .background(if (focused) MenuTokens.CardFocused else MenuTokens.Card, RoundedCornerShape(12.dp))
             .padding(16.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -236,17 +236,17 @@ private fun ThemeBrowserRow(
         }
         Column(modifier = Modifier.weight(1f)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(entry.name, color = Color.White, style = MaterialTheme.typography.titleMedium)
+                Text(entry.name, color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
                 if (entry.deprecated) {
-                    Text("DEPRECATED", color = Color(0xFFAA5555), style = MaterialTheme.typography.labelSmall)
+                    Text("DEPRECATED", color = MenuTokens.Danger, style = MaterialTheme.typography.labelSmall)
                 }
             }
             if (entry.author.isNotBlank()) {
-                Text("by ${entry.author}", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                Text("by ${entry.author}", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall)
             }
             Text(
                 status ?: if (installed) "Installed -- select to check for updates" else "Not installed -- select to download",
-                color = Color(0xFF8AB4FF),
+                color = MenuTokens.Accent,
                 style = MaterialTheme.typography.bodySmall,
             )
         }

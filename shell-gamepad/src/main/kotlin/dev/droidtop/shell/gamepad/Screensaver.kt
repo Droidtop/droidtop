@@ -28,7 +28,6 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -110,7 +109,7 @@ internal fun Screensaver(entries: List<LibraryEntry>, onDismiss: () -> Unit) {
         // menu burning in, but say why it is empty instead of showing a
         // black rectangle that looks like a crash.
         Box(
-            Modifier.fillMaxSize().background(Color.Black).then(dismissModifier),
+            Modifier.fillMaxSize().background(MenuTokens.Ground).then(dismissModifier),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -132,7 +131,7 @@ internal fun Screensaver(entries: List<LibraryEntry>, onDismiss: () -> Unit) {
     }
     val entry = withArt[index.coerceIn(withArt.indices)]
 
-    Box(Modifier.fillMaxSize().background(Color.Black).then(dismissModifier)) {
+    Box(Modifier.fillMaxSize().background(MenuTokens.Ground).then(dismissModifier)) {
         Crossfade(targetState = entry, animationSpec = tween(1200), label = "screensaver-slide") { shown ->
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 AsyncImage(
