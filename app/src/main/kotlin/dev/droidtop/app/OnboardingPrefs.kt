@@ -23,6 +23,9 @@ object GamesRootPrefs {
     // one, or many roots equally well.
     private const val KEY_GAMES_ROOT_PATHS = "droidtop_games_root_paths"
 
+    fun isOnboardingComplete(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_ONBOARDING_COMPLETE, false)
+
     fun markOnboardingComplete(context: Context) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_ONBOARDING_COMPLETE, true)

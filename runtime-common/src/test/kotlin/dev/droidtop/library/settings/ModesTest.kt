@@ -84,6 +84,13 @@ class ModesTest {
     }
 
     @Test
+    fun `the shells icon is offered only while a shell it could open is on`() {
+        assertTrue(ModePiece.APP_SHELLS_ICON in ModeGate.piecesToStart(setOf(Mode.GAMING)))
+        assertTrue(ModePiece.APP_SHELLS_ICON in ModeGate.piecesToStart(setOf(Mode.DESKTOP)))
+        assertFalse(ModePiece.APP_SHELLS_ICON in ModeGate.piecesToStart(setOf(Mode.LAUNCHER)))
+    }
+
+    @Test
     fun `every piece is owned by at least one mode`() {
         assertTrue(ModePiece.entries.all { it.owners.isNotEmpty() })
         // Nothing mode-specific is left running when every mode is off.

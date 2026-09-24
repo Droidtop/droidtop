@@ -133,7 +133,18 @@ class OnboardingActivity : AppCompatActivity() {
         // starting step and the storage answer the PLAN is built from
         // are facts about the run, and re-reading them after a rotation
         // is what made the plan differ by orientation.
-        onboardingRun.start(startStep, hasStorageAccess(this))
+        onboardingRun.start(
+            startStep,
+            hasStorageAccess(this),
+            // A rerun starts from the modes as they are, so walking through
+            // it again changes nothing that is not changed on the way.
+            modesOnBefore = if (GamesRootPrefs.isOnboardingComplete(this)) {
+                dev.droidtop.library.settings.Mode.entries
+                    .filterTo(mutableSetOf()) { dev.droidtop.library.settings.Modes.isEnabledInStorage(this, it) }
+            } else {
+                null
+            },
+        )
         setContent {
             // Onboarding is dark, like the shell it hands over to. It used
             // to follow the system setting, so a device in light mode got
@@ -193,13 +204,26 @@ internal class OnboardingRun : androidx.lifecycle.ViewModel() {
     var storageGrantedAtEntry: Boolean = false
         private set
 
-    fun start(startStep: OnboardingStep?, storageGranted: Boolean) {
+    /**
+     * [modesOnBefore] is null on a first run, where nothing is ticked
+     * until the person ticks it; on a rerun it is the modes already on,
+     * which start ticked.
+     */
+    fun start(
+        startStep: OnboardingStep?,
+        storageGranted: Boolean,
+        modesOnBefore: Set<dev.droidtop.library.settings.Mode>? = null,
+    ) {
         if (started) return
         started = true
         this.startStep = startStep
         this.storageGrantedAtEntry = storageGranted
         storageAccessGranted.value = storageGranted
         step.value = startStep ?: OnboardingStep.WELCOME
+        if (modesOnBefore != null) {
+            configureGaming.value = dev.droidtop.library.settings.Mode.GAMING in modesOnBefore
+            configureDesktop.value = dev.droidtop.library.settings.Mode.DESKTOP in modesOnBefore
+        }
     }
 
     // Each answer is a MutableState the screen delegates to (`var step by
@@ -295,6 +319,33 @@ internal fun plannedSteps(
     add(OnboardingStep.KEYBOARD)
     add(OnboardingStep.DEFAULT_MODE_CHOICE)
     add(OnboardingStep.WHAT_NEXT)
+}
+
+/**
+ * Which of the two app-hosted modes are ON once onboarding finishes
+ * (docs/SPEC.md 7b, "Anything else to set up"). The tick IS the switch: a
+ * mode left unticked is switched off, and a switched-off mode runs no
+ * code (SPEC 2c, Rule 1). Before this, the answer only decided which
+ * steps followed, and both modes stayed on whatever was ticked -- a
+ * person who said "no Gaming" still had Gaming's notification listener,
+ * its platforms warm-up and the Windows backbone running.
+ *
+ * Desktop is also left off when its capability check failed on this
+ * device. The one exception is the mode onboarding opens into: with
+ * nothing else set up that is Gaming, which explains what to add, and a
+ * mode cannot be opened while it is off.
+ */
+internal fun appModesOnAfterOnboarding(
+    configureGaming: Boolean,
+    configureDesktop: Boolean,
+    desktopCapable: Boolean,
+    opensInto: dev.droidtop.library.settings.Mode,
+): Set<dev.droidtop.library.settings.Mode> = buildSet {
+    if (configureGaming) add(dev.droidtop.library.settings.Mode.GAMING)
+    // Ticked, but the capability check said it cannot run here: switching
+    // it on would only offer a mode that opens onto its own failure.
+    if (configureDesktop && desktopCapable) add(dev.droidtop.library.settings.Mode.DESKTOP)
+    if (opensInto != dev.droidtop.library.settings.Mode.LAUNCHER) add(opensInto)
 }
 
 /**
@@ -438,7 +489,16 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
         goTo(next)
     }
 
-    fun finishOnboarding() {
+    fun finishOnboarding(opensInto: dev.droidtop.library.settings.Mode) {
+        // Written only here, at the end: a person who leaves part-way is
+        // told nothing they set is lost, and nothing about the modes is
+        // changed either.
+        val on = appModesOnAfterOnboarding(configureGaming, configureDesktop, desktopCapable, opensInto)
+        listOf(dev.droidtop.library.settings.Mode.GAMING, dev.droidtop.library.settings.Mode.DESKTOP).forEach { mode ->
+            if (dev.droidtop.library.settings.Modes.isEnabledInStorage(context, mode) != (mode in on)) {
+                dev.droidtop.library.settings.Modes.setEnabled(context, mode, mode in on)
+            }
+        }
         GamesRootPrefs.markOnboardingComplete(context)
         onDone()
     }
@@ -622,6 +682,10 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
             mode = chosenMode ?: dev.droidtop.library.settings.Mode.GAMING,
             homeImplementation = homeChoice ?: HomeRolePrefs.activeHomeImplementation(context),
             desktopConfigured = configureDesktop && desktopImageChosen,
+            modesOn = appModesOnAfterOnboarding(
+                configureGaming, configureDesktop, desktopCapable,
+                chosenMode ?: dev.droidtop.library.settings.Mode.GAMING,
+            ),
             gamingConfigured = configureGaming,
             gamesFound = rootReports.values.sumOf { it.total },
             // A root whose count has not come back yet is still being
@@ -632,14 +696,22 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
             storageGranted = storageAccessGranted,
             onFinish = {
                 val mode = chosenMode ?: dev.droidtop.library.settings.Mode.GAMING
-                finishOnboarding()
-                context.startActivity(
-                    Intent(Intent.ACTION_MAIN).apply {
-                        setClassName(context.packageName, "dev.droidtop.app.MainActivity")
-                        putExtra(BackButtonMenu.EXTRA_MODE, mode.id)
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    },
-                )
+                finishOnboarding(mode)
+                if (mode == dev.droidtop.library.settings.Mode.LAUNCHER) {
+                    // The home screen is not a MainActivity shell. Sent
+                    // there with "standard", MainActivity skipped it as
+                    // not its own and opened Gaming, so "Open Android"
+                    // landed in the game library.
+                    BackButtonMenu.openHome(context, homeChoice ?: HomeRolePrefs.activeHomeImplementation(context))
+                } else {
+                    context.startActivity(
+                        Intent(Intent.ACTION_MAIN).apply {
+                            setClassName(context.packageName, "dev.droidtop.app.MainActivity")
+                            putExtra(BackButtonMenu.EXTRA_MODE, mode.id)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        },
+                    )
+                }
             },
         )
     }
@@ -1093,16 +1165,17 @@ private fun ConfigureMoreStep(
 ) {
     OnboardingScaffold(
         title = "Anything else to set up?",
-        body = "Both modes stay reachable from droidtop's mode switcher whatever you " +
-            "picked for your home screen. Leaving both off is a real answer: you can " +
-            "set either of them up later from Settings.",
+        body = "A mode you leave unticked is switched off and runs nothing until you " +
+            "turn it on in Settings, under Global settings. Leaving both unticked is a " +
+            "real answer; if nothing else is set up either, droidtop keeps Gaming on so " +
+            "it has somewhere to open.",
         progress = progress,
         onBack = onBack,
         primary = StepAction("Next", onClick = onContinue),
     ) {
         SelectableRow(
             title = "Gaming",
-            supporting = "A game library with ES-DE themes. Needs storage access and your game folders.",
+            supporting = "A game library in ES-DE themes. Needs storage access and your game folders.",
             selected = gamingChecked,
             onClick = { onGamingChanged(!gamingChecked) },
         )
@@ -1717,6 +1790,7 @@ private fun WhatNextStep(
     mode: dev.droidtop.library.settings.Mode,
     homeImplementation: HomeRolePrefs.HomeImplementation,
     desktopConfigured: Boolean,
+    modesOn: Set<dev.droidtop.library.settings.Mode>,
     gamingConfigured: Boolean,
     gamesFound: Int,
     gamesStillCounting: Boolean,
@@ -1753,10 +1827,22 @@ private fun WhatNextStep(
     }
     val skipped = buildList {
         if (homeImplementation == HomeRolePrefs.HomeImplementation.NONE) {
-            add("Home screen — Settings, Home screen.")
+            add("Home screen — Settings, Global settings.")
         }
-        if (!gamingConfigured) add("Gaming — Settings, Gaming.")
-        if (!desktopConfigured) add("Desktop — Settings, Desktop.")
+        // Where each one lives, and whether it is on: an unticked mode is
+        // switched off at the end of this step (appModesOnAfterOnboarding).
+        when {
+            gamingConfigured -> Unit
+            dev.droidtop.library.settings.Mode.GAMING in modesOn ->
+                add("Game folders — none yet; Settings, Game folders.")
+            else -> add("Gaming — off; turn it on in Settings, Global settings.")
+        }
+        when {
+            desktopConfigured -> Unit
+            dev.droidtop.library.settings.Mode.DESKTOP in modesOn ->
+                add("Desktop — on, with no image chosen yet; Settings, Desktop mode, Desktop setup.")
+            else -> add("Desktop — off; turn it on in Settings, Global settings.")
+        }
         if (gamingConfigured && !storageGranted) add("Storage access — Settings, Game folders.")
     }
 

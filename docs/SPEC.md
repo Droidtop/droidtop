@@ -330,6 +330,12 @@ it plus the integrations only that surface can offer.
 | Preferences, including the mode switches themselves | `Modes` (`:runtime-common`), one prefs file |
 | Self-update and the update-now trigger (§10b) | `AppSelfUpdate`, `UpdateNowReceiver` |
 | Crash reporting and recovery | `CrashReporting`, `LauncherApplication` |
+| Keeping the index honest over time: the slow rebuild pass (§7g) | `Library` (`:library-core`) |
+
+The slow rebuild pass is core, not Gaming's: every surface that shows the
+library reads the same index (the Launcher's Games grid, Gaming's rows,
+Desktop's objects), and it starts only when one of them first asks for a
+scan, never at process start.
 
 The core is why "with Gaming off a game still launches" is true rather
 than a claim: the library and its resolution never belonged to Gaming, and
@@ -369,11 +375,19 @@ package from the drawer. It now works like this:
   one component, and `NativeAppProvider` leaves droidtop's own package out
   of the Apps list, so the Games icon never shows as an "app" in Gaming or
   Desktop.
+- A pinned game's shortcut names `LauncherGamesActivity` as its activity,
+  so it never depends on the gated `OpenShells` icon below.
 
 It is not mode-gated, deliberately. It runs nothing until someone opens
-it, and it is the package's only MAIN/LAUNCHER activity, which Android
-requires before it will accept a pinned shortcut from droidtop at all;
-disabling it with the fork would take the pinned games with it. With
+it, and it is the package's one always-enabled MAIN/LAUNCHER activity,
+which Android requires before it will accept a pinned shortcut from
+droidtop at all; disabling it with the fork would take the pinned games
+with it. The package's other launcher entry is `OpenShells`, an alias of
+`MainActivity` that is droidtop's own icon in another launcher's drawer
+(§7b, "Home screen"); it is a mode piece (`APP_SHELLS_ICON`), enabled
+exactly while Gaming or Desktop is on, and the fork's `AppFilter` hides it
+because droidtop's own home screen reaches the shells through its
+back-button menu. With
 "Alternative" set as home, it is the same Games icon in the other
 launcher's drawer — one more entry point onto the shared library, which
 is what "with Gaming off, games still launch" needs. Every game is not
@@ -452,6 +466,11 @@ Deliberately not component-gated, with reasons: a device-admin receiver
 (disabling an active admin is not droidtop's call behind the user's
 back), exported Activities the HOME role already gates, and the
 launcher's ContentProviders, whose `onCreate` is a bare `return true`.
+
+The Gaming and Desktop switches are set in two places and read in one:
+onboarding writes them from "Anything else to set up" when it finishes
+(§7b), and Settings > Global settings > Modes changes them later; both go
+through `Modes.setEnabled`, which re-runs `ModeStartup`.
 
 A mode's Activities and Compose trees need no gate of their own:
 `MainActivity` renders one enabled shell or nothing (it used to fall
@@ -2624,15 +2643,24 @@ buttons and a link. The component is the shell's existing menu row anatomy
   "pick one" appears only where one can be picked.
 - **Home screen.** How the home screen behaves when Home is pressed: droidtop's own Standard
   launcher, Alternative (droidtop holds the HOME role and forwards to a launcher the person
-  already has), or neither, in which case droidtop claims no `CATEGORY_HOME` role and its
-  icon opens `:app` like any other app.
+  already has), or neither, in which case droidtop claims no `CATEGORY_HOME` role.
+  Whenever droidtop is not the home screen, its icon in the launcher that is (`OpenShells`)
+  opens the default or last-used mode like any other app, beside the Games icon (§2c). With
+  Gaming and Desktop both off it has nothing to open and is not offered.
   - *Standard* points at the Standard shell's own settings rather than re-inventing them,
     and returns to onboarding afterwards.
   - *Alternative* lists the installed home activities with their icons and their application
     labels — never a class name, never a label that names nothing.
 - **Anything else to set up.** Desktop and Gaming, each with a line saying what setting it
-  up involves and what happens if it is left unticked. Leaving both unticked is a valid
-  answer and says so.
+  up involves; the step says what leaving one unticked does. Leaving both unticked is a valid
+  answer and says so. The ticks ARE the mode switches (§2c): when onboarding finishes, a
+  ticked mode is on and an unticked one is off and runs nothing
+  (`appModesOnAfterOnboarding`). They are written only at the end, so leaving part-way
+  changes no mode. Two refinements: Desktop ticked on a device whose capability check failed
+  stays off, since it could only open onto its own failure; and the mode onboarding opens
+  into is on, which matters only when nothing at all was set up and that mode is Gaming. A
+  first run starts with nothing ticked; a rerun starts from the modes that are on, so walking
+  through it again changes nothing that is not changed on the way.
 - **Desktop setup.** States the root situation first, as a statement a person can act on: what
   was found, what it means, and what to do about it — not a backend error string. When the
   mode cannot run on this device, droidtop says so and does not present a choice underneath
@@ -2708,10 +2736,13 @@ buttons and a link. The component is the shell's existing menu row anatomy
 - **Default mode.** Offers only modes whose setup actually produced something usable — the
   outcome, not the tick-box: Desktop qualifies when an image was chosen and the capability
   check passed. When exactly one mode qualifies this is a confirmation, not a question with
-  one answer.
+  one answer. When none does, it is a confirmation that droidtop opens into Gaming, which
+  explains what to add.
 - **What next.** Onboarding ends with a summary: what was set up, what was skipped, and where
-  in Settings each skipped thing lives, then one action into the chosen mode. It does not end
-  by returning to the system home.
+  in Settings each skipped thing lives, and whether it is now off, then one action into the
+  chosen mode. It does not end by returning to the system home. "Android" opens the home
+  screen droidtop holds, through the same `BackButtonMenu.openHome` the mode switcher uses;
+  it is not a `MainActivity` shell.
 
 ### Copy
 

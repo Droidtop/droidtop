@@ -76,6 +76,15 @@ enum class ModePiece(vararg owners: Mode) {
      * one idempotent entry point rather than started twice.
      */
     WINDOWS_BACKBONE(Mode.GAMING, Mode.DESKTOP),
+
+    /**
+     * droidtop's own icon in another launcher's drawer, which opens the
+     * app-hosted shells. It is how a person whose Home is "Alternative" or
+     * "Neither" reaches Gaming or Desktop at all (they have no droidtop home
+     * screen to long-press Back on), and with both of those modes off it
+     * would open onto nothing, so it goes with them.
+     */
+    APP_SHELLS_ICON(Mode.GAMING, Mode.DESKTOP),
     ;
 
     val owners: Set<Mode> = owners.toSet()

@@ -116,14 +116,13 @@
           The real HOME/LAUNCHER entry point is :shell-default's own
           com.android.launcher3.Launcher (forked-in Murine Launcher - see
           shell-default/README.md), declared in that library module's own
-          manifest and merged in here by AGP. This is deliberately NOT a
-          second app-drawer icon: droidtop defaults to the normal Android
-          launcher experience, and reaches Desktop/Gaming/Settings via
-          the home screen's own back-button menu (see
-          dev.droidtop.shell.standard.BackButtonMenu, patched into
-          Launcher.onBackPressed()) launching this Activity by explicit
-          Intent with an EXTRA_MODE extra - not a separate entry point a
-          user would ever tap directly from the app drawer.
+          manifest and merged in here by AGP. From droidtop's own home
+          screen, Desktop/Gaming/Settings are reached through its
+          back-button menu (see dev.droidtop.shell.standard.BackButtonMenu,
+          patched into Launcher.onBackPressed()) launching this Activity by
+          explicit Intent with an EXTRA_MODE extra. A person whose Home is
+          another launcher, or none, has no such menu, so the OpenShells
+          alias below is droidtop's icon in that launcher's drawer.
         -->
         <!--
           configChanges: without this, a real rotation (confirmed live via
@@ -142,6 +141,26 @@
             android:exported="true"
             android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|navigation" />
+
+        <!--
+          droidtop's own drawer icon, for a device whose Home is another
+          launcher or none (docs/SPEC.md 7b, "Home screen"): it opens
+          MainActivity with no mode named, so the default or last-used mode
+          opens. ModeStartup disables it while Gaming and Desktop are both
+          off, when it would open onto nothing. droidtop's own launcher
+          hides it (AppFilter hides droidtop's package except Games), where
+          the back-button menu is the route instead.
+        -->
+        <activity-alias
+            android:name="dev.droidtop.app.OpenShells"
+            android:targetActivity="dev.droidtop.app.MainActivity"
+            android:exported="true"
+            android:label="@string/droidtop_app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
 
         <!--
           Started by dev.droidtop.shell.standard.OnboardingGate (:shell-default,
@@ -173,12 +192,12 @@
 
         <!--
           Launcher mode's view of the library: the Games icon in the app
-          drawer (docs/SPEC.md, "Launcher mode"). The package's only
-          MAIN/LAUNCHER activity, which is also what lets a game be pinned
-          to the home screen at all: the platform attributes a pinned
-          shortcut to its package's launcher activity and refuses one from
-          a package that has none. Not a second way into MainActivity; the
-          shells are still reached from the home screen's back-button menu.
+          drawer (docs/SPEC.md, "Launcher mode"). The package's one
+          always-enabled MAIN/LAUNCHER activity, which is also what lets a
+          game be pinned to the home screen at all: the platform attributes
+          a pinned shortcut to a launcher activity of its package and
+          refuses one from a package that has none. Not a way into
+          MainActivity; that is the OpenShells alias above.
         -->
         <activity
             android:name="dev.droidtop.app.LauncherGamesActivity"
