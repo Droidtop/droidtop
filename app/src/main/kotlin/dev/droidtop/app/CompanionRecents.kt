@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -63,6 +64,20 @@ internal fun CompanionRecents() {
             items(recents, key = { it.id }) { entry ->
                 RecentCard(entry)
             }
+        }
+        val launchError by CompanionState.launchError.collectAsState()
+        launchError?.let { message ->
+            // Tap to dismiss; the next launch from the rail clears it too.
+            Text(
+                message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .clickable { CompanionState.launchError.value = null }
+                    .padding(top = 8.dp),
+            )
         }
     }
 }
