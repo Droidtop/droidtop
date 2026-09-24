@@ -268,6 +268,24 @@ fun CatalogNavigator(
                 .focusRequester(listFocus)
                 .focusable()
                 .onKeyEvent { event ->
+                    // B and Escape leave a screen the same way the system
+                    // Back button does, on the UP edge like every other
+                    // screen in the shell, with the DOWN edge consumed.
+                    // Deliberately NOT Key.Back: that one is delivered
+                    // through the back DISPATCHER (the BackHandler above),
+                    // and handling it here as well would pop twice.
+                    // Without this a pad whose B reports as
+                    // KEYCODE_BUTTON_B had no way out of a settings screen
+                    // at all, and neither did a keyboard. Popping on DOWN
+                    // popped twice anyway: the UP went on to the shell's
+                    // pad owner (Modifier.ownPadButtons), which sent Back
+                    // again, so B from Settings > Android settings left
+                    // Settings for the Games carousel (UI pass 2026-09-24,
+                    // H3).
+                    if (event.key == Key.ButtonB || event.key == Key.Escape) {
+                        if (event.type == KeyEventType.KeyUp) pop()
+                        return@onKeyEvent true
+                    }
                     if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
                     when (event.key) {
                         Key.DirectionDown -> {
@@ -288,18 +306,6 @@ fun CatalogNavigator(
                         }
                         Key.ButtonA, Key.Enter, Key.DirectionCenter, Key.NumPadEnter -> {
                             rows.getOrNull(selected)?.let { activate(it.item) }
-                            true
-                        }
-                        // B and Escape leave a screen the same way the
-                        // system Back button does. Deliberately NOT
-                        // Key.Back: that one is delivered through the
-                        // back DISPATCHER (the BackHandler above), and
-                        // handling it here as well would pop twice.
-                        // Without this branch a pad whose B reports as
-                        // KEYCODE_BUTTON_B had no way out of a settings
-                        // screen at all, and neither did a keyboard.
-                        Key.ButtonB, Key.Escape -> {
-                            pop()
                             true
                         }
                         else -> false
