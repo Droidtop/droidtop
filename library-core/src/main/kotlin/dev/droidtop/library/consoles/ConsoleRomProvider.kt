@@ -577,6 +577,10 @@ class ConsoleRomProvider(
                     title = romFile.nameWithoutExtension,
                     kind = LibraryEntryKind.CONSOLE_ROM,
                     systemId = effectiveSystemId,
+                    // Three media lookups per ROM, each answered from
+                    // one listing per media folder (see EsDeArtwork), so
+                    // an 18,000-file folder lists its dozen media
+                    // folders once instead of stat-ing a million names.
                     artworkUri = EsDeArtwork.resolve(gamesRoot, effectiveSystemId, romFile.nameWithoutExtension),
                     manualUri = EsDeArtwork.resolveManual(gamesRoot, effectiveSystemId, romFile.nameWithoutExtension),
                     videoUri = EsDeArtwork.resolveVideo(gamesRoot, effectiveSystemId, romFile.nameWithoutExtension),
@@ -912,7 +916,10 @@ private fun RomEntity.toLibraryEntry(): LibraryEntry {
     // without a manual rescan, and a freshly composed miximage must
     // outrank whatever cover the scan once saw (EsDeArtwork's own
     // miximages-first priority). The persisted value stays as the
-    // fallback for anything the convention walk can't see.
+    // fallback for anything the convention walk can't see. Resolving
+    // live costs no per-row filesystem call: EsDeArtwork answers from
+    // one listing per media folder, re-read only when that folder
+    // changes.
     val baseName = File(id).nameWithoutExtension
     val root = File(romsRoot)
     return LibraryEntry(

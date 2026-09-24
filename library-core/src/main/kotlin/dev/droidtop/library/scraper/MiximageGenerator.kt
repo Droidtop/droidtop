@@ -120,6 +120,7 @@ object MiximageGenerator {
         output.outputStream().use { stream ->
             canvasBitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
         }
+        dev.droidtop.library.EsDeArtwork.mediaWritten(output)
         return true
     }
 
