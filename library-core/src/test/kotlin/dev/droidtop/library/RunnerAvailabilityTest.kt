@@ -88,12 +88,14 @@ class RunnerAvailabilityTest {
     }
 
     @Test
-    fun `native Linux without a container is not-on-this-device, with the root reason`() {
+    fun `native Linux without a container is not-on-this-device, and says to start Desktop mode`() {
         val option = RunnerAvailability
             .evaluate(facts(hasLinuxBuild = true, linuxContainerAvailable = false))
             .of(GameLaunchStrategy.LINUX_CONTAINER)
         assertEquals(RunnerState.NOT_ON_THIS_DEVICE, option.state)
-        assertTrue(option.reason!!.contains("root"))
+        // Desktop mode's container runs with or without root (SPEC 3), so
+        // the reason names the mode to start, not root.
+        assertTrue(option.reason!!.contains("Desktop mode"))
     }
 
     @Test
