@@ -613,6 +613,31 @@ object AppSettingsCatalogs {
      * activity would be linked. droidtop never reaches inside; every
      * row here is the published contract.
      */
+    /**
+     * An Enginehost engine id ("rpgmaker", "cmvs") as the engine's own
+     * name, with its context ("2000", "ps2") where the engine has more
+     * than one line. An id this does not know is shown with its words
+     * capitalised rather than as the raw id.
+     */
+    private fun engineRuntimeName(engine: String, context: String?): String {
+        val base = when (engine.lowercase()) {
+            "rpgmaker" -> "RPG Maker"
+            "renpy" -> "Ren'Py"
+            "kirikiri" -> "KiriKiri"
+            "cmvs" -> "CMVS"
+            "catsystem2" -> "CatSystem2"
+            "buriko" -> "BGI"
+            else -> engine.split('-', '_', ' ').filter { it.isNotEmpty() }
+                .joinToString(" ") { it.replaceFirstChar { c -> c.uppercaseChar() } }
+        }
+        val ctx = context?.takeIf { it.isNotBlank() } ?: return base
+        return if (ctx.all { it.isDigit() } || ctx.uppercase() in setOf("MV", "MZ", "XP", "VX", "VXACE")) {
+            "$base ${ctx.uppercase()}"
+        } else {
+            "$base (${ctx.uppercase()})"
+        }
+    }
+
     private fun enginehostScreen() = CatalogScreen(
         id = SCREEN_ENGINEHOST,
         title = "Enginehost",
@@ -675,21 +700,43 @@ object AppSettingsCatalogs {
                             ),
                         )
                     } else {
+                        // The engine's own name with the version it runs
+                        // in the value column; the bundle's package id,
+                        // plugin version and source address are on its
+                        // Details page, not in the row (UI pass
+                        // 2026-09-24, M5: package ids and URLs in the list).
                         bundles.map { bundle ->
-                            ActionItem(
+                            val name = engineRuntimeName(bundle.engine, bundle.engineContext)
+                            NestedScreenItem(
                                 id = "enginehost_bundle_${bundle.bundleId}",
-                                title = bundle.engine +
-                                    (bundle.engineContext?.let { " ($it)" } ?: "") +
-                                    (bundle.runtimeVersion?.let { "  $it" } ?: ""),
-                                subtitle = buildString {
-                                    append(bundle.bundleId)
-                                    if (bundle.supportedSeries.isNotEmpty()) {
-                                        append("  |  covers ")
-                                        append(bundle.supportedSeries.joinToString(", ") { "$it.*" })
-                                    }
-                                    bundle.origin?.let { append("  |  ").append(it) }
-                                },
-                                run = {},
+                                title = name,
+                                subtitle = bundle.supportedSeries.takeIf { it.isNotEmpty() }
+                                    ?.let { "Runs versions ${it.joinToString(", ") { series -> "$series.x" }}" },
+                                valueLabel = { bundle.runtimeVersion },
+                                inline = CatalogScreen(
+                                    id = "enginehost_bundle_detail_${bundle.bundleId}",
+                                    title = name,
+                                    groups = {
+                                        listOf(
+                                            CatalogGroup(
+                                                id = "enginehost_bundle_details",
+                                                title = "Details",
+                                                items = listOfNotNull(
+                                                    ActionItem(id = "bundle_id", title = "Bundle", value = bundle.bundleId, run = {}),
+                                                    bundle.runtimeVersion?.let {
+                                                        ActionItem(id = "bundle_runtime", title = "Engine version", value = it, run = {})
+                                                    },
+                                                    bundle.pluginVersion?.let {
+                                                        ActionItem(id = "bundle_plugin", title = "Plugin version", value = it, run = {})
+                                                    },
+                                                    bundle.origin?.let {
+                                                        ActionItem(id = "bundle_origin", title = "Source", subtitle = it, run = {})
+                                                    },
+                                                ),
+                                            ),
+                                        )
+                                    },
+                                ),
                             )
                         }
                     },
@@ -1172,8 +1219,8 @@ object AppSettingsCatalogs {
         // "ROM folders", one navigation step apart -- and the folders are
         // not only ROMs: engine and Windows games are found in them too.
         title = "Game folders",
-        subtitle = "Console ROMs in <folder>/<system>/<romFile>, and engine or Windows games anywhere " +
-            "under these; changes apply on the next library rescan",
+        subtitle = "Console games go in a folder named for their system (snes, psx) inside one of these; " +
+            "PC and engine games can be anywhere under them. Rescan the library after a change",
         groups = { context ->
             listOf(
                 CatalogGroup(
@@ -1266,7 +1313,7 @@ object AppSettingsCatalogs {
                         ActionItem(
                             id = "rom_folder_$path",
                             title = path,
-                            subtitle = "Activate to remove this folder from scanning",
+                            subtitle = "Select twice to stop scanning this folder",
                             confirmTitle = "Remove $path?",
                             run = { ctx -> GamesRootPrefs.removeGamesRoot(ctx, path) },
                         )
@@ -1522,7 +1569,7 @@ object AppSettingsCatalogs {
     private fun platformsScreen() = CatalogScreen(
         id = SCREEN_PLATFORMS,
         title = "Manage platforms",
-        subtitle = "Every platform droidtop recognizes — open one to edit or delete it (built-ins included); Restore defaults resets built-ins without touching your own",
+        subtitle = "Every platform droidtop recognizes. Open one to edit or delete it",
         groups = { context ->
             val dao = ConsoleSystemsDatabase.get(context).consoleSystemDao()
             if (dao.count() == 0) ConsoleSystemsRepository.allSystems(context)
@@ -1554,12 +1601,18 @@ object AppSettingsCatalogs {
                     items = systems.map { entity ->
                         NestedScreenItem(
                             id = "platform_${entity.id}",
-                            title = "${entity.displayName} (${entity.id})",
+                            // The platform's name, and a count rather than
+                            // its whole extension list; the id, the list and
+                            // the core are on the platform's own page (UI
+                            // pass 2026-09-24, L5: "core: null" and
+                            // 30-item lists in every row).
+                            title = entity.displayName,
                             subtitle = listOfNotNull(
-                                entity.extensionsCsv.ifBlank { null }?.let { "extensions: $it" },
-                                entity.retroArchCore?.let { "core: $it" },
-                                if (entity.isBuiltIn) "built-in" else "custom",
-                            ).joinToString("  ·  "),
+                                entity.extensionsCsv.split(',').count { it.isNotBlank() }
+                                    .takeIf { it > 0 }
+                                    ?.let { if (it == 1) "1 file type" else "$it file types" },
+                                if (entity.isBuiltIn) "Built-in" else "Added by you",
+                            ).joinToString(" · "),
                             inline = platformEditScreen(entity),
                         )
                     },
