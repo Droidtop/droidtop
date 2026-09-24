@@ -144,9 +144,8 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  *
  * Deliberately NOT implemented: analog left-stick-as-navigation (needs a
  * real controller to tune against, none was available while writing
- * this) and dual-screen
- * presentation (§4's `DualScreenCoordinator` decides role assignment,
- * nothing here renders companion content on a second screen yet).
+ * this). Second-screen content is not this shell's either: `:app`
+ * places the companion and decides which panel is the main one (§4c).
  */
 @Composable
 fun GamepadShell(

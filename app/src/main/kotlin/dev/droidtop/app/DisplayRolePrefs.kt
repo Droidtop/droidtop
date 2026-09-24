@@ -10,25 +10,14 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * as every other settings concern, written by :shell-default's settings
  * rows and read here.
  *
- * Desktop mode honors [shellTarget] like Gaming does (the desktop
- * renders on the addon/external panel by default, and the built-in panel
- * becomes its input surface — docs/SPEC.md §4c, external screen
- * priority) but deliberately ignores [gameLaunchTarget]: its windows are
- * the compositor's job (§4), not per-launch display targets.
+ * Which panel the shell itself renders on is not here: that is
+ * [dev.droidtop.runtime.MainScreen], the one role model both Gaming and
+ * Desktop read. Desktop mode deliberately ignores [gameLaunchTarget]: its
+ * windows are the compositor's job (§4), not per-launch display targets.
  */
 object DisplayRolePrefs {
     private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
-    private const val KEY_SHELL_DISPLAY = "pref_display_shell_target"
     private const val KEY_GAME_LAUNCH_DISPLAY = "pref_display_game_launch_target"
-
-    /** Where the Gaming shell itself renders. */
-    enum class ShellTarget {
-        /** The second display when one is present (the addon is the upper/main screen — per direction, the default), built-in otherwise. */
-        SECOND_WHEN_PRESENT,
-
-        /** Always the built-in screen; a second display gets the widgets panel (the pre-direction behavior, kept as a real choice). */
-        BUILT_IN,
-    }
 
     /** Which display game/app launches target. */
     enum class GameLaunchTarget {
@@ -43,12 +32,6 @@ object DisplayRolePrefs {
         BUILT_IN,
         SECOND,
     }
-
-    fun shellTarget(context: Context): ShellTarget =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(KEY_SHELL_DISPLAY, null)
-            ?.let { runCatching { ShellTarget.valueOf(it) }.getOrNull() }
-            ?: ShellTarget.SECOND_WHEN_PRESENT
 
     fun gameLaunchTarget(context: Context): GameLaunchTarget =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

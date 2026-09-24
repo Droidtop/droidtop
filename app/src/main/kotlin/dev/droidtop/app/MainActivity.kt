@@ -30,8 +30,10 @@ import dev.droidtop.shell.desktop.DesktopShell
 import dev.droidtop.shell.gamepad.GamepadShell
 import dev.droidtop.shell.standard.BackButtonMenu
 import dev.droidtop.shell.standard.OnboardingGate
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Not an app-drawer entry point — droidtop defaults to the normal Android
@@ -121,18 +123,6 @@ class MainActivity : AppCompatActivity() {
     // This instance's companion tap-to-launch seam -- kept so onDestroy
     // can identity-check before clearing the process-wide hook.
     private var companionLaunchSeam: ((dev.droidtop.library.LibraryEntry) -> Unit)? = null
-
-    // Which physical panel is the main output. Written by
-    // DisplayArrangement.swap, read on every orchestration pass. Android
-    // exposes no reliable physical-position signal, so this is a guess
-    // the user can correct and droidtop then remembers -- never a
-    // decision droidtop keeps making for them.
-    private val dualScreenStore by lazy {
-        dev.droidtop.runtime.PrefsDualScreenAssignmentStore(applicationContext)
-    }
-    private val dualScreenCoordinator by lazy {
-        dev.droidtop.runtime.DualScreenCoordinator(dualScreenStore)
-    }
 
     /**
      * Re-runs orchestration from scratch: drops the parked display and the
@@ -466,8 +456,8 @@ class MainActivity : AppCompatActivity() {
     /**
      * Dual-screen role orchestration (docs/SPEC.md §4, Gaming-mode
      * dual-screen roles — directed after the first live addon session):
-     * when a second display is present and [DisplayRolePrefs.shellTarget]
-     * says so (the default), the GAMING SHELL ITSELF moves to it (the
+     * when a second display is present and [dev.droidtop.runtime.MainScreen]
+     * says so (the default), the SHELL ITSELF moves to it (the
      * addon is the upper/main screen) and the built-in screen gets the
      * widgets panel ([CompanionActivity] — a real Activity, since
      * `Presentation` can only target non-default displays). The
@@ -478,8 +468,8 @@ class MainActivity : AppCompatActivity() {
      * instance) — so window focus, and every gamepad event with it, ends
      * on the shell. Also maintains [LaunchDisplay.targetDisplayId] — the
      * launcher-wide "games launch on which display" setting. Desktop mode
-     * deliberately opts out of all of this (§4: its lower screen is an
-     * input surface).
+     * relocates the same way (§4c, external screen priority) but takes no
+     * part in game launch targeting: its windows are the compositor's.
      */
     private fun observeSecondScreen() {
         val displayOutputs = DisplayOutputRepository(applicationContext)
@@ -595,28 +585,20 @@ class MainActivity : AppCompatActivity() {
                 // with apps we've launched" half of the home-press reinit.
                 val parked = dev.droidtop.library.LaunchDisplay.parkedDisplayId
                 val secondAvailable = second != null && second.androidDisplayId != parked
-                // The user's own panel assignment wins when they have made
-                // one; the ShellTarget preference is only the seed for
-                // before they ever have. Previously this read the
-                // preference alone, so DualScreenCoordinator's whole
-                // resolve/swap/persist mechanism -- written, unit-tested,
-                // and wired to nothing -- could never affect anything, and
-                // "swap my screens" had no way to take effect.
-                val roles = dualScreenCoordinator.resolve(outputs)
-                val assignedUpper = roles.entries
-                    .firstOrNull { it.value == dev.droidtop.runtime.DualScreenRole.UPPER_OUTPUT }
-                    ?.key
-                val hasSavedAssignment = dualScreenStore.get().size >= 2
+                // Which panel is the main output: one persisted, relative
+                // choice (MainScreen), flipped by Swap screens and set by
+                // the Main screen row. Read off the main thread -- the
+                // first read loads a preferences file from disk.
+                val mainScreen = withContext(Dispatchers.IO) {
+                    dev.droidtop.runtime.MainScreen.choice(applicationContext)
+                }
                 // Gaming AND Desktop both put the shell on the addon by
                 // default -- the add-on is the better surface and droidtop
                 // treats it as the main output, not an afterthought (per
                 // direction; docs/SPEC.md section 4). Standard stays with
                 // the platform's own Launcher3 secondary-display handling.
-                val wantShellOnSecond = (gaming || desktop) && secondAvailable && if (hasSavedAssignment) {
-                    assignedUpper?.androidDisplayId == second!!.androidDisplayId
-                } else {
-                    DisplayRolePrefs.shellTarget(this@MainActivity) == DisplayRolePrefs.ShellTarget.SECOND_WHEN_PRESENT
-                }
+                val wantShellOnSecond = (gaming || desktop) && secondAvailable &&
+                    mainScreen == dev.droidtop.runtime.MainScreenChoice.SECOND_WHEN_PRESENT
                 // Relocation give-up: a display can refuse activity
                 // launches, and after MAX_RELOCATION_ATTEMPTS whole
                 // cooldown windows without the shell actually being on the
@@ -652,18 +634,14 @@ class MainActivity : AppCompatActivity() {
                         null
                     }
 
-                // The second display needs no work from droidtop at all
-                // now: the platform places :display's
-                // SecondaryDisplayActivity on every secondary display and
-                // re-places it when whatever ran there finishes. This used
-                // to push a Presentation onto the same display and race
-                // the platform for it -- see docs/SPEC.md section 4c.
+                // Two surfaces cover the second display (docs/SPEC.md 4c):
+                // :display's SECONDARY_HOME activity is the IDLE one the
+                // platform places while droidtop is not foreground, and
+                // the Presentation below is the LIVE one this foreground
+                // shell owns. SECONDARY_HOME never applies to the DEFAULT
+                // display, so when the addon is the main output the shell
+                // moves there and the built-in gets CompanionActivity.
                 //
-                // What remains is the one case the platform cannot cover:
-                // SECONDARY_HOME never applies to the DEFAULT display, so
-                // when the user has assigned the addon as the main output
-                // the shell is moved there and the built-in gets the
-                // companion as an ordinary Activity.
                 // Second screen, shell NOT on it: this shell is foreground
                 // on the built-in panel, so it drives the companion
                 // directly as a Presentation. The SECONDARY_HOME activity
@@ -674,9 +652,7 @@ class MainActivity : AppCompatActivity() {
                 // window too, because that is where its second-screen
                 // keyboard and trackpad live (docs/SPEC.md 4, 6c), and the
                 // live window is the one that exists whether or not
-                // droidtop holds the home role. `shellOnSecond` is only
-                // ever true in Gaming mode, so the Gaming behaviour
-                // this condition already had is unchanged.
+                // droidtop holds the home role.
                 if (!shellOnSecond && second != null && secondAvailable) {
                     if (secondScreenPresentation?.display?.displayId != second.androidDisplayId) {
                         secondScreenPresentation?.dismiss()

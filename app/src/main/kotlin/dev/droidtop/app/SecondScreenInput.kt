@@ -56,12 +56,6 @@ object SecondScreenInputPrefs {
         return stored?.let { runCatching { Role.valueOf(it) }.getOrNull() } ?: defaultFor(mode)
     }
 
-    fun setRole(context: Context, mode: SecondaryDisplayContent.Mode, role: Role) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
-            .putString(KEY_PREFIX + mode.name, role.name)
-            .apply()
-    }
-
     fun defaultFor(mode: SecondaryDisplayContent.Mode): Role = when (mode) {
         SecondaryDisplayContent.Mode.DESKTOP -> Role.INPUT
         else -> Role.COMPANION
