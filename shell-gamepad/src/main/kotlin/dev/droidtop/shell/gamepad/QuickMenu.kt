@@ -181,24 +181,18 @@ internal fun QuickMenu(onDismiss: () -> Unit) {
                                     .padding(horizontal = 14.dp, vertical = 8.dp),
                             )
                         }
-                        Spacer(Modifier.weight(1f))
-                        // Closing is B on a pad and had no touch route at
-                        // all; dismissing by tapping outside is not
-                        // discoverable and is not available at all when the
-                        // sheet is full width.
-                        Text(
-                            "Close",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MenuTokens.OnSurfaceMuted,
-                            modifier = Modifier
-                                .clickable(onClick = onDismiss)
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                        )
                     }
                     Spacer(Modifier.padding(4.dp))
+                    // Closing's touch route is the hint row's own "B Close"
+                    // pill, which dispatches a real B into this window; a
+                    // separate "Close" text in the corner was a second
+                    // control for the same press (UI pass 2026-09-24, M12).
+                    // L1/R1 is hinted by the tab it goes to, so the switch
+                    // is discoverable on a pad and tappable on a screen.
+                    val tabHint = GamepadAction.R to tab.next().label
                     when (tab) {
-                        QuickTab.NOTIFICATIONS -> NotificationsTab(onDismiss)
-                        QuickTab.SYSTEM -> QuickSettingsPanel(sheetWidth.value.toInt(), onDismiss)
+                        QuickTab.NOTIFICATIONS -> NotificationsTab(onDismiss, tabHint)
+                        QuickTab.SYSTEM -> QuickSettingsPanel(sheetWidth.value.toInt(), onDismiss, tabHint)
                     }
                 }
             }
@@ -215,7 +209,7 @@ private enum class QuickTab(val label: String) {
 }
 
 @Composable
-private fun NotificationsTab(onDismiss: () -> Unit) {
+private fun NotificationsTab(onDismiss: () -> Unit, tabHint: Pair<GamepadAction, String>) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val granted = remember { NotificationsStore.isGranted(context) }
     val items by NotificationsStore.items.collectAsState()
@@ -274,9 +268,10 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                 }
             },
     ) {
+        val showList = granted && items.isNotEmpty()
         when {
             !granted -> Text(
-                "droidtop needs notification access to show these.\n\nPress A to open the grant screen -- it is a one-time system permission.",
+                "droidtop needs notification access to show these.\n\nPress A to open the grant screen. It is a one-time system permission.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MenuTokens.OnSurface,
                 modifier = Modifier.padding(vertical = 12.dp),
@@ -287,7 +282,16 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                 color = MenuTokens.OnSurfaceMuted,
                 modifier = Modifier.padding(vertical = 12.dp),
             )
-            else -> LazyColumn(
+            else -> Unit
+        }
+        // The hint row is docked at the bottom of the sheet on every tab.
+        // With no list to take the room it used to float directly under
+        // "No notifications." while the System tab's sat at the bottom
+        // (UI pass 2026-09-24, M12).
+        if (!showList) {
+            Spacer(Modifier.weight(1f))
+        } else {
+            LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -348,15 +352,21 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
         // neither of which had any touch route. As a hint bar the same
         // line IS the route, dispatching into this dialog's own window.
         TouchHintBar(
-            hints = if (granted) {
-                listOf(
-                    GamepadAction.A to "Open",
-                    GamepadAction.X to "Dismiss",
-                    GamepadAction.Y to "Clear all",
-                    GamepadAction.B to "Close",
-                )
-            } else {
-                listOf(GamepadAction.A to "Grant access", GamepadAction.B to "Close")
+            // Only what dispatches right now: Open and Dismiss need a
+            // notification under the cursor, Dismiss and Clear all need one
+            // that can be cleared, and an empty list offers none of them.
+            hints = buildList {
+                val current = items.getOrNull(focusIndex)
+                when {
+                    !granted -> add(GamepadAction.A to "Grant access")
+                    current != null -> {
+                        add(GamepadAction.A to "Open")
+                        if (current.clearable) add(GamepadAction.X to "Dismiss")
+                    }
+                }
+                if (granted && items.any { it.clearable }) add(GamepadAction.Y to "Clear all")
+                add(tabHint)
+                add(GamepadAction.B to "Close")
             },
             background = androidx.compose.ui.graphics.Color.Transparent,
             modifier = Modifier.padding(top = 8.dp),

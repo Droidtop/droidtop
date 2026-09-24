@@ -92,7 +92,11 @@ import java.util.Date
  * screen, runs an action), B closes. Touch works on every tile too.
  */
 @Composable
-internal fun QuickSettingsPanel(sheetWidthDp: Int, onDismiss: () -> Unit) {
+internal fun QuickSettingsPanel(
+    sheetWidthDp: Int,
+    onDismiss: () -> Unit,
+    tabHint: Pair<GamepadAction, String>,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var version by remember { mutableStateOf(0) }
@@ -253,12 +257,13 @@ internal fun QuickSettingsPanel(sheetWidthDp: Int, onDismiss: () -> Unit) {
         }
         // The same bar the Notifications tab beside this one uses: on a
         // touch screen these are the controls, not a legend. L1/R1 is
-        // left out because the tabs above are already tappable.
+        // named too: a pad user cannot tap the tabs above.
         TouchHintBar(
             hints = listOf(
                 GamepadAction.LEFT to "Lower",
                 GamepadAction.RIGHT to "Raise",
                 GamepadAction.A to "Act",
+                tabHint,
                 GamepadAction.B to "Close",
             ),
             background = Color.Transparent,
