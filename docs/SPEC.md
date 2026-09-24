@@ -266,16 +266,31 @@ surface should read the same `LibraryEntry` stream `:shell-gamepad`
 reads, differing only in presentation. Same rule as the secondary display
 (§4c): one mechanism, the active mode selects what it looks like.
 
-Two things this needs that Gaming did not:
+Two things this needs that Gaming did not, decided precisely on
+2026-09-24 because the Start menu lists library entries as text rows and
+nothing else of this section exists:
 
-- **Shortcuts as first-class desktop objects.** A Wine shortcut has an
-  icon, a working directory and an executable — everything a `.desktop`
-  entry has. Desktop should place them the way a Linux desktop does,
-  rather than treating them as rows in a game list.
-- **Windowed launching.** Gaming launches fullscreen to a display;
-  Desktop launches into a window on the shared desktop
-  (`WindowPlacement`, §4), which is a different launch path through the
-  same entry.
+- **Shortcuts as first-class desktop objects.** The Start menu has three
+  sections — Linux apps (the container's desktop entries, §2a), Games
+  (every `LibraryEntry` of the game kinds, with artwork) and Windows
+  (Wine-prefix shortcuts, each with its icon, working directory and
+  executable, the same facts a `.desktop` entry carries) — and any entry
+  can be pinned to the taskbar from its long-press menu, where it sits
+  as an icon until unpinned. The compositor's own desktop surface is the
+  container's and gets no droidtop-drawn icons; "placed the way a Linux
+  desktop does" means the menu and the bar, which is where a Linux
+  desktop places them too.
+- **Launching from Desktop.** A Linux program is an `exec` in its
+  container and appears as a window through the shared socket (§2). A
+  game or a Wine shortcut launches the way it launches everywhere —
+  `Library.launch`, then `LaunchDisplay` — targeting the display the
+  desktop renders on, and it is a fullscreen Activity over the desktop
+  for as long as it runs: a Wine guest draws into gamenative's X server
+  view, not into the compositor (§5b), and an emulator is an Android
+  Activity (the section below). A Windows program as a window INSIDE the
+  container's desktop is Wine-in-the-container, §11's open risk, and no
+  launch path assumes it. `WindowPlacement` therefore applies to
+  container windows and to compositor outputs, not to Activities.
 
 ### Emulators, and Android apps as windows
 
@@ -2647,16 +2662,23 @@ app-drawer icon or a floating switcher button:
     (minimalist/gesture-first, a genuinely different paradigm worth
     comparing against). Not scoped or started yet.
 - **`:shell-desktop` ("Desktop")** — the Android-side half of §2a's split:
-  a cross-container task manager and the `SurfaceView` frame-passthrough
-  viewport (via `:host-bridge`'s `HostBridge`), *not* the taskbar/app
-  launcher — those are container-side (§2a). Current UI chrome (an
-  Android-side taskbar + start menu) is a first pass predating §2a's
-  design and needs reworking to match it: drop the in-app-launcher
-  UI in favor of a real task manager, since the app launcher belongs in
-  the primary container instead. Until then its start menu lists the
-  primary container's installed applications (§2a). The live desktop
-  connection is `DesktopSessionService` (`:app`), over either backend
-  (§3).
+  the `SurfaceView` frame-passthrough viewport (via `:host-bridge`'s
+  `HostBridge`), and around it a taskbar, a Start menu and a tray
+  (`DesktopShell`). **The taskbar IS the cross-container task manager**
+  (decided 2026-09-24): `:host-bridge` binds
+  `wlr-foreign-toplevel-management-unstable-v1` beside screencopy and the
+  virtual-input protocols, and the taskbar lists every toplevel the
+  compositor has — title, app id, which container it came from where the
+  helper knows, focused and minimized state — activating one on tap,
+  minimizing it on a second tap, closing it from its long-press menu, and
+  moving it to another output where one exists (§4). Android tasks
+  droidtop itself launched onto the desktop's display (a game, a Wine
+  activity) appear in the same bar from `LaunchDisplay`'s record, so one
+  bar answers "what is running" across containers and Android alike. The
+  Start menu lists the primary container's installed applications and the
+  library's entries (§2a, §2b) until the container-side launcher exists,
+  and is replaced by it, not joined. The live desktop connection is
+  `DesktopSessionService` (`:app`), over either backend (§3).
 - **`:shell-gamepad` ("Gaming")** — full-screen, D-pad-navigable, reading
   the same `Library`; optional and toggleable, never the assumed default
   experience. **Superseded design decision (2026-08-29): a single real
