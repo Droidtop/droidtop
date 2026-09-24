@@ -67,6 +67,10 @@ object ScrapeOptionsPrefs {
     fun setScrapeVideos(context: Context, value: Boolean) = setBool(context, "droidtop_scrape_videos", value)
     fun generateMiximages(context: Context) = bool(context, "droidtop_scrape_miximages")
     fun setGenerateMiximages(context: Context, value: Boolean) = setBool(context, "droidtop_scrape_miximages", value)
+    // ES-DE's MiximageRotateHorizontalBoxes, default on (Settings.cpp:139).
+    fun miximageRotateHorizontalBoxes(context: Context) = bool(context, "droidtop_miximage_rotate_horizontal_boxes")
+    fun setMiximageRotateHorizontalBoxes(context: Context, value: Boolean) =
+        setBool(context, "droidtop_miximage_rotate_horizontal_boxes", value)
 
     fun scrapeArtwork(context: Context): Boolean =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_CONTENT_ARTWORK, true)

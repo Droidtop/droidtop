@@ -3945,6 +3945,22 @@ source. A screenshot diff against a theme that sets `imageType` on its
 gamelist carousel or grid, on a library with more than one media type
 scraped, is what would confirm the wiring end to end.
 
+**Miximages (2026-09-24)**: the scraper composes the `miximage` media
+type itself when "Generate miximages" is on, in
+`library-core/.../scraper/MiximageGenerator.kt`, a port of ES-DE's own
+`MiximageGenerator.cpp` at ES-DE's default settings (1280x960, medium
+box, medium physical media). The box is the game's 3D box when
+`3dboxes/` has one and its cover otherwise (MiximageGenerator.cpp:68-84);
+droidtop's scrapers write covers, so a 3D box only comes from a media
+folder ES-DE already populated. A box wider than 1.14:1 is turned a
+quarter turn clockwise first (:614-618), behind the same default-on
+setting ES-DE has (`MiximageRotateHorizontalBoxes`, Settings.cpp:139),
+shown as "Rotate horizontal boxes in miximages" under the scraper's
+content options. ES-DE's other miximage settings (resolution, file
+format, fit modes, sizes, which parts to include, overwrite) are fixed
+at their defaults, not offered. Resampling, the drop shadow and letterbox
+trimming use Android's own operations, recorded at the class.
+
 **`text`'s `container*` family (2026-09-02)**: the second most-used
 unrendered property family is now implemented. Re-measured across the
 same ten themes: `container` 8, `containerStartDelay` 7,

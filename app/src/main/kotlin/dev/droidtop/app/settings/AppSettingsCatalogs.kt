@@ -1464,6 +1464,13 @@ object AppSettingsCatalogs {
                             current = dev.droidtop.library.scraper.ScrapeOptionsPrefs.generateMiximages(context),
                             onToggle = { ctx, value -> dev.droidtop.library.scraper.ScrapeOptionsPrefs.setGenerateMiximages(ctx, value) },
                         ),
+                        ToggleItem(
+                            id = "scrape_miximage_rotate_boxes",
+                            title = "Rotate horizontal boxes in miximages",
+                            subtitle = "Turns a box wider than it is tall on its side, so it takes the same space as an upright one",
+                            current = dev.droidtop.library.scraper.ScrapeOptionsPrefs.miximageRotateHorizontalBoxes(context),
+                            onToggle = { ctx, value -> dev.droidtop.library.scraper.ScrapeOptionsPrefs.setMiximageRotateHorizontalBoxes(ctx, value) },
+                        ),
                     ),
                 ),
                 CatalogGroup(

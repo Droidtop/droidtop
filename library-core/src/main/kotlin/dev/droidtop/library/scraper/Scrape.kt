@@ -229,9 +229,11 @@ suspend fun scrapeSystemArtwork(
                     val composed = dev.droidtop.library.scraper.MiximageGenerator.generate(
                         screenshot = screenshotFile,
                         marquee = File(mediaRoot, "marquees/$baseName.png").takeIf { it.isFile },
+                        box3D = File(mediaRoot, "3dboxes/$baseName.png").takeIf { it.isFile },
                         cover = File(mediaRoot, "covers/$baseName.png").takeIf { it.isFile },
                         physicalMedia = File(mediaRoot, "physicalmedia/$baseName.png").takeIf { it.isFile },
                         output = miximage,
+                        rotateHorizontalBoxes = dev.droidtop.library.scraper.ScrapeOptionsPrefs.miximageRotateHorizontalBoxes(context),
                     )
                     if (composed) miximaged++
                 }
