@@ -723,7 +723,7 @@ class Library(
 
     private fun stateFor(key: Set<LibraryEntryKind>): MutableStateFlow<List<LibraryEntry>?> =
         backgroundScanStates.getOrPut(key) { MutableStateFlow(null) }.also {
-            if (key !in stateKeys.value) stateKeys.update { keys -> keys + key }
+            if (key !in stateKeys.value) stateKeys.update { keys -> keys + setOf(key) }
         }
 
     /**
