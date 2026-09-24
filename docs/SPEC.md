@@ -3120,10 +3120,14 @@ Two concrete references to build from rather than design blind:
   `ContainerStorageManagerDialog.kt` (per-container storage).
   **Decision (2026-08-31): these arrive by COMPILING, not porting** —
   `:runtime-windows` now compiles the entire vendored gamenative tree
-  (see §9), so this UI is already built into droidtop's APK; what
-  remains is increment 2 of that work (Hilt bootstrap in `:app`,
-  manifest components, an entry point from droidtop's own settings), not
-  a file-by-file port.
+  (see §9), so this UI is already built into droidtop's APK.
+  `DroidtopApplication` carries the Hilt graph, the store and
+  container-configuration activities are `:app` hosts
+  (`PcContainerConfigActivity` and the store hosts, §7i), and the
+  entry points are two: a game's own "Prefix and graphics" row on the PC
+  surface, and the Windows games row of Desktop settings, which opens
+  the same activity for droidtop's provisioned environment so a prefix
+  can be configured without going through a game.
 - **Linux container management**: distrobox itself is CLI-only (no
   official GUI), but [BoxBuddy](https://github.com/Dvlv/BoxBuddy) is a
   real, actively-maintained GTK4 GUI for it — confirmed feature set:
@@ -6681,12 +6685,11 @@ shim's `false` could never work); Play Integrity's client library is
 deliberately not declared, making the fork's ripout structural; PostHog
 compiles with an empty key (inert) pending a proper strip in the fork.
 
-Increment 2, still open: Hilt bootstrap in `:app` (gamenative's
-`PluviaApp` is a Hilt application; its `@AndroidEntryPoint` activities
-need droidtop's Application to carry the Hilt graph), curating the
-vendor manifest's components into the module manifest, and real entry
-points from droidtop settings into gamenative's container-config UI
-(§7c).
+The Hilt graph lives on `DroidtopApplication` (`@HiltAndroidApp`) so
+gamenative's `@AndroidEntryPoint` activities run as droidtop's own `:app`
+hosts; the vendor manifest's components are curated into the module
+manifest rather than merged wholesale; and the entry points into the
+container-configuration UI are the two §7c names.
 
 ## 10. Build order
 
