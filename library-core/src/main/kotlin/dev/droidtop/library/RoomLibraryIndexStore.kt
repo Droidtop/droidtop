@@ -126,7 +126,7 @@ class RoomLibraryIndexStore(
      * (a schema mismatch this build can't otherwise absorb, or a person
      * who wants a fresh index without a fresh walk).
      */
-    suspend fun rebuildFromRecords() {
+    override suspend fun rebuildFromRecords(): Int {
         val all = records.all()
         db.dao().clearGames()
         db.dao().clearParts()
@@ -146,6 +146,7 @@ class RoomLibraryIndexStore(
         }
         lastWritten.clear()
         ScanLog.write("index: rebuilt from ${all.size} records into ${byPart.size} parts, no games-root walk")
+        return all.size
     }
 
     /**

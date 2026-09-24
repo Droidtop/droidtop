@@ -142,10 +142,7 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  *
  * Deliberately NOT implemented: analog left-stick-as-navigation (needs a
  * real controller to tune against, none was available while writing
- * this), a real Settings screen (placeholder card only — droidtop's
- * actual settings live in `:shell-default`'s `SettingsActivity` per
- * docs/SPEC.md §4; whether Gaming gets its own in-shell settings
- * surface or just launches that one isn't decided), and dual-screen
+ * this) and dual-screen
  * presentation (§4's `DualScreenCoordinator` decides role assignment,
  * nothing here renders companion content on a second screen yet).
  */

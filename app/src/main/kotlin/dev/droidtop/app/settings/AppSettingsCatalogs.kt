@@ -1267,7 +1267,29 @@ object AppSettingsCatalogs {
                     // The same action Gaming settings offers, not a second
                     // one: this screen changes WHICH folders are scanned,
                     // so it is where a user wants to act on that change.
-                    items = listOf(GamingSettingsCatalog.rescanLibraryItem()),
+                    items = listOf(
+                        GamingSettingsCatalog.rescanLibraryItem(),
+                        // A different job from Rescan: it walks no folder.
+                        // The index is derived from the per-game records
+                        // (docs/SPEC.md 7g), so it can always be rebuilt
+                        // from them; this is the recovery path when the
+                        // list looks wrong but the games have not changed.
+                        AsyncActionItem(
+                            id = "library_rebuild_index",
+                            title = "Rebuild the library index",
+                            subtitle = "Rebuilds the game list from what droidtop already knows about each " +
+                                "game, without scanning any folder. Use it if the list looks wrong after an " +
+                                "update; to pick up new or changed games, use Rescan library",
+                            run = { ctx, onStatus ->
+                                onStatus("Rebuilding...")
+                                val count = withContext(Dispatchers.IO) {
+                                    dev.droidtop.app.LibraryCore.library(ctx).rebuildIndexFromRecords()
+                                }
+                                if (count == 0) "Nothing to rebuild from yet: scan the library first"
+                                else "Rebuilt from $count game records"
+                            },
+                        ),
+                    ),
                 ),
                 CatalogGroup(
                     id = "rom_folders_list",

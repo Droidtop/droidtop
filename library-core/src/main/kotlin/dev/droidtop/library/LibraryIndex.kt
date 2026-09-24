@@ -156,6 +156,14 @@ interface LibraryIndexStore {
     suspend fun save(providerKey: String, slice: LibrarySlice)
 
     /**
+     * Throws the index away and rebuilds it from the per-game records alone,
+     * walking no games root (docs/SPEC.md 7g: the index is derived, so
+     * rebuilding it is cheap and safe). Returns how many records it was
+     * rebuilt from; a store with nothing to rebuild from returns 0.
+     */
+    suspend fun rebuildFromRecords(): Int = 0
+
+    /**
      * Each part's own folder modification time, as of the last save
      * (docs/SPEC.md 7g, step 4) -- what the slow rebuild pass compares
      * a part's CURRENT folder mtime against to decide "changed" from
