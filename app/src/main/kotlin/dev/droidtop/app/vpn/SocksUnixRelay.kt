@@ -63,7 +63,7 @@ internal class SocksUnixRelay(
                 runCatching { upstream.close() }
                 continue
             }
-            val close = {
+            val close: () -> Unit = {
                 runCatching { client.close() }
                 runCatching { upstream.close() }
             }
