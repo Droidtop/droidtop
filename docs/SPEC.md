@@ -2735,7 +2735,13 @@ app-drawer icon or a floating switcher button:
   surface's in-place PreferenceScreen stack in
   `CatalogPreferenceNavigator`). `ConsoleSystemsActivity` is now just a
   host for `CatalogNavigator` — its former hand-rolled one-off UI is
-  gone. Desktop/Standard settings are still XML-declared Preference
+  gone. No catalog item blocks the main thread (audit 2026-09-24, C4):
+  an action that touches a database or disk is an `AsyncActionItem`
+  (run off the main thread, with the same optional `confirmTitle` as
+  `ActionItem`), and `TextInputItem.onChange` is a main-safe suspend
+  call; every renderer re-reads the screen only after either returns,
+  so a list shows the write at once. Never `runBlocking` in a catalog
+  callback. Desktop/Standard settings are still XML-declared Preference
   screens — migrating them onto catalogs is the follow-up that makes
   their settings renderable inside Desktop's own shell the same way.
   - **Known real gap, confirmed on-device**: the Standard shell as it

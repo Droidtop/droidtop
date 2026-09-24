@@ -224,6 +224,11 @@ fun CatalogNavigator(
                 refresh()
             }
             is AsyncActionItem -> {
+                if (item.confirmTitle != null && confirmArmedId != item.id) {
+                    confirmArmedId = item.id
+                    return
+                }
+                confirmArmedId = null
                 statusById[item.id] = "Working..."
                 scope.launch {
                     statusById[item.id] = withContext(Dispatchers.IO) {
@@ -255,9 +260,12 @@ fun CatalogNavigator(
         TextEditDialog(
             item = textItem,
             onCommit = { newValue ->
-                textItem.onChange(context, newValue)
                 editingText = null
-                refresh()
+                // Refresh after the write returns, so the re-read sees it.
+                scope.launch {
+                    textItem.onChange(context, newValue)
+                    refresh()
+                }
             },
             onDismiss = { editingText = null },
         )

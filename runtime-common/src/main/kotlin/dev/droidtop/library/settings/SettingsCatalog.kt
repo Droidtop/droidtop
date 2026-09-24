@@ -94,6 +94,13 @@ class SliderItem(
  * it -- there is no separate save step unless the owning screen adds an
  * explicit [ActionItem] for one (e.g. a create-new form whose fields
  * buffer into the catalog object until "Save" commits them atomically).
+ *
+ * [onChange] is suspend and main-safe: renderers call it from a coroutine
+ * on the main thread and re-read the screen once it returns, so a handler
+ * writing Room (a suspend DAO call dispatches itself) never blocks the UI
+ * and the refreshed list already shows the write. Main, not IO, because
+ * some handlers start activities through LaunchDisplay, whose screen
+ * chooser is UI (audit 2026-09-24, C4).
  */
 class TextInputItem(
     override val id: String,
@@ -104,7 +111,7 @@ class TextInputItem(
     override val value: String,
     val secret: Boolean = false,
     val multiline: Boolean = false,
-    val onChange: (Context, String) -> Unit,
+    val onChange: suspend (Context, String) -> Unit,
 ) : CatalogItem
 
 /**
@@ -124,13 +131,17 @@ class ActionItem(
 /**
  * An action with a real async lifecycle the surface should show. [run]
  * reports live progress through its `onStatus` callback ("Scraping
- * 3/40...") and returns the final user-facing outcome text.
+ * 3/40...") and returns the final user-facing outcome text. Renderers run
+ * it off the main thread and re-read the screen when it returns, so this
+ * is also the kind for any action that writes a database. [confirmTitle]
+ * works as on [ActionItem].
  */
 class AsyncActionItem(
     override val id: String,
     override val title: String,
     override val subtitle: String? = null,
     override val value: String? = null,
+    val confirmTitle: String? = null,
     val run: suspend (Context, onStatus: (String) -> Unit) -> String,
 ) : CatalogItem
 

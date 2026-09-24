@@ -1544,13 +1544,14 @@ object AppSettingsCatalogs {
                             title = "Add platform",
                             inline = platformEditScreen(null),
                         ),
-                        ActionItem(
+                        AsyncActionItem(
                             id = "platforms_restore",
                             title = "Restore defaults",
                             subtitle = "Reset every built-in platform to its original values",
                             confirmTitle = "Restore built-in platforms?",
-                            run = { ctx ->
-                                kotlinx.coroutines.runBlocking { ConsoleSystemsRepository.restoreDefaults(ctx) }
+                            run = { ctx, _ ->
+                                ConsoleSystemsRepository.restoreDefaults(ctx)
+                                "Built-in platforms restored"
                             },
                         ),
                     ),
@@ -1619,9 +1620,7 @@ object AppSettingsCatalogs {
                                     value = entity?.displayName ?: newName,
                                     onChange = { ctx, v ->
                                         if (entity != null) {
-                                            kotlinx.coroutines.runBlocking {
-                                                ConsoleSystemsDatabase.get(ctx).consoleSystemDao().upsert(entity.copy(displayName = v.trim().ifBlank { entity.id }))
-                                            }
+                                            ConsoleSystemsDatabase.get(ctx).consoleSystemDao().upsert(entity.copy(displayName = v.trim().ifBlank { entity.id }))
                                         } else {
                                             newName = v
                                         }
@@ -1637,9 +1636,7 @@ object AppSettingsCatalogs {
                                     onChange = { ctx, v ->
                                         val cleaned = v.split(",").map { it.trim() }.filter { it.isNotEmpty() }.joinToString(",")
                                         if (entity != null) {
-                                            kotlinx.coroutines.runBlocking {
-                                                ConsoleSystemsDatabase.get(ctx).consoleSystemDao().upsert(entity.copy(extensionsCsv = cleaned))
-                                            }
+                                            ConsoleSystemsDatabase.get(ctx).consoleSystemDao().upsert(entity.copy(extensionsCsv = cleaned))
                                         } else {
                                             newExtensions = cleaned
                                         }
@@ -1654,9 +1651,7 @@ object AppSettingsCatalogs {
                                     value = entity?.retroArchCore ?: newCore,
                                     onChange = { ctx, v ->
                                         if (entity != null) {
-                                            kotlinx.coroutines.runBlocking {
-                                                ConsoleSystemsDatabase.get(ctx).consoleSystemDao().upsert(entity.copy(retroArchCore = v.trim().ifBlank { null }))
-                                            }
+                                            ConsoleSystemsDatabase.get(ctx).consoleSystemDao().upsert(entity.copy(retroArchCore = v.trim().ifBlank { null }))
                                         } else {
                                             newCore = v
                                         }
@@ -1665,42 +1660,41 @@ object AppSettingsCatalogs {
                             )
                             if (entity == null) {
                                 add(
-                                    ActionItem(
+                                    AsyncActionItem(
                                         id = "platform_create",
                                         title = "Create platform",
                                         subtitle = "Needs at least an id",
-                                        run = { ctx ->
-                                            if (newId.isNotBlank()) {
-                                                kotlinx.coroutines.runBlocking {
-                                                    ConsoleSystemsDatabase.get(ctx).consoleSystemDao().upsert(
-                                                        ConsoleSystemEntity(
-                                                            id = newId,
-                                                            displayName = newName.ifBlank { newId },
-                                                            extensionsCsv = newExtensions,
-                                                            retroArchCore = newCore.ifBlank { null },
-                                                            isBuiltIn = false,
-                                                        ),
-                                                    )
-                                                }
+                                        run = { ctx, _ ->
+                                            if (newId.isBlank()) {
+                                                "Needs an id"
+                                            } else {
+                                                val created = ConsoleSystemEntity(
+                                                    id = newId,
+                                                    displayName = newName.ifBlank { newId },
+                                                    extensionsCsv = newExtensions,
+                                                    retroArchCore = newCore.ifBlank { null },
+                                                    isBuiltIn = false,
+                                                )
+                                                ConsoleSystemsDatabase.get(ctx).consoleSystemDao().upsert(created)
                                                 newId = ""
                                                 newName = ""
                                                 newExtensions = ""
                                                 newCore = ""
+                                                "Added ${created.displayName}"
                                             }
                                         },
                                     ),
                                 )
                             } else {
                                 add(
-                                    ActionItem(
+                                    AsyncActionItem(
                                         id = "platform_delete_${entity.id}",
                                         title = "Delete platform",
                                         subtitle = if (entity.isBuiltIn) "Built-in — Restore defaults can bring it back" else "Removes this custom platform",
                                         confirmTitle = "Delete ${entity.displayName}?",
-                                        run = { ctx ->
-                                            kotlinx.coroutines.runBlocking {
-                                                ConsoleSystemsDatabase.get(ctx).consoleSystemDao().delete(entity.id)
-                                            }
+                                        run = { ctx, _ ->
+                                            ConsoleSystemsDatabase.get(ctx).consoleSystemDao().delete(entity.id)
+                                            "Deleted ${entity.displayName}"
                                         },
                                     ),
                                 )
