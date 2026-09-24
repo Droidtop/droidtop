@@ -533,8 +533,11 @@ object GamingSettingsCatalog {
                 ),
                 SubScreenItem(
                     id = ID_STANDARD_SETTINGS,
-                    title = "Standard mode",
-                    subtitle = "General, icons, home screen, and everything else for the Standard shell",
+                    // The title of the page this opens (SettingsActivity's
+                    // label, and the Standard home's own long-press menu
+                    // item): one name for one page (UI pass 2026-09-24, M8).
+                    title = "Home settings",
+                    subtitle = "Standard mode's home screen, icons and app drawer",
                     fragmentClassName = "app.murinelauncher.settings.SettingsRootFragment",
                 ),
             ),

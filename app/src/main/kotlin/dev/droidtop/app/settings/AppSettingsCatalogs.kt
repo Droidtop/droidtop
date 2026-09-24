@@ -98,7 +98,7 @@ object AppSettingsCatalogs {
     private fun consoleSystemsScreen() = CatalogScreen(
         id = SCREEN_CONSOLE_SYSTEMS,
         title = "Console systems",
-        subtitle = "Each folder's system comes from its name; open a folder to change its system, pick its emulator, or scrape artwork",
+        subtitle = "Each folder's system comes from its name; open a folder to change it",
         groups = { context -> consoleSystemsGroups(context) },
     )
 
@@ -126,33 +126,16 @@ object AppSettingsCatalogs {
                         subtitle = "Add, edit, or delete the platforms droidtop recognizes",
                         registryId = SCREEN_PLATFORMS,
                     ),
-                    NestedScreenItem(
-                        id = "console_systems_rom_folders",
-                        title = "Game folders",
-                        subtitle = "Add or remove the folders droidtop scans for games",
-                        registryId = SCREEN_ROM_FOLDERS,
-                    ),
+                    // Game folders and the Scraper are rows of Settings >
+                    // Library, directly above this screen's own row; a
+                    // second way in here was one setting in two places (UI
+                    // pass 2026-09-24, M8).
                     NestedScreenItem(
                         id = "console_systems_integrations",
                         title = "App integrations",
                         subtitle = "Hook other installed apps into droidtop, e.g. a downloader for a system's games",
                         registryId = SCREEN_INTEGRATIONS,
                         valueLabel = { if (activeIntegrations == 0) "none" else "$activeIntegrations active" },
-                    ),
-                    NestedScreenItem(
-                        id = "console_systems_scraper",
-                        title = "Artwork & metadata scraper",
-                        subtitle = "Source and credentials for ROM scraping",
-                        registryId = SCREEN_SCRAPER,
-                        // All three sources, named: the libretro choice
-                        // used to be shown here as "ScreenScraper".
-                        valueLabel = { ctx ->
-                            when (ScraperSourcePrefs.get(ctx)) {
-                                ScraperSource.SCREENSCRAPER -> "ScreenScraper"
-                                ScraperSource.THEGAMESDB -> "TheGamesDB"
-                                ScraperSource.LIBRETRO -> "libretro database"
-                            }
-                        },
                     ),
                     NestedScreenItem(
                         id = "console_systems_enginehost",
@@ -667,7 +650,7 @@ object AppSettingsCatalogs {
                             ActionItem(
                                 id = "enginehost_settings",
                                 title = "Enginehost settings",
-                                subtitle = "Opens enginehost's own global configuration",
+                                subtitle = "Opens Enginehost's own global configuration",
                                 run = { ctx ->
                                     ctx.startActivity(dev.droidtop.library.EngineHost.settingsIntent())
                                 },
@@ -677,7 +660,7 @@ object AppSettingsCatalogs {
                             ActionItem(
                                 id = "enginehost_saves",
                                 title = "Save storage",
-                                subtitle = "Shared save root and migration, in enginehost's own screen",
+                                subtitle = "Shared save root and migration, in Enginehost's own screen",
                                 run = { ctx ->
                                     ctx.startActivity(dev.droidtop.library.EngineHost.savesSettingsIntent())
                                 },
@@ -1306,7 +1289,9 @@ object AppSettingsCatalogs {
 
     private fun scraperScreen() = CatalogScreen(
         id = SCREEN_SCRAPER,
-        title = "Artwork & metadata scraper",
+        // The name the Settings row that opens it uses, which is ES-DE's
+        // own name for its scraper menu (UI pass 2026-09-24, M8).
+        title = "Scraper",
         // The ScreenScraper sentence used to say droidtop had no developer ID,
         // long after one was registered (ScreenScraperDevCredentials), so the
         // page argued against its own default (UI pass 2026-09-24, finding H7).

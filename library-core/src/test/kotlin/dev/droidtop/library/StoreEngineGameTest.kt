@@ -124,7 +124,7 @@ class StoreEngineGameTest {
 
         assertEquals(GameLaunchStrategy.ENGINEHOST, resolved.option.strategy)
         assertEquals(RunnerState.READY, resolved.option.state)
-        assertEquals("enginehost (Ren'Py)", resolved.label)
+        assertEquals("Enginehost (Ren'Py)", resolved.label)
         // Wine is a real row for this game -- the store shipped an .exe --
         // and it still loses, which is the point of the yardstick. It is
         // now READY rather than a setup step (the renderer seam landed),
