@@ -84,7 +84,7 @@ runs:
           build-essential cmake ninja-build meson pkg-config git python3 \
           autoconf automake libtool libltdl-dev texinfo \
           libexpat1-dev libffi-dev libxml2-utils \
-          wayland-protocols libwayland-bin \
+          wayland-protocols libwayland-bin glslang-tools \
           unzip curl
 
     - name: Cache Android SDK/NDK

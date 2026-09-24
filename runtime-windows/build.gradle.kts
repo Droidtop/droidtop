@@ -33,14 +33,17 @@ android {
 
         // gamenative's natives are prebuilt for arm64-v8a only (the
         // jniLibs source dirs below). The x86_64 half of the fat APK
-        // (docs/SPEC.md 10b) is built here from the fork's own sources,
-        // for the libraries whose source is in the tree and matches what
-        // ships; native/CMakeLists.txt says which and why not the rest.
+        // (docs/SPEC.md 10b) is built here, from the fork's sources or a
+        // shim per library; native/CMakeLists.txt says which and why.
         // arm64 stays upstream's prebuilt set, so CMake builds x86_64 only.
         externalNativeBuild {
             cmake {
                 abiFilters += "x86_64"
-                targets += listOf("virglrenderer", "patchelf", "asurface_renderer", "ahbimage", "xconnectorpatch")
+                targets += listOf(
+                    "virglrenderer", "patchelf", "asurface_renderer", "ahbimage", "xconnectorpatch",
+                    "winlator", "winlator_11", "extras", "vulkan_renderer",
+                    "hook_impl", "main_hook", "kgslshim", "vortekrenderer", "steambootstrap",
+                )
                 // libc++_shared.so is in the arm64 set; the NDK's own copy
                 // for x86_64 is packaged when the STL is the shared one.
                 arguments += "-DANDROID_STL=c++_shared"
