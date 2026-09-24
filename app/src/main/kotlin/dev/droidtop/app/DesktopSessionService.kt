@@ -85,12 +85,15 @@ class DesktopSessionService : Service() {
     override fun onDestroy() {
         // Real fix for a confirmed on-device leak: droidspaces child
         // processes survived past app force-stop because nothing ever
-        // stopped the container -- runBlocking here is deliberate:
-        // onDestroy is the last chance to reap, and scope.cancel() below
-        // would kill an async attempt mid-flight.
+        // stopped the container. The stop is an `su` process plus a
+        // droidspaces stop, seconds long, so it runs in [reaperScope],
+        // which outlives this service, rather than blocking the main
+        // thread here (audit 2026-09-24, C4: an ANR risk); scope.cancel()
+        // below cannot reach it. A session started before it finishes
+        // waits for it (see connect).
         (_stateHolder.value as? DesktopSessionState.Connected)?.let { session ->
             session.hostBridge.disconnect()
-            kotlinx.coroutines.runBlocking {
+            pendingStop = reaperScope.launch {
                 runCatching { session.runtime.stop(session.container) }
                     .onFailure { android.util.Log.w(TAG, "Stopping primary container on destroy failed", it) }
             }
@@ -107,6 +110,8 @@ class DesktopSessionService : Service() {
 
     private suspend fun connect() {
         android.util.Log.i(TAG, "Desktop session connecting")
+        // The last session's container stop, if it is still running.
+        pendingStop?.join()
         val runtime: ContainerRuntime = ContainerRuntimeFactory.select(applicationContext)
         android.util.Log.i(TAG, "Runtime selected: ${runtime.javaClass.simpleName}")
 
@@ -286,6 +291,12 @@ class DesktopSessionService : Service() {
 
     companion object {
         private const val TAG = "droidtop.DesktopSession"
+
+        /** Where a destroyed service's container stop runs; process-lifetime, never cancelled. */
+        private val reaperScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        @Volatile
+        private var pendingStop: kotlinx.coroutines.Job? = null
         private const val NOTIFICATION_ID = 1
         private val _stateHolder = MutableStateFlow<DesktopSessionState>(DesktopSessionState.Idle)
 
