@@ -295,7 +295,7 @@ internal fun PcGameDetail(
             status = runCatching {
                 context.startActivity(intent)
                 null
-            }.getOrElse { "enginehost didn't take that: ${it.message}" }
+            }.getOrElse { "Enginehost didn't take that: ${it.message}" }
         },
         // Both of these open UI :runtime-windows already compiles from the
         // vendored gamenative tree, hosted by an :app Activity (build-plan
@@ -716,16 +716,16 @@ private fun runnerGroup(
     onOpenPrefix: () -> Unit,
 ): PcActionGroup? = when {
     runsOnEnginehost -> PcActionGroup(
-        "Runs on enginehost",
+        "Runs on Enginehost",
         listOfNotNull(
-            PcActionRow("Saves", "Opens enginehost's own save settings", { onEnginehost(EngineHost.savesSettingsIntent()) }),
+            PcActionRow("Saves", "Opens Enginehost's own save settings", { onEnginehost(EngineHost.savesSettingsIntent()) }),
             PcActionRow(
                 "Controls",
-                "Opens enginehost's own per-engine controls for this game",
+                "Opens Enginehost's own per-engine controls for this game",
                 { onEnginehost(EngineHost.settingsIntent()) },
             ),
             if (isEngineGame) {
-                PcActionRow("Engine settings", "Opens enginehost's own settings", { onEnginehost(EngineHost.settingsIntent()) })
+                PcActionRow("Engine settings", "Opens Enginehost's own settings", { onEnginehost(EngineHost.settingsIntent()) })
             } else {
                 null
             },

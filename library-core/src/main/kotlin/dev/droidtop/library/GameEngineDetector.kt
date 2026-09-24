@@ -785,7 +785,7 @@ enum class GameLaunchStrategy {
 
 /** For a real per-entry picker UI — see [EngineGameProvider.availableStrategies]. */
 fun GameLaunchStrategy.displayName(): String = when (this) {
-    GameLaunchStrategy.ENGINEHOST -> "enginehost"
+    GameLaunchStrategy.ENGINEHOST -> "Enginehost"
     GameLaunchStrategy.KIRIKIROID2 -> "Kirikiroid2"
     GameLaunchStrategy.WINE_PREFIX -> "Wine"
     GameLaunchStrategy.LINUX_CONTAINER -> "Linux container"
@@ -1310,7 +1310,7 @@ class EngineGameProvider(
         val overrideStrategy = LaunchStrategyOverridePrefs.get(context, entry.id)
         val strategy = available.firstOrNull { it.name == overrideStrategy } ?: available.firstOrNull()
             ?: error(
-                "No way to launch ${entry.title} — install enginehost (Ren'Py/RPG Maker/etc) " +
+                "No way to launch ${entry.title} — install Enginehost (Ren'Py/RPG Maker/etc) " +
                     "or Kirikiroid2 (Kirikiri), or point it at a Windows .exe (Wine) or a Linux " +
                     "build (Linux container) once those are wired to a running session.",
             )

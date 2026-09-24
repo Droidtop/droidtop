@@ -134,7 +134,7 @@ object PcRunnerOptions {
             context.startActivity(EngineHost.configureIntent(detected.gameRoot, target))
             null
         } catch (t: Throwable) {
-            "enginehost didn't accept the configure request: ${t.message}"
+            "Enginehost didn't accept the configure request: ${t.message}"
         }
     }
 

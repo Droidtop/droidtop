@@ -166,10 +166,10 @@ object RunnerAvailability {
     private fun enginehost(facts: RunnerFacts): RunnerOption {
         val strategy = GameLaunchStrategy.ENGINEHOST
         if (facts.engine == null || !facts.enginehostSupported) {
-            return RunnerOption(strategy, RunnerState.NOT_FOR_THIS_GAME, "No enginehost plugin covers this game's engine")
+            return RunnerOption(strategy, RunnerState.NOT_FOR_THIS_GAME, "No Enginehost plugin covers this game's engine")
         }
         if (!facts.enginehostInstalled) {
-            return RunnerOption(strategy, RunnerState.NEEDS_SETUP, "Install enginehost", RunnerAction.INSTALL_ENGINEHOST)
+            return RunnerOption(strategy, RunnerState.NEEDS_SETUP, "Install Enginehost", RunnerAction.INSTALL_ENGINEHOST)
         }
         if (!facts.enginehostCanReachFolder) {
             // No action id: nothing droidtop can press fixes this. The
@@ -178,7 +178,7 @@ object RunnerAvailability {
             return RunnerOption(
                 strategy,
                 RunnerState.NEEDS_SETUP,
-                "enginehost can't read this folder - move the game to a shared games folder",
+                "Enginehost can't read this folder - move the game to a shared games folder",
             )
         }
         if (!facts.enginehostEngineVersionKnown) {

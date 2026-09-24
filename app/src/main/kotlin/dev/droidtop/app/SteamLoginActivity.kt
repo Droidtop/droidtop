@@ -267,7 +267,7 @@ private fun LibraryPanel(username: String?) {
             },
         )
         Text(
-            gamesRoot?.let { "Games folder (${it.absolutePath}; needed for enginehost)" }
+            gamesRoot?.let { "Games folder (${it.absolutePath}; needed for Enginehost)" }
                 ?: "Games folder (set one up in Settings first)",
             style = MaterialTheme.typography.bodySmall,
         )
