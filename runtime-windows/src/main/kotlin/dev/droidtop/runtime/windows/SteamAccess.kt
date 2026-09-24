@@ -10,7 +10,6 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
-import java.io.File
 import java.util.concurrent.CompletableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -133,9 +132,6 @@ object SteamAccess {
         info.addProgressListener(onProgress)
         return true
     }
-
-    fun installedDirFor(appId: Int): File? =
-        runCatching { File(SteamService.getAppDirPath(appId)) }.getOrNull()?.takeIf { it.isDirectory }
 
     private fun bindListeners() {
         if (listenersBound) return
