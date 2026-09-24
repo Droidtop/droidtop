@@ -6401,10 +6401,20 @@ declaring which installed app to drive and how:
 - `capability` is a closed set (`acquire_content`, `open_with`) because
   the trust shape genuinely differs — handing over one file to a video
   player is not the same as handing over a writable games folder.
-- Integrations live in `filesDir/integrations`, are **never bundled,
-  downloaded or synced**, and an integration whose package isn't
+- Integrations live in `<external files>/integrations`
+  (`Android/data/dev.droidtop.app/files/integrations/`), are **never
+  bundled, downloaded or synced**, and an integration whose package isn't
   installed is hidden rather than offered-and-broken. Which apps someone
-  hooks into their own launcher is their business.
+  hooks into their own launcher is their business. The folder is the
+  external one, not `filesDir`, because a person without root cannot
+  reach `filesDir` at all (the App integrations screen used to tell them
+  to drop a file there, rig 2026-09-24): the external folder is reachable
+  over USB, adb and a file manager. The screen's one action, "Add
+  integration file", opens the system picker for a `.json` and copies the
+  picked file into that folder; its empty state names the folder and
+  offers that row, never a path with no action beside it. (This copy is
+  of a configuration file the person wrote for droidtop, not of a game
+  file; the no-copy rule is about games.)
 - Surfaced per-system: an `acquire_content` integration appears as an
   action inside that system's own settings screen, where the system id
   and its destination folder are both already known.
