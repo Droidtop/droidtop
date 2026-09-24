@@ -49,3 +49,6 @@ Thumbs.db
 # working here starts from (attribution off) is committed.
 .claude/*
 !.claude/settings.json
+
+# Editor backup files
+*~
