@@ -12,6 +12,7 @@ import dev.droidtop.library.ScanSkips
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
+import dev.droidtop.library.PartRef
 import dev.droidtop.library.ScanStep
 import dev.droidtop.library.withScrapedMetadata
 import dev.droidtop.library.integrations.IntegrationPlaceholders
@@ -24,6 +25,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch as coroutineLaunch
@@ -347,10 +349,72 @@ class ConsoleRomProvider(
         streamRootsProgressively(romsRoots, systemsById, scannedFolders = emptySet())
     }
 
+    /**
+     * The slow rebuild pass (docs/SPEC.md 7g, step 4): the rescan's walk,
+     * but only of the systems whose change stamp (see [unitStamp]) moved
+     * since the index took it, with [pauseMs] after each system walked.
+     * Nothing from the cache is sent -- the index already holds it -- and
+     * a root that is not mounted right now is left as it is rather than
+     * walked as empty, which would mark every game on it missing.
+     *
+     * This used to be the whole rescan, every round: every system folder
+     * re-walked, headers re-read and media re-resolved, 5 s after every
+     * start and every 30 minutes after that, for a library that had not
+     * changed.
+     */
+    override fun slowRebuildProgressive(knownMtimes: Map<PartRef, Long>, pauseMs: Long): Flow<ScanStep> = channelFlow {
+        val romsRoots = GamesRoots.current(context).filter { root ->
+            root.isDirectory.also { mounted ->
+                if (!mounted) ScanLog.write("roms root ${root.absolutePath}: not mounted right now, left as-is")
+            }
+        }
+        val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
+        streamRootsProgressively(romsRoots, systemsById, scannedFolders = emptySet(), known = knownMtimes, pauseMs = pauseMs)
+    }
+
+    /**
+     * A system's change stamp: one number over the modification times of
+     * every folder its ROMs sit in -- the system's own folders, and the
+     * parent folder of each ROM in [romPaths] (a system can be sorted
+     * into subfolders, see [scanSystemFolder]). A folder's time moves
+     * when an entry is added to or removed from it, so a ROM added,
+     * removed or renamed in any of them, or a subfolder added to one,
+     * moves the stamp. What it does not see is a ROM dropped into a
+     * subfolder that held no ROM before; "Rescan library" is the answer
+     * to that.
+     *
+     * 0 means unknown, which the slow pass walks: a folder that is gone,
+     * or one whose time is not older than [takenBefore] -- at walk time
+     * the moment the walk started, so a folder that changed while it was
+     * being read is walked again next round rather than stamped as seen.
+     *
+     * One `stat` per folder, and a system's ROMs usually sit in one or
+     * two, so a round over an unchanged library costs a handful of calls
+     * per system.
+     */
+    private fun unitStamp(unit: SystemUnit, romPaths: Collection<String>, takenBefore: Long): Long {
+        val folders = sortedSetOf<String>()
+        unit.folders.mapTo(folders) { it.absolutePath }
+        romPaths.mapNotNullTo(folders) { File(it).parent }
+        var stamp = 17L
+        for (folder in folders) {
+            val mtime = File(folder).lastModified()
+            if (mtime == 0L || mtime >= takenBefore) return 0L
+            stamp = 31 * (31 * stamp + folder.hashCode()) + mtime
+        }
+        return if (stamp == 0L) 1L else stamp
+    }
+
     private suspend fun ProducerScope<ScanStep>.streamRootsProgressively(
         romsRoots: List<File>,
         systemsById: Map<String, ConsoleSystemDef>,
         scannedFolders: Set<Pair<String, String>>,
+        // The slow pass' two knobs: the stamps the index holds, which
+        // make a system whose stamp still matches be left alone, and a
+        // pause after each system that IS walked. Null and 0 for every
+        // other walk: walk everything, back to back.
+        known: Map<PartRef, Long>? = null,
+        pauseMs: Long = 0L,
     ) {
         coroutineScope {
             romsRoots.forEach { root ->
@@ -358,11 +422,23 @@ class ConsoleRomProvider(
                 val rootStartedAt = System.currentTimeMillis()
                 val rootGames = java.util.concurrent.atomic.AtomicInteger(0)
                 val systemScan = systemUnitsUnder(root, systemsById)
+                // What the last walk found per system under this root, for
+                // the stamps (see unitStamp) -- read only by the slow pass.
+                val romPathsBySystem = if (known == null) {
+                    emptyMap()
+                } else {
+                    dao.getEntries(listOf(root.absolutePath)).groupBy({ it.systemFolderId }, { it.id })
+                }
                 val units = systemScan.units
                     // Already has a real scan_metadata row for THIS system
                     // -- its rows were already sent as that part's own
                     // segment, skip re-walking.
                     .filter { (root.absolutePath to it.system.id) !in scannedFolders }
+                    .filter { unit ->
+                        val stamp = known?.get(PartRef(unit.system.id, root.absolutePath)) ?: return@filter true
+                        stamp == 0L ||
+                            unitStamp(unit, romPathsBySystem[unit.system.id].orEmpty(), Long.MAX_VALUE) != stamp
+                    }
                 // Each system is its own coroutine with its own per-folder
                 // budget and publishes the moment it finishes, so one slow
                 // folder costs that folder and nothing else. The root's own
@@ -373,6 +449,7 @@ class ConsoleRomProvider(
                         val system = unit.system
                         coroutineLaunch {
                             try {
+                                val walkStartedAt = System.currentTimeMillis()
                                 val folderEntries = scanSystemUnit(unit)
                                 writeRomRecords(folderEntries, root, system.id)
                                 rootGames.addAndGet(folderEntries.size)
@@ -381,11 +458,15 @@ class ConsoleRomProvider(
                                         key = system.id,
                                         root = root.absolutePath,
                                         entries = folderEntries,
+                                        folderMtime = unitStamp(unit, folderEntries.map { it.id }, walkStartedAt),
                                     ),
                                 )
                                 dao.clearSystemFolder(root.absolutePath, system.id)
                                 dao.insertEntries(folderEntries.map { it.toRomEntity(root.absolutePath, system.id) })
                                 dao.markScanned(ScanMetadataEntity(root.absolutePath, system.id, System.currentTimeMillis()))
+                                if (pauseMs > 0) delay(pauseMs)
+                            } catch (t: kotlinx.coroutines.CancellationException) {
+                                throw t
                             } catch (t: Throwable) {
                                 android.util.Log.e(
                                     "droidtop.ConsoleRomProvider",

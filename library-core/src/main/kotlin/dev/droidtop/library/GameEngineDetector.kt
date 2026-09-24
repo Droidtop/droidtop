@@ -1038,7 +1038,7 @@ class EngineGameProvider(
      * both mean "unknown," which this reads as "walk it" -- the same
      * safe default [LibraryProvider.slowRebuildProgressive] documents.
      */
-    override fun slowRebuildProgressive(knownMtimes: Map<String, Long>, pauseMs: Long): Flow<ScanStep> = channelFlow {
+    override fun slowRebuildProgressive(knownMtimes: Map<PartRef, Long>, pauseMs: Long): Flow<ScanStep> = channelFlow {
         scanRootsByFolder(
             publish = { root, folder, entries ->
                 send(
@@ -1052,8 +1052,8 @@ class EngineGameProvider(
             rootDone = { root, folders ->
                 send(ScanStep.RootDone(root.absolutePath, folders.map { it.absolutePath }))
             },
-            skip = { folder ->
-                val known = knownMtimes[folder.absolutePath]
+            skip = { root, folder ->
+                val known = knownMtimes[PartRef(folder.absolutePath, root.absolutePath)]
                 known != null && known != 0L && folder.exists() && folder.lastModified() == known
             },
             pauseMs = pauseMs,
@@ -1082,7 +1082,7 @@ class EngineGameProvider(
         // deliberate "Rescan library" is allowed to. Defaulted to "skip
         // nothing, pause nothing" so scan()/scanProgressive() -- every
         // call site before step 4 existed -- are unchanged.
-        skip: (folder: File) -> Boolean = { false },
+        skip: (root: File, folder: File) -> Boolean = { _, _ -> false },
         pauseMs: Long = 0L,
         // "A root that is not mounted is skipped, never emptied"
         // (docs/SPEC.md 7g, step 4): defaulted to "always mounted" so
@@ -1115,7 +1115,7 @@ class EngineGameProvider(
             val rootSkips = ScanSkips().apply { addAll(top.skipped) }
             var rootGames = 0
             for (folder in top.folders) {
-                if (skip(folder)) continue
+                if (skip(root, folder)) continue
                 val folderStartedAt = System.currentTimeMillis()
                 val scanned = GameEngineDetector.scanFolder(
                     folder,

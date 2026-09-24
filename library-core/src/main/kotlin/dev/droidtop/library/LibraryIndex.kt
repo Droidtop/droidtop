@@ -26,12 +26,21 @@ sealed interface ScanStep {
      * for a part that is not under a games root at all (a store's own
      * database), which is what makes removing a root a question the
      * index can answer without walking anything.
+     *
+     * [folderMtime] is the part's change stamp as the provider took it
+     * when it walked the part, which the index keeps for the slow pass to
+     * compare against (docs/SPEC.md 7g, step 4). Null leaves it to the
+     * index, which reads [key]'s own folder modification time -- right
+     * for a part that is one folder. A part that is several folders (a
+     * console system) stamps itself, since no single folder's time
+     * speaks for it.
      */
     @Serializable
     data class Segment(
         val key: String,
         val root: String? = null,
         val entries: List<LibraryEntry> = emptyList(),
+        val folderMtime: Long? = null,
     ) : ScanStep
 
     /**
@@ -53,6 +62,21 @@ sealed interface ScanStep {
         const val WHOLE = "*"
     }
 }
+
+/**
+ * One part of a provider's slice as the index names it: a
+ * [ScanStep.Segment.key] under its [ScanStep.Segment.root]. The key alone
+ * is not enough: a console system's key is its id, which every games
+ * root that holds that system shares.
+ */
+data class PartRef(val key: String, val root: String?)
+
+/** The games root a step belongs to, or null for one under no root. */
+val ScanStep.root: String?
+    get() = when (this) {
+        is ScanStep.Segment -> root
+        is ScanStep.RootDone -> root
+    }
 
 /**
  * One provider's place in the index: its parts, each holding what the
@@ -164,15 +188,15 @@ interface LibraryIndexStore {
     suspend fun rebuildFromRecords(): Int = 0
 
     /**
-     * Each part's own folder modification time, as of the last save
-     * (docs/SPEC.md 7g, step 4) -- what the slow rebuild pass compares
-     * a part's CURRENT folder mtime against to decide "changed" from
-     * "unchanged." Empty by default: a store that doesn't track this
-     * (or a provider whose parts aren't one folder each) makes every
-     * part look unknown, which [LibraryProvider.slowRebuildProgressive]'s
-     * own default already treats as "walk it" -- safe, just not faster.
+     * Each part's change stamp as of the last save (docs/SPEC.md 7g,
+     * step 4; see [ScanStep.Segment.folderMtime]) -- what the slow
+     * rebuild pass compares a part's CURRENT stamp against to decide
+     * "changed" from "unchanged." Empty by default: a store that doesn't
+     * track this makes every part look unknown, which
+     * [LibraryProvider.slowRebuildProgressive]'s own default already
+     * treats as "walk it" -- safe, just not faster.
      */
-    suspend fun folderMtimes(providerKey: String): Map<String, Long> = emptyMap()
+    suspend fun folderMtimes(providerKey: String): Map<PartRef, Long> = emptyMap()
 }
 
 object NoOpLibraryIndexStore : LibraryIndexStore {
