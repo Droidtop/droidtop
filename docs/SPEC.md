@@ -5772,10 +5772,12 @@ identity line.
 **PC games get PC-native sources (directed 2026-09-24).** PC and engine games are scraped from the
 sources that actually cover them, tied into the same pipeline as the ROM scrapers (one mechanism):
 SteamGridDB (grids, heroes, logos, icons; it needs the user's own free API key, entered once and
-stored like the ScreenScraper login) and Lutris (game metadata and art from its public game
-database), alongside the Steam store data already used for games with a Steam app id. Which
+stored like the ScreenScraper login; droidtop's own client, not the art-only copy inside
+vendored gamenative) and Lutris (cover art and year: its public search API carries no
+descriptions, genres, developers or ratings), alongside the Steam store data already used for games with a Steam app id. Which
 source won for each field is recorded per game, as for ROMs.
-All of a game's flavour is scraped, not only art: descriptions, genres, developers and
+All of a game's flavour is scraped, not only art (for PC games the text comes from IGDB, as
+for ROMs, since neither Lutris nor SteamGridDB has it): descriptions, genres, developers and
 publishers, release dates, ratings, series, platforms, links, and the game's profile as the source
 presents it. That text is shown to players (detail pages, the companion screen), so it is worth
 the same care as the art.
