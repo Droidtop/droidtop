@@ -638,6 +638,49 @@ earlier behaviour) meant a registry publishing a new `latest` silently
 replaced the whole container, and everything installed in it, on the
 next start.
 
+**The session has a lifetime of its own, and it is not the process's
+(decided 2026-09-24).** `DesktopSessionService` is a foreground service
+with the system's notification (a real icon, the container's name and a
+Stop action; on API 33+ the notification permission is asked when the
+session is first started, §7b, and a refusal only hides the notification).
+Under `DroidSpacesRuntime` the container outlives droidtop's process, so
+a process that starts with a PRIMARY still running re-attaches to it
+(`start` finds the compositor's socket accepting connections and
+returns without provisioning) rather than reporting "not started" over a
+live desktop; under `ProotRuntime` the session is the process's child
+and dies with it, and the service says so and offers Start. A display
+plugged in or removed during a session is a `DisplayManager` event the
+service subscribes to: a new display becomes an output candidate at
+once (§4 Displays), a removed one takes its output with it and the
+compositor's remaining output keeps the windows. Low memory is not the
+session's problem — the compositor and its clients are the container's —
+so `onTrimMemory` drops droidtop's own caches and nothing else. Stopping
+never blocks the main thread: `onDestroy` hands the container stop to a
+process-lifetime worker and returns. Nothing starts at boot: the
+desktop session, like the VPN it may serve (§4a), starts when a person
+opens Desktop mode or turns on "start with droidtop" on the container's
+page (§3d), never from a boot receiver.
+
+**Every external process droidtop runs is bounded.** crane, proot,
+droidspaces and `su` run through one `ProcessRunner` that drains stdout
+and stderr concurrently (a full stderr pipe must never deadlock a read of
+stdout) and takes a timeout from its caller: a catalog listing or digest
+resolution is refused after a minute, a root probe after ten seconds, a
+pull or unpack is unbounded but reports progress and can be cancelled.
+Whether root is available is probed once per process and remembered;
+opening the container manager or the Desktop setup step never runs
+`su id` again, so a prompting root manager asks once.
+
+**Storage is checked before it is spent.** A pull refuses to start when
+the volume holding the containers directory has less free space than
+three times the image's compressed size (the layers, the unpacked tree
+and headroom for the first `apt`/`apk` run), with a sentence naming the
+numbers; the image cache has a cap, 2 GB by default, and evicts oldest
+first; and the container manager shows each container's size so the
+person can see what can be reclaimed. The cache is a settings group
+of its own on the Desktop settings catalog — on/off, the cap, the space
+in use, Clear — rather than a policy object nothing exposes.
+
 **Onboarding's Desktop step** asks the selected backend to prove itself
 (`ContainerRuntime.checkSystemRequirements`: droidspaces' own `check`, or a
 trivial program run under proot against the device's root), instead of
@@ -948,6 +991,32 @@ the `ContainerRuntime` interface that already exists (§3):
   terminal provisioning is what makes "any container" literally true.
 - The desktop session's PRIMARY container is listed like everything else
   but guarded (can't be deleted while it's the active desktop).
+- **The surface, precisely (decided 2026-09-24).** The container manager
+  is one catalog screen (`containers`, registered by `:app`) rendered by
+  the same navigator as every other settings screen, in every mode that
+  can reach Desktop settings. Its list has one row per container: name,
+  role, `image:tag` with the digest's first twelve characters, state
+  (running / stopped / needs root / unavailable on this device) and
+  size on disk. Above the list, "Create a container" opens the one
+  choice component over the live catalog (§3a: Recommended, sortable by
+  desktop environment and arm64 availability) with a Custom row for a
+  raw reference. A container's own page holds, as rows of the one row
+  anatomy: Rename; Image (the reference and digest, and "Recreate from
+  the image" as a two-step action); Storage used; Start, Stop and
+  Restart as the primary action, whichever applies; Start with droidtop
+  (autostart with the session); Sockets (Wayland and audio switches,
+  on by default); Mounts (shared storage on or off, and a list of extra
+  host folder to container path binds, each added with the system
+  picker); Devices (§4b); VPN (§4a); Printing (§4b, primary only);
+  Terminal; and Delete, two-step, with the PRIMARY's row disabled while
+  it is the live desktop and saying so. Everything a row writes lives in
+  one `ContainerConfig` JSON file beside the container's rootfs in the
+  backend's containers directory, read by `ContainerRuntime.start`, so
+  the two backends share the model; the interface gains `rename` and
+  `inspect` (digest, bytes on disk) and nothing else. A sibling's
+  Terminal provisions `foot` into that sibling on first use (the
+  provisioning plan without the compositor), which is what makes "a
+  terminal into any container" literally true.
 
 ## 4. Display
 
