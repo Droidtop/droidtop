@@ -3789,10 +3789,9 @@ cursor for per-system theme reloading, which only the carousel did
 before.
 
 Still open after this, in rough order of how much a real theme notices:
-the `textHorizontalScroll*` family shared by carousel, grid and
-textlist, `helpsystem`'s dimmed-state and entry-layout properties
-(13/31), and the `rotationOrigin`/`stationary` pair that recurs across
-nearly every element type.
+the `textHorizontalScroll*` family on grid and textlist (the carousel
+has it), `helpsystem`'s entry-layout properties, and `rotationOrigin`,
+which recurs across nearly every element type.
 
 **Measured against real themes, then closed by usage (2026-09-02)**: the
 "N of 472 properties" figure above is a poor guide to what to do next,
@@ -4329,11 +4328,12 @@ one screen height below the gamelists (ViewController.cpp:1229).
 Twelve of the fifteen themes collected for the parity work declare a
 profile, and DEcaffe's own first-declared profile fades both into and out
 of a gamelist, so this was visible under the bundled theme on every
-system entry. What is deliberately still missing is the PER-ELEMENT half:
-`stationary`, `renderDuringTransitions` and `fadeAbovePrimary` let an
-individual element sit still, keep drawing, or wear a fade while the
-transition runs, and none of them was implementable before there was a
-transition to act during. They are the named next step.
+system entry. The PER-ELEMENT half — `stationary`,
+`renderDuringTransitions` and `fadeAbovePrimary`, which let an individual
+element sit still, keep drawing, or wear a fade while the transition runs
+— is implemented for the view's elements (`EsDeTransitionBehaviour` in
+the renderer); the list widgets' own items honour `stationary` and
+`renderDuringTransitions` but not yet `fadeAbovePrimary`.
 
 ### Back goes back, and lands where you left (rig, build 542)
 
@@ -4380,6 +4380,111 @@ it does not own the answer and so cannot lose it.
 The three levels are fixed rather than an arbitrary push-down stack,
 because a push-down stack would let one game's detail sit under another's
 and make B mean "the previous game" -- which is not what B means here.
+
+### What Gaming offers beyond the theme (decided 2026-09-24)
+
+ES-DE is the reference for what a gamelist can DO, not only for what it
+draws. The theme decides the shape of a list; droidtop decides its
+contents and the actions on it, and the floor is ES-DE's own gamelist
+options and main menu plus what a handheld needs that a desktop does not.
+Everything here is reached from the gamelist options menu (Select), the
+Games section's own options menu, or the Settings section, drawn in
+droidtop's chrome (§7j, §7k); every item is one catalog item or one menu
+row, never both.
+
+**Filters.** The options menu's Filter screen is ES-DE's
+(`GuiGamelistFilter`): a text filter (a name substring, typed on the
+on-screen keyboard), favourites, completed, kid game, broken, hidden,
+genre, players, rating, developer, publisher, release year, alternative
+emulator and controller. Each is a multi-select over the values the list
+actually holds, the state is per system and per collection in the shell's
+own prefs, a filtered list says so in its header (`gamelistinfo`'s filter
+count) and in the hint row, and "Reset filters" is a row of the same
+screen. **Hidden entries are left out of every list unless the hidden
+filter is on** — the carousel's counts, the unthemed grid, the PC surface
+and the Launcher's Games grid alike; today the flag is written by the
+metadata editor and read by nothing.
+
+**Sorts.** Name, rating, release date, developer, publisher, genre,
+players, last played, times played and, inside a collection, system;
+each ascending or descending; chosen per system and per collection, with
+one default in Settings (Default sort order). Times played reads
+`playCount`; a playtime sort arrives with measured playtime (§7g).
+
+**Jump to letter and Random** stay as they are. **Search across the
+library** is the text filter applied to the All games collection, opened
+from the Games section's options menu (Y on the carousel opens that menu,
+which is what the `Y Info` hint had been promising).
+
+**UI modes** full, kiosk and kid (`UiMode`) stay as they are: kid mode
+lists kid-game entries only and hides Settings; kiosk hides Settings and
+the metadata editor; leaving either is a held press on the Quick Menu's
+System tab.
+
+**Screensaver.** ES-DE's four kinds — dim, black, slideshow and video —
+after Off/2/5/10/15/30 minutes (today: the slideshow only), with the
+slideshow's and the video's source (all games, favourites or one
+collection), interval, and a name overlay as their own rows. A on a
+slideshow or video launches the game shown; any other key wakes the
+shell. Android's own display timeout still powers the panel down, and
+the row says the screensaver shows only when its timer is the shorter.
+
+**Media viewer.** One pager per game over every media type droidtop has
+for it: images (built), the preview video (ExoPlayer, unmuted, with
+pause and seek on the hint row) and the manual (the platform's own
+`PdfRenderer`, page by page, no dependency). Opened from the game's
+detail and from the gamelist's options menu; the `open_with` chips (§12)
+stay beside it for a person who prefers another viewer.
+
+**Theme settings.** Theme, variant, colour scheme and aspect ratio
+(built), plus the remaining ES-DE axes: font size (`fontSize`),
+transitions (the `<transitions>` profile selection of "View
+transitions": automatic, a declared profile, builtin-slide, builtin-fade
+or instant) and controller family (the `controller` badge and helpsystem
+glyphs). Each row is offered only when the active theme declares that
+axis, as ES-DE greys them out. Navigation sounds have an on/off row. The
+two `ThemePrefs` writers that exist with no reader (transitions,
+controller family) are what these rows write, and the renderer reads
+them.
+
+**Browse themes** opens on the index and, when the index is empty or
+older than a week, fetches it in place first, showing the count as it
+grows; there is no separate "Sync theme index" row, and the screen uses
+the shell's gutter and palette tokens like every other screen.
+
+**Gamelists are flat, by decision.** ES-DE lets a gamelist enter
+subfolders; droidtop does not. The reasons people make folders are
+covered elsewhere — attached content by §7h's DLC rule, one game in
+several folders by §7m's parts and versions, deep trees by the walk's
+own recursion — and a folder is one more level for a thumb to back out
+of. Consequently the `folder` badge slot and the textlist's
+`secondaryColor` are permanently inactive, `gamelistinfo`'s folder case
+never occurs, and the "standing gap" wording that older passages of this
+section attach to them is closed by this decision, not by building
+folders.
+
+**Controller mapping in the shell** is the A/B swap (§7b Controller) and
+nothing more: Android already maps a pad's buttons, the shell has eight
+actions, and full remapping belongs to the thing running the game (an
+emulator's own settings, enginehost's controller screens, gamenative's
+input profiles). The unread remap persistence in `GamepadAction` goes,
+one mechanism.
+
+**Where things live.** Settings is configuration. Live device state and
+one-shot device actions — network, volume, brightness, Do Not Disturb,
+VPN, Bluetooth, Swap screens, Reinitialize displays — are rendered by
+the Quick Menu's System tab only: the catalog's System group carries a
+`quickOnly` flag and the Settings section skips it, keeping under System
+just Screens (main screen, game launch target, second-screen roles),
+Software updates and Android settings. One-shot library actions live in
+the options menu of the list they act on and on the folder pages —
+Rescan library and Scrape all systems in the Games section's options
+menu (and Rescan on Game folders, the same item by id), Scrape this
+system and Find orphaned media in a system's gamelist options menu — and
+the Settings section keeps no action rows but Check now (updates),
+Update platform databases and Rebuild the library index (Data). A
+setting exists in one place and a count is one number: the carousel and
+the PC grid agree on what they count or say what each counts.
 
 ## 7g. One library across every source (audit + plan, directed 2026-09-01)
 
