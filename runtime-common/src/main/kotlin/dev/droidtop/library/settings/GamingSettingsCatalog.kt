@@ -91,6 +91,7 @@ object GamingSettingsCatalog {
 
     const val MIN_APPS_GRID_COLUMNS = 2
     const val MAX_APPS_GRID_COLUMNS = 10
+    const val DEFAULT_APPS_GRID_COLUMNS = 5
 
     /**
      * Builds the live catalog. Values are read fresh on every call --
@@ -716,7 +717,7 @@ object GamingSettingsCatalog {
         subtitle = "Icon density for the Apps tab, independent of the launcher app drawer's own grid width",
         min = MIN_APPS_GRID_COLUMNS,
         max = MAX_APPS_GRID_COLUMNS,
-        current = CatalogPrefs.prefs(context).getInt(ID_APPS_GRID_COLUMNS, 5),
+        current = CatalogPrefs.prefs(context).getInt(ID_APPS_GRID_COLUMNS, DEFAULT_APPS_GRID_COLUMNS),
         onChange = { ctx, value ->
             CatalogPrefs.prefs(ctx).edit().putInt(ID_APPS_GRID_COLUMNS, value).apply()
         },
