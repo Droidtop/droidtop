@@ -560,6 +560,24 @@ is unavailable there. Container work is verified on the stock-Android
 emulator (API 34), which, like the user's Android 13 console, also applies
 the exec restrictions on app-private files.
 
+**What the hardware said (emulator, build 581, dq-desktop-08).** On the
+stock Android 14 x86_64 emulator, unrooted, with the published universal
+APK: onboarding's check said Desktop mode can run through proot; the
+session pulled `alpine:latest` with crane, extracted it in-process,
+provisioned sway, xwayland, a font and foot inside proot, and came up in
+under a minute on a provisioned container; `exec` answered (`x86_64 |
+Alpine Linux v3.24 | 0`); host-bridge connected to sway's `wayland-1` and
+had the output resized to the view (1920x984, "output size applied"); the
+viewport showed sway's desktop with its bar and clock; taps moved sway's
+cursor to where they landed; the Start menu's "Linux apps" listed Foot,
+Foot Client and Foot Server, and Foot opened a terminal window on the
+desktop; text typed into it ran (`echo droidtop-typed` printed its output).
+Getting there took three fixes found only on stock Android: fork/vfork
+refused by the x86_64 app seccomp policy (proot patch), the compositor's
+socket name, and the keymap memfd (§6b). Not verified yet: an arm64
+device (the Retroid console), the Debian plan, labwc, sibling containers
+through this backend, clipboard, rotation, and the second screen.
+
 **What the pipeline did off-device (2026-09-24).** Termux's proot built for
 x86_64 Linux, a stock Alpine rootfs owned by an unprivileged user, the exact
 proot options and boot script this backend uses (less `--ashmem-memfd`,
@@ -5070,8 +5088,8 @@ Every module now builds and links for real:
   passthrough (`wlr-screencopy` capture loop → `ANativeWindow`) and input
   injection (virtual pointer/keyboard, with a statically embedded XKB
   keymap — see that module's README for why) are both implemented, not
-  just scaffolded. Unverified against a live compositor (none exists yet
-  to connect to).
+  just scaffolded. Verified against a live sway on the API 34 emulator
+  (§3, dq-desktop-08).
 - `:runtime-linux-root` — cross-compiles the `droidspaces` binary itself (a
   single static musl executable, ~430KB, genuinely simple compared to the
   above: no shared-library deps at all). `DroidSpacesRuntime` drives it as
