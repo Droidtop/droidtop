@@ -20,6 +20,7 @@ import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
+import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.FolderPickItem
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.SliderItem
@@ -63,6 +64,18 @@ class CatalogPreferenceNavigator(
             if (error != null) {
                 AlertDialog.Builder(context).setMessage(error).setPositiveButton(android.R.string.ok, null).show()
             }
+            rebuild()
+        }
+
+    private var pendingDocumentPick: DocumentPickItem? = null
+    private val documentPickLauncher: ActivityResultLauncher<Intent> =
+        fragment.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val item = pendingDocumentPick
+            pendingDocumentPick = null
+            val uri = result.data?.data
+            if (uri == null || item == null) return@registerForActivityResult
+            val context = fragment.requireContext()
+            android.widget.Toast.makeText(context, item.onPicked(context, uri), android.widget.Toast.LENGTH_LONG).show()
             rebuild()
         }
 
@@ -184,6 +197,17 @@ class CatalogPreferenceNavigator(
             setOnPreferenceClickListener {
                 pendingFolderPick = item
                 folderPickLauncher.launch(null)
+                true
+            }
+        }
+        is DocumentPickItem -> Preference(context).apply {
+            key = item.id
+            title = item.title
+            summary = item.subtitle
+            isIconSpaceReserved = false
+            setOnPreferenceClickListener {
+                pendingDocumentPick = item
+                documentPickLauncher.launch(item.pickerIntent())
                 true
             }
         }

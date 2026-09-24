@@ -453,8 +453,8 @@ private fun SystemTray() {
 }
 
 /**
- * Reads the mode-specific preference set from :shell-default's real
- * settings screen (SettingsDesktopFragment / murine_prefs_desktop.xml). No
+ * Reads the mode-specific preference set that :app's Desktop mode
+ * settings catalog (DroidtopWideSettings) writes. No
  * compile-time dependency on :shell-default -- see :shell-gamepad's
  * equivalent GamingPrefs for the same reasoning -- so this reads the
  * shared [LAUNCHER_PREFS_FILE_NAME] SharedPreferences file instead.

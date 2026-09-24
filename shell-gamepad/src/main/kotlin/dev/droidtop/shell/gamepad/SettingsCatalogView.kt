@@ -60,6 +60,7 @@ import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.FolderPickItem
 import dev.droidtop.library.settings.GamingSettingsCatalog
+import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.library.settings.SubScreenItem
@@ -149,6 +150,16 @@ fun CatalogNavigator(
         selectionByDepth[depth] = index
     }
 
+    var pendingDocumentPick by remember { mutableStateOf<DocumentPickItem?>(null) }
+    val documentPickLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val item = pendingDocumentPick
+        pendingDocumentPick = null
+        val uri = result.data?.data
+        if (uri == null || item == null) return@rememberLauncherForActivityResult
+        statusById[item.id] = item.onPicked(context, uri)
+        refresh()
+    }
+
     val folderPickLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         val item = pendingFolderPick
         pendingFolderPick = null
@@ -189,6 +200,10 @@ fun CatalogNavigator(
             is FolderPickItem -> {
                 pendingFolderPick = item
                 folderPickLauncher.launch(null)
+            }
+            is DocumentPickItem -> {
+                pendingDocumentPick = item
+                documentPickLauncher.launch(item.pickerIntent())
             }
             is ActionItem -> {
                 if (item.confirmTitle != null && confirmArmedId != item.id) {
@@ -448,7 +463,7 @@ private fun CatalogRowView(
     }
     val placeholder = value == null && item is TextInputItem
     MenuRow(
-        title = if (confirmArmed) "${item.title} -- press A again to confirm" else item.title,
+        title = if (confirmArmed) "${item.title}: press A again to confirm" else item.title,
         subtitle = status ?: item.subtitle,
         value = value ?: if (placeholder) "not set" else null,
         placeholder = placeholder,

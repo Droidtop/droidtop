@@ -71,10 +71,6 @@ object AppSettingsCatalogs {
     const val SCREEN_ENGINEHOST = "enginehost"
     const val SCREEN_UPDATES = "updates"
 
-    // How deep folderLooksRomLike is willing to walk -- see the doc
-    // comment at the original ConsoleSystemsActivity site this moved from.
-    private const val ROM_LOOKALIKE_MAX_DEPTH = 4
-
     @Volatile private var registered = false
 
     fun ensureRegistered() {
@@ -90,6 +86,8 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(androidSettingsScreen())
         SettingsScreenRegistry.register(enginehostScreen())
         SettingsScreenRegistry.register(updatesScreen())
+        SettingsScreenRegistry.register(DroidtopWideSettings.globalScreen())
+        SettingsScreenRegistry.register(DroidtopWideSettings.desktopScreen())
     }
 
     // ------------------------------------------------------------------
