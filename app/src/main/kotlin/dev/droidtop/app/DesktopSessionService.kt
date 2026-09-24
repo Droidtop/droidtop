@@ -304,6 +304,11 @@ class DesktopSessionService : Service() {
             _launchFailure.value = null
         }
 
+        /** A launch that failed somewhere other than [runInPrimary] (the Start menu's library games), for the same banner. */
+        fun reportLaunchFailure(message: String) {
+            _launchFailure.value = message
+        }
+
         /**
          * Runs a program in the primary container for as long as the
          * desktop session lives. A program's `exec` lasts as long as its

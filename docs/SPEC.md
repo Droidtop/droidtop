@@ -4564,6 +4564,25 @@ not only in a commit message.**
   ordinary scan/rescan keeps its pre-existing behavior (an unmounted
   root there already reads as zero folders) since changing that was
   out of this step's scope.
+- A launch by id reads the record first (2026-09-24). A caller that
+  holds only an id (a pinned game icon through `GameLaunchActivity`, the
+  Desktop's Start menu) calls `Library.launch(id)`, which finds the game
+  from its record, then from the index as the library holds it, and only
+  then walks, and only the providers the index cannot answer for: the
+  app list (outside the index) and a provider with no slice yet. A
+  provider whose slice does not list the id is not walked; as of its last
+  walk it does not hold the game, and a game added since is the rescan's
+  job. Both callers used to walk the whole library (`scanAll`) to launch
+  one game. It never throws: an unknown id, a game marked missing
+  (refused, its files are not where the library last found them) and a
+  launch that fails all come back as a reason to show, a toast from
+  `GameLaunchActivity` and the Desktop's "A program didn't run" banner
+  from the Start menu. `Library.launchInBackground` runs it in the
+  library's own scope, because the Start menu closes on the same tap and
+  its composition scope used to cancel the launch with it. The Start menu
+  lists from the index (the same background scan state the other shells
+  observe) instead of walking. No record is written for an app or a Wine
+  shortcut for this; those are found in the index or by the scoped walk.
 
 ### Performance on the console: no per-item disk work where a list is drawn or walked (2026-09-24)
 
