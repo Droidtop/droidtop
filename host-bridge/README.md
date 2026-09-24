@@ -86,7 +86,7 @@ it is not the same as confirmed-working. Treat the implementation below as
   rather than truncating; the primary (middle-click) selection is not
   bridged, since Android has no counterpart. Android-side policy — when a
   clipboard read is even permitted — lives in `ClipboardBridge` /
-  `ClipboardSync`, and in `docs/SPEC.md` §6c.
+  `ClipboardSync`, and in `docs/SPEC.md` §6d.
 - **Virtual keyboard** — key press/release requests. The protocol requires a
   valid XKB keymap be set before *any* key event is accepted; rather than
   cross-compiling `libxkbcommon` for Android just to generate one,
