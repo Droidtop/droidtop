@@ -453,6 +453,13 @@ class MainActivity : AppCompatActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         clipboardBridge?.onWindowFocusChanged(hasFocus)
+        // The bars were hidden only when the mode changed. Any other window
+        // that shows them -- Android's own settings screens opened from
+        // Settings, a permission dialog, the notification shade -- left them
+        // over the shell's tab bar for the rest of the session, even on the
+        // themed carousel (UI pass 2026-09-24, H1). Coming back to the front
+        // is when the decision has to be made again.
+        if (hasFocus) applySystemBars(mode)
     }
 
     /**
