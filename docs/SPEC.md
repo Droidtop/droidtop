@@ -2132,6 +2132,27 @@ compositor only ever sees one logical pointer and keyboard.
   Winlator has a known, open, acknowledged gap in native/Bluetooth mouse
   pointer capture (issue #1555). This needs real design and testing effort,
   not inherited code.
+- **A physical keyboard and mouse drive the shells too (decided
+  2026-09-24).** Outside Desktop mode there is no seat to feed, and the
+  platform already delivers a lapdock's or a Bluetooth keyboard's and
+  mouse's events to droidtop's own window. A mouse is treated as a finger
+  on droidtop's chrome: a click is a tap on the affordance under it,
+  hover moves focus so pointer and focus stay one selection (the design
+  language's rule), and the wheel scrolls a list or steps a themed
+  widget one entry. A keyboard is treated as a pad through one table in
+  `GamepadKeyMap`: the arrow keys are the D-pad, Enter is A, Escape is B,
+  Tab and Shift+Tab are L1/R1, Space is X, Backspace is Y, the menu key
+  is Select and F10 is R2 — so every hint row's promise holds for a
+  keyboard user, and no screen carries a second key table. Text fields
+  take typed characters ahead of that table while they have focus. In
+  Desktop mode the same devices reach the container through the seat
+  (§6b), and the shell's own chrome around the viewport still answers
+  as above.
+- **The keyboard is core, not Desktop's.** `:input-keyboard`'s IME serves
+  every mode: it is what a text filter, a scraper login or the clipboard
+  bridge (§6d) uses in Gaming and Launcher as much as a terminal in
+  Desktop. It is therefore not a `ModePiece` and is never disabled with a
+  mode (§2c); only the second-screen keyboard SURFACE (§6c) is Desktop's.
 
 ## 6a. Keyboard ownership (directed 2026-09-01)
 
