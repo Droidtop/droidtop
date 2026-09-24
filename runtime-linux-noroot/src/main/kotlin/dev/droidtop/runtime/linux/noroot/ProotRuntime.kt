@@ -17,6 +17,7 @@ import dev.droidtop.runtime.ImageCache
 import dev.droidtop.runtime.ImageCachePolicy
 import dev.droidtop.runtime.PrimaryProvisioning
 import dev.droidtop.runtime.RootfsImage
+import dev.droidtop.runtime.SharedVolume
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runInterruptible
@@ -50,7 +51,8 @@ import kotlin.concurrent.thread
  *
  * Same container model as the root backend: a PRIMARY that boots
  * [ContainerLayout.primaryInitScript] (provision once, then the compositor,
- * headless) and siblings that share its socket directory. Each host
+ * headless) and siblings that share its socket directory and the device's
+ * shared storage ([ContainerLayout.SHARED_STORAGE_DIR]). Each host
  * directory in [ContainerLayout] is a proot bind, so the compositor's
  * socket is a real Unix socket file under [socketsDir] on the Android side,
  * which `:host-bridge` connects to directly.
@@ -360,6 +362,9 @@ class ProotRuntime(
             add("--bind=${shmDir.absolutePath}:/dev/shm")
             add("--bind=${socketsDir.absolutePath}:${ContainerLayout.SOCKET_DIR}")
             add("--bind=${appStorageDir.absolutePath}:${ContainerLayout.APP_STORAGE_DIR}")
+            // Volumes mounted now, looked up per session: a card or USB
+            // drive mounted since the last one is there the next time.
+            ContainerLayout.sharedStorageBinds(SharedVolume.mounted(context)).forEach { (host, guest) -> add("--bind=$host:$guest") }
             add("--bind=${File(etcDir, "resolv.conf").absolutePath}:/etc/resolv.conf")
             add("--bind=${File(etcDir, "hosts").absolutePath}:/etc/hosts")
             add("--cwd=/root")

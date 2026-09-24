@@ -27,6 +27,15 @@ object ContainerLayout {
     const val APP_STORAGE_DIR = "/run/droidtop-app-storage"
 
     /**
+     * Where the device's shared storage appears inside every container,
+     * one directory per mounted volume ([SharedVolume.name]), read-write,
+     * the way distrobox shares the home directory (docs/SPEC.md 4b):
+     * Downloads, documents and game folders are the same files inside and
+     * outside the desktop.
+     */
+    const val SHARED_STORAGE_DIR = "/run/droidtop-shared-storage"
+
+    /**
      * Written once the provisioning command has succeeded, holding which
      * plan it was ([planId]); provisioning runs again whenever the current
      * plan differs, so a package added to a plan reaches containers made
@@ -129,6 +138,25 @@ object ContainerLayout {
         appendLine("unset WAYLAND_DISPLAY")
         appendLine("echo 'droidtop: starting ${provisioning.compositorCommand}'")
         appendLine("exec ${provisioning.compositorCommand}")
+    }
+
+    /** Host directory to in-container path, one per volume, for a backend's bind list. */
+    fun sharedStorageBinds(volumes: List<SharedVolume>): List<Pair<String, String>> =
+        volumes.map { it.root.absolutePath to "$SHARED_STORAGE_DIR/${it.name}" }
+
+    /**
+     * [hostPath] as seen inside a container through [sharedStorageBinds],
+     * or null when it is on none of [volumes] (a file only a content
+     * provider serves, or one in another app's private storage).
+     */
+    fun sharedStorageToContainerPath(volumes: List<SharedVolume>, hostPath: File): String? {
+        val path = hostPath.absoluteFile
+        for (volume in volumes) {
+            val relative = path.toRelativeString(volume.root.absoluteFile)
+            if (relative.startsWith("..") || File(relative).isAbsolute) continue
+            return if (relative.isEmpty()) "$SHARED_STORAGE_DIR/${volume.name}" else "$SHARED_STORAGE_DIR/${volume.name}/$relative"
+        }
+        return null
     }
 
     /**

@@ -13,6 +13,7 @@ import dev.droidtop.runtime.ImageCache
 import dev.droidtop.runtime.ImageCachePolicy
 import dev.droidtop.runtime.PrimaryProvisioning
 import dev.droidtop.runtime.RootfsImage
+import dev.droidtop.runtime.SharedVolume
 import dev.droidtop.runtime.RootfsPuller
 import java.io.File
 import java.util.UUID
@@ -127,6 +128,19 @@ class DroidSpacesRuntime(
         rootfsPuller.pullAndUnpack(image, rootfsPath, imageCache, cachePolicy)
         writeInit(rootfsPath, provisioning)
 
+        writeConfig(name, rootfsPath)
+
+        return Container(id = name, role = role, backend = backend, rootfsPath = rootfsPath)
+    }
+
+    /**
+     * The droidspaces `.config` for [name]: the shared socket directory,
+     * app storage, and every shared-storage volume mounted right now
+     * ([SharedVolume.mounted], docs/SPEC.md 4b). Written at creation and
+     * again at every [start], so a card or USB drive mounted since the
+     * container was made is bound on its next boot.
+     */
+    private fun writeConfig(name: String, rootfsPath: String) {
         socketsDir.mkdirs()
         val envFile = File(configsDir, "$name.env")
         envFile.parentFile?.mkdirs()
@@ -140,12 +154,10 @@ class DroidSpacesRuntime(
             bindMounts = listOf(
                 socketsDir.absolutePath to ContainerLayout.SOCKET_DIR,
                 appStorageDir.absolutePath to ContainerLayout.APP_STORAGE_DIR,
-            ),
+            ) + ContainerLayout.sharedStorageBinds(SharedVolume.mounted(context)),
             envFilePath = envFile.absolutePath,
         )
         config.writeTo(File(configsDir, "$name.config"))
-
-        return Container(id = name, role = role, backend = backend, rootfsPath = rootfsPath)
     }
 
     /**
@@ -193,6 +205,7 @@ class DroidSpacesRuntime(
         // (PRIMARY_NAME etc.), so the next session start is the reliable
         // place to reap the previous one instead of double-starting.
         RootProcess.run(binaryPath, "--name=${container.id}", "stop")
+        writeConfig(container.id, container.rootfsPath)
         val configPath = File(configsDir, "${container.id}.config").absolutePath
         val result = RootProcess.run(binaryPath, "--conf=$configPath", "start")
         check(result.succeeded) { "droidspaces start failed for ${container.id}: ${result.stderr}" }
