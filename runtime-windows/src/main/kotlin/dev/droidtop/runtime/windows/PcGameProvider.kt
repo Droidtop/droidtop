@@ -89,14 +89,116 @@ class PcGameProvider(
     override fun scanProgressive(): kotlinx.coroutines.flow.Flow<dev.droidtop.library.ScanStep> =
         kotlinx.coroutines.flow.channelFlow { walk { step -> send(step) } }
 
-    private suspend fun walk(emit: suspend (dev.droidtop.library.ScanStep) -> Unit) {
-        val storeGames = runCatching { PcLibrary.storeGames(context) }
-            .onFailure { android.util.Log.w("droidtop.PcGameProvider", "Reading the PC stores failed", it) }
-            .getOrDefault(emptyList())
-        val folderGroups = runCatching { PcLibrary.folderGames(context) }
+    /**
+     * The slow rebuild pass (docs/SPEC.md 7g, step 4): the same walk,
+     * except that when the stores' stamp ([storeStamp]) still matches
+     * [knownMtimes], the store part is left alone and so is every
+     * top-level folder whose own modification time still matches. When
+     * the stores moved, everything is walked: the store part suppresses
+     * Wine shortcuts against every folder game's install directory, so it
+     * needs them all.
+     *
+     * The first round in a process walks everything too. The walk is
+     * also what records the install directories engine detection reads
+     * ([PcLibrary.knownInstalls]); a process that has loaded the index
+     * but not walked has none, and a skipped part would leave them out.
+     *
+     * This used to be the default, a full re-read of every store and
+     * every folder every 30 minutes for a PC library that had not
+     * changed. [pauseMs] is not taken: the folder walk is one pass in
+     * [PcLibrary.folderGames], not a part at a time.
+     */
+    override fun slowRebuildProgressive(
+        knownMtimes: Map<dev.droidtop.library.PartRef, Long>,
+        pauseMs: Long,
+    ): kotlinx.coroutines.flow.Flow<dev.droidtop.library.ScanStep> =
+        kotlinx.coroutines.flow.channelFlow {
+            walk(known = knownMtimes.takeIf { walkedInThisProcess }) { step -> send(step) }
+        }
+
+    /** Whether a whole walk has finished since the process started; see [slowRebuildProgressive]. */
+    @Volatile
+    private var walkedInThisProcess = false
+
+    /**
+     * The store part's change stamp: one number over what the store
+     * part reads. That is gamenative's store database (its file and its
+     * write-ahead log, which move on every write: a sign-in, a library
+     * sync, an install), each Wine prefix's Desktop folder (a shortcut
+     * added or removed), and the folders the user gave the vendored
+     * scanner outside droidtop's roots, along with droidtop's roots
+     * themselves, which decide which of those count. What it does not
+     * see: the compatibility cache and a change to the engine rules;
+     * "Rescan library" is the answer there.
+     *
+     * One `stat` per file or folder, read BEFORE the part is walked, so
+     * a change during the walk moves the stamp past what the index
+     * keeps and the next round walks it again.
+     */
+    private fun storeStamp(): Long {
+        val paths = sortedSetOf<String>()
+        val database = context.getDatabasePath(app.gamenative.db.DATABASE_NAME)
+        paths += database.absolutePath
+        paths += database.absolutePath + "-wal"
+        runCatching { ContainerManager(context).containers.forEach { paths += it.desktopDir.absolutePath } }
+        runCatching { paths += app.gamenative.PrefManager.customGameManualFolders }
+        runCatching { paths += app.gamenative.PrefManager.customGameScanRoots }
+        val roots = dev.droidtop.library.GamesRoots.current(context).map { it.absolutePath }
+        var stamp = 17L
+        for (root in roots) stamp = 31 * stamp + root.hashCode()
+        for (path in paths) {
+            // Inside a root is the folder walk's part, and its stamp.
+            if (roots.any { path.startsWith("$it/") }) continue
+            stamp = 31 * (31 * stamp + path.hashCode()) + File(path).lastModified()
+        }
+        return if (stamp == 0L) 1L else stamp
+    }
+
+    private suspend fun walk(
+        // The slow pass' stamps; null walks everything.
+        known: Map<dev.droidtop.library.PartRef, Long>? = null,
+        emit: suspend (dev.droidtop.library.ScanStep) -> Unit,
+    ) {
+        val storeStamp = storeStamp()
+        val storeUnchanged = known?.get(dev.droidtop.library.PartRef(dev.droidtop.library.ScanStep.WHOLE, null)) == storeStamp
+        val skip: (File, Long) -> Boolean = if (known == null || !storeUnchanged) {
+            { _, _ -> false }
+        } else {
+            { folder, mtime ->
+                mtime != 0L && known[dev.droidtop.library.PartRef(folder.absolutePath, folder.parentFile?.absolutePath)] == mtime
+            }
+        }
+        val folderGroups = runCatching { PcLibrary.folderGames(context, skip) }
             .onFailure { android.util.Log.w("droidtop.PcGameProvider", "Reading the PC folders failed", it) }
             .getOrDefault(emptyList())
         val engineDefs = runCatching { EnginesDatabase.defs(context) }.getOrDefault(emptyList())
+        if (!storeUnchanged) emitStorePart(storeStamp, folderGroups, engineDefs, emit)
+        for (group in folderGroups) {
+            if (group.skipped) continue
+            emit(
+                dev.droidtop.library.ScanStep.Segment(
+                    key = group.topFolder,
+                    root = group.root,
+                    entries = group.games.notOwnedByAnEngine(engineDefs).map { it.toLibraryEntry() }.withEntryMetadata(),
+                    folderMtime = group.mtime.takeIf { it != 0L },
+                ),
+            )
+        }
+        for ((root, groups) in folderGroups.groupBy { it.root }) {
+            emit(dev.droidtop.library.ScanStep.RootDone(root, groups.map { it.topFolder }))
+        }
+        if (folderGroups.none { it.skipped } && !storeUnchanged) walkedInThisProcess = true
+    }
+
+    private suspend fun emitStorePart(
+        storeStamp: Long,
+        folderGroups: List<PcLibrary.FolderGroup>,
+        engineDefs: List<dev.droidtop.library.EngineDef>,
+        emit: suspend (dev.droidtop.library.ScanStep) -> Unit,
+    ) {
+        val storeGames = runCatching { PcLibrary.storeGames(context) }
+            .onFailure { android.util.Log.w("droidtop.PcGameProvider", "Reading the PC stores failed", it) }
+            .getOrDefault(emptyList())
         // Shortcut suppression measures against EVERY PC game's install
         // directory, engine-owned ones included: a Wine shortcut pointing
         // inside a Ren'Py game's folder is the same duplicate by another
@@ -116,20 +218,9 @@ class PcGameProvider(
                 key = dev.droidtop.library.ScanStep.WHOLE,
                 entries = (storeGames.notOwnedByAnEngine(engineDefs).map { it.toLibraryEntry() } + shortcutEntries)
                     .withEntryMetadata(),
+                folderMtime = storeStamp,
             ),
         )
-        for (group in folderGroups) {
-            emit(
-                dev.droidtop.library.ScanStep.Segment(
-                    key = group.topFolder,
-                    root = group.root,
-                    entries = group.games.notOwnedByAnEngine(engineDefs).map { it.toLibraryEntry() }.withEntryMetadata(),
-                ),
-            )
-        }
-        for ((root, groups) in folderGroups.groupBy { it.root }) {
-            emit(dev.droidtop.library.ScanStep.RootDone(root, groups.map { it.topFolder }))
-        }
     }
 
     /**
