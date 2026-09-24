@@ -415,7 +415,18 @@ on droidtop's targets:
 
 So the no-root backend runs **[vendor/proot](../vendor/proot)**, Termux's
 PRoot (the build Termux and proot-distro run whole distributions on),
-pinned to the release termux-packages ships and consumed unmodified.
+pinned to the release termux-packages ships. The vendored tree is not
+modified; droidtop's additions are patches in
+`build-scripts/proot-patches/`, each stating its reason, applied to the
+build's own copy. The first: Android's x86_64 app seccomp policy refuses
+the `fork` and `vfork` syscalls (bionic forks with `clone`; arm64 has no
+such syscalls), musl forks with the raw syscall, and proot answered the
+resulting SIGSYS with ENOSYS, so an Alpine guest's shell died at its first
+fork on the API 34 emulator ("can't fork: Function not implemented",
+dq-desktop-05/06). The patch restarts each as the `clone` it is defined to
+be. Reproduced and verified off-device under a seccomp filter that traps
+the two syscalls the way Android does: unpatched, the same error;
+patched, provisioning, sway, exec and screencopy all ran.
 `build-scripts/build-vendor-deps.sh` builds it with its own GNUmakefile and
 the NDK, linking the single-file talloc vendored beside gamenative's proot,
 into `runtime-linux-noroot/src/main/jniLibs/<abi>/`: `libproot.so`,

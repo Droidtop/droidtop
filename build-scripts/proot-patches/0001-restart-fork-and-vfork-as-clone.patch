@@ -1,0 +1,45 @@
+Restart seccomp-refused fork(2)/vfork(2) as clone(2)
+
+On x86_64 Android the app seccomp policy refuses the fork and vfork
+syscalls (bionic forks with clone); musl's fork uses the raw syscall,
+so under proot an Alpine guest's /bin/sh failed its first fork with
+"can't fork: Function not implemented" (droidtop rig, emulator API 34,
+dq-desktop-05/06). Applied by build-scripts/build-vendor-deps.sh to its
+out-of-tree copy of vendor/proot; the vendored tree is not modified.
+
+--- a/src/tracee/seccomp.c	2026-09-24 06:06:25.329260887 -0400
++++ b/src/tracee/seccomp.c	2026-09-24 06:06:25.329375355 -0400
+@@ -1,5 +1,6 @@
+ #include <errno.h>     /* E*, */
+-#include <signal.h>    /* SIGSYS, */
++#include <signal.h>    /* SIGSYS, SIGCHLD, */
++#include <sched.h>     /* CLONE_VM, CLONE_VFORK, */
+ #include <unistd.h>    /* getpgid, */
+ #include <utime.h>     /* utimbuf, */
+ #include <sys/vfs.h>   /* statfs64 */
+@@ -197,6 +198,25 @@
+ 		restart_syscall_after_seccomp(tracee);
+ 		break;
+ 
++	/* fork(2) and vfork(2) exist as syscalls on x86 and x86_64 only,
++	 * and Android's app seccomp policy does not allow them there
++	 * (bionic forks with clone), so a guest whose libc forks with the
++	 * raw syscall (musl does on x86_64) could never start a child.
++	 * Restart each as the clone(2) it is defined to be:
++	 * fork is clone(SIGCHLD, 0, 0, 0, 0), vfork adds CLONE_VM and
++	 * CLONE_VFORK.  The restarted clone goes through the ordinary
++	 * clone handling, so the child is traced as usual.  */
++	case PR_fork:
++	case PR_vfork:
++		poke_reg(tracee, SYSARG_1, (sysnum == PR_vfork ? CLONE_VM | CLONE_VFORK : 0) | SIGCHLD);
++		poke_reg(tracee, SYSARG_2, 0);
++		poke_reg(tracee, SYSARG_3, 0);
++		poke_reg(tracee, SYSARG_4, 0);
++		poke_reg(tracee, SYSARG_5, 0);
++		set_sysnum(tracee, PR_clone);
++		restart_syscall_after_seccomp(tracee);
++		break;
++
+ 	case PR_setgroups:
+ 	case PR_setgroups32:
+ 		set_result_after_seccomp(tracee, 0);

@@ -172,7 +172,9 @@ jobs:
           # cannot be exec'd above targetSdk 28), and vendor/proot builds
           # into runtime-linux-noroot/src/main/jniLibs. A v7 hit would
           # restore neither.
-          key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD', '.git/modules/vendor/proot/HEAD') }}-v8
+          # v9: proot is built with build-scripts/proot-patches applied, so
+          # the patches are part of the key.
+          key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD', '.git/modules/vendor/proot/HEAD', 'build-scripts/proot-patches/**') }}-v9
 
       - name: Build cross-compiled vendor deps (libffi, libwayland-client, droidspaces, crane, proot)
         if: steps.deps-cache.outputs.cache-hit != 'true'
