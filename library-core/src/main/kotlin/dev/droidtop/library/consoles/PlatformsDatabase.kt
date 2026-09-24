@@ -18,7 +18,7 @@ import org.json.JSONObject
  * [builtInsOrEmpty] exists for the few synchronous label lookups
  * (GamepadShell's group labels, the second-screen companion) that have no
  * suspend context -- it serves the last loaded cache, warmed at process
- * start by :app's settings-catalog init provider.
+ * start by :app's ModeStartup when Gaming's platforms piece is on.
  */
 object PlatformsDatabase {
     private const val DB_FILE_NAME = "platforms-database.json"
@@ -53,7 +53,7 @@ object PlatformsDatabase {
      * Bumped whenever the cache is (re)loaded or invalidated, so
      * composition-time consumers of [builtInsOrEmpty] can re-run when
      * the data actually arrives. Real, observed bug this fixes: the
-     * warm-up runs on a background thread (SettingsCatalogInitProvider),
+     * warm-up runs on a background thread (ModeStartup),
      * the Gaming shell's first composition sorted its system carousel
      * against the still-empty cache, every label fell back to the raw
      * system id, and the order froze that way -- "switch" sorted to the

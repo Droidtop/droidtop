@@ -11,11 +11,15 @@ import android.content.Context
  * first time it's ever called on a fresh install (an empty table), so
  * every existing built-in system is present and editable from the very
  * first real read, not just after some separate manual "import" step.
+ *
+ * A platform that a later database refresh adds is added here too, once:
+ * the ids already offered are remembered, so a built-in the person deleted
+ * stays deleted, and a row they edited is never overwritten by the refresh.
  */
 object ConsoleSystemsRepository {
     suspend fun allSystems(context: Context): List<ConsoleSystemDef> {
         val dao = ConsoleSystemsDatabase.get(context).consoleSystemDao()
-        seedIfEmpty(context, dao)
+        seedNewBuiltIns(context, dao)
         // Ownership is integration policy from the refreshable platform
         // database, not a user-editable platform property. Join it at read
         // time so a refresh takes effect without overwriting user edits.
@@ -35,13 +39,40 @@ object ConsoleSystemsRepository {
     suspend fun restoreDefaults(context: Context) {
         val dao = ConsoleSystemsDatabase.get(context).consoleSystemDao()
         dao.clearBuiltIns()
-        dao.upsertAll(PlatformsDatabase.builtIns(context).map { it.toEntity(isBuiltIn = true) })
+        val builtIns = PlatformsDatabase.builtIns(context)
+        dao.upsertAll(builtIns.map { it.toEntity(isBuiltIn = true) })
+        rememberOffered(context, builtIns.map { it.id })
     }
 
-    private suspend fun seedIfEmpty(context: Context, dao: ConsoleSystemDao) {
-        if (dao.count() == 0) {
-            dao.upsertAll(PlatformsDatabase.builtIns(context).map { it.toEntity(isBuiltIn = true) })
+    private const val PREFS = "console_systems_seed"
+    private const val KEY_OFFERED = "offered_builtin_ids"
+
+    /**
+     * Inserts every built-in platform never offered before. On a fresh
+     * install that is all of them. On an install that predates this record
+     * but already has rows, everything currently built in counts as offered
+     * (some of it may have been deleted on purpose), so only platforms a
+     * later refresh brings are added.
+     */
+    private suspend fun seedNewBuiltIns(context: Context, dao: ConsoleSystemDao) {
+        val builtIns = PlatformsDatabase.builtIns(context)
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val offered = prefs.getStringSet(KEY_OFFERED, null)
+        if (offered == null) {
+            if (dao.count() == 0) dao.upsertAll(builtIns.map { it.toEntity(isBuiltIn = true) })
+            rememberOffered(context, builtIns.map { it.id })
+            return
         }
+        val fresh = builtIns.filter { it.id !in offered }
+        if (fresh.isEmpty()) return
+        val existing = dao.getAll().mapTo(HashSet()) { it.id }
+        dao.upsertAll(fresh.filter { it.id !in existing }.map { it.toEntity(isBuiltIn = true) })
+        rememberOffered(context, offered + fresh.map { it.id })
+    }
+
+    private fun rememberOffered(context: Context, ids: Collection<String>) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putStringSet(KEY_OFFERED, ids.toHashSet()).apply()
     }
 }
 

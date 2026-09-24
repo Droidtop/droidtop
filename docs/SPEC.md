@@ -3240,7 +3240,12 @@ validate-before-replace:
   with cores). Replaces the formerly compiled-in
   `ES_DE_CONSOLE_SYSTEMS` Kotlin list (deleted) as the seed for
   `ConsoleSystemsRepository`'s Room store — Room stays the runtime
-  source of truth because the user can edit platforms.
+  source of truth because the user can edit platforms. A platform a
+  refresh adds reaches Room once: the built-in ids already offered are
+  remembered, so a new platform appears while a built-in the user
+  deleted stays deleted and an edited row is never overwritten (a
+  refresh's changes to an existing platform reach Room only through
+  "restore defaults").
   `PlatformsDatabase.builtInsOrEmpty()` serves the synchronous label
   lookups (shell group labels, companion), warmed at process start.
 - `engines-database.json` — the full engine REGISTRY as of v4
