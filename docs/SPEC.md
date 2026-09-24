@@ -2743,7 +2743,9 @@ app-drawer icon or a floating switcher button:
   so a list shows the write at once. Never `runBlocking` in a catalog
   callback. A screen that edits one row re-reads that row on every
   build and, once it is gone, shows only a row saying so: its fields
-  would write the deleted row back (platform edit, 2026-09-24). Desktop/Standard settings are still XML-declared Preference
+  would write the deleted row back (platform edit, 2026-09-24). Its
+  field writes are Room `@Update`, never an insert-or-replace, so an
+  edit committed after a delete changes nothing. Desktop/Standard settings are still XML-declared Preference
   screens — migrating them onto catalogs is the follow-up that makes
   their settings renderable inside Desktop's own shell the same way.
   - **Known real gap, confirmed on-device**: the Standard shell as it
