@@ -25,3 +25,6 @@
 [submodule "vendor/droidtop-platforms"]
 	path = vendor/droidtop-platforms
 	url = https://github.com/Droidtop/droidtop-platforms.git
+[submodule "vendor/proot"]
+	path = vendor/proot
+	url = https://github.com/termux/proot.git

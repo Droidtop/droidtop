@@ -11,14 +11,15 @@ import dev.droidtop.hostbridge.HostBridge
 import dev.droidtop.runtime.BundledImageRepositories
 import dev.droidtop.runtime.CompositorProvisioning
 import dev.droidtop.runtime.Container
+import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.ContainerRuntime
+import dev.droidtop.runtime.CraneImageCatalogResolver
 import dev.droidtop.runtime.DisplayOutput
 import dev.droidtop.runtime.DisplayOutputKind
 import dev.droidtop.runtime.ImageCatalogResolver
+import dev.droidtop.runtime.KnownImageRepository
+import dev.droidtop.runtime.PrimaryProvisioning
 import dev.droidtop.runtime.ResolvedImage
-import dev.droidtop.runtime.linux.noroot.ProotRuntime
-import dev.droidtop.runtime.linux.root.CraneImageCatalogResolver
-import dev.droidtop.runtime.linux.root.DroidSpacesRuntime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -30,7 +31,9 @@ import kotlinx.coroutines.launch
 
 sealed interface DesktopSessionState {
     data object Idle : DesktopSessionState
-    data object Connecting : DesktopSessionState
+
+    /** [detail] is the latest thing the container reported while booting (a first boot installs the desktop), if any. */
+    data class Connecting(val detail: String? = null) : DesktopSessionState
     data class Connected(
         val hostBridge: HostBridge,
         val primaryOutput: DisplayOutput,
@@ -48,31 +51,23 @@ sealed interface DesktopSessionState {
  * "desktop" should keep running when, e.g., the user is only interacting
  * via the second-screen trackpad.
  *
- * Real orchestration (root detection, picking a [ContainerRuntime] backend,
- * creating/starting the primary container, connecting [HostBridge]) — not
- * yet verified against a live compositor or a real device (no rooted
- * device available in this environment). One known, already-documented gap
- * this can't get past regardless of code correctness: [ProotRuntime] (the
- * non-root path) is still `TODO()` throughout.
+ * The session, in order: pick the backend ([ContainerRuntimeFactory]: root
+ * gives droidspaces, anything else proot), prove the device can run it
+ * ([ContainerRuntime.checkSystemRequirements]), find or create the PRIMARY
+ * container from the user's Desktop-setup choice, boot it (a first boot
+ * provisions the compositor, see [CompositorProvisioning]; progress lands
+ * in [DesktopSessionState.Connecting.detail]), and connect [HostBridge] to
+ * its compositor's socket.
  *
- * [selectPrimaryImage] resolves the USER-CHOSEN repository (Desktop
- * setup; droidtop never auto-picks — see that method's own comment)
- * against the real registry via [ImageCatalogResolver] (docs/SPEC.md §3a's
- * "populate at runtime, don't prepopulate" model) — every catalog entry
- * (runtime-common's `known-image-repositories.json`) names a real,
- * already-published stock distro image (e.g. `library/debian`), not a
- * droidtop-maintained custom build:
- * [CompositorProvisioning] supplies the chosen distro's own package-manager
- * command, which [ContainerRuntime.createPrimary] runs once on first boot
- * to actually install a compositor into it. This is what makes §3a's "any
- * OCI image works" genuinely true for the PRIMARY role too.
+ * The primary container is made once and then reused, session after
+ * session: it is the user's desktop, with whatever they installed in it.
+ * It is only recreated when the user has since chosen a different image in
+ * Desktop setup. Re-resolving the catalog's `latest` on every start (the
+ * previous behaviour) meant a registry publishing a new `latest` silently
+ * replaced the whole container on the next session.
  *
  * [state] is how `:shell-desktop`'s `DesktopShell` and `:app`'s
- * `MainActivity` observe the real session — wired: MainActivity collects
- * this flow and passes the live `hostBridge`/`primaryOutput` out of a
- * `Connected` state straight into `DesktopShell`, falling back to the
- * honest "no desktop session" message otherwise. What remains unproven is
- * the session itself against real hardware, not the plumbing to it.
+ * `MainActivity` observe the session.
  */
 class DesktopSessionService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -82,7 +77,7 @@ class DesktopSessionService : Service() {
     override fun onCreate() {
         super.onCreate()
         startForeground(NOTIFICATION_ID, buildNotification())
-        _stateHolder.value = DesktopSessionState.Connecting
+        _stateHolder.value = DesktopSessionState.Connecting()
         scope.launch { connect() }
     }
 
@@ -93,6 +88,7 @@ class DesktopSessionService : Service() {
         // onDestroy is the last chance to reap, and scope.cancel() below
         // would kill an async attempt mid-flight.
         (_stateHolder.value as? DesktopSessionState.Connected)?.let { session ->
+            session.hostBridge.disconnect()
             kotlinx.coroutines.runBlocking {
                 runCatching { session.runtime.stop(session.container) }
                     .onFailure { android.util.Log.w(TAG, "Stopping primary container on destroy failed", it) }
@@ -109,57 +105,47 @@ class DesktopSessionService : Service() {
 
     private suspend fun connect() {
         android.util.Log.i(TAG, "Desktop session connecting")
-        val runtime: ContainerRuntime = selectRuntime()
+        val runtime: ContainerRuntime = ContainerRuntimeFactory.select(applicationContext)
         android.util.Log.i(TAG, "Runtime selected: ${runtime.javaClass.simpleName}")
 
-        if (runtime is DroidSpacesRuntime) {
-            val check = runtime.checkSystemRequirements()
-            if (!check.succeeded) {
-                fail("droidspaces check failed: ${check.stderr.ifBlank { check.stdout }}")
-                return
-            }
-            android.util.Log.i(TAG, "droidspaces check passed")
-        }
-
-        val primaryImage = try {
-            selectPrimaryImage(CraneImageCatalogResolver(applicationContext))
-        } catch (t: Throwable) {
-            fail("Couldn't resolve a primary image from the catalog: ${t.message}", t)
+        val check = runtime.checkSystemRequirements()
+        if (!check.succeeded) {
+            fail("This device can't run ${runtime.javaClass.simpleName}: ${check.stderr.ifBlank { check.stdout }.trim()}")
             return
         }
-        android.util.Log.i(TAG, "Primary image resolved: ${primaryImage.repository.registry}/${primaryImage.repository.repository} @ ${primaryImage.tag}")
+        android.util.Log.i(TAG, "${runtime.javaClass.simpleName} system check passed")
 
-        val provisionCommand = try {
-            val repo = primaryImage.repository
-            val desktopEnvironment = repo.desktopEnvironment
-                ?: error("PRIMARY entry ${repo.id} has no desktopEnvironment set")
-            CompositorProvisioning.installCommand(repo.os, desktopEnvironment)
-                ?: error("No known compositor-install command for ${repo.os}/$desktopEnvironment")
+        val repository = try {
+            chosenRepository()
+        } catch (t: Throwable) {
+            fail(t.message ?: "No desktop image chosen", t)
+            return
+        }
+        val provisioning = try {
+            provisioningFor(repository)
         } catch (t: Throwable) {
             fail("Couldn't determine how to provision a compositor: ${t.message}", t)
             return
         }
 
-        android.util.Log.i(TAG, "Creating primary container (pull + unpack can take a while on first run)")
         val primary = try {
-            runtime.createPrimary(primaryImage.toRootfsImage(), provisionCommand)
+            findOrCreatePrimary(runtime, repository, provisioning)
         } catch (t: Throwable) {
-            // Expected to fail until this has actually been run against a
-            // live droidspaces container (see this class's own doc
-            // comment) — a clear, attributable failure beats a silent
-            // no-op.
             fail("Couldn't create the primary container: ${t.message}", t)
             return
         }
-        android.util.Log.i(TAG, "Primary container created: ${primary.id}")
+        android.util.Log.i(TAG, "Primary container: ${primary.id}")
 
         try {
-            runtime.start(primary)
+            runtime.start(primary) { line ->
+                _stateHolder.value = DesktopSessionState.Connecting(line)
+            }
         } catch (t: Throwable) {
             fail("Couldn't start the primary container: ${t.message}", t)
             return
         }
         android.util.Log.i(TAG, "Primary container started")
+        logContainerIdentity(runtime, primary)
 
         val hostBridge = HostBridge()
         val socketPath = runtime.primaryWaylandSocketPath()
@@ -173,32 +159,44 @@ class DesktopSessionService : Service() {
     }
 
     /**
-     * Resolves the USER-chosen primary repository (onboarding's
-     * `DESKTOP_SETUP` step, or its Settings re-entry point, via
-     * [DesktopSetupPrefs]) against the real registry via [resolver] — the
-     * catalog is populated live, not prepopulated with pinned versions
-     * (docs/SPEC.md §3a). There is deliberately NO fallback pick: droidtop
-     * never chooses an image the user didn't (per direction — an earlier
-     * "first PRIMARY-role entry" fallback here silently selected alpine
-     * on the first live run). Within the chosen repository the registry's
-     * own `latest` tag is preferred (first-listed picked `alpine:2.6`, a
-     * 2015 image); a real per-tag picker is Desktop setup UI work, not
-     * this method's. Returns the full [ResolvedImage] (not just a
-     * [dev.droidtop.runtime.RootfsImage]) so [connect] can still see which
-     * distro/desktopEnvironment was picked — needed to look up the right
-     * [CompositorProvisioning] command.
+     * The existing PRIMARY when it was made from the image the user still
+     * has chosen; otherwise a new one from that image, resolved against the
+     * live registry now (docs/SPEC.md §3a).
      */
-    private suspend fun selectPrimaryImage(resolver: ImageCatalogResolver): ResolvedImage {
+    private suspend fun findOrCreatePrimary(
+        runtime: ContainerRuntime,
+        repository: KnownImageRepository,
+        provisioning: PrimaryProvisioning,
+    ): Container {
+        val existing = runtime.listContainers().firstOrNull { it.container.role == ContainerRole.PRIMARY }?.container
+        if (existing != null && DesktopSetupPrefs.primaryCreatedFrom(applicationContext) == repository.id) {
+            android.util.Log.i(TAG, "Reusing the primary container made from ${repository.id}")
+            return existing
+        }
+        _stateHolder.value = DesktopSessionState.Connecting("Downloading ${repository.repository}")
+        val image = selectPrimaryImage(CraneImageCatalogResolver(applicationContext), repository)
+        android.util.Log.i(
+            TAG,
+            "Creating the primary container from ${image.repository.registry}/${image.repository.repository}:${image.tag} " +
+                "(pull + unpack can take a while)",
+        )
+        val created = runtime.createPrimary(image.toRootfsImage(), provisioning)
+        DesktopSetupPrefs.setPrimaryCreatedFrom(applicationContext, repository.id)
+        return created
+    }
+
+    /**
+     * The USER-chosen primary repository (onboarding's `DESKTOP_SETUP`
+     * step, or its Settings re-entry point, via [DesktopSetupPrefs]).
+     * There is deliberately NO fallback pick: droidtop never chooses an
+     * image the user didn't (per direction — an earlier "first PRIMARY-role
+     * entry" fallback silently selected alpine on the first live run). No
+     * choice, or a stale choice a catalog edit removed, fails with guidance.
+     */
+    private fun chosenRepository(): KnownImageRepository {
         val repositories = BundledImageRepositories.load(applicationContext).repositories
         val preferredId = DesktopSetupPrefs.preferredPrimaryImageId(applicationContext)
-        // The USER chooses the primary image (onboarding's Desktop setup
-        // step, re-enterable from Settings) -- droidtop NEVER auto-picks
-        // one. The previous "first PRIMARY-role entry in the seed list"
-        // fallback was a real spec violation (per direction, and §3a's
-        // whole point): it silently selected an image the user never
-        // chose (alpine, on the first live run). No choice, or a stale
-        // choice a catalog edit removed, now fails with guidance instead.
-        val repo = repositories.firstOrNull { it.id == preferredId }
+        return repositories.firstOrNull { it.id == preferredId }
             ?: error(
                 if (preferredId == null) {
                     "No desktop image chosen yet — pick one in Desktop setup (Onboarding, or Settings → Desktop)"
@@ -206,23 +204,47 @@ class DesktopSessionService : Service() {
                     "The chosen desktop image ('$preferredId') is no longer in the catalog — pick one in Desktop setup"
                 }
             )
-        val tags = resolver.listTags(repo)
-        // Prefer the registry's own real "latest" convention -- taking
-        // whatever tag the listing starts with picked alpine:2.6 (a 2015
-        // image with long-dead package repos) on the first live run,
-        // because `crane ls` returns tags in ascending registry order.
-        // Every stock distro repository in the bundled seed list
-        // publishes a real `latest` tag; anything without one falls back
-        // to the first listed tag as before.
-        val tag = tags.firstOrNull { it.equals("latest", ignoreCase = true) }
-            ?: tags.firstOrNull()
-            ?: error("No tags published under ${repo.registry}/${repo.repository}")
-        return resolver.resolve(repo, tag)
     }
 
-    // Backend selection lives in ContainerRuntimeFactory (shared with the
-    // container manager screen) -- see its doc comment.
-    private suspend fun selectRuntime(): ContainerRuntime = ContainerRuntimeFactory.select(applicationContext)
+    private fun provisioningFor(repository: KnownImageRepository): PrimaryProvisioning {
+        val desktopEnvironment = repository.desktopEnvironment
+            ?: error("PRIMARY entry ${repository.id} has no desktopEnvironment set")
+        return CompositorProvisioning.plan(repository.os, desktopEnvironment)
+            ?: error("No known compositor provisioning for ${repository.os}/$desktopEnvironment")
+    }
+
+    /**
+     * Within the chosen repository the registry's own `latest` tag is
+     * preferred (first-listed picked `alpine:2.6`, a 2015 image, because
+     * `crane ls` returns tags in ascending registry order); a real per-tag
+     * picker is Desktop setup UI work, not this method's. Returns the full
+     * [ResolvedImage], digest included, so the pull is pinned.
+     */
+    private suspend fun selectPrimaryImage(resolver: ImageCatalogResolver, repository: KnownImageRepository): ResolvedImage {
+        val tags = resolver.listTags(repository)
+        val tag = tags.firstOrNull { it.equals("latest", ignoreCase = true) }
+            ?: tags.firstOrNull()
+            ?: error("No tags published under ${repository.registry}/${repository.repository}")
+        return resolver.resolve(repository, tag)
+    }
+
+    /**
+     * One exec into the booted container, logged: which system is actually
+     * running, and proof that [ContainerRuntime.exec] works before anything
+     * (the terminal, the Start menu) depends on it.
+     */
+    private suspend fun logContainerIdentity(runtime: ContainerRuntime, primary: Container) {
+        val probe = runCatching {
+            runtime.exec(primary, listOf("/bin/sh", "-c", "uname -m; . /etc/os-release && echo \"\$PRETTY_NAME\"; id -u"))
+        }
+        probe.onSuccess { result ->
+            android.util.Log.i(
+                TAG,
+                "Container identity (exec exit ${result.exitCode}): ${result.stdout.lines().filter { it.isNotBlank() }.joinToString(" | ")}" +
+                    if (result.stderr.isNotBlank()) " stderr: ${result.stderr.trim()}" else "",
+            )
+        }.onFailure { android.util.Log.w(TAG, "Container identity exec failed", it) }
+    }
 
     private fun primaryDisplayOutput(): DisplayOutput {
         @Suppress("DEPRECATION") // minSdk 26; WindowMetrics needs API 30+

@@ -1109,7 +1109,7 @@ private fun ConfigureMoreStep(
         )
         SelectableRow(
             title = "Desktop",
-            supporting = "Wine and Linux containers. Needs root on this device, and a distro image to download.",
+            supporting = "Wine and Linux containers. Needs a distro image to download.",
             selected = desktopChecked,
             onClick = { onDesktopChanged(!desktopChecked) },
         )
@@ -1141,29 +1141,26 @@ private fun DesktopSetupStep(
         // ONLY a previously-made real choice pre-selects -- droidtop never
         // picks an image the user didn't (docs/SPEC.md §3a).
         selectedId = DesktopSetupPrefs.preferredPrimaryImageId(context)
-        val rootAccess = withContext(Dispatchers.IO) { ContainerRuntimeFactory.rootAccess() }
-        val result = withContext(Dispatchers.IO) {
-            when (val runtime = ContainerRuntimeFactory.select(context)) {
-                is DroidSpacesRuntime -> runtime.checkSystemRequirements()
-                else -> null
-            }
-        }
-        checkResult = result?.succeeded ?: false
-        onCapabilityKnown(result?.succeeded == true)
+        // Whichever backend this device gets (root: droidspaces, otherwise
+        // proot) answers for itself by running something real.
+        val runtime = withContext(Dispatchers.IO) { ContainerRuntimeFactory.select(context) }
+        val result = withContext(Dispatchers.IO) { runtime.checkSystemRequirements() }
+        checkResult = result.succeeded
+        onCapabilityKnown(result.succeeded)
         // A statement a person can act on, not a backend error string:
         // what was found, what it means, what to do about it.
         checkMessage = when {
-            result == null ->
-                "Desktop mode needs root on this device (Magisk, KernelSU or APatch). " +
-                    // RootAccess.description is a whole sentence and ends
-                    // in its own full stop, so this one does not add a
-                    // second (rig, build 548: "...root access..").
-                    "This device reports: ${rootAccess.description.lowercase()} " +
-                    "You can finish setup without it and turn Desktop on later."
-            result.succeeded -> "Root access works. Desktop mode can run here."
-            else ->
+            result.succeeded && runtime is DroidSpacesRuntime ->
+                "Root access works. Desktop mode can run here, with real container isolation."
+            result.succeeded ->
+                "Desktop mode can run here. This device isn't rooted, so containers run " +
+                    "through proot: nothing to grant, somewhat slower, and without real isolation."
+            runtime is DroidSpacesRuntime ->
                 "Root is present but the check did not pass, so Desktop mode cannot " +
                     "start yet. You can finish setup and come back to this in Settings."
+            else ->
+                "Desktop mode cannot run on this device: proot could not start a program here " +
+                    "(${result.stderr.ifBlank { result.stdout }.trim()}). You can finish setup without it."
         }
     }
 

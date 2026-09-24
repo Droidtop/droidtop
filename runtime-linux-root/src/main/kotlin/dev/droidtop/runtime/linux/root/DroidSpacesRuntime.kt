@@ -6,10 +6,12 @@ import android.content.Context
 import dev.droidtop.runtime.Container
 import dev.droidtop.runtime.ContainerBackend
 import dev.droidtop.runtime.ContainerExecResult
+import dev.droidtop.runtime.ContainerLayout
 import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.ImageCache
 import dev.droidtop.runtime.ImageCachePolicy
+import dev.droidtop.runtime.PrimaryProvisioning
 import dev.droidtop.runtime.RootfsImage
 import dev.droidtop.runtime.RootfsPuller
 import java.io.File
@@ -30,11 +32,11 @@ import java.util.UUID
  *     user-configurable, see docs/SPEC.md §2/§3a) runs as the shared
  *     desktop compositor. [image] is expected to be a plain stock distro
  *     image (§3a: "any OCI image works", no droidtop-maintained custom
- *     build) — this class provisions the compositor into it itself, via
- *     [writeInit]'s embedded `provisionCommand` (see
- *     [dev.droidtop.runtime.CompositorProvisioning]), rather than requiring
- *     a pre-built image. Nothing enforces that the caller actually passed
- *     a PRIMARY-appropriate image/command pair — see
+ *     build) — this class provisions the compositor into it itself: the
+ *     `/sbin/init` [writeInit] writes is
+ *     [ContainerLayout.primaryInitScript], the same boot script the proot
+ *     backend runs. Nothing enforces that the caller actually passed a
+ *     PRIMARY-appropriate image/plan pair — see
  *     [ContainerRuntime.createPrimary]'s own doc comment.
  *
  *  2. Every container (primary and sibling alike) also gets a real
@@ -46,7 +48,7 @@ import java.util.UUID
  *     `--termux-x11`/Termux:X11 auto-launch feature at all — instead, every
  *     container (primary and siblings alike) bind-mounts the SAME host
  *     directory ([socketsDir]) to a fixed in-container path
- *     ([CONTAINER_SOCKET_DIR]), with `XDG_RUNTIME_DIR` pointed at it via an
+ *     ([ContainerLayout.SOCKET_DIR]), with `XDG_RUNTIME_DIR` pointed at it via an
  *     injected env file. Whichever container's compositor creates the
  *     Wayland socket there (the primary's sway), every other container
  *     bind-mounting the same host directory sees that exact socket file —
@@ -77,7 +79,7 @@ class DroidSpacesRuntime(
     private val rootfsDir = File(rootDir, "rootfs")
 
     /**
-     * The host-visible directory every container's `CONTAINER_SOCKET_DIR`
+     * The host-visible directory every container's `ContainerLayout.SOCKET_DIR`
      * bind mount points back to. One per device (not per-container) since
      * there's exactly one primary compositor everything else shares.
      */
@@ -85,7 +87,7 @@ class DroidSpacesRuntime(
 
     /**
      * The app's own private-storage root (`Context.getFilesDir()`), bind-
-     * mounted read-write into every container at [CONTAINER_APP_STORAGE_DIR]
+     * mounted read-write into every container at [ContainerLayout.APP_STORAGE_DIR]
      * so a host path under it — most notably gamenative's own per-container
      * Wine prefixes, see [ContainerRuntime.hostStorageToContainerPath]'s own
      * doc comment — is actually reachable from inside the container's mount
@@ -94,12 +96,12 @@ class DroidSpacesRuntime(
     private val appStorageDir = context.filesDir
 
     // [image] is a stock distro image (see docs/SPEC.md §3a's PRIMARY-role
-    // entries) with no compositor preinstalled -- [provisionCommand]
-    // (see CompositorProvisioning) is embedded into the /sbin/init this
-    // class writes onto the pulled rootfs (see [writeInit]) and runs once,
-    // on first boot, to actually install one.
-    override suspend fun createPrimary(image: RootfsImage, provisionCommand: String?): Container =
-        createContainer(name = PRIMARY_NAME, role = ContainerRole.PRIMARY, image = image, provisionCommand = provisionCommand)
+    // entries) with no compositor preinstalled -- [provisioning] (see
+    // CompositorProvisioning) is embedded into the /sbin/init this class
+    // writes onto the pulled rootfs (see [writeInit]) and runs once, on
+    // first boot, to actually install one.
+    override suspend fun createPrimary(image: RootfsImage, provisioning: PrimaryProvisioning): Container =
+        createContainer(name = PRIMARY_NAME, role = ContainerRole.PRIMARY, image = image, provisioning = provisioning)
 
     override suspend fun createSibling(image: RootfsImage): Container =
         createContainer(
@@ -112,7 +114,7 @@ class DroidSpacesRuntime(
         name: String,
         role: ContainerRole,
         image: RootfsImage,
-        provisionCommand: String? = null,
+        provisioning: PrimaryProvisioning? = null,
     ): Container {
         // Best-effort stale-instance stop BEFORE touching the rootfs, not
         // only in start(): a leaked instance from a force-stopped previous
@@ -123,22 +125,19 @@ class DroidSpacesRuntime(
         RootProcess.run(binaryPath, "--name=$name", "stop")
         val rootfsPath = File(rootfsDir, name).absolutePath
         rootfsPuller.pullAndUnpack(image, rootfsPath, imageCache, cachePolicy)
-        writeInit(rootfsPath, provisionCommand)
+        writeInit(rootfsPath, provisioning)
 
         socketsDir.mkdirs()
         val envFile = File(configsDir, "$name.env")
         envFile.parentFile?.mkdirs()
-        envFile.writeText(
-            "XDG_RUNTIME_DIR=$CONTAINER_SOCKET_DIR\n" +
-                "WAYLAND_DISPLAY=$WAYLAND_SOCKET_NAME\n"
-        )
+        envFile.writeText(ContainerLayout.clientEnvironment.entries.joinToString("") { (key, value) -> "$key=$value\n" })
 
         val config = DroidSpacesContainerConfig(
             name = name,
             rootfsPath = rootfsPath,
             bindMounts = listOf(
-                socketsDir.absolutePath to CONTAINER_SOCKET_DIR,
-                appStorageDir.absolutePath to CONTAINER_APP_STORAGE_DIR,
+                socketsDir.absolutePath to ContainerLayout.SOCKET_DIR,
+                appStorageDir.absolutePath to ContainerLayout.APP_STORAGE_DIR,
             ),
             envFilePath = envFile.absolutePath,
         )
@@ -156,46 +155,22 @@ class DroidSpacesRuntime(
      * baked into any image — matching docs/SPEC.md §2a's "OCI images stay
      * stock, injected at runtime" principle.
      *
-     * [provisionCommand] (only ever non-null for the PRIMARY role — see
-     * [CompositorProvisioning]) is the chosen distro's own real package-
-     * manager command to install a compositor; it runs once, guarded by a
-     * marker file, the first time this container actually boots — real
-     * network access is required for that (same "host networking, real
-     * internet" assumption [CraneRootfsPuller]'s own `crane` calls already
-     * depend on), so a fresh primary container's first boot is genuinely
-     * slower than later ones. A SIBLING (or a hand-supplied PRIMARY image
-     * that already has a compositor — [provisionCommand] null either way)
-     * gets a plain idle init instead — matching distrobox's own sibling
+     * The PRIMARY's init is [ContainerLayout.primaryInitScript]: provision
+     * once (real network access required, the same "host networking, real
+     * internet" assumption crane's pulls already depend on), then exec the
+     * compositor headless. It exports its own `XDG_RUNTIME_DIR`, so it does
+     * not depend on droidspaces' `env_file` reaching init. A SIBLING gets a
+     * plain idle init instead — matching distrobox's own sibling
      * containers, which sit up doing nothing until something [exec]s into
      * them.
      *
      * UNVERIFIED against a live droidspaces container — no rooted device
-     * available in this environment; specifically unconfirmed: that
-     * `env_file`'s XDG_RUNTIME_DIR/WAYLAND_DISPLAY are actually exported
-     * into this script's environment before it runs (droidspaces' own docs
-     * describe the config key but not the exact injection point), and that
-     * seatd alone (no systemd-logind) is sufficient for sway's libseat to
-     * open a headless session.
+     * available in this environment. It is the same script the proot backend
+     * runs (docs/SPEC.md §3).
      */
-    private suspend fun writeInit(rootfsPath: String, provisionCommand: String?) {
-        val script = buildString {
-            appendLine("#!/bin/sh")
-            appendLine("set -e")
-            if (provisionCommand != null) {
-                appendLine("if [ ! -f /var/lib/droidtop-provisioned ]; then")
-                appendLine("  $provisionCommand")
-                appendLine("  mkdir -p /var/lib")
-                appendLine("  touch /var/lib/droidtop-provisioned")
-                appendLine("fi")
-                appendLine("mkdir -p /run/seatd")
-                appendLine("seatd -g seat &")
-                appendLine("export WLR_BACKENDS=headless")
-                appendLine("export WLR_LIBINPUT_NO_DEVICES=1")
-                appendLine("exec sway")
-            } else {
-                appendLine("exec sleep infinity")
-            }
-        }
+    private suspend fun writeInit(rootfsPath: String, provisioning: PrimaryProvisioning?) {
+        val script = provisioning?.let { ContainerLayout.primaryInitScript(it) }
+            ?: "#!/bin/sh\nexec sleep infinity\n"
 
         val initPath = "$rootfsPath/sbin/init"
         val writeCommand = "mkdir -p '$rootfsPath/sbin' && cat > '$initPath' <<'DROIDTOP_INIT_EOF'\n" +
@@ -205,7 +180,7 @@ class DroidSpacesRuntime(
         check(result.succeeded) { "Writing /sbin/init into $rootfsPath failed: ${result.stderr}" }
     }
 
-    override suspend fun start(container: Container) {
+    override suspend fun start(container: Container, onProgress: (String) -> Unit) {
         // Best-effort stop of a stale same-name instance first. Real,
         // confirmed on-device leak this recovers from: droidspaces child
         // processes survive an app force-stop (force-stop skips every
@@ -299,23 +274,18 @@ class DroidSpacesRuntime(
      * so a device that can't actually run containers fails with a clear
      * message instead of a confusing mount/namespace error partway through.
      */
-    suspend fun checkSystemRequirements(): RootProcessResult =
-        RootProcess.run(binaryPath, "check")
+    override suspend fun checkSystemRequirements(): ContainerExecResult {
+        val result: RootProcessResult = RootProcess.run(binaryPath, "check")
+        return ContainerExecResult(exitCode = result.exitCode, stdout = result.stdout, stderr = result.stderr)
+    }
 
     override fun primaryWaylandSocketPath(): String =
-        File(socketsDir, WAYLAND_SOCKET_NAME).absolutePath
+        File(socketsDir, ContainerLayout.WAYLAND_SOCKET_NAME).absolutePath
 
-    override fun hostStorageToContainerPath(hostPath: File): String {
-        val relative = hostPath.absoluteFile.toRelativeString(appStorageDir.absoluteFile)
-        require(!relative.startsWith("..")) { "$hostPath isn't under the app storage root $appStorageDir" }
-        return "$CONTAINER_APP_STORAGE_DIR/$relative"
-    }
+    override fun hostStorageToContainerPath(hostPath: File): String =
+        ContainerLayout.hostStorageToContainerPath(appStorageDir, hostPath)
 
     companion object {
         private const val PRIMARY_NAME = "droidtop-primary"
-
-        private const val CONTAINER_SOCKET_DIR = "/run/droidtop-sockets"
-        private const val CONTAINER_APP_STORAGE_DIR = "/run/droidtop-app-storage"
-        private const val WAYLAND_SOCKET_NAME = "wayland-0"
     }
 }

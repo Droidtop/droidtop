@@ -24,6 +24,8 @@ captures/
 .vendor-deps-build/
 host-bridge/src/main/jniLibs/
 runtime-linux-root/src/main/assets/bin/
+runtime-common/src/main/jniLibs/
+runtime-linux-noroot/src/main/jniLibs/
 
 # Signing (real release key + passwords — never commit these; CI reads
 # them from repo secrets instead, see .github/workflows/android-build.yml)

@@ -130,7 +130,7 @@ jobs:
             "platform-tools" "platforms;android-34" "build-tools;34.0.0" \
             "platforms;android-36" "build-tools;36.0.0" "ndk;${NDK_VERSION}"
 
-      - name: Cache cross-compiled vendor deps (libffi, libwayland-client, droidspaces)
+      - name: Cache cross-compiled vendor deps (libffi, libwayland-client, droidspaces, crane, proot)
         id: deps-cache
         uses: actions/cache@v4
         with:
@@ -154,6 +154,8 @@ jobs:
           # broke :host-bridge:mergeDebugNativeLibs.
           path: |
             runtime-linux-root/src/main/assets/bin
+            runtime-common/src/main/jniLibs
+            runtime-linux-noroot/src/main/jniLibs
             ${{ env.ANDROID_DEPS_PREFIX }}
           # Keyed on every vendored submodule this script actually builds
           # from, not just a static string — a submodule bump on any of
@@ -165,9 +167,14 @@ jobs:
           # binary's pure-Go DNS resolver was dead on-device — see
           # build-vendor-deps.sh's crane section); the cached v6 assets/bin
           # would keep serving that broken binary forever otherwise.
-          key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD') }}-v7
+          # v8: crane moved to runtime-common/src/main/jniLibs as
+          # libcrane.so (exec from nativeLibraryDir; an extracted asset
+          # cannot be exec'd above targetSdk 28), and vendor/proot builds
+          # into runtime-linux-noroot/src/main/jniLibs. A v7 hit would
+          # restore neither.
+          key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD', '.git/modules/vendor/proot/HEAD') }}-v8
 
-      - name: Build cross-compiled vendor deps (libffi, libwayland-client, droidspaces)
+      - name: Build cross-compiled vendor deps (libffi, libwayland-client, droidspaces, crane, proot)
         if: steps.deps-cache.outputs.cache-hit != 'true'
         # Invoked via `bash` explicitly, not `./build-scripts/build-vendor-deps.sh`
         # — this repo is developed partly on Windows, where the executable
@@ -245,7 +252,7 @@ jobs:
         # never once run in CI. Add the module here the moment it grows its
         # first test; a test nothing runs is not a test.
         if: always()
-        run: ./gradlew :app:testDebugUnitTest :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :runtime-windows:testDebugUnitTest :input-keyboard:testDebugUnitTest :host-bridge:testDebugUnitTest --stacktrace
+        run: ./gradlew :app:testDebugUnitTest :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :runtime-windows:testDebugUnitTest :input-keyboard:testDebugUnitTest :host-bridge:testDebugUnitTest :runtime-linux-noroot:testDebugUnitTest --stacktrace
 
       - name: Upload test reports
         if: always()

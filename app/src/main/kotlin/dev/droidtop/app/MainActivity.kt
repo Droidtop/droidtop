@@ -54,15 +54,10 @@ import kotlinx.coroutines.launch
  * read) never ran a second time.
  *
  * Desktop mode starts [DesktopSessionService] and observes its
- * [DesktopSessionService.state] instead of a hardcoded null HostBridge/
- * DisplayOutput -- real wiring, but the session itself is still expected
- * to land in [DesktopSessionState.Failed] on any real device right now
- * (see that service's own doc comment for the two concrete gaps: no
- * primary container image published yet, and the non-root runtime
- * ([dev.droidtop.runtime.linux.noroot.ProotRuntime]) is unimplemented).
- * [DesktopShell] renders that Idle/Connecting/Failed/Connected state
- * distinctly via its own [dev.droidtop.shell.desktop.DesktopSessionMessage]
- * rather than a single generic placeholder.
+ * [DesktopSessionService.state]. [DesktopShell] renders that
+ * Idle/Connecting/Failed/Connected state distinctly via its own
+ * [dev.droidtop.shell.desktop.DesktopSessionMessage] rather than a single
+ * generic placeholder, including what a booting container last reported.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -252,7 +247,7 @@ class MainActivity : AppCompatActivity() {
                         primaryOutput = connected?.primaryOutput,
                         sessionMessage = when (val state = sessionState) {
                             is DesktopSessionState.Idle -> DesktopSessionMessage.Idle
-                            is DesktopSessionState.Connecting -> DesktopSessionMessage.Connecting
+                            is DesktopSessionState.Connecting -> DesktopSessionMessage.Connecting(state.detail)
                             is DesktopSessionState.Connected -> DesktopSessionMessage.Idle
                             is DesktopSessionState.Failed -> DesktopSessionMessage.Failed(state.message)
                         },
