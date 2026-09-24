@@ -16,18 +16,24 @@ import java.io.File
  * 2), the screenshot centered at 1060x800 with a +40px horizontal
  * offset inside a 12px frame whose color samples the screenshot, the
  * marquee top-right inside a 620x460 target sized by ES-DE's own
- * surface-area rule (calculateMarqueeSize, transcribed), the cover
- * bottom-left scaled to 600px height capped at 500px width (the
- * "medium" box size with cover fallback -- droidtop scrapes 2D covers,
- * and MiximageCoverFallback is ES-DE's own default-on path), physical
- * media bottom, 32px right of the cover, inside 300x240.
+ * surface-area rule (calculateMarqueeSize, transcribed), the box
+ * bottom-left at the "medium" box size (see [boxSize]), physical
+ * media bottom, 32px right of the box, inside 300x240.
+ *
+ * The box is the game's 3D box when one is on disk and its 2D cover
+ * otherwise, ES-DE's own order with its default-on MiximageCoverFallback
+ * (MiximageGenerator.cpp:68-84). droidtop's scrapers write covers, not
+ * 3D boxes, so the 3D box is used when a media folder carried over from
+ * ES-DE already has one. A box wider than 1.14:1 is turned a quarter
+ * turn clockwise first, ES-DE's default-on MiximageRotateHorizontalBoxes
+ * (MiximageGenerator.cpp:614-618; CImg's `rotate(90)` maps result (x, y)
+ * to source (y, h-1-x), CImg.h:39622-39626, which is clockwise).
  *
  * Deliberate deviations, documented rather than hidden: Android's
  * bilinear filtering replaces Lanczos/box resampling; the drop shadow
  * is one blurred-alpha pass (BlurMaskFilter) instead of four box-blur
  * iterations; letterbox/pillarbox removal trims fully-black edge
- * rows/columns rather than CImg's average-luminance scan; horizontal
- * box rotation is not implemented (droidtop feeds portrait 2D covers).
+ * rows/columns rather than CImg's average-luminance scan.
  */
 object MiximageGenerator {
 
@@ -40,7 +46,9 @@ object MiximageGenerator {
     private const val MARQUEE_TARGET_WIDTH = 620
     private const val MARQUEE_TARGET_HEIGHT = 460
     private const val COVER_TARGET_WIDTH = 500
+    private const val BOX_TARGET_WIDTH = 620
     private const val BOX_TARGET_HEIGHT = 600
+    private const val HORIZONTAL_BOX_RATIO = 1.14f
     private const val PHYSICAL_TARGET_WIDTH = 300
     private const val PHYSICAL_TARGET_HEIGHT = 240
     private const val PHYSICAL_MARGIN = 32
@@ -49,7 +57,15 @@ object MiximageGenerator {
     private const val ASPECT_MIN = 1.05f
 
     /** Composes and writes [output] (PNG). False when the screenshot can't be decoded -- it is the mandatory ingredient, same as real ES-DE. */
-    fun generate(screenshot: File, marquee: File?, cover: File?, physicalMedia: File?, output: File): Boolean {
+    fun generate(
+        screenshot: File,
+        marquee: File?,
+        box3D: File?,
+        cover: File?,
+        physicalMedia: File?,
+        output: File,
+        rotateHorizontalBoxes: Boolean = true,
+    ): Boolean {
         val screenshotBitmap = decode(screenshot) ?: return false
         val canvasBitmap = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(canvasBitmap)
@@ -82,18 +98,21 @@ object MiximageGenerator {
         }
 
         var boxRightEdge = 0
-        cover?.let { decode(it) }?.let { raw ->
-            val boxBitmap = trimTransparentPadding(raw)
-            var scale = BOX_TARGET_HEIGHT.toFloat() / boxBitmap.height
-            if (boxBitmap.width * scale > COVER_TARGET_WIDTH) {
-                scale = COVER_TARGET_WIDTH.toFloat() / boxBitmap.width
+        // The cover is only consulted when there is no 3D box file at all: a
+        // 3D box that will not decode leaves the miximage without a box, as
+        // ES-DE's own load failure does (MiximageGenerator.cpp:210-246 clears
+        // mBox3D without ever having set mCover).
+        val boxSource = if (box3D != null) decode(box3D) else cover?.let { decode(it) }
+        boxSource?.let { raw ->
+            val trimmed = trimTransparentPadding(raw)
+            val size = boxSize(trimmed.width, trimmed.height, is3D = box3D != null, rotateHorizontalBoxes)
+            val boxBitmap = if (size.rotated) {
+                val quarterTurn = android.graphics.Matrix().apply { postRotate(90f) }
+                Bitmap.createBitmap(trimmed, 0, 0, trimmed.width, trimmed.height, quarterTurn, true)
+            } else {
+                trimmed
             }
-            val scaled = Bitmap.createScaledBitmap(
-                boxBitmap,
-                (boxBitmap.width * scale).toInt().coerceAtLeast(1),
-                (boxBitmap.height * scale).toInt().coerceAtLeast(1),
-                true,
-            )
+            val scaled = Bitmap.createScaledBitmap(boxBitmap, size.width, size.height, true)
             val y = HEIGHT - scaled.height
             drawWithShadow(canvas, scaled, 0f, y.toFloat(), paint)
             boxRightEdge = scaled.width
@@ -122,6 +141,32 @@ object MiximageGenerator {
         }
         dev.droidtop.library.EsDeArtwork.mediaWritten(output)
         return true
+    }
+
+    /** Where the box lands: whether it is turned, and its drawn size. */
+    internal data class BoxSize(val rotated: Boolean, val width: Int, val height: Int)
+
+    /**
+     * The box's rotation and size, from its size after padding removal
+     * (MiximageGenerator.cpp:614-641): turned when wider than 1.14:1, then
+     * scaled to the target height unless that makes it wider than the
+     * target width, which is the 3D-box width or the narrower cover width
+     * ("some cover images are in square format and would cover too much
+     * surface otherwise", :625-631).
+     */
+    internal fun boxSize(width: Int, height: Int, is3D: Boolean, rotateHorizontalBoxes: Boolean): BoxSize {
+        val rotated = rotateHorizontalBoxes && width.toFloat() / height > HORIZONTAL_BOX_RATIO
+        val w = if (rotated) height else width
+        val h = if (rotated) width else height
+        val targetWidth = if (is3D) BOX_TARGET_WIDTH else COVER_TARGET_WIDTH
+        val heightScale = BOX_TARGET_HEIGHT.toFloat() / h
+        val scaledWidth = (w * heightScale).toInt()
+        return if (scaledWidth > targetWidth) {
+            val widthScale = targetWidth.toFloat() / w
+            BoxSize(rotated, targetWidth, (h * widthScale).toInt().coerceAtLeast(1))
+        } else {
+            BoxSize(rotated, scaledWidth.coerceAtLeast(1), BOX_TARGET_HEIGHT)
+        }
     }
 
     private fun decode(file: File): Bitmap? =
