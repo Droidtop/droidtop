@@ -46,15 +46,24 @@ object LutrisScraperClient {
      * ("Eternum-0.9.5-pc" is not a title), so the caller decides whether
      * any result is confident enough to apply on its own or whether the
      * user has to pick -- see [dev.droidtop.library.scraper.PcMatching].
+     *
+     * A non-200 is a [ScrapeLookup.Refused], never an empty list: an empty
+     * list would be reported as "Lutris has nothing by that name", which is
+     * a claim about the game the server never made (docs/SPEC.md 7h).
      */
-    fun search(gameTitle: String): List<LutrisGameResult> {
+    fun search(gameTitle: String): ScrapeLookup<List<LutrisGameResult>> {
         val query = URLEncoder.encode(gameTitle, "UTF-8")
         val url = URL("https://lutris.net/api/games?search=$query")
         val connection = (url.openConnection() as HttpURLConnection).apply { requestMethod = "GET" }
-        if (connection.responseCode != 200) return emptyList()
-        val response = JSONObject(connection.inputStream.bufferedReader().readText())
-        val results = response.optJSONArray("results") ?: return emptyList()
-        return (0 until minOf(results.length(), MAX_RESULTS)).mapNotNull { index ->
+        val status = connection.responseCode
+        if (status != 200) return ScrapeRefusals.refused("Lutris", connection, status, emptyList(), gameTitle)
+        return parse(JSONObject(connection.inputStream.bufferedReader().readText()))
+    }
+
+    /** Pure, for the JVM tests. */
+    internal fun parse(response: JSONObject): ScrapeLookup<List<LutrisGameResult>> {
+        val results = response.optJSONArray("results") ?: return ScrapeLookup.NoMatch
+        val parsed = (0 until minOf(results.length(), MAX_RESULTS)).mapNotNull { index ->
             val row = results.getJSONObject(index)
             val name = row.optString("name", "").ifBlank { null } ?: return@mapNotNull null
             LutrisGameResult(
@@ -69,5 +78,6 @@ object LutrisScraperClient {
                 year = row.optInt("year", 0).takeIf { it > 0 },
             )
         }
+        return if (parsed.isEmpty()) ScrapeLookup.NoMatch else ScrapeLookup.Found(parsed)
     }
 }

@@ -58,6 +58,9 @@ data class TheGamesDbMetadata(
 object TheGamesDbClient {
     private const val BASE_URL = "https://api.thegamesdb.net/v1"
 
+    /** The name a refusal is reported under (docs/SPEC.md section 7h). */
+    private const val SOURCE = "TheGamesDB"
+
     private fun fetchReferenceList(apiKey: String, endpoint: String, resourceName: String): Map<Int, String> {
         val url = URL("$BASE_URL$endpoint?apikey=${URLEncoder.encode(apiKey, "UTF-8")}")
         val connection = (url.openConnection() as HttpURLConnection).apply { requestMethod = "GET" }
@@ -153,7 +156,7 @@ object TheGamesDbClient {
         thegamesdbSystemId: String,
         gameTitle: String,
         limit: Int = 12,
-    ): List<Candidate> {
+    ): ScrapeLookup<List<Candidate>> {
         val searchUrl = URL(
             "$BASE_URL/Games/ByGameName?apikey=${URLEncoder.encode(apiKey, "UTF-8")}" +
                 "&fields=release_date" +
@@ -161,10 +164,11 @@ object TheGamesDbClient {
                 "&filter%5Bplatform%5D=${URLEncoder.encode(thegamesdbSystemId, "UTF-8")}",
         )
         val connection = (searchUrl.openConnection() as HttpURLConnection).apply { requestMethod = "GET" }
-        if (connection.responseCode != 200) return emptyList()
+        val status = connection.responseCode
+        if (status != 200) return ScrapeRefusals.refused(SOURCE, connection, status, listOf(apiKey), gameTitle)
         val response = JSONObject(connection.inputStream.bufferedReader().readText())
-        val games = response.optJSONObject("data")?.optJSONArray("games") ?: return emptyList()
-        return (0 until minOf(games.length(), limit)).mapNotNull { index ->
+        val games = response.optJSONObject("data")?.optJSONArray("games") ?: return ScrapeLookup.NoMatch
+        val candidates = (0 until minOf(games.length(), limit)).mapNotNull { index ->
             val game = games.optJSONObject(index) ?: return@mapNotNull null
             val id = game.optInt("id", -1).takeIf { it >= 0 } ?: return@mapNotNull null
             Candidate(
@@ -173,10 +177,11 @@ object TheGamesDbClient {
                 releaseYear = game.optString("release_date", "").take(4).ifBlank { null },
             )
         }
+        return if (candidates.isEmpty()) ScrapeLookup.NoMatch else ScrapeLookup.Found(candidates)
     }
 
     /** The full metadata for one candidate the user picked. */
-    fun metadataForId(apiKey: String, cacheDir: File, gameId: Int): TheGamesDbMetadata? {
+    fun metadataForId(apiKey: String, cacheDir: File, gameId: Int): ScrapeLookup<TheGamesDbMetadata> {
         val developers = cachedReferenceList(apiKey, "/Developers", "developers", File(cacheDir, "thegamesdb_developers.json"))
         val publishers = cachedReferenceList(apiKey, "/Publishers", "publishers", File(cacheDir, "thegamesdb_publishers.json"))
         val genres = cachedReferenceList(apiKey, "/Genres", "genres", File(cacheDir, "thegamesdb_genres.json"))
@@ -185,10 +190,11 @@ object TheGamesDbClient {
                 "&fields=players,publishers,genres,overview,release_date&id=$gameId",
         )
         val connection = (url.openConnection() as HttpURLConnection).apply { requestMethod = "GET" }
-        if (connection.responseCode != 200) return null
+        val status = connection.responseCode
+        if (status != 200) return ScrapeRefusals.refused(SOURCE, connection, status, listOf(apiKey), "game $gameId")
         val response = JSONObject(connection.inputStream.bufferedReader().readText())
-        val game = response.optJSONObject("data")?.optJSONArray("games")?.optJSONObject(0) ?: return null
-        return TheGamesDbMetadata(
+        val game = response.optJSONObject("data")?.optJSONArray("games")?.optJSONObject(0) ?: return ScrapeLookup.NoMatch
+        return ScrapeLookup.Found(TheGamesDbMetadata(
             name = game.optString("game_title", "").ifBlank { null },
             description = game.optString("overview", "").ifBlank { null },
             developer = game.optJSONArray("developers")?.let { arr ->
@@ -203,10 +209,15 @@ object TheGamesDbClient {
             releaseDate = game.optString("release_date", "").ifBlank { null }?.let { parseReleaseDate(it) },
             players = game.optInt("players", -1).takeIf { it >= 0 }?.toString(),
             coverUrl = fetchCoverUrl(apiKey, gameId),
-        )
+        ))
     }
 
-    fun findMetadata(apiKey: String, cacheDir: File, thegamesdbSystemId: String, gameTitle: String): TheGamesDbMetadata? {
+    fun findMetadata(
+        apiKey: String,
+        cacheDir: File,
+        thegamesdbSystemId: String,
+        gameTitle: String,
+    ): ScrapeLookup<TheGamesDbMetadata> {
         @Suppress("NAME_SHADOWING")
         val gameTitle = cleanSearchName(gameTitle)
         val developers = cachedReferenceList(apiKey, "/Developers", "developers", File(cacheDir, "thegamesdb_developers.json"))
@@ -220,10 +231,13 @@ object TheGamesDbClient {
                 "&filter%5Bplatform%5D=${URLEncoder.encode(thegamesdbSystemId, "UTF-8")}",
         )
         val searchConnection = (searchUrl.openConnection() as HttpURLConnection).apply { requestMethod = "GET" }
-        if (searchConnection.responseCode != 200) return null
+        val searchStatus = searchConnection.responseCode
+        if (searchStatus != 200) {
+            return ScrapeRefusals.refused(SOURCE, searchConnection, searchStatus, listOf(apiKey), gameTitle)
+        }
         val searchResponse = JSONObject(searchConnection.inputStream.bufferedReader().readText())
-        val games = searchResponse.optJSONObject("data")?.optJSONArray("games") ?: return null
-        if (games.length() == 0) return null
+        val games = searchResponse.optJSONObject("data")?.optJSONArray("games") ?: return ScrapeLookup.NoMatch
+        if (games.length() == 0) return ScrapeLookup.NoMatch
         // The API's fuzzy ordering put a fan game ("Pokemon Black and
         // White 3: Genesis") above Pokemon Crystal on a real pass --
         // rank the response ourselves: exact title match first, then
@@ -268,7 +282,7 @@ object TheGamesDbClient {
 
         val coverUrl = if (gameId >= 0) fetchCoverUrl(apiKey, gameId) else null
 
-        return TheGamesDbMetadata(
+        return ScrapeLookup.Found(TheGamesDbMetadata(
             name = name,
             description = description,
             developer = developer,
@@ -277,7 +291,7 @@ object TheGamesDbClient {
             releaseDate = releaseDate,
             players = players,
             coverUrl = coverUrl,
-        )
+        ))
     }
 
     /**

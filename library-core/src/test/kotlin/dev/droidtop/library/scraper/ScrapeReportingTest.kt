@@ -35,7 +35,7 @@ class ScrapeReportingTest {
             miximaged = 0,
             failed = 0,
             refused = 46,
-            lastRefusal = ScreenScraperLookup.Refused(403, "Application non autorisee"),
+            lastRefusal = ScrapeLookup.Refused("ScreenScraper", 403, "Application non autorisee"),
         )
         // The exact regression: this sentence may never claim a miss.
         assertFalse(summary, summary.contains("no match"))
@@ -78,7 +78,7 @@ class ScrapeReportingTest {
             miximaged = 0,
             failed = 0,
             refused = 2,
-            lastRefusal = ScreenScraperLookup.Refused(429, "Quota atteint"),
+            lastRefusal = ScrapeLookup.Refused("ScreenScraper", 429, "Quota atteint"),
         )
         assertTrue(summary, summary.contains("no match for 3"))
         assertTrue(summary, summary.contains("2 refused by the server"))
@@ -97,7 +97,7 @@ class ScrapeReportingTest {
             miximaged = 0,
             failed = 0,
             refused = 5,
-            lastRefusal = ScreenScraperLookup.Refused(403, "Application non autorisee"),
+            lastRefusal = ScrapeLookup.Refused("ScreenScraper", 403, "Application non autorisee"),
         )
         assertTrue(summary, summary.contains("of 40 targeted"))
         assertTrue(summary, summary.contains("6 asked for before giving up"))
@@ -117,7 +117,7 @@ class ScrapeReportingTest {
             miximaged = 0,
             failed = 0,
             refused = 3,
-            lastRefusal = ScreenScraperLookup.Refused(403, null),
+            lastRefusal = ScrapeLookup.Refused("ScreenScraper", 403, null),
         )
         assertTrue(summary, summary.contains("HTTP 403"))
         assertTrue(summary, summary.contains("droidtop.Scraper"))
@@ -129,7 +129,7 @@ class ScrapeReportingTest {
     fun `the server's own explanation survives to the log line`() {
         assertEquals(
             "Erreur de login : Verifier vos identifiants developpeur !",
-            ScreenScraperClient.summarizeErrorBody(
+            ScrapeRefusals.summarizeErrorBody(
                 "\n  Erreur de login : Verifier vos identifiants developpeur !\n",
                 emptyList(),
             ),
@@ -138,7 +138,7 @@ class ScrapeReportingTest {
 
     @Test
     fun `an HTML error page from an intermediary is reduced to its text`() {
-        val summary = ScreenScraperClient.summarizeErrorBody(
+        val summary = ScrapeRefusals.summarizeErrorBody(
             "<html><head><title>403 Forbidden</title></head><body><h1>403 Forbidden</h1></body></html>",
             emptyList(),
         )
@@ -149,7 +149,7 @@ class ScrapeReportingTest {
     fun `no credential value can ride out in an error body`() {
         // The one thing a refusal body must never be able to do: echo
         // back what was sent to earn it.
-        val summary = ScreenScraperClient.summarizeErrorBody(
+        val summary = ScrapeRefusals.summarizeErrorBody(
             "Bad password hunter2hunter2 for user hunter2",
             listOf("hunter2", "hunter2hunter2"),
         )
@@ -161,20 +161,20 @@ class ScrapeReportingTest {
     fun `blank credentials are not treated as something to redact`() {
         assertEquals(
             "Application non autorisee",
-            ScreenScraperClient.summarizeErrorBody("Application non autorisee", listOf("", "  ")),
+            ScrapeRefusals.summarizeErrorBody("Application non autorisee", listOf("", "  ")),
         )
     }
 
     @Test
     fun `an empty or markup-only body reads as no explanation at all`() {
-        assertNull(ScreenScraperClient.summarizeErrorBody("", emptyList()))
-        assertNull(ScreenScraperClient.summarizeErrorBody("   \n\t ", emptyList()))
-        assertNull(ScreenScraperClient.summarizeErrorBody("<html><body></body></html>", emptyList()))
+        assertNull(ScrapeRefusals.summarizeErrorBody("", emptyList()))
+        assertNull(ScrapeRefusals.summarizeErrorBody("   \n\t ", emptyList()))
+        assertNull(ScrapeRefusals.summarizeErrorBody("<html><body></body></html>", emptyList()))
     }
 
     @Test
     fun `an oversized body is bounded rather than logged whole`() {
-        val summary = ScreenScraperClient.summarizeErrorBody("x".repeat(5_000), emptyList())!!
+        val summary = ScrapeRefusals.summarizeErrorBody("x".repeat(5_000), emptyList())!!
         assertTrue(summary.length.toString(), summary.length <= 203)
         assertTrue(summary.endsWith("..."))
     }

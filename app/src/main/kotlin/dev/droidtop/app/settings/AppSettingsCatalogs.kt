@@ -144,7 +144,15 @@ object AppSettingsCatalogs {
                         title = "Artwork & metadata scraper",
                         subtitle = "Source and credentials for ROM scraping",
                         registryId = SCREEN_SCRAPER,
-                        valueLabel = { ctx -> if (ScraperSourcePrefs.get(ctx) == ScraperSource.THEGAMESDB) "TheGamesDB" else "ScreenScraper" },
+                        // All three sources, named: the libretro choice
+                        // used to be shown here as "ScreenScraper".
+                        valueLabel = { ctx ->
+                            when (ScraperSourcePrefs.get(ctx)) {
+                                ScraperSource.SCREENSCRAPER -> "ScreenScraper"
+                                ScraperSource.THEGAMESDB -> "TheGamesDB"
+                                ScraperSource.LIBRETRO -> "libretro database"
+                            }
+                        },
                     ),
                     NestedScreenItem(
                         id = "console_systems_enginehost",
@@ -1375,6 +1383,7 @@ object AppSettingsCatalogs {
                         ChoiceItem(
                             id = "pc_scraper_source_choice",
                             title = "PC & engine game source",
+                            subtitle = "Steam games are looked up in the Steam store by their own id first",
                             options = dev.droidtop.library.scraper.PcScraperSource.entries.map {
                                 ChoiceOption(it.name, it.label)
                             },

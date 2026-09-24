@@ -22,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.scraper.ScrapeLookup
+import dev.droidtop.library.scraper.foundOrNull
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.scraper.PcMatch
@@ -94,13 +96,22 @@ internal fun ManualMatchPicker(
             candidates = emptyList()
             return@LaunchedEffect
         }
-        val found = withContext(Dispatchers.IO) {
+        val lookup = withContext(Dispatchers.IO) {
             runCatching {
                 TheGamesDbClient.searchCandidates(apiKey, tgdbId, java.io.File(entry.id).nameWithoutExtension)
-            }.getOrDefault(emptyList())
+            }
         }
+        // A refusal and a failed request are not "no candidates": each
+        // says what actually happened (docs/SPEC.md section 7h).
+        val found = lookup.getOrNull()?.foundOrNull.orEmpty()
         candidates = found.map { MatchCandidate.Rom(it) }
-        if (found.isEmpty()) status = "No candidates came back for this name."
+        status = when (val result = lookup.getOrNull()) {
+            is ScrapeLookup.Found -> null
+            ScrapeLookup.NoMatch -> "TheGamesDB has nothing under this name."
+            is ScrapeLookup.Refused -> "TheGamesDB refused the search (HTTP ${result.httpStatus})" +
+                (result.reason?.let { ": $it" } ?: ".")
+            null -> "The search failed: ${lookup.exceptionOrNull()?.message}"
+        }
     }
 
     fun apply(candidate: MatchCandidate) {

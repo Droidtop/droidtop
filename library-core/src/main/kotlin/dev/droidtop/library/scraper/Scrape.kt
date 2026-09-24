@@ -85,15 +85,24 @@ suspend fun scrapeSystemArtwork(
     // The keyless libretro-database source: one cached DAT set per
     // system, matched by the same No-Intro naming as the thumbnails.
     val libretroLookup = if (source == ScraperSource.LIBRETRO) {
-        dev.droidtop.library.scraper.LibretroMetadata.load(context, system.id)
-            ?: return@withContext "${system.displayName}: no libretro database name is mapped for this system."
+        when (val loaded = LibretroMetadata.load(context, system.id)) {
+            null -> return@withContext "${system.displayName}: no libretro database name is mapped for this system."
+            is ScrapeLookup.Refused -> return@withContext totalRefusalSummary(
+                subject = system.displayName,
+                attempted = 1,
+                found = 0,
+                refused = 1,
+                lastRefusal = loaded,
+            ).orEmpty()
+            else -> loaded.foundOrNull
+        }
     } else null
 
     var found = 0
     var failed = 0
     var refused = 0
     var consecutiveRefusals = 0
-    var lastRefusal: ScreenScraperLookup.Refused? = null
+    var lastRefusal: ScrapeLookup.Refused? = null
     var attempted = 0
     var hashMatched = 0
     var thumbnailed = 0
@@ -127,18 +136,21 @@ suspend fun scrapeSystemArtwork(
                     md5 = localMd5.orEmpty(),
                 )
             }
-            // The whole point of ScreenScraperLookup: a refusal is the
-            // server's problem, a NoMatch is a fact about the library,
-            // and only the second one may ever be counted as "no match".
-            when (screenScraperLookup) {
-                is ScreenScraperLookup.Refused -> {
-                    refused++
-                    consecutiveRefusals++
-                    lastRefusal = screenScraperLookup
-                }
-                else -> consecutiveRefusals = 0
+            val gamesDbLookup = gamesDbSystemId?.let {
+                TheGamesDbClient.findMetadata(gamesDbApiKey, context.cacheDir, it, romFile.nameWithoutExtension)
             }
-            val screenScraperResult = (screenScraperLookup as? ScreenScraperLookup.Found)?.game
+            // The whole point of ScrapeLookup: a refusal is the server's
+            // problem, a NoMatch is a fact about the library, and only
+            // the second one may ever be counted as "no match". Exactly
+            // one of the two lookups ran (one selected source).
+            val refusal = (screenScraperLookup ?: gamesDbLookup) as? ScrapeLookup.Refused
+            if (refusal != null) {
+                consecutiveRefusals++
+                lastRefusal = refusal
+            } else {
+                consecutiveRefusals = 0
+            }
+            val screenScraperResult = screenScraperLookup?.foundOrNull
             val confidence = when {
                 screenScraperResult == null -> null
                 localMd5 != null && screenScraperResult.romMd5 == localMd5 -> {
@@ -147,9 +159,7 @@ suspend fun scrapeSystemArtwork(
                 }
                 else -> "name"
             }
-            val gamesDbResult = gamesDbSystemId?.let {
-                TheGamesDbClient.findMetadata(gamesDbApiKey, context.cacheDir, it, romFile.nameWithoutExtension)
-            }
+            val gamesDbResult = gamesDbLookup?.foundOrNull
             val libretroResult = libretroLookup?.find(romFile.nameWithoutExtension)
 
             // Keyless boxart fallback, consulted only when the selected
@@ -273,7 +283,14 @@ suspend fun scrapeSystemArtwork(
                     ),
                 )
             }
-            if (coverUrl != null || hasAnyMetadata) found++
+            // Each ROM lands in exactly one bucket. A refused ROM that the
+            // keyless thumbnails still gave a cover is found, not refused:
+            // counting it twice is what could drive "no match" below zero.
+            if (coverUrl != null || hasAnyMetadata) {
+                found++
+            } else if (refusal != null) {
+                refused++
+            }
         } catch (t: Exception) {
             failed++
             android.util.Log.e("droidtop.Scraper", "Failed to scrape ${romFile.name}", t)
@@ -292,13 +309,6 @@ suspend fun scrapeSystemArtwork(
         lastRefusal = lastRefusal,
     )
 }
-
-/**
- * How many refusals in a row end the pass. One refusal can be about one
- * request; several in a row cannot be, and every further request is just
- * more time spent to be told the same thing.
- */
-private const val REFUSAL_ABORT_THRESHOLD = 5
 
 /**
  * The sentence the user actually reads after a scrape, kept pure and out
@@ -323,15 +333,9 @@ internal fun formatScrapeSummary(
     miximaged: Int,
     failed: Int,
     refused: Int,
-    lastRefusal: ScreenScraperLookup.Refused?,
+    lastRefusal: ScrapeLookup.Refused?,
 ): String {
-    // A pass that was refused everything it asked for is an outage, not a
-    // result, and reading it as one is the whole bug. Say so first.
-    if (refused > 0 && found == 0 && refused == attempted) {
-        return "$systemName: ScreenScraper refused every request " +
-            describeRefusal(refused, attempted, lastRefusal) +
-            " Nothing was scraped, and this says nothing about whether your games are in the database."
-    }
+    totalRefusalSummary(systemName, attempted, found, refused, lastRefusal)?.let { return it }
     // hashMatched is the ES-DE "perfect match" count -- file digest
     // identical to ScreenScraper's own dump digest. The remainder of
     // $found matched by name search only, which is worth the user
@@ -347,18 +351,6 @@ internal fun formatScrapeSummary(
         append(").")
         if (refused > 0) append(describeRefusal(refused, attempted, lastRefusal))
     }
-}
-
-/**
- * The server's own explanation, surfaced on screen rather than left in
- * logcat -- it is the only thing that tells a user whether to fix their
- * credentials, wait for an application approval, or come back tomorrow.
- */
-private fun describeRefusal(refused: Int, attempted: Int, lastRefusal: ScreenScraperLookup.Refused?): String {
-    if (lastRefusal == null) return ""
-    val reason = lastRefusal.reason
-        ?: "the server sent no explanation with it -- check logcat, tag droidtop.Scraper, for the full request context"
-    return " ($refused of $attempted refused; HTTP ${lastRefusal.httpStatus}: $reason)."
 }
 
 /**
@@ -436,8 +428,12 @@ suspend fun applyManualMatch(
     val systemId = entry.systemId ?: return@withContext "No system for ${entry.title}."
     val apiKey = TheGamesDbPrefs.apiKey(context)
     if (apiKey.isBlank()) return@withContext "TheGamesDB needs its API key."
-    val metadata = TheGamesDbClient.metadataForId(apiKey, context.cacheDir, theGamesDbId)
-        ?: return@withContext "That match returned nothing."
+    val metadata = when (val lookup = TheGamesDbClient.metadataForId(apiKey, context.cacheDir, theGamesDbId)) {
+        is ScrapeLookup.Found -> lookup.value
+        ScrapeLookup.NoMatch -> return@withContext "TheGamesDB has no game under that id any more."
+        is ScrapeLookup.Refused -> return@withContext "TheGamesDB refused the request (HTTP ${lookup.httpStatus})" +
+            (lookup.reason?.let { ": $it" } ?: ".")
+    }
 
     val gamesRoot = dev.droidtop.library.GamesRoots.current(context)
         .firstOrNull { romFile.absolutePath.startsWith(it.absolutePath) }

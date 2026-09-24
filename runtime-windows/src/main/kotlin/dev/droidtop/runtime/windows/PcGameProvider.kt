@@ -164,7 +164,7 @@ class PcGameProvider(
      * fall back on.
      */
     private suspend fun List<LibraryEntry>.withEntryMetadata(): List<LibraryEntry> =
-        withScrapedMetadata(dev.droidtop.library.consoles.RomDatabase.get(context).romDao())
+        withScrapedMetadata(dev.droidtop.library.consoles.RomDatabase.get(context).romDao(), scrapedArtworkFirst = true)
 
     private fun PcLibrary.Game.toLibraryEntry(): LibraryEntry = LibraryEntry(
         id = id,
