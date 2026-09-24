@@ -21,7 +21,7 @@ import kotlinx.coroutines.flow.callbackFlow
  * from "an external lapdock monitor" among non-default displays; both are
  * folded into SECOND_SCREEN until real hardware differentiates them,
  * `DisplayOutputKind.EXTERNAL` stays unused). This is deliberately just
- * *enumeration*, not physical position — see [DualScreenCoordinator] for
+ * *enumeration*, not physical position — see [MainScreen] for
  * why `DisplayOutputKind` is only ever a starting guess, never trusted as
  * "which one is physically upper/lower" (§4).
  */

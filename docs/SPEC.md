@@ -956,11 +956,21 @@ the `ContainerRuntime` interface that already exists (§3):
   connection/registration order, which is not guaranteed to match physical
   upper/lower position, so the two must never be conflated in code.
   droidtop's own upper/lower role assignment needs manual override, not
-  just auto-detected enumeration order, plus a persisted per-output (or
-  per-app) choice — not trusting auto-detection alone. [Mjolnir](
+  just auto-detected enumeration order, plus a persisted choice — not
+  trusting auto-detection alone. [Mjolnir](
   https://github.com/blacksheepmvp/mjolnir) (a companion dual-screen
   home-launcher-routing tool) is a concrete reference for the same
   problem.
+  **One persisted answer, relative (decided 2026-09-24):** which panel is
+  the main output is a single choice, `MainScreen` in `:runtime-common`
+  — "the second screen when one is connected" or "the built-in screen" —
+  written by the Main screen settings row and by Swap screens, and read
+  by Gaming and Desktop alike. It is never keyed by display id: Android
+  hands the add-on a new id when it re-enumerates, so an id-keyed store
+  (the earlier `DualScreenCoordinator`, which ran alongside a separate
+  shell-target preference with the opposite default) forgot the user's
+  swap after a replug and let the first Swap press do nothing. Changing
+  it, or the game launch target, re-runs orchestration immediately.
 - Each `DisplayOutput` maps to one headless output inside the primary
   container's compositor (whichever the user's configured — see §2).
 - **Default**: every window is placed on the primary screen's output —
@@ -1312,7 +1322,7 @@ implementations of one job. A single module owns:
 - what that activity renders, chosen by the active mode: Standard gets
   the launcher's secondary-display UI, Gaming gets the companion
   surface, Desktop gets its input surface (§4);
-- the panel role assignment and swap (`DualScreenCoordinator`);
+- the panel role assignment and swap (`MainScreen`, `DisplayArrangement`);
 - launch-target resolution, relative vocabulary first.
 
 One controlling configuration read by every mode, rather than each shell
@@ -1354,7 +1364,7 @@ Three things droidtop should copy:
 
 **BUILT (2026-09-02), as the launch-screen memory model.** The three
 lessons above are now code, layered over (not replacing) the
-`ShellTarget`/`GameLaunchTarget` enums, which remain the global
+`MainScreenChoice`/`GameLaunchTarget` choices, which remain the global
 fallback:
 
 - `LaunchScreenMemory` (library-core) stores relative `LaunchScreen`

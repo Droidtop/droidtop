@@ -72,7 +72,7 @@ object GamingSettingsCatalog {
         1_800_000 to "30 minutes",
     )
     const val ID_GAME_FOLDERS = "pref_gaming_game_folders"
-    const val ID_DISPLAY_SHELL_TARGET = "pref_display_shell_target"
+    const val ID_DISPLAY_SHELL_TARGET = dev.droidtop.runtime.MainScreen.KEY
     const val ID_DISPLAY_GAME_LAUNCH_TARGET = "pref_display_game_launch_target"
     const val ID_DISPLAY_SWAP = "action_display_swap"
     const val ID_DISPLAY_REINIT = "action_display_reinit"
@@ -555,16 +555,21 @@ object GamingSettingsCatalog {
         },
     )
 
+    // The one role model (MainScreen): this row and Swap screens both
+    // write it, and both Gaming and Desktop read it -- hence "Main
+    // screen", not "Gaming shell display".
     private fun displayShellTargetItem(context: Context) = ChoiceItem(
         id = ID_DISPLAY_SHELL_TARGET,
-        title = "Gaming shell display",
+        title = "Main screen",
+        subtitle = "Where the shell appears; the other screen gets widgets or input",
         options = listOf(
-            ChoiceOption("SECOND_WHEN_PRESENT", "Second display when connected"),
-            ChoiceOption("BUILT_IN", "Always the built-in screen"),
+            ChoiceOption(dev.droidtop.runtime.MainScreenChoice.SECOND_WHEN_PRESENT.name, "Second screen when connected"),
+            ChoiceOption(dev.droidtop.runtime.MainScreenChoice.BUILT_IN.name, "Built-in screen"),
         ),
-        current = CatalogPrefs.prefs(context).getString(ID_DISPLAY_SHELL_TARGET, "SECOND_WHEN_PRESENT"),
+        current = dev.droidtop.runtime.MainScreen.choice(context).name,
         onSelect = { ctx, value ->
-            CatalogPrefs.prefs(ctx).edit().putString(ID_DISPLAY_SHELL_TARGET, value).apply()
+            runCatching { dev.droidtop.runtime.MainScreenChoice.valueOf(value) }.getOrNull()
+                ?.let { dev.droidtop.runtime.MainScreen.set(ctx, it) }
         },
     )
 
@@ -580,6 +585,9 @@ object GamingSettingsCatalog {
         current = CatalogPrefs.prefs(context).getString(ID_DISPLAY_GAME_LAUNCH_TARGET, "ASK"),
         onSelect = { ctx, value ->
             CatalogPrefs.prefs(ctx).edit().putString(ID_DISPLAY_GAME_LAUNCH_TARGET, value).apply()
+            // The launch target is resolved during orchestration; without
+            // this the new choice waits for the next display event.
+            dev.droidtop.runtime.DisplayArrangement.changed()
         },
     )
 
@@ -593,7 +601,7 @@ object GamingSettingsCatalog {
      * what section 4 means by the input role being toggleable.
      *
      * Written as raw keys read by `:app`'s `SecondScreenInputPrefs`, the
-     * same seam `pref_display_shell_target` already uses: this module must
+     * same seam `pref_display_game_launch_target` already uses: this module must
      * not depend on `:app`.
      */
     private fun secondScreenRoleItem(context: Context, mode: String): ChoiceItem {
