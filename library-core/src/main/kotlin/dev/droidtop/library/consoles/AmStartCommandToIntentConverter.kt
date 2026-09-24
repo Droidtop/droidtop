@@ -93,53 +93,152 @@ object AmStartCommandToIntentConverter {
         if (inQuotes) throw IllegalArgumentException("Unterminated quote in am start command")
         if (current.isNotEmpty() || sawQuote) tokens.add(current.toString())
 
-        return tokens.map { token ->
-            var t = token
-            if (filePath != null) t = t.replace("{file.path}", filePath)
-            if (fileUri != null) t = t.replace("{file.uri}", fileUri)
+        return tokens.map { token -> expandToken(token, filePath, fileUri, placeholders) }
+    }
+
+    /**
+     * Expands one template token in a single left-to-right pass.
+     *
+     * Only the TEMPLATE's own text is ever read for placeholders and
+     * `{file.inject:...}` directives. A substituted value (a ROM path, a
+     * folder, a search query) and injected file content are copied through
+     * verbatim and never scanned again. Before this, a file under shared
+     * storage whose path contained `{file.inject:/data/...}` -- any app with
+     * storage access can create such a folder -- made droidtop read that
+     * file out of its own private storage into the launch Intent
+     * (docs/security/2026-09-24-droidtop-intents-updater.md, finding 2).
+     */
+    private fun expandToken(
+        token: String,
+        filePath: String?,
+        fileUri: String?,
+        placeholders: Map<String, String>,
+    ): String {
+        val values = buildMap {
+            if (filePath != null) put("{file.path}", filePath)
+            if (fileUri != null) put("{file.uri}", fileUri)
             // Integrations' own placeholders ({system.folder}, {query},
             // ...) expand here for the same reason the file ones do: a
             // value containing a space must not be split into separate
             // tokens. One place knows how a template becomes tokens.
-            for ((key, value) in placeholders) t = t.replace(key, value)
-            expandInject(t, filePath)
+            putAll(placeholders)
         }
+        val out = StringBuilder()
+        var i = 0
+        while (i < token.length) {
+            if (token.startsWith(INJECT_PREFIX, i)) {
+                val end = closingBrace(token, i + INJECT_PREFIX.length)
+                val rel = substitute(token.substring(i + INJECT_PREFIX.length, end), values)
+                out.append(readInject(rel, filePath))
+                i = end + 1
+                continue
+            }
+            val end = token.indexOf(INJECT_PREFIX, i).let { if (it < 0) token.length else it }
+            out.append(substitute(token.substring(i, end), values))
+            i = end
+        }
+        return out.toString()
+    }
+
+    /** Replaces each placeholder in [text] once; a substituted value is never scanned again. */
+    private fun substitute(text: String, values: Map<String, String>): String {
+        if (values.isEmpty() || '{' !in text) return text
+        val out = StringBuilder(text.length)
+        var i = 0
+        while (i < text.length) {
+            val hit = if (text[i] == '{') values.entries.firstOrNull { text.startsWith(it.key, i) } else null
+            if (hit != null) {
+                out.append(hit.value)
+                i += hit.key.length
+            } else {
+                out.append(text[i])
+                i++
+            }
+        }
+        return out.toString()
+    }
+
+    /** The `}` closing a directive whose body starts at [from], allowing placeholders nested inside it. */
+    private fun closingBrace(token: String, from: Int): Int {
+        var depth = 1
+        for (i in from until token.length) {
+            when (token[i]) {
+                '{' -> depth++
+                '}' -> if (--depth == 0) return i
+            }
+        }
+        throw IllegalArgumentException("Unterminated {file.inject:...} in am start command")
     }
 
     /**
      * `{file.inject:REL}` becomes the CONTENT of the file at REL,
-     * resolved against the game's own directory (absolute REL allowed --
-     * the GameNative presets read the launched file itself). This is
-     * ES-DE's own %INJECT% mechanism: Vita3K launches by a title id
-     * stored in `<basename>.psvita`, GameNative by an app id stored in
-     * the .steam stub -- the argument the emulator needs simply is not
-     * derivable from the path, only from the bytes.
+     * resolved against the game's own directory (an absolute REL is
+     * allowed -- the GameNative presets read the launched file itself via
+     * `{file.inject:{file.path}}`). This is ES-DE's own %INJECT%
+     * mechanism: Vita3K launches by a title id stored in
+     * `<basename>.psvita`, GameNative by an app id stored in the .steam
+     * stub -- the argument the emulator needs simply is not derivable
+     * from the path, only from the bytes.
      *
-     * REL is expanded AFTER the ordinary placeholders, so
+     * Placeholders inside REL are expanded first, so
      * `{file.inject:{file.basename}.psvita}` works. Content is trimmed
      * (these are one-line id files, and a trailing newline would ride
      * into the extra). A missing or unreadable file is an error by name
      * -- launching with a half-substituted argument would fail somewhere
      * far less explicable inside the emulator.
+     *
+     * The file must lie in the game's own directory, after resolving
+     * `..` and links. Every real use reads a sibling of the game or the
+     * game itself; anything else would let a launch template (which can
+     * come from the downloaded players database) copy an arbitrary file
+     * droidtop can read, its own private storage included, into an
+     * Intent bound for another app.
      */
-    private fun expandInject(token: String, filePath: String?): String {
-        val start = token.indexOf(INJECT_PREFIX)
-        if (start < 0) return token
-        val end = token.indexOf('}', start + INJECT_PREFIX.length)
-        if (end < 0) throw IllegalArgumentException("Unterminated {file.inject:...} in am start command")
-        val rel = token.substring(start + INJECT_PREFIX.length, end)
-        val resolved = File(rel).let { raw ->
-            if (raw.isAbsolute) raw
-            else File(File(filePath ?: throw IllegalArgumentException("{file.inject} needs a game file")).parentFile, rel)
+    private fun readInject(rel: String, filePath: String?): String {
+        val base = File(filePath ?: throw IllegalArgumentException("{file.inject} needs a game file")).parentFile
+            ?: throw IllegalArgumentException("{file.inject} needs a game file")
+        val resolved = File(rel).let { raw -> if (raw.isAbsolute) raw else File(base, rel) }
+        val inside = runCatching {
+            resolved.canonicalPath.startsWith(base.canonicalPath.trimEnd(File.separatorChar) + File.separator)
+        }.getOrDefault(false)
+        if (!inside) {
+            throw IllegalArgumentException("{file.inject} reads only files beside the game; refused ${resolved.absolutePath}")
         }
-        val content = runCatching { resolved.readText().trim() }.getOrElse {
+        return runCatching { resolved.readText().trim() }.getOrElse {
             throw IllegalArgumentException("Couldn't read ${resolved.absolutePath} for {file.inject}")
         }
-        // Recurse: a token may hold several directives.
-        return expandInject(token.substring(0, start) + content + token.substring(end + 1), filePath)
     }
 
     private const val INJECT_PREFIX = "{file.inject:"
+
+    private const val URI_GRANT_FLAGS = Intent.FLAG_GRANT_READ_URI_PERMISSION or
+        Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+        Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or
+        Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
+
+    private fun fileProviderAuthority(context: Context) = "${context.packageName}.fileprovider"
+
+    /**
+     * A launch template targets another app. Pointed at droidtop itself it
+     * would start droidtop's own unexported screens with extras of the
+     * template's choosing, which nothing legitimate needs.
+     */
+    private fun requireOtherApp(context: Context, packageName: String) {
+        require(packageName != context.packageName) { "am start command targets droidtop itself" }
+    }
+
+    /** Whether [file] resolves into droidtop's credential- or device-protected app data. */
+    private fun isPrivateStorage(context: Context, file: File): Boolean {
+        val target = runCatching { file.canonicalPath }.getOrElse { return true }
+        val roots = listOfNotNull(
+            context.dataDir,
+            context.createDeviceProtectedStorageContext().dataDir,
+        )
+        return roots.any { root ->
+            val base = runCatching { root.canonicalPath }.getOrNull() ?: return@any false
+            target == base || target.startsWith(base.trimEnd(File.separatorChar) + File.separator)
+        }
+    }
 
     fun toIntent(
         context: Context,
@@ -175,7 +274,12 @@ object AmStartCommandToIntentConverter {
         // integration handed a destination folder, say) must not be made
         // to invent one purely to satisfy a URI nobody referenced.
         val fileUri = if (usesFileUri) {
-            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(filePath!!))
+            val file = File(filePath!!)
+            // The provider's root-path reaches droidtop's own private
+            // storage too; a game never lives there, so a URI for it is
+            // never issued, whatever path a caller or template supplies.
+            require(!isPrivateStorage(context, file)) { "Refusing to share droidtop's private file ${file.path}" }
+            FileProvider.getUriForFile(context, fileProviderAuthority(context), file)
         } else {
             null
         }
@@ -192,12 +296,24 @@ object AmStartCommandToIntentConverter {
                 "-n" -> {
                     val component = ComponentName.unflattenFromString(tokens.removeFirst())
                         ?: throw IllegalArgumentException("Bad component name in am start command")
+                    requireOtherApp(context, component.packageName)
                     intent.component = component
                 }
-                "-p" -> intent.setPackage(tokens.removeFirst())
-                "-d" -> dataUri = Uri.parse(tokens.removeFirst())
+                "-p" -> intent.setPackage(tokens.removeFirst().also { requireOtherApp(context, it) })
+                "-d" -> dataUri = Uri.parse(tokens.removeFirst()).also { uri ->
+                    // droidtop's own provider serves exactly the file being
+                    // launched, never a URI a template wrote by hand.
+                    if (uri.scheme == "content" && uri.authority == fileProviderAuthority(context)) {
+                        require(uri.toString() == fileUri?.toString()) {
+                            "am start command names a droidtop content URI other than {file.uri}"
+                        }
+                    }
+                }
                 "-t" -> mimeType = tokens.removeFirst()
-                "-f" -> intent.flags = Integer.decode(tokens.removeFirst())
+                // URI grants are droidtop's to decide (below), never the
+                // template's: a template setting write or persistable
+                // grant bits would hand the target lasting write access.
+                "-f" -> intent.flags = Integer.decode(tokens.removeFirst()) and URI_GRANT_FLAGS.inv()
                 // "-e" is real `am start`'s own documented shorthand for
                 // "--es" (a string extra) -- both forms show up verbatim
                 // across real emulator presets pulled from Daijishō's own

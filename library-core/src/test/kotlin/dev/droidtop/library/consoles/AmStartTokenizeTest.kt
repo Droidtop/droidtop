@@ -201,4 +201,60 @@ class AmStartTokenizeTest {
         )
         assertEquals(listOf("-n", "com.example/.Main", "--activity-clear-task"), tokens)
     }
+
+    @Test
+    fun `an inject directive inside a ROM path is copied, not read`() {
+        // Shared storage is writable by other apps, so a folder named
+        // after a directive is attacker-shaped text, never template text.
+        val rom = "/storage/emulated/0/Roms/psx/{file.inject:/data/data/dev.droidtop.app/shared_prefs/x.xml}/Game.cue"
+        val tokens = AmStartCommandToIntentConverter.tokenize("--es path {file.path}", rom, null)
+        assertEquals(listOf("--es", "path", rom), tokens)
+    }
+
+    @Test
+    fun `a substituted value is not expanded a second time`() {
+        val tokens = AmStartCommandToIntentConverter.tokenize(
+            "--es q {query}",
+            null,
+            null,
+            mapOf("{query}" to "{file.path}"),
+        )
+        assertEquals("{file.path}", tokens[2])
+    }
+
+    @Test
+    fun `file inject refuses a file outside the game's directory`() {
+        val dir = java.nio.file.Files.createTempDirectory("inject").toFile()
+        val outside = java.nio.file.Files.createTempFile("secret", ".txt").toFile().apply { writeText("secret") }
+        try {
+            val game = java.io.File(dir, "Game.psvita").apply { writeText("x") }
+            for (template in listOf("-e id {file.inject:${outside.absolutePath}}", "-e id {file.inject:../${outside.name}}")) {
+                try {
+                    AmStartCommandToIntentConverter.tokenize(template, game.absolutePath, null)
+                    org.junit.Assert.fail("expected IllegalArgumentException for $template")
+                } catch (expected: IllegalArgumentException) {
+                    org.junit.Assert.assertTrue(expected.message!!.contains("beside the game"))
+                }
+            }
+        } finally {
+            dir.deleteRecursively()
+            outside.delete()
+        }
+    }
+
+    @Test
+    fun `file inject reads the launched file itself and does not expand its content`() {
+        val dir = java.nio.file.Files.createTempDirectory("inject").toFile()
+        try {
+            val game = java.io.File(dir, "Game.steam").apply { writeText("{file.inject:Game.steam}\n") }
+            val tokens = AmStartCommandToIntentConverter.tokenize(
+                "--es appid {file.inject:{file.path}}",
+                game.absolutePath,
+                null,
+            )
+            assertEquals("{file.inject:Game.steam}", tokens[2])
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
 }
