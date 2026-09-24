@@ -36,7 +36,7 @@ import androidx.room.migration.Migration
  * with a metadata row is skipped and served from cache, a folder without
  * one is walked and persisted the moment ITS OWN scan finishes, regardless
  * of whether sibling folders in the same root are still running or stuck.
- * [ConsoleRomProvider.rescan]/[ConsoleRomProvider.rescanProgressive] force
+ * [ConsoleRomProvider.rescanProgressive] forces
  * a real walk regardless of cache state, for an explicit user-triggered
  * "my ROMs changed, rescan" action -- same per-folder persistence timing,
  * so one stuck folder can't block every other folder's fresh results from
@@ -238,17 +238,11 @@ interface RomDao {
     @Query("DELETE FROM rom_entries WHERE roms_root = :romsRoot AND system_folder_id = :systemFolderId")
     suspend fun clearSystemFolder(romsRoot: String, systemFolderId: String)
 
-    @Query("DELETE FROM rom_entries WHERE roms_root = :romsRoot")
-    suspend fun clearRoot(romsRoot: String)
-
     @Query("SELECT roms_root, system_folder_id FROM scan_metadata WHERE roms_root IN (:romsRoots)")
     suspend fun getScannedSystemFolders(romsRoots: List<String>): List<ScannedFolderKey>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun markScanned(metadata: ScanMetadataEntity)
-
-    @Query("DELETE FROM scan_metadata WHERE roms_root = :romsRoot")
-    suspend fun clearScanMetadata(romsRoot: String)
 
     @Query("SELECT * FROM game_metadata WHERE id IN (:ids)")
     suspend fun getGameMetadata(ids: List<String>): List<GameMetadataEntity>
@@ -320,9 +314,6 @@ interface RomDao {
 
     @Query("DELETE FROM collection_members WHERE collection_id = :id")
     suspend fun deleteCollectionMembers(id: String)
-
-    @Query("SELECT game_id FROM collection_members WHERE collection_id = :collectionId")
-    suspend fun getCollectionMemberIds(collectionId: String): List<String>
 
     // Real collectionId -> gameIds map in one query, for the games-list
     // read path (every custom collection's membership needed at once,

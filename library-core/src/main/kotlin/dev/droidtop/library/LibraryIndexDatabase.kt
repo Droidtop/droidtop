@@ -68,9 +68,6 @@ interface LibraryIndexDao {
     @Query("SELECT * FROM games")
     suspend fun allGames(): List<GameIndexEntity>
 
-    @Query("SELECT * FROM parts")
-    suspend fun allParts(): List<PartIndexEntity>
-
     @Query("SELECT * FROM games WHERE provider = :provider")
     suspend fun gamesFor(provider: String): List<GameIndexEntity>
 
@@ -99,12 +96,6 @@ interface LibraryIndexDao {
         if (games.isNotEmpty()) insertGames(games)
         upsertPart(part)
     }
-
-    @Query("DELETE FROM games WHERE provider = :provider")
-    suspend fun deleteProvider(provider: String)
-
-    @Query("DELETE FROM parts WHERE provider = :provider")
-    suspend fun deletePartsForProvider(provider: String)
 
     @Query("DELETE FROM parts WHERE provider = :provider AND `key` = :key")
     suspend fun deletePart(provider: String, key: String)

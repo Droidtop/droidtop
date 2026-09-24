@@ -91,14 +91,4 @@ object EsDeFolderStructure {
                 ". Put a system's games in the folder named after it."
         }
     }
-
-    /**
-     * Whether [root] looks like it has already been given the structure,
-     * so the offer can say "again" honestly rather than pretending this
-     * is the first time.
-     */
-    fun alreadyStructured(root: File): Boolean =
-        (root.listFiles() ?: emptyArray()).count {
-            it.isDirectory && dev.droidtop.library.ScanPrune.isScannableFolder(it) && File(it, "systeminfo.txt").isFile
-        } > 0
 }

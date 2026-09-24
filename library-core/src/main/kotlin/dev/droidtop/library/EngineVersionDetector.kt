@@ -78,14 +78,6 @@ object EngineVersionDetector {
 
     private val RGSS_LIBRARY_LINE = Regex("""Library\s*=\s*.*?RGSS(\d)(\d{2})""", RegexOption.IGNORE_CASE)
 
-    /** RGSS major version -> enginehost's own RPG Maker generation context. */
-    fun rgssGenerationContext(majorRgss: Int): String? = when (majorRgss) {
-        1 -> "xp"
-        2 -> "vx"
-        3 -> "vxace"
-        else -> null
-    }
-
     private fun detectRgss(gameRoot: File): DetectedVersion? {
         val text = readHead(File(gameRoot, "Game.ini")) ?: return null
         val match = RGSS_LIBRARY_LINE.find(text) ?: return null
