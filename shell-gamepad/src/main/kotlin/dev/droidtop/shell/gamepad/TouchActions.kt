@@ -79,19 +79,11 @@ fun rememberGamepadTouch(): (GamepadAction) -> Unit {
  * and dropping hints to make them fit would drop actions a touch user
  * has no other route to.
  */
-/**
- * The bar's own plate, where it has one. It has none over a themed view:
- * real ES-DE's HelpComponent draws its text ON the view and paints no
- * background of its own, and an opaque strip there covers the plate the
- * theme drew for exactly this row (rig, build 548).
- */
-val TouchHintBarBackground = Color(0xFF111111)
-
 @Composable
 fun TouchHintBar(
     hints: List<Pair<GamepadAction, String>>,
     modifier: Modifier = Modifier,
-    background: Color = TouchHintBarBackground,
+    background: Color = MenuTokens.HintBar,
 ) {
     if (hints.isEmpty()) return
     val window = LocalShellWindow.current
@@ -133,7 +125,7 @@ private fun TouchHint(action: GamepadAction, label: String, onPress: () -> Unit)
             .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
             .then(
                 if (window.touchFirst) {
-                    Modifier.border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(24.dp))
+                    Modifier.border(1.dp, MenuTokens.HintPillOutline, RoundedCornerShape(24.dp))
                 } else {
                     Modifier
                 },
@@ -143,13 +135,13 @@ private fun TouchHint(action: GamepadAction, label: String, onPress: () -> Unit)
     ) {
         Text(
             GamepadKeyMap.labelFor(action).takeIf { it.isNotBlank() } ?: label,
-            color = Color.Black,
+            color = MenuTokens.OnSelected,
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier
-                .background(Color.White, RoundedCornerShape(50))
+                .background(MenuTokens.Selected, RoundedCornerShape(50))
                 .padding(horizontal = 8.dp, vertical = 2.dp),
         )
-        Text(label, color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+        Text(label, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.labelMedium)
     }
 }
 

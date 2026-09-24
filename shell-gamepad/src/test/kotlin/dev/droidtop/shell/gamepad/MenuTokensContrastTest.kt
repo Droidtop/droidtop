@@ -78,6 +78,48 @@ class MenuTokensContrastTest {
         }
     }
 
+    /**
+     * The shell's own pages draw the same text roles on [MenuTokens.Ground]
+     * and on the cards laid on it (docs/SPEC.md 7k: every text-on-surface
+     * pair is covered, not only the overlay's).
+     */
+    @Test
+    fun `page text is readable on the ground and on every card`() {
+        listOf(
+            "Ground" to MenuTokens.Ground,
+            "Card" to MenuTokens.Card,
+            "CardFocused" to MenuTokens.CardFocused,
+            "CardInset" to MenuTokens.CardInset,
+            "HintBar" to MenuTokens.HintBar,
+        ).forEach { (name, ground) ->
+            assertReadable("OnSurface on $name", MenuTokens.OnSurface, ground, 4.5f)
+            assertReadable("Value on $name", MenuTokens.Value, ground, 4.5f)
+            assertReadable("Accent on $name", MenuTokens.Accent, ground, 4.5f)
+            assertReadable("Danger on $name", MenuTokens.Danger, ground, 4.5f)
+            assertReadable("Favourite on $name", MenuTokens.Favourite, ground, 4.5f)
+            assertReadable("OnSurfaceMuted on $name", MenuTokens.OnSurfaceMuted, ground, 3f)
+            assertReadable("OnSurfaceDisabled on $name", MenuTokens.OnSurfaceDisabled, ground, 3f)
+        }
+    }
+
+    @Test
+    fun `a chosen chip, the launch button and a danger plate keep their labels readable`() {
+        assertReadable("OnSelected on Selected", MenuTokens.OnSelected, MenuTokens.Selected, 4.5f)
+        listOf(MenuTokens.Launch, MenuTokens.LaunchFocused).forEach { launch ->
+            assertReadable("OnSurface on the launch button", MenuTokens.OnSurface, launch, 4.5f)
+            assertReadable("OnLaunchMuted on the launch button", MenuTokens.OnLaunchMuted, launch, 3f)
+        }
+        assertReadable("OnSurfaceDisabled on LaunchDisabled", MenuTokens.OnSurfaceDisabled, MenuTokens.LaunchDisabled, 3f)
+        // The plate is translucent over the page, as it is on screen.
+        val plate = MenuTokens.DangerPlate
+        val onGround = Color(
+            red = plate.red * plate.alpha + MenuTokens.Ground.red * (1 - plate.alpha),
+            green = plate.green * plate.alpha + MenuTokens.Ground.green * (1 - plate.alpha),
+            blue = plate.blue * plate.alpha + MenuTokens.Ground.blue * (1 - plate.alpha),
+        )
+        assertReadable("Danger on DangerPlate", MenuTokens.Danger, onGround, 4.5f)
+    }
+
     @Test
     fun `the palette would NOT be readable on a light platform surface`() {
         // The bug, written down: these tokens are not theme-aware, so any

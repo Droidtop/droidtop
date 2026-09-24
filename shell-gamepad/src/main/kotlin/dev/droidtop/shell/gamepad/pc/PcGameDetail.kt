@@ -411,13 +411,13 @@ internal fun PcGameDetail(
                 )
             }
 
-            status?.let { message -> item { Text(message, color = Color(0xFFB0BEC5), style = MaterialTheme.typography.bodySmall) } }
+            status?.let { message -> item { Text(message, color = MenuTokens.Value, style = MaterialTheme.typography.bodySmall) } }
 
             actions.forEach { group ->
                 item(key = "group:" + group.title) {
                     Text(
                         group.title,
-                        color = Color.Gray,
+                        color = MenuTokens.OnSurfaceMuted,
                         style = MaterialTheme.typography.labelLarge,
                         modifier = Modifier.padding(top = 16.dp),
                     )
@@ -430,11 +430,11 @@ internal fun PcGameDetail(
             entry.pcInfo?.compatibility?.let { compat ->
                 item {
                     Column(modifier = Modifier.padding(top = 16.dp, bottom = 32.dp)) {
-                        Text("Compatibility", color = Color.Gray, style = MaterialTheme.typography.labelLarge)
-                        Text(compat.summary(), color = Color.LightGray, style = MaterialTheme.typography.bodyMedium)
+                        Text("Compatibility", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.labelLarge)
+                        Text(compat.summary(), color = MenuTokens.Value, style = MaterialTheme.typography.bodyMedium)
                         Text(
                             "Other people's results on other hardware.",
-                            color = Color(0xFF6F6F6F),
+                            color = MenuTokens.OnSurfaceDisabled,
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -804,22 +804,22 @@ private fun PcDetailHeader(entry: LibraryEntry, grouping: dev.droidtop.library.L
                 model = entry.artworkUri,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().background(Color(0xFF1A1A1A), RoundedCornerShape(16.dp)),
+                modifier = Modifier.fillMaxSize().background(MenuTokens.Card, RoundedCornerShape(16.dp)),
             )
         } else {
-            Box(modifier = Modifier.fillMaxSize().background(Color(0xFF1A1A1A), RoundedCornerShape(16.dp)))
+            Box(modifier = Modifier.fillMaxSize().background(MenuTokens.Card, RoundedCornerShape(16.dp)))
         }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomStart)
-                .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000))))
+                .background(Brush.verticalGradient(listOf(Color.Transparent, MenuTokens.Scrim)))
                 .padding(16.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     title,
-                    color = Color.White,
+                    color = MenuTokens.OnSurface,
                     style = MaterialTheme.typography.headlineSmall,
                     maxLines = 2,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -827,7 +827,7 @@ private fun PcDetailHeader(entry: LibraryEntry, grouping: dev.droidtop.library.L
                 if (copyLine != null) {
                     Text(
                         copyLine,
-                        color = Color(0xFFD7E6DC),
+                        color = MenuTokens.OnLaunchMuted,
                         style = MaterialTheme.typography.labelLarge,
                         maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -835,7 +835,7 @@ private fun PcDetailHeader(entry: LibraryEntry, grouping: dev.droidtop.library.L
                 }
                 Text(
                     entry.identityLine(),
-                    color = Color.LightGray,
+                    color = MenuTokens.Value,
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -862,9 +862,9 @@ private fun PrimaryActionButton(
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(12.dp)
     val background = when {
-        !enabled -> Color(0xFF232323)
-        focused -> Color(0xFF3D7A52)
-        else -> Color(0xFF2B5C3C)
+        !enabled -> MenuTokens.LaunchDisabled
+        focused -> MenuTokens.LaunchFocused
+        else -> MenuTokens.Launch
     }
     Column(
         modifier = Modifier
@@ -887,7 +887,7 @@ private fun PrimaryActionButton(
             .background(background, shape)
             .border(
                 width = if (focused) 3.dp else 1.dp,
-                color = if (focused) MenuTokens.Accent else Color(0x1FFFFFFF),
+                color = if (focused) MenuTokens.Accent else MenuTokens.CardOutline,
                 shape = shape,
             )
             .padding(horizontal = 20.dp, vertical = 18.dp),
@@ -896,13 +896,13 @@ private fun PrimaryActionButton(
     ) {
         Text(
             label,
-            color = if (enabled) Color.White else Color(0xFF8A8A8A),
+            color = if (enabled) MenuTokens.OnSurface else MenuTokens.OnSurfaceDisabled,
             style = MaterialTheme.typography.headlineSmall,
         )
         if (detail.isNotBlank()) {
             Text(
                 detail,
-                color = if (enabled) Color(0xFFD7E6DC) else Color(0xFF6F6F6F),
+                color = if (enabled) MenuTokens.OnLaunchMuted else MenuTokens.OnSurfaceDisabled,
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -935,7 +935,7 @@ private fun DetailRow(
             .focusable(enabled = enabled)
             .then(if (enabled) Modifier.clickable(onClick = onSelect) else Modifier)
             .background(
-                if (focused) Color(0xFF2F2F2F) else Color(0xFF141414),
+                if (focused) MenuTokens.CardFocused else MenuTokens.CardInset,
                 RoundedCornerShape(10.dp),
             )
             .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -943,11 +943,11 @@ private fun DetailRow(
     ) {
         Text(
             title,
-            color = if (enabled) Color.White else Color(0xFF7A7A7A),
+            color = if (enabled) MenuTokens.OnSurface else MenuTokens.OnSurfaceDisabled,
             style = MaterialTheme.typography.titleMedium,
         )
         if (detail.isNotBlank()) {
-            Text(detail, color = if (enabled) Color.LightGray else Color(0xFF5F5F5F), style = MaterialTheme.typography.bodySmall)
+            Text(detail, color = if (enabled) MenuTokens.Value else MenuTokens.OnSurfaceDisabled, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

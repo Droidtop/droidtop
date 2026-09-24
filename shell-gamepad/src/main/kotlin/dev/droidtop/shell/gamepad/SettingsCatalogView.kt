@@ -563,7 +563,7 @@ private fun TextEditDialog(
                     .fillMaxWidth()
                     .padding(top = 12.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF2A2A2A))
+                    .background(MenuTokens.SurfaceSelected)
                     .padding(12.dp),
             )
             val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current

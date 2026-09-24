@@ -6214,11 +6214,18 @@ full-bleed line on a 1280dp screen is a defect. One line of text that cannot fit
 with an ellipsis and is reachable in full somewhere.
 
 **Colour.** One source per surface family, and the families are named so a screen cannot pick
-the wrong one. The shell's menu palette is absolute against its own overlay surface, so any
+the wrong one. The shell's palette (`MenuTokens`) is absolute against its own grounds, so any
 panel that hosts it is painted from that same palette — a platform scheme underneath a
-hand-picked one is what produced white-on-white. droidtop's chrome outside the shell takes its
-colours from droidtop's own scheme. No screen defines a colour inline. Every text-on-surface
-pair in both palettes is covered by a contrast test, not only the menu palette.
+hand-picked one is what produced white-on-white. It has two grounds and one set of text roles:
+the menus' overlay surface, and the black `Ground` under the shell's own pages (the game grid
+and a game's detail, the PC surface, the editors and pickers the shell opens full-screen), with
+the cards laid on it (`Card`, the brightened `CardFocused`, `CardInset`), the solid chosen chip
+(`Selected`/`OnSelected`), the one primary action (`Launch`) and one faded label for anything
+unavailable (`OnSurfaceDisabled`, faded by `ChromeColors.DisabledAlpha`). droidtop's chrome
+outside the shell takes its colours from droidtop's own scheme. No screen defines a colour
+inline: a hex value or a named platform colour in a screen is a defect. Every text-on-surface
+pair in both palettes is covered by a contrast test — each text role over each ground and card
+it is drawn on, not only the menu overlay.
 
 **One anatomy per thing.** One row (title, optional supporting line, optional value, optional
 chevron; a chevron means "this opens", a value means "this is set to", and neither stands in
@@ -6257,8 +6264,9 @@ orientation and on every input.
 **Where it lives.** One file, `shell-gamepad/.../DesignTokens.kt`, in that module because it is
 the one both the Gaming shell and `:app` can see — a token half the chrome cannot reach is not
 a system. It carries `Space` (the step scale), `Measure.bodyMaxWidth` (the readable line),
-`TypeRole` naming the job of each role with `DroidtopTypography` behind it, and `ChromeColors`
-as the colour source for chrome outside the shell's menus. `DroidtopTheme` supplies the colour
+`TypeRole` naming the job of each role with `DroidtopTypography` behind it, `MenuTokens` as the
+shell's palette and row measures, and `ChromeColors` as the colour source for chrome outside
+the shell. `DroidtopTheme` supplies the colour
 scheme and the type scale together and defines neither itself. The window-derived
 measurements — gutter, tab gap, minimum grid item, minimum touch target, maximum panel
 width — stay on `ShellWindow`, which is the one place that asks how much room there is.

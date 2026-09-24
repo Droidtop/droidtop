@@ -85,7 +85,7 @@ internal fun PcGameCard(
             // a phone user spends most of their time in (rig, build 546).
             .border(
                 width = if (focused) 3.dp else 1.dp,
-                color = if (focused) MenuTokens.Accent else Color(0x1FFFFFFF),
+                color = if (focused) MenuTokens.Accent else MenuTokens.CardOutline,
                 shape = RoundedCornerShape(12.dp),
             )
             .background(
@@ -105,13 +105,13 @@ internal fun PcGameCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomStart)
-                .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000))))
+                .background(Brush.verticalGradient(listOf(Color.Transparent, MenuTokens.Scrim)))
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
                 entry.title,
-                color = Color.White,
+                color = MenuTokens.OnSurface,
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -130,13 +130,13 @@ internal fun PcGameCard(
                         if (pc?.installed == false) append(" - not installed")
                     }
                 },
-                color = if (entry.missing) MenuTokens.Danger else Color.LightGray,
+                color = if (entry.missing) MenuTokens.Danger else MenuTokens.Value,
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             pc?.compatibility?.takeIf { it.hasBeenTried }?.let {
-                Text(it.summary(), color = Color(0xFFB0BEC5), style = MaterialTheme.typography.labelSmall)
+                Text(it.summary(), color = MenuTokens.Value, style = MaterialTheme.typography.labelSmall)
             }
         }
     }

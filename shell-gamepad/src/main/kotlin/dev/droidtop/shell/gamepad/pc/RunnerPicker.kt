@@ -20,7 +20,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
@@ -32,6 +31,7 @@ import dev.droidtop.library.RunnerOption
 import dev.droidtop.library.RunnerState
 import dev.droidtop.library.displayName
 import dev.droidtop.shell.gamepad.LocalShellWindow
+import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 
@@ -101,7 +101,7 @@ internal fun RunnerPicker(
                 items(hidden, key = { "why:" + it.strategy.name }) { option ->
                     Text(
                         "${option.strategy.displayName(engine)} - ${option.reason.orEmpty()}",
-                        color = Color.Gray,
+                        color = MenuTokens.OnSurfaceMuted,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
                     )
@@ -159,7 +159,7 @@ private fun PickerPage(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(MenuTokens.Ground)
             .padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 32.dp)
             .onKeyEvent { event ->
                 val action = GamepadKeyMap.actionFor(event.key)
@@ -172,7 +172,7 @@ private fun PickerPage(
             },
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(title, color = Color.White, style = MaterialTheme.typography.headlineSmall)
+        Text(title, color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineSmall)
         LazyColumn(
             modifier = Modifier.fillMaxWidth().weight(1f),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -211,7 +211,7 @@ private fun RunnerRow(
             .onFocusChanged { focused = it.isFocused }
             .focusable(enabled = enabled)
             .then(if (enabled) Modifier.clickable(onClick = onSelect) else Modifier)
-            .background(if (focused) Color(0xFF2A2A2A) else Color(0xFF141414), RoundedCornerShape(8.dp))
+            .background(if (focused) MenuTokens.CardFocused else MenuTokens.CardInset, RoundedCornerShape(8.dp))
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -219,9 +219,9 @@ private fun RunnerRow(
             title + if (selected) "  (current)" else "",
             // Dimmed rather than absent: this is the "not on this device"
             // row the user is entitled to know about.
-            color = if (enabled) Color.White else Color(0xFF7A7A7A),
+            color = if (enabled) MenuTokens.OnSurface else MenuTokens.OnSurfaceDisabled,
             style = MaterialTheme.typography.titleMedium,
         )
-        Text(detail, color = if (enabled) Color.LightGray else Color(0xFF5F5F5F), style = MaterialTheme.typography.bodySmall)
+        Text(detail, color = if (enabled) MenuTokens.Value else MenuTokens.OnSurfaceDisabled, style = MaterialTheme.typography.bodySmall)
     }
 }

@@ -80,8 +80,8 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
     }
 
     val current = loaded ?: run {
-        Column(modifier = Modifier.fillMaxSize().background(Color.Black).padding(LocalShellWindow.current.edgePadding)) {
-            Text("Loading...", color = Color.White, style = MaterialTheme.typography.titleMedium)
+        Column(modifier = Modifier.fillMaxSize().background(MenuTokens.Ground).padding(LocalShellWindow.current.edgePadding)) {
+            Text("Loading...", color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
         }
         return
     }
@@ -101,7 +101,7 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(MenuTokens.Ground)
             .padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 32.dp)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp && GamepadKeyMap.actionFor(event.key) == GamepadAction.BACK) {
@@ -112,8 +112,8 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
                 }
             },
     ) {
-        Text("Edit metadata", color = Color.White, style = MaterialTheme.typography.headlineSmall)
-        Text(entry.title, color = Color.Gray, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 12.dp))
+        Text("Edit metadata", color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineSmall)
+        Text(entry.title, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 12.dp))
 
         LazyColumn(
             modifier = Modifier.weight(1f),
@@ -170,7 +170,7 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
             item {
                 Text(
                     if (entry.manualUri != null) "Manual: found (${entry.manualUri})" else "Manual: none found",
-                    color = Color.Gray,
+                    color = MenuTokens.OnSurfaceMuted,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(vertical = 8.dp),
                 )
@@ -253,10 +253,10 @@ private fun MetadataTextRow(
         singleLine = !multiline,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         colors = TextFieldDefaults.colors(
-            focusedTextColor = Color.White,
-            unfocusedTextColor = Color.White,
-            focusedLabelColor = Color.White,
-            unfocusedLabelColor = Color.Gray,
+            focusedTextColor = MenuTokens.OnSurface,
+            unfocusedTextColor = MenuTokens.OnSurface,
+            focusedLabelColor = MenuTokens.OnSurface,
+            unfocusedLabelColor = MenuTokens.OnSurfaceMuted,
         ),
         modifier = Modifier.fillMaxWidth(),
     )
@@ -283,8 +283,8 @@ private fun MetadataToggleRow(label: String, value: Boolean, onToggle: (Boolean)
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(label, color = Color.White, style = MaterialTheme.typography.bodyLarge)
-        Text(if (value) "On" else "Off", color = if (value) MenuTokens.Affirmative else Color.Gray, style = MaterialTheme.typography.bodyLarge)
+        Text(label, color = MenuTokens.OnSurface, style = MaterialTheme.typography.bodyLarge)
+        Text(if (value) "On" else "Off", color = if (value) MenuTokens.Affirmative else MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyLarge)
     }
 }
 
@@ -310,8 +310,8 @@ private fun MetadataPickerRow(label: String, currentValueLabel: String, onClick:
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(label, color = Color.White, style = MaterialTheme.typography.bodyLarge)
-        Text(currentValueLabel, color = Color.Gray, style = MaterialTheme.typography.bodyLarge)
+        Text(label, color = MenuTokens.OnSurface, style = MaterialTheme.typography.bodyLarge)
+        Text(currentValueLabel, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyLarge)
     }
 }
 
@@ -320,7 +320,7 @@ private fun ControllerPicker(current: String?, onPick: (String?) -> Unit, onDism
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(MenuTokens.Ground)
             .padding(LocalShellWindow.current.edgePadding)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp && GamepadKeyMap.actionFor(event.key) == GamepadAction.BACK) {
@@ -332,7 +332,7 @@ private fun ControllerPicker(current: String?, onPick: (String?) -> Unit, onDism
             },
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Controller", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+        Text("Controller", color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineSmall)
         LazyColumn(
             modifier = Modifier.weight(1f),
             // The hint bar's own room (MenuTokens.HintBarRoom).
@@ -353,7 +353,7 @@ private fun ControllerRow(label: String, isCurrent: Boolean, onPick: () -> Unit)
     var focused by remember { mutableStateOf(false) }
     Text(
         label + if (isCurrent) " (current)" else "",
-        color = Color.White,
+        color = MenuTokens.OnSurface,
         style = MaterialTheme.typography.titleMedium,
         modifier = Modifier
             .fillMaxWidth()

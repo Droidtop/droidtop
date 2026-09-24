@@ -109,7 +109,7 @@ internal fun LaunchDisplayChooserDialog(
             rows.forEachIndexed { index, row ->
                 Text(
                     row.label,
-                    color = if (index == selected) Color.White else MenuTokens.Value,
+                    color = if (index == selected) MenuTokens.OnSurface else MenuTokens.Value,
                     fontWeight = if (index == selected) FontWeight.SemiBold else FontWeight.Normal,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier

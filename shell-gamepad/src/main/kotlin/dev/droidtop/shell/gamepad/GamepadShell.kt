@@ -534,7 +534,7 @@ fun GamepadShell(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(MenuTokens.Ground)
             // Shoulder-button section switching -- a standard console-UI
             // pattern (Daijishō and most console launchers use L1/R1 to
             // cycle top-level tabs) that works regardless of what currently
@@ -684,11 +684,11 @@ fun GamepadShell(
             }
             Text(
                 message,
-                color = Color(0xFFFFB4AB),
+                color = MenuTokens.Danger,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xCC330E0B))
+                    .background(MenuTokens.DangerPlate)
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             )
         }
@@ -813,8 +813,8 @@ fun GamepadShell(
                         // gameEntries/appEntries' own comment) -- Games' spinner no
                         // longer has anything to do with whether Apps is ready, and
                         // vice versa.
-                        shownSection == GamingSection.GAMES && gameEntries == null -> CircularProgressIndicator(color = Color.White)
-                        shownSection == GamingSection.APPS && appEntries == null -> CircularProgressIndicator(color = Color.White)
+                        shownSection == GamingSection.GAMES && gameEntries == null -> CircularProgressIndicator(color = MenuTokens.OnSurface)
+                        shownSection == GamingSection.APPS && appEntries == null -> CircularProgressIndicator(color = MenuTokens.OnSurface)
                         else -> when (shownSection) {
                             GamingSection.GAMES -> GamesSection(
                                 entries = gameEntries.orEmpty().let { all ->
@@ -893,7 +893,7 @@ fun GamepadShell(
         // -- the theme laid the help row out itself -- so there the same
         // bar is placed over that spot instead, above.
         if (helpRowOwner == HelpRowOwner.SHELL && helpRowClaim != HelpRowClaim.THEME) {
-            shellHelpRow(TouchHintBarBackground)
+            shellHelpRow(MenuTokens.HintBar)
         }
     }
     }
@@ -1059,13 +1059,13 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(220.dp)
-                    .background(Color(0xFF1A1A1A), RoundedCornerShape(16.dp)),
+                    .background(MenuTokens.Card, RoundedCornerShape(16.dp)),
             ) {
                 AsyncImage(
                     model = entry.artworkUri,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().background(Color(0xFF1A1A1A), RoundedCornerShape(16.dp)),
+                    modifier = Modifier.fillMaxSize().background(MenuTokens.Card, RoundedCornerShape(16.dp)),
                 )
                 // Platform/kind label overlaid on the art, matching Daijishō's
                 // own detail-screen layout (boxart with the platform name
@@ -1074,19 +1074,19 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomStart)
-                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000))))
+                        .background(Brush.verticalGradient(listOf(Color.Transparent, MenuTokens.Scrim)))
                         .padding(12.dp),
                 ) {
-                    Text(entry.kind.itemName(), color = Color.White, style = MaterialTheme.typography.labelMedium)
+                    Text(entry.kind.itemName(), color = MenuTokens.OnSurface, style = MaterialTheme.typography.labelMedium)
                 }
             }
         }
-        Text(entry.title, color = Color.White, style = MaterialTheme.typography.headlineMedium)
+        Text(entry.title, color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineMedium)
         if (entry.artworkUri == null) {
-            Text(entry.kind.itemName(), color = Color.Gray, style = MaterialTheme.typography.titleMedium)
+            Text(entry.kind.itemName(), color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.titleMedium)
         }
         if (entry.playtimeSeconds > 0) {
-            Text("Played ${entry.playtimeSeconds / 60} min", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
+            Text("Played ${entry.playtimeSeconds / 60} min", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
         }
         val detailScope = rememberCoroutineScope()
         Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -1160,13 +1160,13 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
             ActionChip("Back", highlighted = false, onClick = onClose)
         }
         (scrapeStatus ?: scrapeResult)?.let {
-            Text(it, color = Color.Gray, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+            Text(it, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
         }
         // An integration drives another app's own real Activity, so it can
         // fail for reasons droidtop cannot see coming (the template names a
         // component that app no longer exports). Shown, not swallowed.
         integrationError?.let {
-            Text(it, color = Color(0xFFFF8A80), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+            Text(it, color = MenuTokens.Danger, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
         }
     }
 }
@@ -1176,7 +1176,7 @@ internal fun ActionChip(label: String, highlighted: Boolean, modifier: Modifier 
     var focused by remember { mutableStateOf(false) }
     Text(
         label,
-        color = if (highlighted) Color.Black else Color.White,
+        color = if (highlighted) MenuTokens.OnSelected else MenuTokens.OnSurface,
         style = MaterialTheme.typography.titleMedium,
         modifier = modifier
             .onKeyEvent { event ->
@@ -1194,10 +1194,10 @@ internal fun ActionChip(label: String, highlighted: Boolean, modifier: Modifier 
             // Same real touch-input fix as GameCard -- see its own comment.
             .clickable(onClick = onClick)
             .background(
-                if (highlighted) Color.White else if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A),
+                if (highlighted) MenuTokens.Selected else if (focused) MenuTokens.CardFocused else MenuTokens.Card,
                 RoundedCornerShape(50),
             )
-            .border(width = if (focused && !highlighted) 2.dp else 0.dp, color = Color.White, shape = RoundedCornerShape(50))
+            .border(width = if (focused && !highlighted) 2.dp else 0.dp, color = MenuTokens.OnSurface, shape = RoundedCornerShape(50))
             .padding(horizontal = 20.dp, vertical = 10.dp),
     )
 }
@@ -1221,7 +1221,7 @@ private fun ButtonHintFooter(
     showSectionSwitch: Boolean = false,
     showSystemSwitch: Boolean = false,
     showOptions: Boolean = false,
-    background: Color = TouchHintBarBackground,
+    background: Color = MenuTokens.HintBar,
 ) {
     TouchHintBar(
         background = background,
@@ -1310,7 +1310,7 @@ private fun SectionTabBar(
                 val focused = entrySection == current
                 Text(
                     text = entrySection.displayName(),
-                    color = if (focused) Color.White else Color.Gray,
+                    color = if (focused) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
                     style = MaterialTheme.typography.titleMedium,
                     modifier = (if (entrySection == current) Modifier.focusRequester(currentTabFocus) else Modifier)
                         .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
@@ -1348,13 +1348,13 @@ private fun SectionTabBar(
         ) {
             Text(
                 "R2",
-                color = Color.White,
+                color = MenuTokens.OnSurface,
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier
-                    .border(1.dp, Color.Gray, RoundedCornerShape(6.dp))
+                    .border(1.dp, MenuTokens.OnSurfaceMuted, RoundedCornerShape(6.dp))
                     .padding(horizontal = 8.dp, vertical = 2.dp),
             )
-            Text("Quick Menu", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+            Text("Quick Menu", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.labelMedium)
         }
     }
 }
@@ -2173,7 +2173,7 @@ private fun GamesSection(
                 // signature was already in the device's older crash logs.
                 if (entries.isEmpty()) {
                     Column(modifier = Modifier.fillMaxSize().padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(32.dp)) {
-                        Text("No games detected yet.", color = Color.White, modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding))
+                        Text("No games detected yet.", color = MenuTokens.OnSurface, modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding))
                     }
                 } else {
                     // Box, not Column: EsDeThemedView needs to genuinely fill
@@ -2701,7 +2701,7 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     Text(
         label,
-        color = if (selected) Color.Black else Color.White,
+        color = if (selected) MenuTokens.OnSelected else MenuTokens.OnSurface,
         style = MaterialTheme.typography.labelMedium,
         modifier = Modifier
             .onKeyEvent { event ->
@@ -2719,7 +2719,7 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
             // Same real touch-input fix as GameCard -- see its own comment.
             .clickable(onClick = onClick)
             .background(
-                if (selected) Color.White else if (focused) Color(0xFF2A2A2A) else Color(0xFF1A1A1A),
+                if (selected) MenuTokens.Selected else if (focused) MenuTokens.CardFocused else MenuTokens.Card,
                 RoundedCornerShape(50),
             )
             .padding(horizontal = 14.dp, vertical = 6.dp),
@@ -2745,7 +2745,7 @@ private fun AppsSection(
     LaunchedEffect(entries) { if (sections.isNotEmpty()) requestFocusWhenAttached(firstFocus, "Sections") }
 
     if (sections.isEmpty()) {
-        Text("No apps detected yet.", color = Color.White)
+        Text("No apps detected yet.", color = MenuTokens.OnSurface)
         return
     }
     var firstAssigned = false
@@ -2806,7 +2806,7 @@ private fun AppIconGrid(
     Column {
         Text(
             section.title,
-            color = Color.White,
+            color = MenuTokens.OnSurface,
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 8.dp),
         )
@@ -2898,7 +2898,7 @@ private fun AppIconTile(
             // selected look like" on two grids of the same shell.
             .border(
                 width = if (focused) 3.dp else 1.dp,
-                color = if (focused) MenuTokens.Accent else Color(0x1FFFFFFF),
+                color = if (focused) MenuTokens.Accent else MenuTokens.CardOutline,
                 shape = RoundedCornerShape(16.dp),
             )
             .background(
@@ -2911,7 +2911,7 @@ private fun AppIconTile(
         Box(
             modifier = Modifier
                 .size(64.dp)
-                .background(Color(0xFF1A1A1A), RoundedCornerShape(16.dp)),
+                .background(MenuTokens.Card, RoundedCornerShape(16.dp)),
         ) {
             if (entry.artworkUri != null) {
                 AsyncImage(
@@ -2936,7 +2936,7 @@ private fun AppIconTile(
         // already said it (rig, build 547).
         Text(
             entry.title,
-            color = Color.White,
+            color = MenuTokens.OnSurface,
             style = MaterialTheme.typography.labelMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -2944,7 +2944,7 @@ private fun AppIconTile(
         )
         Text(
             entry.kindLine(),
-            color = Color.Gray,
+            color = MenuTokens.OnSurfaceMuted,
             style = MaterialTheme.typography.labelSmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -3003,7 +3003,7 @@ private fun HomeSectionRow(
     Column(modifier = modifier) {
         Text(
             section.title,
-            color = Color.White,
+            color = MenuTokens.OnSurface,
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 8.dp),
         )
@@ -3112,7 +3112,7 @@ private fun GameCard(
             // theme's own highlight.
             .border(
                 width = if (focused) 3.dp else 1.dp,
-                color = if (focused) MenuTokens.Accent else Color(0x1FFFFFFF),
+                color = if (focused) MenuTokens.Accent else MenuTokens.CardOutline,
                 shape = RoundedCornerShape(12.dp),
             )
             .background(
@@ -3133,7 +3133,7 @@ private fun GameCard(
                     .fillMaxWidth()
                     .align(Alignment.BottomStart)
                     .background(
-                        Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000))),
+                        Brush.verticalGradient(listOf(Color.Transparent, MenuTokens.Scrim)),
                     )
                     .padding(12.dp),
             ) {
@@ -3144,14 +3144,14 @@ private fun GameCard(
                     // its neighbour's.
                     Text(
                         entry.title,
-                        color = Color.White,
+                        color = MenuTokens.OnSurface,
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         entry.kind.displayName(),
-                        color = Color.LightGray,
+                        color = MenuTokens.Value,
                         style = MaterialTheme.typography.labelSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -3162,14 +3162,14 @@ private fun GameCard(
             Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.Bottom) {
                 Text(
                     entry.title,
-                    color = Color.White,
+                    color = MenuTokens.OnSurface,
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     entry.kind.displayName(),
-                    color = Color.Gray,
+                    color = MenuTokens.OnSurfaceMuted,
                     style = MaterialTheme.typography.labelSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -3179,7 +3179,7 @@ private fun GameCard(
         if (entry.favorite) {
             Text(
                 "★",
-                color = Color(0xFFFFD700),
+                color = MenuTokens.Favourite,
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
             )
