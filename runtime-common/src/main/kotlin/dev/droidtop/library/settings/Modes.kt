@@ -70,6 +70,13 @@ enum class ModePiece(vararg owners: Mode) {
     DESKTOP_SECOND_SCREEN(Mode.DESKTOP),
 
     /**
+     * "Open with droidtop" for downloaded programs and packages: it runs
+     * them in Desktop mode's Wine environments and containers, so with
+     * Desktop off it is not offered to other apps at all.
+     */
+    DESKTOP_OPEN_WITH(Mode.DESKTOP),
+
+    /**
      * The vendored gamenative backbone. Two owners, not one: Gaming's PC
      * surface and Desktop's containers both need it. The shared PC launch
      * path starts it on demand as well, which is why it is reached through

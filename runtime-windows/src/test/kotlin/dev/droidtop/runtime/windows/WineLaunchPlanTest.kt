@@ -34,6 +34,20 @@ class WineLaunchPlanTest {
     }
 
     @Test
+    fun `droidtop's own arguments are escaped one by one and come before the prefix's`() {
+        // An installer opened with droidtop: `start /unix <path>`.
+        assertEquals(
+            "wine explorer /desktop=shell,1280x720 start /unix /storage/emulated/0/Download/My\\ Setup.msi -x",
+            WineLaunchPlan.guestExecutable(
+                "1280x720",
+                "start",
+                "-x",
+                listOf("/unix", "/storage/emulated/0/Download/My Setup.msi"),
+            ),
+        )
+    }
+
+    @Test
     fun `the prefix's own arguments follow the target`() {
         assertEquals(
             "wine explorer /desktop=shell,1280x720 /storage/games/Game.exe -windowed -nosound",

@@ -62,6 +62,7 @@ class WineXSession(
     private val target: String,
     private val workingDir: File,
     private val xServer: XServer,
+    private val arguments: List<String> = emptyList(),
 ) {
 
     private var environment: XEnvironment? = null
@@ -227,7 +228,7 @@ class WineXSession(
             bindingPaths = prefix.drivesIterator().map { it[1] }.toTypedArray()
             this.envVars = envVars
             setWorkingDir(workingDir.takeIf { it.isDirectory } ?: imageFs.rootDir)
-            guestExecutable = WineLaunchPlan.guestExecutable(xServer.screenInfo.toString(), target, prefix.execArgs)
+            guestExecutable = WineLaunchPlan.guestExecutable(xServer.screenInfo.toString(), target, prefix.execArgs, arguments)
             setTerminationCallback { code -> onTerminated(code ?: EXEC_FAILED) }
         }
         environment.addComponent(launcher)
@@ -363,10 +364,12 @@ object WineLaunchPlan {
      * hand Wine a path that does not exist, but it treats a
      * backslash-space pair as a literal space. [execArgs] is the prefix's
      * own argument string and goes through unescaped, the way a person
-     * typed it.
+     * typed it. [arguments] are droidtop's own, one argument each, and
+     * are escaped like [target].
      */
-    fun guestExecutable(screenInfo: String, target: String, execArgs: String = ""): String {
-        val command = "wine explorer /desktop=shell,$screenInfo " + target.replace(" ", "\\ ")
+    fun guestExecutable(screenInfo: String, target: String, execArgs: String = "", arguments: List<String> = emptyList()): String {
+        val command = (listOf(target) + arguments)
+            .joinToString(" ", prefix = "wine explorer /desktop=shell,$screenInfo ") { it.replace(" ", "\\ ") }
         return if (execArgs.isBlank()) command else "$command ${execArgs.trim()}"
     }
 }

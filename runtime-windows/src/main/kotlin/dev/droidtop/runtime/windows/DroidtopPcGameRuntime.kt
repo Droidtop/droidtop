@@ -331,16 +331,7 @@ class DroidtopPcGameRuntime(
                 "the Windows environment isn't set up yet -- run \"Set up Windows games\" in Settings",
             )
 
-        val prefixHostPath = File(container.rootDir, ".wine")
-        if (!prefixHostPath.isDirectory) {
-            return PcLaunchResult(
-                false,
-                "container \"${container.name}\" has no Wine prefix at ${prefixHostPath.absolutePath}",
-            )
-        }
-
-        return runCatching { wineEngine.launch(container, executable.absolutePath, gameRoot) }
-            .getOrElse { PcLaunchResult(false, it.message ?: it.toString()) }
+        return launchInPrefix(wineEngine, container, executable.absolutePath, gameRoot)
     }
 
     override suspend fun launchLinux(executable: File, gameRoot: File): PcLaunchResult {
@@ -435,6 +426,65 @@ object PcContainers {
             // A folder game's entry id IS the scanner's own appId.
             "folder" -> nativeId
             else -> null
+        }
+    }
+}
+
+/**
+ * The one way a Windows program starts in a prefix droidtop resolved: a
+ * library game ([DroidtopPcGameRuntime.launchWindows]) and a file opened
+ * with droidtop ([WinePrefixes.open]) both come through here.
+ */
+internal suspend fun launchInPrefix(
+    engine: WineEngine,
+    container: Container,
+    target: String,
+    workingDir: File,
+    arguments: List<String> = emptyList(),
+): PcLaunchResult {
+    val prefixHostPath = File(container.rootDir, ".wine")
+    if (!prefixHostPath.isDirectory) {
+        return PcLaunchResult(
+            false,
+            "container \"${container.name}\" has no Wine prefix at ${prefixHostPath.absolutePath}",
+        )
+    }
+    return runCatching { engine.launch(container, target, workingDir, arguments) }
+        .getOrElse { PcLaunchResult(false, it.message ?: it.toString()) }
+}
+
+/**
+ * Every Wine prefix on this device, for choosing one by hand: the chooser
+ * a downloaded `.exe` or `.msi` opens (docs/SPEC.md 4b). Plain values, so
+ * `:app` needs none of gamenative's types.
+ */
+object WinePrefixes {
+    data class Prefix(val id: String, val name: String)
+
+    /** droidtop's own environment first, then every per-game prefix. */
+    fun list(context: Context): List<Prefix> {
+        val containers = runCatching { ContainerManager(context).containers }.getOrNull().orEmpty()
+        return containers
+            .sortedBy { if (it.id == DroidtopPcGameRuntime.CONTAINER_ID) 0 else 1 }
+            .map { Prefix(it.id, it.name?.takeIf(String::isNotBlank) ?: it.id) }
+    }
+
+    /**
+     * Runs [file] in prefix [prefixId], from where it is. An `.msi` is
+     * handed to Wine's own `start /unix`, which opens it with the prefix's
+     * registered installer (msiexec) exactly as a double-click in
+     * Explorer would; anything else runs directly, as a library game does.
+     */
+    suspend fun open(context: Context, prefixId: String, file: File): PcLaunchResult {
+        val container = withContext(Dispatchers.IO) {
+            runCatching { ContainerManager(context).getContainerById(prefixId) }.getOrNull()
+        } ?: return PcLaunchResult(false, "that Windows environment no longer exists")
+        val workingDir = file.parentFile ?: file
+        val engine = BionicWineEngine(context)
+        return if (file.name.endsWith(".msi", ignoreCase = true)) {
+            launchInPrefix(engine, container, "start", workingDir, listOf("/unix", file.absolutePath))
+        } else {
+            launchInPrefix(engine, container, file.absolutePath, workingDir)
         }
     }
 }

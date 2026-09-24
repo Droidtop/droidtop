@@ -54,6 +54,9 @@ sealed interface WineEngine {
      * of an executable on a mapped drive, or the Windows path a
      * `.desktop` shortcut already stores. Both are things Wine resolves;
      * neither is something this engine should try to convert.
+     * [arguments] follow [target] on Wine's command line, escaped the way
+     * [target] is ([WineLaunchPlan.guestExecutable]); an installer opened
+     * with droidtop passes `start /unix <path>` this way (docs/SPEC.md 4b).
      *
      * Returns once the game has been HANDED OFF, not once it has exited.
      * The result answers "did this launch start", which is the question
@@ -62,7 +65,7 @@ sealed interface WineEngine {
      * the Activity that presents it, the same way every other droidtop
      * launch works.
      */
-    suspend fun launch(prefix: Container, target: String, workingDir: File): PcLaunchResult
+    suspend fun launch(prefix: Container, target: String, workingDir: File, arguments: List<String> = emptyList()): PcLaunchResult
 }
 
 /** Either ready, or the specific missing piece a user can act on. */
@@ -116,6 +119,7 @@ class BionicWineEngine(private val context: Context) : WineEngine {
         prefix: Container,
         target: String,
         workingDir: File,
+        arguments: List<String>,
     ): PcLaunchResult {
         // Readiness reads the contents store off disk, so it does not run
         // on whatever thread the caller happens to be on.
@@ -127,7 +131,7 @@ class BionicWineEngine(private val context: Context) : WineEngine {
         // screen a launch lands on, and it is the same call for all of
         // them.
         return runCatching {
-            LaunchDisplay.start(context, WineGameActivity.intent(context, prefix, target, workingDir))
+            LaunchDisplay.start(context, WineGameActivity.intent(context, prefix, target, workingDir, arguments))
         }.fold(
             onSuccess = { PcLaunchResult(true, "ok") },
             onFailure = { PcLaunchResult(false, it.message ?: "couldn't start the Windows game screen") },
