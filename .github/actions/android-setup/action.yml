@@ -1,0 +1,167 @@
+name: Android build setup
+description: >-
+  Everything android-build.yml and android-checks.yml need before their first
+  Gradle call: JDKs, Go, the apt toolchain, the pinned SDK/NDK, the
+  cross-compiled vendor deps and the Gradle cache. One definition, so the two
+  workflows cannot drift apart. Needs a checkout with submodules first.
+
+runs:
+  using: composite
+  steps:
+    - name: Export the SDK/NDK/deps paths
+      shell: bash
+      # GitHub's ubuntu-24.04 runner image preinstalls its own SDK and sets
+      # ANDROID_HOME to it (/usr/local/lib/android/sdk). AGP refuses to
+      # configure at all if ANDROID_HOME and ANDROID_SDK_ROOT disagree
+      # ("Several environment variables and/or system properties contain
+      # different paths to the SDK"), confirmed from a real failing CI log.
+      # Pointing both at the pinned SDK installed below resolves it.
+      # ANDROID_DEPS_PREFIX is not /opt/android-deps (this repo's local-dev
+      # default, see build-scripts/build-vendor-deps.sh): that needs root on a
+      # fresh runner, and the workspace is just as reproducible.
+      run: |
+        {
+          echo "NDK_VERSION=27.0.12077973"
+          echo "ANDROID_SDK_ROOT=$GITHUB_WORKSPACE/.android-sdk"
+          echo "ANDROID_HOME=$GITHUB_WORKSPACE/.android-sdk"
+          echo "ANDROID_NDK_HOME=$GITHUB_WORKSPACE/.android-sdk/ndk/27.0.12077973"
+          echo "ANDROID_DEPS_PREFIX=$GITHUB_WORKSPACE/.android-deps"
+        } >> "$GITHUB_ENV"
+
+    - name: Set up JDK 17 + 21
+      # 21 is needed for shell-default's forked-in sub-modules (Murine
+      # Launcher/Launcher3): several request a Gradle toolchain matching JDK
+      # 21, confirmed by a real ToolchainProvisioningException ("Cannot find a
+      # Java installation... matching: {languageVersion=21, ...}"). Installing
+      # both lets Gradle's toolchain auto-detection satisfy whichever each
+      # module asks for; the rest of droidtop stays on 17.
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: |
+          17
+          21
+
+    - name: Set up Gradle (dependency, wrapper and build cache)
+      # Caches the Gradle user home between runs: the wrapper distribution,
+      # every downloaded dependency, and the local build cache that
+      # gradle.properties turns on (org.gradle.caching), so a push that
+      # touches one module reuses the other modules' task outputs instead of
+      # recompiling all of them. Entries are written only by runs on main
+      # (the action's default) and read by every run, pull requests included;
+      # entries unused by a successful run are pruned so the cache does not
+      # grow without bound against the repository's cache quota.
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        cache-cleanup: on-success
+
+    - name: Set up Go
+      # For cross-compiling crane (vendor/go-containerregistry), the OCI
+      # registry client CraneRootfsPuller shells out to; see
+      # build-scripts/build-vendor-deps.sh's crane section.
+      # go-containerregistry's go.mod requires >= 1.25; not assuming the
+      # runner's own preinstalled Go meets that.
+      uses: actions/setup-go@v5
+      with:
+        go-version: "1.25"
+        cache: false
+
+    - name: Install build dependencies
+      shell: bash
+      env:
+        DEBIAN_FRONTEND: noninteractive
+        NEEDRESTART_MODE: a
+      run: |
+        # Three earlier runs hung with zero visible output. `set -x` shows
+        # which command is stuck, apt runs without -qq so its progress
+        # streams, and `timeout` makes a hang fail loudly after a bounded
+        # wait instead of needing a manual cancel to be noticed.
+        set -x
+        sudo systemctl stop apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
+        sudo systemctl stop apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
+        timeout 120 sudo apt-get update -o DPkg::Lock::Timeout=300
+        timeout 300 sudo apt-get install -y -o DPkg::Lock::Timeout=300 \
+          build-essential cmake ninja-build meson pkg-config git python3 \
+          autoconf automake libtool libltdl-dev texinfo \
+          libexpat1-dev libffi-dev libxml2-utils \
+          wayland-protocols libwayland-bin \
+          unzip curl
+
+    - name: Cache Android SDK/NDK
+      id: sdk-cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/.android-sdk
+        # v2: added platforms;android-36 + build-tools;36.0.0. shell-default
+        # (the forked-in Murine Launcher) and its sub-modules compile against
+        # 36, and several of their AndroidX deps require :app to compile
+        # against 35+ too (AAR-metadata check). 34 is kept for the rest of
+        # droidtop's modules. The NDK version is part of the key.
+        key: android-sdk-ndk27.0.12077973-v2
+
+    - name: Install Android SDK + NDK
+      if: steps.sdk-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
+        curl -sL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o /tmp/cmdline-tools.zip
+        unzip -q /tmp/cmdline-tools.zip -d "$ANDROID_SDK_ROOT/cmdline-tools"
+        mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+        rm /tmp/cmdline-tools.zip
+
+        SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+        yes | "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" --licenses > /dev/null
+        "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" \
+          "platform-tools" "platforms;android-34" "build-tools;34.0.0" \
+          "platforms;android-36" "build-tools;36.0.0" "ndk;${NDK_VERSION}"
+
+    - name: Cache cross-compiled vendor deps (libffi, libwayland-client, droidspaces, crane, proot)
+      id: deps-cache
+      uses: actions/cache@v4
+      with:
+        # The packaged outputs AND the ANDROID_DEPS_PREFIX build dir: on a
+        # cache hit the build step below is skipped, but host-bridge's own
+        # CMake build still needs wayland-client.h/wayland-util.h/libffi.a
+        # from that prefix every run (run 32405390718 failed with
+        # "'wayland-util.h' file not found" when only assets/bin was cached).
+        # Both ABIs live under these same directories.
+        #
+        # host-bridge/src/main/jniLibs is NOT cached (or populated):
+        # libwayland-client.so is packaged via CMake's prebuilt-shared-lib
+        # linking (host-bridge/native/CMakeLists.txt); a second copy in
+        # jniLibs duplicated that APK path and broke
+        # :host-bridge:mergeDebugNativeLibs.
+        path: |
+          runtime-linux-root/src/main/assets/bin
+          runtime-common/src/main/jniLibs
+          runtime-linux-noroot/src/main/jniLibs
+          ${{ github.workspace }}/.android-deps
+        # Keyed on every vendored submodule the script builds from, so a
+        # submodule bump invalidates it. The suffix is bumped when what the
+        # script produces changes without a submodule moving:
+        # v6 added crane; v7 built crane CGO_ENABLED=1 on arm64 (the pure-Go
+        # DNS resolver was dead on-device); v8 moved crane to
+        # runtime-common/src/main/jniLibs as libcrane.so (an extracted asset
+        # cannot be exec'd above targetSdk 28) and built vendor/proot into
+        # runtime-linux-noroot/src/main/jniLibs; v9 put
+        # build-scripts/proot-patches into the key.
+        key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD', '.git/modules/vendor/proot/HEAD', 'build-scripts/proot-patches/**') }}-v9
+
+    - name: Build cross-compiled vendor deps (libffi, libwayland-client, droidspaces, crane, proot)
+      if: steps.deps-cache.outputs.cache-hit != 'true'
+      shell: bash
+      # Run with `bash` explicitly: this repo is developed partly on Windows,
+      # where the executable bit does not reliably survive a commit, and
+      # relying on it failed CI with "Permission denied". One fat APK covers
+      # arm64-v8a and x86_64; the script builds one ABI per invocation.
+      #
+      # GH_TOKEN: the script pulls the musl cross toolchains from this
+      # repository's mirrored "build-toolchains" release with
+      # `gh release download` (musl.cc was unreachable from hosted runners
+      # often enough, run 32400505729), and the repository is private.
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        for abi in arm64-v8a x86_64; do
+          bash build-scripts/build-vendor-deps.sh "$abi"
+        done

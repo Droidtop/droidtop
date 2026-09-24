@@ -1,0 +1,73 @@
+name: Release promote
+
+# Publishes a build that CI already made and checked to the Testing or Stable
+# channel. Nothing is built here: the APKs and release-info.json are the
+# droidtop-apk artifact of that commit's own android-build.yml run, byte for
+# byte what "latest" carried and what was installed and tried on a rig. A
+# promotion refuses a commit whose build or checks run did not succeed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Channel to publish to"
+        type: choice
+        options: [testing, stable]
+      commit:
+        description: "Commit to promote. Empty: the commit the latest channel carries now."
+        type: string
+        required: false
+
+permissions:
+  contents: write
+  actions: read
+
+# Two promotions to one channel wait for each other instead of interleaving.
+concurrency:
+  group: release-${{ inputs.channel }}
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Find the tested build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT: ${{ inputs.commit }}
+        run: |
+          if [ -z "$COMMIT" ]; then
+            COMMIT=$(gh release download latest --pattern release-info.json --output - | jq -r .commit)
+          fi
+          COMMIT=$(gh api "repos/$GITHUB_REPOSITORY/commits/$COMMIT" --jq .sha)
+          echo "Promoting $COMMIT"
+
+          latest_success() {
+            gh run list --workflow "$1" --commit "$COMMIT" --branch main --status success \
+              --limit 1 --json databaseId --jq '.[0].databaseId // empty'
+          }
+          build_run=$(latest_success android-build.yml)
+          if [ -z "$build_run" ]; then
+            echo "::error::No successful android-build.yml run on main for $COMMIT. Only a commit whose APK CI built and published to latest can be promoted."
+            exit 1
+          fi
+          if [ -z "$(latest_success android-checks.yml)" ]; then
+            echo "::error::android-checks.yml (lint and unit tests) did not succeed on main for $COMMIT; not promoting it."
+            exit 1
+          fi
+
+          gh run download "$build_run" --name droidtop-apk --dir promoted
+          if [ "$(jq -r .commit promoted/release-info.json 2>/dev/null)" != "$COMMIT" ]; then
+            echo "::error::Run $build_run's artifact has no release-info.json for $COMMIT (built before promotion by artifact existed)."
+            exit 1
+          fi
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 build-scripts/release_channel.py publish "${{ inputs.channel }}" promoted

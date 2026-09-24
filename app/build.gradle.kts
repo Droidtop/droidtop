@@ -23,10 +23,11 @@ android {
     // everything it depends on.
     compileSdk = 36
 
-    // A plain incrementing integer, not a git SHA — CI passes its own
-    // run number (github.run_number, monotonically increasing per
-    // workflow run) via VERSION_REVISION; local builds fall back to "0"
-    // since there's no meaningful revision counter outside CI.
+    // A plain incrementing integer, not a git SHA — CI passes the number
+    // of commits reachable from the commit it builds (see
+    // build-scripts/release_channel.py) via VERSION_REVISION; local builds
+    // fall back to "0" since there's no meaningful revision counter
+    // outside CI.
     val versionRevision = System.getenv("VERSION_REVISION") ?: "0"
 
     androidResources {
@@ -43,7 +44,7 @@ android {
         applicationId = "dev.droidtop.app"
         minSdk = 26
         targetSdk = 34
-        // The CI run number (VERSION_REVISION): a plain monotonic integer,
+        // The commit's revision number (VERSION_REVISION): a plain monotonic integer,
         // so Android itself refuses downgrades and AppSelfUpdate can answer
         // "is this newer" numerically against the published release-info.
         // Local builds without the env var stay at 1.
