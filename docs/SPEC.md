@@ -6970,11 +6970,10 @@ The list of what is missing is read from each build, not kept here:
 reports while the splits exist and becomes a failing gate
 (`--require-complete`) in the change that removes them. On 2026-09-24
 (build of `ce75426`) 24 of the 39 arm64 libraries were missing, all
-gamenative's. `:runtime-windows` now builds the x86_64 half of the ones
-whose source is in the fork and is the source of what ships (virglrenderer,
-patchelf, asurface_renderer, ahbimage, xconnectorpatch, plus the NDK's
-libc++_shared) with AGP's CMake, restricted to x86_64 so arm64 stays
-upstream's prebuilt set (`runtime-windows/native/CMakeLists.txt`).
+gamenative's. `:runtime-windows` builds their x86_64 half with AGP's
+CMake, restricted to x86_64 so arm64 stays upstream's prebuilt set
+(`runtime-windows/native/CMakeLists.txt`, shims in `native/shims/`); the
+upstream projects in the list below are the ones not built yet.
 
 **The x86_64 Windows runtime (user, 2026-09-24).** arm64 keeps upstream
 GameNative's binaries untouched. An x86_64 device runs real x86_64 Wine,
