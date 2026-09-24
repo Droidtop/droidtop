@@ -115,12 +115,10 @@ internal fun Modifier.selectionFrame(
     restOutline: Color = Color.Transparent,
 ): Modifier = this
     .background(if (selected) MenuTokens.SurfaceSelected else rest, shape)
+    // Never a 0.dp border: Compose draws 0.dp (Dp.Hairline) as a 1px line,
+    // so "no ring" is a transparent colour, not a zero width.
     .border(
-        width = when {
-            selected -> MenuTokens.FocusRingWidth
-            restOutline != Color.Transparent -> 1.dp
-            else -> 0.dp
-        },
+        width = if (selected) MenuTokens.FocusRingWidth else 1.dp,
         color = if (selected) MenuTokens.Accent else restOutline,
         shape = shape,
     )
@@ -172,7 +170,7 @@ internal fun ShellChip(
                 if (filled) {
                     Modifier
                         .background(if (focused) MenuTokens.Selected else MenuTokens.Accent, shape)
-                        .border(if (focused) MenuTokens.FocusRingWidth else 0.dp, MenuTokens.Accent, shape)
+                        .border(MenuTokens.FocusRingWidth, if (focused) MenuTokens.Accent else Color.Transparent, shape)
                 } else {
                     Modifier.selectionFrame(focused, shape)
                 },
