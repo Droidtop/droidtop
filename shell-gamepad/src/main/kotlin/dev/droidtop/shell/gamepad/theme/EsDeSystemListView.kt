@@ -339,7 +339,7 @@ fun EsDeSystemListView(
             val generation = EsDeArtwork.mediaGeneration
             val stale = images.generation != generation
             val pending = items.asSequence()
-                .filter { it.mediaLocator != null && (stale || it.mediaLocator !in images.paths) }
+                .filter { it.mediaLocator != null && (stale || !images.paths.containsKey(it.mediaLocator)) }
                 .distinctBy { it.mediaLocator }
                 .toList()
             // In chunks, each drawn as it lands: a cancelled run (the
