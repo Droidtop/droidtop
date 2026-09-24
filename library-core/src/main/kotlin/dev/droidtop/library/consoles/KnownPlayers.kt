@@ -66,7 +66,8 @@ object KnownPlayers {
         cached = null
     }
 
-    private fun parse(text: String): List<KnownPlayerPreset> {
+    /** Also [PlayersDatabaseUpdater]'s validation, so what is installed is what this reads. */
+    internal fun parse(text: String): List<KnownPlayerPreset> {
         val root = JSONObject(text)
         val players = root.getJSONArray("players")
         return (0 until players.length()).map { i ->

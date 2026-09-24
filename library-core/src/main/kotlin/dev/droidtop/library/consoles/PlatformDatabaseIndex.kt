@@ -126,18 +126,26 @@ object PlatformDatabaseIndex {
         }
 
         // Nothing is written until every file is in hand and every composed
-        // document has parsed, so a refresh that dies half way through
-        // leaves the databases on the previous, consistent snapshot.
-        val counts = LinkedHashMap<String, Int>()
+        // document has passed its database's own validation, so a refresh
+        // that dies half way through, or one collection that does not
+        // parse, leaves every database on the previous, consistent snapshot.
+        val composed = ArrayList<Triple<String, Consumer, String>>()
         for (collection in index.collections.values) {
             val legacy = collection.legacy ?: continue
+            val consumer = CONSUMERS[legacy] ?: continue // nothing in this build reads it
             val entries = index.files.filter { it.collection == collection.name }
             if (entries.isEmpty()) continue
-            val composed = compose(collection, entries.map { it to contents.getValue(it.path) })
-            val count = install(context, legacy, composed) ?: continue
-            counts[collection.name] = count
+            val text = compose(collection, entries.map { it to contents.getValue(it.path) })
+            try {
+                consumer.validate(text)
+            } catch (e: Exception) {
+                throw IllegalStateException(collection.name + " did not validate: " + e.message, e)
+            }
+            composed += Triple(collection.name, consumer, text)
         }
-        check(counts.isNotEmpty()) { "The index carried no database this build knows how to read" }
+        check(composed.isNotEmpty()) { "The index carried no database this build knows how to read" }
+        val counts = LinkedHashMap<String, Int>()
+        for ((name, consumer, text) in composed) counts[name] = consumer.install(context, text)
 
         for ((path, text) in contents) PlatformDatabaseTransport.write(File(cache, path), text)
         PlatformDatabaseTransport.write(File(cache, INDEX_FILE_NAME), indexText)
@@ -168,12 +176,18 @@ object PlatformDatabaseIndex {
         return root.toString(1)
     }
 
-    /** Hands a composed document to its database's own validate-then-replace. Null when nothing here reads it. */
-    private fun install(context: Context, legacyFileName: String, text: String): Int? = when (legacyFileName) {
-        "engines-database.json" -> EnginesDatabase.install(context, text)
-        "platforms-database.json" -> PlatformsDatabase.install(context, text)
-        "players-database.json" -> PlayersDatabaseUpdater.install(context, text)
-        "bios-database.json" -> BiosDatabase.install(context, text)
-        else -> null
+    /**
+     * The documents this build reads, each with its database's own
+     * validation (no write) and validate-then-replace install.
+     */
+    private class Consumer(val validate: (String) -> Int, val install: (Context, String) -> Int)
+
+    private val CONSUMERS: Map<String, Consumer> by lazy {
+        mapOf(
+            "engines-database.json" to Consumer(EnginesDatabase::validate, EnginesDatabase::install),
+            "platforms-database.json" to Consumer(PlatformsDatabase::validate, PlatformsDatabase::install),
+            "players-database.json" to Consumer(PlayersDatabaseUpdater::validate, PlayersDatabaseUpdater::install),
+            "bios-database.json" to Consumer(BiosDatabase::validate, BiosDatabase::install),
+        )
     }
 }

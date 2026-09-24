@@ -1,7 +1,6 @@
 package dev.droidtop.library.consoles
 
 import android.content.Context
-import org.json.JSONObject
 
 /**
  * User-driven refresh of the player database from the droidtop platform-db
@@ -22,10 +21,21 @@ object PlayersDatabaseUpdater {
     fun update(context: Context, url: String = PlatformDatabaseSource.urlFor(context, DB_FILE_NAME)): Int =
         install(context, PlatformDatabaseTransport.get(url))
 
+    /**
+     * Parses [text] with the same parser [KnownPlayers] reads it with, so a
+     * row it would reject (a missing `pkg`, say) fails here rather than
+     * being written and then silently ignored in favour of the seed.
+     * Returns the player count; throws when [text] is not a usable database.
+     */
+    fun validate(text: String): Int {
+        val playerCount = KnownPlayers.parse(text).size
+        check(playerCount > 0) { "Downloaded database has no players — not replacing the current one" }
+        return playerCount
+    }
+
     /** Validates [text] and only then replaces the current copy; see [dev.droidtop.library.EnginesDatabase.install]. */
     fun install(context: Context, text: String): Int {
-        val playerCount = JSONObject(text).getJSONArray("players").length()
-        check(playerCount > 0) { "Downloaded database has no players — not replacing the current one" }
+        val playerCount = validate(text)
         PlatformDatabaseTransport.replace(context, DB_FILE_NAME, text)
         KnownPlayers.invalidate()
         return playerCount

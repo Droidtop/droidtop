@@ -3200,7 +3200,9 @@ changed, composes the monolithic documents the parsers read, and hands
 each to its database's own validate-then-atomically-replace
 (`PlatformDatabaseIndex` → `EnginesDatabase.install` and friends). A
 one-engine fix costs a few hundred bytes; a check with nothing new costs
-one request; a composed document that does not parse changes nothing. A
+one request; every composed document is validated by its database's own
+parser before any is written, so one that does not validate changes
+nothing in any of the four. A
 source that publishes no index falls back to the four whole files, which
 is what a fork or an older commit serves. This runs on the update
 schedule (§ Software updates) as well as from the manual "Update
