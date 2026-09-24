@@ -2949,6 +2949,15 @@ not the client's `steamapps/common/`. Product copy must not promise more.
 
 ## 7b. Onboarding
 
+**The bar: ready to use at the first home screen (directed 2026-09-24).** Onboarding covers,
+clearly and in order, everything a person needs to be up and running the moment they reach the
+home page of the default view they chose: games found, controls understood, the way to launch,
+switch modes and reach the Quick Menu known. Anything that leaves a newcomer thinking "I have to
+look in the settings" or "I don't know how to do this" is a defect to fix, not a documentation
+gap. droidtop has a first-run tutorial for what onboarding cannot ask about (controls, navigation,
+sections, launching, the Quick Menu, switching modes, where help is); its content comes from the
+rig's new-user passes, which try to break onboarding on purpose.
+
 ### What onboarding is for
 
 droidtop onboards the **device**, not one mode. Configuring a mode and choosing the
