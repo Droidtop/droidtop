@@ -18,7 +18,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import dev.droidtop.library.LibraryEntry
@@ -84,7 +83,7 @@ internal fun CompanionIdle(entries: List<LibraryEntry>) {
                 Text(
                     shown.title,
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color.White.copy(alpha = 0.85f),
+                    color = MaterialTheme.colorScheme.onBackground,
                 )
                 val subtitle = shown.systemId
                     ?.let { dev.droidtop.library.consoles.PlatformsDatabase.displayNameOrNull(it) }
@@ -93,7 +92,7 @@ internal fun CompanionIdle(entries: List<LibraryEntry>) {
                     Text(
                         subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.55f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }

@@ -8,11 +8,10 @@ import android.view.KeyEvent
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.droidtop.display.SecondaryDisplayContent
 import dev.droidtop.input.DesktopInputRouter
@@ -25,6 +24,7 @@ import dev.droidtop.input.TrackpadGestureEngine
 import dev.droidtop.input.TrackpadOutput
 import dev.droidtop.input.TrackpadView
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
+import dev.droidtop.shell.gamepad.ChromeColors
 import org.pocketworkstation.pckeyboard.AndroidCharKeyResolver
 
 import org.pocketworkstation.pckeyboard.LatinKeyboardView
@@ -154,7 +154,7 @@ class SecondScreenInputView(
 
     init {
         orientation = VERTICAL
-        setBackgroundColor(android.graphics.Color.BLACK)
+        setBackgroundColor(ChromeColors.DarkBackground.toArgb())
 
         val listener = buildKeyboardListener()
         keyboardListener = listener
@@ -164,7 +164,7 @@ class SecondScreenInputView(
             addView(view, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         }
 
-        status.setTextColor(android.graphics.Color.parseColor("#FF6E7B8B"))
+        status.setTextColor(ChromeColors.DarkOnSurfaceVariant.toArgb())
         status.textSize = 13f
         status.gravity = Gravity.CENTER
         addView(status, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
@@ -303,7 +303,7 @@ class SecondScreenInputView(
 @Composable
 fun SecondScreenInputSurface(mode: SecondaryDisplayContent.Mode) {
     AndroidView(
-        modifier = Modifier.fillMaxSize().background(Color.Black),
+        modifier = Modifier.fillMaxSize(),
         factory = { context -> SecondScreenInputView(context, mode) as View },
     )
 }

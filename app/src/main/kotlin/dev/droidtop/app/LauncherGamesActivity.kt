@@ -30,7 +30,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -178,7 +177,7 @@ private fun GamesGrid(
     onLaunch: (LibraryEntry) -> Unit,
     onPin: (LibraryEntry) -> Unit,
 ) {
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         when {
             games == null -> Message("Reading the library…")
             games.isEmpty() -> Message("No games yet. Add a games folder in droidtop's settings.")
@@ -192,7 +191,7 @@ private fun GamesGrid(
                     Column(
                         modifier = Modifier
                             .clip(RoundedCornerShape(10.dp))
-                            .background(Color.White.copy(alpha = 0.06f))
+                            .background(MaterialTheme.colorScheme.surface)
                             .combinedClickable(
                                 onClick = { onLaunch(entry) },
                                 onLongClick = { onPin(entry) },
@@ -205,7 +204,7 @@ private fun GamesGrid(
                                 .fillMaxWidth()
                                 .aspectRatio(0.75f)
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(Color.White.copy(alpha = 0.08f)),
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
                         ) {
                             if (!entry.artworkUri.isNullOrBlank()) {
                                 AsyncImage(
@@ -218,7 +217,7 @@ private fun GamesGrid(
                                 Text(
                                     entry.title,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = Color.White.copy(alpha = 0.75f),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(8.dp).align(Alignment.Center),
                                     maxLines = 4,
                                     overflow = TextOverflow.Ellipsis,
@@ -228,7 +227,7 @@ private fun GamesGrid(
                         Text(
                             entry.title,
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.85f),
+                            color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(top = 4.dp),
@@ -243,6 +242,6 @@ private fun GamesGrid(
 @Composable
 private fun Message(text: String) {
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        Text(text, color = Color.White.copy(alpha = 0.75f), style = MaterialTheme.typography.bodyLarge)
+        Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
     }
 }

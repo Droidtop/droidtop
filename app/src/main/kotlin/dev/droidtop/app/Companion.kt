@@ -17,7 +17,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -132,7 +131,7 @@ private const val FOCUS_SETTLE_MS = 350L
 
 @Composable
 internal fun CompanionContent(entry: LibraryEntry?) {
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         // Nothing focused: a slow rotation of the user's own library
         // artwork (docs/SPEC.md section 4d, from iiSU's "Show Hero on Idle
         // Bottom Screen"). This used to paint a "droidtop" wordmark, which
@@ -157,39 +156,39 @@ internal fun CompanionContent(entry: LibraryEntry?) {
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text(entry.title, color = Color.White, style = MaterialTheme.typography.headlineLarge)
+                Text(entry.title, color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineLarge)
                 // Real system name (Nintendo 64, PlayStation 2) when this
                 // is a console ROM; the shared kind grouping name otherwise.
                 val systemName = entry.systemId
                     ?.let { id -> PlatformsDatabase.displayNameOrNull(id) }
                     ?: entry.kind.displayName()
-                Text(systemName, color = Color(0xFF9BB4D0), style = MaterialTheme.typography.titleMedium)
+                Text(systemName, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
                 val detailLine = listOfNotNull(
                     entry.developer,
                     entry.releaseDate?.take(4),
                     entry.genre,
                 ).joinToString("  ·  ")
                 if (detailLine.isNotEmpty()) {
-                    Text(detailLine, color = Color.LightGray, style = MaterialTheme.typography.bodyLarge)
+                    Text(detailLine, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
                 }
                 entry.rating?.let { rating ->
                     Text(
                         "★".repeat((rating * 5).toInt().coerceIn(0, 5)) + "☆".repeat(5 - (rating * 5).toInt().coerceIn(0, 5)),
-                        color = Color(0xFFE0C060),
+                        color = MaterialTheme.colorScheme.tertiary,
                         style = MaterialTheme.typography.titleMedium,
                     )
                 }
                 entry.description?.let { description ->
                     Text(
                         description,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 6,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     )
                 }
                 if (entry.playtimeSeconds > 0) {
-                    Text("Played ${entry.playtimeSeconds / 60} min", color = Color.Gray, style = MaterialTheme.typography.bodyLarge)
+                    Text("Played ${entry.playtimeSeconds / 60} min", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
                 }
                 // PC entries carry facts a ROM does not: which store it
                 // came from, how much disk it holds, and what other
@@ -204,13 +203,13 @@ internal fun CompanionContent(entry: LibraryEntry?) {
                     }
                     Text(
                         facts.joinToString("  ·  "),
-                        color = Color(0xFF9BB4D0),
+                        color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     pc.compatibility?.let { compat ->
                         Text(
                             compat.summary(),
-                            color = Color.Gray,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
