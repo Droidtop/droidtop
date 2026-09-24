@@ -6913,9 +6913,8 @@ examples already given:
 - A content-acquisition integration: search a third-party source and add
   the result into one of droidtop's own configured library folders,
   directly from droidtop's own UI, without leaving it.
-- Spotify (real now-playing/control integration -- droidtop already has
-  a real, working Spotify presence client per §7e, a real, concrete
-  precedent for "talk to one specific real third-party app's real API").
+- Media apps such as Spotify (now playing and control through the
+  platform's media session and `MediaBrowserService`, per §7e).
 - A hotspot/tethering app, similarly hookable.
 
 **Two real integration types, per the user's own direction:**
