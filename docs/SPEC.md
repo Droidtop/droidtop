@@ -34,7 +34,7 @@ its group, is placed in numeric order, and gets a line in the contents below.
 - [7a. Remote PC streaming — via windowcast, not a droidtop module](#7a-remote-pc-streaming--via-windowcast-not-a-droidtop-module)
 - [7b. Onboarding](#7b-onboarding)
 - [7c. Wine prefix / container configuration UI](#7c-wine-prefix--container-configuration-ui)
-- [7d. VN/RPG-Maker engine games — JoiPlay support + `enginehost`](#7d-vnrpg-maker-engine-games--joiplay-support--enginehost)
+- [7d. Engine games — enginehost, the contract and the coverage](#7d-engine-games--enginehost-the-contract-and-the-coverage)
 - [7e. Second-screen / ambient integrations (Spotify now-playing, Discord presence)](#7e-second-screen--ambient-integrations-spotify-now-playing-discord-presence)
 - [7e2. Data-driven player/platform database (directed 2026-08-30)](#7e2-data-driven-playerplatform-database-directed-2026-08-30)
 - [7e2b. Launch resolution FROM the platforms database (directed 2026-08-31)](#7e2b-launch-resolution-from-the-platforms-database-directed-2026-08-31)
@@ -3004,91 +3004,188 @@ Two concrete references to build from rather than design blind:
   focused launchers are UX references for `:shell-gamepad` rather than
   code to port.
 
-## 7d. VN/RPG-Maker engine games — JoiPlay support + `enginehost`
+## 7d. Engine games — enginehost, the contract and the coverage
 
-Superseded, corrected understanding — this section previously assumed an
-undocumented JoiPlay launch API existed and hadn't been verified.
-Verification here stayed at the manifest/structural level (`aapt dump`,
-`dumpsys` — what any Android app's public-facing package inspection
-tools show), not a full decompile of JoiPlay's own closed-source
-implementation, since that would likely violate its own ToS/EULA and
-wasn't cleared with the user first.
+An engine game is a folder holding a game written for an interpreter
+(Ren'Py, RPG Maker, KiriKiri, Godot, ...) rather than a ROM for an
+emulator or a Windows binary. droidtop classifies the folder (§7e2b),
+lists it once (§7g, §7m) and ROUTES it; it never runs an engine itself.
+**Enginehost** (`Droidtop/enginehost`, deliberately not droidtop-branded
+because anything may drive it) is the app that runs the game, through a
+per-engine plugin. JoiPlay is permanently out of the launch loop (§7e2):
+it exposes nothing a launcher can call. And nothing about a game folder is
+ever copied, moved or imported by either app; both read it in place.
 
-**Real, confirmed at the manifest/behavioral level** (not guessed):
-- JoiPlay's own "Add Game" import flow is documented (its own site/wiki)
-  to work by picking a game archive through its file browser, and it
-  extracts into its own app storage — **droidtop never observed or relied
-  on any way to add a game to JoiPlay's catalog without a real copy
-  landing in JoiPlay's own storage.**
-- **Per explicit, repeated, non-negotiable direction: droidtop must never
-  copy, move, or otherwise duplicate a user's game files as part of any
-  integration** — this rules out driving JoiPlay's own import
-  automatically, copy-based or otherwise. Symlinks on Android shared
-  storage were tested directly on a real device and don't work either
-  (`ln`: "Function not implemented" — a FUSE storage-layer limitation,
-  not a permissions issue). Root was considered and explicitly rejected
-  as a "solution" — it works on the one dev device, but isn't a real
-  answer for other users.
-- JoiPlay ships separate plugin APKs per engine (RPG Maker, Ren'Py, Flash,
-  etc., confirmed via `pm list packages` on the real test device) — a
-  real, standard Android app-plugin pattern (a shared intent-filter
-  action + package discovery), the same general shape `enginehost`'s own
-  plugin system below uses. No shipped JoiPlay plugin exists for KiriKiri
-  anywhere (confirmed: not installed on the real test device, and the
-  one public attempt in JoiPlay's own GitHub org has been inactive since
-  2022 with no real plugin wiring committed) — a real, confirmed gap
-  worth droidtop filling itself.
+### The contract droidtop uses
 
-**Conclusion, and the actual current design**: JoiPlay is a good,
-independent, user-facing project worth supporting as-is, not routing
-around — droidtop does not try to automate its import. **`enginehost`**
-(a separate, standalone repo — `bi0shacker001/enginehost`, deliberately
-NOT droidtop-branded, since it's meant to be usable by anything, not just
-droidtop) is droidtop's own answer for the cases JoiPlay doesn't cover
-programmatically:
+Enginehost's surface is Intents and one content provider, and the rule
+both apps hold to is that **any flow in Enginehost's UI has a programmatic
+equivalent, and vice versa** (its README). What droidtop calls:
 
-- **The whole contract**: fire `ACTION dev.enginehost.LAUNCH` with a
-  `path` extra (an absolute folder) and optionally an inline `config`
-  JSON extra (used only if the folder has no `enginehost.json` of its
-  own — the folder's own file always wins). No catalog, no import step,
-  nothing about the folder ever copied or moved.
-- **Plugins are separate, manually-installed apps, each its own repo**,
-  discovered via `PackageManager` (the same real mechanism JoiPlay's own
-  plugin system uses) — identified by `(engine, engineVersion,
-  pluginVersion)`. Resolution: exact `engineVersion` match, else nearest;
-  an optional per-game `pluginVersion` constraint (comma-separated exact
-  versions and/or ranges) lets a game exclude specific plugin builds it's
-  known to regress on, independent of engine version — the real
-  motivating case being JoiPlay's own RPG Maker plugin reportedly
-  regressing specific games in newer builds.
-- **Full detail, methodology, and current status**: see
-  `/root/coordination/HANDOFF.md`'s own "ES-DE theme engine" and
-  "enginehost" sections (kept up to date there, not duplicated here) —
-  and `enginehost`'s own README for the real contract spec.
-- **Real engine coverage plan, replacing the old Pythia-derived
-  RENPY/RPG_MAKER_MV/MZ/VX_ACE-only detection**:
-  - **KiriKiri** (`kirikiroid2-joiplay`, a fork of Kirikiroid2Yuri) — the
-    one confirmed real gap in JoiPlay's own ecosystem. Plugin shell real
-    and discovered correctly by enginehost; engine not wired up yet
-    (blocked on finding how to point Kirikiroid2's native init at an
-    arbitrary runtime folder — see handoff doc).
-  - **RPG Maker XP/VX/VX Ace** via `mkxp-z` (the same real open-source
-    engine JoiPlay's own plugin wraps) — covers Monster Girl Quest
-    Paradox (confirmed VX Ace). Not started.
-  - **Ren'Py** via a fork of the real upstream engine
-    (`bi0shacker001/renpy`) — `master` auto-syncs with upstream,
-    `plugin/renpy8` branch exists for the real Android patches (not
-    written yet).
-  - Detection signatures for these (and RPG Maker 2000/2003 via
-    EasyRPG's own real engine, WOLF RPG, TyranoBuilder, NScripter) were
-    researched and confirmed against real project docs this session —
-    see handoff doc for the verified per-engine file signatures.
-- **`LibraryEntryKind` stays named per-engine, not per-launcher** (as
-  before) — a droidtop `LibraryProvider` detecting a folder can hand off
-  either to JoiPlay (foreground-launch only, letting the user add it via
-  JoiPlay's own UI if they choose) or to an installed enginehost plugin
-  via the contract above, without the entry's own kind needing to know
-  which.
+- `dev.enginehost.LAUNCH` with `path` (the game folder), an optional
+  `config` (an `enginehost.json`-shaped string that fills only what the
+  folder's own file omits; the file always wins) and `autoinstallPlugin`
+  (when true, a missing plugin is offered from the catalog instead of a
+  bare failure). droidtop fills `config` from the game record's launch
+  facts — engine, context, version, executable, runtime requirements —
+  so a folder with no `enginehost.json` still launches; Enginehost writes
+  the file itself when detection is complete and opens its config editor
+  only for a folder that leaves a question open.
+- `dev.enginehost.CONFIGURE` with the same `path`: the config editor,
+  for "Engine settings" on the game's detail (§7i).
+- `dev.enginehost.CONFIGURE_SETTINGS` and `CONFIGURE_SAVES`: the host's
+  settings, for the rows droidtop does not model twice.
+- `content://dev.enginehost.capabilities/installed`: one row per
+  capability of every installed bundle — bundle id, the engine THAT
+  CAPABILITY serves (a web bundle serves `html`, `rpgmaker` and
+  `flash_air` at once, and each row names its own), context, plugin
+  version, runtime version, the exact versions, series and ranges it
+  supports, whether it accepts any engine version, its runtime
+  components, origin, and its trust state (approved, pending, denied).
+  droidtop reads it to annotate a game's enginehost runner as Ready,
+  Needs setup or Not for this game (§7i), reading ranges as objects and
+  "accepts any version" as covering every version; the list is advisory,
+  and droidtop never refuses a launch Enginehost would resolve.
+- `dev.enginehost.UPDATE_NOW` (§10b), the forced update pass over adb.
+- **The outcome comes back.** A launch Enginehost cannot start —
+  the folder is gone, the executable is missing, no plugin covers the
+  version, the plugin is not approved, the save root is unwritable —
+  is reported to the caller as well as on Enginehost's own launch
+  screen: a broadcast `dev.enginehost.LAUNCH_RESULT`, sent to the
+  calling package only, carrying `path`, an `outcome` (`started`,
+  `failed`, `detour`) and the same one-sentence `reason` the screen
+  shows. droidtop shows that sentence in its own launch failure path,
+  so a person who launched from the shell learns what happened where
+  they pressed A, and a detour (the catalog, the trust screen, the
+  editor) is Enginehost's screen in front, by design.
+- Per-engine controls and saves are Enginehost screens droidtop links
+  to, so they are exported: `dev.enginehost.CONTROLLER` with `engine`
+  and `engineContext` opens that scope's mapping, and
+  `dev.enginehost.SAVES` with `path` opens the game's save location.
+  droidtop's detail rows say "opens enginehost's controls for this
+  engine" and mean it.
+
+### Plugins are signed bundles, not apps
+
+A plugin is a signed `*.enginehost.tar.xz` engine bundle (an earlier
+version of this section said "separate apps discovered via
+PackageManager"; that was the design before bundles and is wrong).
+Enginehost verifies the manifest's P-256 signature against the key pinned
+for the bundle's origin, extracts into its private storage, and runs the
+approved entrypoint in its own `:runtime` process under its own UID;
+approval is bound to the exact archive digest and signer and is the hard
+gate (enginehost's `docs/engine-bundle-format.md` and
+`docs/plugin-catalog.md` are the normative documents). Resolution is
+exact: a capability serves its bundled runtime version plus only the
+exact versions, series (`8.2` covers `8.2.*`, never `8.3`) and ranges it
+declares, preferring the exact runtime, then the narrowest span, then the
+newest build the game's own `pluginVersion` allowlist permits. There is
+no "nearest version" fallback, and droidtop's `versionSelectorFallback`
+exists for the one engine family (KiriKiri) whose games carry no version
+at all. Every bundle ships arm64-v8a AND x86_64 (enginehost's standing
+rule), enforced by the bundle builder and refused by the host at install
+when a native bundle lacks the device's ABI. Updates within one bundle id
+replace in place; a different id coexists; approval never carries over.
+
+### One registry, both apps
+
+`engines-database.json` from droidtop-platforms is the single
+classification authority for droidtop's scan and Enginehost's launch
+(§7e2b, v5). Each app seeds from its own submodule pin and refreshes from
+the same index; the two pins are moved by the same weekly job so the
+seeds never drift by more than a week, and both apps' unit tests parse
+the shipped seed. Rows an app's id map does not know are skipped by that
+app: `rpgmaker-mvmz` and `flash-swf` are Enginehost-only by design, and
+a family the host does not name (display name, controller scope, default
+origin and key) is not a family the host runs, whatever the row says.
+Enrichment (RGSS version from `Game.ini`, `vc_version.py`, the GDPC
+trailer) runs after classification and never changes it. The two
+interpreters agree on rules OR / conditions AND / file order, and their
+builtins agree on what they accept (`.htm` and `.html` alike, the same
+Godot pack test, the same depth cap), because a folder that scans as one
+engine and launches as another is the defect v5 exists to prevent.
+
+### Coverage: what runs where
+
+Every engine row in the registry routes to at least one runner (§7i).
+The table is the design; a row's `strategies` list carries it as data.
+
+| Engine family | Runner | Plugin line(s) |
+| --- | --- | --- |
+| Ren'Py 7.3 to 7.8, 8.0 to 8.5 | enginehost | `enginehost-renpy-plugin`, one `plugin/<minor>` per line. Ren'Py 6.99 to 7.2 games are served by the 7.3 line, whose capability declares that range: Ren'Py's Python 2 runtime runs the earlier scripts, and a separate line per dead minor is upkeep for nothing. |
+| Godot 4.0 to 4.7 | enginehost | `enginehost-godot-plugin`, one line per minor (GDScript tokens are refused across minors). Godot 3.x games exist in real libraries, so a 3.6 line is in scope; .NET exports are not (no Mono runtime on Android arm64 worth carrying). |
+| RPG Maker 2000/2003 | enginehost | `enginehost-rpgmaker-easyrpg-plugin` (EasyRPG Player) |
+| RPG Maker XP/VX/VX Ace | enginehost | `enginehost-rpgmaker-mkxp-z-plugin` (mkxp-z; Ruby 1.9.2 and 3.1.3 as runtime components) |
+| RPG Maker MV/MZ | enginehost | `enginehost-rpgmaker-mv-mz-plugin` (a WebView shell; browser storage mapped to the save folder) |
+| KiriKiri 2 / KAG3 | enginehost, Kirikiroid2 | `enginehost-kirikiri-plugin` (Kirikiroid2 lineage). Kirikiroid2 as an installed app is offered only as "opens the app, not the game" (§7i). KiriKiri Z is out until a port exists. |
+| Buriko / Ethornell (AUGUST) | enginehost | `enginehost-buriko-plugin` (OpenBGI) |
+| CatSystem2 | enginehost | `enginehost-catsystem2-plugin` (droidtop's own scene player) |
+| CMVS (PS2/PS3 scripts) | enginehost | `enginehost-cmvs-plugin` (droidtop's own engine) |
+| NScripter / ONScripter | enginehost | `enginehost-nscripter-plugin` (OnscripterYuri); a default origin with a certified key, a named family and an `ons_*` controller scope in the host, like every other family. |
+| HTML games, Twine 2.x, TyranoScript, Construct 2/3, Visual Novel Maker, NW.js/Electron packages | enginehost | `enginehost-html-plugin`: one WebView runtime, one capability per format. The registry rows for TyranoScript, Construct, Visual Novel Maker and `nwjs-electron` route to it (enginehost family `html` with a context each) rather than to Wine. |
+| Flash and AIR, plain SWF | enginehost | `enginehost-flash-air-plugin` (Ruffle); `flash-swf` is Enginehost's row, a lone `.swf` stays a players-database file. |
+| Unity, Unreal, WOLF RPG, Artemis/Live2D, GameMaker, Siglus, LiveMaker, RAGS and the other Windows-only engines in the registry | Wine (§5b), a native Linux build in a container where one exists (§5a) | none: no portable interpreter exists, and Enginehost's rule is that a plugin embeds a real implementation of its engine, never a Wine hand-off |
+| DOS, ScummVM engines, J2ME, and every other emulated platform | an emulator from the players database (§7e2) | not engine games |
+
+"Complete" for coverage means: on an unrooted arm64 handheld every
+engine game in a real library has a runner whose row reads Ready or
+Needs setup with a named action, and a game whose only route needs
+something this device cannot do says so with the reason (§7i). It does
+not mean every plugin line has a stable release: a line is published to
+`testing` on device evidence and to `stable` at 1.0 (§10b), and until
+then the catalog's channel picker says which lines hold what.
+
+### What droidtop requires of Enginehost, and Enginehost's own rules
+
+Enginehost is a complete app on its own and its own repository owns its
+decisions; this list is the part of them droidtop depends on, stated once
+so neither app assumes the other:
+
+- **Preflight before the engine.** A launch checks the all-files grant,
+  that the folder and the executable exist and that the save folder can
+  be created, and turns each failure into a sentence, before any engine
+  code runs; a bad path is never a native crash reported afterwards.
+- **The one-game rule survives process death**, so relaunching the game
+  droidtop shows as running brings it back rather than ending it; and a
+  finished game ends its `:runtime` process, so the next launch never
+  waits on, or loads into, a live one.
+- **The runtime activity declares every configuration change**
+  (keyboard, navigation, ui mode, density, screen layout, smallest
+  screen size, orientation, screen size), because a pad attaching or a
+  dark-mode toggle must not recreate the Activity inside a live engine.
+- **The update pass runs on the schedule the person set** (§10b), from
+  a scheduled job and not only when the home screen is opened, so an
+  install that is only ever driven by droidtop still checks; an
+  auto-installed bundle never replaces one a running game is using, and
+  a working game is never demoted to a trust prompt without a notice on
+  the home screen saying an update is waiting for approval.
+- **Saves**: Enginehost changes no engine's save logic; it makes SYSTEM
+  locations (user data dirs, app-private dirs, browser storage) mean a
+  folder the person chose, and engines that save beside the game keep
+  doing so (its CLAUDE.md rule). droidtop's "Saves" row opens that
+  location and models nothing of its own.
+- **Controller**: the host's map speaks each engine's own vocabulary
+  (`rgss_*`, `mvmz_*`, `cs2_*`, `cmvs_*`, `ons_*`, the common set for the
+  rest) and every plugin that reads the map reads its engine's ids; a
+  bypass engine (one whose runtime maps a pad itself: Ren'Py, Godot,
+  EasyRPG) reads no map and the controller screen says so beside it.
+- **The engine sandbox direction** (decided 2026-09-24 in Enginehost):
+  engine code must not have internet access or arbitrary file access;
+  the host does the reads a launch needs. Today the `:runtime` process
+  inherits both under the app's UID; nothing widens that, and
+  `dev.enginehost.LAUNCH` stays open to any app by design.
+- **Its surface is the shared design language** (`docs/DESIGN-LANGUAGE.md`,
+  §7j, §7k): fully pad-driven with a docked hint row on every screen, one
+  focus token, B back by every route, a dark palette resolved from the
+  same role names droidtop uses so the two apps read as one system, no
+  system bar over a game, two-step confirmation on every destructive
+  control, display names rather than bundle ids and URLs in primary text,
+  the channel chosen in one place, and a home screen that IS the library
+  (every game added, scanned or launched, most recent first).
+- **What is published is a release build**, with the same signing-key
+  continuity, rolling `latest` and `release-info.json` shape as droidtop
+  (§10b); the debug installer activities live in the debug source set
+  only.
 
 ## 7e. Second-screen / ambient integrations (Spotify now-playing, Discord presence)
 
