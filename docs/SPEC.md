@@ -1465,16 +1465,25 @@ not settled designs):
 **Decided (2026-09-24), so each has one shape:**
 
 - **Printing.** CUPS is an option in the primary container's provisioning
-  plan (`CompositorProvisioning.plan`, a "Printing" switch on the
-  container's page, §3d) and its socket is bound into every sibling at the
-  same path as in the primary, so a program in any container prints
-  through the primary's CUPS like a program on any Linux desktop. Printers
-  are configured with CUPS's own web page opened in the container's
-  browser, which droidtop links to from the same row. Container printers
-  are **not** exposed back to Android as a `PrintService`: Android apps
-  already print through the platform's framework and IPP Everywhere, and a
-  second print path with its own driver model is duplication for no case
-  the standing test names.
+  plan (`CompositorProvisioning.plan(..., printing)`, the "Printing" switch
+  on the primary's entry in the container manager, §3d, kept in
+  `DesktopSetupPrefs`). Switching it changes the plan, so the next desktop
+  start installs and configures CUPS, and the boot script starts `cupsd`
+  (the plan's `daemons`) before the compositor. cupsd also listens on
+  `cups.sock` in the shared socket directory (`ContainerLayout.CUPS_SOCKET`)
+  and every container's processes get `CUPS_SERVER` pointing at it
+  (`ContainerLayout.clientEnvironment`), so a program in any container
+  prints through the primary's CUPS like a program on any Linux desktop,
+  through the same shared directory as the compositor rather than a bind
+  of its own. Printers are added in CUPS's own web interface, which moves
+  to `127.0.0.1:6310` (Android refuses an app a port below 1024) and is
+  opened in Android's browser from the same row: a proot container shares
+  the device's network, and no container is provisioned with a browser.
+  Where CUPS asks for a login the container cannot give, `lpadmin` in the
+  terminal adds the printer. Container printers are **not** exposed back
+  to Android as a `PrintService`: Android apps already print through the
+  platform's framework and IPP Everywhere, and a second print path with
+  its own driver model is duplication for no case the standing test names.
 - **USB peripherals.** A "Devices" row on a container's page (§3d) lists
   the device nodes Android currently exposes and lets each be bound into
   that container, one at a time; under `DroidSpacesRuntime` that is a real

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -230,6 +231,58 @@ private fun ContainerRow(
             }
         }
         dev.droidtop.app.vpn.ContainerVpnRow(info.container.id, hostSocketDir, enabled = actionsEnabled)
+        if (info.container.role == ContainerRole.PRIMARY) PrintingRow(enabled = actionsEnabled)
+    }
+}
+
+/**
+ * Printing (docs/SPEC.md 4b): CUPS in the primary's provisioning plan,
+ * shared with every container through the socket directory. The switch
+ * changes the plan, which the next desktop start provisions. Printers are
+ * added in CUPS's own web interface, which listens on the device's
+ * loopback because a proot container shares the device's network.
+ */
+@Composable
+private fun PrintingRow(enabled: Boolean) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var printing by remember { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(Unit) { printing = withContext(Dispatchers.IO) { DesktopSetupPrefs.printing(context) } }
+    val on = printing ?: return
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 48.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Printing", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                if (on) {
+                    "CUPS, for every container. Installed or removed the next time the desktop starts."
+                } else {
+                    "Off. Turn on to install CUPS the next time the desktop starts."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (on) {
+                TextButton(onClick = {
+                    context.startActivity(
+                        android.content.Intent(
+                            android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse("http://127.0.0.1:${dev.droidtop.runtime.CompositorProvisioning.PRINTING_WEB_PORT}/admin"),
+                        ),
+                    )
+                }) { Text("Add a printer") }
+            }
+        }
+        androidx.compose.material3.Switch(
+            checked = on,
+            enabled = enabled,
+            onCheckedChange = { value ->
+                printing = value
+                scope.launch(Dispatchers.IO) { DesktopSetupPrefs.setPrinting(context, value) }
+            },
+        )
     }
 }
 

@@ -431,6 +431,7 @@ class ProotRuntime(
         val config = readConfig(name)
         config[KEY_INSTALL] = provisioning.installCommand
         config[KEY_COMPOSITOR] = provisioning.compositorCommand
+        config[KEY_DAEMONS] = provisioning.daemons.joinToString("\n")
         configOf(name).outputStream().use { config.store(it, "droidtop proot container") }
     }
 
@@ -438,7 +439,8 @@ class ProotRuntime(
         val config = readConfig(name)
         val install = config.getProperty(KEY_INSTALL) ?: return@withContext null
         val compositor = config.getProperty(KEY_COMPOSITOR) ?: return@withContext null
-        PrimaryProvisioning(install, compositor)
+        val daemons = config.getProperty(KEY_DAEMONS).orEmpty().lines().filter { it.isNotBlank() }
+        PrimaryProvisioning(install, compositor, daemons)
     }
 
     private fun requireRootfs(container: Container) {
@@ -524,6 +526,7 @@ class ProotRuntime(
         private const val KEY_IMAGE = "image"
         private const val KEY_INSTALL = "provision.install"
         private const val KEY_COMPOSITOR = "provision.compositor"
+        private const val KEY_DAEMONS = "provision.daemons"
 
         private const val CHECK_TOKEN = "droidtop-proot-ok"
         private const val CHECK_TIMEOUT_S = 30L

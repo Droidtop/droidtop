@@ -11,6 +11,12 @@ package dev.droidtop.runtime
 data class PrimaryProvisioning(
     val installCommand: String,
     val compositorCommand: String,
+    /**
+     * Daemons the boot script starts before the compositor, each a
+     * command that puts itself in the background (a container has no
+     * service manager to do it). Printing's `cupsd` is the one today.
+     */
+    val daemons: List<String> = emptyList(),
 )
 
 /**
@@ -50,7 +56,42 @@ object CompositorProvisioning {
     private const val DEBIAN_NO_SERVICE_STARTS =
         "printf '#!/bin/sh\\nexit 101\\n' > /usr/sbin/policy-rc.d && chmod 755 /usr/sbin/policy-rc.d"
 
-    fun plan(os: String, desktopEnvironment: String): PrimaryProvisioning? {
+    /** CUPS's own package name, the same in both distros droidtop provisions. */
+    const val PRINTING_PACKAGE = "cups"
+
+    /** Where CUPS's web interface listens: a port an app may bind (Android refuses 631, below 1024). */
+    const val PRINTING_WEB_PORT = 6310
+
+    /**
+     * cupsd.conf edits, idempotent so a re-provision does not repeat them:
+     * cupsd also listens on [ContainerLayout.CUPS_SOCKET] in the shared
+     * socket directory, which is how every container prints through the
+     * primary's CUPS ([ContainerLayout.clientEnvironment] points clients
+     * at it), and its web interface moves to [PRINTING_WEB_PORT].
+     */
+    private val CUPS_CONFIGURE =
+        "sed -i 's/^Listen localhost:631\$/Listen 127.0.0.1:$PRINTING_WEB_PORT/' /etc/cups/cupsd.conf && " +
+            "{ grep -q '^Listen ${ContainerLayout.SOCKET_DIR}/${ContainerLayout.CUPS_SOCKET}\$' /etc/cups/cupsd.conf || " +
+            "echo 'Listen ${ContainerLayout.SOCKET_DIR}/${ContainerLayout.CUPS_SOCKET}' >> /etc/cups/cupsd.conf; }"
+
+    /**
+     * [printing] adds CUPS to the plan (docs/SPEC.md 4b, the "Printing"
+     * switch on the primary's entry in the container manager): its package,
+     * its configuration, and `cupsd` among the daemons. Turning it on or
+     * off changes the plan, which the boot script notices and re-runs.
+     */
+    fun plan(os: String, desktopEnvironment: String, printing: Boolean = false): PrimaryProvisioning? {
+        val base = basePlan(os, desktopEnvironment) ?: return null
+        if (!printing) return base
+        val install = when (os) {
+            "debian" -> "${base.installCommand} && apt-get install -y --no-install-recommends $PRINTING_PACKAGE"
+            "alpine" -> "${base.installCommand} && apk add --no-cache $PRINTING_PACKAGE"
+            else -> return base
+        }
+        return base.copy(installCommand = "$install && $CUPS_CONFIGURE", daemons = base.daemons + "cupsd")
+    }
+
+    private fun basePlan(os: String, desktopEnvironment: String): PrimaryProvisioning? {
         val terminal = ContainerTerminal.PACKAGE
         return when (os to desktopEnvironment) {
             "debian" to "sway" -> PrimaryProvisioning(

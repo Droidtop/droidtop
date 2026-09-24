@@ -216,7 +216,7 @@ class DesktopSessionService : Service() {
     private fun provisioningFor(repository: KnownImageRepository): PrimaryProvisioning {
         val desktopEnvironment = repository.desktopEnvironment
             ?: error("PRIMARY entry ${repository.id} has no desktopEnvironment set")
-        return CompositorProvisioning.plan(repository.os, desktopEnvironment)
+        return CompositorProvisioning.plan(repository.os, desktopEnvironment, DesktopSetupPrefs.printing(applicationContext))
             ?: error("No known compositor provisioning for ${repository.os}/$desktopEnvironment")
     }
 

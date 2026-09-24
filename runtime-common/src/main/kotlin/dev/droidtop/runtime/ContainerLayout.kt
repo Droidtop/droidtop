@@ -31,6 +31,13 @@ object ContainerLayout {
      */
     const val VPN_SOCKET = "vpn.sock"
 
+    /**
+     * The primary's CUPS, under [SOCKET_DIR] so every container prints
+     * through it ([CompositorProvisioning.plan] with printing on; clients
+     * find it through `CUPS_SERVER`, [clientEnvironment]).
+     */
+    const val CUPS_SOCKET = "cups.sock"
+
     /** Where the app's private storage root (`Context.getFilesDir()`) appears inside every container. */
     const val APP_STORAGE_DIR = "/run/droidtop-app-storage"
 
@@ -80,10 +87,14 @@ object ContainerLayout {
      * Environment every process droidtop starts in a container gets, so a
      * Wayland client reaches the primary compositor: [SOCKET_DIR] as
      * `XDG_RUNTIME_DIR`, and the socket's name ([findWaylandSocket]) as
-     * `WAYLAND_DISPLAY` once the compositor has created it.
+     * `WAYLAND_DISPLAY` once the compositor has created it, and CUPS's
+     * shared socket as `CUPS_SERVER`.
      */
     fun clientEnvironment(waylandSocketName: String?): Map<String, String> = buildMap {
         put("XDG_RUNTIME_DIR", SOCKET_DIR)
+        // CUPS clients take a socket path here. With printing off nothing
+        // listens there, which to a program is the same as no CUPS.
+        put("CUPS_SERVER", "$SOCKET_DIR/$CUPS_SOCKET")
         waylandSocketName?.let { put("WAYLAND_DISPLAY", it) }
     }
 
@@ -140,6 +151,11 @@ object ContainerLayout {
         appendLine("mkdir -p $SOCKET_DIR")
         appendLine("chmod 700 $SOCKET_DIR")
         compositorEnvironment.forEach { (key, value) -> appendLine("export $key=$value") }
+        // Each daemon backgrounds itself; one that fails to start is
+        // reported and the desktop comes up without it.
+        provisioning.daemons.forEach { daemon ->
+            appendLine("$daemon || echo 'droidtop: $daemon did not start' >&2")
+        }
         // The compositor creates the socket; a WAYLAND_DISPLAY inherited
         // from the client environment would only name the one it is about
         // to create.
