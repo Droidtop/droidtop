@@ -16,6 +16,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.core.graphics.drawable.toBitmap
 import dev.droidtop.shell.gamepad.Measure
@@ -83,8 +85,16 @@ internal fun SelectableRow(
                 Text(it, color = MenuTokens.OnSurfaceMuted, style = TypeRole.supporting)
             }
         }
+        // The chosen answer carries the check the shell's chips use for
+        // "this is on" (ShellChip), not a word in a different blue (UI
+        // pass 2026-09-24, L11); the accent ring stays for focus alone.
         if (selected && trailing == null) {
-            Text("Selected", color = MenuTokens.Accent, style = TypeRole.supporting)
+            Text(
+                "\u2713",
+                color = MenuTokens.Accent,
+                style = TypeRole.rowTitle,
+                modifier = Modifier.semantics { contentDescription = "Chosen" },
+            )
         }
         trailing?.invoke()
     }

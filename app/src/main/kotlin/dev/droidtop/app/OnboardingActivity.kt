@@ -1481,7 +1481,7 @@ private fun ControllerStep(
 
         StepSectionLabel("Which button means yes")
         StepNote(
-            "Android tells droidtop where a button IS, not what is printed on it, so this is " +
+            "Android tells droidtop where a button is, not what is printed on it, so this is " +
                 "the one thing it cannot work out for you.",
         )
         // Marked only once the question HAS an answer. The preference
