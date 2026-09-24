@@ -4725,13 +4725,17 @@ one mechanism.
 one-shot device actions — network, volume, brightness, Do Not Disturb,
 VPN, Bluetooth, Swap screens, Reinitialize displays — are rendered by
 the Quick Menu's System tab only: the catalog's System group carries a
-`quickOnly` flag and the Settings section skips it, keeping under System
-just Screens (main screen, game launch target, second-screen roles),
-Software updates and Android settings. One-shot library actions live in
+`quickOnly` flag and every Settings renderer skips it
+(`GamingSettingsCatalog.settingsGroups`), keeping under System just
+Screens (main screen, game launch target, second-screen roles), Software
+updates and Android settings. The Quick Menu shows those configuration
+rows too, by id (`QuickTiles.CONFIGURATION_IDS`), as the same items. One-shot library actions live in
 the options menu of the list they act on and on the folder pages —
-Rescan library and Scrape all systems in the Games section's options
-menu (and Rescan on Game folders, the same item by id), Scrape this
-system and Find orphaned media in a system's gamelist options menu — and
+Rescan library, Scrape all systems and Find orphaned media in the Games
+section's options menu (and Rescan on Game folders, the same item by id;
+orphaned media is one row that finds on the first A and deletes on the
+second, recomputing first), Scrape this system in a system's gamelist
+options menu — and
 the Settings section keeps no action rows but Check now (updates),
 Update platform databases and Rebuild the library index (Data). A
 setting exists in one place and a count is one number: the carousel and

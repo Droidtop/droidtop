@@ -239,6 +239,12 @@ data class CatalogGroup(
     val id: String,
     val title: String?,
     val items: List<CatalogItem>,
+    /**
+     * Live device state and one-shot device actions, rendered by the
+     * Quick Menu's System tab and skipped by every Settings renderer:
+     * Settings is configuration (docs/SPEC.md 7f, "Where things live").
+     */
+    val quickOnly: Boolean = false,
 )
 
 /**

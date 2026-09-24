@@ -41,7 +41,7 @@ public final class SettingsGamingFragment : AbstractSettingsFragment() {
         preferenceManager.sharedPreferencesName = LauncherFiles.SHARED_PREFERENCES_KEY
         val nav = CatalogPreferenceNavigator(
             fragment = this,
-            rootGroups = { ctx -> GamingSettingsCatalog.groups(ctx) },
+            rootGroups = { ctx -> GamingSettingsCatalog.settingsGroups(ctx) },
             skipGroupIds = setOf(GamingSettingsCatalog.GROUP_GLOBAL),
         )
         navigator = nav
