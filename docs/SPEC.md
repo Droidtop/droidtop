@@ -869,6 +869,216 @@ the `ContainerRuntime` interface that already exists (§3):
 - The desktop session's PRIMARY container is listed like everything else
   but guarded (can't be deleted while it's the active desktop).
 
+## 4. Display
+
+- One `DisplayOutput` per Android `Display` the device currently has: the
+  built-in screen, the Retroid-style second screen (via Android's
+  `DisplayManager`/`Presentation` API — the standard, currently-supported
+  mechanism; verify the actual accessory enumerates as a normal secondary
+  `Display` before building against it), or an external lapdock monitor over
+  USB-C DisplayPort alt mode (also a standard secondary `Display` from
+  Android's point of view).
+- **"Second screen" is a physical position (upper = output, lower = input
+  by default on a Retroid-style device), not whichever `Display` Android
+  happens to enumerate second** — `DisplayManager` assigns display IDs by
+  connection/registration order, which is not guaranteed to match physical
+  upper/lower position, so the two must never be conflated in code.
+  droidtop's own upper/lower role assignment needs manual override, not
+  just auto-detected enumeration order, plus a persisted per-output (or
+  per-app) choice — not trusting auto-detection alone. [Mjolnir](
+  https://github.com/blacksheepmvp/mjolnir) (a companion dual-screen
+  home-launcher-routing tool) is a concrete reference for the same
+  problem.
+- Each `DisplayOutput` maps to one headless output inside the primary
+  container's compositor (whichever the user's configured — see §2).
+- **Default**: every window is placed on the primary screen's output —
+  `WindowPlacement.merged()` — one shared desktop, nothing hidden away.
+- **Opt-in**: any window can be reassigned to a different `DisplayOutput` at
+  runtime (fullscreen or windowed) without touching the process/container
+  that owns it — this is sway reassigning a surface to a different headless
+  output, a compositor-side operation, not something `:host-bridge` or the
+  owning app needs to know about.
+- **Configurable per-output role, KDE KScreen-modeled**: which screen shows
+  what isn't hardcoded — the user configures, per `DisplayOutput`, whether
+  it mirrors the primary, presents an independent `SecondaryDisplayLauncher`
+  instance (see below), or is a dedicated compositor output. Named/labeled
+  identity per output ("the Retroid's second screen," "the lapdock
+  monitor") is a first-class, persisted setting, not just an enumerated
+  `Display` id — matching how KDE's System Settings → Display & Monitor
+  lets a user name and assign roles to each physical output rather than
+  just listing them by number. This configuration lives in the Standard
+  shell's own settings menu (`com.android.launcher3.settings.
+  SettingsActivity`, forked in with `:shell-default` — see §9); droidtop
+  does not have or want a separate standalone settings app (§7).
+- **Real hook already exists, not hypothetical**: AOSP Launcher3 (and so
+  `:shell-default`, its fork) already ships
+  `com.android.launcher3.secondarydisplay.SecondaryDisplayLauncher` — a
+  `SECONDARY_HOME`-category `Activity`, Android's own standard mechanism
+  for a launcher to provide a home screen on a secondary `Display`. The
+  droidtop-specific multi-display patch work is wiring this existing
+  Activity to our `DisplayOutput`/mirror-vs-independent configuration
+  model, not building secondary-display launcher support from nothing.
+- **Dual-screen input/output split** (Retroid-style second-screen
+  accessory): the **upper** physical screen is the default visual output;
+  the **lower** physical screen defaults to a trackpad/keyboard *input*
+  surface for whatever's showing on the upper one, per §6's
+  `AbsoluteTouchContext`/`RelativeTouchContext` split — not automatically a
+  second desktop, and not assumed to be "whichever `Display` enumerates
+  second" (see the physical-position note above — needs the same manual-
+  override-plus-persisted-choice treatment Mjolnir uses, not a fixed
+  mapping). Making the lower screen an independent output (its own
+  `SecondaryDisplayLauncher` or mirrored desktop) is one of the per-output
+  roles above, opt-in like everything else in this section.
+  - **Concrete for Desktop mode specifically** (BUILT — see §6c): the
+    lower screen's default input role is a *persistent* on-screen keyboard
+    (the forked Hacker's Keyboard's own `LatinKeyboardView` — see §6) plus
+    a trackpad region beneath it, always available rather than popping up
+    only when a text field is focused. That last part is not achievable as
+    an IME window — Android places those itself, §6c has the detail — so
+    it is an ordinary droidtop window on that display, and droidtop's IME
+    is told to stop drawing over the primary one while it is up.
+    **Toggleable**: "Second screen in Desktop mode" and "Second screen in
+    Gaming mode" in settings choose between this input surface and the
+    companion/widgets surface, per mode, per the per-output role model
+    above. Gaming defaults to the companion, Desktop to input.
+- **Gaming dual-screen roles (directed 2026-08-30, first live addon
+  session)**: when the Dual-Screen Add-On (or any second display) is
+  present, the GAMING SHELL ITSELF moves to it — the addon is the
+  upper/main screen — and the built-in screen becomes the
+  widgets/ambient-info surface (FocusCompanion/PresencePanel tenants,
+  §7e), the inverse of a phone-style "companion on the accessory"
+  model. Desktop mode relocates the same way as of 2026-09-02 (its
+  output renders on the addon/external panel, the built-in panel keeps
+  the input surface role — §4c, external screen priority); it stays
+  exempt only from per-launch GAME display targeting, since its windows
+  are the compositor's job. Additionally,
+  **launch-display targeting is a launcher-wide capability**: every
+  launch (console ROM players via `ActivityOptions.setLaunchDisplayId`,
+  engine/native/Wine launches alike) targets a configured display,
+  defaulting to wherever the shell is. All of it is user-configurable —
+  the §4 per-output role/mapping UI is now required, not deferred:
+  which display hosts the shell, which hosts widgets, and where games
+  launch. Hardware findings from the first session: the addon
+  enumerates as a presentation-category EXTERNAL display ("DP Screen",
+  1080×1920 native per DRM) but can come up in a 480×640 fallback mode
+  until power-cycled — detect and surface that state rather than
+  silently running at fallback resolution.
+- **On-screen controller (directed 2026-08-30)**: when no physical
+  gamepad is detected (`InputDevice` scan for SOURCE_GAMEPAD/JOYSTICK —
+  dual-screen phones and foldables running droidtop's surfaces on both
+  halves are real targets, not just the Retroid + addon), the companion
+  display offers a VIRTUAL controller as one of its roles, feeding the
+  same GamepadKeyMap/GamepadAction layer physical pads use. Not built
+  from scratch AND not ported: vendor/gamenative's
+  `com.winlator.inputcontrols` (a complete, real touch-controls/
+  virtual-gamepad implementation) is already vendored and compiled into
+  droidtop's build — hook those classes directly in-process (per
+  direction), extending what runtime-windows compiles only if a needed
+  class isn't in the set yet. User-toggleable; auto-offered only when
+  no controller is present.
+- **Companion surface is user-populatable (directed 2026-08-30, second
+  live addon session)**: the widgets/info screen (CompanionActivity on
+  whichever display the shell is not on) is not just droidtop's ambient
+  readout — the user populates it: real Android app WIDGETS (an
+  `AppWidgetHost`, the same mechanism every launcher uses — music
+  controls, calendars, whatever's installed) laid over droidtop's own
+  focused-game/info backdrop, plus resizable/floating apps (launched to
+  that display via the same launch-display targeting; freeform
+  windowing per §2a's native-apps plan). Widget layout persists
+  per-display-role. droidtop's info stays the BACKGROUND layer; user
+  content composites above it.
+- **Gaming Quick Menu (directed 2026-08-31, iiSU-inspired)**: a
+  trigger-opened overlay with a Notifications tab and a System tab.
+  Paradigm survey behind the design (knowledge-based; no iiSU decompile
+  artifacts exist in the container): the Steam Deck QAM (dedicated
+  button → right-edge sheet, vertical tabs: notifications / quick
+  settings / performance) is the strongest prior art for
+  glanceable-while-playing; iiSU's trigger menu is the same family on
+  Android handhelds; PS5's control center (bottom pill bar) and the
+  Switch HOME-hold sheet are the alternatives considered and passed
+  over (bottom bars fight the theme's own helpsystem row; the Switch
+  sheet is single-purpose). Chosen: right-edge sheet IN LANDSCAPE and
+  a bottom sheet in portrait (2026-09-11, §7j: the premise is that the
+  shell stays visible behind it, and a full-height right-edge sheet on
+  a tall screen is the whole screen; the bottom sheet also puts the
+  tabs in thumb reach. The tabs are tappable and the sheet has a
+  visible Close, neither of which it had), HOLD SELECT to
+  open (the system key-repeat threshold, ~500ms, detected via
+  repeatCount — no timers; short-press Select keeps its meaning; chords
+  rejected as undiscoverable; remappable later via the GamepadAction
+  layer). **Fully controller-driven, per direction**: L1/R1 tabs,
+  D-pad focus, A act, X dismiss, Y clear-all, B close, with the hint
+  row stating exactly that --- and, since 2026-09-11, fully reachable
+  by touch as well (§7j): the hint row IS the touch control surface,
+  every hint dispatching the real button press it names. The System tab is Android's QUICK-SETTINGS
+  shape, not a settings list (directed 2026-09-10, against droidtop's
+  older habit of a single centred narrow column): a status header
+  (clock, battery and level, network state, the connected controller's
+  name), brightness and media volume as sliders, then a grid of large
+  tiles — two columns, three when the sheet is wide enough. A toggle is
+  a lit or dim tile, a choice shows its current value and cycles on A
+  (a long option list opens the catalog's own picker screen), an action
+  is a tile, a nested screen opens in the sheet, and the display-role
+  rows (shell display, game launch display, swap screens) are tiles
+  too. The sheet stays a right-edge, full-height sheet, widened to what
+  the grid needs instead of a fixed 420 dp column. What it renders is
+  unchanged: the settings catalog's own System group plus those display
+  rows, through the same catalog items and the same write paths the
+  Settings section uses — a view, never a copy, so a System setting
+  added to the catalog appears here as a tile with no edit to the menu,
+  and an item the tile view has no glyph for still gets a real tile.
+  Tile glyphs are drawn in the shell (droidtop ships no icon
+  dependency). Notifications need the
+  notification-access grant (NotificationListenerService in `:app`
+  feeding `runtime-common`'s NotificationsStore); until granted the tab
+  offers the grant, never a silently empty list. Honest limitation:
+  the menu overlays the SHELL only — games are separate activities, and
+  a Deck-style in-game overlay is future work tied to this section's
+  overlay plans, not claimed here.
+- **Display reinit + parked displays (directed 2026-08-30)**: Android
+  silently MIRRORS a second display nothing presents on (confirmed live
+  on the addon) — droidtop's answer is that some droidtop surface owns
+  every display whenever Gaming runs, and a HOME press is the user's
+  "fix my screens" gesture: Launcher forwards a warm HOME press back to
+  the last-used shell with a display-reinit flag, and MainActivity
+  re-runs its role orchestration. A display an app was LAUNCHED onto is
+  *parked* (`LaunchDisplay.parkedDisplayId`): reinit never relocates the
+  shell onto it or presents the widgets panel over it (a Presentation
+  layers above activities), so a running game is never covered; an
+  explicit shell entry from the BackButtonMenu reclaims it. Shell
+  relocation attempts are cooldown-guarded — the recreated instance can
+  read its display as DEFAULT before window attach, and an unguarded
+  mismatch check relaunch-looped forever (confirmed live).
+- **Recents (decided 2026-08-30): droidtop builds its OWN in-shell
+  recents; system quickstep recents is out.** Holding the system
+  recents role is impossible without root/system privileges
+  (`config_recentsComponentName` is ROM configuration; every launcher
+  with working quickstep recents is a system/ROM install), and root is
+  desktop-mode-only by standing rule — so replacing the system Recents
+  UI would make droidtop device- and Android-version-specific and is
+  rejected. Instead: a droidtop recents surface inside the shells,
+  unprivileged — droidtop-launched entries first (play history +
+  `LaunchDisplay`'s own per-launch display knowledge → screen-aware
+  grouping and "pull this game to the other screen" actions the system
+  recents could never offer), optionally enriched to all apps via
+  `UsageStatsManager` with the user-grantable usage-access permission.
+  **Backlog (directed)**: the same in-shell recents should also expose
+  every WINDOW running in the Desktop-mode session (the primary
+  compositor's window list, via the same wlroots protocols host-bridge
+  already speaks — e.g. `wlr-foreign-toplevel-management`) as
+  first-class recents entries, so desktop apps can be made fullscreen
+  and switched between naturally from the same surface as Android
+  tasks. The quickstep sources stay parked in
+  `upstream-unused-reference/` for a hypothetical future ROM/system
+  build only.
+- **General framing**: droidtop's display/shell/settings model takes KDE
+  Plasma as its broader reference point, not just for KScreen specifically
+  — the goal (§1) is a real general-purpose compute device, and KDE is the
+  most complete existing example of "one coherent desktop shell with
+  modular, discoverable settings" to learn conventions from as more of
+  this gets built out (workspace switching, per-app window rules, etc.),
+  not a component to fork code from.
+
 ## 4a. Networking & VPN (directed 2026-08-30)
 
 Explicit direction: containerized VPNs should be able to serve the WHOLE
@@ -1155,216 +1365,6 @@ What "the addon is the better screen" concretely means in each mode:
 - The launch chooser lists the ADD-ON row first in both arrangements,
   so the default-highlighted choice is the better screen
   (`DualScreenOrchestration.chooserCandidates`, unit-tested).
-
-## 4. Display
-
-- One `DisplayOutput` per Android `Display` the device currently has: the
-  built-in screen, the Retroid-style second screen (via Android's
-  `DisplayManager`/`Presentation` API — the standard, currently-supported
-  mechanism; verify the actual accessory enumerates as a normal secondary
-  `Display` before building against it), or an external lapdock monitor over
-  USB-C DisplayPort alt mode (also a standard secondary `Display` from
-  Android's point of view).
-- **"Second screen" is a physical position (upper = output, lower = input
-  by default on a Retroid-style device), not whichever `Display` Android
-  happens to enumerate second** — `DisplayManager` assigns display IDs by
-  connection/registration order, which is not guaranteed to match physical
-  upper/lower position, so the two must never be conflated in code.
-  droidtop's own upper/lower role assignment needs manual override, not
-  just auto-detected enumeration order, plus a persisted per-output (or
-  per-app) choice — not trusting auto-detection alone. [Mjolnir](
-  https://github.com/blacksheepmvp/mjolnir) (a companion dual-screen
-  home-launcher-routing tool) is a concrete reference for the same
-  problem.
-- Each `DisplayOutput` maps to one headless output inside the primary
-  container's compositor (whichever the user's configured — see §2).
-- **Default**: every window is placed on the primary screen's output —
-  `WindowPlacement.merged()` — one shared desktop, nothing hidden away.
-- **Opt-in**: any window can be reassigned to a different `DisplayOutput` at
-  runtime (fullscreen or windowed) without touching the process/container
-  that owns it — this is sway reassigning a surface to a different headless
-  output, a compositor-side operation, not something `:host-bridge` or the
-  owning app needs to know about.
-- **Configurable per-output role, KDE KScreen-modeled**: which screen shows
-  what isn't hardcoded — the user configures, per `DisplayOutput`, whether
-  it mirrors the primary, presents an independent `SecondaryDisplayLauncher`
-  instance (see below), or is a dedicated compositor output. Named/labeled
-  identity per output ("the Retroid's second screen," "the lapdock
-  monitor") is a first-class, persisted setting, not just an enumerated
-  `Display` id — matching how KDE's System Settings → Display & Monitor
-  lets a user name and assign roles to each physical output rather than
-  just listing them by number. This configuration lives in the Standard
-  shell's own settings menu (`com.android.launcher3.settings.
-  SettingsActivity`, forked in with `:shell-default` — see §9); droidtop
-  does not have or want a separate standalone settings app (§7).
-- **Real hook already exists, not hypothetical**: AOSP Launcher3 (and so
-  `:shell-default`, its fork) already ships
-  `com.android.launcher3.secondarydisplay.SecondaryDisplayLauncher` — a
-  `SECONDARY_HOME`-category `Activity`, Android's own standard mechanism
-  for a launcher to provide a home screen on a secondary `Display`. The
-  droidtop-specific multi-display patch work is wiring this existing
-  Activity to our `DisplayOutput`/mirror-vs-independent configuration
-  model, not building secondary-display launcher support from nothing.
-- **Dual-screen input/output split** (Retroid-style second-screen
-  accessory): the **upper** physical screen is the default visual output;
-  the **lower** physical screen defaults to a trackpad/keyboard *input*
-  surface for whatever's showing on the upper one, per §6's
-  `AbsoluteTouchContext`/`RelativeTouchContext` split — not automatically a
-  second desktop, and not assumed to be "whichever `Display` enumerates
-  second" (see the physical-position note above — needs the same manual-
-  override-plus-persisted-choice treatment Mjolnir uses, not a fixed
-  mapping). Making the lower screen an independent output (its own
-  `SecondaryDisplayLauncher` or mirrored desktop) is one of the per-output
-  roles above, opt-in like everything else in this section.
-  - **Concrete for Desktop mode specifically** (BUILT — see §6c): the
-    lower screen's default input role is a *persistent* on-screen keyboard
-    (the forked Hacker's Keyboard's own `LatinKeyboardView` — see §6) plus
-    a trackpad region beneath it, always available rather than popping up
-    only when a text field is focused. That last part is not achievable as
-    an IME window — Android places those itself, §6c has the detail — so
-    it is an ordinary droidtop window on that display, and droidtop's IME
-    is told to stop drawing over the primary one while it is up.
-    **Toggleable**: "Second screen in Desktop mode" and "Second screen in
-    Gaming mode" in settings choose between this input surface and the
-    companion/widgets surface, per mode, per the per-output role model
-    above. Gaming defaults to the companion, Desktop to input.
-- **Gaming dual-screen roles (directed 2026-08-30, first live addon
-  session)**: when the Dual-Screen Add-On (or any second display) is
-  present, the GAMING SHELL ITSELF moves to it — the addon is the
-  upper/main screen — and the built-in screen becomes the
-  widgets/ambient-info surface (FocusCompanion/PresencePanel tenants,
-  §7e), the inverse of a phone-style "companion on the accessory"
-  model. Desktop mode relocates the same way as of 2026-09-02 (its
-  output renders on the addon/external panel, the built-in panel keeps
-  the input surface role — §4c, external screen priority); it stays
-  exempt only from per-launch GAME display targeting, since its windows
-  are the compositor's job. Additionally,
-  **launch-display targeting is a launcher-wide capability**: every
-  launch (console ROM players via `ActivityOptions.setLaunchDisplayId`,
-  engine/native/Wine launches alike) targets a configured display,
-  defaulting to wherever the shell is. All of it is user-configurable —
-  the §4 per-output role/mapping UI is now required, not deferred:
-  which display hosts the shell, which hosts widgets, and where games
-  launch. Hardware findings from the first session: the addon
-  enumerates as a presentation-category EXTERNAL display ("DP Screen",
-  1080×1920 native per DRM) but can come up in a 480×640 fallback mode
-  until power-cycled — detect and surface that state rather than
-  silently running at fallback resolution.
-- **On-screen controller (directed 2026-08-30)**: when no physical
-  gamepad is detected (`InputDevice` scan for SOURCE_GAMEPAD/JOYSTICK —
-  dual-screen phones and foldables running droidtop's surfaces on both
-  halves are real targets, not just the Retroid + addon), the companion
-  display offers a VIRTUAL controller as one of its roles, feeding the
-  same GamepadKeyMap/GamepadAction layer physical pads use. Not built
-  from scratch AND not ported: vendor/gamenative's
-  `com.winlator.inputcontrols` (a complete, real touch-controls/
-  virtual-gamepad implementation) is already vendored and compiled into
-  droidtop's build — hook those classes directly in-process (per
-  direction), extending what runtime-windows compiles only if a needed
-  class isn't in the set yet. User-toggleable; auto-offered only when
-  no controller is present.
-- **Companion surface is user-populatable (directed 2026-08-30, second
-  live addon session)**: the widgets/info screen (CompanionActivity on
-  whichever display the shell is not on) is not just droidtop's ambient
-  readout — the user populates it: real Android app WIDGETS (an
-  `AppWidgetHost`, the same mechanism every launcher uses — music
-  controls, calendars, whatever's installed) laid over droidtop's own
-  focused-game/info backdrop, plus resizable/floating apps (launched to
-  that display via the same launch-display targeting; freeform
-  windowing per §2a's native-apps plan). Widget layout persists
-  per-display-role. droidtop's info stays the BACKGROUND layer; user
-  content composites above it.
-- **Gaming Quick Menu (directed 2026-08-31, iiSU-inspired)**: a
-  trigger-opened overlay with a Notifications tab and a System tab.
-  Paradigm survey behind the design (knowledge-based; no iiSU decompile
-  artifacts exist in the container): the Steam Deck QAM (dedicated
-  button → right-edge sheet, vertical tabs: notifications / quick
-  settings / performance) is the strongest prior art for
-  glanceable-while-playing; iiSU's trigger menu is the same family on
-  Android handhelds; PS5's control center (bottom pill bar) and the
-  Switch HOME-hold sheet are the alternatives considered and passed
-  over (bottom bars fight the theme's own helpsystem row; the Switch
-  sheet is single-purpose). Chosen: right-edge sheet IN LANDSCAPE and
-  a bottom sheet in portrait (2026-09-11, §7j: the premise is that the
-  shell stays visible behind it, and a full-height right-edge sheet on
-  a tall screen is the whole screen; the bottom sheet also puts the
-  tabs in thumb reach. The tabs are tappable and the sheet has a
-  visible Close, neither of which it had), HOLD SELECT to
-  open (the system key-repeat threshold, ~500ms, detected via
-  repeatCount — no timers; short-press Select keeps its meaning; chords
-  rejected as undiscoverable; remappable later via the GamepadAction
-  layer). **Fully controller-driven, per direction**: L1/R1 tabs,
-  D-pad focus, A act, X dismiss, Y clear-all, B close, with the hint
-  row stating exactly that --- and, since 2026-09-11, fully reachable
-  by touch as well (§7j): the hint row IS the touch control surface,
-  every hint dispatching the real button press it names. The System tab is Android's QUICK-SETTINGS
-  shape, not a settings list (directed 2026-09-10, against droidtop's
-  older habit of a single centred narrow column): a status header
-  (clock, battery and level, network state, the connected controller's
-  name), brightness and media volume as sliders, then a grid of large
-  tiles — two columns, three when the sheet is wide enough. A toggle is
-  a lit or dim tile, a choice shows its current value and cycles on A
-  (a long option list opens the catalog's own picker screen), an action
-  is a tile, a nested screen opens in the sheet, and the display-role
-  rows (shell display, game launch display, swap screens) are tiles
-  too. The sheet stays a right-edge, full-height sheet, widened to what
-  the grid needs instead of a fixed 420 dp column. What it renders is
-  unchanged: the settings catalog's own System group plus those display
-  rows, through the same catalog items and the same write paths the
-  Settings section uses — a view, never a copy, so a System setting
-  added to the catalog appears here as a tile with no edit to the menu,
-  and an item the tile view has no glyph for still gets a real tile.
-  Tile glyphs are drawn in the shell (droidtop ships no icon
-  dependency). Notifications need the
-  notification-access grant (NotificationListenerService in `:app`
-  feeding `runtime-common`'s NotificationsStore); until granted the tab
-  offers the grant, never a silently empty list. Honest limitation:
-  the menu overlays the SHELL only — games are separate activities, and
-  a Deck-style in-game overlay is future work tied to this section's
-  overlay plans, not claimed here.
-- **Display reinit + parked displays (directed 2026-08-30)**: Android
-  silently MIRRORS a second display nothing presents on (confirmed live
-  on the addon) — droidtop's answer is that some droidtop surface owns
-  every display whenever Gaming runs, and a HOME press is the user's
-  "fix my screens" gesture: Launcher forwards a warm HOME press back to
-  the last-used shell with a display-reinit flag, and MainActivity
-  re-runs its role orchestration. A display an app was LAUNCHED onto is
-  *parked* (`LaunchDisplay.parkedDisplayId`): reinit never relocates the
-  shell onto it or presents the widgets panel over it (a Presentation
-  layers above activities), so a running game is never covered; an
-  explicit shell entry from the BackButtonMenu reclaims it. Shell
-  relocation attempts are cooldown-guarded — the recreated instance can
-  read its display as DEFAULT before window attach, and an unguarded
-  mismatch check relaunch-looped forever (confirmed live).
-- **Recents (decided 2026-08-30): droidtop builds its OWN in-shell
-  recents; system quickstep recents is out.** Holding the system
-  recents role is impossible without root/system privileges
-  (`config_recentsComponentName` is ROM configuration; every launcher
-  with working quickstep recents is a system/ROM install), and root is
-  desktop-mode-only by standing rule — so replacing the system Recents
-  UI would make droidtop device- and Android-version-specific and is
-  rejected. Instead: a droidtop recents surface inside the shells,
-  unprivileged — droidtop-launched entries first (play history +
-  `LaunchDisplay`'s own per-launch display knowledge → screen-aware
-  grouping and "pull this game to the other screen" actions the system
-  recents could never offer), optionally enriched to all apps via
-  `UsageStatsManager` with the user-grantable usage-access permission.
-  **Backlog (directed)**: the same in-shell recents should also expose
-  every WINDOW running in the Desktop-mode session (the primary
-  compositor's window list, via the same wlroots protocols host-bridge
-  already speaks — e.g. `wlr-foreign-toplevel-management`) as
-  first-class recents entries, so desktop apps can be made fullscreen
-  and switched between naturally from the same surface as Android
-  tasks. The quickstep sources stay parked in
-  `upstream-unused-reference/` for a hypothetical future ROM/system
-  build only.
-- **General framing**: droidtop's display/shell/settings model takes KDE
-  Plasma as its broader reference point, not just for KScreen specifically
-  — the goal (§1) is a real general-purpose compute device, and KDE is the
-  most complete existing example of "one coherent desktop shell with
-  modular, discoverable settings" to learn conventions from as more of
-  this gets built out (workspace switching, per-app window rules, etc.),
-  not a component to fork code from.
 
 ## 4d. The companion screen, designed (research 2026-09-01)
 
@@ -1910,6 +1910,58 @@ compositor only ever sees one logical pointer and keyboard.
   pointer capture (issue #1555). This needs real design and testing effort,
   not inherited code.
 
+## 6a. Keyboard ownership (directed 2026-09-01)
+
+droidtop ships **Hacker's Keyboard** — `:input-keyboard`, forked from
+klausw/hackerskeyboard (`org.pocketworkstation.pckeyboard`). Its main
+class is named `LatinIME` because Hacker's Keyboard is itself an AOSP
+LatinIME fork that kept the class name; the project is not AOSP's
+keyboard, and a report that said otherwise was reading the class rather
+than the package.
+
+**It is droidtop's default keyboard, by design.** A device meant to
+replace a computer needs a keyboard that computer software can be driven
+from: Ctrl, Alt, Esc, Tab, arrow keys and the function row. A terminal
+(§4b), a Wine application, or any real desktop program is unusable
+without them, and no stock phone keyboard has them. That is why it is
+forked in rather than recommended as a download.
+
+Being the active input method has a second real effect, stated plainly
+rather than left as a hidden benefit: from Android 10, only a focused app
+or the **current input method** may read the clipboard, so droidtop's
+host↔container clipboard bridge works properly exactly when its own
+keyboard is active.
+
+### The ownership principle, and its limit
+
+Standing direction: droidtop wants to own the device as much as it
+usefully can — it is not merely a launcher. The limit is equally
+standing: **the user keeps control and is told why.**
+
+Concretely, droidtop cannot silently become the input method even if it
+wanted to. Setting `Settings.Secure.DEFAULT_INPUT_METHOD` requires
+`WRITE_SECURE_SETTINGS`, which a normal app is never granted, and
+handheld/launcher features must never depend on root. So the whole
+mechanism is: enumerate what is installed, explain the reason once, and
+open Android's own pickers.
+
+- `InputMethodManager.enabledInputMethodList` — what is installed, with
+  droidtop's own and the active one marked.
+- `InputMethodManager.showInputMethodPicker()` — the system's own
+  switcher, no permission needed. **This is how a user swaps keyboards
+  from inside droidtop**, and it is the system drawing it, not droidtop
+  impersonating it.
+- `Settings.ACTION_INPUT_METHOD_SETTINGS` — needed the first time,
+  because an installed-but-not-enabled IME does not appear in the picker
+  at all.
+- An IME may also call `switchInputMethod`/`switchToNextInputMethod` for
+  itself, so droidtop's own keyboard can offer "switch keyboard" from a
+  key — a real future addition, not built yet.
+
+`Keyboards` (`:runtime-common`) is the single surface for all of this,
+and the settings catalog shows the active keyboard, says what it is, and
+offers the switch. It never nags and never changes the setting itself.
+
 ## 6b. Desktop surface input (built 2026-09-01)
 
 The seat in §6 was a primitive with no caller. `:shell-desktop`'s
@@ -2113,7 +2165,7 @@ editor the user expects; and every latency and feel judgement, which is
 the whole reason the acceleration curve is written as constants that can
 be read and changed rather than tuned by hand.
 
-## 6c. Clipboard bridge, host↔container (built 2026-09-02)
+## 6d. Clipboard bridge, host↔container (built 2026-09-02)
 
 Text copied in Android pastes in the container, and text copied in the
 container pastes in Android. Clipboard forwarding is friction on ordinary
@@ -2172,58 +2224,6 @@ run through the same `ClipboardSync`, and because they share its one
 piece of state, each direction's echo is recognised as already-synced
 text and dropped. That is the whole loop-prevention mechanism and it
 lives in exactly one place, under unit test.
-
-## 6a. Keyboard ownership (directed 2026-09-01)
-
-droidtop ships **Hacker's Keyboard** — `:input-keyboard`, forked from
-klausw/hackerskeyboard (`org.pocketworkstation.pckeyboard`). Its main
-class is named `LatinIME` because Hacker's Keyboard is itself an AOSP
-LatinIME fork that kept the class name; the project is not AOSP's
-keyboard, and a report that said otherwise was reading the class rather
-than the package.
-
-**It is droidtop's default keyboard, by design.** A device meant to
-replace a computer needs a keyboard that computer software can be driven
-from: Ctrl, Alt, Esc, Tab, arrow keys and the function row. A terminal
-(§4b), a Wine application, or any real desktop program is unusable
-without them, and no stock phone keyboard has them. That is why it is
-forked in rather than recommended as a download.
-
-Being the active input method has a second real effect, stated plainly
-rather than left as a hidden benefit: from Android 10, only a focused app
-or the **current input method** may read the clipboard, so droidtop's
-host↔container clipboard bridge works properly exactly when its own
-keyboard is active.
-
-### The ownership principle, and its limit
-
-Standing direction: droidtop wants to own the device as much as it
-usefully can — it is not merely a launcher. The limit is equally
-standing: **the user keeps control and is told why.**
-
-Concretely, droidtop cannot silently become the input method even if it
-wanted to. Setting `Settings.Secure.DEFAULT_INPUT_METHOD` requires
-`WRITE_SECURE_SETTINGS`, which a normal app is never granted, and
-handheld/launcher features must never depend on root. So the whole
-mechanism is: enumerate what is installed, explain the reason once, and
-open Android's own pickers.
-
-- `InputMethodManager.enabledInputMethodList` — what is installed, with
-  droidtop's own and the active one marked.
-- `InputMethodManager.showInputMethodPicker()` — the system's own
-  switcher, no permission needed. **This is how a user swaps keyboards
-  from inside droidtop**, and it is the system drawing it, not droidtop
-  impersonating it.
-- `Settings.ACTION_INPUT_METHOD_SETTINGS` — needed the first time,
-  because an installed-but-not-enabled IME does not appear in the picker
-  at all.
-- An IME may also call `switchInputMethod`/`switchToNextInputMethod` for
-  itself, so droidtop's own keyboard can offer "switch keyboard" from a
-  key — a real future addition, not built yet.
-
-`Keyboards` (`:runtime-common`) is the single surface for all of this,
-and the settings catalog shows the active keyboard, says what it is, and
-offers the switch. It never nags and never changes the setting itself.
 
 ## 7. Library / launcher-readiness
 
@@ -2974,25 +2974,6 @@ launch surface. Engine games launch via enginehost, Kirikiroid2, Wine,
 or a Linux-container build — never JoiPlay, regardless of it being
 installed.
 
-## 7e4. Emulator setup helpers (directed 2026-08-31, EmuDeck-style)
-
-Guided per-system setup instead of dead ends, all data-driven like §7e2:
-`bios-database.json` in droidtop-platforms is GENERATED from Batocera's
-real, maintained BIOS registry (`batocera-systems`, GPL — the same
-md5/path data Batocera's own missing-bios checker uses; regenerate with
-`generator/from_batocera.py`, never hand-author hashes). droidtop's
-`BiosDatabase` (:library-core) mirrors `KnownPlayers`' bundled-seed +
-GitHub-refresh + validate-before-replace model, and checks a system's
-firmware under `<gamesRoot>/bios` by presence AND md5 (the classic
-"right name, wrong dump"). Surfaced as settings-catalog rows in each
-folder's screen: a BIOS status screen per system that needs firmware,
-and — when NO installed emulator can run a system — "Get an emulator"
-actions built from the player database's real packages (market:// with
-a web fallback). Follow-ups, not started: per-emulator install sources
-beyond Play (GitHub releases in the players DB), and applying
-recommended per-emulator settings where an emulator exposes a real
-configuration surface.
-
 ## 7e2b. Launch resolution FROM the platforms database (directed 2026-08-31)
 
 Extends §7e2 to the whole launch pipeline: droidtop-platforms is the
@@ -3172,6 +3153,25 @@ but not exclusively (its coverage/format may not be the best fit); any
 runner-execution mapping goes through the existing strategy resolver
 (§7e2) and gamenative-tux's container backends, never a new parallel
 launch path.
+
+## 7e4. Emulator setup helpers (directed 2026-08-31, EmuDeck-style)
+
+Guided per-system setup instead of dead ends, all data-driven like §7e2:
+`bios-database.json` in droidtop-platforms is GENERATED from Batocera's
+real, maintained BIOS registry (`batocera-systems`, GPL — the same
+md5/path data Batocera's own missing-bios checker uses; regenerate with
+`generator/from_batocera.py`, never hand-author hashes). droidtop's
+`BiosDatabase` (:library-core) mirrors `KnownPlayers`' bundled-seed +
+GitHub-refresh + validate-before-replace model, and checks a system's
+firmware under `<gamesRoot>/bios` by presence AND md5 (the classic
+"right name, wrong dump"). Surfaced as settings-catalog rows in each
+folder's screen: a BIOS status screen per system that needs firmware,
+and — when NO installed emulator can run a system — "Get an emulator"
+actions built from the player database's real packages (market:// with
+a web fallback). Follow-ups, not started: per-emulator install sources
+beyond Play (GitHub releases in the players DB), and applying
+recommended per-emulator settings where an emulator exposes a real
+configuration surface.
 
 ## 7f. Gaming mode: real, generic ES-DE theme engine
 
@@ -4084,6 +4084,52 @@ individual element sit still, keep drawing, or wear a fade while the
 transition runs, and none of them was implementable before there was a
 transition to act during. They are the named next step.
 
+### Back goes back, and lands where you left (rig, build 542)
+
+B from a PC game's detail put the user on the system carousel, at the top,
+having lost the grid's position; getting back to the game they had been
+looking at took B, B, Right, A.
+
+The cause was that the shell had no answer to "where am I". The section
+was one piece of state, the drilled-into group was a `remember` inside the
+games screen, and the open detail was a third; the detail was drawn as a
+sibling branch of the games screen, so opening it DESTROYED that screen
+and everything it remembered, and closing it rebuilt the screen from
+nothing.
+
+**One stack answers it** (`ShellBackStack`, `shell-gamepad`). The Gaming
+shell is a section, a group inside Games, that group's own options screen
+and one game's detail -- and the stack holds all of them, plus the entry
+the user was on in each one. A screen ASKS where it is and what to focus;
+it does not own the answer and so cannot lose it.
+
+- B closes the detail, else closes the group's own options screen, else
+  leaves the group, else does nothing (the top of the shell is a home
+  screen).
+- **A screen opened from a level is a level**, not state the screen under
+  it holds. The PC surface's "Stores and folders" was a `remember` inside
+  the PC surface -- which stops being composed the moment that screen is
+  drawn instead of it -- and the group's own drill-up sits ABOVE it in the
+  tree, so the drill-up answered for it: `KEYCODE_BACK` reaches the view
+  tree as an ordinary key event before it reaches the back dispatcher, so
+  B out of Stores and folders left the group outright and landed on the
+  carousel with the system reset (rig, build 548). Both back routes -- the
+  dispatcher and the B/BACK key -- go through `nav.back()`, which leaves
+  one level at a time.
+- Returning to a group lands on the entry that was focused there: the PC
+  grid scrolls to that card and focuses it, and a themed gamelist opens on
+  that game. A group this session has not been in opens at the top, which
+  is ES-DE's own "selection resets per gamelist".
+- Opening another version or part of a game from its own detail (SPEC 7m)
+  is a move SIDEWAYS, not a level: B from it still means "back to the grid
+  I came from".
+- Switching sections is a move at the top level and leaves no group or
+  detail open.
+
+The three levels are fixed rather than an arbitrary push-down stack,
+because a push-down stack would let one game's detail sit under another's
+and make B mean "the previous game" -- which is not what B means here.
+
 ## 7g. One library across every source (audit + plan, directed 2026-09-01)
 
 A full audit of droidtop and every vendored repo, against the question
@@ -4810,6 +4856,202 @@ resolves identically every scan.
 7. Delete the dead streaming module. (The `winlator-upstream` and
    `lemuroid` submodules are gone; nothing consumed either.)
 
+## 7h. Scraper honesty, and what counts as a game (directed 2026-09-02)
+
+An overnight ScreenScraper pass over the user's real library — 46 ROMs
+across 11 systems — returned HTTP 403 for **all 46** requests: zero
+successes, zero exceptions, zero files written. The app reported it as
+`no match for 46, 0 failed`. Two rules come out of that, and they are
+binding on every scraper source, not just ScreenScraper.
+
+**A refusal is not a miss, and the type system says so.**
+`ScreenScraperClient.findMetadata` no longer returns a nullable metadata
+object. It returns `ScreenScraperLookup`, which is exactly one of
+`Found`, `NoMatch` (the server answered HTTP 200 and its response carried
+no game — the only outcome that is a statement about the user's library)
+or `Refused(httpStatus, reason)` (the server would not serve the request
+at all — a statement about the API, about credentials, or about a quota,
+and about nothing else). A transport failure stays a thrown exception and
+stays counted as `failed`. The scrape summary reports all four buckets
+separately and may never fold any of the other three into "no match"; a
+pass that was refused everything it asked for leads with that instead of
+reporting a count. `formatScrapeSummary` is a pure function so this
+arithmetic is unit-tested rather than only observable on hardware.
+
+**The server's own reason is surfaced, not discarded.** ScreenScraper
+answers a non-200 with a short human-readable explanation in the response
+body. That body is read from `errorStream` under a hard 512-character
+bound, has every non-blank credential the request carried redacted out of
+it *before* anything else touches it, is stripped of any markup an
+intermediary added, and then appears both in logcat (tag
+`droidtop.Scraper`) and in the summary the user reads. Credentials
+themselves are still never logged — only whether they are present.
+
+**A repeated refusal ends the pass.** Five consecutive refusals stop the
+run and report; 46 refusals paced ~11s apart buy no information that the
+first five did not.
+
+**Not decided here, deliberately:** the cause of the 2026-09-01 403s.
+Credentials were verified present, verified to descramble, and the
+personal account was configured. The two candidates — a newly registered
+ScreenScraper application pair still awaiting manual approval, and
+`softname` needing to match the *registered application name* — are
+documented in `ScreenScraperClient.refusalHint` and printed on a 403.
+`softname` is **not** changed speculatively: only the person who
+registered the application knows what it was registered as.
+
+### One ROM walk, and a DLC folder is not twelve games
+
+A `Rune Factory 5` DLC directory produced twelve separate library
+entries, each with its own metadata row and cover, because twelve add-on
+files carried the system's ROM extension and the scan was a plain
+`walkTopDown()`. The library scan and the scraper each had their own copy
+of that walk and could disagree about what a game is; they now share
+`RomScanWalk`, which owns the rule:
+
+1. Recursion stays. Reorganising a large system into subfolders must
+   never hide files.
+2. A directory whose **final name token** is one of `dlc`/`dlcs`,
+   `update`/`updates`, `patch`/`patches`, `addon`/`addons`, `bios` or
+   `firmware` holds content that attaches to a game rather than being
+   one, and is not descended into. Matching the final token is what makes
+   this a rule instead of a special case for one title: it covers `DLC`,
+   `Rune Factory 5 (DLC)`, `Zelda - Updates` and `_patches` without
+   knowing any game's name.
+3. The marker list is deliberately short, and `mods`/`hacks`/`romhacks`
+   are pointedly **not** on it. A ROM hack is a playable game. A rule that
+   hides real games to tidy a list is worse than the bug it fixes.
+4. The system folder itself is never excluded by its own name, so this
+   can never empty out a whole system.
+5. The user's override is ES-DE's own real `noload.txt`
+   (`SystemData::populateFolder`): a directory containing that file, and
+   everything under it, is skipped. droidtop honours the existing
+   mechanism rather than inventing a second one.
+
+Every skipped directory is logged with its reason, so this never loses
+files silently.
+
+### A folder that holds games is a container, in both walks (rig, 2026-09-16)
+
+droidtop has two walks over a games root -- engine detection
+(`GameEngineDetector`) and the PC folder scan (`PcFolderScan`) -- and the
+rig showed what happens when only one of them knows the rule. The rules
+below are one set, asked by both, in this order:
+
+1. **A folder with two or more ENGINE games directly below it is a
+   container**, whatever evidence it carries of its own. `adult/godot`
+   holds two Godot games and one loose Godot Linux build left beside them;
+   the loose build is precise Godot evidence, so the category folder
+   became a game called "godot" and both games inside it were never
+   walked. Two, not one: a folder with exactly one game below it is that
+   game's wrapper or its payload, and both walks already have rules for
+   that shape. Only the immediate children are tested, with the precise
+   rules only, so this costs one directory listing per child.
+2. **A folder that directly holds an executable and no engine evidence at
+   all is a PC game, and its subfolders are its payload.** The engine walk
+   stops there instead of descending: `Ghost Recon Breakpoint/benchmark`
+   (an index.html and sixteen PNGs) and `The Movies/Docs` were listed as
+   games by the database's weakest row, "there is a page here", while the
+   games they sit inside were not listed at all.
+
+   The rule is ONE function, `GameEngineDetector.isPlainPcGameFolder`, and
+   every walk asks it. Build 540 is why that is written down: the walk
+   applied it and `detectGame` did not, so the walk correctly returned no
+   engine game for `Ghost Recon Breakpoint` while `detectGame` read the
+   payload's `index.html` one level down, called the folder engine-owned,
+   and `PcGameProvider` dropped its PC entry as a duplicate of an engine
+   entry that was never created. Both folders vanished from the library
+   entirely. A folder that holds an executable and no engine evidence of
+   its own is a PC game, listed once, whatever sits beneath it.
+3. **A folder that holds files of its own AND games below it is those
+   games' root**, however many there are, and when exactly one game sits
+   below it, that game's own markers are this folder's
+   (`Humble/macdows95_windows/macdows95/{PLAY.bat, files/}` is the game
+   `macdows95`, whose root is `files`; build 540 listed a game called
+   `files`). The version-named wrapper
+   (`BeingADik/BeingADIK-0.8.3-scrappy/{renpy,game}`) is the same rule
+   recognised by the name instead of by the files. Neither applies inside
+   a store tree, where `steamapps` holding one installed game must still
+   yield the game. The one-game form of this rule
+   could not see a Ubisoft install: `Far Cry 5` keeps its launcher files
+   in the game folder and its executables in `bin` and `bin_plus`, so the
+   list got `bin` and `bin_plus` and never Far Cry 5. `EA/SimCity` is the
+   same shape with three payload folders. A container proper holds no
+   files of its own, which is what still makes `EA`, `Ubisoft`, `adult`
+   and a games root containers.
+
+4. **Evidence that could have come from below only names a folder when
+   it is that engine's own root layout** (rig, build 542). A detection
+   rule that reads an unnamed subtree -- Unity's three-deep player search,
+   the compiled-Ren'Py `.rpa`/`.rpyc` fallback -- proves a game is
+   somewhere under a folder without saying where, so it matches at every
+   folder on the way down and the OUTERMOST match is taken. `Pirated`
+   holds three games (`PRAGMATA`, `The Movies`, `The Tenants Pets`); the
+   third is a plain Unity install with `UnityPlayer.dll` in its own root,
+   so Unity's probe matched at `Pirated` too, nothing below `Pirated` was
+   precise, and the container took the entry while the Unity game appeared
+   in no list at all.
+
+   So a subtree rule whose evidence is found IN a folder, in a folder that
+   also holds the executable that starts it, names that folder
+   (`GameEngineDetector.engineHere`). Unity's own root is the player
+   runtime beside the player; a folder holding the runtime and nothing to
+   run is a payload folder, and the outermost-match rule still reads it
+   correctly. This is deliberately narrower than "any subtree rule at
+   depth 0": Ren'Py keeps its archives in the game's `game/` subfolder by
+   that engine's own layout, so a depth-0 match there would name the
+   payload rather than the game.
+
+   The `.gamenative` file in `Pirated` is not what made this happen, and
+   is not evidence of anything. gamenative writes that file into every
+   folder its own scanner called a custom game
+   (`app/gamenative/utils/CustomGameScanner.writeGameIdToFile`), and that
+   scanner is the one-level rule `PcFolderScan` replaced -- so the marker
+   in a store or category root is droidtop's own stale verdict, read back.
+   Nothing in either walk reads it. It is a dotfile, so it is not "files
+   of its own" for rule 3 either.
+5. **A store's own install root is never a game**, in either walk, however
+   much evidence its client leaves in it. `PcFolderScan` already had this;
+   the engine walk did not, so a Steam library folder with one engine game
+   under `steamapps/common` could be claimed by the outermost-match rule
+   above and listed as a game called "Steam".
+
+**A folder name only means a ROM system where a system folder can be.**
+ES-DE's layout is `<root>/<systemId>/<rom>` and droidtop allows one
+container level above it (`<root>/roms/<systemId>`), so nothing deeper is
+a system folder however it is named, and nothing inside a store's install
+tree is one at all. `Ubisoft/Far Cry 5/data_final/pc` and
+`Ghost Recon Breakpoint/sounddata/pc` are game data four levels down that
+match the real platform id `pc` (DOS games, `dosbox_pure`); they are what
+build 540's log line `2 x it is a console system folder, scanned for ROMs
+instead` was counting, and that line named neither of them.
+
+**A scan line names the folders each rule fired on.** Counts by reason
+replaced one line per skipped folder (several hundred on the rig) and are
+still the shape of the line; the folders are now named beside the count,
+up to six per reason and then `+N more`, relative to the folder the line
+is about. A count alone cannot be acted on: "2 folders skipped" gives a
+person no way to find the games behind them.
+
+**A budget costs a folder its own evidence, never its subtree.** The
+per-folder budget (SPEC 7g) bounds one folder's own step. When that step
+runs over, the folder cannot claim to be a game on evidence a rule never
+finished gathering -- but its children are still walked, each under a
+budget of its own. `adult/RPGMaker` ran past 20 s on a cold scan of the
+rig's shared folder and all six games under it were dropped with it. A
+budget that drops a subtree loses real games, which is worse than the slow
+scan it exists to bound; bigness is not pathology.
+
+**droidtop's own answer is not read back out of a vendored preference.**
+The folders `PcFolderScan` finds are turned into library items directly,
+in the same pass, and only written to gamenative's `customGameManualFolders`
+as a side effect for its own screens. They used to be written there and
+read straight back: `PrefManager.setPref` hands the write to a DataStore
+coroutine and returns, while `candidateFolders()` reads synchronously, so
+the first scan after an install read the EMPTY set. That is why build 537
+(upgraded, with a previous run's value in the preference) listed 171 games
+and a freshly installed 539 listed 151 with every folder game missing.
+
 ## 7i. The PC surface — "a PC in a box", not an ES-DE system (directed 2026-09-10)
 
 The user's framing: "we explicitly want THAT category to break from the
@@ -5061,6 +5303,415 @@ cannot run and a section of dead rows repeating that is not information.
 No section is titled like its own first row -- "Prefix and graphics" over
 a row called "Prefix and graphics" says one thing twice.
 
+## 7j. Portrait and touch-first chrome (directed 2026-09-10)
+
+"Most people will be on phones without controllers." droidtop's own
+chrome --- the tab bar, Quick Menu, PC surface, game detail, gamelist
+options, settings, onboarding and the launch chooser --- treats a screen
+held upright with no pad attached as a primary target, not a degraded
+one. Two rules carry the whole design.
+
+**One layout system, no duplicated screens.** `LocalShellWindow` carries
+the live window size class (Android's own compact/medium/expanded
+thresholds) and orientation, and every screen measures itself from it.
+There is no portrait COPY of any screen and no orientation branch beyond
+the handful of places where the shape genuinely differs:
+
+- the screen-edge gutter is one definition (48dp at TV distance, 16dp on
+  a compact screen), not a number repeated at every call site;
+- game cards and the PC grid size from the window rather than the
+  console's 220dp;
+- rows that can outgrow the width scroll instead of clipping (the PC
+  filter chips, the hint bar);
+- a modal panel's fixed width is capped by the window, because the half
+  that falls off a phone's edge is the half with the buttons on it;
+- the **Quick Menu** is a right-edge sheet in landscape and a **bottom
+  sheet** in portrait. Its whole premise is that the shell stays visible
+  behind it, and a full-height right-edge sheet on a tall screen IS the
+  whole screen; the bottom sheet also puts its tabs in thumb reach.
+
+**Touch dispatches the real press; it never re-implements it.** Every
+screen decides what a button MEANS in one `onKeyEvent` block next to the
+state it acts on. A touch affordance therefore sends a genuine key event
+down the focused window (`rememberGamepadTouch`,
+`GamepadKeyMap.keyCodeFor`) and travels that same path, so there is
+exactly one definition of every action and touch cannot drift from the
+pad.
+
+**The shell owns the pad; Android's generic fallbacks never act on it.**
+`Generic.kcm` gives every pad button a fallback key (A, Start and the thumb
+clicks become DPAD_CENTER, B becomes BACK, X DEL, Y SPACE, Select MENU),
+dispatched on both edges whenever the window leaves the button unhandled.
+Every screen here acts on the UP edge, so the unhandled DOWN of A on a card
+became a DPAD_CENTER pair that pressed the primary button of the detail the
+A had just opened (build 552). The outermost node of every window
+(`Modifier.ownPadButtons`: the shell's root, the Quick Menu's dialog)
+consumes every pad button nothing below it wanted and gives B its one
+meaning explicitly, the back dispatcher. A `BackHandler` is therefore a
+complete answer to B for pad and touch alike -- a hint pill dispatches a
+real `BUTTON_B` into the window and it arrives at the root exactly as a
+pad's does -- and a screen with nothing focusable (an empty list) must have
+one. D-pad, keyboard and volume keys are not pad buttons and pass through.
+
+**That block goes AHEAD of the element's focus targets in the modifier
+chain, never behind them.** Compose dispatches a key event to the
+key-input modifiers between the ACTIVE focus target and the root:
+`FocusOwnerImpl.dispatchKeyEvent` takes `activeFocusTarget
+.lastLocalKeyInputNode()`, and that helper stops at the next `FocusTarget`
+in the same chain (compose ui 1.7.2). `Modifier.clickable` delegates a
+`FocusableNode` of its own, so in `.focusable().clickable { }
+.onKeyEvent { }` the handler is behind a focus target and is never
+dispatched at all -- only ancestors get the event. What hides it is
+Android's own key-character-map fallback: an unhandled `BUTTON_A` is
+re-sent as `DPAD_CENTER` (`Generic.kcm`), which `clickable` treats as a
+click, so A appears to work through the click path while every other
+action written the same way (X for favourite, Y for a detail) is dead,
+and every hint-bar tap -- a direct `dispatchKeyEvent`, which gets no
+fallback -- does nothing (rig, build 548: the PC grid's own `A Open` hint
+inert while `B` and `Y`, handled on ancestors, worked).
+
+**A hint row promises only what dispatches.** A row is this shell's touch
+control surface, so a hint that names an action nothing handles is a
+promise the screen does not keep: either the action exists by every route
+the row implies, or the hint is not drawn. The Apps grid drew `Y  Info`
+over tiles that handled only A, while the long-press beside them already
+opened the app's own detail (rig, build 548).
+
+Consequences:
+
+- the persistent help bar stops being a legend and becomes the control
+  surface: every hint is tappable (`TouchHintBar`), and it stays on a
+  touch screen even when a theme draws its own help row, because that row
+  is decoration and the bar is the only route to B/Y/Select without a pad;
+  **when it stays, the theme's own row goes.** Real ES-DE gives the
+  Window exactly ONE help bar (`Window.cpp:126`, `Window::setHelpPrompts`
+  at `:884`; `HelpComponent.cpp:629` draws nothing when help is off) and a
+  theme's `<helpsystem>` styles that one component rather than adding a
+  second. droidtop keeps that count with one value, read by every side
+  of it. A screen says what it HAS of its own (`HelpRowClaim`: nothing,
+  a row of its OWN, or a THEME's `<helpsystem>`) and one function
+  (`esDeHelpRowOwner`) says who draws (`HelpRowOwner`, published as
+  `LocalHelpRowOwner`): the shell's `ButtonHintFooter` draws exactly when
+  it says SHELL, a screen's own `TouchHintBar` exactly when it says
+  SCREEN, and the themed renderer draws the theme's `<helpsystem>`
+  exactly when it says THEME. A theme's row is a LEGEND -- it names
+  buttons, it does not dispatch them -- so a touch-first window takes it
+  over; a screen's own row is a real control surface with this screen's
+  own actions in it (the PC surface: A opens a game, it does not launch
+  it), so it is never doubled by the shell's bar in either shape.
+  Independent conditions for the one row are how droidtop drew two,
+  twice: the theme's row sliced in half by the bar over it in landscape
+  with Slate (rig, build 546), and the shell's bar stacked under the PC
+  grid's own row in portrait but not in landscape, because the PC
+  surface claimed the row as a THEME's and a touch-first window then
+  overrode a claim that was never a theme's (rig, build 547). A claim is
+  also scoped to the screen that makes it, so a screen the shell is still
+  fading out cannot answer for the screen arriving;
+- **the one row is drawn in the one place laid out for it, and paints
+  nothing there.** Real ES-DE draws its single `HelpComponent` ON the
+  view, at the theme's own `<helpsystem>` position and with no background
+  of its own; the view is not shortened to make room for it. So when the
+  shell owns the row over a THEME's screen, droidtop's bar is drawn at
+  that same position (`EsDeHelpRowSlot`, reported by the renderer from the
+  merged element's `pos`/`origin` and applied after the row is measured,
+  exactly as the theme's own bar is) with a transparent background, and
+  the themed view gets the whole area in portrait that it gets in
+  landscape. An opaque plate there covers the plate the theme drew for
+  this row, which is what still read as "a strip below the canvas" after
+  the bar had already moved onto it (rig, build 548). The claim is about
+  the CANVAS, not about the element: a theme that declares no
+  `<helpsystem>` still draws the whole window and still has a help
+  position -- ES-DE's own component default, `0.012` of the width and
+  `0.9515` of the height, `0.975` when the window is vertical, origin
+  `0 0` (`HelpComponent.cpp:23-27`) -- so its canvas is not shortened
+  either. Otherwise a theme was laid out into a canvas that changed
+  height with droidtop's chrome, and the plate the theme drew for its own
+  help row was left visibly empty above droidtop's bar (rig, build 547,
+  DEcaffe in portrait). That plate is the THEME's art, not its
+  `<helpsystem>`: droidtop suppresses the `<helpsystem>` element and
+  nothing else, and never guesses that some `<image>` a theme declares
+  was "really" a help-bar background;
+- actions that had no on-screen name at all are now named and reachable:
+  Select for gamelist options, Y for the PC surface's stores and folders;
+- **a card says what IT is, never the heading it sits under.** The line
+  under a tile's or card's name is what the thing itself declares -- an
+  installed app's own Android application category, a scraped game's
+  genre -- and, when it declares nothing, what one entry of its kind is
+  called in the singular (`LibraryEntry.kindLine`, `LibraryEntryKind
+  .itemName`; `displayName` is the name of the GROUP and belongs to the
+  heading). Filling it from the group name made all eighteen Apps tiles
+  read "Apps", two lines below a heading that already said so (rig,
+  build 547). Nothing is invented for it: an app that declares no
+  category gets "Android app", not a guess;
+- **long-press is Y** on a game card or app tile --- the same "act on
+  this one" the pad reaches with a second button;
+- a value that is **stepped** rather than opened --- a slider, a small
+  cycling choice --- makes the two arrows the row already draws into two
+  targets, because a touch screen has no Left/Right and a slider has no
+  "open" to tap: it was otherwise pad-only, in the settings list a phone
+  user has to use;
+- **every scrolling screen the shell draws ends above the hint bar.** The
+  bar is the last thing in the window, so a list measured against the rest
+  of it ends exactly where the bar begins: the last row is sliced by the
+  window edge and scrolling to the end never brings it clear (rig, build
+  546, the settings list; build 548, a game detail's last card). The room
+  is CONTENT padding, not a padding modifier -- a modifier shrinks the
+  viewport and the row still ends against the bar -- and it is one value,
+  `MenuTokens.HintBarRoom`, because it is one bar;
+- the Quick Menu's notifications are rows, not a read-out: a tap moves
+  the cursor and opens one, and dismiss/clear-all are on the hint bar
+  instead of a legend naming buttons that were not there;
+- **swipe steps** a themed carousel, textlist or grid
+  (`Modifier.esDeSwipeSteps`). Those widgets own a cursor and move in
+  whole entries rather than scrolling, so no Compose gesture applied to
+  them at all before: a themed view could only be driven by a pad.
+- a **tap on a themed entry is one selection, not two**: it moves the
+  widget's own cursor onto the entry it hit --- through that widget's own
+  `step()`, so the move carries the direction and animation the D-pad
+  gives it --- and then acts on it. The carousel activated without moving
+  its cursor, so backing out of a system landed on a different entry than
+  the one just visited. A reflection is decoration and takes no taps at
+  all; it used to be a second, invisible hit target for the entry it
+  mirrors.
+- the top-level **tab bar scrolls** and keeps the Quick Menu control
+  pinned beside it. Four tab names do not fit across a 411dp phone, and a
+  plain row pushes the last one --- in desktop mode, a tab with no other
+  touch route --- silently off the edge.
+
+**Every screen states its own way out, and the hint bar tells the truth
+about it (rig, build 539).** The Gaming shell's Settings section declared
+"no back available" while a nested settings screen was open, which took
+the B hint out of the hint bar -- and that hint IS the touch route to B,
+so a person on a touch screen had no way out of "Windows games" at all and
+Game folders, Rescan library and Software updates became unreachable. Two
+rules follow: a section that can go back says so, always; and a menu takes
+B by every route it can arrive on -- the back dispatcher (what KEYCODE_BACK
+and the hint bar's own tap become), and `KEYCODE_BUTTON_B`/Escape as
+ordinary key events, which never reach that dispatcher at all.
+
+The pad keeps everything. Touch affordances are additions; no key route
+was changed or removed, and a pad plugged into a portrait phone behaves
+exactly as it does on the console.
+
+ES-DE's own Android answer is the same idea taken further from the UI: a
+floating virtual gamepad overlay whose fingers are fed into the ordinary
+input path as `DEVICE_TOUCH` presses (`InputManager.cpp:446-500`,
+`InputTouchOverlay*` settings in `GuiMenu.cpp:1401-1436`). droidtop
+routes touch the same way --- one input path, no second definition ---
+but puts the targets on the real affordances rather than under a
+translucent d-pad drawn over the screen, because droidtop's chrome is
+its own, is laid out for the window it is in, and is the part a phone
+user spends their time in. A themed view, whose element positions belong
+to the theme's author, is where the swipe-steps gesture does the same
+job the overlay would.
+
+Rigs: the emulator `droidtop-portrait` AVD (1080x1920 at 420dpi = 411 x
+731dp, a real 1080p phone) alongside `droidtop-1080p`, driven by the same
+`run.ps1` with `-Portrait`; and a portrait BlueStacks instance.
+Screenshots of both belong in the evidence for any chrome change.
+
+## 7k. The design system: one spacing scale, one type scale, one colour source
+
+droidtop draws two kinds of surface. A **themed view** takes every colour, typeface and
+measurement from the active ES-DE theme (section 7f) and is out of scope here. Everything
+else — onboarding, the shell's chrome and menus, the settings catalog, the Quick Menu, the
+PC surface, the desktop panels — is **droidtop's own chrome**, and all of it obeys one system.
+
+**Spacing.** One responsive source, `ShellWindow`: the screen-edge gutter, the gap between
+top-level tabs, the minimum grid item, the minimum touch target and the maximum modal width
+are all derived from the window's own size class, never repeated as a number at a call site.
+Between the gutter and the glyph there is one step scale, and every padding, gap and inset is
+a step on it. A measurement that is not a step is a defect, not a preference. The minimum
+touch target applies in every orientation and on every input, because a pad-shaped device
+still has a touchscreen; it is not conditional on the window being touch-first.
+
+**Type.** droidtop's chrome has its own type scale, supplied to the theme alongside the colour
+scheme rather than inherited from the platform default, and each role has one documented job:
+what a screen title is, what a row title is, what a row's supporting line is, what a section
+label is, what a value is. Two screens in the same flow do not use different roles for the
+same job. Body text is capped to a readable measure regardless of how wide the window is; a
+full-bleed line on a 1280dp screen is a defect. One line of text that cannot fit is truncated
+with an ellipsis and is reachable in full somewhere.
+
+**Colour.** One source per surface family, and the families are named so a screen cannot pick
+the wrong one. The shell's menu palette is absolute against its own overlay surface, so any
+panel that hosts it is painted from that same palette — a platform scheme underneath a
+hand-picked one is what produced white-on-white. droidtop's chrome outside the shell takes its
+colours from droidtop's own scheme. No screen defines a colour inline. Every text-on-surface
+pair in both palettes is covered by a contrast test, not only the menu palette.
+
+**One anatomy per thing.** One row (title, optional supporting line, optional value, optional
+chevron; a chevron means "this opens", a value means "this is set to", and neither stands in
+for the other). One selectable choice row. One tile. One section label. One empty state. One
+selection idiom — a brightened card — across every droidtop-drawn surface; a focus rectangle
+in one place and a card in another is two answers to one question. One help/hint bar per
+screen, positioned inside the window.
+
+**Copy is part of the system.** Sentence case, one dash convention, one name per concept, verb
+labels on buttons, no developer notation and no backend error strings in a user-facing string.
+
+**Where it lives.** One file, `shell-gamepad/.../DesignTokens.kt`, in that module because it is
+the one both the Gaming shell and `:app` can see — a token half the chrome cannot reach is not
+a system. It carries `Space` (the step scale), `Measure.bodyMaxWidth` (the readable line),
+`TypeRole` naming the job of each role with `DroidtopTypography` behind it, and `ChromeColors`
+as the colour source for chrome outside the shell's menus. `DroidtopTheme` supplies the colour
+scheme and the type scale together and defines neither itself. The window-derived
+measurements — gutter, tab gap, minimum grid item, minimum touch target, maximum panel
+width — stay on `ShellWindow`, which is the one place that asks how much room there is.
+
+Two things implementation settled. A **disabled label** needs its own token: Material's stock
+38% alpha lands at 2.3:1 on the light ground, which is not a control a person sees, so
+`ChromeColors.DisabledAlpha` is the one value droidtop's chrome fades by and it clears 3:1 in
+both palettes. And **onboarding takes the dark palette deliberately** rather than the system
+setting (section 7b), which is what lets it use the shell's own menu row anatomy — those
+tokens are absolute against the menu overlay surface and legible over a dark ground and
+nothing else.
+
+## 7m. One game, its versions and its segments (directed 2026-09-16)
+
+**Part and version folders are structure, not depth.** Both walks bound
+themselves to `MAX_SCAN_DEPTH` title folders below a root so a mistakenly
+added root is never walked whole. A folder whose name is a part marker or a
+bare version (`GameNaming.isStructuralFolderName`: `Chap3+`, `Week 2`,
+`12.0-scrappy`, `1.0`) is the structure of one game and costs the walk no
+depth, and it is never itself the game when a game sits directly below it.
+The rig's `adult/renpy/BeingADik/Chap3+/12.0-scrappy` is the case: five
+folders down, one past the bound, and the walk stopped at `Chap3+`, claimed
+it on the `.rpa` fallback and handed enginehost a folder with no game in it
+(build 550).
+
+A game is ONE entry in the library, however many folders it occupies. Two
+real shapes in the user's own library, and they are the normative examples
+this section is tested against:
+
+- `adult/renpy/Fetish Locator/{Week 1, Week 2, Week 3}` is one game called
+  **Fetish Locator with three SEGMENTS**. It was three entries that shared
+  a cover and sorted apart from each other.
+- `Goodbye Eternity` in two folders, `...-0.8.1-pc-animated-unc` beside one
+  with no version in its name, is one game with **two VERSIONS**, and
+  `v0.8.1` is what Play starts.
+
+### A version is a FOLDER (decided 2026-09-17)
+
+`adult/godot/Anomalous_Coffee_Machine_2-1.0.00_deluxe_linux.x86_64` is a
+2 GB Linux ELF **file** sitting beside the folder
+`Anomalous_Coffee_Machine_2_v1.2-deluxe_windows`. It is NOT a second
+version of that game, and Anomalous Coffee Machine 2 correctly shows no
+Versions section: it has one.
+
+Decided from Pythia's own behaviour, because Pythia's version logic is
+what droidtop ports. Pythia never considers a non-directory at all:
+`pythia/scanning.py` enumerates game roots as `p for p in path.iterdir()
+if p.is_dir()` in every one of its four discovery functions, and
+`pythia/onboarding.py::preview` -- the entry point behind both its CLI and
+its Qt UI, and the thing that produces the version label and the candidate
+list -- refuses the path outright with "does not exist or is not a
+directory" before any detection runs. A bare executable, an AppImage, a
+`.zip` and a loose `.x86_64` export are therefore never version
+candidates, and droidtop does the same.
+
+The rule and its consequences, stated once: a version, a copy and a
+segment are each a folder that a scan found a game in. A loose file beside
+a game is not a game, not a version and not a copy; it is a file the user
+left there. droidtop does not hide it, rename it or claim it -- it simply
+has nothing to say about it. (If a bare-file release should ever become a
+version, the change is in what a SCAN yields -- an entry for the file --
+and not a second grouping rule; nothing in this section would change.)
+
+### How a version row is named
+
+A row in the Versions section is named by what it IS: its part, its
+version, or -- when the folder name carries neither -- the folder's own
+name. Never a pronoun. Build 542 named the unversioned `Goodbye Eternity`
+folder "This version", which reads as the one you are already on in a list
+whose whole purpose is switching to another.
+
+### The model
+
+`GroupedGame` is a name, a list of `GameVersion`, and a list of
+`GameSegment` (which each hold versions of their own). A `GameVersion` is
+a version string plus every `GameCopy` of it -- one install, with its
+path, mods, language, platforms, source and whether it is installed --
+because two copies of one version that differ by mods or language are two
+copies, not two versions. The version/copy split is Pythia's
+(`versions[] -> variants[]`), and so is the per-copy state
+(installed / latest known / update available).
+
+A **segment** is a part of a game: a week, a chapter, a part, an act, an
+episode, a season, a volume, a day or a disc. The default is the newest
+version of the first segment; `LibraryGameGroup` maps the model back onto
+the `LibraryEntry` each folder actually is, so launching, artwork,
+scraped metadata and runner resolution are unchanged and a themed ES-DE
+gamelist (which lists entries, by ES-DE's own schema) still works.
+
+### Where the logic comes from
+
+Name, version, mods, language and segment are derived from folder names by
+`GameNaming`, a rewrite of the user's own Pythia project's naming logic
+(`pythia/onboarding.py`: `_NAME_VERSION_RE`, `_GENERIC_PART_PREFIX_RE`,
+`_is_generic_part_leaf`, `_find_meaningful_ancestor_name`,
+`_extract_version_only`, `_derive_name_version_mods_language`,
+`_merge_version`; `pythia/datadir.py: classify_variant_tokens`). Pythia is
+the user's own GPL-3 project and the reasoning is reused under droidtop's
+licence as a rewrite with tests, not a file copy. Two rules carry most of
+the value and both are Pythia's own corrections against a real library:
+
+- A bare trailing number is part of the NAME, not a version (`Far Cry 5`,
+  `Cyberpunk 2077`); only `v`-prefixed or dotted numbers are versions.
+- A folder whose whole name is a part marker takes its name from the
+  nearest titled ancestor, so `Week 1` never becomes a game.
+
+droidtop adds two things Pythia has nowhere to put: a title that ENDS in a
+part marker is that part of the game the rest of it names
+(`ThiefofHeartsPart3-0.0.9-pc` sits beside `Part1` and `Part2`), and a
+part-marker folder passed on the way up to the title is kept as the
+segment (`BeingADik/Chap3+/10.0-sancho` is version 10.0 of chapter 3).
+
+### What merges, and what only suggests
+
+Two folders are the same game when their derived names are equal once case
+and punctuation are dropped (`GoodbyeEternity` = `Goodbye Eternity`).
+Similarity does NOT merge. Pythia's `NAME_SIMILARITY_THRESHOLD` of 0.6
+(difflib's `SequenceMatcher.ratio`, ported exactly, because the threshold
+was chosen against that measure) decides what Pythia SUGGESTS to the
+person onboarding a folder -- only an exact path, a sync marker or a store
+id is ever `certain` there. droidtop's scan has nobody to ask, and the
+corpus says what automatic merging at 0.6 would cost:
+`love_of_magic_book1`, `book2` and `book3` score 0.94 against each other
+and are three different games; `Lust Academy` and `Lust Theory` score
+0.61; `ARTEMIS` and `RTS` score 0.60. So similar names become
+suggestions, and nothing acts on them without the user.
+
+The same naming answers a second question, added 2026-09-17: which
+detected game replaces a missing one (7g). `MissingGames.candidates`
+offers same-`nameKey` games first and 0.6-similar ones after, in that
+order, and the user chooses -- `Game v0.3` deleted and `Game v0.4`
+unpacked beside it is the case it exists for, and it is Pythia's
+`find_candidates` shape (certain, then suggested by descending ratio)
+rather than a second measure of its own. A missing folder is still one of
+the game's versions until it is folded away, so it keeps its row in
+"Parts and versions" and that row's detail is where "Find its
+replacement" lives.
+
+### The UI this needs, and no more
+
+The PC surface draws one card per game and says how many folders it stands
+for when the two numbers differ. The game detail gains one section --
+"Parts and versions", or "Versions" when the game has no parts -- with a
+row per part and per version saying what it carries (language, mods, an
+available update) and marking the one that is open. Choosing a row opens
+that folder's detail, so Play starts what the user chose. That is the
+whole surface: the model's job is that a game is one entry, so what the
+detail needs is a way to reach the other folders of it.
+
+### The corpus
+
+`library-core/src/test/resources/adult-folder-names-2026-09-16.txt` is the
+real list of the user's game folders taken off the rig on 2026-09-16, and
+`GameGroupingTest` runs every line of it through the grouping, prints the
+result and asserts it: 79 folders become 76 games, three of which have two
+versions, and no two different games are merged.
+
 ## 8. Licensing
 
 `vendor/gamenative` and `vendor/droidspaces` are GPL-3.0. Winlator itself
@@ -5095,7 +5746,7 @@ and dependency rationale; each module also has its own README. Summary:
 ```
 app                    → depends on everything; owns DesktopSessionService + MainActivity
 host-bridge             → native Wayland client + JNI; frame passthrough, input injection,
-                          and the host<->container clipboard bridge (§6c)
+                          and the host<->container clipboard bridge (§6d)
 runtime-common          → shared types (Container, DisplayOutput, RootfsImage); no deps
 runtime-windows         → Wine/Box64 (fork: vendor/gamenative), no display code of its own
 runtime-linux-root      → DroidSpaces fork (vendor/droidspaces), namespaces/cgroups, needs root
@@ -5157,52 +5808,6 @@ need droidtop's Application to carry the Hilt graph), curating the
 vendor manifest's components into the module manifest, and real entry
 points from droidtop settings into gamenative's container-config UI
 (§7c).
-
-### Back goes back, and lands where you left (rig, build 542)
-
-B from a PC game's detail put the user on the system carousel, at the top,
-having lost the grid's position; getting back to the game they had been
-looking at took B, B, Right, A.
-
-The cause was that the shell had no answer to "where am I". The section
-was one piece of state, the drilled-into group was a `remember` inside the
-games screen, and the open detail was a third; the detail was drawn as a
-sibling branch of the games screen, so opening it DESTROYED that screen
-and everything it remembered, and closing it rebuilt the screen from
-nothing.
-
-**One stack answers it** (`ShellBackStack`, `shell-gamepad`). The Gaming
-shell is a section, a group inside Games, that group's own options screen
-and one game's detail -- and the stack holds all of them, plus the entry
-the user was on in each one. A screen ASKS where it is and what to focus;
-it does not own the answer and so cannot lose it.
-
-- B closes the detail, else closes the group's own options screen, else
-  leaves the group, else does nothing (the top of the shell is a home
-  screen).
-- **A screen opened from a level is a level**, not state the screen under
-  it holds. The PC surface's "Stores and folders" was a `remember` inside
-  the PC surface -- which stops being composed the moment that screen is
-  drawn instead of it -- and the group's own drill-up sits ABOVE it in the
-  tree, so the drill-up answered for it: `KEYCODE_BACK` reaches the view
-  tree as an ordinary key event before it reaches the back dispatcher, so
-  B out of Stores and folders left the group outright and landed on the
-  carousel with the system reset (rig, build 548). Both back routes -- the
-  dispatcher and the B/BACK key -- go through `nav.back()`, which leaves
-  one level at a time.
-- Returning to a group lands on the entry that was focused there: the PC
-  grid scrolls to that card and focuses it, and a themed gamelist opens on
-  that game. A group this session has not been in opens at the top, which
-  is ES-DE's own "selection resets per gamelist".
-- Opening another version or part of a game from its own detail (SPEC 7m)
-  is a move SIDEWAYS, not a level: B from it still means "back to the grid
-  I came from".
-- Switching sections is a move at the top level and leaves no group or
-  detail open.
-
-The three levels are fixed rather than an arbitrary push-down stack,
-because a push-down stack would let one game's detail sit under another's
-and make B mean "the previous game" -- which is not what B means here.
 
 ## 10. Suggested build order
 
@@ -5722,609 +6327,3 @@ above for the plugin half, and answered in fact for the JSON half by
 what is built: the surface is the closed `IntegrationCapability` set
 plus the placeholders each one is given, the manifest is the `.json`
 file, and the trust model is per-capability rather than per-app.
-
-## 7h. Scraper honesty, and what counts as a game (directed 2026-09-02)
-
-An overnight ScreenScraper pass over the user's real library — 46 ROMs
-across 11 systems — returned HTTP 403 for **all 46** requests: zero
-successes, zero exceptions, zero files written. The app reported it as
-`no match for 46, 0 failed`. Two rules come out of that, and they are
-binding on every scraper source, not just ScreenScraper.
-
-**A refusal is not a miss, and the type system says so.**
-`ScreenScraperClient.findMetadata` no longer returns a nullable metadata
-object. It returns `ScreenScraperLookup`, which is exactly one of
-`Found`, `NoMatch` (the server answered HTTP 200 and its response carried
-no game — the only outcome that is a statement about the user's library)
-or `Refused(httpStatus, reason)` (the server would not serve the request
-at all — a statement about the API, about credentials, or about a quota,
-and about nothing else). A transport failure stays a thrown exception and
-stays counted as `failed`. The scrape summary reports all four buckets
-separately and may never fold any of the other three into "no match"; a
-pass that was refused everything it asked for leads with that instead of
-reporting a count. `formatScrapeSummary` is a pure function so this
-arithmetic is unit-tested rather than only observable on hardware.
-
-**The server's own reason is surfaced, not discarded.** ScreenScraper
-answers a non-200 with a short human-readable explanation in the response
-body. That body is read from `errorStream` under a hard 512-character
-bound, has every non-blank credential the request carried redacted out of
-it *before* anything else touches it, is stripped of any markup an
-intermediary added, and then appears both in logcat (tag
-`droidtop.Scraper`) and in the summary the user reads. Credentials
-themselves are still never logged — only whether they are present.
-
-**A repeated refusal ends the pass.** Five consecutive refusals stop the
-run and report; 46 refusals paced ~11s apart buy no information that the
-first five did not.
-
-**Not decided here, deliberately:** the cause of the 2026-09-01 403s.
-Credentials were verified present, verified to descramble, and the
-personal account was configured. The two candidates — a newly registered
-ScreenScraper application pair still awaiting manual approval, and
-`softname` needing to match the *registered application name* — are
-documented in `ScreenScraperClient.refusalHint` and printed on a 403.
-`softname` is **not** changed speculatively: only the person who
-registered the application knows what it was registered as.
-
-### One ROM walk, and a DLC folder is not twelve games
-
-A `Rune Factory 5` DLC directory produced twelve separate library
-entries, each with its own metadata row and cover, because twelve add-on
-files carried the system's ROM extension and the scan was a plain
-`walkTopDown()`. The library scan and the scraper each had their own copy
-of that walk and could disagree about what a game is; they now share
-`RomScanWalk`, which owns the rule:
-
-1. Recursion stays. Reorganising a large system into subfolders must
-   never hide files.
-2. A directory whose **final name token** is one of `dlc`/`dlcs`,
-   `update`/`updates`, `patch`/`patches`, `addon`/`addons`, `bios` or
-   `firmware` holds content that attaches to a game rather than being
-   one, and is not descended into. Matching the final token is what makes
-   this a rule instead of a special case for one title: it covers `DLC`,
-   `Rune Factory 5 (DLC)`, `Zelda - Updates` and `_patches` without
-   knowing any game's name.
-3. The marker list is deliberately short, and `mods`/`hacks`/`romhacks`
-   are pointedly **not** on it. A ROM hack is a playable game. A rule that
-   hides real games to tidy a list is worse than the bug it fixes.
-4. The system folder itself is never excluded by its own name, so this
-   can never empty out a whole system.
-5. The user's override is ES-DE's own real `noload.txt`
-   (`SystemData::populateFolder`): a directory containing that file, and
-   everything under it, is skipped. droidtop honours the existing
-   mechanism rather than inventing a second one.
-
-Every skipped directory is logged with its reason, so this never loses
-files silently.
-
-### A folder that holds games is a container, in both walks (rig, 2026-09-16)
-
-droidtop has two walks over a games root -- engine detection
-(`GameEngineDetector`) and the PC folder scan (`PcFolderScan`) -- and the
-rig showed what happens when only one of them knows the rule. The rules
-below are one set, asked by both, in this order:
-
-1. **A folder with two or more ENGINE games directly below it is a
-   container**, whatever evidence it carries of its own. `adult/godot`
-   holds two Godot games and one loose Godot Linux build left beside them;
-   the loose build is precise Godot evidence, so the category folder
-   became a game called "godot" and both games inside it were never
-   walked. Two, not one: a folder with exactly one game below it is that
-   game's wrapper or its payload, and both walks already have rules for
-   that shape. Only the immediate children are tested, with the precise
-   rules only, so this costs one directory listing per child.
-2. **A folder that directly holds an executable and no engine evidence at
-   all is a PC game, and its subfolders are its payload.** The engine walk
-   stops there instead of descending: `Ghost Recon Breakpoint/benchmark`
-   (an index.html and sixteen PNGs) and `The Movies/Docs` were listed as
-   games by the database's weakest row, "there is a page here", while the
-   games they sit inside were not listed at all.
-
-   The rule is ONE function, `GameEngineDetector.isPlainPcGameFolder`, and
-   every walk asks it. Build 540 is why that is written down: the walk
-   applied it and `detectGame` did not, so the walk correctly returned no
-   engine game for `Ghost Recon Breakpoint` while `detectGame` read the
-   payload's `index.html` one level down, called the folder engine-owned,
-   and `PcGameProvider` dropped its PC entry as a duplicate of an engine
-   entry that was never created. Both folders vanished from the library
-   entirely. A folder that holds an executable and no engine evidence of
-   its own is a PC game, listed once, whatever sits beneath it.
-3. **A folder that holds files of its own AND games below it is those
-   games' root**, however many there are, and when exactly one game sits
-   below it, that game's own markers are this folder's
-   (`Humble/macdows95_windows/macdows95/{PLAY.bat, files/}` is the game
-   `macdows95`, whose root is `files`; build 540 listed a game called
-   `files`). The version-named wrapper
-   (`BeingADik/BeingADIK-0.8.3-scrappy/{renpy,game}`) is the same rule
-   recognised by the name instead of by the files. Neither applies inside
-   a store tree, where `steamapps` holding one installed game must still
-   yield the game. The one-game form of this rule
-   could not see a Ubisoft install: `Far Cry 5` keeps its launcher files
-   in the game folder and its executables in `bin` and `bin_plus`, so the
-   list got `bin` and `bin_plus` and never Far Cry 5. `EA/SimCity` is the
-   same shape with three payload folders. A container proper holds no
-   files of its own, which is what still makes `EA`, `Ubisoft`, `adult`
-   and a games root containers.
-
-4. **Evidence that could have come from below only names a folder when
-   it is that engine's own root layout** (rig, build 542). A detection
-   rule that reads an unnamed subtree -- Unity's three-deep player search,
-   the compiled-Ren'Py `.rpa`/`.rpyc` fallback -- proves a game is
-   somewhere under a folder without saying where, so it matches at every
-   folder on the way down and the OUTERMOST match is taken. `Pirated`
-   holds three games (`PRAGMATA`, `The Movies`, `The Tenants Pets`); the
-   third is a plain Unity install with `UnityPlayer.dll` in its own root,
-   so Unity's probe matched at `Pirated` too, nothing below `Pirated` was
-   precise, and the container took the entry while the Unity game appeared
-   in no list at all.
-
-   So a subtree rule whose evidence is found IN a folder, in a folder that
-   also holds the executable that starts it, names that folder
-   (`GameEngineDetector.engineHere`). Unity's own root is the player
-   runtime beside the player; a folder holding the runtime and nothing to
-   run is a payload folder, and the outermost-match rule still reads it
-   correctly. This is deliberately narrower than "any subtree rule at
-   depth 0": Ren'Py keeps its archives in the game's `game/` subfolder by
-   that engine's own layout, so a depth-0 match there would name the
-   payload rather than the game.
-
-   The `.gamenative` file in `Pirated` is not what made this happen, and
-   is not evidence of anything. gamenative writes that file into every
-   folder its own scanner called a custom game
-   (`app/gamenative/utils/CustomGameScanner.writeGameIdToFile`), and that
-   scanner is the one-level rule `PcFolderScan` replaced -- so the marker
-   in a store or category root is droidtop's own stale verdict, read back.
-   Nothing in either walk reads it. It is a dotfile, so it is not "files
-   of its own" for rule 3 either.
-5. **A store's own install root is never a game**, in either walk, however
-   much evidence its client leaves in it. `PcFolderScan` already had this;
-   the engine walk did not, so a Steam library folder with one engine game
-   under `steamapps/common` could be claimed by the outermost-match rule
-   above and listed as a game called "Steam".
-
-**A folder name only means a ROM system where a system folder can be.**
-ES-DE's layout is `<root>/<systemId>/<rom>` and droidtop allows one
-container level above it (`<root>/roms/<systemId>`), so nothing deeper is
-a system folder however it is named, and nothing inside a store's install
-tree is one at all. `Ubisoft/Far Cry 5/data_final/pc` and
-`Ghost Recon Breakpoint/sounddata/pc` are game data four levels down that
-match the real platform id `pc` (DOS games, `dosbox_pure`); they are what
-build 540's log line `2 x it is a console system folder, scanned for ROMs
-instead` was counting, and that line named neither of them.
-
-**A scan line names the folders each rule fired on.** Counts by reason
-replaced one line per skipped folder (several hundred on the rig) and are
-still the shape of the line; the folders are now named beside the count,
-up to six per reason and then `+N more`, relative to the folder the line
-is about. A count alone cannot be acted on: "2 folders skipped" gives a
-person no way to find the games behind them.
-
-**A budget costs a folder its own evidence, never its subtree.** The
-per-folder budget (SPEC 7g) bounds one folder's own step. When that step
-runs over, the folder cannot claim to be a game on evidence a rule never
-finished gathering -- but its children are still walked, each under a
-budget of its own. `adult/RPGMaker` ran past 20 s on a cold scan of the
-rig's shared folder and all six games under it were dropped with it. A
-budget that drops a subtree loses real games, which is worse than the slow
-scan it exists to bound; bigness is not pathology.
-
-**droidtop's own answer is not read back out of a vendored preference.**
-The folders `PcFolderScan` finds are turned into library items directly,
-in the same pass, and only written to gamenative's `customGameManualFolders`
-as a side effect for its own screens. They used to be written there and
-read straight back: `PrefManager.setPref` hands the write to a DataStore
-coroutine and returns, while `candidateFolders()` reads synchronously, so
-the first scan after an install read the EMPTY set. That is why build 537
-(upgraded, with a previous run's value in the preference) listed 171 games
-and a freshly installed 539 listed 151 with every folder game missing.
-
-
-## 7m. One game, its versions and its segments (directed 2026-09-16)
-
-**Part and version folders are structure, not depth.** Both walks bound
-themselves to `MAX_SCAN_DEPTH` title folders below a root so a mistakenly
-added root is never walked whole. A folder whose name is a part marker or a
-bare version (`GameNaming.isStructuralFolderName`: `Chap3+`, `Week 2`,
-`12.0-scrappy`, `1.0`) is the structure of one game and costs the walk no
-depth, and it is never itself the game when a game sits directly below it.
-The rig's `adult/renpy/BeingADik/Chap3+/12.0-scrappy` is the case: five
-folders down, one past the bound, and the walk stopped at `Chap3+`, claimed
-it on the `.rpa` fallback and handed enginehost a folder with no game in it
-(build 550).
-
-A game is ONE entry in the library, however many folders it occupies. Two
-real shapes in the user's own library, and they are the normative examples
-this section is tested against:
-
-- `adult/renpy/Fetish Locator/{Week 1, Week 2, Week 3}` is one game called
-  **Fetish Locator with three SEGMENTS**. It was three entries that shared
-  a cover and sorted apart from each other.
-- `Goodbye Eternity` in two folders, `...-0.8.1-pc-animated-unc` beside one
-  with no version in its name, is one game with **two VERSIONS**, and
-  `v0.8.1` is what Play starts.
-
-### A version is a FOLDER (decided 2026-09-17)
-
-`adult/godot/Anomalous_Coffee_Machine_2-1.0.00_deluxe_linux.x86_64` is a
-2 GB Linux ELF **file** sitting beside the folder
-`Anomalous_Coffee_Machine_2_v1.2-deluxe_windows`. It is NOT a second
-version of that game, and Anomalous Coffee Machine 2 correctly shows no
-Versions section: it has one.
-
-Decided from Pythia's own behaviour, because Pythia's version logic is
-what droidtop ports. Pythia never considers a non-directory at all:
-`pythia/scanning.py` enumerates game roots as `p for p in path.iterdir()
-if p.is_dir()` in every one of its four discovery functions, and
-`pythia/onboarding.py::preview` -- the entry point behind both its CLI and
-its Qt UI, and the thing that produces the version label and the candidate
-list -- refuses the path outright with "does not exist or is not a
-directory" before any detection runs. A bare executable, an AppImage, a
-`.zip` and a loose `.x86_64` export are therefore never version
-candidates, and droidtop does the same.
-
-The rule and its consequences, stated once: a version, a copy and a
-segment are each a folder that a scan found a game in. A loose file beside
-a game is not a game, not a version and not a copy; it is a file the user
-left there. droidtop does not hide it, rename it or claim it -- it simply
-has nothing to say about it. (If a bare-file release should ever become a
-version, the change is in what a SCAN yields -- an entry for the file --
-and not a second grouping rule; nothing in this section would change.)
-
-### How a version row is named
-
-A row in the Versions section is named by what it IS: its part, its
-version, or -- when the folder name carries neither -- the folder's own
-name. Never a pronoun. Build 542 named the unversioned `Goodbye Eternity`
-folder "This version", which reads as the one you are already on in a list
-whose whole purpose is switching to another.
-
-### The model
-
-`GroupedGame` is a name, a list of `GameVersion`, and a list of
-`GameSegment` (which each hold versions of their own). A `GameVersion` is
-a version string plus every `GameCopy` of it -- one install, with its
-path, mods, language, platforms, source and whether it is installed --
-because two copies of one version that differ by mods or language are two
-copies, not two versions. The version/copy split is Pythia's
-(`versions[] -> variants[]`), and so is the per-copy state
-(installed / latest known / update available).
-
-A **segment** is a part of a game: a week, a chapter, a part, an act, an
-episode, a season, a volume, a day or a disc. The default is the newest
-version of the first segment; `LibraryGameGroup` maps the model back onto
-the `LibraryEntry` each folder actually is, so launching, artwork,
-scraped metadata and runner resolution are unchanged and a themed ES-DE
-gamelist (which lists entries, by ES-DE's own schema) still works.
-
-### Where the logic comes from
-
-Name, version, mods, language and segment are derived from folder names by
-`GameNaming`, a rewrite of the user's own Pythia project's naming logic
-(`pythia/onboarding.py`: `_NAME_VERSION_RE`, `_GENERIC_PART_PREFIX_RE`,
-`_is_generic_part_leaf`, `_find_meaningful_ancestor_name`,
-`_extract_version_only`, `_derive_name_version_mods_language`,
-`_merge_version`; `pythia/datadir.py: classify_variant_tokens`). Pythia is
-the user's own GPL-3 project and the reasoning is reused under droidtop's
-licence as a rewrite with tests, not a file copy. Two rules carry most of
-the value and both are Pythia's own corrections against a real library:
-
-- A bare trailing number is part of the NAME, not a version (`Far Cry 5`,
-  `Cyberpunk 2077`); only `v`-prefixed or dotted numbers are versions.
-- A folder whose whole name is a part marker takes its name from the
-  nearest titled ancestor, so `Week 1` never becomes a game.
-
-droidtop adds two things Pythia has nowhere to put: a title that ENDS in a
-part marker is that part of the game the rest of it names
-(`ThiefofHeartsPart3-0.0.9-pc` sits beside `Part1` and `Part2`), and a
-part-marker folder passed on the way up to the title is kept as the
-segment (`BeingADik/Chap3+/10.0-sancho` is version 10.0 of chapter 3).
-
-### What merges, and what only suggests
-
-Two folders are the same game when their derived names are equal once case
-and punctuation are dropped (`GoodbyeEternity` = `Goodbye Eternity`).
-Similarity does NOT merge. Pythia's `NAME_SIMILARITY_THRESHOLD` of 0.6
-(difflib's `SequenceMatcher.ratio`, ported exactly, because the threshold
-was chosen against that measure) decides what Pythia SUGGESTS to the
-person onboarding a folder -- only an exact path, a sync marker or a store
-id is ever `certain` there. droidtop's scan has nobody to ask, and the
-corpus says what automatic merging at 0.6 would cost:
-`love_of_magic_book1`, `book2` and `book3` score 0.94 against each other
-and are three different games; `Lust Academy` and `Lust Theory` score
-0.61; `ARTEMIS` and `RTS` score 0.60. So similar names become
-suggestions, and nothing acts on them without the user.
-
-The same naming answers a second question, added 2026-09-17: which
-detected game replaces a missing one (7g). `MissingGames.candidates`
-offers same-`nameKey` games first and 0.6-similar ones after, in that
-order, and the user chooses -- `Game v0.3` deleted and `Game v0.4`
-unpacked beside it is the case it exists for, and it is Pythia's
-`find_candidates` shape (certain, then suggested by descending ratio)
-rather than a second measure of its own. A missing folder is still one of
-the game's versions until it is folded away, so it keeps its row in
-"Parts and versions" and that row's detail is where "Find its
-replacement" lives.
-
-### The UI this needs, and no more
-
-The PC surface draws one card per game and says how many folders it stands
-for when the two numbers differ. The game detail gains one section --
-"Parts and versions", or "Versions" when the game has no parts -- with a
-row per part and per version saying what it carries (language, mods, an
-available update) and marking the one that is open. Choosing a row opens
-that folder's detail, so Play starts what the user chose. That is the
-whole surface: the model's job is that a game is one entry, so what the
-detail needs is a way to reach the other folders of it.
-
-### The corpus
-
-`library-core/src/test/resources/adult-folder-names-2026-09-16.txt` is the
-real list of the user's game folders taken off the rig on 2026-09-16, and
-`GameGroupingTest` runs every line of it through the grouping, prints the
-result and asserts it: 79 folders become 76 games, three of which have two
-versions, and no two different games are merged.
-
-## 7j. Portrait and touch-first chrome (directed 2026-09-10)
-
-"Most people will be on phones without controllers." droidtop's own
-chrome --- the tab bar, Quick Menu, PC surface, game detail, gamelist
-options, settings, onboarding and the launch chooser --- treats a screen
-held upright with no pad attached as a primary target, not a degraded
-one. Two rules carry the whole design.
-
-**One layout system, no duplicated screens.** `LocalShellWindow` carries
-the live window size class (Android's own compact/medium/expanded
-thresholds) and orientation, and every screen measures itself from it.
-There is no portrait COPY of any screen and no orientation branch beyond
-the handful of places where the shape genuinely differs:
-
-- the screen-edge gutter is one definition (48dp at TV distance, 16dp on
-  a compact screen), not a number repeated at every call site;
-- game cards and the PC grid size from the window rather than the
-  console's 220dp;
-- rows that can outgrow the width scroll instead of clipping (the PC
-  filter chips, the hint bar);
-- a modal panel's fixed width is capped by the window, because the half
-  that falls off a phone's edge is the half with the buttons on it;
-- the **Quick Menu** is a right-edge sheet in landscape and a **bottom
-  sheet** in portrait. Its whole premise is that the shell stays visible
-  behind it, and a full-height right-edge sheet on a tall screen IS the
-  whole screen; the bottom sheet also puts its tabs in thumb reach.
-
-**Touch dispatches the real press; it never re-implements it.** Every
-screen decides what a button MEANS in one `onKeyEvent` block next to the
-state it acts on. A touch affordance therefore sends a genuine key event
-down the focused window (`rememberGamepadTouch`,
-`GamepadKeyMap.keyCodeFor`) and travels that same path, so there is
-exactly one definition of every action and touch cannot drift from the
-pad.
-
-**The shell owns the pad; Android's generic fallbacks never act on it.**
-`Generic.kcm` gives every pad button a fallback key (A, Start and the thumb
-clicks become DPAD_CENTER, B becomes BACK, X DEL, Y SPACE, Select MENU),
-dispatched on both edges whenever the window leaves the button unhandled.
-Every screen here acts on the UP edge, so the unhandled DOWN of A on a card
-became a DPAD_CENTER pair that pressed the primary button of the detail the
-A had just opened (build 552). The outermost node of every window
-(`Modifier.ownPadButtons`: the shell's root, the Quick Menu's dialog)
-consumes every pad button nothing below it wanted and gives B its one
-meaning explicitly, the back dispatcher. A `BackHandler` is therefore a
-complete answer to B for pad and touch alike -- a hint pill dispatches a
-real `BUTTON_B` into the window and it arrives at the root exactly as a
-pad's does -- and a screen with nothing focusable (an empty list) must have
-one. D-pad, keyboard and volume keys are not pad buttons and pass through.
-
-**That block goes AHEAD of the element's focus targets in the modifier
-chain, never behind them.** Compose dispatches a key event to the
-key-input modifiers between the ACTIVE focus target and the root:
-`FocusOwnerImpl.dispatchKeyEvent` takes `activeFocusTarget
-.lastLocalKeyInputNode()`, and that helper stops at the next `FocusTarget`
-in the same chain (compose ui 1.7.2). `Modifier.clickable` delegates a
-`FocusableNode` of its own, so in `.focusable().clickable { }
-.onKeyEvent { }` the handler is behind a focus target and is never
-dispatched at all -- only ancestors get the event. What hides it is
-Android's own key-character-map fallback: an unhandled `BUTTON_A` is
-re-sent as `DPAD_CENTER` (`Generic.kcm`), which `clickable` treats as a
-click, so A appears to work through the click path while every other
-action written the same way (X for favourite, Y for a detail) is dead,
-and every hint-bar tap -- a direct `dispatchKeyEvent`, which gets no
-fallback -- does nothing (rig, build 548: the PC grid's own `A Open` hint
-inert while `B` and `Y`, handled on ancestors, worked).
-
-**A hint row promises only what dispatches.** A row is this shell's touch
-control surface, so a hint that names an action nothing handles is a
-promise the screen does not keep: either the action exists by every route
-the row implies, or the hint is not drawn. The Apps grid drew `Y  Info`
-over tiles that handled only A, while the long-press beside them already
-opened the app's own detail (rig, build 548).
-
-Consequences:
-
-- the persistent help bar stops being a legend and becomes the control
-  surface: every hint is tappable (`TouchHintBar`), and it stays on a
-  touch screen even when a theme draws its own help row, because that row
-  is decoration and the bar is the only route to B/Y/Select without a pad;
-  **when it stays, the theme's own row goes.** Real ES-DE gives the
-  Window exactly ONE help bar (`Window.cpp:126`, `Window::setHelpPrompts`
-  at `:884`; `HelpComponent.cpp:629` draws nothing when help is off) and a
-  theme's `<helpsystem>` styles that one component rather than adding a
-  second. droidtop keeps that count with one value, read by every side
-  of it. A screen says what it HAS of its own (`HelpRowClaim`: nothing,
-  a row of its OWN, or a THEME's `<helpsystem>`) and one function
-  (`esDeHelpRowOwner`) says who draws (`HelpRowOwner`, published as
-  `LocalHelpRowOwner`): the shell's `ButtonHintFooter` draws exactly when
-  it says SHELL, a screen's own `TouchHintBar` exactly when it says
-  SCREEN, and the themed renderer draws the theme's `<helpsystem>`
-  exactly when it says THEME. A theme's row is a LEGEND -- it names
-  buttons, it does not dispatch them -- so a touch-first window takes it
-  over; a screen's own row is a real control surface with this screen's
-  own actions in it (the PC surface: A opens a game, it does not launch
-  it), so it is never doubled by the shell's bar in either shape.
-  Independent conditions for the one row are how droidtop drew two,
-  twice: the theme's row sliced in half by the bar over it in landscape
-  with Slate (rig, build 546), and the shell's bar stacked under the PC
-  grid's own row in portrait but not in landscape, because the PC
-  surface claimed the row as a THEME's and a touch-first window then
-  overrode a claim that was never a theme's (rig, build 547). A claim is
-  also scoped to the screen that makes it, so a screen the shell is still
-  fading out cannot answer for the screen arriving;
-- **the one row is drawn in the one place laid out for it, and paints
-  nothing there.** Real ES-DE draws its single `HelpComponent` ON the
-  view, at the theme's own `<helpsystem>` position and with no background
-  of its own; the view is not shortened to make room for it. So when the
-  shell owns the row over a THEME's screen, droidtop's bar is drawn at
-  that same position (`EsDeHelpRowSlot`, reported by the renderer from the
-  merged element's `pos`/`origin` and applied after the row is measured,
-  exactly as the theme's own bar is) with a transparent background, and
-  the themed view gets the whole area in portrait that it gets in
-  landscape. An opaque plate there covers the plate the theme drew for
-  this row, which is what still read as "a strip below the canvas" after
-  the bar had already moved onto it (rig, build 548). The claim is about
-  the CANVAS, not about the element: a theme that declares no
-  `<helpsystem>` still draws the whole window and still has a help
-  position -- ES-DE's own component default, `0.012` of the width and
-  `0.9515` of the height, `0.975` when the window is vertical, origin
-  `0 0` (`HelpComponent.cpp:23-27`) -- so its canvas is not shortened
-  either. Otherwise a theme was laid out into a canvas that changed
-  height with droidtop's chrome, and the plate the theme drew for its own
-  help row was left visibly empty above droidtop's bar (rig, build 547,
-  DEcaffe in portrait). That plate is the THEME's art, not its
-  `<helpsystem>`: droidtop suppresses the `<helpsystem>` element and
-  nothing else, and never guesses that some `<image>` a theme declares
-  was "really" a help-bar background;
-- actions that had no on-screen name at all are now named and reachable:
-  Select for gamelist options, Y for the PC surface's stores and folders;
-- **a card says what IT is, never the heading it sits under.** The line
-  under a tile's or card's name is what the thing itself declares -- an
-  installed app's own Android application category, a scraped game's
-  genre -- and, when it declares nothing, what one entry of its kind is
-  called in the singular (`LibraryEntry.kindLine`, `LibraryEntryKind
-  .itemName`; `displayName` is the name of the GROUP and belongs to the
-  heading). Filling it from the group name made all eighteen Apps tiles
-  read "Apps", two lines below a heading that already said so (rig,
-  build 547). Nothing is invented for it: an app that declares no
-  category gets "Android app", not a guess;
-- **long-press is Y** on a game card or app tile --- the same "act on
-  this one" the pad reaches with a second button;
-- a value that is **stepped** rather than opened --- a slider, a small
-  cycling choice --- makes the two arrows the row already draws into two
-  targets, because a touch screen has no Left/Right and a slider has no
-  "open" to tap: it was otherwise pad-only, in the settings list a phone
-  user has to use;
-- **every scrolling screen the shell draws ends above the hint bar.** The
-  bar is the last thing in the window, so a list measured against the rest
-  of it ends exactly where the bar begins: the last row is sliced by the
-  window edge and scrolling to the end never brings it clear (rig, build
-  546, the settings list; build 548, a game detail's last card). The room
-  is CONTENT padding, not a padding modifier -- a modifier shrinks the
-  viewport and the row still ends against the bar -- and it is one value,
-  `MenuTokens.HintBarRoom`, because it is one bar;
-- the Quick Menu's notifications are rows, not a read-out: a tap moves
-  the cursor and opens one, and dismiss/clear-all are on the hint bar
-  instead of a legend naming buttons that were not there;
-- **swipe steps** a themed carousel, textlist or grid
-  (`Modifier.esDeSwipeSteps`). Those widgets own a cursor and move in
-  whole entries rather than scrolling, so no Compose gesture applied to
-  them at all before: a themed view could only be driven by a pad.
-- a **tap on a themed entry is one selection, not two**: it moves the
-  widget's own cursor onto the entry it hit --- through that widget's own
-  `step()`, so the move carries the direction and animation the D-pad
-  gives it --- and then acts on it. The carousel activated without moving
-  its cursor, so backing out of a system landed on a different entry than
-  the one just visited. A reflection is decoration and takes no taps at
-  all; it used to be a second, invisible hit target for the entry it
-  mirrors.
-- the top-level **tab bar scrolls** and keeps the Quick Menu control
-  pinned beside it. Four tab names do not fit across a 411dp phone, and a
-  plain row pushes the last one --- in desktop mode, a tab with no other
-  touch route --- silently off the edge.
-
-**Every screen states its own way out, and the hint bar tells the truth
-about it (rig, build 539).** The Gaming shell's Settings section declared
-"no back available" while a nested settings screen was open, which took
-the B hint out of the hint bar -- and that hint IS the touch route to B,
-so a person on a touch screen had no way out of "Windows games" at all and
-Game folders, Rescan library and Software updates became unreachable. Two
-rules follow: a section that can go back says so, always; and a menu takes
-B by every route it can arrive on -- the back dispatcher (what KEYCODE_BACK
-and the hint bar's own tap become), and `KEYCODE_BUTTON_B`/Escape as
-ordinary key events, which never reach that dispatcher at all.
-
-The pad keeps everything. Touch affordances are additions; no key route
-was changed or removed, and a pad plugged into a portrait phone behaves
-exactly as it does on the console.
-
-ES-DE's own Android answer is the same idea taken further from the UI: a
-floating virtual gamepad overlay whose fingers are fed into the ordinary
-input path as `DEVICE_TOUCH` presses (`InputManager.cpp:446-500`,
-`InputTouchOverlay*` settings in `GuiMenu.cpp:1401-1436`). droidtop
-routes touch the same way --- one input path, no second definition ---
-but puts the targets on the real affordances rather than under a
-translucent d-pad drawn over the screen, because droidtop's chrome is
-its own, is laid out for the window it is in, and is the part a phone
-user spends their time in. A themed view, whose element positions belong
-to the theme's author, is where the swipe-steps gesture does the same
-job the overlay would.
-
-Rigs: the emulator `droidtop-portrait` AVD (1080x1920 at 420dpi = 411 x
-731dp, a real 1080p phone) alongside `droidtop-1080p`, driven by the same
-`run.ps1` with `-Portrait`; and a portrait BlueStacks instance.
-Screenshots of both belong in the evidence for any chrome change.
-## 7k. The design system: one spacing scale, one type scale, one colour source
-
-droidtop draws two kinds of surface. A **themed view** takes every colour, typeface and
-measurement from the active ES-DE theme (section 7f) and is out of scope here. Everything
-else — onboarding, the shell's chrome and menus, the settings catalog, the Quick Menu, the
-PC surface, the desktop panels — is **droidtop's own chrome**, and all of it obeys one system.
-
-**Spacing.** One responsive source, `ShellWindow`: the screen-edge gutter, the gap between
-top-level tabs, the minimum grid item, the minimum touch target and the maximum modal width
-are all derived from the window's own size class, never repeated as a number at a call site.
-Between the gutter and the glyph there is one step scale, and every padding, gap and inset is
-a step on it. A measurement that is not a step is a defect, not a preference. The minimum
-touch target applies in every orientation and on every input, because a pad-shaped device
-still has a touchscreen; it is not conditional on the window being touch-first.
-
-**Type.** droidtop's chrome has its own type scale, supplied to the theme alongside the colour
-scheme rather than inherited from the platform default, and each role has one documented job:
-what a screen title is, what a row title is, what a row's supporting line is, what a section
-label is, what a value is. Two screens in the same flow do not use different roles for the
-same job. Body text is capped to a readable measure regardless of how wide the window is; a
-full-bleed line on a 1280dp screen is a defect. One line of text that cannot fit is truncated
-with an ellipsis and is reachable in full somewhere.
-
-**Colour.** One source per surface family, and the families are named so a screen cannot pick
-the wrong one. The shell's menu palette is absolute against its own overlay surface, so any
-panel that hosts it is painted from that same palette — a platform scheme underneath a
-hand-picked one is what produced white-on-white. droidtop's chrome outside the shell takes its
-colours from droidtop's own scheme. No screen defines a colour inline. Every text-on-surface
-pair in both palettes is covered by a contrast test, not only the menu palette.
-
-**One anatomy per thing.** One row (title, optional supporting line, optional value, optional
-chevron; a chevron means "this opens", a value means "this is set to", and neither stands in
-for the other). One selectable choice row. One tile. One section label. One empty state. One
-selection idiom — a brightened card — across every droidtop-drawn surface; a focus rectangle
-in one place and a card in another is two answers to one question. One help/hint bar per
-screen, positioned inside the window.
-
-**Copy is part of the system.** Sentence case, one dash convention, one name per concept, verb
-labels on buttons, no developer notation and no backend error strings in a user-facing string.
-
-**Where it lives.** One file, `shell-gamepad/.../DesignTokens.kt`, in that module because it is
-the one both the Gaming shell and `:app` can see — a token half the chrome cannot reach is not
-a system. It carries `Space` (the step scale), `Measure.bodyMaxWidth` (the readable line),
-`TypeRole` naming the job of each role with `DroidtopTypography` behind it, and `ChromeColors`
-as the colour source for chrome outside the shell's menus. `DroidtopTheme` supplies the colour
-scheme and the type scale together and defines neither itself. The window-derived
-measurements — gutter, tab gap, minimum grid item, minimum touch target, maximum panel
-width — stay on `ShellWindow`, which is the one place that asks how much room there is.
-
-Two things implementation settled. A **disabled label** needs its own token: Material's stock
-38% alpha lands at 2.3:1 on the light ground, which is not a control a person sees, so
-`ChromeColors.DisabledAlpha` is the one value droidtop's chrome fades by and it clears 3:1 in
-both palettes. And **onboarding takes the dark palette deliberately** rather than the system
-setting (section 7b), which is what lets it use the shell's own menu row anatomy — those
-tokens are absolute against the menu overlay surface and legible over a dark ground and
-nothing else.
-
