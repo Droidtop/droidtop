@@ -36,10 +36,13 @@ on:
   # published by release-promote.yml from an existing run's artifact.
   workflow_dispatch:
 
-# Publishing the "latest" release needs write access to repo contents; the
-# default GITHUB_TOKEN is read-only unless granted this explicitly.
+# Read-only by default. Only the publish job, which runs no build code, gets
+# a token that can write releases: Gradle, its plugins and the vendor-deps
+# build run in the build job and must not be able to rewrite "latest", which
+# the in-app updater installs (Droidtop/enginehost
+# docs/security/2026-09-24-ci-supply-chain.md, H3).
 permissions:
-  contents: write
+  contents: read
 
 # One agent push supersedes the previous one instead of racing it. Before
 # this, every push queued another full build and nothing cancelled the run
@@ -61,13 +64,16 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout (with submodules)
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           submodules: recursive
           # Vendored upstream sources (GameNative, DroidSpaces, sway,
           # wlroots, moonlight-common-c, mbedtls, libffi, ...) are large;
           # we only ever need their current tip, not history.
           fetch-depth: 1
+          # Gradle and the vendor builds run in this job; they have no
+          # business with a git credential left in .git/config.
+          persist-credentials: false
 
       - name: XML comment dash check
         # "-" sequences (and em/en dashes one edit away from them) inside
@@ -136,7 +142,7 @@ jobs:
         # universal APK as arm64-v8a under ARM translation (the BlueStacks
         # rig; see app/build.gradle.kts `splits`): it is uploaded here, not
         # published.
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: droidtop-apk
           path: |
@@ -172,16 +178,41 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 build-scripts/abi_sets.py app/build/outputs/apk/release/app-universal-release.apk
 
+  publish:
+    # A GitHub Release is the "give this to someone to install"
+    # mechanism: permanent, one clean download URL, and what the in-app
+    # updater reads. Workflow artifacts are ephemeral and buried. Only
+    # real pushes to main (or a hand-started run on main) publish; a
+    # PR's build is not something to hand out yet. This is the "latest"
+    # channel, which the updater calls Unstable. Testing and Stable are
+    # published by release-promote.yml, which takes an earlier run's
+    # artifact rather than building main again.
+    #
+    # Its own job so the write token never shares a runner with Gradle: it
+    # downloads the droidtop-apk artifact the build job made (whose layout
+    # is app/build/outputs's, the same one release-promote.yml publishes
+    # from) and runs only release_channel.py from this commit's checkout.
+    # needs: build keeps the old gating: the build job's class-load gate
+    # failing still stops the publish.
+    needs: build
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout (release script only)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Download the build's APKs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: droidtop-apk
+          path: outputs
+
       - name: Publish to the latest channel
-        # A GitHub Release is the "give this to someone to install"
-        # mechanism: permanent, one clean download URL, and what the in-app
-        # updater reads. Workflow artifacts are ephemeral and buried. Only
-        # real pushes to main (or a hand-started run on main) publish; a
-        # PR's build is not something to hand out yet. This is the "latest"
-        # channel, which the updater calls Unstable. Testing and Stable are
-        # published by release-promote.yml, which takes an earlier run's
-        # artifact rather than building main again.
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 build-scripts/release_channel.py publish latest app/build/outputs
+        run: python3 build-scripts/release_channel.py publish latest outputs

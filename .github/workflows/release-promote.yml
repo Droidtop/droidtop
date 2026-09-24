@@ -32,9 +32,12 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 1
+          # Publishing goes through the API (release_channel.py); nothing
+          # here pushes, so the write token stays out of .git/config.
+          persist-credentials: false
 
       - name: Find the tested build
         env:
@@ -70,4 +73,5 @@ jobs:
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 build-scripts/release_channel.py publish "${{ inputs.channel }}" promoted
+          CHANNEL: ${{ inputs.channel }}
+        run: python3 build-scripts/release_channel.py publish "$CHANNEL" promoted

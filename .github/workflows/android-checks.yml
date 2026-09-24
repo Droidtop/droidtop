@@ -27,6 +27,11 @@ on:
       - ".claude/**"
   workflow_dispatch:
 
+# Nothing here publishes or pushes; Gradle and the vendor builds get a
+# read-only token (Droidtop/enginehost docs/security/2026-09-24-ci-supply-chain.md).
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -36,13 +41,14 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout (with submodules)
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           submodules: recursive
           # Vendored upstream sources (GameNative, DroidSpaces, sway,
           # wlroots, moonlight-common-c, mbedtls, libffi, ...) are large;
           # we only ever need their current tip, not history.
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Set up the Android build
         uses: ./.github/actions/android-setup
@@ -79,7 +85,7 @@ jobs:
 
       - name: Upload lint report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           # The baseline itself goes up too: when it does not exist lint
           # WRITES it and aborts, and that generated file is how the
@@ -103,7 +109,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: unit-test-reports
           path: |
