@@ -4719,6 +4719,19 @@ still parses in place, once, because the alternative is drawing the
 unthemed fallback and swapping the theme in, a visible flash at every
 start.
 
+**The PC surface groups games off the main thread.** Folding folders
+into games (7m) derives a name from every folder by regex, and the PC grid
+did it in `remember` on the main thread at every publish of a walk; the
+game detail did the same over the whole Games list, compared every name in
+it for replacement candidates, and listed the game's media folder, all
+before its first frame. The grid's cards and the detail's grouping and
+candidates are now worked out on the Default dispatcher and the media
+listing on IO; composition reads the answers. Until the first grouping is
+ready the grid draws nothing and its header says it is counting, rather
+than a false "no games"; a republish keeps the cards already shown until
+the new ones are ready. The detail's header names the game from its own
+folder until the grouping answers.
+
 **The slow pass reads only what changed, one writer at a time.** Its
 round was a full rescan of every console system every 30 minutes and 5 s
 after every start, beside the first walk, into a list nothing observed,
