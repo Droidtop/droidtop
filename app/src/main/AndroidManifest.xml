@@ -172,6 +172,26 @@
         </activity>
 
         <!--
+          Launcher mode's view of the library: the Games icon in the app
+          drawer (docs/SPEC.md, "Launcher mode"). The package's only
+          MAIN/LAUNCHER activity, which is also what lets a game be pinned
+          to the home screen at all: the platform attributes a pinned
+          shortcut to its package's launcher activity and refuses one from
+          a package that has none. Not a second way into MainActivity; the
+          shells are still reached from the home screen's back-button menu.
+        -->
+        <activity
+            android:name="dev.droidtop.app.LauncherGamesActivity"
+            android:exported="true"
+            android:label="@string/launcher_games_label"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|navigation">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
           Explicit folder-to-console-system assignment. Started by
           :shell-gamepad's SettingsSection via explicit component name, same
           pattern as the SettingsActivity launches elsewhere.

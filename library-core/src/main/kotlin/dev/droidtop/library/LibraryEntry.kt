@@ -433,6 +433,34 @@ enum class LibraryEntryKind {
 }
 
 /**
+ * The library's one split between apps and games, read by every surface
+ * that shows one and not the other: the Gaming shell's Apps and Games
+ * sections and the Launcher's Games screen. Keyed the same everywhere, so
+ * [Library.backgroundScanState] hands every surface the same scan.
+ */
+object LibraryKinds {
+    // Apps are what is NOT a game. A Wine profile and a Linux-container
+    // game used to live here, which is why the PC surface -- the declared
+    // home of "every PC and engine game" (DECISIONS 2026-09-10 17:05) --
+    // could never be handed a store or Wine title: the Games section never
+    // saw one. They are games; the PC card is where they belong.
+    val APPS: Set<LibraryEntryKind> = setOf(
+        LibraryEntryKind.NATIVE_ANDROID_APP,
+        LibraryEntryKind.REMOTE_STREAM,
+    )
+
+    /**
+     * Emulated/interpreted content -- droidtop's equivalent of ES-DE's
+     * "systems." THE COMPLEMENT on purpose: this used to be a hand-kept
+     * list of four engine kinds, which silently dropped every OTHER engine
+     * (KiriKiri, RM2000/2003, Buriko, CatSystem2, CMVS, Flash, Godot,
+     * HTML, ...) -- a new engine kind now lands in Games automatically
+     * instead of nowhere.
+     */
+    val GAMES: Set<LibraryEntryKind> = LibraryEntryKind.entries.toSet() - APPS
+}
+
+/**
  * User-facing group/category name for a [LibraryEntryKind] — shared by the
  * Gaming shell's section grouping and the second-screen companion panel
  * (moved here from a private GamepadShell copy so both surfaces name kinds

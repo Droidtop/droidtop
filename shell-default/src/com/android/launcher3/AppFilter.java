@@ -19,6 +19,9 @@ import javax.inject.Inject;
  */
 public class AppFilter {
 
+    /** Named by string: :shell-default cannot depend on :app, which declares it. */
+    private static final String LAUNCHER_GAMES_ACTIVITY = "dev.droidtop.app.LauncherGamesActivity";
+
     private final Context mContext;
     private final Set<ComponentName> mFilteredComponents;
 
@@ -40,7 +43,11 @@ public class AppFilter {
      */
     public boolean shouldShowApp(ComponentName app, boolean retainSearchable) {
         if (mFilteredComponents.contains(app)) return false;
-        if (SettingsHiddenAppsFragment.HIDE_SELF && app.getPackageName().equals(mContext.getPackageName())) return false;
+        // droidtop patch (not upstream Murine/Launcher3): droidtop's own
+        // package is hidden except for its Games screen, which is how
+        // Launcher mode shows the library (docs/SPEC.md, "Launcher mode").
+        if (SettingsHiddenAppsFragment.HIDE_SELF && app.getPackageName().equals(mContext.getPackageName())
+                && !LAUNCHER_GAMES_ACTIVITY.equals(app.getClassName())) return false;
         return !HiddenAppsRepository.isHidden(mContext, app) || (retainSearchable && HiddenAppsRepository.isSearchHiddenAppsEnabled(mContext));
     }
 }
