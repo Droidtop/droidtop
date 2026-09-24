@@ -4515,9 +4515,9 @@ wait, the ROM cache fixed the provider that was slow at the time, and the
 engine and PC providers that became most of the library got neither.
 
 **The index.** `LibraryIndexStore` keeps each provider's last COMPLETE scan
-result as one slice per `LibraryProvider.indexKey` (one JSON file each under
-`files/library-index/`, written whole and renamed into place; a file this
-build cannot read is a walk, never an error). `Library` reads the index
+result as one slice per `LibraryProvider.indexKey`, persisted in the index
+database described in the next subsection (an index this build cannot read
+is a walk, never an error). `Library` reads the index
 first and publishes every slice it has at once; that is what the shell
 draws at start. A provider whose slice is missing walks, streaming
 progressively as a first run always did. A completed walk becomes the new
@@ -4559,8 +4559,8 @@ taken away can be told from one the walk has not reached: the first leaves
 its games missing, the second leaves them alone. `LibrarySlice` is the index
 entry for one provider, a list of those segments; `Library.libraryProgressive`
 merges each step into the slice as it arrives, publishes the merged slice and
-writes the file. A walk that fails or is cancelled leaves the parts it never
-reached exactly as they were.
+saves the parts that changed. A walk that fails or is cancelled leaves the
+parts it never reached exactly as they were.
 
 `LibraryEntry.missing` is the state, serialized with the entry, and it is NOT
 the ES-DE `broken` metadata flag beside it: `broken` is the user's own
@@ -4611,9 +4611,10 @@ to load." And: "we also need to optimize the scanning, JSON reads/updates...
 we're just layering an index on TOP of those fixes. The index can sit in ram,
 even, which is the point."
 
-This replaces the storage half of the section above (one JSON slice per
-provider). What that section says about WHEN a walk runs, parts, and missing
-games stands.
+This is the storage under the section above, which says WHEN a walk runs,
+what a part is, and what happens to missing games. (Until 2026-09-21 each
+provider's slice was one JSON file under `files/library-index/`; the
+records and the index database replaced it.)
 
 **What was wrong underneath (read from the code, 2026-09-21).** Costs that
 grow with the square of the library, all inside a walk:
@@ -4626,12 +4627,12 @@ an entry needs at launch was kept: `EngineGameProvider.launch` calls
 folder, and the ROM launch resolves its system again. These are fixed first;
 the index does not paper over them.
 
-**The game record.** One JSON file per game, the source of truth for
-everything droidtop knows about that game: identity (id, provider, kind,
-system), where it came from (games root, the part of the walk that found it),
-what is shown (title, sort names, metadata, media), its state flags (missing,
-hidden, ...), and its LAUNCH FACTS, which until now were re-derived on every
-launch: for an engine game the game root, the engine and its version, the
+**The game record.** One JSON file per game, the source of truth for what
+a walk knows about that game: identity (id, provider, kind, system), where
+it came from (games root, the part of the walk that found it), the entry as
+the walk produced it (title, sort names, media, state flags such as
+missing and hidden), and its LAUNCH FACTS, which until now were re-derived
+on every launch: for an engine game the game root, the engine and its version, the
 executable, the Enginehost target and requirements; for a ROM the file, the
 system and any per-game emulator choice; for a PC game its store install.
 Records carry their own `formatVersion`; an unreadable record is a game to
@@ -4641,6 +4642,18 @@ without bound and no game's own filename ever reaches the filesystem (the
 j2me lesson, 7g). A record is written when a walk finds or changes that game,
 and at no other time; it is read when that ONE game is needed: opened,
 focused in a view that shows its metadata, launched.
+
+**What the record is not the owner of.** Three things are the person's or
+a scraper's rather than a walk's, and each keeps its own store keyed by the
+game's id: scraped metadata and collection memberships
+(`ConsoleRomProvider`'s `RomDatabase`, `game_metadata` and
+`collection_members`, for every kind of game), and favourites and play
+history (`PlayHistoryDatabase`). A walk joins scraped metadata onto the
+entries it finds, so a record carries a copy as of its last walk; favourites
+and play history are joined when the library publishes (`Library`'s
+`LibraryFacts`).
+Moving a game's facts to another id (`Library.replaceMissing`) is therefore
+a move in each of those stores, not an edit of one record.
 
 **The index.** A separate database (`library-index.db`, its own file, not the
 play-history database), holding only what a LIST needs for every game: id,
@@ -4656,10 +4669,11 @@ once at start and keep in memory, and that in-memory index is what the shell
 draws from; the database is its persistence.
 
 **Updates are the size of the change.** A finished part replaces that part's
-rows in one transaction and writes only the records that differ; the shell is
-told what changed (these ids added, changed, gone missing), not handed the
-library again; play history and favourites are joined once at start and then
-per changed id.
+rows in one transaction and writes only the records that differ; play
+history and favourites are joined once per id and then again only for an id
+whose history or favourite changed. The shell is still handed the whole list,
+at most every 250 ms while a walk runs (a changed-ids stream to the shell was
+not built; see the decisions below).
 
 **Rebuilding over time.** After the first walk the index is kept honest by a
 slow pass, not by the user remembering to rescan: at low priority, a part at
@@ -4672,14 +4686,7 @@ rows and records (7g, above); nothing else deletes a record.
 **Backups and exports** are the `files/library/` tree: the records are the
 data, and any index can be rebuilt from them.
 
-**Order of work.** (1) the three quadratic costs; (2) records, with launch
-facts, and launch reading them; (3) the index database and the in-memory
-index, with lists drawing from it and single-game views reading the record;
-(4) the slow pass and the forced rebuild.
-
-**Implementation decisions from steps 2–4 (2026-09-21/22), recorded here
-per this file's own standing rule that a real decision lives in the spec,
-not only in a commit message.**
+**Implementation decisions (2026-09-21 onwards).**
 
 - `GameRecord.launch` is a closed `LaunchFacts` union (`Engine`/`Rom`/`Pc`/
   `None`) rather than one loosely-typed bag, matching `LibraryEntryKind`'s
@@ -4726,7 +4733,7 @@ not only in a commit message.**
 - `parts.folderMtime` is the part's change stamp. For a part that is one
   folder the index reads that folder's own modification time; a part
   that is several folders stamps itself (`ScanStep.Segment.folderMtime`,
-  see the slow pass below). 0 is "unknown", which step 4's slow pass
+  see the slow pass below). 0 is "unknown", which the slow pass
   reads as "walk it," never "unchanged since forever."
 - Removing a root (`Library.keepOnlyRoots`) is the one case where a
   segment disappears from a slice entirely rather than being replaced;
@@ -4734,7 +4741,7 @@ not only in a commit message.**
   is no longer present and deletes both its index rows and its
   records there, matching "removing a root still drops its rows and
   records; nothing else deletes a record."
-- Step 4's slow pass skips unchanged parts in both folder-walking
+- The slow pass skips unchanged parts in both folder-walking
   providers. `EngineGameProvider`'s parts are one folder each, so a
   part's own modification time is its stamp. `ConsoleRomProvider`'s part
   is a system under a root, several folders, and it stamps itself: one
@@ -4865,7 +4872,7 @@ after every start, beside the first walk, into a list nothing observed,
 racing a rescan's writes. What replaced that (a change stamp per console
 system, one current slice per provider, rounds that yield to ordinary
 walks and publish into the observed lists) is recorded with the rest of
-step 4's decisions in "One file per game is the truth" above.
+the slow pass's decisions in "One file per game is the truth" above.
 
 **A key press recomposes nothing but what shows it.** The Gaming shell's
 screensaver idle time was Compose state read as a `LaunchedEffect` key
@@ -5027,23 +5034,29 @@ a second, weaker mechanism.
 
 ### Launch resolution: keep the default, expose it
 
-The Daijisho model stands, and droidtop half-implements it already. The
-defect is surfacing, not policy:
+The Daijisho model stands: a candidate list per platform with a stated
+default, and a per-game override over it. With exactly one candidate there
+is no decision; with several the default is stated, never silent. Where
+each choice is made:
 
-- `LaunchStrategyOverridePrefs` (engine games) exists with no settings
-  screen attached; the engines database's `strategies` priority is
-  therefore an invisible constant to the user.
-- ROMs have `PlayerOverridePrefs` and a picker, but no per-platform
-  *default* editor of the kind §7e2 describes.
-- `firstOrNull()` in `GameEngineDetector.launch` and
-  `ConsoleRomProvider` stays — with exactly one candidate that is not a
-  decision, and with several it is a stated default, not a silent one.
+- **A PC or engine game** states its resolved runner and why it won on its
+  own detail ("Runs with", 7i). The engines database's `strategies` list
+  ranks only runners that are available; the per-game override is
+  `LaunchStrategyOverridePrefs`, set and cleared from that row's picker.
+- **A console system's** default player is Settings › Console systems ›
+  the system › Player (`PlayerOverridePrefs`; unset means the first
+  installed player in the players database's order).
+- **A ROM's** own override is ES-DE's `altemulator` field, edited as
+  "Alternative emulator" in the game's metadata editor and read before the
+  system's default (`ConsoleRomProvider.resolvePlayer`).
 
-Work: a per-platform launch section (ordered candidate list + default,
-user-reorderable) covering ROM players, engine strategies, and PC
-backends under one control, with the per-game override in context on the
-game. Wine is the declared fallback for Windows titles nothing else
-backs; a native Linux depot still wins where one exists (§5a).
+Wine is the declared fallback for Windows titles nothing else backs; a
+native Linux depot still wins where one exists (§5a).
+
+The direction still standing is one per-platform launch section (ordered
+candidate list and default, reorderable) covering ROM players, engine
+strategies and PC backends under one control. An engine's default order
+is not editable today: it is the engines database's.
 
 ### Store-installed engine games actually reaching enginehost (fixed 2026-09-02)
 
@@ -5114,19 +5127,13 @@ of three slightly different ones; its nested-folder search is
 name-ordered rather than in `listFiles()` order so a wrapper folder
 resolves identically every scan.
 
-### Dead weight to remove
+### What was removed, and what stays
 
-- **`runtime-remote-stream/`** — already gone from git: zero tracked
-  files, absent from `settings.gradle.kts`, and the `moonlight-common-c`
-  and `mbedtls` submodules it once used are not in `.gitmodules` either.
-  What survived is untracked `.cxx`/`build` residue in working copies,
-  deleted 2026-09-01. Streaming is windowcast's exclusively (directed,
-  restated 2026-09-01). Note the Windows mirror at `G:\dev\and-pc` still
-  carries those stale submodule directories; the WSL clone is
-  authoritative and is already clean.
-  `LibraryEntryKind.REMOTE_STREAM` **stays** — it is how a
-  windowcast-launched entry appears in the same library model as
-  everything else, which is the point of that model.
+- **`runtime-remote-stream/`** is gone, with the `moonlight-common-c` and
+  `mbedtls` submodules it used. Streaming is windowcast's exclusively
+  (directed, restated 2026-09-01). `LibraryEntryKind.REMOTE_STREAM`
+  **stays**: it is how a windowcast-launched entry appears in the same
+  library model as everything else, which is the point of that model.
 - **Lemuroid** is no longer a submodule: nothing built from it, and its
   detection code lives forked-in at `library-core/.../romdetect/` (four
   files) with its community ROM database bundled as
@@ -5134,21 +5141,29 @@ resolves identically every scan.
   GPL-3.0 notice are in `NOTICE.md`; extending the detector means editing
   those files, not chasing an upstream checkout.
 
-### Order of work
+### What the store services give, and what they do not
 
-1. Source-agnostic PC library: rewrite `SteamAccess` over
-   `LibraryItem`/`GameSource` backed by the four DAOs plus
-   `CustomGameScanner`; point `PcGameProvider.scan()` at it. One change
-   surfaces GOG, Epic, Amazon and loose Windows games at once.
-2. Compatibility rating, installed state and size onto library entries.
-3. (Dropped 2026-09-24: the GameNative migration read another app's
-   private data directory, which only root can do, and root is
-   desktop-only. Signing in to each store is the route.)
-4. Per-platform launch settings + in-context per-game override.
-5. Playtime/last-played from `LibraryPlayHistoryDao`.
-6. Cloud saves across the four stores.
-7. Delete the dead streaming module. (The `winlator-upstream` and
-   `lemuroid` submodules are gone; nothing consumed either.)
+Read from the vendored gamenative tree (2026-09-24), because "What is best
+for users" above promises more than the store services hold:
+
+- **Sources** are wired: `PcLibrary` reads the Steam, GOG, Epic and Amazon
+  DAOs and `CustomGameScanner` into one `PcLibrary.Game` shape, and
+  `PcGameProvider` publishes them as ordinary entries.
+- **Compatibility** is wired from `GameCompatibilityCache`, cached only: a
+  scan never makes a network call or needs a signed-in account, so a game
+  carries no rating until something else has filled the cache.
+- **Playtime has no source to read.** `LibraryPlayHistoryDao` holds only a
+  last-played time, written by gamenative's own launch path, which droidtop
+  does not use. The GOG, Epic and Amazon rows have a play-time column that
+  nothing in the tree writes (always 0). Steam's owned-games call does
+  carry lifetime minutes, but it is a network call to a signed-in session,
+  which a scan may not depend on. So `LibraryEntry.playtimeSeconds` stays 0
+  and nothing droidtop draws may pretend otherwise: last played and play
+  count are droidtop's own (`PlayHistoryDatabase`), and real playtime waits
+  on droidtop measuring a session itself, one mechanism per launch path.
+- **Cloud saves** are not reached from droidtop. **`gamefixes/`** is left
+  out of droidtop's prefix preparation on purpose (`WinePrefixPreparation`
+  lists it with the other store-specific steps it does not run).
 
 ## 7h. Scraper honesty, and what counts as a game (directed 2026-09-02)
 
