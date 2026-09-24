@@ -1203,6 +1203,42 @@ bridges packets to/from the container's VPN:
   the container vs. point droidtop at an already-running container VPN),
   and kill-switch semantics are open. The product decision — containers
   can be the device's VPN — is settled.
+- **The shape, decided (2026-09-24), so it can be built rather than
+  re-opened.** `DroidtopVpnService` lives in `:app`, is a Desktop-mode
+  piece in `ModePiece` (a VPN that a container serves needs the container
+  session), and is one foreground service with the system's own VPN
+  notification. Its tun fd is fed by a userspace IP stack compiled into
+  droidtop as a native library (a tun2socks implementation such as
+  hev-socks5-tunnel, packaged in `nativeLibraryDir` like crane and proot,
+  §3) that forwards every device packet to a SOCKS5 endpoint. **The
+  container's VPN is whatever the person installed in it**; what droidtop
+  asks of it is one thing every VPN client can provide, a SOCKS5 proxy
+  bound on a Unix socket in the shared socket directory
+  (`/run/droidtop-sockets/vpn.sock`, `ContainerLayout`): WireGuard through
+  `wireproxy`, OpenVPN through its own client plus a local `microsocks`,
+  or any commercial client's proxy mode. Root does not change the device
+  side; with real namespaces (`DroidSpacesRuntime`) the container may
+  additionally own a real tun and route its own traffic, which is a
+  per-container setting and never required.
+- **Configuration is per container, in the container manager (§3d)**:
+  a "VPN" row on the container's page names the socket the container is
+  expected to serve, a switch turns the device VPN on and off, and the
+  row's value states the live state (connected, no endpoint at the socket,
+  container stopped). droidtop does not import `.conf` or `.ovpn` files:
+  the VPN client is configured inside the container with that client's
+  own tools, in the terminal (§3d), because a config format is the
+  client's and a second importer per client would be exactly the
+  duplication the socket contract avoids.
+- **Kill switch and per-app routing are the platform's.** With the VPN
+  on, `VpnService.Builder.setBlocking(true)` is set, so traffic never
+  bypasses the tunnel while it is up; when the container stops or the
+  endpoint disappears the service stays up and blocking until the person
+  turns it off (a silent fall-through to the bare network is the failure
+  mode). "Route only these apps" is the builder's own allowed-apps list,
+  edited on the same row, with droidtop itself always excluded so a
+  container's own downloads are never routed through the tunnel it
+  serves. Android's own "always-on VPN" and "block connections without
+  VPN" settings are linked, not reimplemented.
 
 ## 4b. PC-parity requirements: printing, USB peripherals, "open with droidtop"
 
@@ -1237,6 +1273,52 @@ not settled designs):
   runtime plumbing exists; the association surface and chooser are the
   missing pieces. This is the moment-of-friction fix: execution already
   works, the tap on the download is what currently dead-ends.
+
+**Decided (2026-09-24), so each has one shape:**
+
+- **Printing.** CUPS is an option in the primary container's provisioning
+  plan (`CompositorProvisioning.plan`, a "Printing" switch on the
+  container's page, §3d) and its socket is bound into every sibling at the
+  same path as in the primary, so a program in any container prints
+  through the primary's CUPS like a program on any Linux desktop. Printers
+  are configured with CUPS's own web page opened in the container's
+  browser, which droidtop links to from the same row. Container printers
+  are **not** exposed back to Android as a `PrintService`: Android apps
+  already print through the platform's framework and IPP Everywhere, and a
+  second print path with its own driver model is duplication for no case
+  the standing test names.
+- **USB peripherals.** A "Devices" row on a container's page (§3d) lists
+  the device nodes Android currently exposes and lets each be bound into
+  that container, one at a time; under `DroidSpacesRuntime` that is a real
+  bind of the node, under `ProotRuntime` the row states, with the reason,
+  that a device cannot be shared without root and offers nothing to tick.
+  Storage is the one exception with a no-root story: a USB drive mounted
+  by Android is a storage volume, and volumes are reachable through the
+  shared-storage bind below.
+- **Shared storage is bound into every container.** `ContainerLayout`
+  binds the device's shared storage (every mounted volume droidtop can
+  read, at `/run/droidtop-shared-storage/<volume>`) into the primary and
+  every sibling, read-write, the way distrobox shares the home directory.
+  Downloads, documents and game folders are then the same files inside and
+  outside the desktop, which is what "PC in a box" means for a file, and
+  it is what the file associations below hand a path to.
+- **"Open with droidtop"** is one Activity in `:app`, `OpenWithActivity`,
+  declared for `VIEW` and `SEND` on the MIME types and path patterns of
+  `.exe`, `.msi`, `.AppImage`, `.deb` and `.rpm`, and enabled as a component
+  only while Desktop mode is on (§2c). It resolves the content URI to a
+  real path on a volume droidtop can read (a file in Downloads is one; a
+  file only a provider serves is not, and the Activity says the file has
+  to be saved to a folder first, naming one). It then shows the chooser,
+  which is the one choice component (§7b): for `.exe`/`.msi`, droidtop's
+  provisioned Wine environment plus every per-game prefix (§7i), launched
+  through the same `WineEngine` a library game uses; for `.deb`/`.rpm`,
+  each container whose package manager matches, running the install as
+  an `exec` of that manager in the provisioned terminal so its output
+  and prompts are visible; for `.AppImage`, each container, marking the
+  file executable and running it in place. The last choice per extension
+  is remembered and offered first, with "always" as an explicit row in the
+  chooser, iiSU-style (§4c), never a silent default. Nothing is copied:
+  the file runs, or installs, from where it is.
 
 ## 4c. Multi-display: what iiSU does, and why droidtop fights the platform (2026-09-01)
 
