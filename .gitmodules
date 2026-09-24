@@ -28,3 +28,6 @@
 [submodule "vendor/proot"]
 	path = vendor/proot
 	url = https://github.com/termux/proot.git
+[submodule "vendor/hev-socks5-tunnel"]
+	path = vendor/hev-socks5-tunnel
+	url = https://github.com/heiher/hev-socks5-tunnel.git

@@ -2,7 +2,7 @@
 # Cross-compiles the native dependencies Gradle's CMake builds can't build
 # themselves: libffi + libwayland-client (for :host-bridge), droidspaces
 # (:runtime-linux-root), crane (:runtime-common), proot
-# (:runtime-linux-noroot) and mbedTLS
+# (:runtime-linux-noroot), hev-socks5-tunnel (:app) and mbedTLS
 # (for :runtime-remote-stream, via moonlight-common-c's USE_MBEDTLS option
 # — that one's wired up directly in runtime-remote-stream's CMakeLists.txt
 # via add_subdirectory, so it needs no separate step here).
@@ -346,8 +346,39 @@ echo "=== proot ($ABI) ==="
     cp loader/loader-m32 "$PROOT_OUT/libproot-loader32.so"
 )
 
+echo "=== hev-socks5-tunnel ($ABI) ==="
+# vendor/hev-socks5-tunnel is the userspace IP stack DroidtopVpnService
+# feeds the device's tun fd to (docs/SPEC.md 4a): every packet Android
+# routes into the VPN becomes a SOCKS5 connection, which droidtop relays to
+# the container's VPN socket. Consumed unmodified, with its own Android.mk
+# and ndk-build; only its JNI class is chosen at compile time
+# (src/hev-jni.c registers its natives on PKGNAME/CLSNAME), to be
+# dev.droidtop.app.vpn.TunnelNative. APP_MODULES builds the library, not
+# the standalone executable beside it; APP_PLATFORM is droidtop's minSdk.
+#
+# Output: app/src/main/jniLibs/$ABI/libhev-socks5-tunnel.so.
+(
+    HEV_WORK="$WORK/hev-socks5-tunnel"
+    rm -rf "$HEV_WORK"
+    "$NDK/ndk-build" -C "$VENDOR/hev-socks5-tunnel" \
+        NDK_PROJECT_PATH=. \
+        APP_BUILD_SCRIPT=Android.mk \
+        NDK_APPLICATION_MK=Application.mk \
+        APP_ABI="$ABI" \
+        APP_PLATFORM="android-$API" \
+        APP_MODULES=hev-socks5-tunnel \
+        NDK_OUT="$HEV_WORK/obj" \
+        NDK_LIBS_OUT="$HEV_WORK/libs" \
+        APP_CFLAGS="-O3 -DPKGNAME=dev/droidtop/app/vpn -DCLSNAME=TunnelNative" \
+        -j"$(nproc)"
+    HEV_OUT="$REPO_ROOT/app/src/main/jniLibs/$ABI"
+    mkdir -p "$HEV_OUT"
+    cp "$HEV_WORK/libs/$ABI/libhev-socks5-tunnel.so" "$HEV_OUT/"
+)
+
 echo "=== Done. Deps installed under $DEPS_DIR ==="
 find "$DEPS_DIR" -iname "*wayland-client*" -o -iname "libffi.a"
 file "$DS_ASSETS/droidspaces-$ABI"
 file "$REPO_ROOT/runtime-common/src/main/jniLibs/$ABI/libcrane.so"
 file "$REPO_ROOT/runtime-linux-noroot/src/main/jniLibs/$ABI/"lib*.so
+file "$REPO_ROOT/app/src/main/jniLibs/$ABI/libhev-socks5-tunnel.so"

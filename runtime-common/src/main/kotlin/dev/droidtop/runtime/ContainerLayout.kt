@@ -23,6 +23,14 @@ object ContainerLayout {
      */
     const val SOCKET_DIR = "/run/droidtop-sockets"
 
+    /**
+     * The device VPN's endpoint, under [SOCKET_DIR]: a SOCKS5 proxy the
+     * container's own VPN client serves on this Unix socket (wireproxy
+     * for WireGuard, microsocks beside OpenVPN, a client's proxy mode).
+     * droidtop relays every device connection to it (docs/SPEC.md 4a).
+     */
+    const val VPN_SOCKET = "vpn.sock"
+
     /** Where the app's private storage root (`Context.getFilesDir()`) appears inside every container. */
     const val APP_STORAGE_DIR = "/run/droidtop-app-storage"
 

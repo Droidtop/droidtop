@@ -77,6 +77,13 @@ enum class ModePiece(vararg owners: Mode) {
     DESKTOP_OPEN_WITH(Mode.DESKTOP),
 
     /**
+     * The device VPN a container serves: it needs a container, so it is
+     * Desktop's, and with Desktop off the service is neither offered to
+     * the system nor left running.
+     */
+    DESKTOP_VPN(Mode.DESKTOP),
+
+    /**
      * The vendored gamenative backbone. Two owners, not one: Gaming's PC
      * surface and Desktop's containers both need it. The shared PC launch
      * path starts it on demand as well, which is why it is reached through

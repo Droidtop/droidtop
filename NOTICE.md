@@ -41,6 +41,10 @@ This project is distributed under the GNU General Public License v3.0 (see
   executables `runtime-linux-noroot` runs containers through on a device
   without root. Linked with the single-file talloc (LGPL-3.0-or-later)
   vendored at `vendor/gamenative/app/src/main/cpp/proot/talloc`.
+- **hev-socks5-tunnel** — `vendor/hev-socks5-tunnel`, https://github.com/heiher/hev-socks5-tunnel — MIT,
+  with its submodules hev-task-system, hev-socks5-core and yaml (MIT) and lwIP
+  (BSD-3-Clause). Built into `libhev-socks5-tunnel.so`, the userspace IP
+  stack behind droidtop's device VPN.
 - **libffi** — `vendor/libffi`, https://github.com/libffi/libffi — MIT.
   Runtime dependency of `libwayland-client`, cross-compiled by
   `build-scripts/build-vendor-deps.sh`.

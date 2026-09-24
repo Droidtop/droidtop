@@ -115,7 +115,7 @@ runs:
           "platform-tools" "platforms;android-34" "build-tools;34.0.0" \
           "platforms;android-36" "build-tools;36.0.0" "ndk;${NDK_VERSION}"
 
-    - name: Cache cross-compiled vendor deps (libffi, libwayland-client, droidspaces, crane, proot)
+    - name: Cache cross-compiled vendor deps (libffi, libwayland-client, droidspaces, crane, proot, hev-socks5-tunnel)
       id: deps-cache
       uses: actions/cache@v4
       with:
@@ -135,6 +135,7 @@ runs:
           runtime-linux-root/src/main/assets/bin
           runtime-common/src/main/jniLibs
           runtime-linux-noroot/src/main/jniLibs
+          app/src/main/jniLibs
           ${{ github.workspace }}/.android-deps
         # Keyed on every vendored submodule the script builds from, so a
         # submodule bump invalidates it. The suffix is bumped when what the
@@ -144,10 +145,11 @@ runs:
         # runtime-common/src/main/jniLibs as libcrane.so (an extracted asset
         # cannot be exec'd above targetSdk 28) and built vendor/proot into
         # runtime-linux-noroot/src/main/jniLibs; v9 put
-        # build-scripts/proot-patches into the key.
-        key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD', '.git/modules/vendor/proot/HEAD', 'build-scripts/proot-patches/**') }}-v9
+        # build-scripts/proot-patches into the key; v10 added
+        # hev-socks5-tunnel into app/src/main/jniLibs.
+        key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD', '.git/modules/vendor/proot/HEAD', '.git/modules/vendor/hev-socks5-tunnel/HEAD', 'build-scripts/proot-patches/**') }}-v10
 
-    - name: Build cross-compiled vendor deps (libffi, libwayland-client, droidspaces, crane, proot)
+    - name: Build cross-compiled vendor deps (libffi, libwayland-client, droidspaces, crane, proot, hev-socks5-tunnel)
       if: steps.deps-cache.outputs.cache-hit != 'true'
       shell: bash
       # Run with `bash` explicitly: this repo is developed partly on Windows,
