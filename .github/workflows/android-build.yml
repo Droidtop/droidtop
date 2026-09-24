@@ -18,6 +18,7 @@ on:
       - "README.md"
       - "NOTICE.md"
       - "LICENSE"
+      - "AGENTS.md"
   pull_request:
     # A commit that only edits prose does not need a 25-minute Android
     # build. Deliberately NOT a blanket "**.md": the decaffe ES-DE theme
@@ -28,6 +29,7 @@ on:
       - "README.md"
       - "NOTICE.md"
       - "LICENSE"
+      - "AGENTS.md"
   workflow_dispatch:
     inputs:
       channel:

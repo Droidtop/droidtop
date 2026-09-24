@@ -43,3 +43,5 @@ Thumbs.db
 .vscode/
 
 # Local agent tooling tooling config, not project source
+# Local agent tooling state stays out; the shared settings every agent
+# working here starts from (attribution off) is committed.
