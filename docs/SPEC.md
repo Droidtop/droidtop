@@ -1,7 +1,59 @@
 # droidtop — Architecture Specification
 
-Status: pre-implementation. This document is the source of truth for the
-design; module READMEs point back here rather than restating it.
+This document is the source of truth for the design; module READMEs point
+back here rather than restating it. Sections keep their numbers, because code
+comments cite them ("SPEC §7g"): a new section takes the next free number in
+its group, is placed in numeric order, and gets a line in the contents below.
+
+## Contents
+
+- [1. Product vision](#1-product-vision)
+- [2. Core architectural decision: Qubes-style split, not a hand-rolled compositor](#2-core-architectural-decision-qubes-style-split-not-a-hand-rolled-compositor)
+- [2a. Desktop shell architecture: launching, task management, native apps](#2a-desktop-shell-architecture-launching-task-management-native-apps)
+- [2b. Desktop mode gets the library context, and Android apps as windows (directed 2026-09-01)](#2b-desktop-mode-gets-the-library-context-and-android-apps-as-windows-directed-2026-09-01)
+- [2c. Modes and what each contributes (directed 2026-09-11)](#2c-modes-and-what-each-contributes-directed-2026-09-11)
+- [3. Containers](#3-containers)
+- [3a. Image index — populated live, not a pinned/prepopulated catalog](#3a-image-index--populated-live-not-a-pinnedprepopulated-catalog)
+- [3b. Optional: other architectures/OSes via QEMU/libvirt — a value-add, not core](#3b-optional-other-architecturesoses-via-qemulibvirt--a-value-add-not-core)
+- [3c. FEX-Emu — x86/x86-64 emulation for Linux software in general, not just Wine](#3c-fex-emu--x86x86-64-emulation-for-linux-software-in-general-not-just-wine)
+- [3d. User-facing container/distro management (directed 2026-08-30)](#3d-user-facing-containerdistro-management-directed-2026-08-30)
+- [4. Display](#4-display)
+- [4a. Networking & VPN (directed 2026-08-30)](#4a-networking--vpn-directed-2026-08-30)
+- [4b. PC-parity requirements: printing, USB peripherals, "open with droidtop"](#4b-pc-parity-requirements-printing-usb-peripherals-open-with-droidtop)
+- [4c. Multi-display: what iiSU does, and why droidtop fights the platform (2026-09-01)](#4c-multi-display-what-iisu-does-and-why-droidtop-fights-the-platform-2026-09-01)
+- [4d. The companion screen, designed (research 2026-09-01)](#4d-the-companion-screen-designed-research-2026-09-01)
+- [5. Windows compatibility — no real virtualization](#5-windows-compatibility--no-real-virtualization)
+- [5a. CPU-translation backend choice, and preferring a native Linux build over Wine](#5a-cpu-translation-backend-choice-and-preferring-a-native-linux-build-over-wine)
+- [5b. One Wine engine, one prefix store, whichever backend is live (assessed 2026-09-02)](#5b-one-wine-engine-one-prefix-store-whichever-backend-is-live-assessed-2026-09-02)
+- [6. Input](#6-input)
+- [6a. Keyboard ownership (directed 2026-09-01)](#6a-keyboard-ownership-directed-2026-09-01)
+- [6b. Desktop surface input (built 2026-09-01)](#6b-desktop-surface-input-built-2026-09-01)
+- [6c. Second-screen input (built 2026-09-02)](#6c-second-screen-input-built-2026-09-02)
+- [6d. Clipboard bridge, host↔container (built 2026-09-02)](#6d-clipboard-bridge-hostcontainer-built-2026-09-02)
+- [7. Library / launcher-readiness](#7-library--launcher-readiness)
+- [7a. Remote PC streaming — via windowcast, not a droidtop module](#7a-remote-pc-streaming--via-windowcast-not-a-droidtop-module)
+- [7b. Onboarding](#7b-onboarding)
+- [7c. Wine prefix / container configuration UI](#7c-wine-prefix--container-configuration-ui)
+- [7d. VN/RPG-Maker engine games — JoiPlay support + `enginehost`](#7d-vnrpg-maker-engine-games--joiplay-support--enginehost)
+- [7e. Second-screen / ambient integrations (Spotify now-playing, Discord presence)](#7e-second-screen--ambient-integrations-spotify-now-playing-discord-presence)
+- [7e2. Data-driven player/platform database (directed 2026-08-30)](#7e2-data-driven-playerplatform-database-directed-2026-08-30)
+- [7e2b. Launch resolution FROM the platforms database (directed 2026-08-31)](#7e2b-launch-resolution-from-the-platforms-database-directed-2026-08-31)
+- [7e3. Lutris install-script integration (directed 2026-08-30, backlog)](#7e3-lutris-install-script-integration-directed-2026-08-30-backlog)
+- [7e4. Emulator setup helpers (directed 2026-08-31, EmuDeck-style)](#7e4-emulator-setup-helpers-directed-2026-08-31-emudeck-style)
+- [7f. Gaming mode: real, generic ES-DE theme engine](#7f-gaming-mode-real-generic-es-de-theme-engine)
+- [7g. One library across every source (audit + plan, directed 2026-09-01)](#7g-one-library-across-every-source-audit--plan-directed-2026-09-01)
+- [7h. Scraper honesty, and what counts as a game (directed 2026-09-02)](#7h-scraper-honesty-and-what-counts-as-a-game-directed-2026-09-02)
+- [7i. The PC surface — "a PC in a box", not an ES-DE system (directed 2026-09-10)](#7i-the-pc-surface--a-pc-in-a-box-not-an-es-de-system-directed-2026-09-10)
+- [7j. Portrait and touch-first chrome (directed 2026-09-10)](#7j-portrait-and-touch-first-chrome-directed-2026-09-10)
+- [7k. The design system: one spacing scale, one type scale, one colour source](#7k-the-design-system-one-spacing-scale-one-type-scale-one-colour-source)
+- [7m. One game, its versions and its segments (directed 2026-09-16)](#7m-one-game-its-versions-and-its-segments-directed-2026-09-16)
+- [8. Licensing](#8-licensing)
+- [9. Module map](#9-module-map)
+- [10. Suggested build order](#10-suggested-build-order)
+- [10a. Build environment](#10a-build-environment)
+- [10b. Releases and updates (directed 2026-09-02)](#10b-releases-and-updates-directed-2026-09-02)
+- [11. Open risks to verify hands-on, not assume](#11-open-risks-to-verify-hands-on-not-assume)
+- [12. Third-party app integration system](#12-third-party-app-integration-system)
 
 ## 1. Product vision
 
