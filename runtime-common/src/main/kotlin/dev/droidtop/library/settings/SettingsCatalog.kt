@@ -149,6 +149,29 @@ class FolderPickItem(
 ) : CatalogItem
 
 /**
+ * A document to write or read through the system's own file picker
+ * (ACTION_CREATE_DOCUMENT with [createName], ACTION_OPEN_DOCUMENT
+ * without): a settings backup and its restore. The renderer owns the
+ * picker; [onPicked] receives the chosen document and returns what
+ * happened, success or failure, for the renderer to show.
+ */
+class DocumentPickItem(
+    override val id: String,
+    override val title: String,
+    override val subtitle: String? = null,
+    val mimeType: String,
+    val createName: String? = null,
+    val onPicked: (Context, Uri) -> String,
+) : CatalogItem {
+    fun pickerIntent(): Intent =
+        Intent(if (createName != null) Intent.ACTION_CREATE_DOCUMENT else Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = mimeType
+            createName?.let { putExtra(Intent.EXTRA_TITLE, it) }
+        }
+}
+
+/**
  * A dynamically-built nested settings screen, rendered by the SAME
  * surface that showed the item opening it (in-shell pushes it on its nav
  * stack; the Preference surface opens a child fragment). [groups] is

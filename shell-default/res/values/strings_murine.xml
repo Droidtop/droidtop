@@ -23,33 +23,9 @@
     <string name="pref_category_desktop_desc">Settings for the Desktop shell</string>
     <string name="pref_category_gaming_title">Gaming mode</string>
     <string name="pref_category_gaming_desc">Settings for the Gaming shell</string>
-    <string name="pref_standard_settings_title">Standard mode</string>
-    <string name="pref_standard_settings_desc">General, icons, home screen, and everything else for the Standard shell</string>
 
     <string name="pref_global_settings_title">Global settings</string>
-    <string name="pref_global_home_role_title">Use droidtop as home screen</string>
-    <string name="pref_global_home_role_desc">Make the Standard shell your device\'s actual Android home screen</string>
-    <string name="pref_global_default_mode_title">Default mode</string>
-    <string name="pref_global_default_mode_desc">Which mode droidtop starts in when launched fresh, instead of resuming whichever you used last</string>
-    <string name="pref_global_enable_desktop_title">Enable Desktop mode</string>
-    <string name="pref_global_enable_desktop_desc">Show Desktop as a choice in the shell switcher</string>
-    <string name="pref_global_enable_gaming_title">Enable Gaming mode</string>
-    <string name="pref_global_enable_gaming_desc">Show Gaming as a choice in the shell switcher</string>
-    <string name="pref_global_rerun_onboarding_title">Rerun onboarding</string>
-    <string name="pref_global_rerun_onboarding_desc">Go through droidtop\'s first-run setup again</string>
-    <string name="pref_global_backup_title">Back up settings</string>
-    <string name="pref_global_backup_desc">Save droidtop\'s settings to a JSON file (not games, roms, or downloaded themes)</string>
-    <string name="pref_global_restore_title">Restore settings</string>
-    <string name="pref_global_restore_desc">Load droidtop\'s settings from a previously saved JSON file</string>
-    <string name="pref_global_system_settings_title">System settings</string>
-    <string name="pref_global_system_settings_desc">Open your device\'s real Android Settings app</string>
 
-    <string name="pref_desktop_taskbar_top_title">Taskbar at top</string>
-    <string name="pref_desktop_taskbar_top_desc">Move the desktop taskbar to the top of the screen instead of the bottom</string>
-    <string name="pref_desktop_root_compositor_setup_title">Root &amp; compositor setup</string>
-    <string name="pref_desktop_root_compositor_setup_desc">Re-check root access and choose which distro + compositor to use</string>
-    <string name="pref_desktop_containers_title">Containers</string>
-    <string name="pref_desktop_containers_desc">Manage Linux containers and distros: create, start, stop, delete</string>
     <string name="pref_gaming_theme_colorscheme_title">Theme color scheme</string>
     <string name="pref_gaming_theme_variant_title">Theme variant</string>
     <string name="pref_display_shell_target_title">Gaming shell display</string>
@@ -99,8 +75,6 @@
     </string-array>
 
     <string name="pref_subcategory_other_shells">Other shells</string>
-    <string name="pref_subcategory_modes">Modes</string>
-    <string name="pref_subcategory_data">Data</string>
 
     <string name="pref_subcategory_day_night">UI theme</string>
     <string name="pref_subcategory_layout">Layout</string>

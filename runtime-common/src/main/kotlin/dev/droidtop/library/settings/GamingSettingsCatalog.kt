@@ -102,11 +102,11 @@ object GamingSettingsCatalog {
             id = GROUP_GLOBAL,
             title = null,
             items = listOf(
-                SubScreenItem(
+                NestedScreenItem(
                     id = ID_GLOBAL_SETTINGS,
                     title = "Global settings",
-                    subtitle = "Home role, default mode, and everything droidtop-wide",
-                    fragmentClassName = "app.murinelauncher.settings.SettingsGlobalFragment",
+                    subtitle = "Home role, modes, and droidtop's settings as a whole",
+                    registryId = "global_settings",
                 ),
             ),
         ),
@@ -519,11 +519,11 @@ object GamingSettingsCatalog {
             id = GROUP_OTHER_SHELLS,
             title = "Other shells",
             items = listOf(
-                SubScreenItem(
+                NestedScreenItem(
                     id = ID_DESKTOP_SETTINGS,
                     title = "Desktop mode",
                     subtitle = "Settings for the Desktop shell",
-                    fragmentClassName = "app.murinelauncher.settings.SettingsDesktopFragment",
+                    registryId = "desktop_settings",
                 ),
                 SubScreenItem(
                     id = ID_STANDARD_SETTINGS,

@@ -2341,35 +2341,27 @@ app-drawer icon or a floating switcher button:
   the bottom, rather than one shared, generic root every mode's Settings
   entry point lands on identically.
 
-  **Global settings** (`SettingsGlobalFragment`/`droidtop_global_prefs.xml`)
-  is deliberately NOT a row inside any shell's own screen — a plain
-  preference row can't be visually distinct from whichever shell's screen
-  happens to be showing, and it isn't itself a hub between the three
-  shells (linking both ways would just be a redundant loop, since every
-  shell's screen already links here). It's reached instead via a real,
-  persistent action-bar item on `SettingsActivity` itself
-  (`onCreateOptionsMenu`/`settings_activity_menu.xml`), present on every
-  settings screen — Standard's root, Desktop, Gaming, and Global
-  itself — genuinely above the scrollable list rather than part of it,
-  hidden only when already on Global settings (`onPrepareOptionsMenu`).
-  Real droidtop-wide content lives there, none of it specific to any one
-  shell: which HOME role droidtop holds; a **Modes** category (a real
-  Default-mode `ListPreference` with dynamic entries reflecting which
-  modes are currently enabled, `ModePrefs.defaultMode`; per-mode
-  enable/disable `SwitchPreferenceCompat` toggles for Desktop/Gaming,
-  `ModePrefs.isModeEnabled` — a disabled mode's entry is hidden entirely
-  from `BackButtonMenu`'s own shell-switcher, not shown greyed out); a
-  **Data** category (Rerun onboarding — relaunches `OnboardingActivity`
-  with no `EXTRA_START_STEP`, which correctly defaults to
-  `OnboardingStep.WELCOME`; Back up/Restore settings — a SAF-based JSON
-  export/import of the one shared `"com.android.launcher3.prefs"`
-  SharedPreferences file every droidtop setting actually lives in,
-  honestly scoped: NOT games, ROMs, downloaded themes, or folder grants,
-  which can't safely round-trip through a plain JSON file, folder grants
-  in particular needing real re-consent rather than a silent restore);
-  and a real Android system Settings shortcut — NOT Standard's own
-  launcher preferences, which are Standard's own per-shell settings like
-  any other. A
+  **Global settings and Desktop mode's settings are catalogs**
+  (`DroidtopWideSettings` in `:app`, registered as `global_settings` and
+  `desktop_settings`), like every other droidtop setting. The Gaming shell
+  opens them as its own nested settings pages, with focus, the hint row
+  and B back to Settings; `SettingsGlobalFragment` and
+  `SettingsDesktopFragment` only chrome the same catalogs for the
+  Standard settings surface, where Global stays the persistent action-bar
+  item on every screen. They were launcher3 preference XML until the UI
+  pass of 2026-09-24 (H4): from the Gaming shell they opened a stock
+  Android list that the pad could not drive. Global holds which HOME role
+  droidtop has, **Modes** (the default mode, offering only enabled modes,
+  and the Desktop/Gaming enable switches; a disabled mode is absent from
+  `BackButtonMenu`'s shell switcher, not greyed out) and **Data** (Rerun
+  onboarding from `OnboardingStep.WELCOME`; Back up/Restore settings, a
+  JSON export/import of the one shared `"com.android.launcher3.prefs"`
+  file through the system file picker, `DocumentPickItem`, and NOT games,
+  ROMs, downloaded themes or folder grants, which need consent again
+  rather than a silent restore). Android's own Settings are reached from
+  Settings > Android settings, so Global has no second shortcut to them.
+  Standard mode's launcher pages (icons, drawer, home screen) stay stock
+  launcher3 preferences. A
   persistent, always-visible controller-button hint bar
   (what A/B currently do) avoids ever leaving the user guessing — theme-
   driven when the active theme declares a real `<helpsystem>`, a
@@ -3900,7 +3892,7 @@ metadata lookup folder is shared.
 
 Superseded same day: the app-private debug-credentials file below was
 built, then retired by direction once the existing whole-prefs settings
-backup/restore (Global settings, `BackupHelper` -- it archives the
+backup/restore (Global settings, `DroidtopWideSettings` -- it archives the
 entire shared prefs file, so every `droidtop_*` credential key rides
 along) turned out to already cover the job with one mechanism. The
 scraper screen carries a pointer to it; the ScreenScraper fields say
