@@ -3439,6 +3439,28 @@ launch surface. Engine games launch via enginehost, Kirikiroid2, Wine,
 or a Linux-container build — never JoiPlay, regardless of it being
 installed.
 
+**What a launch template may do (decided 2026-09-24, security review).**
+A template is data that droidtop turns into an Intent it sends with its
+own identity, and templates arrive from the network (the players
+database, whose base URL is also overridable) as well as from the
+person. So `AmStartCommandToIntentConverter` enforces the limits itself,
+whatever the template's source, rather than trusting any one source:
+
+- Only the template's own text is expanded. A substituted value (a ROM
+  path, a folder, `{query}`) and injected file content are copied
+  verbatim and never scanned for placeholders or directives again.
+- `{file.inject:REL}` reads only a file inside the game's own directory
+  (after resolving `..` and links); the launched file itself qualifies.
+- URI grant bits in `-f` are dropped: droidtop alone decides grants, and
+  it grants read access to `{file.uri}` and nothing else.
+- `-d` may name droidtop's FileProvider only as the exact `{file.uri}`
+  it issued, and `{file.uri}` is never issued for a file in droidtop's
+  own app data.
+- `-n`/`-p` may not target droidtop itself: a template launches another
+  app, never droidtop's unexported screens.
+
+Findings and reasoning: `docs/security/2026-09-24-droidtop-intents-updater.md`.
+
 ## 7e2b. Launch resolution FROM the platforms database (directed 2026-08-31)
 
 Extends §7e2 to the whole launch pipeline: droidtop-platforms is the
