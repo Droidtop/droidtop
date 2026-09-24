@@ -2604,29 +2604,16 @@ app-drawer icon or a floating switcher button:
   non-emulated — native/Wine/Linux/remote — kept as its own top-level
   section rather than folded into Games, since treating that content as
   equally first-class is the actual differentiator), and **Settings** —
-  as of 2026-08-29, no longer a separate in-house Compose screen:
-  selecting Settings (tab click or L/R shoulder cycle) opens the real,
-  unified `com.android.launcher3.settings.SettingsActivity` (the same
-  Android Preference-based screen every other mode's settings live in —
-  see §7's own "no separate standalone settings app" note), deep-linked
-  straight to its "Gaming mode" category
-  (`SettingsGamingFragment`/`droidtop_gaming_prefs.xml`, `:shell-default`).
-  Default section/Show button hints/Console systems/Game folders/Rescan
-  library/Theme/Sync theme index are all real, direct Preference entries
-  there now (Theme is a dynamically-populated `ListPreference` — real
-  discovered theme names, not a compiled-in list — and reads/writes
-  `dev.droidtop.library.theme.ThemeAssets`/`ThemePrefs` directly, which
-  moved to `:runtime-common` specifically so `:shell-default` could reach
-  them without a circular dependency on `:library-core`). **Browse
-  themes** is the one deliberate exception left, still jumping into
-  GamepadShell's own Compose `ThemeBrowserScreen` (real per-theme
-  screenshot previews genuinely need a different interaction shape than
-  a flat preference list) — but directly into it now, not through an
-  intermediate list. Real, purpose-modularized settings crosslinking:
-  each shell's own settings screen shows ITS OWN settings first (not a
-  shared root), with real shortcuts to the other shells' own settings at
-  the bottom, rather than one shared, generic root every mode's Settings
-  entry point lands on identically.
+  the Gaming settings catalog rendered inside the shell
+  (`SettingsCatalogView`), with the pad's focus, the hint row and B back,
+  as the settings architecture above describes. It is not the Standard
+  shell's `SettingsActivity`: that surface chromes the same catalogs for
+  touch (`SettingsGamingFragment` in `:shell-default`), so a setting
+  changed in either place is the same setting. **Browse themes** opens
+  the Compose `ThemeBrowserScreen` from inside that view, because
+  per-theme screenshot previews need a different interaction shape than a
+  list of rows. Each mode's settings show that mode's own settings first,
+  with shortcuts to the other modes' settings at the bottom.
 
   **Global settings and Desktop mode's settings are catalogs**
   (`DroidtopWideSettings` in `:app`, registered as `global_settings` and
