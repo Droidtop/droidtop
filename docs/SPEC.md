@@ -6564,7 +6564,10 @@ declaring which installed app to drive and how:
   FileProvider `content://` handling and read-permission grants that path
   already had to get right.
 - Placeholders droidtop fills in: `{system.id}`, `{system.name}`,
-  `{system.folder}` (the real scanned directory), `{query}`.
+  `{system.folder}` (the real scanned directory), `{query}` (a search
+  string the person types: an `acquire_content` integration whose
+  template uses it is offered as a text field instead of a button, and
+  committing the text runs it, so it never runs with the value missing).
 - `capability` is a closed set (`acquire_content`, `open_with`) because
   the trust shape genuinely differs — handing over one file to a video
   player is not the same as handing over a writable games folder.
@@ -6627,14 +6630,6 @@ or a destination, and extras are simply ignored. Making that case work
 needs an intent surface added to the *target* app, not more integration
 machinery here.
 
-**The PLUGIN half (APK or Python module) is still not built** — and,
-after a pass over what it would take, deliberately so: the shape is
-genuinely undecided (see the open questions below, all of which are
-still open), and picking one unilaterally would be exactly the kind of
-silent decision this project does not make. What follows is a concrete
-proposal to accept, reject or amend, not a description of code that
-exists.
-
 ### 12a. Plugin half — DECIDED (2026-09-02)
 
 The one line already decided in §12 is the constraint that shapes
@@ -6656,14 +6651,17 @@ An earlier proposal here argued for an installed APK exposing a bound
 Service, on the grounds that a separate app is a separate uid and
 therefore the only sandbox Android gives for free. That is rejected. The
 reason is the directive this project keeps returning to: one mechanism
-per job, and shared modules wherever a capability already exists.
-droidtop already has a complete apparatus for distributing third-party
-extension code — signed `.enginehost.tar.xz` bundles, per-origin pinned
-keys certified under one root, an install path that verifies every
-payload file, and a trust screen the user approves before anything runs.
-Tying integrations to APKs would mean a second distribution channel, a
-second trust model, a second install flow and a second failure mode, to
-solve a problem the first one already solves.
+per job, and shared modules wherever a capability already exists. The
+project already has a complete apparatus for distributing third-party
+extension code — enginehost's signed `.enginehost.tar.xz` bundles,
+per-origin pinned keys certified under one root, an install path that
+verifies every payload file, and a trust screen the user approves before
+anything runs. Tying integrations to APKs would mean a second
+distribution channel, a second trust model, a second install flow and a
+second failure mode, to solve a problem the first one already solves.
+Python modules are out for the same reason, and for a worse one: running
+foreign source inside droidtop's own process, with droidtop's
+permissions, is the opposite of a sandbox.
 
 So an integration plugin is a subplugin: the same bundle format, the
 same signing and pinning, the same catalogue and download path, the same
@@ -6679,39 +6677,30 @@ that already exists, so discovery does not equal activation — a
 downloaded subplugin is approved before it runs, per the existing trust
 screen.
 
-- droidtop **never** downloads or side-loads third-party code, and will
-  never grow a WebView or in-app download path for it. So a plugin has
-  to be something the user installed themselves by the normal means,
-  which on Android is an APK.
-- A separate app is a separate uid in a separate process. That is the
-  only sandbox Android hands you for free, and the only one droidtop
-  would not have to invent and then get wrong. A Python module means
-  droidtop shipping an interpreter and executing foreign source **inside
-  its own process**, with droidtop's own permissions and no boundary at
-  all — the opposite of a sandbox.
-- A bound Service gives a typed request/response surface, which is the
-  half an Intent cannot do.
+**Where the code runs and how droidtop reaches it (2026-09-24).** The
+apparatus above lives in enginehost, and droidtop never downloads or
+side-loads extension code itself (§7d). An integration subplugin is
+therefore installed, approved and run by enginehost, in enginehost's
+process, and droidtop reaches it the way it already reaches everything
+enginehost owns: through enginehost's exported surface — the
+capabilities ContentProvider it already reads installed bundles from
+(`EnginehostCapabilities`) for discovery, and a request/response call on
+that same provider for the "something back" a plugin exists to give.
+droidtop passes values out and takes values back; it never hands over a
+handle to the library, the database or a directory, and file access
+stays what the JSON half already does: a read-only per-call `content://`
+grant for one named file. With enginehost absent, no plugin integration
+is shown, the same rule as a JSON integration whose app is missing.
 
-**Discovery (proposed).** droidtop enumerates installed apps declaring a
-Service with a droidtop-owned intent-filter action, plus `<meta-data>`
-naming which capabilities it implements. Same rule as JSON: not
-installed means not shown, never shown-and-broken.
+**What this waits on.** enginehost has no subplugin mechanism yet (the
+Spine runtime is still compiled into the Godot plugins), so droidtop has
+nothing to discover or call. droidtop's half — the provider reader, the
+integrations-screen rows and the per-capability call sites — is built
+against enginehost's published contract once that exists, not ahead of
+it against a guessed one.
 
-**Trust (proposed).** Discovery must not equal activation. A discovered
-plugin appears in the integrations settings screen as *available*, and
-does nothing until the user enables it there — per plugin, and per
-capability where a plugin declares more than one. droidtop passes values
-out and takes values back; it never hands over a handle to the library,
-the database, or a directory. File access, if any, stays what the JSON
-half already does: a read-only per-call `content://` grant for one named
-file.
+**Still open, for the user to settle:**
 
-**Still genuinely open, for the user to settle:**
-
-- Are Python-module plugins in scope at all, or is the APK the whole
-  answer? (§12's original wording allows both; the sandbox argument
-  above is the case against Python, but it is an argument, not a
-  decision.)
 - May a plugin contribute **library entries** — things that show up as
   games — or only metadata, media and actions attached to entries
   droidtop found itself? This is the largest open question, because
@@ -6724,14 +6713,10 @@ file.
 - What happens to entries or state a plugin contributed once the user
   uninstalls or disables it.
 
-Until those are answered, nothing plugin-side is built. The `open_with`
-work above is the part of §12 that was decided and merely unbuilt.
-
-The original open-questions list from this section — the shape of the
-internal API surface, how a plugin is sandboxed and invoked, how
-droidtop discovers what is installed and integration-capable, and what
-the permission/trust model is — is answered as a **proposal** in §12a
-above for the plugin half, and answered in fact for the JSON half by
-what is built: the surface is the closed `IntegrationCapability` set
-plus the placeholders each one is given, the manifest is the `.json`
+§12's original open questions — the shape of the internal API surface,
+how a plugin is sandboxed and invoked, how droidtop discovers what is
+installed and integration-capable, and what the permission/trust model
+is — are answered above for the plugin half, and in fact for the JSON
+half by what is built: the surface is the closed `IntegrationCapability`
+set plus the placeholders each one is given, the manifest is the `.json`
 file, and the trust model is per-capability rather than per-app.

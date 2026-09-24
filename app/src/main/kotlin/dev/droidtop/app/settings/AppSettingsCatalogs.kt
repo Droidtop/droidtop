@@ -353,6 +353,35 @@ object AppSettingsCatalogs {
                                     // acquire-content integration needs.
                                     IntegrationStore.available(context, IntegrationCapability.ACQUIRE_CONTENT)
                                         .forEach { integration ->
+                                            // A template that uses {query} needs a search
+                                            // string before it can run: it is offered as a
+                                            // text field, and committing the text runs it.
+                                            if (IntegrationPlaceholders.QUERY in
+                                                IntegrationPlaceholders.usedIn(integration.argumentsTemplate)
+                                            ) {
+                                                add(
+                                                    TextInputItem(
+                                                        id = "folder_integration_${integration.id}_${resolved.id}",
+                                                        title = integration.label,
+                                                        subtitle = integration.description
+                                                            ?: "Type what to search for; ${integration.packageName} opens with it for ${resolved.displayName}",
+                                                        value = "",
+                                                        onChange = { ctx, query ->
+                                                            if (query.isNotBlank()) {
+                                                                IntegrationStore.run(
+                                                                    context = ctx,
+                                                                    integration = integration,
+                                                                    systemId = resolved.id,
+                                                                    systemName = resolved.displayName,
+                                                                    systemFolder = folder,
+                                                                    query = query.trim(),
+                                                                )
+                                                            }
+                                                        },
+                                                    ),
+                                                )
+                                                return@forEach
+                                            }
                                             add(
                                                 ActionItem(
                                                     id = "folder_integration_${integration.id}_${resolved.id}",
