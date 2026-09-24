@@ -26,8 +26,20 @@ object ContainerLayout {
     /** Where the app's private storage root (`Context.getFilesDir()`) appears inside every container. */
     const val APP_STORAGE_DIR = "/run/droidtop-app-storage"
 
-    /** Written once the provisioning command has succeeded; its presence skips provisioning on later boots. */
+    /**
+     * Written once the provisioning command has succeeded, holding which
+     * plan it was ([planId]); provisioning runs again whenever the current
+     * plan differs, so a package added to a plan reaches containers made
+     * before it. Package managers skip what is already installed, so a
+     * re-run costs only what changed.
+     */
     const val PROVISIONED_MARKER = "/var/lib/droidtop-provisioned"
+
+    /** A short stable identity for [provisioning]'s install command (hex SHA-256). */
+    fun planId(provisioning: PrimaryProvisioning): String =
+        java.security.MessageDigest.getInstance("SHA-256")
+            .digest(provisioning.installCommand.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
 
     private val WAYLAND_SOCKET = Regex("wayland-(\\d+)")
 
@@ -83,10 +95,10 @@ object ContainerLayout {
     )
 
     /**
-     * The primary container's boot script: provision once (guarded by
-     * [PROVISIONED_MARKER], so a failed or interrupted install runs again
-     * next boot instead of being skipped), then replace itself with the
-     * compositor. A failed install ends the script, which each backend
+     * The primary container's boot script: provision when the marker does
+     * not name this plan ([PROVISIONED_MARKER]; a failed or interrupted
+     * install runs again next boot instead of being skipped), then replace
+     * itself with the compositor. A failed install ends the script, which each backend
      * reports as the compositor never appearing.
      *
      * The install command is tested explicitly rather than left to
@@ -95,16 +107,17 @@ object ContainerLayout {
      * `apt-get update` would otherwise fall through to writing the marker.
      */
     fun primaryInitScript(provisioning: PrimaryProvisioning): String = buildString {
+        val plan = planId(provisioning)
         appendLine("#!/bin/sh")
         appendLine("set -e")
-        appendLine("if [ ! -f $PROVISIONED_MARKER ]; then")
+        appendLine("if [ \"$(cat $PROVISIONED_MARKER 2>/dev/null)\" != \"$plan\" ]; then")
         appendLine("  echo 'droidtop: provisioning the desktop (first boot)'")
         appendLine("  if ! { ${provisioning.installCommand}; }; then")
         appendLine("    echo 'droidtop: provisioning failed' >&2")
         appendLine("    exit 1")
         appendLine("  fi")
         appendLine("  mkdir -p ${PROVISIONED_MARKER.substringBeforeLast('/')}")
-        appendLine("  touch $PROVISIONED_MARKER")
+        appendLine("  echo $plan > $PROVISIONED_MARKER")
         appendLine("  echo 'droidtop: provisioning finished'")
         appendLine("fi")
         appendLine("mkdir -p $SOCKET_DIR")

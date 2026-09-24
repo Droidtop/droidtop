@@ -36,7 +36,7 @@ class ContainerTerminalTest {
         override suspend fun listContainers(): List<ContainerInfo> = error("not used")
         override suspend fun createPrimary(image: RootfsImage, provisioning: PrimaryProvisioning): Container = error("not used")
         override suspend fun createSibling(image: RootfsImage): Container = error("not used")
-        override suspend fun start(container: Container, onProgress: (String) -> Unit) = error("not used")
+        override suspend fun start(container: Container, provisioning: PrimaryProvisioning?, onProgress: (String) -> Unit) = error("not used")
         override suspend fun checkSystemRequirements(): ContainerExecResult = error("not used")
         override suspend fun stop(container: Container) = error("not used")
         override suspend fun destroy(container: Container) = error("not used")

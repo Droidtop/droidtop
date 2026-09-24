@@ -490,6 +490,10 @@ compositor. droidspaces writes it to `/sbin/init`; proot runs it as the
 primary's one long-lived session, and `start()` returns when the
 compositor's socket accepts a connection (it fails with the script's last
 output if the script exits first, or prints nothing for fifteen minutes).
+The plan booted is the catalog entry's current one (`start` takes it), and
+the marker records which plan last completed, so a package added to a plan
+reaches a container made before it; a reused container provisioned with
+its creation-time command and had no font (dq-desktop-07).
 The proot backend also binds a generated `/etc/resolv.conf` (the active
 Android network's own DNS servers, read at every start; a stock image has
 none and Android has no `/etc/resolv.conf` to inherit) and `/etc/hosts`.

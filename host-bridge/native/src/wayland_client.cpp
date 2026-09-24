@@ -1,9 +1,12 @@
 #include "wayland_client.h"
 #include "default_keymap.h"
 
+#include <android/api-level.h>
 #include <android/log.h>
 #include <android/native_window.h>
 #include <android/sharedmem.h>
+#include <linux/memfd.h>
+#include <sys/syscall.h>
 #include <wayland-client.h>
 
 #include <cerrno>
@@ -184,6 +187,37 @@ struct ClipboardState {
 };
 
 namespace {
+
+// ---- keymap fd ----
+
+/**
+ * A file holding `size` bytes the compositor can map however it likes.
+ * wlroots maps a virtual keyboard's keymap MAP_PRIVATE
+ * (types/wlr_virtual_keyboard_v1.c), and a private mapping of an ashmem
+ * region is anonymous memory: Android's ashmem driver only attaches the
+ * region's file to VM_SHARED mappings. An ASharedMemory keymap therefore
+ * reached sway as zeros; xkbcommon refused it ("unexpected NULL
+ * character" at 1:1) and wlroots answered with post_no_memory, which
+ * killed this connection 2 ms after it opened (emulator API 34,
+ * dq-desktop-07). A memfd maps privately like any file. memfd_create is
+ * bionic's from API 30 and allowed to apps there; it is called through
+ * syscall() because this library's minSdk is 26, and older releases keep
+ * ASharedMemory (their app seccomp policies are not known to allow the
+ * syscall, and a refused one kills the process).
+ */
+int createKeymapFd(const char* name, size_t size) {
+    if (android_get_device_api_level() >= 30) {
+        int fd = static_cast<int>(syscall(__NR_memfd_create, name, MFD_CLOEXEC));
+        if (fd >= 0) {
+            if (ftruncate(fd, static_cast<off_t>(size)) == 0) return fd;
+            LOGE("ftruncate of the keymap memfd failed: %s", strerror(errno));
+            close(fd);
+        } else {
+            LOGW("memfd_create failed (%s); falling back to ASharedMemory", strerror(errno));
+        }
+    }
+    return ASharedMemory_create(name, size);
+}
 
 // ---- output management (wlr-output-management-unstable-v1) ----
 
@@ -1062,7 +1096,7 @@ bool WaylandClient::connect(const char* socketPath) {
     // see default_keymap.h for why this is a static embedded blob rather
     // than something generated on-device.
     size_t keymapSize = sizeof(kDefaultXkbKeymapUS); // includes the trailing NUL, which is fine/expected
-    int keymapFd = ASharedMemory_create("hostbridge-keymap", keymapSize);
+    int keymapFd = createKeymapFd("hostbridge-keymap", keymapSize);
     if (keymapFd >= 0) {
         void* dst = mmap(nullptr, keymapSize, PROT_READ | PROT_WRITE, MAP_SHARED, keymapFd, 0);
         if (dst != MAP_FAILED) {
@@ -1075,7 +1109,7 @@ bool WaylandClient::connect(const char* socketPath) {
         }
         close(keymapFd); // wl_keyboard.keymap request duplicates the fd internally; safe to close ours
     } else {
-        LOGE("ASharedMemory_create failed for keymap");
+        LOGE("creating the keymap file failed");
     }
 
     // Clipboard. Non-fatal when absent, unlike the globals checked above:

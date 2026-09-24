@@ -139,7 +139,7 @@ class DesktopSessionService : Service() {
         android.util.Log.i(TAG, "Primary container: ${primary.id}")
 
         try {
-            runtime.start(primary) { line ->
+            runtime.start(primary, provisioning) { line ->
                 _stateHolder.value = DesktopSessionState.Connecting(line)
             }
         } catch (t: Throwable) {
