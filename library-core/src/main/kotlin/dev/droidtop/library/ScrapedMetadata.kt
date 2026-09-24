@@ -38,6 +38,15 @@ suspend fun List<LibraryEntry>.withScrapedMetadata(
      * behaviour.
      */
     alsoUnderId: (LibraryEntry) -> String? = { null },
+    /**
+     * Whether a scraped cover beats the art the provider brought. False for
+     * every provider whose art is a real cover on disk (the ES-DE layout,
+     * a game folder's own image). True for `PcGameProvider`: what a store
+     * row or a Wine shortcut carries is Steam's 32-pixel client icon, an
+     * Epic icon or the icon inside an .exe, and a cover the user scraped or
+     * picked by hand would otherwise never be seen at all.
+     */
+    scrapedArtworkFirst: Boolean = false,
 ): List<LibraryEntry> {
     if (isEmpty()) return this
     val ids = flatMap { listOfNotNull(it.id, alsoUnderId(it)) }.distinct()
@@ -51,7 +60,11 @@ suspend fun List<LibraryEntry>.withScrapedMetadata(
             ?: alsoUnderId(entry)?.let { metadataById[it] }
             ?: return@map entry
         entry.copy(
-            artworkUri = entry.artworkUri ?: meta.artworkPath?.takeIf { File(it).isFile },
+            artworkUri = if (scrapedArtworkFirst) {
+                meta.artworkPath?.takeIf { File(it).isFile } ?: entry.artworkUri
+            } else {
+                entry.artworkUri ?: meta.artworkPath?.takeIf { File(it).isFile }
+            },
             videoUri = entry.videoUri ?: meta.videoPath?.takeIf { File(it).isFile },
             description = meta.description,
             developer = meta.developer,

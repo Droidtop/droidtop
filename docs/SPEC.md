@@ -3424,7 +3424,7 @@ completed flags and collection membership are real user data.
 
 ## 7e3. Lutris install-script integration (directed 2026-08-30, backlog)
 
-Beyond cover art (§7d's Lutris scraper client), lutris.net's real public
+Beyond cover art (§7h's Lutris scraper source), lutris.net's real public
 install-script database is a fit for the PC side: per-game scripts that
 declare how a game from an arbitrary source (user-provided installers,
 GOG/itch builds, engine games) gets set up — files, Wine settings,
@@ -3499,8 +3499,8 @@ summary):
   publisher/genre/releaseDate/rating/players/favorite (explicitly NOT an
   ESRB field — confirmed real ES-DE has none), populated by real
   ScreenScraper and TheGamesDB scraper clients (real ES-DE's own actual
-  ROM scrapers — not Lutris/IGDB, which are reserved for PC/engine
-  content per §7d) wired into `ConsoleSystemsActivity.kt`'s manual
+  ROM scrapers) and the keyless libretro database — not Lutris/IGDB/the
+  Steam store, which are reserved for PC/engine content per §7h — wired into `ConsoleSystemsActivity.kt`'s manual
   per-folder scrape action, single-selected-source only (real ES-DE has
   no automatic multi-source fallback chain).
 - Real element rendering: `image`/`text`/`carousel`/`grid`/`textlist`/
@@ -5394,23 +5394,28 @@ successes, zero exceptions, zero files written. The app reported it as
 `no match for 46, 0 failed`. Two rules come out of that, and they are
 binding on every scraper source, not just ScreenScraper.
 
-**A refusal is not a miss, and the type system says so.**
-`ScreenScraperClient.findMetadata` no longer returns a nullable metadata
-object. It returns `ScreenScraperLookup`, which is exactly one of
-`Found`, `NoMatch` (the server answered HTTP 200 and its response carried
-no game — the only outcome that is a statement about the user's library)
-or `Refused(httpStatus, reason)` (the server would not serve the request
-at all — a statement about the API, about credentials, or about a quota,
-and about nothing else). A transport failure stays a thrown exception and
-stays counted as `failed`. The scrape summary reports all four buckets
-separately and may never fold any of the other three into "no match"; a
-pass that was refused everything it asked for leads with that instead of
-reporting a count. `formatScrapeSummary` is a pure function so this
-arithmetic is unit-tested rather than only observable on hardware.
+**A refusal is not a miss, and the type system says so.** Every
+source's lookup returns `ScrapeLookup` (`scraper/ScrapeLookup.kt`), which
+is exactly one of `Found`, `NoMatch` (the server answered and its response
+carried no game — the only outcome that is a statement about the user's
+library) or `Refused(source, httpStatus, reason)` (the server would not
+serve the request at all — a statement about the API, about credentials,
+or about a quota, and about nothing else). ScreenScraper, TheGamesDB (the
+automatic search, the manual picker's search and the by-id fetch), the
+libretro-database DAT download, Lutris, IGDB (including the Twitch
+sign-in it needs) and the Steam store all answer in it; none may turn a
+non-200 into an empty list or a null. A transport failure stays a thrown
+exception and stays counted as `failed`. The scrape summary reports all
+four buckets separately and may never fold any of the other three into
+"no match"; a pass that was refused everything it asked for leads with
+that, naming the source that refused, instead of reporting a count.
+`formatScrapeSummary` (ROMs) and `formatPcScrapeSummary` (PC and engine
+games) are pure functions so this arithmetic is unit-tested rather than
+only observable on hardware.
 
 **The server's own reason is surfaced, not discarded.** ScreenScraper
-answers a non-200 with a short human-readable explanation in the response
-body. That body is read from `errorStream` under a hard 512-character
+(and most sources) answer a non-200 with a short human-readable
+explanation in the response body. That body is read from `errorStream` under a hard 512-character
 bound, has every non-blank credential the request carried redacted out of
 it *before* anything else touches it, is stripped of any markup an
 intermediary added, and then appears both in logcat (tag
@@ -5418,8 +5423,8 @@ intermediary added, and then appears both in logcat (tag
 themselves are still never logged — only whether they are present.
 
 **A repeated refusal ends the pass.** Five consecutive refusals stop the
-run and report; 46 refusals paced ~11s apart buy no information that the
-first five did not.
+run and report, in the ROM pass and the PC pass alike; 46 refusals paced
+~11s apart buy no information that the first five did not.
 
 **Not decided here, deliberately:** the cause of the 2026-09-01 403s.
 Credentials were verified present, verified to descramble, and the
@@ -5429,6 +5434,47 @@ ScreenScraper application pair still awaiting manual approval, and
 documented in `ScreenScraperClient.refusalHint` and printed on a 403.
 `softname` is **not** changed speculatively: only the person who
 registered the application knows what it was registered as.
+
+### PC and engine games: what the scrape asks, and of whom
+
+The ROM scrapers index console dumps by platform id and file hash; none of
+them covers a Ren'Py build in a folder or a Steam install, so PC and
+engine games (`isPcOrEngineGame`: Wine/store entries and every detected
+engine kind) have their own pass, `PcScraper` (`scraper/PcScrape.kt`),
+built on the same model: user-initiated, one selected title source, ES-DE's
+`downloaded_media` layout, the same `game_metadata` rows and the same
+never-clobber-a-user's-edits write.
+
+- **Title sources, one selected at a time.** Lutris (keyless; the default,
+  because it works on a fresh install) returns covers and a year; IGDB
+  (the user's own free Twitch application credentials, never droidtop's)
+  also returns description, developer, publisher, genre, date and rating.
+  A folder name is cleaned of version and platform tags before it is
+  searched (`PcScrapeTitle`), and a result is applied without asking only
+  when exactly one candidate matches the cleaned title exactly
+  (`PcMatching`); anything less is counted as waiting on the user's
+  **Choose match**, never guessed. A year with no month or day is shown in
+  the picker and never written as a date.
+- **A Steam game is identified, not searched for.** An entry whose id, or
+  whose `PcInfo.storeId` (a store-installed engine game), is `steam:<appid>`
+  is first looked up in Steam's own public storefront record by that id
+  (`SteamStoreClient`, keyless). That is to a Steam game what a file hash is
+  to a ROM, so it is applied without a picker and counted apart
+  ("by store id"). It is not a fallback chain: only when the store has no
+  public record of the app does the game go to the selected title source,
+  and a store refusal is reported as one rather than quietly becoming a
+  name search. The cover is the portrait library capsule, with the store
+  record's own header image tried only if that download fails.
+- **A scraped cover is a PC game's cover.** What a store row or a Wine
+  shortcut brings on its own is Steam's 32-pixel client icon, an Epic icon
+  or the icon inside an `.exe`. The PC provider therefore shows a scraped
+  cover ahead of it (`withScrapedMetadata(scrapedArtworkFirst = true)`),
+  and the scrape's "missing artwork" filter counts only a scraped cover as
+  art for those entries. Engine games keep the ordinary order: their art is
+  their own folder's or the ES-DE layout's.
+- **A title is not a file name.** Media for an entry that is not a folder
+  is filed under its title made safe for FAT/exFAT (`PcMediaLayout.fileSafe`),
+  since a handheld's games root is usually an SD card.
 
 ### One ROM walk, and a DLC folder is not twelve games
 

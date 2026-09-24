@@ -60,8 +60,6 @@ data class IgdbGameMetadata(
  *    real usable cover, IGDB's own documented image-sizing convention).
  */
 object IgdbScraperClient {
-    class ScraperException(message: String, cause: Throwable? = null) : Exception(message, cause)
-
     /**
      * The bearer token, cached until shortly before it expires.
      *
@@ -78,9 +76,10 @@ object IgdbScraperClient {
 
     private const val TOKEN_EXPIRY_MARGIN_MS = 60_000L
 
-    private fun token(clientId: String, clientSecret: String): String {
+    /** The token, or the refusal Twitch answered with (a rejected Client ID or Secret is the usual one). */
+    private fun token(clientId: String, clientSecret: String): ScrapeLookup<String> {
         val now = System.currentTimeMillis()
-        cached?.let { if (it.clientId == clientId && it.expiresAtMs > now) return it.token }
+        cached?.let { if (it.clientId == clientId && it.expiresAtMs > now) return ScrapeLookup.Found(it.token) }
         val url = URL("https://id.twitch.tv/oauth2/token")
         val connection = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
@@ -90,17 +89,23 @@ object IgdbScraperClient {
             "&client_secret=${URLEncoder.encode(clientSecret, "UTF-8")}" +
             "&grant_type=client_credentials"
         OutputStreamWriter(connection.outputStream).use { it.write(body) }
-        if (connection.responseCode != 200) {
-            throw ScraperException(
-                "Twitch rejected the IGDB credentials (HTTP ${connection.responseCode}) -- " +
-                    "check the Client ID and Secret in Settings",
+        val status = connection.responseCode
+        if (status != 200) {
+            // Named as what the user configured, so the summary reads
+            // "IGDB (Twitch sign-in) refused ... invalid client secret".
+            return ScrapeRefusals.refused(
+                "IGDB (Twitch sign-in)",
+                connection,
+                status,
+                listOf(clientId, clientSecret),
+                "the configured Client ID and Secret",
             )
         }
         val response = JSONObject(connection.inputStream.bufferedReader().readText())
         val accessToken = response.getString("access_token")
         val lifetimeMs = response.optLong("expires_in", 0L) * 1000
         cached = CachedToken(clientId, accessToken, now + lifetimeMs - TOKEN_EXPIRY_MARGIN_MS)
-        return accessToken
+        return ScrapeLookup.Found(accessToken)
     }
 
     /**
@@ -125,8 +130,12 @@ object IgdbScraperClient {
      * (`ceil((raw/scale)/0.1)/10`), just against a 100-point scale
      * instead of a 20-point one.
      */
-    fun search(clientId: String, clientSecret: String, gameTitle: String, limit: Int = 10): List<IgdbGameMetadata> {
-        val bearer = token(clientId, clientSecret)
+    fun search(clientId: String, clientSecret: String, gameTitle: String, limit: Int = 10): ScrapeLookup<List<IgdbGameMetadata>> {
+        val bearer = when (val token = token(clientId, clientSecret)) {
+            is ScrapeLookup.Found -> token.value
+            is ScrapeLookup.Refused -> return token
+            ScrapeLookup.NoMatch -> return ScrapeLookup.NoMatch
+        }
         val url = URL("https://api.igdb.com/v4/games")
         val connection = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
@@ -139,11 +148,13 @@ object IgdbScraperClient {
             "genres.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher; " +
             "limit $limit;"
         OutputStreamWriter(connection.outputStream).use { it.write(query) }
-        if (connection.responseCode != 200) {
-            throw ScraperException("IGDB search failed: HTTP ${connection.responseCode}")
+        val status = connection.responseCode
+        if (status != 200) {
+            return ScrapeRefusals.refused("IGDB", connection, status, listOf(clientId, clientSecret, bearer), gameTitle)
         }
         val results = JSONArray(connection.inputStream.bufferedReader().readText())
-        return (0 until results.length()).mapNotNull { index -> parse(results.getJSONObject(index)) }
+        val parsed = (0 until results.length()).mapNotNull { index -> parse(results.getJSONObject(index)) }
+        return if (parsed.isEmpty()) ScrapeLookup.NoMatch else ScrapeLookup.Found(parsed)
     }
 
     /** Parses one `/v4/games` row; visible for the pure JVM tests, which exercise it against captured response shapes. */

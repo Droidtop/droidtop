@@ -54,36 +54,59 @@ object LibretroMetadata {
 
     fun systemName(systemId: String): String? = LibretroThumbnails.systemNameFor(systemId)
 
-    /** Null when the system has no known libretro name; an empty lookup when the DATs exist but carry nothing. */
-    fun load(context: Context, systemId: String): Lookup? {
+    /**
+     * Null when the system has no known libretro name. Otherwise the lookup
+     * (empty when the DATs exist but carry nothing), or [ScrapeLookup.Refused]
+     * when not one category could be read because the server refused every
+     * download: a whole system's worth of "no match" would otherwise be
+     * reported for a download that never happened (docs/SPEC.md section 7h).
+     * A category that is simply absent upstream is a 404 and is not fatal
+     * on its own -- several systems lack one or two of the four.
+     */
+    fun load(context: Context, systemId: String): ScrapeLookup<Lookup>? {
         val systemName = systemName(systemId) ?: return null
         val byName = HashMap<String, MutableMap<String, String>>()
+        var loaded = 0
+        var lastRefusal: ScrapeLookup.Refused? = null
         CATEGORIES.forEach { category ->
-            val text = cachedDat(context, category, systemName) ?: return@forEach
-            parseInto(text, byName)
+            when (val dat = cachedDat(context, category, systemName)) {
+                is ScrapeLookup.Found -> {
+                    loaded++
+                    parseInto(dat.value, byName)
+                }
+                // A 404 is a category this system does not have upstream.
+                is ScrapeLookup.Refused -> if (dat.httpStatus != 404) lastRefusal = dat
+                ScrapeLookup.NoMatch, null -> Unit
+            }
         }
-        return Lookup(byName)
+        lastRefusal?.let { if (loaded == 0) return it }
+        return ScrapeLookup.Found(Lookup(byName))
     }
 
-    private fun cachedDat(context: Context, category: String, systemName: String): String? {
+    /** The DAT text, a refusal, or null for a transport failure (logged). */
+    private fun cachedDat(context: Context, category: String, systemName: String): ScrapeLookup<String>? {
         val cache = File(File(context.filesDir, "libretro-metadat"), "$category-$systemName.dat")
-        if (cache.isFile) return cache.readText()
+        if (cache.isFile) return ScrapeLookup.Found(cache.readText())
         val encoded = URLEncoder.encode(systemName, "UTF-8").replace("+", "%20")
         val url = "https://raw.githubusercontent.com/libretro/libretro-database/master/metadat/$category/$encoded.dat"
-        return runCatching {
+        return runCatching<ScrapeLookup<String>> {
             val connection = URL(url).openConnection() as HttpURLConnection
             connection.connectTimeout = 10000
             connection.readTimeout = 20000
-            if (connection.responseCode != 200) {
-                connection.disconnect()
-                null
+            val status = connection.responseCode
+            if (status != 200) {
+                ScrapeRefusals.refused("libretro-database", connection, status, emptyList(), "$category/$systemName")
+                    .also { connection.disconnect() }
             } else {
                 val text = connection.inputStream.bufferedReader().use { it.readText() }
                 cache.parentFile?.mkdirs()
                 cache.writeText(text)
-                text
+                ScrapeLookup.Found(text)
             }
-        }.getOrNull()
+        }.getOrElse {
+            android.util.Log.w("droidtop.Scraper", "libretro-database $category/$systemName: ${it.message}")
+            null
+        }
     }
 
     private val KEY_VALUE = Regex("^\\s*(\\w+)\\s+\"(.*)\"\\s*$")

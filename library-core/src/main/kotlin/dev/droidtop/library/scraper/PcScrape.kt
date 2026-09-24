@@ -82,12 +82,19 @@ data class PcMatch(
     val genre: String? = null,
     val releaseDate: String? = null,
     val rating: Float? = null,
+    /** A second cover to try only when [coverUrl] cannot be downloaded (see [SteamStoreClient]). */
+    val alternateCoverUrl: String? = null,
 )
 
-/** Where candidates come from. An interface so the matching logic is testable without a network or a key. */
+/**
+ * Where candidates come from. An interface so the matching logic is
+ * testable without a network or a key. A search answers with the same
+ * three outcomes every scraper source does ([ScrapeLookup]): candidates,
+ * a real miss, or a refusal that says nothing about the game.
+ */
 interface PcMetadataSource {
     val label: String
-    fun search(title: String): List<PcMatch>
+    fun search(title: String): ScrapeLookup<List<PcMatch>>
 }
 
 /**
@@ -195,6 +202,11 @@ object PcMediaLayout {
     fun coverFile(gamesRoot: File, systemFolder: String, baseName: String): File =
         File(File(File(gamesRoot, "downloaded_media"), systemFolder), "covers/$baseName.png")
 
+    /** [name] with every character FAT/exFAT refuses in a file name replaced by a space, collapsed. */
+    fun fileSafe(name: String): String =
+        name.map { if (it in "\\/:*?\"<>|" || it < ' ') ' ' else it }.joinToString("")
+            .replace(Regex("\\s+"), " ").trim().trimEnd('.').trim().ifBlank { "game" }
+
     /**
      * The `downloaded_media` system folder for an entry: a console
      * system id when the entry has one (PC store/Wine entries use ES-DE's
@@ -256,40 +268,44 @@ object PcScraper {
 
     private object LutrisSource : PcMetadataSource {
         override val label = "Lutris"
-        override fun search(title: String): List<PcMatch> =
-            LutrisScraperClient.search(title).map { result ->
-                PcMatch(
-                    name = result.name,
-                    sourceLabel = label,
-                    year = result.year,
-                    coverUrl = result.coverUrl,
-                    // Lutris's API carries no description, developer,
-                    // publisher, genre or rating at all, and its `year`
-                    // is a year with no month or day. ES-DE's own MD_DATE
-                    // is a full "YYYYMMDDT000000" string, so writing one
-                    // would mean inventing a January 1st that Lutris
-                    // never said: the year is shown in the picker, where
-                    // it helps a person choose, and nothing is written.
-                )
+        override fun search(title: String): ScrapeLookup<List<PcMatch>> =
+            LutrisScraperClient.search(title).mapFound { results ->
+                results.map { result ->
+                    PcMatch(
+                        name = result.name,
+                        sourceLabel = label,
+                        year = result.year,
+                        coverUrl = result.coverUrl,
+                        // Lutris's API carries no description, developer,
+                        // publisher, genre or rating at all, and its `year`
+                        // is a year with no month or day. ES-DE's own MD_DATE
+                        // is a full "YYYYMMDDT000000" string, so writing one
+                        // would mean inventing a January 1st that Lutris
+                        // never said: the year is shown in the picker, where
+                        // it helps a person choose, and nothing is written.
+                    )
+                }
             }
     }
 
     private class IgdbSource(private val clientId: String, private val clientSecret: String) : PcMetadataSource {
         override val label = "IGDB"
-        override fun search(title: String): List<PcMatch> =
-            IgdbScraperClient.search(clientId, clientSecret, title).map { result ->
-                PcMatch(
-                    name = result.name,
-                    sourceLabel = label,
-                    year = result.releaseDate?.take(4)?.toIntOrNull(),
-                    coverUrl = result.coverUrl,
-                    description = result.description,
-                    developer = result.developer,
-                    publisher = result.publisher,
-                    genre = result.genre,
-                    releaseDate = result.releaseDate,
-                    rating = result.rating,
-                )
+        override fun search(title: String): ScrapeLookup<List<PcMatch>> =
+            IgdbScraperClient.search(clientId, clientSecret, title).mapFound { results ->
+                results.map { result ->
+                    PcMatch(
+                        name = result.name,
+                        sourceLabel = label,
+                        year = result.releaseDate?.take(4)?.toIntOrNull(),
+                        coverUrl = result.coverUrl,
+                        description = result.description,
+                        developer = result.developer,
+                        publisher = result.publisher,
+                        genre = result.genre,
+                        releaseDate = result.releaseDate,
+                        rating = result.rating,
+                    )
+                }
             }
     }
 
@@ -307,13 +323,21 @@ object PcScraper {
         unavailableReason(context)?.let { return@withContext Candidates.Unavailable(it) }
         val source = source(context) ?: return@withContext Candidates.Unavailable("No PC scraper source is configured.")
         val title = PcScrapeTitle.clean(baseNameFor(entry))
-        val found = runCatching { source.search(title) }.getOrElse { error ->
+        val lookup = runCatching { source.search(title) }.getOrElse { error ->
             return@withContext Candidates.Unavailable("${source.label} search failed: ${error.message}")
         }
-        if (found.isEmpty()) {
-            Candidates.Unavailable("${source.label} has nothing under \"$title\".")
-        } else {
-            Candidates.Found(found)
+        when (lookup) {
+            is ScrapeLookup.Found -> if (lookup.value.isEmpty()) {
+                Candidates.Unavailable("${source.label} has nothing under \"$title\".")
+            } else {
+                Candidates.Found(lookup.value)
+            }
+            ScrapeLookup.NoMatch -> Candidates.Unavailable("${source.label} has nothing under \"$title\".")
+            // A refusal is not an empty result (docs/SPEC.md section 7h).
+            is ScrapeLookup.Refused -> Candidates.Unavailable(
+                "${lookup.source} refused the search (HTTP ${lookup.httpStatus})" +
+                    (lookup.reason?.let { ": $it" } ?: "."),
+            )
         }
     }
 
@@ -359,7 +383,13 @@ object PcScraper {
         val targets = entries.filter { entry ->
             val row = existing[entry.id]
             val noMeta = row?.description == null && row?.genre == null && row?.developer == null
-            val noArt = entry.artworkUri == null && row?.artworkPath?.let { File(it).isFile } != true
+            val scrapedCover = row?.artworkPath?.let { File(it).isFile } == true
+            // What a PC provider brings on its own is a store's icon or
+            // the icon inside an .exe, not a cover: only a scraped cover
+            // counts as art for one (see withScrapedMetadata's
+            // scrapedArtworkFirst). An engine game's art is what its
+            // folder or downloaded_media holds, which does count.
+            val noArt = !scrapedCover && (entry.kind == LibraryEntryKind.WINE_PROFILE || entry.artworkUri == null)
             when (filter) {
                 ScrapeFilter.MISSING_ANY -> noArt || noMeta
                 ScrapeFilter.MISSING_ARTWORK -> noArt
@@ -370,35 +400,86 @@ object PcScraper {
         }
         if (targets.isEmpty()) return@withContext "Nothing matches the \"${filter.label}\" scrape filter."
 
-        var applied = 0
-        var needsPicking = 0
-        var noMatch = 0
-        var failed = 0
-        targets.forEachIndexed { index, entry ->
+        val counts = PcScrapeCounts(targeted = targets.size)
+        var consecutiveRefusals = 0
+        for ((index, entry) in targets.withIndex()) {
+            // The same rule as the ROM pass: several refusals in a row are
+            // about the server, not about any game, and asking again only
+            // spends the user's time to be told the same thing.
+            if (consecutiveRefusals >= REFUSAL_ABORT_THRESHOLD) break
             onProgress(index, targets.size)
+            counts.attempted++
             try {
-                val title = PcScrapeTitle.clean(baseNameFor(entry))
-                when (val decision = PcMatching.decide(title, source.search(title))) {
-                    is PcMatching.Decision.Confident -> {
-                        write(context, entry, decision.match, confidence = "name", replaceExistingCover = false)
-                        applied++
-                    }
-                    is PcMatching.Decision.Ambiguous -> needsPicking++
-                    PcMatching.Decision.None -> noMatch++
+                val outcome = scrapeOne(context, entry, source)
+                if (outcome is PcOutcome.Refused) {
+                    consecutiveRefusals++
+                    counts.lastRefusal = outcome.refusal
+                } else {
+                    consecutiveRefusals = 0
+                }
+                when (outcome) {
+                    PcOutcome.ByStoreId -> counts.byStoreId++
+                    PcOutcome.ByName -> counts.byName++
+                    PcOutcome.NeedsPicking -> counts.needsPicking++
+                    PcOutcome.NoMatch -> counts.noMatch++
+                    is PcOutcome.Refused -> counts.refused++
                 }
             } catch (t: Exception) {
-                failed++
+                counts.failed++
+                consecutiveRefusals = 0
                 android.util.Log.e("droidtop.Scraper", "Failed to scrape ${entry.title}", t)
             }
         }
-        buildString {
-            append("${source.label}: matched $applied of ${targets.size}")
-            if (needsPicking > 0) append(", $needsPicking need a match you pick (Choose match on the game)")
-            if (noMatch > 0) append(", $noMatch had no result at all")
-            if (failed > 0) append(", $failed failed")
-            append('.')
+        formatPcScrapeSummary(source.label, counts)
+    }
+
+    /** What happened to one game in the automatic pass; each lands in its own bucket of the summary. */
+    private sealed interface PcOutcome {
+        data object ByStoreId : PcOutcome
+        data object ByName : PcOutcome
+        data object NeedsPicking : PcOutcome
+        data object NoMatch : PcOutcome
+        data class Refused(val refusal: ScrapeLookup.Refused) : PcOutcome
+    }
+
+    /**
+     * One game. A Steam game is asked of Steam's own store by its app id
+     * first: that answer is certain by construction, the way a hash match
+     * is for a ROM, so nothing about it is a guess or a fallback chain.
+     * Only when the store has no public record of the app (a real miss)
+     * does the game go to the selected title source like any other; a
+     * store REFUSAL is reported as one and does not quietly turn into a
+     * name search.
+     */
+    private suspend fun scrapeOne(context: Context, entry: LibraryEntry, source: PcMetadataSource): PcOutcome {
+        steamAppIdOf(entry)?.let { appId ->
+            when (val lookup = SteamStoreClient.appDetails(appId)) {
+                is ScrapeLookup.Found -> {
+                    write(context, entry, lookup.value, confidence = "id", replaceExistingCover = false)
+                    return PcOutcome.ByStoreId
+                }
+                is ScrapeLookup.Refused -> return PcOutcome.Refused(lookup)
+                ScrapeLookup.NoMatch -> Unit
+            }
+        }
+        val title = PcScrapeTitle.clean(baseNameFor(entry))
+        return when (val lookup = source.search(title)) {
+            is ScrapeLookup.Refused -> PcOutcome.Refused(lookup)
+            ScrapeLookup.NoMatch -> PcOutcome.NoMatch
+            is ScrapeLookup.Found -> when (val decision = PcMatching.decide(title, lookup.value)) {
+                is PcMatching.Decision.Confident -> {
+                    write(context, entry, decision.match, confidence = "name", replaceExistingCover = false)
+                    PcOutcome.ByName
+                }
+                is PcMatching.Decision.Ambiguous -> PcOutcome.NeedsPicking
+                PcMatching.Decision.None -> PcOutcome.NoMatch
+            }
         }
     }
+
+    /** The Steam app id behind an entry: its own id, or the store id a store-installed engine game carries. */
+    internal fun steamAppIdOf(entry: LibraryEntry): Int? =
+        SteamStoreClient.appIdOf(entry.id) ?: SteamStoreClient.appIdOf(entry.pcInfo?.storeId)
 
     /**
      * The one write path, shared by the automatic and manual routes.
@@ -422,11 +503,17 @@ object PcScraper {
         val systemFolder = PcMediaLayout.systemFolderFor(entry)
         val gamesRoot = mediaRootFor(context, entry)
         if (ScrapeOptionsPrefs.scrapeArtwork(context) && match.coverUrl != null && systemFolder != null && gamesRoot != null) {
-            val destination = PcMediaLayout.coverFile(gamesRoot, systemFolder, baseNameFor(entry))
+            // A title is not a file name: "Half-Life: Alyx" cannot be
+            // written to an exFAT SD card, which is where a handheld's
+            // games root usually is. A folder name already is one.
+            val destination = PcMediaLayout.coverFile(gamesRoot, systemFolder, PcMediaLayout.fileSafe(baseNameFor(entry)))
             if (replaceExistingCover || !destination.isFile) {
-                runCatching { downloadImage(match.coverUrl, destination) }
-                    .onSuccess { coverPath = destination.absolutePath }
-                    .onFailure { android.util.Log.w("droidtop.Scraper", "Cover for ${entry.title} failed: ${it.message}") }
+                val downloaded = listOfNotNull(match.coverUrl, match.alternateCoverUrl).any { url ->
+                    runCatching { downloadImage(url, destination) }
+                        .onFailure { android.util.Log.w("droidtop.Scraper", "Cover for ${entry.title} failed: ${it.message}") }
+                        .isSuccess
+                }
+                if (downloaded) coverPath = destination.absolutePath
             } else {
                 coverPath = destination.absolutePath
             }
@@ -473,5 +560,52 @@ object PcScraper {
         val roots = GamesRoots.current(context)
         val path = File(entry.id)
         return roots.firstOrNull { path.absolutePath.startsWith(it.absolutePath) } ?: roots.firstOrNull()
+    }
+}
+
+/** Maps the value of a [ScrapeLookup.Found]; the other two outcomes pass through unchanged. */
+internal inline fun <T, R> ScrapeLookup<T>.mapFound(transform: (T) -> R): ScrapeLookup<R> = when (this) {
+    is ScrapeLookup.Found -> ScrapeLookup.Found(transform(value))
+    ScrapeLookup.NoMatch -> ScrapeLookup.NoMatch
+    is ScrapeLookup.Refused -> this
+}
+
+/** The buckets a PC/engine pass reports, each one only what it says (docs/SPEC.md section 7h). */
+internal class PcScrapeCounts(val targeted: Int) {
+    var attempted = 0
+    /** Matched by a store's own record of the app id: certain by construction. */
+    var byStoreId = 0
+    /** Matched by an exact, unique title match in the selected source. */
+    var byName = 0
+    /** Candidates exist and none is certain: waiting on the user's pick. */
+    var needsPicking = 0
+    /** The source answered and has nothing by this name. The only bucket that is a statement about the game. */
+    var noMatch = 0
+    var failed = 0
+    var refused = 0
+    var lastRefusal: ScrapeLookup.Refused? = null
+}
+
+/**
+ * The sentence the user reads after a PC/engine pass. Pure, so the counting
+ * is tested rather than only observable on hardware. The same rule as
+ * [formatScrapeSummary]: a game is "no result" only when a source said so;
+ * refusals, failures, and games never asked about because the pass gave up
+ * are each reported as themselves.
+ */
+internal fun formatPcScrapeSummary(sourceLabel: String, counts: PcScrapeCounts): String {
+    val matched = counts.byStoreId + counts.byName
+    totalRefusalSummary("PC and engine games", counts.attempted, matched, counts.refused, counts.lastRefusal)
+        ?.let { return it }
+    return buildString {
+        append("$sourceLabel: matched $matched of ${counts.targeted}")
+        if (counts.byStoreId > 0) append(" (${counts.byStoreId} by store id)")
+        if (counts.needsPicking > 0) append(", ${counts.needsPicking} need a match you pick (Choose match on the game)")
+        if (counts.noMatch > 0) append(", ${counts.noMatch} had no result at all")
+        if (counts.failed > 0) append(", ${counts.failed} failed")
+        if (counts.refused > 0) append(", ${counts.refused} refused by the server")
+        if (counts.attempted < counts.targeted) append(", ${counts.targeted - counts.attempted} not asked for after the pass gave up")
+        append('.')
+        if (counts.refused > 0) append(describeRefusal(counts.refused, counts.attempted, counts.lastRefusal))
     }
 }
