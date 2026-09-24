@@ -6387,6 +6387,14 @@ and disabled states each have a shape or weight of their own. Themed views are t
 author's and are excluded, as in ES-DE. The touch-target minimum (§7j) already holds in every
 orientation and on every input.
 
+**The rule is checked, not trusted.** A unit test in `:shell-gamepad` and `:app` fails on any
+`Color(0x` literal, any named `Color.*` constant and any `.dp` literal outside `DesignTokens.kt`,
+`MenuTokens` and the themed renderer (whose measurements are the theme's), and on any
+`MaterialTheme.typography` read outside the `TypeRole` table; the check reads the sources, so a
+new screen cannot pass with a private palette. (Measured 2026-09-24: 53 colour literals, about
+a hundred named colours and 273 `.dp` literals in the shell against 19 uses of `Space`, so the
+contract is the file and not yet the screens.)
+
 **Where it lives.** One file, `shell-gamepad/.../DesignTokens.kt`, in that module because it is
 the one both the Gaming shell and `:app` can see — a token half the chrome cannot reach is not
 a system. It carries `Space` (the step scale), `Measure.bodyMaxWidth` (the readable line),
@@ -6978,8 +6986,11 @@ folder (`crash-<epoch>.txt`: build, mode, shell screen, the exception and
 its stack, and the last hundred lines of `scan.log`), written synchronously
 by the uncaught-exception handler before the process dies, and the ten
 newest notes are kept. The Murine fork's Recovery library keeps its job of
-restarting the app into the last shell; the note is what makes the restart
-diagnosable afterwards. Crash reporting is **local only**: the Sentry SDK
+restarting the app, and it restarts into `MainActivity` — the mode
+independent entry that renders whichever shell is enabled — never into
+the launcher fork's `Launcher`, which `HomeRolePrefs` may have disabled
+(a restart into a disabled component is a second crash); the note is what
+makes the restart diagnosable afterwards. Crash reporting is **local only**: the Sentry SDK
 that shipped with an empty DSN reported nowhere and is removed rather than
 pointed at a server, because a crash report leaves the device only when the
 person sends it (below). There is no automatic upload and no switch to
