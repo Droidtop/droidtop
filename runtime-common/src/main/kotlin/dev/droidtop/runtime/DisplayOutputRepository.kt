@@ -82,6 +82,8 @@ class DisplayOutputRepository(private val context: Context) {
             // that is genuinely a secondary output says so. The displayId
             // check stays as the fallback for anything that does not.
             val presentation = (display.flags and Display.FLAG_PRESENTATION) != 0
+            val native = display.supportedModes
+                .maxByOrNull { it.physicalWidth.toLong() * it.physicalHeight }
             DisplayOutput(
                 id = display.displayId.toString(),
                 androidDisplayId = display.displayId,
@@ -94,6 +96,8 @@ class DisplayOutputRepository(private val context: Context) {
                 heightPx = point.y,
                 name = display.name.orEmpty(),
                 isPresentation = presentation,
+                nativeWidthPx = native?.physicalWidth ?: point.x,
+                nativeHeightPx = native?.physicalHeight ?: point.y,
             )
         }
     }

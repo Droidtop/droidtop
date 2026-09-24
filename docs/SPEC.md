@@ -1052,7 +1052,13 @@ the `ContainerRuntime` interface that already exists (§3):
   enumerates as a presentation-category EXTERNAL display ("DP Screen",
   1080×1920 native per DRM) but can come up in a 480×640 fallback mode
   until power-cycled — detect and surface that state rather than
-  silently running at fallback resolution.
+  silently running at fallback resolution. Detection compares the
+  current size with the panel's largest `Display.getSupportedModes()`
+  entry and flags only a VGA-class mode (short side under 720 px) below
+  it (`DisplayModes.isFallback`), so a 1080p lapdock that also lists
+  4K is not called broken. It is surfaced on the companion's status bar
+  and on the Reinitialize displays row, each saying to power-cycle the
+  panel; droidtop does not try to force a mode change itself.
 - **On-screen controller (directed 2026-08-30)**: when no physical
   gamepad is detected (`InputDevice` scan for SOURCE_GAMEPAD/JOYSTICK —
   dual-screen phones and foldables running droidtop's surfaces on both

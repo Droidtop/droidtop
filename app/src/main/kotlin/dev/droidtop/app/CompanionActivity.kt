@@ -272,8 +272,35 @@ internal fun CompanionSystemBar() {
         if (controlsOpen) {
             SystemControlsRow()
         }
+        DisplayFallbackNotice()
     }
 }
+
+/**
+ * The add-on can come up in a low safe mode and stay there until it is
+ * power-cycled (docs/SPEC.md section 4); Android reports it as a normal
+ * display, so this says so on the glanceable screen, with what to do.
+ */
+@androidx.compose.runtime.Composable
+private fun DisplayFallbackNotice() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val outputs by androidx.compose.runtime.remember {
+        dev.droidtop.runtime.DisplayOutputRepository(context.applicationContext).observe()
+    }.collectAsState(initial = emptyList())
+    val degraded = outputs.firstOrNull {
+        it.kind == dev.droidtop.runtime.DisplayOutputKind.SECOND_SCREEN && it.isInFallbackMode
+    } ?: return
+    Text(
+        displayFallbackMessage(degraded),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.error,
+        modifier = Modifier.padding(top = 8.dp),
+    )
+}
+
+internal fun displayFallbackMessage(output: dev.droidtop.runtime.DisplayOutput): String =
+    "The second screen is running at ${output.modeSummary()}. " +
+        "Turn it off and on again to get its full resolution back."
 
 internal fun statusLine(status: dev.droidtop.runtime.systemstatus.SystemStatusSnapshot): String {
     val network = when (status.network) {
