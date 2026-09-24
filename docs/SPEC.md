@@ -1080,10 +1080,26 @@ the `ContainerRuntime` interface that already exists (§3):
   monitor") is a first-class, persisted setting, not just an enumerated
   `Display` id — matching how KDE's System Settings → Display & Monitor
   lets a user name and assign roles to each physical output rather than
-  just listing them by number. This configuration lives in the Standard
-  shell's own settings menu (`com.android.launcher3.settings.
-  SettingsActivity`, forked in with `:shell-default` — see §9); droidtop
-  does not have or want a separate standalone settings app (§7).
+  just listing them by number. This configuration lives in the settings
+  catalog (§7), rendered by every mode's settings surface; droidtop does
+  not have or want a separate standalone settings app.
+  **How it fits the one main-screen answer (decided 2026-09-24):**
+  `MainScreen` says which panel is the main output and is the only
+  relative choice; the KScreen-shaped part is the **Displays** screen of
+  the catalog (`displays`, under Screens), one row per display Android
+  currently has, named by the platform's own name for it ("DP Screen",
+  a lapdock's EDID name) with its size beside it, and identified for
+  persistence by that name and size, never by display id (§4c). The main
+  display's row says Main and links to the Main screen row. Every other
+  display's row is a choice of role: **Input surface** (§6c), **Companion**
+  (§4d), **Virtual controller** (§4), **Extended desktop output** (Desktop
+  only: a second headless output in the compositor, sized to the display,
+  with the taskbar's "move to" action reaching it), or **Mirror** (Android's
+  own mirroring, chosen rather than fallen into). The per-mode
+  second-screen role rows are these same rows filtered to the mode. A
+  display in a fallback mode the add-on is known to come up in (480x640
+  until power-cycled) shows that state on its row with "replug to fix"
+  rather than being used at that size silently.
 - **Real hook already exists, not hypothetical**: AOSP Launcher3 (and so
   `:shell-default`, its fork) already ships
   `com.android.launcher3.secondarydisplay.SecondaryDisplayLauncher` — a
