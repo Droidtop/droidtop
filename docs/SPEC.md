@@ -5775,6 +5775,10 @@ SteamGridDB (grids, heroes, logos, icons; it needs the user's own free API key, 
 stored like the ScreenScraper login) and Lutris (game metadata and art from its public game
 database), alongside the Steam store data already used for games with a Steam app id. Which
 source won for each field is recorded per game, as for ROMs.
+All of a game's flavour is scraped, not only art: descriptions, genres, developers and
+publishers, release dates, ratings, series, platforms, links, and the game's profile as the source
+presents it. That text is shown to players (detail pages, the companion screen), so it is worth
+the same care as the art.
 
 An overnight ScreenScraper pass over the user's real library — 46 ROMs
 across 11 systems — returned HTTP 403 for **all 46** requests: zero
