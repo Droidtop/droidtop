@@ -1071,7 +1071,22 @@ the `ContainerRuntime` interface that already exists (§3):
   droidtop's build — hook those classes directly in-process (per
   direction), extending what runtime-windows compiles only if a needed
   class isn't in the set yet. User-toggleable; auto-offered only when
-  no controller is present.
+  no controller is present. Precisely: the virtual controller is a
+  third **role of the second screen** beside the companion and the
+  input surface (`SecondScreenInput`'s role set gains `VIRTUAL_PAD`),
+  drawn with gamenative's `inputcontrols` profile renderer on the panel
+  the shell is not on, and its presses are dispatched as real gamepad
+  key events into droidtop's own window (the same `dispatchKeyEvent`
+  route the trackpad's focus steps take, §6c) so the shell, the Quick
+  Menu and every hint row see a pad and nothing knows the difference.
+  It is offered — a one-time notice on the companion with "Use the
+  screen as a controller" — when `ControllerPrefs.attachedControllers`
+  is empty and a second display is present, and chosen from the same
+  per-mode second-screen setting as the other two roles. On a
+  single-screen device there is no virtual pad over droidtop's own
+  chrome, by §7j: the chrome is touch-first, so the pad would only cover
+  the affordances that already answer; in a Wine game the overlay is
+  gamenative's own (§5b), and in an emulator it is the emulator's.
 - **Companion surface is user-populatable (directed 2026-08-30, second
   live addon session)**: the widgets/info screen (CompanionActivity on
   whichever display the shell is not on) is not just droidtop's ambient
@@ -1100,11 +1115,19 @@ the `ContainerRuntime` interface that already exists (§3):
   shell stays visible behind it, and a full-height right-edge sheet on
   a tall screen is the whole screen; the bottom sheet also puts the
   tabs in thumb reach. The tabs are tappable and the sheet has a
-  visible Close, neither of which it had), HOLD SELECT to
-  open (the system key-repeat threshold, ~500ms, detected via
-  repeatCount — no timers; short-press Select keeps its meaning; chords
-  rejected as undiscoverable; remappable later via the GamepadAction
-  layer). **Fully controller-driven, per direction**: L1/R1 tabs,
+  visible Close, neither of which it had). **R2 opens it** (directed:
+  the dedicated quick-device-management button, named on screen by the
+  R2 pill beside the tab bar; a fresh R2 press inside the menu closes
+  it), and HOLD SELECT is the fallback for pads whose triggers are
+  analog-only and never emit an R2 key event (the system's own
+  key-repeat, a second KeyDown at ~500 ms, no timer of droidtop's;
+  short-press Select keeps its meaning; chords rejected as
+  undiscoverable). The menu's hint row is docked at the bottom of the
+  sheet on every tab, carries `L1/R1 Tab` beside the tab's own actions,
+  and its Close is the row's `B Close` pill rather than a second text
+  button; on the Notifications tab `A Open`, `X Dismiss` and `Y Clear all`
+  are drawn only while there is a notification to act on (§7j: a hint
+  row promises only what dispatches). **Fully controller-driven, per direction**: L1/R1 tabs,
   D-pad focus, A act, X dismiss, Y clear-all, B close, with the hint
   row stating exactly that --- and, since 2026-09-11, fully reachable
   by touch as well (§7j): the hint row IS the touch control surface,
@@ -1148,7 +1171,25 @@ the `ContainerRuntime` interface that already exists (§3):
   read its display as DEFAULT before window attach, and an unguarded
   mismatch check relaunch-looped forever (confirmed live).
 - **Recents (decided 2026-08-30): droidtop builds its OWN in-shell
-  recents; system quickstep recents is out.** Holding the system
+  recents; system quickstep recents is out.** Its shape, so it can be
+  built: a **Recents** tab of the Quick Menu beside Notifications and
+  System (the menu is the one overlay that opens over every shell
+  screen, and "what was I playing" is a glance, not a section), listing
+  droidtop's own launches newest first from play history, each row
+  carrying the entry's artwork, name, when it was played and, on a
+  dual-screen device, WHICH panel it was launched onto from
+  `LaunchDisplay`'s per-launch record; `A` launches it again through
+  `Library.launch` (launch-screen memory included), `X` offers "on the
+  other screen" (the relative vocabulary of §4c, writing the per-game
+  launch screen), and `Y` opens its detail. Below droidtop's own rows,
+  once usage access is granted (§7b permissions), the same list continues
+  with every other app used today from `UsageStatsManager`, launched as
+  an app; until granted, one row offers the grant and the list is
+  droidtop's launches only, never empty when there are any. Desktop
+  windows (the compositor's toplevels through
+  `wlr-foreign-toplevel-management`) join the same list as rows that
+  activate or fullscreen the window when Desktop mode is on; that is the
+  only Desktop-specific half and it waits on nothing else. Holding the system
   recents role is impossible without root/system privileges
   (`config_recentsComponentName` is ROM configuration; every launcher
   with working quickstep recents is a system/ROM install), and root is
@@ -1616,12 +1657,25 @@ Top to bottom, each layer earning its space:
    entry through `settledFocusedEntry`, which draws a new focus only once
    it has held for 350 ms and a cleared focus at once.
 4. **Notifications** (built).
-5. **droidtop-native widgets** (to build): library stats, playtime,
-   recently played, and live scan/scrape/download progress — the things
-   droidtop already knows and currently shows nowhere.
-6. **Android widgets** (built).
-7. **Controls** (partly built): per-panel brightness, Wi-Fi, Bluetooth,
-   DND, volume.
+5. **droidtop-native widgets**: the widget picker offers droidtop's own
+   tiles beside the installed Android widgets, each a `CompanionWidget`
+   drawn by droidtop and laid out and persisted like an Android widget:
+   library stats (games per system, the numbers the theme's `systemdata`
+   knows), playtime and most played (from play history, once playtime
+   is measured, §7g), recently played (the rail, as a placeable tile),
+   and live progress for the scan, a scrape and downloads (the same
+   `ScanProgress`, scrape summary and download queue the settings rows
+   read, so a walk started from onboarding is visible on the second
+   screen while it runs). Tiles never run their own scan or query; they
+   observe the stores the shell already holds.
+6. **Android widgets**.
+7. **Controls**: per-panel brightness (the companion's own display's
+   brightness, `WindowManager.LayoutParams.screenBrightness` on that
+   window, which needs no grant; and the system's, through the same
+   `SystemControls` tile the Quick Menu uses), Wi-Fi, Bluetooth, DND and
+   media volume, drawn as the Quick Menu's tiles in a row the person can
+   show or hide. The companion never carries a control the Quick Menu
+   does not: it is the same catalog items rendered on the other panel.
 
 ### Rules this design commits to
 
