@@ -76,13 +76,19 @@ object EnginesDatabase {
      * validation and the atomic replace have to be the same either way.
      */
     fun install(context: Context, text: String): Int {
+        val count = validate(text)
+        PlatformDatabaseTransport.replace(context, DB_FILE_NAME, text)
+        invalidate()
+        return count
+    }
+
+    /** The check [install] makes, without writing anything. Returns the engine count. */
+    fun validate(text: String): Int {
         val parsed = EngineRegistryParser.parse(text)
         check(parsed.isNotEmpty()) { "Engines database has no engines" }
         check(parsed.any { it.detect.isNotEmpty() }) {
             "Engines database carries no detection rules (legacy v3 file?) -- refusing to replace the seed"
         }
-        PlatformDatabaseTransport.replace(context, DB_FILE_NAME, text)
-        invalidate()
         return parsed.size
     }
 }

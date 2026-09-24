@@ -112,9 +112,12 @@ object BiosDatabase {
 
     /** Validates [text] and only then replaces the current copy; see [dev.droidtop.library.EnginesDatabase.install]. */
     fun install(context: Context, text: String): Int {
-        val count = parse(text).size
+        val count = validate(text)
         PlatformDatabaseTransport.replace(context, DB_FILE_NAME, text)
         invalidate()
         return count
     }
+
+    /** The check [install] makes, without writing anything. Returns the entry count. */
+    fun validate(text: String): Int = parse(text).size
 }
