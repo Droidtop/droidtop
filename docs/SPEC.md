@@ -52,6 +52,7 @@ its group, is placed in numeric order, and gets a line in the contents below.
 - [10. Build order](#10-build-order)
 - [10a. Build environment](#10a-build-environment)
 - [10b. Releases and updates (directed 2026-09-02)](#10b-releases-and-updates-directed-2026-09-02)
+- [10c. Diagnostics, crash recovery and privacy](#10c-diagnostics-crash-recovery-and-privacy)
 - [11. Open risks to verify hands-on, not assume](#11-open-risks-to-verify-hands-on-not-assume)
 - [12. Third-party app integration system](#12-third-party-app-integration-system)
 
@@ -6211,6 +6212,69 @@ publishes only when every asset is up. Published releases are permanent
 met the bar (8.2/8.3 releases exist on enginehost-renpy-plugin); everything
 else stays a CI artifact until proven, and proving it makes publishing a
 one-command act.
+
+## 10c. Diagnostics, crash recovery and privacy
+
+A handheld is used away from a computer, so the evidence for a defect has
+to be gathered on the device, by the person holding it, and handed over
+in one motion. Three mechanisms, one folder, and one privacy rule.
+
+**One folder for everything droidtop records about itself:**
+`<external files>/logs/` (`Android/data/dev.droidtop.app/files/logs/`),
+readable on an unrooted device over adb, USB file transfer and any file
+manager. It holds `scan.log` (§7g), `desktop-container.log` (§3), the
+update log, and crash notes (below). Every file rolls at a fixed size with
+one rotation, so the folder never grows without bound. No file in it ever
+carries a credential: scraper and store secrets are redacted before a line
+is written (§7h's rule, applied to every sink), and a full library path is
+the most private thing a log holds.
+
+**A crash is written down before anything else happens.** An uncaught
+exception in droidtop's process, in any mode, becomes a crash note in that
+folder (`crash-<epoch>.txt`: build, mode, shell screen, the exception and
+its stack, and the last hundred lines of `scan.log`), written synchronously
+by the uncaught-exception handler before the process dies, and the ten
+newest notes are kept. The Murine fork's Recovery library keeps its job of
+restarting the app into the last shell; the note is what makes the restart
+diagnosable afterwards. Crash reporting is **local only**: the Sentry SDK
+that shipped with an empty DSN reported nowhere and is removed rather than
+pointed at a server, because a crash report leaves the device only when the
+person sends it (below). There is no automatic upload and no switch to
+turn one on.
+
+**Safe mode after a crash loop.** The Gaming shell renders third-party
+themes, and "a theme must never be able to kill droidtop" (§7f) cannot be
+proven for every theme. When the process has crashed twice within a minute
+of starting, the next start of the Gaming shell draws its unthemed fallback
+surface instead of the active theme and says so at the top of the screen,
+with one action that draws the theme again. The stored theme choice is not
+changed. A third crash in the same window starts the app on Global settings
+(the catalog the shell draws itself, §7) rather than in any shell, so a
+person can always reach Data, Rerun onboarding and Share diagnostics. The
+counter resets on any start that lives for a minute.
+
+**Share diagnostics** is one action in Global settings > Data. It zips the
+logs folder, the settings export (§7 Data, with every `droidtop_*`
+credential key left out), the platform-database snapshot ids (§7e2), the
+installed theme names and the enginehost version, and opens the system
+share sheet with the archive. It never sends anywhere by itself. The same
+action is reachable from a crash note's own restart screen, so the report
+can be sent before the crash is reproduced.
+
+**Privacy.** droidtop sends nothing about the device, the library or the
+person anywhere. The complete list of hosts it talks to, each for one job
+the person asked for: GitHub releases (§10b, its own and enginehost's update
+check: an unauthenticated fetch of one small file); the droidtop-platforms
+repository on GitHub (§7e2, database refresh); GitLab's ES-DE theme index
+and the theme repositories a person chooses to download (§7f); the scraper
+a person selected, with credentials the person entered (§7h); the OCI
+registries an image reference names (§3); and the store backends a person
+signed in to through the vendored client (§7g). There is no analytics, no
+telemetry, no usage statistics and no crash upload, so there is no
+"send usage data" setting: a switch for a thing that does not exist would
+be a lie either way. The update check and the database refresh run on the
+schedule the person set and never on mobile data when "unmetered only" is
+on (§10b).
 
 ## 11. Open risks to verify hands-on, not assume
 
