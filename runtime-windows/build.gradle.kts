@@ -26,9 +26,26 @@ android {
     // BE app.gamenative for both to resolve without editing forked files.
     namespace = "app.gamenative"
     compileSdk = 36
+    ndkVersion = "27.0.12077973"
 
     defaultConfig {
         minSdk = 26
+
+        // gamenative's natives are prebuilt for arm64-v8a only (the
+        // jniLibs source dirs below). The x86_64 half of the fat APK
+        // (docs/SPEC.md 10b) is built here from the fork's own sources,
+        // for the libraries whose source is in the tree and matches what
+        // ships; native/CMakeLists.txt says which and why not the rest.
+        // arm64 stays upstream's prebuilt set, so CMake builds x86_64 only.
+        externalNativeBuild {
+            cmake {
+                abiFilters += "x86_64"
+                targets += listOf("virglrenderer", "patchelf", "asurface_renderer", "ahbimage", "xconnectorpatch")
+                // libc++_shared.so is in the arm64 set; the NDK's own copy
+                // for x86_64 is packaged when the STL is the shared one.
+                arguments += "-DANDROID_STL=c++_shared"
+            }
+        }
 
         // The whole vendored tree compiles here, so all of gamenative's
         // BuildConfig surface has to exist. Values mirror its "modern"
@@ -136,6 +153,12 @@ android {
         // anywhere, so a missing version is an unrecoverable failure, not
         // a slow first launch.
         ignoreAssetsPatterns += listOf("dxwrapper", "steampipe", "steaminput", "steam_regions.json")
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("native/CMakeLists.txt")
+        }
     }
 
     compileOptions {

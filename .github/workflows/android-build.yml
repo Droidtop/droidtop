@@ -163,6 +163,15 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 build-scripts/check_class_load_api.py app/build/outputs/apk/release/app-universal-release.apk
 
+      - name: ABI sets (arm64-v8a libraries without an x86_64 build)
+        # The fat APK installs as x86_64 on an Android-x86 device with ARM
+        # translation only when its x86_64 set holds every arm64 name
+        # (docs/SPEC.md 10b). A report, not a gate, while the per-ABI
+        # splits still cover that case; it gets --require-complete when
+        # they go.
+        if: ${{ !cancelled() }}
+        run: python3 build-scripts/abi_sets.py app/build/outputs/apk/release/app-universal-release.apk
+
       - name: Publish to the latest channel
         # A GitHub Release is the "give this to someone to install"
         # mechanism: permanent, one clean download URL, and what the in-app
