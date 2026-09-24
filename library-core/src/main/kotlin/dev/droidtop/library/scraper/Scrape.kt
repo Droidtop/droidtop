@@ -450,7 +450,9 @@ suspend fun applyManualMatch(
         // path skips an existing file, which here would leave the
         // picture of the game the user just rejected.
         runCatching { downloadImage(metadata.coverUrl, destination) }
-        runCatching { File(File(File(gamesRoot, "downloaded_media"), systemId), "miximages/$baseName.png").delete() }
+        val staleMiximage = File(File(File(gamesRoot, "downloaded_media"), systemId), "miximages/$baseName.png")
+        runCatching { staleMiximage.delete() }
+        EsDeArtwork.mediaWritten(staleMiximage)
     }
 
     val dao = RomDatabase.get(context).romDao()
@@ -477,4 +479,5 @@ internal fun downloadImage(imageUrl: String, destination: File) {
         throw java.io.IOException("Image download failed: HTTP ${connection.responseCode}")
     }
     connection.inputStream.use { input -> destination.outputStream().use { output -> input.copyTo(output) } }
+    EsDeArtwork.mediaWritten(destination)
 }

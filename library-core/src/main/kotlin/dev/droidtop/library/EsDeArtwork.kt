@@ -141,6 +141,42 @@ object EsDeArtwork {
     )
 
     /**
+     * The one file lookup every function here makes: the first of
+     * [extensions] that names a file `<mediaRoot>/<system>/<folder>/<baseName>.<ext>`,
+     * answered from [MediaFolders]' listing of that folder rather than a
+     * `stat` per candidate.
+     */
+    private fun find(mediaRoot: File, system: String, folder: String, baseName: String, extensions: List<String>): String? {
+        val dir = File(File(mediaRoot, system), folder)
+        val names = MediaFolders.namesIn(dir)
+        if (names.isEmpty()) return null
+        for (ext in extensions) {
+            names["$baseName.$ext".lowercase()]?.let { return File(dir, it).absolutePath }
+        }
+        return null
+    }
+
+    /**
+     * Tells the lookup that droidtop itself just wrote or deleted [file]
+     * in a media folder, so the next lookup sees it at once instead of
+     * after [MediaFolders]' revalidation interval. Every media writer in
+     * droidtop (the scrapers, the miximage generator, orphan cleanup)
+     * calls this; media written by anything else is picked up through
+     * the folder's own modification time.
+     */
+    fun mediaWritten(file: File) {
+        file.parentFile?.let { MediaFolders.forget(it) }
+    }
+
+    /**
+     * Moves whenever a media folder this object had already read turns
+     * out to hold something different, or droidtop wrote to one. A
+     * caller that keeps its own answers (the themed gamelist does, per
+     * game) compares it to decide whether they are still good.
+     */
+    val mediaGeneration: Long get() = MediaFolders.generation
+
+    /**
      * Every scraped image for a game, in display order, labelled for a
      * viewer. [resolve] answers "the single best one and stop", which is
      * right for a theme element and useless for browsing what was
@@ -160,11 +196,9 @@ object EsDeArtwork {
         val found = mutableListOf<Pair<String, String>>()
         for (mediaType in MEDIA_TYPES_BY_PRIORITY) {
             for (mediaRoot in mediaRoots) {
-                val hit = EXTENSIONS.asSequence()
-                    .map { ext -> File(File(File(mediaRoot, system), mediaType), "$romBaseName.$ext") }
-                    .firstOrNull { it.isFile }
+                val hit = find(mediaRoot, system, mediaType, romBaseName, EXTENSIONS)
                 if (hit != null) {
-                    found += (labels[mediaType] ?: mediaType) to hit.absolutePath
+                    found += (labels[mediaType] ?: mediaType) to hit
                     break
                 }
             }
@@ -198,10 +232,7 @@ object EsDeArtwork {
         val mediaRoots = candidateMediaRoots(gamesRoot)
         for (mediaRoot in mediaRoots) {
             for (mediaType in folders) {
-                for (ext in EXTENSIONS) {
-                    val candidate = File(mediaRoot, "$system/$mediaType/$romBaseName.$ext")
-                    if (candidate.isFile) return candidate.absolutePath
-                }
+                find(mediaRoot, system, mediaType, romBaseName, EXTENSIONS)?.let { return it }
             }
         }
         return null
@@ -233,10 +264,10 @@ object EsDeArtwork {
      * belongs to the caller. Present-but-unrecognised types simply do not
      * match, matching [resolve]'s existing behaviour.
      *
-     * Cost: this is the same stat-only walk [resolve] already does, but
-     * bounded by what the theme asked for -- at most one folder per
-     * declared type, times [EXTENSIONS], times the two candidate media
-     * roots. It is deliberately NOT called during a library scan; see
+     * Cost: the same folder-listing lookup [resolve] does (see
+     * [MediaFolders]), bounded by what the theme asked for -- at most one
+     * folder per declared type, times the two candidate media roots. It is
+     * deliberately NOT called during a library scan; see
      * [GameMediaLocator].
      */
     fun resolveImageTypes(locator: GameMediaLocator, imageTypes: List<String>): String? {
@@ -250,11 +281,7 @@ object EsDeArtwork {
             }
             for (folder in folders) {
                 for (mediaRoot in mediaRoots) {
-                    for (ext in EXTENSIONS) {
-                        val candidate =
-                            File(mediaRoot, "${locator.system}/$folder/${locator.baseName}.$ext")
-                        if (candidate.isFile) return candidate.absolutePath
-                    }
+                    find(mediaRoot, locator.system, folder, locator.baseName, EXTENSIONS)?.let { return it }
                 }
             }
         }
@@ -272,10 +299,8 @@ object EsDeArtwork {
      * as [resolve].
      */
     fun resolveManual(gamesRoot: File, system: String, romBaseName: String): String? {
-        val mediaRoots = candidateMediaRoots(gamesRoot)
-        for (mediaRoot in mediaRoots) {
-            val candidate = File(mediaRoot, "$system/manuals/$romBaseName.pdf")
-            if (candidate.isFile) return candidate.absolutePath
+        for (mediaRoot in candidateMediaRoots(gamesRoot)) {
+            find(mediaRoot, system, "manuals", romBaseName, MANUAL_EXTENSIONS)?.let { return it }
         }
         return null
     }
@@ -291,15 +316,84 @@ object EsDeArtwork {
      * file here the same way [resolve]'s own PNG/JPG fallback list works.
      */
     fun resolveVideo(gamesRoot: File, system: String, romBaseName: String): String? {
-        val mediaRoots = candidateMediaRoots(gamesRoot)
-        for (mediaRoot in mediaRoots) {
-            for (ext in VIDEO_EXTENSIONS) {
-                val candidate = File(mediaRoot, "$system/videos/$romBaseName.$ext")
-                if (candidate.isFile) return candidate.absolutePath
-            }
+        for (mediaRoot in candidateMediaRoots(gamesRoot)) {
+            find(mediaRoot, system, "videos", romBaseName, VIDEO_EXTENSIONS)?.let { return it }
         }
         return null
     }
+
+    private val MANUAL_EXTENSIONS = listOf("pdf")
+}
+
+/**
+ * Listings of media folders, so that answering "does this game have a
+ * cover" is a set lookup, not a filesystem call.
+ *
+ * The cost it removes is the one the Retroid pays most for: every
+ * candidate name used to be one `stat`, and a ROM asked up to about 60 of
+ * them (seven types, two media roots, four extensions, plus manual and
+ * video), at every walk and again at every cache load. Through Android's
+ * FUSE layer onto an SD card each costs tens to hundreds of
+ * microseconds, which on an 18,000-file folder is minutes of IO. A media
+ * folder instead is listed once, into a map of lower-cased name to real
+ * name, and every later question about it is answered from memory.
+ *
+ * Lower-cased, because Android's shared storage is case-insensitive:
+ * `Sonic.PNG` answered a lookup for `Sonic.png` when each name was a
+ * `stat`, and it still must.
+ *
+ * Freshness: a listing is trusted for [REVALIDATE_MS]; after that the
+ * next lookup reads the folder's modification time (one `stat`) and
+ * lists it again only if it moved. A folder's mtime changes whenever a
+ * file is added to or removed from it, which is exactly the event that
+ * matters here, so media placed by ES-DE, a PC-side scraper or by hand
+ * shows within a couple of seconds without a rescan. A folder whose
+ * mtime is too recent to trust (a file may land in the same tick as the
+ * listing) is re-listed at its next revalidation rather than trusted.
+ * droidtop's own writers do not wait for any of that: they call
+ * [EsDeArtwork.mediaWritten]. A folder that does not exist is cached as
+ * empty on the same terms, since most of the fourteen candidate folders
+ * per system usually don't.
+ */
+private object MediaFolders {
+    private const val REVALIDATE_MS = 2_000L
+
+    private class Listing(val mtime: Long, val names: Map<String, String>, @Volatile var checkedAt: Long)
+
+    private val listings = java.util.concurrent.ConcurrentHashMap<String, Listing>()
+
+    fun namesIn(dir: File): Map<String, String> {
+        val now = System.currentTimeMillis()
+        val cached = listings[dir.path]
+        if (cached != null && now - cached.checkedAt < REVALIDATE_MS) return cached.names
+        // 0 for a folder that does not exist, which is also what an
+        // absent folder's listing is stored under.
+        val mtime = dir.lastModified()
+        if (cached != null && cached.mtime == mtime && mtime != UNTRUSTED) {
+            cached.checkedAt = now
+            return cached.names
+        }
+        val names = if (mtime == 0L) {
+            emptyMap()
+        } else {
+            dir.list()?.associateBy { it.lowercase() } ?: emptyMap()
+        }
+        val trustedMtime = if (mtime != 0L && now - mtime < REVALIDATE_MS) UNTRUSTED else mtime
+        listings[dir.path] = Listing(trustedMtime, names, now)
+        if (cached != null && cached.names != names) changes.incrementAndGet()
+        return names
+    }
+
+    fun forget(dir: File) {
+        listings.remove(dir.path)
+        changes.incrementAndGet()
+    }
+
+    private val changes = java.util.concurrent.atomic.AtomicLong()
+
+    val generation: Long get() = changes.get()
+
+    private const val UNTRUSTED = -1L
 }
 
 /** Folder-name convention used both to scan under [File] roots and to key into [EsDeArtwork]'s media lookup. */

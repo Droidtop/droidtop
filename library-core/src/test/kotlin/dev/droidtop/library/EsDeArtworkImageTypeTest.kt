@@ -29,7 +29,29 @@ class EsDeArtworkImageTypeTest {
         val f = File(gamesRoot, "downloaded_media/$system/$subdir/$name.$ext")
         f.parentFile.mkdirs()
         f.writeText("x")
+        // What every droidtop media writer does after writing; without it
+        // the folder's listing from an earlier lookup stands for up to
+        // its revalidation interval.
+        EsDeArtwork.mediaWritten(f)
         return f
+    }
+
+    @Test
+    fun `a file written after a lookup is found once the writer says so`() {
+        setUpRoot()
+        assertNull(EsDeArtwork.resolveImageTypes(locator(), listOf("cover")))
+        val cover = File(gamesRoot, "downloaded_media/megadrive/covers/Sonic.png")
+        cover.parentFile.mkdirs()
+        cover.writeText("x")
+        EsDeArtwork.mediaWritten(cover)
+        assertEquals(cover.absolutePath, EsDeArtwork.resolveImageTypes(locator(), listOf("cover")))
+    }
+
+    @Test
+    fun `a name differing only in case still matches, as it does on Android shared storage`() {
+        setUpRoot()
+        val cover = media("megadrive", "covers", "SONIC", ext = "PNG")
+        assertEquals(cover.absolutePath, EsDeArtwork.resolveImageTypes(locator(), listOf("cover")))
     }
 
     private fun locator(name: String = "Sonic") = GameMediaLocator(gamesRoot.absolutePath, "megadrive", name)

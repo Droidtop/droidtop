@@ -132,7 +132,10 @@ object OrphanedMedia {
     suspend fun clean(context: Context, report: Report): String = withContext(Dispatchers.IO) {
         if (report.isEmpty) return@withContext report.describe()
         var deleted = 0
-        report.files.forEach { if (runCatching { it.delete() }.getOrDefault(false)) deleted++ }
+        report.files.forEach {
+            if (runCatching { it.delete() }.getOrDefault(false)) deleted++
+            dev.droidtop.library.EsDeArtwork.mediaWritten(it)
+        }
         val dao = RomDatabase.get(context).romDao()
         report.metadataIds.chunked(400).forEach { chunk -> dao.deleteGameMetadata(chunk) }
         "Removed $deleted media files and ${report.metadataIds.size} metadata rows."

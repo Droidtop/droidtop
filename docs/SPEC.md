@@ -4410,6 +4410,29 @@ not only in a commit message.**
   root there already reads as zero folders) since changing that was
   out of this step's scope.
 
+### Performance on the console: no per-item disk work where a list is drawn or walked (2026-09-24)
+
+The code audit of 2026-09-24 found the console's slowness in four places,
+each doing filesystem or parse work per item, on the wrong thread, or more
+often than anything had changed. The decisions:
+
+**Media is looked up in a folder listing, not by `stat`.** `EsDeArtwork`
+answers every media question (artwork, the theme's `imageType` chain,
+manual, video, the detail screen's media list) from a listing of the one
+`<media root>/<system>/<type>` folder concerned, read once into a map of
+lower-cased name to real name and kept. A ROM used to ask up to about 60
+names by `stat` (seven types, two media roots, four extensions, plus
+manual and video), at every walk and again at every cache load: about a
+million FUSE calls for the rig's 18,000-file j2me folder. Lower-cased,
+because Android's shared storage is case-insensitive and a `stat` lookup
+was too. Freshness is the folder's own modification time, which moves
+whenever a file is added to or removed from it: a listing is trusted for
+two seconds, then one `stat` of the folder decides whether to list it
+again, so media placed by ES-DE, a PC-side scraper or by hand appears
+without a rescan. droidtop's own media writers (the scrapers, the
+miximage generator, orphan cleanup) tell the lookup directly
+(`EsDeArtwork.mediaWritten`) instead of waiting for that.
+
 ### The scan's unit of work is a folder (directed by the rig, 2026-09-11)
 
 Pointing droidtop at a whole-library root — the rig's games root is the
