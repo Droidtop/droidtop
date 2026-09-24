@@ -70,9 +70,10 @@ class DroidtopPcGameRuntime(
         get() = runCatching { ContainerManager(context).containers.isNotEmpty() }.getOrDefault(false)
 
     // The primary container session IS the Linux runtime: launchLinux
-    // runs inside it and nothing else can. Root-only today, which is
-    // exactly why the PC surface shows a Linux row as "not on this
-    // device" rather than offering a launch that cannot work.
+    // runs inside it and nothing else can. It exists only while Desktop
+    // mode's container is up (droidspaces with root, proot without), which
+    // is why the PC surface shows a Linux row as "not on this device"
+    // otherwise rather than offering a launch that cannot work.
     override val isLinuxContainerAvailable: Boolean
         get() = primarySession() != null
 
@@ -344,7 +345,7 @@ class DroidtopPcGameRuntime(
 
     override suspend fun launchLinux(executable: File, gameRoot: File): PcLaunchResult {
         val session = primarySession()
-            ?: return PcLaunchResult(false, "no live container session")
+            ?: return PcLaunchResult(false, "a native Linux build runs inside Desktop mode's container, and it isn't running")
 
         val result = runCatching {
             NativeLinuxGameSession(session.container, session.runtime)

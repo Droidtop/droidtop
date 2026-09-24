@@ -51,22 +51,21 @@ interface PcGameRuntime {
     val isAvailable: Boolean
 
     /**
-     * Whether a Windows environment has actually been set up yet.
-     *
-     * Distinct from [isAvailable], which asks whether a container
-     * session is live right now. Both have to be true to launch, and
-     * they fail for different reasons the user can act on differently:
-     * nothing installed yet versus installed but not running.
+     * Whether a Windows environment has actually been set up yet: the
+     * one precondition a Windows launch has. A Wine launch needs no
+     * container session (docs/SPEC.md 5b); only [launchLinux] does, and
+     * [isLinuxContainerAvailable] answers that separately.
      */
     val isProvisioned: Boolean
 
     /**
      * Whether a container runtime that can really exec a native Linux
-     * binary is live right now.
+     * binary is live right now: Desktop mode's primary container, whether
+     * droidspaces (root) or proot (no root) runs it.
      *
      * Separate from [isAvailable], which is true as soon as a Wine prefix
-     * exists: a Windows game needs no container and no root, a native
-     * Linux build needs both. Conflating them made the PC surface tell a
+     * exists: a Windows game needs no container, a native Linux build
+     * needs one. Conflating them made the PC surface tell a
      * user with a Wine prefix that a Linux-only game was ready to run.
      */
     val isLinuxContainerAvailable: Boolean
