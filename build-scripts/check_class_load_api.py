@@ -62,9 +62,8 @@ DEFAULT_MIN_SDK = 26
 FATAL_POSITIONS = ("superclass", "interface", "return type")
 ALL_POSITIONS = ("superclass", "interface", "return type", "parameter", "field")
 
-# Source trees whose classes are NOT droidtop's to fix: reference-only copies
-# that are never compiled into the APK anyway.
-SKIP_SOURCE_DIRS = ("upstream-unused-reference", "/build/", "/.git/")
+# Build output and git internals are not source.
+SKIP_SOURCE_DIRS = ("/build/", "/.git/")
 
 
 # --------------------------------------------------------------------------
@@ -73,8 +72,7 @@ SKIP_SOURCE_DIRS = ("upstream-unused-reference", "/build/", "/.git/")
 def owned_packages(repo):
     packages = set()
     for base, dirs, files in os.walk(repo):
-        dirs[:] = [d for d in dirs if d not in (".git", "build", ".gradle",
-                                                "upstream-unused-reference")]
+        dirs[:] = [d for d in dirs if d not in (".git", "build", ".gradle")]
         for name in files:
             if not (name.endswith(".java") or name.endswith(".kt")):
                 continue

@@ -15,7 +15,7 @@ from pathlib import Path
 
 COMMENT_RE = re.compile(r"<!--(.*?)-->", re.S)
 BAD = ["--", "—", "–"]  # double dash, em dash, en dash
-SKIP_PARTS = {"vendor", "build", ".git", "upstream-unused-reference"}
+SKIP_PARTS = {"vendor", "build", ".git"}
 
 failures = []
 for path in Path(".").rglob("*.xml"):

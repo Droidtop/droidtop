@@ -1324,9 +1324,8 @@ the `ContainerRuntime` interface that already exists (§3):
   already speaks — e.g. `wlr-foreign-toplevel-management`) as
   first-class recents entries, so desktop apps can be made fullscreen
   and switched between naturally from the same surface as Android
-  tasks. The quickstep sources stay parked in
-  `upstream-unused-reference/` for a hypothetical future ROM/system
-  build only.
+  tasks. Quickstep is not carried in the fork; a hypothetical future
+  ROM/system build would take it from upstream Launcher3.
 - **General framing**: droidtop's display/shell/settings model takes KDE
   Plasma as its broader reference point, not just for KScreen specifically
   — the goal (§1) is a real general-purpose compute device, and KDE is the
@@ -2618,8 +2617,8 @@ app-drawer icon or a floating switcher button:
   can hold, confirmed by real compile errors (local reimplementations of
   AOSP's internal Transitions-framework classes needing package-private
   `android.annotation` visibility only available inside a real platform
-  source tree compile), not assumed upfront. Source stays in the repo for
-  reference; just not part of the active build.
+  source tree compile), not assumed upfront. The fork does not carry that
+  source; upstream Murine Launcher and AOSP Launcher3 have it.
   **droidtop has no separate settings app** — the Standard shell's own
   forked-in settings menu (`com.android.launcher3.settings.
   SettingsActivity`) is where display configuration (§4), shell

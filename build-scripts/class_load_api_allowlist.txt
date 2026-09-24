@@ -54,9 +54,9 @@ com.android.launcher3.compat.WallpaperManagerCompatVOMR1
 com.android.launcher3.views.DoubleShadowIconDrawable
 
 # ValueAnimator.DurationScaleChangeListener (API 33) as a lambda, created
-# inside `if (Build.VERSION.SDK_INT >= 33)` in AnimationHandler.java:126.
-# Vendored androidx source (shell-default/androidx-lib), upstream's own
-# version split, kept as upstream wrote it.
+# inside an `if (Build.VERSION.SDK_INT >= 33)` branch of AnimationHandler.
+# It is the androidx.dynamicanimation library's own version split
+# (shell-default/build.gradle depends on that artifact), not our code.
 androidx.dynamicanimation.animation.AnimationHandler
 
 # --- Unreachable below their API for a structural reason ---
