@@ -139,7 +139,6 @@ class ProotRuntime(
 
         val provisioning = readProvisioning(container.id)
             ?: error("${container.id} has no provisioning plan recorded; recreate it")
-        val socket = File(socketsDir, ContainerLayout.WAYLAND_SOCKET_NAME)
         withContext(Dispatchers.IO) {
             prepareSharedDirectories()
             // A socket (and its .lock) left by a previous session would
@@ -167,7 +166,8 @@ class ProotRuntime(
                         "came up. Last output:\n" + tail.lines().joinToString("\n"),
                 )
             }
-            if (socket.exists() && canConnect(socket)) {
+            val socket = ContainerLayout.findWaylandSocket(socketsDir)
+            if (socket != null && canConnect(socket)) {
                 log.line("${container.id}: compositor socket is accepting connections at ${socket.path}")
                 return
             }
@@ -317,7 +317,8 @@ class ProotRuntime(
     }
 
     override fun primaryWaylandSocketPath(): String =
-        File(socketsDir, ContainerLayout.WAYLAND_SOCKET_NAME).absolutePath
+        (ContainerLayout.findWaylandSocket(socketsDir) ?: error("the primary compositor has no socket in ${socketsDir.path}"))
+            .absolutePath
 
     override fun hostStorageToContainerPath(hostPath: File): String =
         ContainerLayout.hostStorageToContainerPath(appStorageDir, hostPath)
@@ -344,7 +345,7 @@ class ProotRuntime(
     private fun startSession(rootfs: File, guestCommand: List<String>, env: Map<String, String>, mergeStderr: Boolean): Process {
         val guestEnvironment = LinkedHashMap<String, String>().apply {
             putAll(baseGuestEnvironment)
-            putAll(ContainerLayout.clientEnvironment)
+            putAll(ContainerLayout.clientEnvironment(ContainerLayout.findWaylandSocket(socketsDir)?.name))
             putAll(env)
         }
         val argv = buildList {

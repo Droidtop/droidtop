@@ -32,9 +32,25 @@ class ContainerLayoutTest {
     }
 
     @Test
-    fun `clients get the socket directory and name the compositor creates`() {
-        assertEquals(ContainerLayout.SOCKET_DIR, ContainerLayout.clientEnvironment["XDG_RUNTIME_DIR"])
-        assertEquals(ContainerLayout.WAYLAND_SOCKET_NAME, ContainerLayout.clientEnvironment["WAYLAND_DISPLAY"])
+    fun `clients get the socket directory and the name the compositor chose`() {
+        val env = ContainerLayout.clientEnvironment("wayland-1")
+        assertEquals(ContainerLayout.SOCKET_DIR, env["XDG_RUNTIME_DIR"])
+        assertEquals("wayland-1", env["WAYLAND_DISPLAY"])
+        assertEquals(null, ContainerLayout.clientEnvironment(null)["WAYLAND_DISPLAY"])
+    }
+
+    @Test
+    fun `the compositor socket is found, whatever it is called`() {
+        // sway starts at wayland-1 and never uses wayland-0.
+        val dir = java.nio.file.Files.createTempDirectory("sockets").toFile()
+        try {
+            assertEquals(null, ContainerLayout.findWaylandSocket(dir))
+            listOf("sway-ipc.0.12.sock", "wayland-1.lock", "wayland-10", "wayland-1").forEach { File(dir, it).writeText("") }
+            assertEquals("wayland-1", ContainerLayout.findWaylandSocket(dir)!!.name)
+        } finally {
+            dir.listFiles()?.forEach { it.delete() }
+            dir.delete()
+        }
     }
 
     @Test
