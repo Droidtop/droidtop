@@ -5680,6 +5680,30 @@ screen, positioned inside the window.
 **Copy is part of the system.** Sentence case, one dash convention, one name per concept, verb
 labels on buttons, no developer notation and no backend error strings in a user-facing string.
 
+**Language is part of the system.** Every user-facing string in droidtop's own chrome is a
+string resource, and English is the source language. A sentence is one resource with
+placeholders, never assembled in Kotlin from fragments, because word order is a property of a
+language and not of the code. Plurals use plural resources. A translation is a set of the same
+resources in another language; a string with no translation falls back to English per string,
+never to a blank or an id. Themed views are excluded, as in ES-DE: a theme's own labels are the
+theme's, resolved for the running language with `en_US` as the floor (§7b Appearance). Vendored
+trees keep their own resources. The rule is enforced the way the API-level gate is (§10b): lint's
+hardcoded-text check is strict for every module droidtop writes, and the vendored trees sit in
+the baseline.
+
+**Accessibility is part of the system.** droidtop's chrome is driven by a pad, a finger or a
+screen reader through one focus order: every focusable is reachable by D-pad and by linear
+navigation in the same order, and every control that shows no text (a glyph tile, a hint pill,
+an icon button, a card's artwork) carries a content description that says what it is and what
+it does, taken from the same string the hint row draws. Text and its ground clear 4.5:1 in both
+palettes, a disabled control clears 3:1 (`ChromeColors.DisabledAlpha`), and the contrast test
+covers every text-on-surface pair. The chrome honours the system font scale to 1.3 without
+clipping: rows keep the one-row-height rule at each scale, and text that still does not fit is
+abbreviated with an ellipsis. Colour is never the only signal for a state; the focused, selected
+and disabled states each have a shape or weight of their own. Themed views are the theme
+author's and are excluded, as in ES-DE. The touch-target minimum (§7j) already holds in every
+orientation and on every input.
+
 **Where it lives.** One file, `shell-gamepad/.../DesignTokens.kt`, in that module because it is
 the one both the Gaming shell and `:app` can see — a token half the chrome cannot reach is not
 a system. It carries `Space` (the step scale), `Measure.bodyMaxWidth` (the readable line),
