@@ -376,6 +376,104 @@ echo "=== hev-socks5-tunnel ($ABI) ==="
     cp "$HEV_WORK/libs/$ABI/libhev-socks5-tunnel.so" "$HEV_OUT/"
 )
 
+echo "=== PulseAudio 13.0, libsndfile, libltdl ($ABI) ==="
+# The audio half of gamenative's Windows runtime (docs/SPEC.md 10b). Its
+# arm64 set is prebuilt upstream (libpulse*, libsndfile, libltdl in the
+# fork's jniLibs, the daemon as libpulseaudio.so, and modules + pactl in
+# the pulseaudio-gamenative asset); x86_64 is built here, with the same
+# file names: the ABI picker compares names, and PulseAudioComponent
+# execs nativeLibraryDir/libpulseaudio.so.
+#
+#   libltdl      the standalone libltdl tree libltdl-dev installs under
+#                /usr/share/libtool (already on the apt list).
+#   libsndfile   vendor/libsndfile at 1.0.28, the version in the arm64 set.
+#   PulseAudio   vendor/pulseaudio at v13.0; the file names carry 13.0.
+#                Termux's Android patches of its 13.0 package and its
+#                module-aaudio-sink.c (build-scripts/pulseaudio-patches,
+#                the sink extended with the arguments GameNative passes).
+#                Configured as the arm64 set was: no speex or soxr (its
+#                libpulsecore has no speex resampler), no memfd.
+#                ac_cv_header_glob_h=no: bionic has glob() only from
+#                API 28, and PulseAudio uses it only for scache
+#                directories, behind HAVE_GLOB_H.
+#
+# libtool versions sonames (libpulse.so.0); Android loads only lib*.so
+# out of nativeLibraryDir, so every output's soname and NEEDED entries
+# lose the version and its RUNPATH goes (patchelf, on the apt list).
+#
+# Outputs: runtime-windows/src/main/jniLibs/x86_64/ (the six libraries)
+# and runtime-windows/src/main/assets/pulseaudio-gamenative-x86_64.tzst
+# (modules/ and pactl, laid out like the arm64 asset).
+if [ "$ABI" = "x86_64" ]; then (
+    export PATH="$TOOLCHAIN_BIN:$PATH"
+    export CC CXX AR=llvm-ar RANLIB=llvm-ranlib STRIP=llvm-strip NM=llvm-nm
+    PA_WORK="$WORK/pulseaudio"
+    PA_PREFIX="$PA_WORK/prefix"
+    rm -rf "$PA_WORK"
+    mkdir -p "$PA_WORK/src" "$PA_PREFIX"
+    HOST_ARGS=(--host="$TARGET_TRIPLE" --prefix="$PA_PREFIX" --disable-static --enable-shared)
+
+    cp -rL /usr/share/libtool "$PA_WORK/src/ltdl"
+    cp -rL /usr/share/libtool/build-aux "$PA_WORK/src/build-aux"
+    ( cd "$PA_WORK/src/ltdl" && ./configure "${HOST_ARGS[@]}" --enable-ltdl-install && make -j"$(nproc)" && make install )
+
+    cp -r "$VENDOR/libsndfile" "$PA_WORK/src/sndfile"
+    rm -f "$PA_WORK/src/sndfile/.git"
+    ( cd "$PA_WORK/src/sndfile" && autoreconf -fi && \
+        ./configure "${HOST_ARGS[@]}" --disable-external-libs --disable-sqlite --disable-alsa \
+            --disable-full-suite --disable-octave && \
+        make -C src -j"$(nproc)" && make -C src install && make install-pkgconfigDATA )
+
+    cp -r "$VENDOR/pulseaudio" "$PA_WORK/src/pulseaudio"
+    cd "$PA_WORK/src/pulseaudio"
+    rm -f .git
+    # A shallow submodule has no tags for git-version-gen to describe.
+    echo -n 13.0 > .tarball-version
+    PA_PATCHES="$REPO_ROOT/build-scripts/pulseaudio-patches"
+    for pa_patch in "$PA_PATCHES"/*.patch; do patch -p1 --forward < "$pa_patch"; done
+    mkdir -p src/modules/aaudio
+    cp "$PA_PATCHES/module-aaudio-sink.c" src/modules/aaudio/
+    autoreconf --force --install
+    PKG_CONFIG_LIBDIR="$PA_PREFIX/lib/pkgconfig" \
+    CPPFLAGS="-I$PA_PREFIX/include" LDFLAGS="-L$PA_PREFIX/lib" \
+    ./configure "${HOST_ARGS[@]}" \
+        --disable-neon-opt --disable-alsa --disable-esound --disable-glib2 --disable-x11 \
+        --disable-gtk3 --disable-openssl --without-caps --with-database=simple --disable-memfd \
+        --disable-gsettings --disable-dbus --disable-udev --disable-bluez5 --disable-avahi \
+        --disable-jack --disable-lirc --disable-tcpwrap --disable-systemd-daemon \
+        --disable-systemd-login --disable-systemd-journal --without-speex --without-soxr \
+        --disable-orc --disable-webrtc-aec --disable-tests --disable-manpages --disable-hal-compat \
+        --disable-oss-output --disable-oss-wrapper --disable-gconf --disable-asyncns --disable-nls \
+        --without-fftw --disable-default-build-tests \
+        ax_cv_PTHREAD_PRIO_INHERIT=no ac_cv_header_glob_h=no
+    make -C src -j"$(nproc)" \
+        libpulsecommon-13.0.la libpulse.la libpulsecore-13.0.la pulseaudio pactl \
+        libprotocol-native.la module-native-protocol-unix.la module-aaudio-sink.la
+
+    PA_LIBS="$REPO_ROOT/runtime-windows/src/main/jniLibs/$ABI"
+    PA_ASSET="$PA_WORK/asset"
+    mkdir -p "$PA_LIBS" "$PA_ASSET/modules"
+    cp -L "$PA_PREFIX/lib/libltdl.so" "$PA_PREFIX/lib/libsndfile.so" "$PA_LIBS/"
+    cp -L src/.libs/libpulse.so src/.libs/libpulsecommon-13.0.so src/.libs/libpulsecore-13.0.so "$PA_LIBS/"
+    cp -L src/.libs/pulseaudio "$PA_LIBS/libpulseaudio.so"
+    cp -L src/.libs/libprotocol-native.so src/.libs/module-native-protocol-unix.so \
+        src/.libs/module-aaudio-sink.so "$PA_ASSET/modules/"
+    cp -L src/.libs/pactl "$PA_ASSET/pactl"
+    for elf in "$PA_LIBS"/libltdl.so "$PA_LIBS"/libsndfile.so "$PA_LIBS"/libpulse*.so \
+        "$PA_ASSET"/modules/*.so "$PA_ASSET/pactl"; do
+        patchelf --remove-rpath "$elf"
+        soname="$(patchelf --print-soname "$elf" 2>/dev/null || true)"
+        case "$soname" in *.so.*) patchelf --set-soname "${soname%%.so.*}.so" "$elf" ;; esac
+        for needed in $(patchelf --print-needed "$elf"); do
+            case "$needed" in *.so.*) patchelf --replace-needed "$needed" "${needed%%.so.*}.so" "$elf" ;; esac
+        done
+        llvm-strip --strip-unneeded "$elf"
+    done
+    mkdir -p "$REPO_ROOT/runtime-windows/src/main/assets"
+    tar -C "$PA_ASSET" -I 'zstd -19' -cf \
+        "$REPO_ROOT/runtime-windows/src/main/assets/pulseaudio-gamenative-x86_64.tzst" modules pactl
+) fi
+
 echo "=== Done. Deps installed under $DEPS_DIR ==="
 find "$DEPS_DIR" -iname "*wayland-client*" -o -iname "libffi.a"
 file "$DS_ASSETS/droidspaces-$ABI"

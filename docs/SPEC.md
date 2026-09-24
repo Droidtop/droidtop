@@ -7003,7 +7003,13 @@ gamenative's code actually calls:
   dlopens SDL at run time), the OpenXR loader (`vendor/OpenXR-SDK` at a
   release tag), and PulseAudio 13.0 (`libpulse`, `libpulseaudio`,
   `libpulsecommon-13.0`, `libpulsecore-13.0`) with libsndfile 1.0.28 and
-  libltdl, built for x86_64.
+  libltdl, built by `build-scripts/build-vendor-deps.sh` from
+  `vendor/pulseaudio` and `vendor/libsndfile` with Termux's 13.0-era
+  Android patches. The AAudio sink is Termux's `module-aaudio-sink.c`
+  extended with the `volume`, `performance_mode` and `low_latency`
+  arguments GameNative's `default.pa` passes; its modules and `pactl` go
+  in `pulseaudio-gamenative-x86_64.tzst`, the x86_64 counterpart of the
+  arm64 asset.
 
 **Steam on x86_64 is the Linux client in proot (user, 2026-09-24).** On
 arm64, `libsteambootstrap` brings up Valve's Android arm64

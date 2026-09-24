@@ -39,3 +39,11 @@
 	path = vendor/SDL2
 	url = https://github.com/libsdl-org/SDL
 	shallow = true
+[submodule "vendor/pulseaudio"]
+	path = vendor/pulseaudio
+	url = https://github.com/pulseaudio/pulseaudio
+	shallow = true
+[submodule "vendor/libsndfile"]
+	path = vendor/libsndfile
+	url = https://github.com/libsndfile/libsndfile
+	shallow = true
