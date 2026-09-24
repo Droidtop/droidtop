@@ -456,7 +456,7 @@ private fun QuickTileView(
         }
         Spacer(Modifier.weight(1f))
         Text(
-            if (confirmArmed) "${tile.label} -- A again" else tile.label,
+            if (confirmArmed) "${tile.label}: press A again" else tile.label,
             color = if (confirmArmed) MenuTokens.Danger else MenuTokens.OnSurface,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,

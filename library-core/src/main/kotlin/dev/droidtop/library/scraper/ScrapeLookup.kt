@@ -86,7 +86,7 @@ object ScrapeRefusals {
         android.util.Log.w(
             "droidtop.Scraper",
             "$source refused $subject: HTTP $status" +
-                (reason?.let { " -- server said: $it" } ?: " (server sent no error body)"),
+                (reason?.let { " — server said: $it" } ?: " (server sent no error body)"),
         )
         return ScrapeLookup.Refused(source, status, reason)
     }
@@ -164,6 +164,6 @@ internal fun totalRefusalSummary(
 internal fun describeRefusal(refused: Int, attempted: Int, lastRefusal: ScrapeLookup.Refused?): String {
     if (lastRefusal == null) return ""
     val reason = lastRefusal.reason
-        ?: "the server sent no explanation with it -- check logcat, tag droidtop.Scraper, for the full request context"
+        ?: "the server gave no reason"
     return " ($refused of $attempted refused; ${lastRefusal.source} HTTP ${lastRefusal.httpStatus}: $reason)."
 }

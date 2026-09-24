@@ -367,7 +367,7 @@ suspend fun importGamelistXml(
     folder: File,
 ): String = withContext(Dispatchers.IO) {
     val gamelist = dev.droidtop.library.consoles.GamelistXml.fileFor(folder)
-    if (!gamelist.isFile) return@withContext "No gamelist.xml in ${folder.name} -- run an external scraper against this folder first."
+    if (!gamelist.isFile) return@withContext "No gamelist.xml in ${folder.name} — run an external scraper against this folder first."
     val entries = try {
         dev.droidtop.library.consoles.GamelistXml.parse(gamelist)
     } catch (t: Exception) {

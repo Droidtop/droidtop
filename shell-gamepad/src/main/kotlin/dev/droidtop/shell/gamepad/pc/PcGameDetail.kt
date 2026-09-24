@@ -370,7 +370,7 @@ internal fun PcGameDetail(
                         title = "Runs with",
                         detail = when {
                             !loaded -> "Working out what can run this…"
-                            runner == null -> "Not chosen -- ${runners.options.size} to choose from"
+                            runner == null -> "Not chosen — ${runners.options.size} to choose from"
                             else -> "${runner.label} - ${runner.reason}"
                         },
                         enabled = loaded && runners.options.isNotEmpty(),

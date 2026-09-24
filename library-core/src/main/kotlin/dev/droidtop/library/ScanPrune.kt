@@ -226,7 +226,7 @@ object ScanPrune {
                 return if (store.allows(relative)) {
                     null
                 } else {
-                    "${store.store} owns this tree -- its games are listed from " +
+                    "${store.store} owns this tree — its games are listed from " +
                         store.gameSubtrees.joinToString(", ")
                 }
             }

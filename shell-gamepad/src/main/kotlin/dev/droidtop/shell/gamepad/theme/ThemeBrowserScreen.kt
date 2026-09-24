@@ -297,7 +297,7 @@ private fun ThemeBrowserRow(
                 Text("by ${entry.author}", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall)
             }
             Text(
-                status ?: if (installed) "Installed -- select to check for updates" else "Not installed -- select to download",
+                status ?: if (installed) "Installed — select to check for updates" else "Not installed — select to download",
                 color = MenuTokens.Accent,
                 style = MaterialTheme.typography.bodySmall,
             )

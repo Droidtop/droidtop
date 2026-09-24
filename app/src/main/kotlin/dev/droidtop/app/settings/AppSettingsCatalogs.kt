@@ -415,7 +415,7 @@ object AppSettingsCatalogs {
     private fun biosScreen(gamesRoot: File, spec: SystemBiosSpec) = CatalogScreen(
         id = "bios_${spec.systemId}",
         title = "${spec.name} BIOS files",
-        subtitle = "Checked under ${gamesRoot.absolutePath}/bios -- md5-verified against Batocera's real registry",
+        subtitle = "Checked under ${gamesRoot.absolutePath}/bios — md5-verified against Batocera's real registry",
         groups = { context ->
             withContext(Dispatchers.IO) {
                 val statuses = BiosDatabase.check(gamesRoot, spec)
@@ -428,7 +428,7 @@ object AppSettingsCatalogs {
                                 id = "bios_${spec.systemId}_${status.spec.file}",
                                 title = status.spec.file.removePrefix("bios/"),
                                 subtitle = when {
-                                    !status.present -> "Missing -- place it at ${File(gamesRoot, status.spec.file).absolutePath}"
+                                    !status.present -> "Missing — place it at ${File(gamesRoot, status.spec.file).absolutePath}"
                                     status.md5Ok == false -> "Present, but the md5 matches no known-good dump"
                                     status.md5Ok == true -> "Present, verified"
                                     else -> "Present (no known hash to verify against)"
@@ -495,7 +495,7 @@ object AppSettingsCatalogs {
             id = "system_player_${system.id}",
             title = "Player",
             subtitle = if (players.isEmpty()) {
-                "No installed emulator can run ${system.displayName} yet -- add a custom player below, or install one"
+                "No installed emulator can run ${system.displayName} yet — add a custom player below, or install one"
             } else {
                 "Which installed emulator launches ${system.displayName}"
             },
@@ -752,7 +752,7 @@ object AppSettingsCatalogs {
                             title = "Install debug builds",
                             subtitle = if (update.debugBuilds(context)) {
                                 "WARNING: debug builds exist to be inspected with adb, not played on. Android " +
-                                    "never compiles one ahead of time, so it is several times slower -- build 567 " +
+                                    "never compiles one ahead of time, so it is several times slower — build 567 " +
                                     "started in 3.9 s as a debug build and 0.7 s as the normal one, same device. " +
                                     "Turn this off and check again to go back"
                             } else {
@@ -782,7 +782,7 @@ object AppSettingsCatalogs {
                                 val info = withContext(Dispatchers.IO) { update.fetch(ctx) }
                                 if (info.versionCode > update.installedVersionCode(ctx)) {
                                     "${info.versionName} (build ${info.versionCode}) is available on " +
-                                        "${info.channel.label}${if (info.debug) ", debug build" else ""} -- " +
+                                        "${info.channel.label}${if (info.debug) ", debug build" else ""} — " +
                                         "use \"Download and install\" below."
                                 } else {
                                     "This is the newest published build."
@@ -797,7 +797,7 @@ object AppSettingsCatalogs {
                             title = "Check and install now",
                             subtitle = "Checks immediately, whatever the schedule above says, and installs a newer " +
                                 "build straight away: verified against the digest published with the release, then " +
-                                "handed to the Android installer -- Android checks the signing key and asks you to " +
+                                "handed to the Android installer — Android checks the signing key and asks you to " +
                                 "confirm. Also reachable over adb: " +
                                 "am broadcast -a dev.droidtop.UPDATE_NOW -n dev.droidtop.app/.UpdateNowReceiver",
                             run = { ctx, onStatus ->
@@ -834,21 +834,17 @@ object AppSettingsCatalogs {
                         ActionItem(
                             id = "grant_write_settings",
                             title = "Modify system settings",
-                            subtitle = if (controls.canWriteBrightness(context)) {
-                                "Granted -- brightness, timeout, and rotation are controlled in droidtop"
-                            } else {
-                                "Not granted -- needed for brightness, screen timeout, and auto-rotate"
-                            },
+                            // State in the value column, what it is for in
+                            // the subtitle (UI pass 2026-09-24, M14).
+                            subtitle = "Lets droidtop change brightness, screen timeout and auto-rotate",
+                            value = if (controls.canWriteBrightness(context)) "Granted" else "Not granted",
                             run = { ctx -> ctx.startActivity(controls.brightnessGrantIntent(ctx)) },
                         ),
                         ActionItem(
                             id = "grant_dnd",
                             title = "Do Not Disturb access",
-                            subtitle = if (controls.hasDndAccess(context)) {
-                                "Granted -- DND is a toggle in every droidtop mode"
-                            } else {
-                                "Not granted -- needed for the DND toggle"
-                            },
+                            subtitle = "Lets droidtop turn Do Not Disturb on and off",
+                            value = if (controls.hasDndAccess(context)) "Granted" else "Not granted",
                             run = { ctx -> ctx.startActivity(controls.dndGrantIntent()) },
                         ),
                     ),
@@ -944,7 +940,7 @@ object AppSettingsCatalogs {
                         ActionItem(
                             id = "windows_no_roots",
                             title = "No game folders added yet",
-                            subtitle = "Add one under Game folders first -- a Windows environment that cannot see your games is not much use",
+                            subtitle = "Add one under Game folders first — a Windows environment that cannot see your games is not much use",
                             run = {},
                         ),
                     )
@@ -1100,7 +1096,7 @@ object AppSettingsCatalogs {
     private fun integrationsScreen() = CatalogScreen(
         id = SCREEN_INTEGRATIONS,
         title = "App integrations",
-        subtitle = "Declared as .json files you add, never bundled or synced -- which apps you hook in is yours alone",
+        subtitle = "Declared as .json files you add, never bundled or synced — which apps you hook in is yours alone",
         groups = { context ->
             val declared = withContext(Dispatchers.IO) {
                 IntegrationStore.seedExampleIfEmpty(context)
@@ -1118,7 +1114,7 @@ object AppSettingsCatalogs {
                                     id = "integrations_none",
                                     title = "No integrations yet",
                                     subtitle = "Add an integration file below, or copy one into $folderLabel " +
-                                        "over USB or a file manager -- example.json.txt there shows the format",
+                                        "over USB or a file manager — example.json.txt there shows the format",
                                     run = {},
                                 ),
                             )
@@ -1194,7 +1190,7 @@ object AppSettingsCatalogs {
                                     GamesRootPrefs.addGamesRoot(ctx, resolved)
                                     null
                                 } else {
-                                    "Couldn't resolve that folder to a real path on this device -- not added"
+                                    "Couldn't resolve that folder to a real path on this device — not added"
                                 }
                             },
                         ),
@@ -1446,7 +1442,7 @@ object AppSettingsCatalogs {
                         TextInputItem(
                             id = "tgdb_api_key",
                             title = "API key",
-                            subtitle = "Free at thegamesdb.net -- required before TheGamesDB can scrape at all",
+                            subtitle = "Free at thegamesdb.net — required before TheGamesDB can scrape at all",
                             value = TheGamesDbPrefs.apiKey(context),
                             onChange = { c, v -> TheGamesDbPrefs.set(c, v.trim()) },
                         ),
@@ -1464,7 +1460,7 @@ object AppSettingsCatalogs {
                         TextInputItem(
                             id = "igdb_client_id",
                             title = "Client ID",
-                            subtitle = "Create an application at dev.twitch.tv/console -- free, instant, no approval queue",
+                            subtitle = "Create an application at dev.twitch.tv/console — free, instant, no approval queue",
                             value = ScraperPrefs.clientId(context),
                             onChange = { c, v -> ScraperPrefs.set(c, v.trim(), ScraperPrefs.clientSecret(c)) },
                         ),
@@ -1486,7 +1482,7 @@ object AppSettingsCatalogs {
                             id = "scraper_backup_pointer",
                             title = "Back up / restore settings",
                             subtitle = "The settings backup in Global settings includes everything here, " +
-                                "credentials included -- one file restores a working configuration",
+                                "credentials included — one file restores a working configuration",
                             run = { ctx ->
                                 // Component by name, same as OnboardingActivity's
                                 // own launch of this screen.
@@ -1526,7 +1522,7 @@ object AppSettingsCatalogs {
     private fun platformsScreen() = CatalogScreen(
         id = SCREEN_PLATFORMS,
         title = "Manage platforms",
-        subtitle = "Every platform droidtop recognizes -- open one to edit or delete it (built-ins included); Restore defaults resets built-ins without touching your own",
+        subtitle = "Every platform droidtop recognizes — open one to edit or delete it (built-ins included); Restore defaults resets built-ins without touching your own",
         groups = { context ->
             val dao = ConsoleSystemsDatabase.get(context).consoleSystemDao()
             if (dao.count() == 0) ConsoleSystemsRepository.allSystems(context)
@@ -1686,7 +1682,7 @@ object AppSettingsCatalogs {
                                     ActionItem(
                                         id = "platform_delete_${entity.id}",
                                         title = "Delete platform",
-                                        subtitle = if (entity.isBuiltIn) "Built-in -- Restore defaults can bring it back" else "Removes this custom platform",
+                                        subtitle = if (entity.isBuiltIn) "Built-in — Restore defaults can bring it back" else "Removes this custom platform",
                                         confirmTitle = "Delete ${entity.displayName}?",
                                         run = { ctx ->
                                             kotlinx.coroutines.runBlocking {

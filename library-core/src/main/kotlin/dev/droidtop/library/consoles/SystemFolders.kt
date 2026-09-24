@@ -48,7 +48,7 @@ object SystemFolders {
                     // A store's install tree is the PC library's, whatever
                     // the folder is called -- see ScanPrune.storeRootOwner.
                     storeOwner != null ->
-                        skipped.add(child, "$storeOwner owns this tree -- its games are the PC library's, not a ROM system")
+                        skipped.add(child, "$storeOwner owns this tree — its games are the PC library's, not a ROM system")
                     else -> {
                         val system = SystemOverridePrefs.resolveForFolder(context, child.absolutePath, child.name, systemsById)
                         when {

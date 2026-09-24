@@ -1539,7 +1539,7 @@ private fun AppearanceStep(
         title = "Appearance",
         body = if (portraitScreen) {
             "Gaming mode draws itself with a real ES-DE theme. This screen is taller than it " +
-                "is wide, so themes that lay out a tall screen are marked -- the others will be " +
+                "is wide, so themes that lay out a tall screen are marked — the others will be " +
                 "stretched sideways to fit."
         } else {
             "Gaming mode draws itself with a real ES-DE theme. Every one droidtop has is here, " +
