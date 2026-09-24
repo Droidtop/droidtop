@@ -193,9 +193,6 @@ object SystemControls {
     fun internetPanelIntent(): Intent =
         Intent(Settings.Panel.ACTION_INTERNET_CONNECTIVITY).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-    fun volumePanelIntent(): Intent =
-        Intent(Settings.Panel.ACTION_VOLUME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-
     fun bluetoothSettingsIntent(): Intent =
         Intent(Settings.ACTION_BLUETOOTH_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -387,10 +386,4 @@ internal fun MenuPanel(
         verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
         content = content,
     )
-}
-
-/** Shared full-screen menu ground, so a menu never shows the themed view bleeding through. */
-@Composable
-internal fun MenuScreen(content: @Composable () -> Unit) {
-    Box(Modifier.fillMaxSize().background(MenuTokens.Ground)) { content() }
 }
