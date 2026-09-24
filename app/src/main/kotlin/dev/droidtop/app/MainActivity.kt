@@ -192,8 +192,13 @@ class MainActivity : AppCompatActivity() {
         // logging included. One launch mechanism, two entry points.
         companionLaunchSeam = { entry ->
             lifecycleScope.launch {
+                CompanionState.launchError.value = null
                 runCatching { library.launch(entry) }
-                    .onFailure { android.util.Log.e("droidtop.MainActivity", "Companion launch of ${entry.title} failed", it) }
+                    .onFailure {
+                        android.util.Log.e("droidtop.MainActivity", "Companion launch of ${entry.title} failed", it)
+                        // The shell's own wording for the same failure.
+                        CompanionState.launchError.value = "Couldn't launch ${entry.title}: ${it.message}"
+                    }
             }
         }
         CompanionState.onLaunchEntry = companionLaunchSeam

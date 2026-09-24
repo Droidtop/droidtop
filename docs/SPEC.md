@@ -1645,6 +1645,9 @@ companion never runs its own scan); a tap goes through
 `CompanionState.onLaunchEntry`, installed by MainActivity and backed by
 the ordinary `Library.launch` path — launch-screen memory, play
 history and error handling included, never a second launch mechanism.
+A failed launch is said under the rail in the shell's own wording
+(`CompanionState.launchError`), since the shell's error line is on the
+other screen.
 While no shell is alive to launch through, a tap does nothing rather
 than half-launching outside that path.
 

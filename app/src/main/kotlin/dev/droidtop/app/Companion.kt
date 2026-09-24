@@ -96,6 +96,13 @@ object CompanionState {
      */
     @Volatile
     var onLaunchEntry: ((LibraryEntry) -> Unit)? = null
+
+    /**
+     * Why the last rail launch failed, shown under the rail. The shell's
+     * own error line is on the other screen, and a log line alone left a
+     * tap on the companion looking like it did nothing.
+     */
+    val launchError = MutableStateFlow<String?>(null)
 }
 
 @Composable
