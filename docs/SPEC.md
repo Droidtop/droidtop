@@ -5266,6 +5266,83 @@ for users" above promises more than the store services hold:
   out of droidtop's prefix preparation on purpose (`WinePrefixPreparation`
   lists it with the other store-specific steps it does not run).
 
+### Playtime is measured by the shell, one way for every launch path (decided 2026-09-24)
+
+`playtimeSeconds` has been 0 since the play-history store was written,
+by a decision that measuring needed "a different mechanism per launch
+path". It does not. Every launch droidtop makes hands the screen to
+something else and gets it back, and that hand-back is what a frontend
+can honestly measure: a session begins when `Library.launch` dispatches
+the entry and ends when a droidtop Activity next resumes with window
+focus — the emulator, enginehost, the Wine activity or the native app
+having finished or been left. `PlayHistoryStore` gains a session table
+(entry id, start, end) and `playtimeSeconds` is the sum of a game's
+sessions; last played is the latest end. Sessions shorter than fifteen
+seconds are kept but not counted as playtime (a launch that failed or was
+backed out of is not play), a session is capped at twelve hours (the
+device fell asleep in a game), and a session left open by process death
+is closed at the next process start with the time droidtop last saw the
+foreground. A launch into a container program (a Desktop `exec`) is not
+a session: the desktop is not left. The measurement is droidtop's own,
+so it is the same for a ROM, an engine game and a Windows game, and a
+store's own lifetime minutes (Steam's, over the network) are never mixed
+into it. Playtime feeds the sort of the same name (§7f), the "most
+played" gameselector, the companion's tiles (§4d) and the detail's
+identity line.
+
+### What a ROM file is, and what droidtop does not manage (decided 2026-09-24)
+
+- **One entry per file, as in ES-DE.** Two dumps of one game (regions,
+  revisions, a hack beside the original) are two entries; the title
+  disambiguation shows the tag that tells them apart, and nothing merges
+  ROM files. §7m's grouping is about folders, and a person who keeps
+  two dumps chose to.
+- **A multi-disc game is its `.m3u`.** When a system's extensions include
+  `m3u`, an `.m3u` in a system folder is the entry and every disc image
+  it names is that entry's disc, hidden from the list and from every
+  count; a `.cue` likewise hides the `.bin` files it names. A folder
+  that holds only one game's discs and their `.m3u` is that game (§7h's
+  container rules), and a disc image nothing names remains an entry of
+  its own.
+- **An archive is an entry as it is.** Emulators read `.zip` and `.7z`
+  themselves, so droidtop never extracts one. Identity for a
+  single-file `.zip` is the inner file's CRC32, read from the archive's
+  own central directory at no cost, which is what the libretro DATs
+  match; a `.7z` and a multi-file archive are identified by name only
+  and say so in the scan log.
+- **Saves, states and achievements are the runner's.** droidtop does not
+  read, write, back up or sync an emulator's save files or save states,
+  and it does not integrate RetroAchievements: each of those belongs to
+  the emulator, to enginehost (§7d) or to the Wine prefix, and the
+  game's detail links to where the runner keeps them rather than
+  modelling them a second time. Store cloud saves (§7g yardstick) are the
+  store client's feature and are reached through its own screens.
+- **An unmounted root is skipped by every walk, never emptied.** A games
+  root whose storage volume is not mounted (`StorageManager`'s volume
+  state, or the path failing to list) is skipped by an ordinary scan and
+  a rescan exactly as the slow pass skips it, so pulling an SD card
+  marks nothing missing; a `MEDIA_MOUNTED`/`MEDIA_UNMOUNTED` broadcast
+  for a volume a root lives on restarts the walk the way a roots change
+  does.
+- **All files access is the library's floor on API 30+.** A SAF tree
+  grant alone is not a games root: every runner droidtop launches needs a
+  real path, so the scanner reads `java.io.File` and nothing else, and
+  onboarding says that (§7b Storage). droidtop does not carry a
+  `DocumentFile` walk beside the real one.
+- **The person's own data is never in a destructive database.** Scraped
+  metadata, collections and their memberships, favourites and play
+  history live in stores whose schema changes are explicit migrations,
+  never `fallbackToDestructiveMigration`; a store this build cannot
+  migrate refuses to open and says so, rather than opening empty. Caches
+  (the ROM cache's `rom_entries`, the index) may be dropped and rebuilt.
+  A query over a list of ids is chunked below SQLite's variable limit
+  (999 on Android 9 and 10), because a system folder can hold more.
+- **A round runs when the shell returns.** Beside its 30 minute interval
+  the slow pass runs a round when a shell comes back to the foreground
+  after more than five minutes away (a game copied over USB appears
+  when the person comes back to the shell), and no round starts while
+  the device is in battery saver.
+
 ## 7h. Scraper honesty, and what counts as a game (directed 2026-09-02)
 
 An overnight ScreenScraper pass over the user's real library — 46 ROMs
