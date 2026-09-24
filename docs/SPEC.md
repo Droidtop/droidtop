@@ -370,6 +370,23 @@ Enablement follows the HOME role rather than a switch of its own —
 neither), and `Modes` reads that component state rather than a second
 flag.
 
+**Holding the role is Android's decision, and droidtop watches it.**
+Enabling the HOME activity is what droidtop can do; which app answers the
+Home key is what the person chose in Android's own chooser, and it can
+change behind droidtop's back (another launcher installed and picked, a
+factory reset of defaults). So Launcher mode reads the real state —
+`RoleManager.isRoleHeld(ROLE_HOME)` on API 29+, the resolved default home
+activity below — and when droidtop's HOME activity is enabled but not the
+device's home, Global settings shows a row saying so ("droidtop is not
+your home screen") that opens the system's home chooser, and the
+`SECONDARY_HOME` idle surface (§4c), which the platform places only for
+the home app, is covered by the companion's Presentation while Gaming
+runs. Nothing else changes: Launcher mode stays enabled, because the
+person may pick droidtop again from that row. droidtop registers no
+boot receiver; the HOME role is what starts it at boot, and nothing
+else of droidtop's (the desktop session, the VPN) starts before a person
+opens it (§3).
+
 **Games in the Launcher (built 2026-09-24).** Until this change the
 Launcher could not show or launch a single library game: droidtop's
 package had no launcher activity, and the fork hid everything in its own
@@ -2760,7 +2777,16 @@ app-drawer icon or a floating switcher button:
   JSON export/import of the one shared `"com.android.launcher3.prefs"`
   file through the system file picker, `DocumentPickItem`, and NOT games,
   ROMs, downloaded themes or folder grants, which need consent again
-  rather than a silent restore). Android's own Settings are reached from
+  rather than a silent restore). **What a backup holds (decided
+  2026-09-24):** the settings file, the game records under
+  `files/library/` (§7g), and the person's own stores exported as JSON —
+  play history and sessions, favourites, collections and memberships,
+  scraped metadata and metadata edits — in one archive, so restoring on
+  a new device brings back everything a person did in droidtop and
+  nothing that needs a grant; the row is named "Back up droidtop" for
+  that reason, and Restore says what it will and will not bring back
+  before it runs. The index is rebuilt from the restored records (Data
+  › Rebuild the library index), never copied. Android's own Settings are reached from
   Settings > Android settings, so Global has no second shortcut to them.
   Standard mode's launcher pages (icons, drawer, home screen) stay stock
   launcher3 preferences. A
