@@ -2,9 +2,10 @@ package dev.droidtop.app
 
 import android.content.Context
 import dev.droidtop.runtime.ContainerRuntime
+import dev.droidtop.runtime.Crane
 import dev.droidtop.runtime.CraneRootfsPuller
-import dev.droidtop.runtime.FileImageCache
 import dev.droidtop.runtime.ImageCachePolicy
+import dev.droidtop.runtime.OciImageStore
 import dev.droidtop.runtime.RootAccess
 import dev.droidtop.runtime.RootProcess
 import dev.droidtop.runtime.linux.noroot.ProotRuntime
@@ -19,8 +20,8 @@ import dev.droidtop.runtime.linux.root.RootTarUnpacker
  * signal. Shared by [DesktopSessionService], [ContainersActivity] and
  * onboarding's Desktop step (one mechanism, not a copy per caller).
  *
- * Both backends pull through the same [CraneRootfsPuller] and share one
- * [FileImageCache]; they differ in who writes the rootfs (root for
+ * Both backends pull through the same [CraneRootfsPuller] into one
+ * [OciImageStore]; they differ in who writes the rootfs (root for
  * droidspaces, the app itself for proot).
  *
  * Selection REPORTS root as a state ([rootAccess]) and never fails on its
@@ -36,17 +37,16 @@ object ContainerRuntimeFactory {
 
     suspend fun select(context: Context): ContainerRuntime {
         val app = context.applicationContext
-        val cache = FileImageCache(app)
-        val policy = ImageCachePolicy(enabled = true)
+        val store = OciImageStore.of(app)
+        val policy = ImageCachePolicy.DEFAULT
         return if (rootAccess().available) {
             DroidSpacesRuntime(
                 context = app,
-                rootfsPuller = CraneRootfsPuller(app, RootTarUnpacker()),
-                imageCache = cache,
+                rootfsPuller = CraneRootfsPuller({ Crane.binaryPath(app) }, store, RootTarUnpacker()),
                 cachePolicy = policy,
             )
         } else {
-            ProotRuntime(app, cache, policy)
+            ProotRuntime(app, store, policy)
         }
     }
 }

@@ -30,6 +30,19 @@ object Crane {
         return binary.absolutePath
     }
 
+    /**
+     * The OCI platform to pull for: this install's own ABI, which is the
+     * kernel's (docs/SPEC.md §3, "The installed ABI must be the kernel's
+     * own"). Always passed to `crane pull`: without it, a multi-platform
+     * image is stored whole, every architecture's layers included.
+     */
+    fun platform(context: Context): String =
+        when (val abi = File(context.applicationInfo.nativeLibraryDir).name) {
+            "arm64", "arm64-v8a" -> "linux/arm64"
+            "x86_64" -> "linux/amd64"
+            else -> error("crane is not packaged for $abi; only arm64-v8a and x86_64 are built")
+        }
+
     /** Resolves [reference] (`registry/repo:tag`) to its immutable digest via `crane digest`. */
     suspend fun digest(binaryPath: String, reference: String): String {
         val result = ProcessRunner.run(listOf(binaryPath, "digest", reference))

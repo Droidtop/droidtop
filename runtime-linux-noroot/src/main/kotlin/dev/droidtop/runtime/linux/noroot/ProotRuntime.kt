@@ -12,9 +12,10 @@ import dev.droidtop.runtime.ContainerInfo
 import dev.droidtop.runtime.ContainerLayout
 import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.ContainerRuntime
+import dev.droidtop.runtime.Crane
 import dev.droidtop.runtime.CraneRootfsPuller
-import dev.droidtop.runtime.ImageCache
 import dev.droidtop.runtime.ImageCachePolicy
+import dev.droidtop.runtime.OciImageStore
 import dev.droidtop.runtime.PrimaryProvisioning
 import dev.droidtop.runtime.RootfsImage
 import dev.droidtop.runtime.SharedVolume
@@ -70,7 +71,7 @@ import kotlin.concurrent.thread
  */
 class ProotRuntime(
     private val context: Context,
-    private val imageCache: ImageCache,
+    private val imageStore: OciImageStore,
     private val cachePolicy: ImageCachePolicy,
 ) : ContainerRuntime {
     override val backend: ContainerBackend = ContainerBackend.PROOT
@@ -92,7 +93,7 @@ class ProotRuntime(
 
     private val appStorageDir: File = context.filesDir
     private val nativeLibraryDir: String = context.applicationInfo.nativeLibraryDir
-    private val rootfsPuller = CraneRootfsPuller(context, ProotRootfsUnpacker(containersDir))
+    private val rootfsPuller = CraneRootfsPuller({ Crane.binaryPath(context) }, imageStore, ProotRootfsUnpacker(containersDir))
     private val log = ContainerLog(context)
 
     override suspend fun createPrimary(image: RootfsImage, provisioning: PrimaryProvisioning): Container =
@@ -110,7 +111,7 @@ class ProotRuntime(
         stopProcess(name)
         val rootfs = rootfsOf(name)
         log.line("creating $name from ${image.reference}${image.digest?.let { "@$it" } ?: ""}")
-        rootfsPuller.pullAndUnpack(image, rootfs.absolutePath, imageCache, cachePolicy)
+        rootfsPuller.pullAndUnpack(image, rootfs.absolutePath, cachePolicy)
         withContext(Dispatchers.IO) {
             val config = Properties()
             config[KEY_ROLE] = role.name
