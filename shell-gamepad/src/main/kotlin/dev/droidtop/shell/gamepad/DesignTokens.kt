@@ -359,4 +359,11 @@ object MenuTokens {
      * end of the list. One value, because it is one bar.
      */
     val HintBarRoom = 72.dp
+
+    /**
+     * The width of the focus ring `selectionFrame` draws (GamingMenu.kt):
+     * one value for every focusable thing the shell draws, cards, rows,
+     * chips, tabs and tiles alike (docs/SPEC.md 7k).
+     */
+    val FocusRingWidth = 3.dp
 }

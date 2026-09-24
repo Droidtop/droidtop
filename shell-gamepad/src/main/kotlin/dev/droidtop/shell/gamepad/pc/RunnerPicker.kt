@@ -32,6 +32,7 @@ import dev.droidtop.library.RunnerState
 import dev.droidtop.library.displayName
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuTokens
+import dev.droidtop.shell.gamepad.selectionFrame
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 
@@ -211,7 +212,7 @@ private fun RunnerRow(
             .onFocusChanged { focused = it.isFocused }
             .focusable(enabled = enabled)
             .then(if (enabled) Modifier.clickable(onClick = onSelect) else Modifier)
-            .background(if (focused) MenuTokens.CardFocused else MenuTokens.CardInset, RoundedCornerShape(8.dp))
+            .selectionFrame(focused, RoundedCornerShape(8.dp), rest = MenuTokens.CardInset)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {

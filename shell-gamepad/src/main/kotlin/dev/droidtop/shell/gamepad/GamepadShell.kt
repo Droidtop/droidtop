@@ -651,9 +651,9 @@ fun GamepadShell(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 4.dp),
                 ) {
-                    ActionChip(
+                    ShellChip(
                         "Get an emulator",
-                        highlighted = true,
+                        primary = true,
                         onClick = {
                             // The players database's own package for this
                             // system, straight to the store: the fix, at
@@ -676,9 +676,8 @@ fun GamepadShell(
                             launchError = null
                         },
                     )
-                    ActionChip(
+                    ShellChip(
                         "Dismiss",
-                        highlighted = false,
                         onClick = {
                             missingEmulator = null
                             launchError = null
@@ -1094,15 +1093,15 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
         }
         val detailScope = rememberCoroutineScope()
         Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            ActionChip("Launch", highlighted = true, modifier = Modifier.focusRequester(launchFocus), onClick = onLaunch)
+            ShellChip("Launch", primary = true, modifier = Modifier.focusRequester(launchFocus), onClick = onLaunch)
             // Real ConsoleRomProvider-specific concept -- same honest
             // "not applicable" gating Library.toggleFavorite/
             // saveMetadata already use for a non-ROM entry.
             if (isRomEntry) {
-                ActionChip("Choose match", highlighted = false, onClick = { pickingMatch = true })
+                ShellChip("Choose match", onClick = { pickingMatch = true })
             }
             if (media.size > 1) {
-                ActionChip("View media (${media.size})", highlighted = false, onClick = { viewingMedia = true })
+                ShellChip("View media (${media.size})", onClick = { viewingMedia = true })
             }
             // One chip per (hook, openable file). Never a substitution and
             // never a silent pick: droidtop has no manual reader and no
@@ -1112,9 +1111,8 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
             // not rank them.
             openWith.forEach { integration ->
                 openWithTargets.forEach { target ->
-                    ActionChip(
+                    ShellChip(
                         openWithChipLabel(integration, target, openWithTargets.size),
-                        highlighted = false,
                         onClick = {
                             integrationError = runCatching {
                                 IntegrationStore.run(
@@ -1131,11 +1129,10 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
                 }
             }
             if (isRomEntry) {
-                ActionChip("Edit metadata", highlighted = false, onClick = { editingMetadata = true })
-                ActionChip("Collections", highlighted = false, onClick = { editingCollections = true })
-                ActionChip(
+                ShellChip("Edit metadata", onClick = { editingMetadata = true })
+                ShellChip("Collections", onClick = { editingCollections = true })
+                ShellChip(
                     scrapeStatus?.let { "Scraping…" } ?: "Scrape",
-                    highlighted = false,
                     onClick = {
                         if (scrapeStatus == null) {
                             scrapeStatus = "Scraping ${entry.title}…"
@@ -1161,7 +1158,7 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
                     },
                 )
             }
-            ActionChip("Back", highlighted = false, onClick = onClose)
+            ShellChip("Back", onClick = onClose)
         }
         (scrapeStatus ?: scrapeResult)?.let {
             Text(it, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
@@ -1175,36 +1172,6 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
     }
 }
 
-@Composable
-internal fun ActionChip(label: String, highlighted: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    Text(
-        label,
-        color = if (highlighted) MenuTokens.OnSelected else MenuTokens.OnSurface,
-        style = MaterialTheme.typography.titleMedium,
-        modifier = modifier
-            .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp &&
-                    GamepadKeyMap.actionFor(event.key) == GamepadAction.A
-                ) {
-                    onClick()
-                    true
-                } else {
-                    false
-                }
-            }
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            // Same real touch-input fix as GameCard -- see its own comment.
-            .clickable(onClick = onClick)
-            .background(
-                if (highlighted) MenuTokens.Selected else if (focused) MenuTokens.CardFocused else MenuTokens.Card,
-                RoundedCornerShape(50),
-            )
-            .border(width = if (focused && !highlighted) 2.dp else 0.dp, color = MenuTokens.OnSurface, shape = RoundedCornerShape(50))
-            .padding(horizontal = 20.dp, vertical = 10.dp),
-    )
-}
 
 /**
  * A persistent, always-visible legend for what the controller's face
@@ -1311,13 +1278,15 @@ private fun SectionTabBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             sections.forEach { entrySection ->
-                val focused = entrySection == current
+                val isCurrent = entrySection == current
+                var focused by remember { mutableStateOf(false) }
                 Text(
                     text = entrySection.displayName(),
-                    color = if (focused) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
+                    color = if (isCurrent) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = (if (entrySection == current) Modifier.focusRequester(currentTabFocus) else Modifier)
+                    modifier = (if (isCurrent) Modifier.focusRequester(currentTabFocus) else Modifier)
                         .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
+                        .onFocusChanged { focused = it.isFocused }
                         // Ahead of the focus targets, not after them: see
                         // [GameCard].
                         .onKeyEvent { event ->
@@ -1334,7 +1303,17 @@ private fun SectionTabBar(
                         // Same real touch-input fix as GameCard -- see its own
                         // comment. This is the top-level Games/Apps/Settings
                         // tab bar, the very first thing a user taps.
-                        .clickable(onClick = { onSelect(entrySection) }),
+                        .clickable(onClick = { onSelect(entrySection) })
+                        // The one selection idiom: the ring only while the
+                        // pad is on the tab; the section you are in keeps
+                        // the raised fill so it reads as current from
+                        // anywhere below it.
+                        .selectionFrame(
+                            selected = focused,
+                            shape = RoundedCornerShape(50),
+                            rest = if (isCurrent) MenuTokens.SurfaceSelected else Color.Transparent,
+                        )
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
                 )
             }
         }
@@ -2637,9 +2616,9 @@ private fun GamesSection(
                         modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        FilterChip("${allGames.size} items", selected = !recentOnly, onClick = { recentOnly = false })
+                        ShellChip("${allGames.size} items", on = !recentOnly, onClick = { recentOnly = false })
                         if (recentCount > 0) {
-                            FilterChip("$recentCount recent", selected = recentOnly, onClick = { recentOnly = true })
+                            ShellChip("$recentCount recent", on = recentOnly, onClick = { recentOnly = true })
                         }
                     }
                     val focusManager = LocalFocusManager.current
@@ -2699,36 +2678,6 @@ private fun GamesSection(
     }
 }
 
-/** Inline quick-filter chip — a view/scope toggle right in the header, no separate filter menu. */
-@Composable
-private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    Text(
-        label,
-        color = if (selected) MenuTokens.OnSelected else MenuTokens.OnSurface,
-        style = MaterialTheme.typography.labelMedium,
-        modifier = Modifier
-            .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp &&
-                    GamepadKeyMap.actionFor(event.key) == GamepadAction.A
-                ) {
-                    onClick()
-                    true
-                } else {
-                    false
-                }
-            }
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            // Same real touch-input fix as GameCard -- see its own comment.
-            .clickable(onClick = onClick)
-            .background(
-                if (selected) MenuTokens.Selected else if (focused) MenuTokens.CardFocused else MenuTokens.Card,
-                RoundedCornerShape(50),
-            )
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-    )
-}
 
 
 /** Flat, kind-sectioned browser — no drill-down, unlike Games: apps aren't organized into "systems." */
@@ -2900,14 +2849,11 @@ private fun AppIconTile(
             // rectangle over an unchanged card -- after the cards were
             // fixed (rig, build 546), which is two answers to "what does
             // selected look like" on two grids of the same shell.
-            .border(
-                width = if (focused) 3.dp else 1.dp,
-                color = if (focused) MenuTokens.Accent else MenuTokens.CardOutline,
+            .selectionFrame(
+                selected = focused,
                 shape = RoundedCornerShape(16.dp),
-            )
-            .background(
-                if (focused) MenuTokens.SurfaceSelected else Color.Transparent,
-                RoundedCornerShape(16.dp),
+                rest = Color.Transparent,
+                restOutline = MenuTokens.CardOutline,
             )
             .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -3114,14 +3060,11 @@ private fun GameCard(
             // third one. The rig counted three at once -- this card's 1px
             // white rectangle, the menus' brightened card, and the
             // theme's own highlight.
-            .border(
-                width = if (focused) 3.dp else 1.dp,
-                color = if (focused) MenuTokens.Accent else MenuTokens.CardOutline,
+            .selectionFrame(
+                selected = focused,
                 shape = RoundedCornerShape(12.dp),
-            )
-            .background(
-                if (focused) MenuTokens.SurfaceSelected else MenuTokens.Surface,
-                RoundedCornerShape(12.dp),
+                rest = MenuTokens.Surface,
+                restOutline = MenuTokens.CardOutline,
             ),
     ) {
         if (entry.artworkUri != null) {

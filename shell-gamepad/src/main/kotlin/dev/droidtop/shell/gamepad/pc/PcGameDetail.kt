@@ -55,6 +55,7 @@ import dev.droidtop.library.scraper.PcScraper
 import dev.droidtop.shell.gamepad.CollectionMembershipEditor
 import dev.droidtop.shell.gamepad.ManualMatchPicker
 import dev.droidtop.shell.gamepad.MenuTokens
+import dev.droidtop.shell.gamepad.selectionFrame
 import dev.droidtop.shell.gamepad.MediaViewer
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
@@ -886,7 +887,7 @@ private fun PrimaryActionButton(
             .then(if (enabled) Modifier.clickable(onClick = onSelect) else Modifier)
             .background(background, shape)
             .border(
-                width = if (focused) 3.dp else 1.dp,
+                width = if (focused) MenuTokens.FocusRingWidth else 1.dp,
                 color = if (focused) MenuTokens.Accent else MenuTokens.CardOutline,
                 shape = shape,
             )
@@ -934,10 +935,7 @@ private fun DetailRow(
             .onFocusChanged { focused = it.isFocused }
             .focusable(enabled = enabled)
             .then(if (enabled) Modifier.clickable(onClick = onSelect) else Modifier)
-            .background(
-                if (focused) MenuTokens.CardFocused else MenuTokens.CardInset,
-                RoundedCornerShape(10.dp),
-            )
+            .selectionFrame(focused, RoundedCornerShape(10.dp), rest = MenuTokens.CardInset)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {

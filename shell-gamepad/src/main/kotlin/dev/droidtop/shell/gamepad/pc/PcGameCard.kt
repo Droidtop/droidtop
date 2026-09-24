@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.shell.gamepad.MenuTokens
+import dev.droidtop.shell.gamepad.selectionFrame
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 
@@ -83,14 +84,11 @@ internal fun PcGameCard(
             // card kept its own white rectangle over a hand-picked grey,
             // which read as a different kind of selection on the surface
             // a phone user spends most of their time in (rig, build 546).
-            .border(
-                width = if (focused) 3.dp else 1.dp,
-                color = if (focused) MenuTokens.Accent else MenuTokens.CardOutline,
+            .selectionFrame(
+                selected = focused,
                 shape = RoundedCornerShape(12.dp),
-            )
-            .background(
-                if (focused) MenuTokens.SurfaceSelected else MenuTokens.Surface,
-                RoundedCornerShape(12.dp),
+                rest = MenuTokens.Surface,
+                restOutline = MenuTokens.CardOutline,
             ),
     ) {
         if (entry.artworkUri != null) {

@@ -48,6 +48,7 @@ import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.HelpRowOwner
 import dev.droidtop.shell.gamepad.LocalHelpRowOwner
 import dev.droidtop.shell.gamepad.MenuTokens
+import dev.droidtop.shell.gamepad.ShellChip
 import dev.droidtop.shell.gamepad.TouchHintBar
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
@@ -222,13 +223,13 @@ internal fun PcSurface(
             // Sort is one chip that cycles rather than a menu: it is a
             // single-choice setting with three values, and a menu for that
             // is a screen the pad has to walk into and back out of.
-            PcChip("Sort: ${sort.label}", selected = false, onClick = { sort = sort.next() })
-            PcChip("Installed", selected = installedOnly, onClick = { installedOnly = !installedOnly })
+            ShellChip("Sort: ${sort.label}", onClick = { sort = sort.next() })
+            ShellChip("Installed", on = installedOnly, onClick = { installedOnly = !installedOnly })
             allSources.forEach { source ->
-                PcChip(source, selected = source in sources, onClick = { sources = sources.toggle(source) })
+                ShellChip(source, on = source in sources, onClick = { sources = sources.toggle(source) })
             }
             allEngines.forEach { engine ->
-                PcChip(engine, selected = engine in engines, onClick = { engines = engines.toggle(engine) })
+                ShellChip(engine, on = engine in engines, onClick = { engines = engines.toggle(engine) })
             }
         }
 
@@ -352,34 +353,6 @@ private fun PcHints() {
     )
 }
 
-/** Multi-select chip: focusable for the pad, clickable for touch, same as everything else in this shell. */
-@Composable
-internal fun PcChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    Text(
-        label,
-        color = if (selected) MenuTokens.OnSelected else MenuTokens.OnSurface,
-        style = MaterialTheme.typography.labelMedium,
-        modifier = Modifier
-            // Ahead of the focus targets, not after them: see [GameCard].
-            .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp && GamepadKeyMap.actionFor(event.key) == GamepadAction.A) {
-                    onClick()
-                    true
-                } else {
-                    false
-                }
-            }
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            .clickable(onClick = onClick)
-            .background(
-                if (selected) MenuTokens.Selected else if (focused) MenuTokens.CardFocused else MenuTokens.Card,
-                RoundedCornerShape(50),
-            )
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-    )
-}
 
 /**
  * Sorts the one list; never a filter, and never reordered by anything the

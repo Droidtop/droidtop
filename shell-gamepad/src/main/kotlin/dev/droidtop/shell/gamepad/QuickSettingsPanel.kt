@@ -344,8 +344,7 @@ private fun QuickSliderRow(item: SliderItem, focused: Boolean, onSet: (Int) -> U
             .fillMaxWidth()
             .padding(bottom = 8.dp)
             .clip(MenuTokens.RowShape)
-            .background(if (focused) MenuTokens.SurfaceSelected else MenuTokens.Surface)
-            .border(2.dp, if (focused) MenuTokens.Accent else Color.Transparent, MenuTokens.RowShape)
+            .selectionFrame(focused, MenuTokens.RowShape)
             .onSizeChanged { rowWidthPx = it.width }
             // Touch sets the value where you touch, and follows a
             // drag -- what a slider does everywhere else. It used to
@@ -434,7 +433,7 @@ private fun QuickTileView(
             .height(104.dp)
             .clip(shape)
             .background(background)
-            .border(2.dp, if (focused) MenuTokens.Accent else Color.Transparent, shape)
+            .border(if (focused) MenuTokens.FocusRingWidth else 0.dp, MenuTokens.Accent, shape)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {

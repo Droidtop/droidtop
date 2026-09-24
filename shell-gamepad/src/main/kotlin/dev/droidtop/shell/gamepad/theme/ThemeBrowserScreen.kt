@@ -41,6 +41,7 @@ import coil3.compose.AsyncImage
 import dev.droidtop.library.theme.ThemeAssets
 import dev.droidtop.library.theme.ThemeDownloader
 import dev.droidtop.shell.gamepad.MenuTokens
+import dev.droidtop.shell.gamepad.selectionFrame
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import kotlinx.coroutines.Dispatchers
@@ -222,7 +223,7 @@ private fun ThemeBrowserRow(
             // Same real touch-input fix used throughout this shell --
             // .focusable() alone only covers D-pad/gamepad focus, never touch.
             .clickable(onClick = onDownload)
-            .background(if (focused) MenuTokens.CardFocused else MenuTokens.Card, RoundedCornerShape(12.dp))
+            .selectionFrame(focused, RoundedCornerShape(12.dp), rest = MenuTokens.Card)
             .padding(16.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {

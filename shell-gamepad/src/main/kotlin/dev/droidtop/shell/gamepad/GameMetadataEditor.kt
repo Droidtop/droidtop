@@ -217,13 +217,13 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
         }
 
         Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            ActionChip("Save", highlighted = true, onClick = {
+            ShellChip("Save", primary = true, onClick = {
                 scope.launch {
                     library.saveMetadata(entry, current)
                     onDismiss()
                 }
             })
-            ActionChip("Cancel", highlighted = false, onClick = onDismiss)
+            ShellChip("Cancel", onClick = onDismiss)
         }
     }
 }
@@ -279,7 +279,7 @@ private fun MetadataToggleRow(label: String, value: Boolean, onToggle: (Boolean)
                     false
                 }
             }
-            .background(if (focused) MenuTokens.SurfaceSelected else Color.Transparent, RoundedCornerShape(8.dp))
+            .selectionFrame(focused, RoundedCornerShape(8.dp), rest = Color.Transparent)
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -306,7 +306,7 @@ private fun MetadataPickerRow(label: String, currentValueLabel: String, onClick:
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             .clickable(onClick = onClick)
-            .background(if (focused) MenuTokens.SurfaceSelected else Color.Transparent, RoundedCornerShape(8.dp))
+            .selectionFrame(focused, RoundedCornerShape(8.dp), rest = Color.Transparent)
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -369,7 +369,7 @@ private fun ControllerRow(label: String, isCurrent: Boolean, onPick: () -> Unit)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             .clickable(onClick = onPick)
-            .background(if (focused) MenuTokens.SurfaceSelected else Color.Transparent, RoundedCornerShape(8.dp))
+            .selectionFrame(focused, RoundedCornerShape(8.dp), rest = Color.Transparent)
             .padding(12.dp),
     )
 }

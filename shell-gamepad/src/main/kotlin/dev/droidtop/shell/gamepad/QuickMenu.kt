@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -29,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.KeyEventType
@@ -164,13 +166,19 @@ internal fun QuickMenu(onDismiss: () -> Unit) {
                             Text(
                                 t.label,
                                 style = MaterialTheme.typography.titleMedium,
-                                color = if (t == tab) MenuTokens.Accent else MenuTokens.OnSurfaceMuted,
+                                color = if (t == tab) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
                                 // The tabs were nameplates: L1/R1 switched
                                 // them and a tap did nothing, so on a phone
-                                // the System tab was unreachable.
+                                // the System tab was unreachable. The
+                                // current one carries the raised fill the
+                                // shell's section tabs use; the focus ring
+                                // stays on the one thing the pad is on.
                                 modifier = Modifier
+                                    .padding(end = 8.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(if (t == tab) MenuTokens.SurfaceSelected else androidx.compose.ui.graphics.Color.Transparent)
                                     .clickable { tab = t }
-                                    .padding(end = 16.dp, top = 8.dp, bottom = 8.dp),
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
                             )
                         }
                         Spacer(Modifier.weight(1f))
@@ -291,7 +299,7 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(if (focused) MenuTokens.SurfaceSelected else MenuTokens.Surface)
+                            .selectionFrame(focused, MenuTokens.RowShape)
                             // Without this a notification could only be
                             // reached with a pad: the rows carried no
                             // touch route at all, in the one sheet a

@@ -1,6 +1,7 @@
 package dev.droidtop.shell.gamepad
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.verticalScroll
@@ -24,14 +25,22 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -39,6 +48,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
+import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 
 /*
  * The Gaming shell's shared menu language, in one place. Its colours
@@ -83,6 +94,92 @@ internal val MenuListContentPadding: PaddingValues
         top = 12.dp,
         bottom = MenuTokens.HintBarRoom,
     )
+
+/**
+ * The shell's ONE selection idiom: an accent ring over a raised fill.
+ *
+ * Every focusable piece of chrome draws selection through this -- menu
+ * rows, chips, tabs, buttons, cards, Quick Menu tiles -- so "what am I
+ * on" has one answer across the shell. Settings rows used to show focus
+ * only as a slightly lighter card (about #2e on #121212), which the UI
+ * pass of 2026-09-24 (M1) found hard to see at arm's length on a 5.5"
+ * screen, while the cards and the Quick Menu already drew the ring.
+ *
+ * [rest] is the fill while not selected; [restOutline] is an optional
+ * hairline kept while not selected (the cards keep [MenuTokens.CardOutline]).
+ */
+internal fun Modifier.selectionFrame(
+    selected: Boolean,
+    shape: Shape,
+    rest: Color = MenuTokens.Surface,
+    restOutline: Color = Color.Transparent,
+): Modifier = this
+    .background(if (selected) MenuTokens.SurfaceSelected else rest, shape)
+    .border(
+        width = when {
+            selected -> MenuTokens.FocusRingWidth
+            restOutline != Color.Transparent -> 1.dp
+            else -> 0.dp
+        },
+        color = if (selected) MenuTokens.Accent else restOutline,
+        shape = shape,
+    )
+
+/**
+ * The shell's one chip: a pill that is focusable for the pad and
+ * clickable for touch. [on] is a filter or toggle in effect: it is filled
+ * with the accent and carries a check, so which filters are on reads
+ * without moving onto them (UI pass 2026-09-24, L3). [primary] is the one
+ * action a row of chips leads with (Launch, Save). Focus is the
+ * [selectionFrame] ring, as on every other piece of chrome.
+ *
+ * This replaces three private copies (the detail screen's action chip,
+ * the recent filter and the PC surface's filter chip), each of which drew
+ * focus its own way.
+ */
+@Composable
+internal fun ShellChip(
+    label: String,
+    modifier: Modifier = Modifier,
+    on: Boolean = false,
+    primary: Boolean = false,
+    onClick: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(50)
+    val filled = on || primary
+    Text(
+        if (on) "\u2713 $label" else label,
+        color = if (filled) MenuTokens.OnSelected else MenuTokens.OnSurface,
+        style = MaterialTheme.typography.labelLarge,
+        maxLines = 1,
+        modifier = modifier
+            // Ahead of the focus targets, not after them: see [GameCard].
+            .onKeyEvent { event ->
+                if (event.type == KeyEventType.KeyUp &&
+                    GamepadKeyMap.actionFor(event.key) == GamepadAction.A
+                ) {
+                    onClick()
+                    true
+                } else {
+                    false
+                }
+            }
+            .onFocusChanged { focused = it.isFocused }
+            .focusable()
+            .clickable(onClick = onClick)
+            .then(
+                if (filled) {
+                    Modifier
+                        .background(if (focused) MenuTokens.Selected else MenuTokens.Accent, shape)
+                        .border(if (focused) MenuTokens.FocusRingWidth else 0.dp, MenuTokens.Accent, shape)
+                } else {
+                    Modifier.selectionFrame(focused, shape)
+                },
+            )
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    )
+}
 
 /** A screen-level menu header: name first, explanation second, both quiet. */
 @Composable
@@ -155,7 +252,7 @@ internal fun MenuRow(
             // touch-first window it is at least one touch target tall.
             .heightIn(min = if (window.touchFirst) window.minTouchTarget else MenuTokens.RowMinHeight)
             .clip(MenuTokens.RowShape)
-            .background(if (selected) MenuTokens.SurfaceSelected else MenuTokens.Surface)
+            .selectionFrame(selected, MenuTokens.RowShape)
             // Touch works on every row, always -- the shell is
             // gamepad-first, never gamepad-only.
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
