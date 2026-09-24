@@ -176,7 +176,7 @@ To check and install now from a computer, whatever the schedule says:
 
     adb shell am broadcast -a dev.droidtop.UPDATE_NOW -n dev.droidtop.app/.UpdateNowReceiver
 
-The same forced pass is the "Check and install now" row in Settings.
+The same forced pass is the "Check now" row in Settings > Software updates.
 `UpdateNowReceiver` requires `android.permission.DUMP`, which only the adb
 shell, root and the system hold. The outcome is logged under
 `DroidtopUpdateNow`, and you can read it with

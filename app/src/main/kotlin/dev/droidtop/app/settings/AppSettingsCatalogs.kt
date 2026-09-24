@@ -764,9 +764,8 @@ object AppSettingsCatalogs {
                         ChoiceItem(
                             id = "updates_frequency",
                             title = "Check for updates",
-                            subtitle = "Downloads one small release-description file from droidtop's GitHub releases; " +
-                                "nothing about this device or your library is sent. \"Never\" stops all " +
-                                "automatic update traffic; you can still check by hand below",
+                            subtitle = "Fetches one small file describing the latest build; nothing about this " +
+                                "device or your library is sent. Never stops automatic checks; Check now still works",
                             options = dev.droidtop.app.update.AppSelfUpdate.Frequency.entries
                                 .map { ChoiceOption(it.name, it.label) },
                             current = update.frequency(context).name,
@@ -784,9 +783,8 @@ object AppSettingsCatalogs {
                         ChoiceItem(
                             id = "updates_channel",
                             title = "Build channel",
-                            subtitle = "Which line of builds this device follows. \"Unstable\" is every build CI " +
-                                "publishes from main; the other channels carry builds promoted to them, and a " +
-                                "channel nothing has been promoted to yet reports that there is nothing there",
+                            subtitle = "Which builds this device follows. Unstable gets every new build; the " +
+                                "others get a build once it has been promoted to them",
                             options = dev.droidtop.app.update.AppSelfUpdate.Channel.entries
                                 .map { ChoiceOption(it.name, it.label) },
                             current = update.channel(context).name,
@@ -798,55 +796,32 @@ object AppSettingsCatalogs {
                             id = "updates_debug_builds",
                             title = "Install debug builds",
                             subtitle = if (update.debugBuilds(context)) {
-                                "WARNING: debug builds exist to be inspected with adb, not played on. Android " +
-                                    "never compiles one ahead of time, so it is several times slower — build 567 " +
-                                    "started in 3.9 s as a debug build and 0.7 s as the normal one, same device. " +
-                                    "Turn this off and check again to go back"
+                                "Debug builds run several times slower. Turn this off and check again to go back"
                             } else {
-                                "Follows the debug APK of the channel above instead of the normal one. Debug " +
-                                    "builds are much slower, and exist so a build can be inspected with adb; " +
-                                    "leave this off unless you are debugging droidtop itself"
+                                "Much slower builds for debugging droidtop itself. Leave this off to play"
                             },
                             current = update.debugBuilds(context),
                             onToggle = { ctx, value -> update.setDebugBuilds(ctx, value) },
                         ),
-                        AsyncActionItem(
-                            id = "updates_check_now",
-                            title = "Check for a droidtop update",
-                            subtitle = "Installed: ${update.installedVersionName(context)} " +
-                                "(build ${update.installedVersionCode(context)}), following " +
-                                "${update.channel(context).label}" +
-                                (if (update.debugBuilds(context)) " debug builds" else "") + ". " +
-                                (update.lastAttempt(context)?.let { last ->
-                                    "Last checked " + android.text.format.DateUtils.getRelativeDateTimeString(
-                                        context, last, android.text.format.DateUtils.MINUTE_IN_MILLIS,
-                                        android.text.format.DateUtils.WEEK_IN_MILLIS, 0,
-                                    )
-                                } ?: "Not checked yet"),
-                            run = { ctx, onStatus ->
-                                onStatus("Checking...")
-                                update.noteAttempt(ctx)
-                                val info = withContext(Dispatchers.IO) { update.fetch(ctx) }
-                                if (info.versionCode > update.installedVersionCode(ctx)) {
-                                    "${info.versionName} (build ${info.versionCode}) is available on " +
-                                        "${info.channel.label}${if (info.debug) ", debug build" else ""} — " +
-                                        "use \"Download and install\" below."
-                                } else {
-                                    "This is the newest published build."
-                                }
-                            },
-                        ),
-                        // The forced pass, the same one the UPDATE_NOW
-                        // broadcast fires: check right now whatever the
-                        // schedule says, and install if newer.
+                        // ONE check: it checks now, whatever the schedule
+                        // says, and installs a newer build (verified against
+                        // the release's digest, then Android's installer,
+                        // which checks the signing key and asks). There used
+                        // to be a check-only row beside it that pointed at a
+                        // "Download and install" row which did not exist (UI
+                        // pass 2026-09-24, L4). The same pass is reachable
+                        // over adb: am broadcast -a dev.droidtop.UPDATE_NOW
+                        // -n dev.droidtop.app/.UpdateNowReceiver.
                         AsyncActionItem(
                             id = "updates_install",
-                            title = "Check and install now",
-                            subtitle = "Checks immediately, whatever the schedule above says, and installs a newer " +
-                                "build straight away: verified against the digest published with the release, then " +
-                                "handed to the Android installer — Android checks the signing key and asks you to " +
-                                "confirm. Also reachable over adb: " +
-                                "am broadcast -a dev.droidtop.UPDATE_NOW -n dev.droidtop.app/.UpdateNowReceiver",
+                            title = "Check now",
+                            subtitle = (update.lastAttempt(context)?.let { last ->
+                                "Last checked " + android.text.format.DateUtils.getRelativeDateTimeString(
+                                    context, last, android.text.format.DateUtils.MINUTE_IN_MILLIS,
+                                    android.text.format.DateUtils.WEEK_IN_MILLIS, 0,
+                                )
+                            } ?: "Not checked yet") + ". Installs a newer build if there is one; Android asks you to confirm",
+                            value = update.installedVersionName(context),
                             run = { ctx, onStatus ->
                                 withContext(Dispatchers.IO) {
                                     dev.droidtop.app.update.UpdateNow.runNow(ctx) { status ->

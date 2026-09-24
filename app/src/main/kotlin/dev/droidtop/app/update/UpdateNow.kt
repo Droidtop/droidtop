@@ -21,7 +21,7 @@ import android.util.Log
  * PackageInstaller session, and the system's own confirmation (and its
  * signing-key check) is the only prompt that remains.
  *
- * Reached two ways: the "Check and install now" row on Settings > Software
+ * Reached two ways: the "Check now" row on Settings > Software
  * updates, and the UPDATE_NOW broadcast (dev.droidtop.app.UpdateNowReceiver).
  */
 object UpdateNow {
