@@ -201,6 +201,9 @@ Java_dev_droidtop_hostbridge_HostBridge_nativeDisconnect(JNIEnv* env, jobject th
         g_clipboardSinks.erase(key);
     }
     std::lock_guard<std::mutex> lock(g_clientsMutex);
+    // Capture stops before its window is released: the dispatch thread
+    // draws into that window until stopPresenting() returns.
+    if (auto* client = findClient(key)) client->stopPresenting();
     releasePresentedWindowLocked(key);
     g_clients.erase(key);
 }
@@ -221,7 +224,9 @@ Java_dev_droidtop_hostbridge_HostBridge_nativePresentOutput(JNIEnv* env, jobject
         return JNI_FALSE;
     }
 
-    releasePresentedWindowLocked(key); // drop any previous target first
+    // Stop drawing into the previous target before dropping it.
+    client->stopPresenting();
+    releasePresentedWindowLocked(key);
     bool ok = client->presentPrimaryOutput(window);
     if (ok) {
         g_presentedWindows[key] = window; // ownership of the acquired reference moves here
@@ -283,4 +288,13 @@ Java_dev_droidtop_hostbridge_HostBridge_nativeInjectKey(
     if (auto* client = findClient(identityHash(env, thiz))) {
         client->injectKey(static_cast<uint32_t>(evdevKeyCode), pressed == JNI_TRUE);
     }
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_dev_droidtop_hostbridge_HostBridge_nativeSetOutputSize(JNIEnv* env, jobject thiz, jint width, jint height) {
+    std::lock_guard<std::mutex> lock(g_clientsMutex);
+    if (auto* client = findClient(identityHash(env, thiz))) {
+        return client->setOutputSize(width, height) ? JNI_TRUE : JNI_FALSE;
+    }
+    return JNI_FALSE;
 }

@@ -51,6 +51,18 @@ class HostBridge : HostBridgeInput {
         nativeStopPresenting()
     }
 
+    /**
+     * Asks the compositor to make its output exactly [width] x [height]
+     * pixels (a custom mode over wlr-output-management; a headless output
+     * takes any size), so the frames presented into a view of that size
+     * map 1:1 instead of being stretched. The desktop viewport calls this
+     * with its surface's real size on every layout change. Returns false
+     * when the compositor offers no output management, in which case the
+     * desktop keeps its own size and is scaled to fit.
+     */
+    fun setOutputSize(width: Int, height: Int): Boolean =
+        width > 0 && height > 0 && nativeSetOutputSize(width, height)
+
     // ---- Input injection, called from :input-seat's InputSeat ----
 
     /** Relative pointer motion (trackpad-style delta), in compositor-defined units. */
@@ -113,6 +125,7 @@ class HostBridge : HostBridgeInput {
     private external fun nativeDisconnect()
     private external fun nativePresentOutput(surface: Surface): Boolean
     private external fun nativeStopPresenting()
+    private external fun nativeSetOutputSize(width: Int, height: Int): Boolean
     private external fun nativeInjectPointerMotion(dx: Double, dy: Double)
     private external fun nativeInjectPointerMotionAbsolute(x: Double, y: Double, extentWidth: Int, extentHeight: Int)
     private external fun nativeInjectPointerButton(linuxButtonCode: Int, pressed: Boolean)

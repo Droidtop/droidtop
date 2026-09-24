@@ -7,12 +7,16 @@
 #include <wayland-client.h>
 
 #include <cerrno>
+#include <condition_variable>
 #include <cstring>
+#include <deque>
 #include <fcntl.h>
 #include <mutex>
+#include <poll.h>
 #include <pthread.h>
 #include <signal.h>
 #include <string>
+#include <sys/eventfd.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -25,6 +29,7 @@
 #include "wlr-virtual-pointer-unstable-v1-client-protocol.h"
 #include "virtual-keyboard-unstable-v1-client-protocol.h"
 #include "ext-data-control-v1-client-protocol.h"
+#include "wlr-output-management-unstable-v1-client-protocol.h"
 
 #define LOG_TAG "hostbridge/wl"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -44,8 +49,24 @@ struct WaylandGlobals {
     wl_seat* seat = nullptr;
     wl_shm* shm = nullptr;
     zwlr_screencopy_manager_v1* screencopy_manager = nullptr;
+    uint32_t screencopy_version = 0;
     zwlr_virtual_pointer_manager_v1* virtual_pointer_manager = nullptr;
     zwp_virtual_keyboard_manager_v1* virtual_keyboard_manager = nullptr;
+
+    // Output sizing (wlr-output-management). Optional: without it the
+    // desktop still works, the frame is just stretched to the view. All of
+    // it is touched on the dispatch thread only. `head` is the first head
+    // announced, the one headless output this compositor has; `serial` is
+    // the latest `done` serial, which every configuration must quote.
+    zwlr_output_manager_v1* output_manager = nullptr;
+    uint32_t output_manager_version = 0;
+    zwlr_output_head_v1* head = nullptr;
+    uint32_t output_serial = 0;
+    bool output_serial_known = false;
+    int32_t wanted_width = 0;
+    int32_t wanted_height = 0;
+    int32_t applied_width = 0;
+    int32_t applied_height = 0;
 
     // Clipboard. NOT required at connect() time, unlike the five above: a
     // compositor without it still gives a usable desktop, just one whose
@@ -92,6 +113,20 @@ struct OutputCapture {
     uint32_t stride = 0;
     uint32_t format = 0; // enum wl_shm_format
     bool haveBufferInfo = false;
+
+    // What the current wl_buffer was created with. A new size with the same
+    // byte count (1280x720 -> 720x1280) still needs a new buffer: the
+    // compositor fails a copy into a buffer of the wrong dimensions.
+    uint32_t bufferWidth = 0;
+    uint32_t bufferHeight = 0;
+    uint32_t bufferStride = 0;
+    uint32_t bufferFormat = 0;
+
+    // copy_with_damage (screencopy v2+) makes the compositor hold each
+    // frame until something on the output changed: an idle desktop costs
+    // nothing, instead of a full-screen copy and blit as fast as the loop
+    // can run.
+    uint32_t screencopyVersion = 0;
 
     bool running = false;
 };
@@ -150,6 +185,128 @@ struct ClipboardState {
 
 namespace {
 
+// ---- output management (wlr-output-management-unstable-v1) ----
+
+void applyOutputSize(WaylandGlobals* globals); // fwd decl: manager_done applies a size requested before the serial arrived
+
+void mode_size(void*, zwlr_output_mode_v1*, int32_t, int32_t) {}
+void mode_refresh(void*, zwlr_output_mode_v1*, int32_t) {}
+void mode_preferred(void*, zwlr_output_mode_v1*) {}
+void mode_finished(void* data, zwlr_output_mode_v1* mode) {
+    auto version = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(data));
+    if (version >= 3) zwlr_output_mode_v1_release(mode); else zwlr_output_mode_v1_destroy(mode);
+}
+constexpr zwlr_output_mode_v1_listener kModeListener = {
+    .size = mode_size,
+    .refresh = mode_refresh,
+    .preferred = mode_preferred,
+    .finished = mode_finished,
+};
+
+void head_name(void*, zwlr_output_head_v1*, const char* name) {
+    LOGI("compositor output head: %s", name);
+}
+void head_description(void*, zwlr_output_head_v1*, const char*) {}
+void head_physical_size(void*, zwlr_output_head_v1*, int32_t, int32_t) {}
+void head_mode(void* data, zwlr_output_head_v1*, zwlr_output_mode_v1* mode) {
+    auto* globals = static_cast<WaylandGlobals*>(data);
+    zwlr_output_mode_v1_add_listener(mode, &kModeListener,
+        reinterpret_cast<void*>(static_cast<uintptr_t>(globals->output_manager_version)));
+}
+void head_enabled(void*, zwlr_output_head_v1*, int32_t) {}
+void head_current_mode(void*, zwlr_output_head_v1*, zwlr_output_mode_v1*) {}
+void head_position(void*, zwlr_output_head_v1*, int32_t, int32_t) {}
+void head_transform(void*, zwlr_output_head_v1*, int32_t) {}
+void head_scale(void*, zwlr_output_head_v1*, wl_fixed_t) {}
+void head_finished(void* data, zwlr_output_head_v1* head) {
+    auto* globals = static_cast<WaylandGlobals*>(data);
+    if (globals->head == head) {
+        globals->head = nullptr;
+        globals->applied_width = globals->applied_height = 0;
+    }
+    if (globals->output_manager_version >= 3) zwlr_output_head_v1_release(head); else zwlr_output_head_v1_destroy(head);
+}
+void head_make(void*, zwlr_output_head_v1*, const char*) {}
+void head_model(void*, zwlr_output_head_v1*, const char*) {}
+void head_serial_number(void*, zwlr_output_head_v1*, const char*) {}
+void head_adaptive_sync(void*, zwlr_output_head_v1*, uint32_t) {}
+constexpr zwlr_output_head_v1_listener kHeadListener = {
+    .name = head_name,
+    .description = head_description,
+    .physical_size = head_physical_size,
+    .mode = head_mode,
+    .enabled = head_enabled,
+    .current_mode = head_current_mode,
+    .position = head_position,
+    .transform = head_transform,
+    .scale = head_scale,
+    .finished = head_finished,
+    .make = head_make,
+    .model = head_model,
+    .serial_number = head_serial_number,
+    .adaptive_sync = head_adaptive_sync,
+};
+
+void manager_head(void* data, zwlr_output_manager_v1*, zwlr_output_head_v1* head) {
+    auto* globals = static_cast<WaylandGlobals*>(data);
+    zwlr_output_head_v1_add_listener(head, &kHeadListener, globals);
+    if (!globals->head) globals->head = head; // single headless output: the first head is it
+}
+void manager_done(void* data, zwlr_output_manager_v1*, uint32_t serial) {
+    auto* globals = static_cast<WaylandGlobals*>(data);
+    globals->output_serial = serial;
+    globals->output_serial_known = true;
+    applyOutputSize(globals);
+}
+void manager_finished(void* data, zwlr_output_manager_v1* manager) {
+    auto* globals = static_cast<WaylandGlobals*>(data);
+    zwlr_output_manager_v1_destroy(manager);
+    globals->output_manager = nullptr;
+    globals->head = nullptr;
+}
+constexpr zwlr_output_manager_v1_listener kOutputManagerListener = {
+    .head = manager_head,
+    .done = manager_done,
+    .finished = manager_finished,
+};
+
+void configuration_succeeded(void*, zwlr_output_configuration_v1* config) {
+    LOGI("output size applied");
+    zwlr_output_configuration_v1_destroy(config);
+}
+void configuration_failed(void* data, zwlr_output_configuration_v1* config) {
+    auto* globals = static_cast<WaylandGlobals*>(data);
+    LOGW("compositor refused output size %dx%d", globals->wanted_width, globals->wanted_height);
+    globals->applied_width = globals->applied_height = 0;
+    zwlr_output_configuration_v1_destroy(config);
+}
+void configuration_cancelled(void* data, zwlr_output_configuration_v1* config) {
+    // The output changed under the request (its serial went stale). The
+    // next `done` carries a fresh serial and re-applies the wanted size.
+    auto* globals = static_cast<WaylandGlobals*>(data);
+    globals->applied_width = globals->applied_height = 0;
+    zwlr_output_configuration_v1_destroy(config);
+}
+constexpr zwlr_output_configuration_v1_listener kConfigurationListener = {
+    .succeeded = configuration_succeeded,
+    .failed = configuration_failed,
+    .cancelled = configuration_cancelled,
+};
+
+void applyOutputSize(WaylandGlobals* globals) {
+    if (!globals->output_manager || !globals->head || !globals->output_serial_known) return;
+    if (globals->wanted_width <= 0 || globals->wanted_height <= 0) return;
+    if (globals->wanted_width == globals->applied_width && globals->wanted_height == globals->applied_height) return;
+    auto* config = zwlr_output_manager_v1_create_configuration(globals->output_manager, globals->output_serial);
+    zwlr_output_configuration_v1_add_listener(config, &kConfigurationListener, globals);
+    auto* configHead = zwlr_output_configuration_v1_enable_head(config, globals->head);
+    zwlr_output_configuration_head_v1_set_custom_mode(configHead, globals->wanted_width, globals->wanted_height, 0);
+    zwlr_output_configuration_v1_apply(config);
+    globals->applied_width = globals->wanted_width;
+    globals->applied_height = globals->wanted_height;
+    LOGI("requested output size %dx%d", globals->wanted_width, globals->wanted_height);
+}
+
 // ---- registry ----
 
 void registry_global(void* data, wl_registry* registry, uint32_t name,
@@ -173,6 +330,15 @@ void registry_global(void* data, wl_registry* registry, uint32_t name,
     } else if (std::strcmp(interface, zwlr_screencopy_manager_v1_interface.name) == 0) {
         globals->screencopy_manager = static_cast<zwlr_screencopy_manager_v1*>(
             wl_registry_bind(registry, name, &zwlr_screencopy_manager_v1_interface, version));
+        globals->screencopy_version = version;
+    } else if (std::strcmp(interface, zwlr_output_manager_v1_interface.name) == 0) {
+        // Capped at the version this client's listeners were written for:
+        // binding higher would deliver events with no handler.
+        uint32_t bound = version < 4 ? version : 4;
+        globals->output_manager = static_cast<zwlr_output_manager_v1*>(
+            wl_registry_bind(registry, name, &zwlr_output_manager_v1_interface, bound));
+        globals->output_manager_version = bound;
+        zwlr_output_manager_v1_add_listener(globals->output_manager, &kOutputManagerListener, globals);
     } else if (std::strcmp(interface, zwlr_virtual_pointer_manager_v1_interface.name) == 0) {
         globals->virtual_pointer_manager = static_cast<zwlr_virtual_pointer_manager_v1*>(
             wl_registry_bind(registry, name, &zwlr_virtual_pointer_manager_v1_interface, version));
@@ -206,8 +372,9 @@ void startNextCapture(OutputCapture* cap); // fwd decl — frame_ready/frame_fai
 
 void allocateShmBuffer(OutputCapture* cap) {
     size_t size = static_cast<size_t>(cap->stride) * cap->height;
-    if (cap->buffer && size == cap->shmSize) {
-        return; // reuse — dimensions unchanged since last frame
+    if (cap->buffer && cap->bufferWidth == cap->width && cap->bufferHeight == cap->height &&
+        cap->bufferStride == cap->stride && cap->bufferFormat == cap->format) {
+        return; // reuse — geometry unchanged since last frame
     }
 
     if (cap->buffer) {
@@ -250,6 +417,10 @@ void allocateShmBuffer(OutputCapture* cap) {
     cap->buffer = wl_shm_pool_create_buffer(
         cap->pool, 0, static_cast<int32_t>(cap->width), static_cast<int32_t>(cap->height),
         static_cast<int32_t>(cap->stride), static_cast<wl_shm_format>(cap->format));
+    cap->bufferWidth = cap->width;
+    cap->bufferHeight = cap->height;
+    cap->bufferStride = cap->stride;
+    cap->bufferFormat = cap->format;
 }
 
 // Copies the just-captured shm frame onto the target ANativeWindow, with a
@@ -359,7 +530,11 @@ void frame_buffer_done(void* data, zwlr_screencopy_frame_v1* frame) {
         return;
     }
 
-    zwlr_screencopy_frame_v1_copy(frame, cap->buffer);
+    if (cap->screencopyVersion >= 2) {
+        zwlr_screencopy_frame_v1_copy_with_damage(frame, cap->buffer);
+    } else {
+        zwlr_screencopy_frame_v1_copy(frame, cap->buffer);
+    }
 }
 
 // A real named object with static storage duration — deliberately NOT a
@@ -646,6 +821,24 @@ constexpr ext_data_control_device_v1_listener kDeviceListener = {
 
 // ---- WaylandClient ----
 
+/**
+ * Work posted to the dispatch thread, and whether that thread is still
+ * there to run it. A caller waits on `done` for its own task; once the
+ * thread has exited, tasks run inline in the caller instead.
+ */
+struct DispatchTasks {
+    struct Task {
+        void (*fn)(WaylandClient*, void*);
+        void* arg;
+        bool finished = false;
+    };
+    std::mutex mutex;
+    std::condition_variable done;
+    std::deque<Task*> queue;
+    bool threadAlive = false;
+    pthread_t thread{};
+};
+
 WaylandClient::~WaylandClient() {
     disconnect();
 }
@@ -658,33 +851,150 @@ void* dispatchThreadTrampoline(void* arg) {
 } // namespace
 
 void WaylandClient::startDispatchThread() {
+    if (!tasks_) tasks_ = new DispatchTasks();
+    wakeFd_ = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
     dispatchThreadRunning_ = true;
     auto* thread = new pthread_t();
-    pthread_create(thread, nullptr, dispatchThreadTrampoline, this);
+    {
+        std::lock_guard<std::mutex> lock(tasks_->mutex);
+        tasks_->threadAlive = true;
+    }
+    if (pthread_create(thread, nullptr, dispatchThreadTrampoline, this) != 0) {
+        LOGE("pthread_create for the dispatch thread failed: %s", strerror(errno));
+        std::lock_guard<std::mutex> lock(tasks_->mutex);
+        tasks_->threadAlive = false;
+        delete thread;
+        return;
+    }
+    {
+        std::lock_guard<std::mutex> lock(tasks_->mutex);
+        tasks_->thread = *thread;
+    }
     dispatchThreadHandle_ = thread;
+}
+
+void WaylandClient::wake() {
+    if (wakeFd_ < 0) return;
+    uint64_t one = 1;
+    ssize_t ignored = write(wakeFd_, &one, sizeof(one));
+    (void)ignored;
 }
 
 void WaylandClient::stopDispatchThread() {
     if (!dispatchThreadHandle_) return;
+    // The loop polls the display AND wakeFd_, so this wakes it even when the
+    // compositor is sending nothing (it used to block in
+    // wl_display_dispatch() until an event arrived, and an idle compositor
+    // sends none: disconnect() could hang forever in the join below).
     dispatchThreadRunning_ = false;
-    // wl_display_dispatch() is blocking (waits on the socket) — in practice
-    // disconnect() closing the underlying fd out from under the thread is
-    // what actually unblocks it here. Good enough for a first version; a
-    // self-pipe/eventfd wakeup would be cleaner and should replace this if
-    // shutdown latency ever actually matters.
+    wake();
     auto* thread = static_cast<pthread_t*>(dispatchThreadHandle_);
     pthread_join(*thread, nullptr);
     delete thread;
     dispatchThreadHandle_ = nullptr;
+    if (wakeFd_ >= 0) {
+        close(wakeFd_);
+        wakeFd_ = -1;
+    }
 }
 
-void WaylandClient::dispatchLoop() {
-    while (dispatchThreadRunning_ && display_) {
-        if (wl_display_dispatch(display_) < 0) {
-            LOGW("wl_display_dispatch returned error, dispatch thread exiting");
-            break;
+void WaylandClient::runOnDispatchThread(void (*task)(WaylandClient*, void*), void* arg) {
+    if (tasks_) {
+        std::unique_lock<std::mutex> lock(tasks_->mutex);
+        bool onDispatchThread = tasks_->threadAlive && pthread_equal(pthread_self(), tasks_->thread);
+        if (tasks_->threadAlive && !onDispatchThread) {
+            DispatchTasks::Task posted{task, arg};
+            tasks_->queue.push_back(&posted);
+            wake();
+            tasks_->done.wait(lock, [&] { return posted.finished; });
+            return;
         }
     }
+    task(this, arg);
+    if (display_) wl_display_flush(display_);
+}
+
+void WaylandClient::runPendingTasks() {
+    if (!tasks_) return;
+    while (true) {
+        DispatchTasks::Task* next = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(tasks_->mutex);
+            if (tasks_->queue.empty()) return;
+            next = tasks_->queue.front();
+            tasks_->queue.pop_front();
+        }
+        next->fn(this, next->arg);
+        {
+            std::lock_guard<std::mutex> lock(tasks_->mutex);
+            next->finished = true;
+        }
+        tasks_->done.notify_all();
+    }
+}
+
+/**
+ * The one thread that reads the Wayland connection and owns everything the
+ * compositor's events touch (capture, output configuration). It waits on
+ * the display fd and on wakeFd_ together, using libwayland's
+ * prepare_read/read_events protocol, flushing before every wait: requests
+ * made here, or posted here as tasks, reach the compositor even when it has
+ * nothing to send back. The previous loop blocked in wl_display_dispatch(),
+ * which flushes only when it wakes, so a capture request made from the UI
+ * thread against an idle compositor was never sent at all.
+ */
+void WaylandClient::dispatchLoop() {
+    pollfd fds[2] = {
+        {wl_display_get_fd(display_), POLLIN, 0},
+        {wakeFd_, POLLIN, 0},
+    };
+    bool broken = false;
+    while (dispatchThreadRunning_ && !broken) {
+        runPendingTasks();
+        while (wl_display_prepare_read(display_) != 0) {
+            if (wl_display_dispatch_pending(display_) < 0) { broken = true; break; }
+        }
+        if (broken) break;
+        fds[0].events = POLLIN;
+        if (wl_display_flush(display_) < 0) {
+            if (errno == EAGAIN) {
+                fds[0].events |= POLLOUT; // socket full: wait until it drains
+            } else {
+                wl_display_cancel_read(display_);
+                broken = true;
+                break;
+            }
+        }
+        fds[0].revents = 0;
+        fds[1].revents = 0;
+        if (poll(fds, 2, -1) < 0) {
+            wl_display_cancel_read(display_);
+            if (errno == EINTR) continue;
+            broken = true;
+            break;
+        }
+        if (fds[0].revents & (POLLIN | POLLERR | POLLHUP)) {
+            if (wl_display_read_events(display_) < 0) { broken = true; break; }
+        } else {
+            wl_display_cancel_read(display_);
+        }
+        if (fds[1].revents & POLLIN) {
+            uint64_t drained;
+            ssize_t ignored = read(wakeFd_, &drained, sizeof(drained));
+            (void)ignored;
+        }
+        if (wl_display_dispatch_pending(display_) < 0) broken = true;
+    }
+    if (broken) {
+        LOGW("the compositor connection failed (%s); dispatch thread exiting", strerror(errno));
+    }
+    // Anything posted from now on runs inline in its caller; anything
+    // already posted runs here, so no caller waits forever.
+    {
+        std::lock_guard<std::mutex> lock(tasks_->mutex);
+        tasks_->threadAlive = false;
+    }
+    runPendingTasks();
 }
 
 bool WaylandClient::connect(const char* socketPath) {
@@ -830,28 +1140,49 @@ void WaylandClient::disconnect() {
         wl_display_disconnect(display_);
         display_ = nullptr;
     }
+    delete tasks_;
+    tasks_ = nullptr;
 }
 
+namespace {
+struct PresentRequest {
+    ANativeWindow* window;
+    bool ok = false;
+};
+} // namespace
+
+// Capture state belongs to the dispatch thread (its frame callbacks run
+// there), so starting and stopping a capture happens there too: tearing
+// it down from the UI thread raced a frame callback still using it.
 bool WaylandClient::presentPrimaryOutput(ANativeWindow* window) {
-    if (!globals_ || !globals_->output || !globals_->shm || !globals_->screencopy_manager) {
-        LOGE("presentPrimaryOutput: missing output/shm/screencopy_manager global");
-        return false;
-    }
-
-    stopPresenting();
-
-    capture_ = new OutputCapture();
-    capture_->window = window;
-    capture_->manager = globals_->screencopy_manager;
-    capture_->output = globals_->output;
-    capture_->shm = globals_->shm;
-    capture_->running = true;
-
-    startNextCapture(capture_);
-    return true;
+    PresentRequest request{window};
+    runOnDispatchThread([](WaylandClient* self, void* arg) {
+        auto* req = static_cast<PresentRequest*>(arg);
+        auto* globals = self->globals_;
+        if (!globals || !globals->output || !globals->shm || !globals->screencopy_manager) {
+            LOGE("presentPrimaryOutput: missing output/shm/screencopy_manager global");
+            return;
+        }
+        self->stopPresentingOnDispatchThread();
+        auto* cap = new OutputCapture();
+        cap->window = req->window;
+        cap->manager = globals->screencopy_manager;
+        cap->output = globals->output;
+        cap->shm = globals->shm;
+        cap->screencopyVersion = globals->screencopy_version;
+        cap->running = true;
+        self->capture_ = cap;
+        startNextCapture(cap);
+        req->ok = true;
+    }, &request);
+    return request.ok;
 }
 
 void WaylandClient::stopPresenting() {
+    runOnDispatchThread([](WaylandClient* self, void*) { self->stopPresentingOnDispatchThread(); }, nullptr);
+}
+
+void WaylandClient::stopPresentingOnDispatchThread() {
     if (!capture_) return;
 
     capture_->running = false;
@@ -867,12 +1198,42 @@ void WaylandClient::stopPresenting() {
     capture_ = nullptr;
 }
 
+namespace {
+struct SizeRequest {
+    int32_t width;
+    int32_t height;
+    bool supported = false;
+};
+} // namespace
+
+bool WaylandClient::setOutputSize(int32_t width, int32_t height) {
+    SizeRequest request{width, height};
+    runOnDispatchThread([](WaylandClient* self, void* arg) {
+        auto* req = static_cast<SizeRequest*>(arg);
+        auto* globals = self->globals_;
+        if (!globals || !globals->output_manager) {
+            LOGW("compositor offers no wlr-output-management; the desktop stays at its own size");
+            return;
+        }
+        globals->wanted_width = req->width;
+        globals->wanted_height = req->height;
+        self->applyOutputSizeOnDispatchThread();
+        req->supported = true;
+    }, &request);
+    return request.supported;
+}
+
+void WaylandClient::applyOutputSizeOnDispatchThread() {
+    if (globals_) applyOutputSize(globals_);
+}
+
 void WaylandClient::injectPointerMotion(double dx, double dy) {
     if (!globals_ || !globals_->virtual_pointer) return;
     uint32_t timeMs = 0; // 0 lets the compositor timestamp it — fine for injected input
     zwlr_virtual_pointer_v1_motion(globals_->virtual_pointer, timeMs,
                                     wl_fixed_from_double(dx), wl_fixed_from_double(dy));
     zwlr_virtual_pointer_v1_frame(globals_->virtual_pointer);
+    wl_display_flush(display_);
 }
 
 void WaylandClient::injectPointerMotionAbsolute(double x, double y, uint32_t extentWidth, uint32_t extentHeight) {
@@ -882,6 +1243,7 @@ void WaylandClient::injectPointerMotionAbsolute(double x, double y, uint32_t ext
         static_cast<uint32_t>(x), static_cast<uint32_t>(y),
         extentWidth, extentHeight);
     zwlr_virtual_pointer_v1_frame(globals_->virtual_pointer);
+    wl_display_flush(display_);
 }
 
 void WaylandClient::injectPointerButton(uint32_t linuxButtonCode, bool pressed) {
@@ -889,6 +1251,7 @@ void WaylandClient::injectPointerButton(uint32_t linuxButtonCode, bool pressed) 
     zwlr_virtual_pointer_v1_button(globals_->virtual_pointer, 0, linuxButtonCode,
                                     pressed ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED);
     zwlr_virtual_pointer_v1_frame(globals_->virtual_pointer);
+    wl_display_flush(display_);
 }
 
 void WaylandClient::injectPointerAxis(double horizontal, double vertical) {
@@ -902,12 +1265,16 @@ void WaylandClient::injectPointerAxis(double horizontal, double vertical) {
                                       wl_fixed_from_double(vertical));
     }
     zwlr_virtual_pointer_v1_frame(globals_->virtual_pointer);
+    wl_display_flush(display_);
 }
 
 void WaylandClient::injectKey(uint32_t evdevKeyCode, bool pressed) {
     if (!globals_ || !globals_->virtual_keyboard) return;
     zwp_virtual_keyboard_v1_key(globals_->virtual_keyboard, 0, evdevKeyCode,
                                  pressed ? WL_KEYBOARD_KEY_STATE_PRESSED : WL_KEYBOARD_KEY_STATE_RELEASED);
+    // Requests made off the dispatch thread are only buffered; without a
+    // flush they wait for the next time the dispatch thread wakes.
+    wl_display_flush(display_);
 }
 
 void WaylandClient::setClipboardListener(ClipboardTextCallback callback, void* userData) {
