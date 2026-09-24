@@ -237,6 +237,9 @@ object AppSelfUpdate {
             val name = if (debug) json.getString("debugApkName") else json.getString("apkName")
             val digest = (if (debug) json.getString("debugApkSha256") else json.getString("apkSha256")).uppercase()
             require(digest.matches(Regex("[A-F0-9]{64}"))) { "Release info carries no valid APK digest" }
+            // A bare file name on this release, never a path: the name is
+            // appended to the channel's download URL.
+            require(name.matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]*\\.apk"))) { "Release info names no valid APK file" }
             return Info(
                 json.getLong("versionCode"),
                 json.getString("versionName"),
