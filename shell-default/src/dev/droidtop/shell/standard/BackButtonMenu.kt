@@ -95,7 +95,7 @@ object BackButtonMenu {
         AlertDialog.Builder(activity, com.android.launcher3.R.style.DroidtopDialog)
             .setItems(items.toTypedArray()) { _, which ->
                 when (items[which]) {
-                    "Android" -> launchHomeImplementation(activity, homeImplementation)
+                    "Android" -> openHome(activity, homeImplementation)
                     Mode.DESKTOP.label -> launchAppMode(activity, Mode.DESKTOP)
                     Mode.GAMING.label -> launchAppMode(activity, Mode.GAMING)
                     "Settings" -> launchSettings(activity)
@@ -104,18 +104,25 @@ object BackButtonMenu {
             .show()
     }
 
-    private fun launchHomeImplementation(activity: Activity, implementation: HomeRolePrefs.HomeImplementation) {
+    /**
+     * Opens the Android home screen droidtop holds -- its own launcher, or
+     * the one "Alternative" forwards to -- and records it as the last mode,
+     * so the launcher's own last-mode redirect does not bounce straight
+     * back into a shell. The one way into Launcher mode: this menu's
+     * "Android" and the end of onboarding both come here.
+     */
+    fun openHome(context: Context, implementation: HomeRolePrefs.HomeImplementation) {
         val activityName = when (implementation) {
             HomeRolePrefs.HomeImplementation.STANDARD -> STANDARD_LAUNCHER_ACTIVITY
             HomeRolePrefs.HomeImplementation.ALTERNATIVE -> ALTERNATIVE_LAUNCHER_ACTIVITY
             HomeRolePrefs.HomeImplementation.NONE -> return
         }
-        Modes.setLastMode(activity, Mode.LAUNCHER)
+        Modes.setLastMode(context, Mode.LAUNCHER)
         val intent = Intent(Intent.ACTION_MAIN).apply {
-            component = ComponentName(activity.packageName, activityName)
+            component = ComponentName(context.packageName, activityName)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        activity.startActivity(intent)
+        context.startActivity(intent)
     }
 
     private fun launchAppMode(activity: Activity, mode: Mode) {

@@ -64,9 +64,11 @@ import java.io.File
  * Gaming adds on top -- themes, scraped metadata views, the Quick Menu --
  * is deliberately absent.
  *
- * This is the package's only MAIN/LAUNCHER activity, which is also what
- * makes pinning possible at all: the platform refuses a pinned shortcut
- * from a package with no launcher activity to attribute it to.
+ * It is the package's one ALWAYS-enabled MAIN/LAUNCHER activity, which
+ * is also what makes pinning possible at all: the platform refuses a
+ * pinned shortcut from a package with no launcher activity to attribute
+ * it to, and the other one (the OpenShells icon into the shells) goes
+ * away with Gaming and Desktop.
  */
 class LauncherGamesActivity : AppCompatActivity() {
 
@@ -121,6 +123,11 @@ class LauncherGamesActivity : AppCompatActivity() {
                     .setShortLabel(entry.title)
                     .setIcon(icon)
                     .setIntent(GameLaunchActivity.intentFor(context, entry.id))
+                    // Attributed to this activity by name: left unset, the
+                    // platform picks one of the package's launcher
+                    // activities, and the other one (OpenShells) is
+                    // disabled whenever Gaming and Desktop are both off.
+                    .setActivity(android.content.ComponentName(context, LauncherGamesActivity::class.java))
                     .build()
                 val asked = runCatching { ShortcutManagerCompat.requestPinShortcut(context, shortcut, null) }
                     .onFailure { android.util.Log.w("droidtop.LauncherGames", "Pin of ${entry.title} refused", it) }
