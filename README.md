@@ -85,7 +85,7 @@ These are droidtop's own modules:
 | `:input-keyboard` | Hacker's Keyboard, forked in as a real Android IME. It is offered as an optional step in onboarding. |
 | `:runtime-windows` | Wine/Box64 compiled from the whole vendored GameNative tree (`vendor/gamenative`). It also provides the PC store library and launching PC games. |
 | `:runtime-linux-root` | Rooted Linux containers. It drives the `droidspaces` binary built from `vendor/droidspaces`, and pulls OCI images with `crane`. Root is required. |
-| `:runtime-linux-noroot` | The proot container backend for devices without root. It is a stub: its lifecycle methods are still `TODO()`. |
+| `:runtime-linux-noroot` | The proot container backend for devices without root (`ProotRuntime`), running Termux's proot from `vendor/proot` out of `nativeLibraryDir`. |
 
 These directories are in the repository but are not Gradle modules:
 
