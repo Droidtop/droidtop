@@ -42,6 +42,19 @@ runs:
           17
           21
 
+    - name: Validate Gradle wrappers
+      # Every gradle-wrapper.jar in the checkout, as setup-gradle's own
+      # validation did, with one exception: vendor/SDL2/android-project's
+      # (SDL's sample Android project) is not on Gradle's list of release
+      # checksums. droidtop takes only SDL's headers and never runs that
+      # wrapper, so exactly its checksum is allowed (run 36045468564 failed
+      # on it). setup-gradle has no input for allowed checksums; this
+      # action, from the same pinned release, does.
+      uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+      with:
+        min-wrapper-count: 1
+        allow-checksums: 2c23278a62dc9f96ab11bee897d9f53e6479d6419135e4560ce822a6431df5e5
+
     - name: Set up Gradle (dependency, wrapper and build cache)
       # Caches the Gradle user home between runs: the wrapper distribution,
       # every downloaded dependency, and the local build cache that
@@ -54,12 +67,8 @@ runs:
       uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
       with:
         cache-cleanup: on-success
-        # Wrapper validation checks every gradle-wrapper.jar in the checkout.
-        # This one is vendor/SDL2/android-project's (SDL's sample Android
-        # project), not on Gradle's list of release checksums; droidtop
-        # takes only SDL's headers and never runs that wrapper, so exactly
-        # this checksum is allowed (run 36045468564 failed on it).
-        allow-checksums: 2c23278a62dc9f96ab11bee897d9f53e6479d6419135e4560ce822a6431df5e5
+        # Validated by the step below instead, which can allow one checksum.
+        validate-wrappers: false
 
     - name: Set up Go
       # For cross-compiling crane (vendor/go-containerregistry), the OCI
