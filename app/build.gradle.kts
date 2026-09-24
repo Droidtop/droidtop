@@ -49,13 +49,27 @@ android {
         // Local builds without the env var stay at 1.
         versionCode = versionRevision.toIntOrNull()?.coerceAtLeast(1) ?: 1
         versionName = "0.1.0-dev-$versionRevision"
-        // arm64-v8a (real hardware, e.g. Retroid Pocket 5) + x86_64
-        // (emulators/x86 devices), matching host-bridge/runtime-remote-
-        // stream's own abiFilters — one fat APK covering both rather than
-        // separate per-ABI builds.
-        ndk {
-            abiFilters += "arm64-v8a"
-            abiFilters += "x86_64"
+        // The ABIs droidtop ships (arm64-v8a for real hardware, x86_64 for
+        // x86 devices and emulators) are set by `splits` below and the
+        // packaging excludes, not an ndk abiFilters block: AGP refuses the
+        // two together.
+    }
+
+    // One universal APK with both ABIs is what the release channel
+    // publishes (docs/SPEC.md 10b). The per-ABI APKs exist because an app's
+    // native libraries are ONE ABI's, chosen at install, and Android-x86
+    // derivatives with ARM translation (the BlueStacks rig) choose
+    // arm64-v8a for the universal APK: their package manager's ABIPicker
+    // takes the x86_64 set only when it holds every arm64 library, and
+    // gamenative's prebuilt natives exist for arm64 alone. Everything droidtop
+    // EXECUTES (proot and its loaders, crane) must be the kernel's own ABI,
+    // so on such a device Desktop mode needs the x86_64 APK (docs/SPEC.md 3).
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "x86_64")
+            isUniversalApk = true
         }
     }
 
@@ -113,6 +127,10 @@ android {
 
     packaging {
         jniLibs {
+            // Dependencies (zstd-jni, libarchive, sentry, ...) carry 32-bit
+            // and other ABIs droidtop does not ship; the universal APK keeps
+            // exactly arm64-v8a + x86_64, as the old ndk abiFilters did.
+            excludes += listOf("lib/armeabi/**", "lib/armeabi-v7a/**", "lib/x86/**", "lib/mips/**", "lib/mips64/**", "lib/riscv64/**")
             // The vendored gamenative runtime does not just dlopen its
             // native libraries, it hands their paths to other processes:
             // BionicProgramLauncherComponent LD_PRELOADs libevshim.so out

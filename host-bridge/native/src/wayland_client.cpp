@@ -427,7 +427,7 @@ void allocateShmBuffer(OutputCapture* cap) {
 // naive per-pixel BGRA<->RGBA channel swap: wl_shm's common format
 // (WL_SHM_FORMAT_ARGB8888/XRGB8888) is native-endian 0xAARRGGBB, i.e. bytes
 // B,G,R,A on a little-endian device — Android's WINDOW_FORMAT_RGBA_8888 is
-// bytes R,G,B,A. Correct, not optimized: fine for a first working version,
+// bytes R,G,B,A. Alpha is written opaque (see the loop). Correct, not optimized: fine for a first working version,
 // worth revisiting (GPU blit / shader) once this is actually running against
 // a live compositor and framerate is measurable.
 void blitFrameToWindow(OutputCapture* cap) {
@@ -456,7 +456,10 @@ void blitFrameToWindow(OutputCapture* cap) {
             q[0] = p[2];
             q[1] = p[1];
             q[2] = p[0];
-            q[3] = p[3];
+            // Opaque, whatever the source byte holds: the desktop output
+            // is opaque, and in the XRGB8888 frames a pixman compositor
+            // sends that byte is undefined, not alpha.
+            q[3] = 0xFF;
         }
     }
 

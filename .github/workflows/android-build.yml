@@ -294,12 +294,19 @@ jobs:
         run: ./gradlew :app:assembleRelease :app:assembleDebug --stacktrace
 
       - name: Upload APK
+        # The universal APKs are what the channel publishes. The x86_64-only
+        # pair is for x86 devices whose package manager installs the
+        # universal APK as arm64-v8a under ARM translation (the BlueStacks
+        # rig; see app/build.gradle.kts `splits`): it is uploaded here, not
+        # published.
         uses: actions/upload-artifact@v4
         with:
           name: droidtop-apk
           path: |
-            app/build/outputs/apk/release/app-release.apk
-            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/release/app-universal-release.apk
+            app/build/outputs/apk/debug/app-universal-debug.apk
+            app/build/outputs/apk/release/app-x86_64-release.apk
+            app/build/outputs/apk/debug/app-x86_64-debug.apk
           if-no-files-found: error
 
       - name: Class-load API gate (minSdk)
@@ -316,7 +323,7 @@ jobs:
         # costs anyone the installable build. Lint and the unit tests are
         # in android-checks.yml.
         if: ${{ !cancelled() }}
-        run: python3 build-scripts/check_class_load_api.py app/build/outputs/apk/release/app-release.apk
+        run: python3 build-scripts/check_class_load_api.py app/build/outputs/apk/release/app-universal-release.apk
 
       - name: Publish to the release channel
         # Workflow artifacts (the step above) are ephemeral — ~90-day
@@ -337,8 +344,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           CHANNEL: ${{ github.event.inputs.channel || 'latest' }}
         run: |
-          cp app/build/outputs/apk/release/app-release.apk droidtop-latest.apk
-          cp app/build/outputs/apk/debug/app-debug.apk droidtop-latest-debug.apk
+          cp app/build/outputs/apk/release/app-universal-release.apk droidtop-latest.apk
+          cp app/build/outputs/apk/debug/app-universal-debug.apk droidtop-latest-debug.apk
 
           # release-info.json is the in-app update check's one probe
           # (app/.../update/AppSelfUpdate.kt): the app downloads this small
