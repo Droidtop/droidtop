@@ -165,11 +165,13 @@
         <!--
           Started by dev.droidtop.shell.standard.OnboardingGate (:shell-default,
           via explicit component name; see that class's own doc comment for
-          why not a typed Intent) on first launch only.
+          why not a typed Intent) on first launch only. Every caller is
+          inside this APK, so it is not exported: another app has no
+          business walking the user into droidtop's setup screens.
         -->
         <activity
             android:name="dev.droidtop.app.OnboardingActivity"
-            android:exported="true" />
+            android:exported="false" />
 
         <!--
           Launching one library entry with no mode attached: how the
@@ -213,11 +215,12 @@
         <!--
           Explicit folder-to-console-system assignment. Started by
           :shell-gamepad's SettingsSection via explicit component name, same
-          pattern as the SettingsActivity launches elsewhere.
+          pattern as the SettingsActivity launches elsewhere. Started only
+          from inside this APK, so not exported.
         -->
         <activity
             android:name="dev.droidtop.app.ConsoleSystemsActivity"
-            android:exported="true" />
+            android:exported="false" />
 
         <!--
           The widgets/ambient-info surface for whichever display the
