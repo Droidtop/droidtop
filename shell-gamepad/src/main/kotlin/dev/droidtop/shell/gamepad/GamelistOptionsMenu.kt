@@ -447,7 +447,7 @@ internal fun GamelistOptionsMenu(
                     )
                 }
             }
-            status?.let { MenuRow(title = it.lineSequence().first(), subtitle = it.substringAfter('\n', "").ifEmpty { null }) }
+            status?.let { MenuRow(title = it.lineSequence().first(), subtitle = it.substringAfter('\n', "").ifEmpty { null }, subtitleLines = 4) }
             MenuHint(
                 if (pickingLetter) "Up/Down moves, A jumps, B goes back" else "Up/Down moves, A activates, B closes",
             )
