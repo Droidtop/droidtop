@@ -6060,8 +6060,14 @@ draws its own hint row because the theme is not drawing one here.
 resolved runner, its reason, and the picker; a primary button that is
 Play when the runner is Ready and *is the setup action* when it is not;
 install and storage actions for store games; prefix and graphics; saves;
-controls; engine settings; metadata, scrape, collections and hide; and
-compatibility.
+controls; engine settings; metadata, scrape, collections, favourite and
+hide; and compatibility. The download queue is not this game's and lives
+under Stores and folders. While the primary button is focused the hint
+row names what A does ("A Play", "A Set up"; "A Launch" on a console or
+app detail). Art narrower than 320px is not stretched across the hero:
+the plate is drawn without it. An app's detail draws its icon at icon
+size on the plate and offers App info and Uninstall (Android's own
+screens); B is the hint row's, never a Back button beside it.
 
 **Compatibility is evidence, never a verdict and never a gate.** It is
 other people's results on other hardware. It is shown factually, it may be

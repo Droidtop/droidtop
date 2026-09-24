@@ -98,9 +98,14 @@ internal fun PcGameDetail(
     // caller that has no list passes.
     siblings: List<LibraryEntry> = emptyList(),
     onOpenOther: (LibraryEntry) -> Unit = {},
+    // What A does on the focused element, for the shell's hint row: the
+    // primary button's own verb while it is focused, null (the row's
+    // generic "Select") everywhere else (UI pass 2026-09-24, M7).
+    onPrimaryFocus: (String?) -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var favorite by remember(entry) { mutableStateOf(entry.favorite) }
 
     var runners by remember(entry) { mutableStateOf(PcRunners(null, emptyList())) }
     var resolved by remember(entry) { mutableStateOf<ResolvedRunner?>(null) }
@@ -267,6 +272,10 @@ internal fun PcGameDetail(
         onChooseMatch = { pickingMatch = true },
         onViewMedia = { viewingMedia = true },
         onCollections = { editingCollections = true },
+        favorite = favorite,
+        onToggleFavorite = {
+            scope.launch { library.toggleFavorite(entry)?.let { favorite = it } }
+        },
         engineRow = runners.engine.let { engine ->
             if (engineChoice.folder == null || !loaded) {
                 null
@@ -397,6 +406,16 @@ internal fun PcGameDetail(
                         else -> runner?.option?.reason ?: "No runner on this device offers this game"
                     },
                     enabled = loaded && (isReady || setupAction != null),
+                    onFocus = { focused ->
+                        onPrimaryFocus(
+                            when {
+                                !focused -> null
+                                isReady -> "Play"
+                                setupAction != null -> "Set up"
+                                else -> null
+                            },
+                        )
+                    },
                     onSelect = {
                         if (isReady) {
                             onLaunch()
@@ -490,6 +509,8 @@ private fun rememberPcActions(
     onChooseMatch: () -> Unit,
     onViewMedia: () -> Unit,
     onCollections: () -> Unit,
+    favorite: Boolean,
+    onToggleFavorite: () -> Unit,
     engineRow: PcActionRow?,
     onEnginehost: (android.content.Intent) -> Unit,
     onOpenAppScreen: (className: String, extras: Map<String, String>) -> Unit,
@@ -555,15 +576,9 @@ private fun rememberPcActions(
                         null
                     },
                 ),
-                if (isStoreGame) {
-                    PcActionRow(
-                        "Downloads",
-                        "Everything downloading or waiting, and the storage it is going into",
-                        { onOpenAppScreen(PC_STORE_ACTIVITY, emptyMap()) },
-                    )
-                } else {
-                    null
-                },
+                // The global download queue is not this game's; it is
+                // under Stores and folders with the stores it serves (UI
+                // pass 2026-09-24, M7).
             ),
         ),
         // ONE runner section, for the runner this game actually uses.
@@ -592,6 +607,11 @@ private fun rememberPcActions(
                 PcActionRow("Choose match", "Pick the right game by hand when the scraper guessed wrong", onChooseMatch),
                 if (media > 1) PcActionRow("View media", "$media images and videos scraped for this game", onViewMedia) else null,
                 PcActionRow("Collections", "Which of your collections this game is in", onCollections),
+                PcActionRow(
+                    if (favorite) "Remove from favourites" else "Add to favourites",
+                    if (favorite) "It is in your Favourites collection" else "Puts it in your Favourites collection",
+                    onToggleFavorite,
+                ),
             ),
         ),
     )
@@ -799,16 +819,23 @@ private fun PcDetailHeader(entry: LibraryEntry, grouping: dev.droidtop.library.L
     }
     val title = dev.droidtop.library.GameNaming.displayName(grouping?.game?.name ?: ownName)
     val copyLine = grouping?.let { copyLabel(it, entry) }
+    // Art narrower than this, cropped across a 220dp hero, is a blur of
+    // a small icon rather than artwork (UI pass 2026-09-24, M7); the plate
+    // is drawn without it, as for a game with no art at all.
+    var artTooSmall by remember(entry.artworkUri) { mutableStateOf(false) }
     Box(modifier = Modifier.fillMaxWidth().height(220.dp).padding(top = 24.dp)) {
-        if (entry.artworkUri != null) {
+        Box(modifier = Modifier.fillMaxSize().background(MenuTokens.Card, RoundedCornerShape(16.dp)))
+        if (entry.artworkUri != null && !artTooSmall) {
             AsyncImage(
                 model = entry.artworkUri,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
+                onSuccess = { state ->
+                    val width = state.painter.intrinsicSize.width
+                    if (width.isFinite() && width < HERO_MIN_ART_WIDTH_PX) artTooSmall = true
+                },
                 modifier = Modifier.fillMaxSize().background(MenuTokens.Card, RoundedCornerShape(16.dp)),
             )
-        } else {
-            Box(modifier = Modifier.fillMaxSize().background(MenuTokens.Card, RoundedCornerShape(16.dp)))
         }
         Box(
             modifier = Modifier
@@ -859,6 +886,7 @@ private fun PrimaryActionButton(
     detail: String,
     enabled: Boolean,
     onSelect: () -> Unit,
+    onFocus: (Boolean) -> Unit = {},
 ) {
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(12.dp)
@@ -882,7 +910,10 @@ private fun PrimaryActionButton(
                     false
                 }
             }
-            .onFocusChanged { focused = it.isFocused }
+            .onFocusChanged {
+                focused = it.isFocused
+                onFocus(it.isFocused)
+            }
             .focusable(enabled = enabled)
             .then(if (enabled) Modifier.clickable(onClick = onSelect) else Modifier)
             .background(background, shape)
@@ -949,3 +980,6 @@ private fun DetailRow(
         }
     }
 }
+
+/** The narrowest artwork the detail's hero draws; below it the plate goes without. */
+private const val HERO_MIN_ART_WIDTH_PX = 320f

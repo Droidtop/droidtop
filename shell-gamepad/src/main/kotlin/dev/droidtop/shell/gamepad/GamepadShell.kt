@@ -272,6 +272,9 @@ fun GamepadShell(
             gameEntries.orEmpty().firstOrNull { it.id == id } ?: appEntries.orEmpty().firstOrNull { it.id == id }
         }
     }
+    // What A does on the open detail's focused element, reported by the
+    // detail itself; null is the generic "Select". Reset per detail.
+    var detailPrimaryLabel by remember(nav.detailId) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     // Real user-visible launch-failure state -- see launchError's render
     // site. A failed launch must inform, never kill.
@@ -716,6 +719,9 @@ fun GamepadShell(
         val shellHelpRow: @Composable (Color) -> Unit = { background ->
             ButtonHintFooter(
                 background = background,
+                // A names what it does on a detail's primary button
+                // ("A Play"), and stays "Select" everywhere else.
+                aLabel = detailPrimaryLabel.takeIf { detailEntry != null } ?: "Select",
                 canGoBack = canGoBack || overlayScreen,
                 showInfo = !overlayScreen,
                 showSectionSwitch = !overlayScreen,
@@ -781,6 +787,7 @@ fun GamepadShell(
                             library = library,
                             onLaunch = { onLaunch(entry); nav.back() },
                             onClose = { nav.back() },
+                            onPrimaryFocus = { detailPrimaryLabel = it },
                             // The game's other folders -- its versions and its
                             // segments (docs/SPEC.md 7m) -- are reachable from
                             // here, and picking one opens that folder's own
@@ -796,6 +803,7 @@ fun GamepadShell(
                             library = library,
                             onLaunch = { onLaunch(entry); nav.back() },
                             onClose = { nav.back() },
+                            onPrimaryFocus = { detailPrimaryLabel = it },
                         )
                         shownSection == GamingSection.SETTINGS -> {
                             // Back always does something in Settings: it pops a
@@ -938,7 +946,13 @@ private object GamingPrefs {
  * only behavior. Reached via a card's Y/Info action, closed via B/Back.
  */
 @Composable
-private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: () -> Unit, onClose: () -> Unit) {
+private fun EntryDetailScreen(
+    entry: LibraryEntry,
+    library: Library,
+    onLaunch: () -> Unit,
+    onClose: () -> Unit,
+    onPrimaryFocus: (String?) -> Unit = {},
+) {
     val context = LocalContext.current
     val launchFocus = remember { FocusRequester() }
     LaunchedEffect(entry) { launchFocus.requestFocus() }
@@ -1043,12 +1057,24 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
                     .height(220.dp)
                     .background(MenuTokens.Card, RoundedCornerShape(16.dp)),
             ) {
-                AsyncImage(
-                    model = entry.artworkUri,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().background(MenuTokens.Card, RoundedCornerShape(16.dp)),
-                )
+                if (entry.kind == LibraryEntryKind.NATIVE_ANDROID_APP) {
+                    // An app's artwork is its launcher icon: drawn at an
+                    // icon's size on the plate, never cropped and blown up
+                    // into a blurred banner (UI pass 2026-09-24, L1).
+                    AsyncImage(
+                        model = entry.artworkUri,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.size(96.dp).align(Alignment.Center),
+                    )
+                } else {
+                    AsyncImage(
+                        model = entry.artworkUri,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().background(MenuTokens.Card, RoundedCornerShape(16.dp)),
+                    )
+                }
                 // Platform/kind label overlaid on the art, matching Daijishō's
                 // own detail-screen layout (boxart with the platform name
                 // overlaid at the bottom of the art) -- structure, not pixels.
@@ -1071,8 +1097,20 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
             Text("Played ${entry.playtimeSeconds / 60} min", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
         }
         val detailScope = rememberCoroutineScope()
-        Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            ShellChip("Launch", primary = true, modifier = Modifier.focusRequester(launchFocus), onClick = onLaunch)
+        // Scrolls rather than clipping: on a phone the chips outgrow the
+        // width, and a chip off the edge is an action nobody can reach.
+        Row(
+            modifier = Modifier.padding(top = 16.dp).horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            ShellChip(
+                "Launch",
+                primary = true,
+                modifier = Modifier
+                    .focusRequester(launchFocus)
+                    .onFocusChanged { onPrimaryFocus(if (it.isFocused) "Launch" else null) },
+                onClick = onLaunch,
+            )
             // Real ConsoleRomProvider-specific concept -- same honest
             // "not applicable" gating Library.toggleFavorite/
             // saveMetadata already use for a non-ROM entry.
@@ -1138,7 +1176,32 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
                     },
                 )
             }
-            ShellChip("Back", onClick = onClose)
+            // An app's own actions, on its own screen (UI pass 2026-09-24,
+            // L1). Android's screens do the work and Uninstall asks its own
+            // confirmation. There is no Back chip: B is on the hint row,
+            // which is also its touch route.
+            if (entry.kind == LibraryEntryKind.NATIVE_ANDROID_APP) {
+                ShellChip("App info", onClick = {
+                    runCatching {
+                        context.startActivity(
+                            android.content.Intent(
+                                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                android.net.Uri.fromParts("package", entry.id, null),
+                            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    }
+                })
+                ShellChip("Uninstall", onClick = {
+                    runCatching {
+                        context.startActivity(
+                            android.content.Intent(
+                                android.content.Intent.ACTION_DELETE,
+                                android.net.Uri.fromParts("package", entry.id, null),
+                            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    }
+                })
+            }
         }
         (scrapeStatus ?: scrapeResult)?.let {
             Text(it, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
@@ -1167,6 +1230,7 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
  */
 @Composable
 private fun ButtonHintFooter(
+    aLabel: String = "Select",
     canGoBack: Boolean,
     showInfo: Boolean,
     showSectionSwitch: Boolean = false,
@@ -1177,7 +1241,7 @@ private fun ButtonHintFooter(
     TouchHintBar(
         background = background,
         hints = buildList {
-            add(GamepadAction.A to "Select")
+            add(GamepadAction.A to aLabel)
             if (showInfo) add(GamepadAction.Y to "Info")
             if (canGoBack) add(GamepadAction.B to "Back")
             // Gamelist options (sort/scrape/import for where you are)
