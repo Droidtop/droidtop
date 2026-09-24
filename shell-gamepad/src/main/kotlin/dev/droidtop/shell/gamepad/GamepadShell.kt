@@ -64,6 +64,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import dev.droidtop.library.settings.CatalogPrefs
 import dev.droidtop.library.settings.GamingSettingsCatalog
 import dev.droidtop.library.EngineGameProvider
 import dev.droidtop.library.Library
@@ -114,7 +115,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * Full-screen, controller-first library shell — the Gaming-mode UI.
@@ -903,60 +903,32 @@ fun GamepadShell(
 }
 
 /**
- * Reads the mode-specific preferences set from :shell-default's real
- * settings screen (SettingsGamingFragment).
- * No compile-time dependency on :shell-default from here -- it and
- * :shell-gamepad are separate library modules wired together only by :app
- * -- so this reads the same shared SharedPreferences file
- * ([LAUNCHER_PREFS_FILE_NAME]) instead.
+ * The Gaming shell's reads of its own settings. [GamingSettingsCatalog]
+ * owns the keys, defaults and every write (both the in-shell settings and
+ * Standard's SettingsGamingFragment render that catalog); this only reads
+ * them, from the same file ([CatalogPrefs]).
  */
 private object GamingPrefs {
-    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
-    private const val KEY_DEFAULT_SECTION = "pref_gaming_default_section"
-    private const val KEY_SHOW_HINTS = "pref_gaming_show_hints"
-    private const val KEY_APPS_GRID_COLUMNS = "pref_gaming_apps_grid_columns"
-    private const val DEFAULT_APPS_GRID_COLUMNS = 5
-    // One shared range definition -- the settings catalog
-    // (:runtime-common) is the single owner of this setting now, so the
-    // formerly hand-synced copy of the XML seekbar's range is gone.
-    const val MIN_APPS_GRID_COLUMNS = GamingSettingsCatalog.MIN_APPS_GRID_COLUMNS
-    const val MAX_APPS_GRID_COLUMNS = GamingSettingsCatalog.MAX_APPS_GRID_COLUMNS
+    private fun prefs(context: Context) = CatalogPrefs.prefs(context)
 
-    fun defaultSection(context: Context): GamingSection {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return when (prefs.getString(KEY_DEFAULT_SECTION, "games")) {
+    fun defaultSection(context: Context): GamingSection =
+        when (prefs(context).getString(GamingSettingsCatalog.ID_DEFAULT_SECTION, "games")) {
             "apps" -> GamingSection.APPS
             else -> GamingSection.GAMES
         }
-    }
 
     fun showHints(context: Context): Boolean =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_SHOW_HINTS, true)
-
-    fun setDefaultSection(context: Context, section: GamingSection) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
-            .putString(KEY_DEFAULT_SECTION, if (section == GamingSection.APPS) "apps" else "games")
-            .apply()
-    }
-
-    fun setShowHints(context: Context, show: Boolean) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_SHOW_HINTS, show).apply()
-    }
-
-    fun setAppsGridColumns(context: Context, columns: Int) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putInt(KEY_APPS_GRID_COLUMNS, columns).apply()
-    }
+        prefs(context).getBoolean(GamingSettingsCatalog.ID_SHOW_HINTS, true)
 
     // Deliberately separate from :shell-default's own drawer grid-width
-    // override (SettingsDrawerFragment's GRID_SIZE_WIDTH_DRAWER_OVERRIDE) --
-    // that one sizes Standard's app drawer, an entirely different view with
-    // its own icon size/screen-real-estate needs. Same SharedPreferences
-    // file as every other Gaming pref here, set via SettingsGamingFragment
-    // (:shell-default) through the shared CustomSeekBarPreference widget,
-    // which self-persists as an int.
+    // override (SettingsDrawerFragment's GRID_SIZE_WIDTH_DRAWER_OVERRIDE):
+    // that one sizes Standard's app drawer, a different view with its own
+    // icon size needs.
     fun appsGridColumns(context: Context): Int =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getInt(KEY_APPS_GRID_COLUMNS, DEFAULT_APPS_GRID_COLUMNS)
+        prefs(context).getInt(
+            GamingSettingsCatalog.ID_APPS_GRID_COLUMNS,
+            GamingSettingsCatalog.DEFAULT_APPS_GRID_COLUMNS,
+        )
 }
 
 /**
