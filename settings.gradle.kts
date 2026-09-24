@@ -153,12 +153,11 @@ project(":SettingsLib-SegmentedButtonPreference").projectDir = file("shell-defau
 include(":SettingsLib-MainSwitchPreference")
 project(":SettingsLib-MainSwitchPreference").projectDir = file("shell-default/SettingsLib/MainSwitchPreference")
 
-// compatLib (+ its 7 per-Android-version variants) and androidx-lib are
-// deliberately NOT included — see shell-default/build.gradle for why
-// (quickstep/recents-animation-only code that can't compile outside a real
-// AOSP platform source tree, confirmed by a real compile attempt, and
-// unreferenced by the actual launcher code). Source is still physically
-// present under shell-default/ for reference.
+// Upstream's compatLib (+ its 7 per-Android-version variants) and
+// androidx-lib are not part of this fork: quickstep/recents-animation-only
+// code that can't compile outside a real AOSP platform source tree,
+// confirmed by a real compile attempt, and unreferenced by the launcher
+// code. They are upstream's to consult, not kept here.
 //
 // systemUIPluginCore, unlike those, genuinely IS needed — it provides the
 // base Plugin/PluginListener/ProvidesInterface classes every interface in

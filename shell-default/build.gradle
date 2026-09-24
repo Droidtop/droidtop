@@ -39,8 +39,7 @@ final String FRAMEWORK_PREBUILTS_DIR = "${projectDir}/prebuilts/libs/"
 // ------------------ Framework stub dependency pipeline ------------------
 // Per-Android-version hidden/internal API stub jars, published on Jitpack —
 // this is the actual mechanism that lets this fork call hidden framework
-// APIs without a full AOSP source tree (see compatLib's per-version
-// modules, which target these).
+// APIs without a full AOSP source tree. Only the newest is used here.
 ext.resolveJitpackStub = { String version ->
     def config = project.configurations.detachedConfiguration(
             project.dependencies.create("com.github.alesimula:android-framework-stubs:${version}")
@@ -49,18 +48,11 @@ ext.resolveJitpackStub = { String version ->
     return project.files(config.resolve())
 }
 
-def frameworkStubs10 = resolveJitpackStub('10-r1')
-def frameworkStubs11 = resolveJitpackStub('11-r1')
-def frameworkStubs12 = resolveJitpackStub('12-r1')
-def frameworkStubs13 = resolveJitpackStub('13-r1')
-def frameworkStubs14 = resolveJitpackStub('14-r1')
-def frameworkStubs15 = resolveJitpackStub('15-r1')
 def frameworkStubs16 = resolveJitpackStub('16-r2')
 
 android {
     namespace 'com.android.launcher3'
-    // Matches every sub-module this depends on (androidx-lib, compatLib*,
-    // SettingsLib-*, systemUIPluginCore, ...) — they all hardcode
+    // Matches every sub-module this depends on (SettingsLib-*, systemUIPluginCore, ...) — they all hardcode
     // compileSdk 36, so this module has to as well even though the rest
     // of droidtop's own modules (:app, :host-bridge, ...) are still on 34.
     // AGP allows a mixed compileSdk across modules in one build; it's the
@@ -175,7 +167,7 @@ ext.addFrameworkStubsInternal = { Project proj, String excludePrefix, def stubsC
 //    literally named "afterEvaluate" holding an unused closure. The
 //    framework-stub and androidx.annotation/core-ktx/coroutines injection
 //    below silently never ran for any submodule as a result — confirmed
-//    while building this fork (compatLib failed with "cannot find symbol:
+//    while building this fork (upstream's compatLib failed with "cannot find symbol:
 //    RemoteAnimationTarget" / "cannot find symbol: androidx.annotation.
 //    NonNull", both of which this injection is supposed to provide).
 //
@@ -195,7 +187,7 @@ ext.addFrameworkStubsInternal = { Project proj, String excludePrefix, def stubsC
 // into sibling projects reactively like this; each module now declares
 // its own framework-stub/androidx.annotation/core-ktx/coroutines
 // dependencies directly in its own build.gradle instead (see e.g.
-// systemUIPluginCore/build.gradle, compatLib/*/build.gradle) — more
+// systemUIPluginCore/build.gradle) — more
 // lines, but doesn't depend on cross-project evaluation order at all.
 
 dependencies {
@@ -273,7 +265,7 @@ dependencies {
 
     implementation project(':systemUIPluginCore')
 
-    // compatLib (+ its 7 per-Android-version variants) is NOT included —
+    // Upstream's compatLib (+ its 7 per-Android-version variants) is NOT included —
     // it's genuinely quickstep/recents-animation-only (unlike
     // systemUIPluginCore, which is core plugin infrastructure needed
     // regardless of quickstep — see above) and can't compile standalone
@@ -287,9 +279,8 @@ dependencies {
     // recents-animation system-signature-permission wall dropping the
     // quickstep flavor was already meant to avoid (see this file's own
     // header comment) — confirmed by a real compile attempt, not assumed.
-    // The source is still physically present in this repo (compatLib/)
-    // for reference if a privileged/system-signed build ever revisits
-    // quickstep support; it just isn't included in settings.gradle.kts.
+    // It is upstream's to consult if a privileged/system-signed build ever
+    // revisits quickstep support; this fork does not carry it.
 }
 
 // This module's own compile against Launcher.java etc. needs the same
