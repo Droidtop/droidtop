@@ -14,6 +14,9 @@ cmake_minimum_required(VERSION 3.22.1)
 #   shims/, where the arm64 job does not exist on x86_64:
 #     adrenotools (static, system Vulkan), hook_impl, main_hook, kgslshim,
 #     vortekrenderer, steambootstrap
+#   upstream projects:
+#     lsfg-vk (the fork's submodule), evshim (the fork's source against
+#     vendor/SDL2's headers), openxr_loader (vendor/OpenXR-SDK)
 project(gamenative_x86_64 C CXX)
 
 set(GAMENATIVE_CPP ${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/gamenative/app/src/main/cpp)
@@ -107,3 +110,29 @@ page_16k(vortekrenderer)
 add_executable(steambootstrap ${SHIMS}/steambootstrap.c)
 set_target_properties(steambootstrap PROPERTIES PREFIX "lib" OUTPUT_NAME "steambootstrap" SUFFIX ".so")
 page_16k(steambootstrap)
+
+# liblsfg-vk-layer: the fork's lsfg-vk-android submodule, built the way
+# its CMakeLists.txt builds it for GameNative. Upstream ships the result
+# as liblsfg-vk-layer.so (LsfgVkManager.kt's LIB_FILENAME).
+set(LSFGVK_ANDROID_WINE ON CACHE BOOL "" FORCE)
+add_subdirectory(${GAMENATIVE_CPP}/lsfg-vk-android lsfg-vk EXCLUDE_FROM_ALL)
+set_target_properties(lsfg-vk PROPERTIES OUTPUT_NAME "lsfg-vk-layer")
+page_16k(lsfg-vk)
+
+# libevshim: the fork's evshim.c includes <SDL2/SDL.h> from a third_party
+# directory the fork does not carry, and dlopens libSDL2 at run time, so
+# only the headers are needed: vendor/SDL2's, under the SDL2/ prefix.
+set(SDL2_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/sdl2-headers)
+file(MAKE_DIRECTORY ${SDL2_HEADERS})
+file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/SDL2/include ${SDL2_HEADERS}/SDL2 SYMBOLIC)
+add_library(evshim SHARED ${GAMENATIVE_CPP}/evshim/evshim.c)
+set_target_properties(evshim PROPERTIES C_STANDARD 11)
+target_include_directories(evshim PRIVATE ${SDL2_HEADERS})
+target_compile_options(evshim PRIVATE -fvisibility=hidden -O3 -Wall -Wextra)
+target_link_libraries(evshim log dl)
+page_16k(evshim)
+
+# libopenxr_loader: Khronos' loader, vendor/OpenXR-SDK at a release tag.
+set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(BUILD_API_LAYERS OFF CACHE BOOL "" FORCE)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/OpenXR-SDK openxr EXCLUDE_FROM_ALL)

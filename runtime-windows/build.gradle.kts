@@ -43,6 +43,7 @@ android {
                     "virglrenderer", "patchelf", "asurface_renderer", "ahbimage", "xconnectorpatch",
                     "winlator", "winlator_11", "extras", "vulkan_renderer",
                     "hook_impl", "main_hook", "kgslshim", "vortekrenderer", "steambootstrap",
+                    "lsfg-vk", "evshim", "openxr_loader",
                 )
                 // libc++_shared.so is in the arm64 set; the NDK's own copy
                 // for x86_64 is packaged when the STL is the shared one.

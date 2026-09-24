@@ -31,3 +31,11 @@
 [submodule "vendor/hev-socks5-tunnel"]
 	path = vendor/hev-socks5-tunnel
 	url = https://github.com/heiher/hev-socks5-tunnel.git
+[submodule "vendor/OpenXR-SDK"]
+	path = vendor/OpenXR-SDK
+	url = https://github.com/KhronosGroup/OpenXR-SDK
+	shallow = true
+[submodule "vendor/SDL2"]
+	path = vendor/SDL2
+	url = https://github.com/libsdl-org/SDL
+	shallow = true
