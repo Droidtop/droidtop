@@ -1184,8 +1184,10 @@ private fun ButtonHintFooter(
             // be tappable on its own.
             if (showSystemSwitch) add(GamepadAction.LEFT to "Previous system")
             if (showSystemSwitch) add(GamepadAction.RIGHT to "Next system")
-            // L1/R1 cycle the top-level sections from anywhere.
-            if (showSectionSwitch) add(GamepadAction.R to "Switch section")
+            // L1/R1 cycle the top-level sections from anywhere; both
+            // directions are named, each tappable on its own.
+            if (showSectionSwitch) add(GamepadAction.L to "Previous section")
+            if (showSectionSwitch) add(GamepadAction.R to "Next section")
         },
     )
 }

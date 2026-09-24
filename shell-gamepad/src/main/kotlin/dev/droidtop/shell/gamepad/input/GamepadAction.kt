@@ -195,8 +195,11 @@ object GamepadKeyMap {
         GamepadAction.DOWN -> "▼"
         GamepadAction.LEFT -> "◄"
         GamepadAction.RIGHT -> "►"
-        GamepadAction.L -> "L"
-        GamepadAction.R -> "R"
+        // The printed names: the shoulders carry "L1"/"R1" beside
+        // "L2"/"R2" on the pads droidtop targets, and a hint reading "R"
+        // next to an "R2" chip left which one was meant to the reader.
+        GamepadAction.L -> "L1"
+        GamepadAction.R -> "R1"
         GamepadAction.L2 -> "L2"
         GamepadAction.R2 -> "R2"
         GamepadAction.L3 -> "L3"
