@@ -106,7 +106,7 @@ class RoomLibraryIndexStore(
                     provider = providerKey,
                     key = segment.key,
                     root = segment.root,
-                    folderMtime = folderMtimeOf(segment.key),
+                    folderMtime = segment.folderMtime ?: folderMtimeOf(segment.key),
                     walkedAt = System.currentTimeMillis(),
                 ),
                 segment.entries.map { it.toIndexRow(providerKey, segment.key, segment.root) },
@@ -115,8 +115,8 @@ class RoomLibraryIndexStore(
         lastWritten[providerKey] = slice
     }
 
-    override suspend fun folderMtimes(providerKey: String): Map<String, Long> =
-        db.dao().partsFor(providerKey).associate { it.key to it.folderMtime }
+    override suspend fun folderMtimes(providerKey: String): Map<PartRef, Long> =
+        db.dao().partsFor(providerKey).associate { PartRef(it.key, it.root) to it.folderMtime }
 
     /**
      * Drops and rebuilds the WHOLE index from every readable record --
@@ -150,11 +150,12 @@ class RoomLibraryIndexStore(
     }
 
     /**
-     * 0 when [key] isn't itself a directory -- a console system's part
-     * is several folders, not one (docs/SPEC.md 7g,
-     * [dev.droidtop.library.consoles.ConsoleRomProvider]'s own doc
-     * comment), and the step-4 slow pass must read 0 as "unknown, walk
-     * it" rather than "unchanged since forever."
+     * 0 when [key] isn't itself a directory, which the step-4 slow pass
+     * reads as "unknown, walk it" rather than "unchanged since forever."
+     * A part that is several folders (a console system) brings its own
+     * stamp instead (see [ScanStep.Segment.folderMtime]); this covers
+     * the rest, and a rebuild from records, which has no walk to take a
+     * stamp from.
      */
     private fun folderMtimeOf(key: String): Long =
         runCatching { File(key).takeIf { it.isDirectory }?.lastModified() }.getOrNull() ?: 0L

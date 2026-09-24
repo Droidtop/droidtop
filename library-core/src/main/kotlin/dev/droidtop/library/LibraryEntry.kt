@@ -20,7 +20,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch as coroutineLaunch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -564,18 +566,19 @@ interface LibraryProvider {
 
     /**
      * The slow rebuild pass (docs/SPEC.md 7g, step 4): like
-     * [rescanProgressive], but a provider that can tell one part's own
-     * folder apart from another (see [EngineGameProvider]) skips a part
-     * whose folder's modification time still matches [knownMtimes], and
-     * pauses [pauseMs] between the parts it does not skip -- "walk only
-     * changed parts." The default, for every provider with no cheaper way
-     * to tell changed from unchanged (a part that isn't one directory,
-     * see [GameIndexEntity]'s own doc comment), is a plain
+     * [rescanProgressive], but a provider that can tell a changed part
+     * from an unchanged one skips a part whose change stamp still matches
+     * [knownMtimes] (a folder's own modification time for
+     * [EngineGameProvider], a stamp over a system's folders for
+     * [dev.droidtop.library.consoles.ConsoleRomProvider]), and pauses
+     * [pauseMs] between the parts it does not skip -- "walk only changed
+     * parts." The default, for every provider with no cheaper way to
+     * tell changed from unchanged, is a plain
      * [rescanProgressive]: always correct, never wrongly skips, so a
      * provider that does not override this just costs what a full
      * rescan already costs -- never less, never wrong.
      */
-    fun slowRebuildProgressive(knownMtimes: Map<String, Long>, pauseMs: Long): Flow<ScanStep> = rescanProgressive()
+    fun slowRebuildProgressive(knownMtimes: Map<PartRef, Long>, pauseMs: Long): Flow<ScanStep> = rescanProgressive()
 }
 
 /**
@@ -607,6 +610,43 @@ class Library(
     /** Ids whose play history or favourite changed; a publishing scan asks about them again (see LibraryFacts). */
     private val changedFactIds: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val backgroundScanJobs = mutableMapOf<Set<LibraryEntryKind>, Job>()
+
+    /**
+     * Each provider's slice as the library holds it NOW, keyed by
+     * [LibraryProvider.indexKey]: the one copy every walk merges its steps
+     * into, every publication reads, and every index save writes
+     * (docs/SPEC.md 7g, "one writer per provider").
+     *
+     * There used to be one private copy per running walk, each loaded at
+     * the walk's start and each saved whole after every step. Two walks
+     * of one provider at once (the slow pass and a rescan, which is
+     * routine) then overwrote each other: a root the user removed came
+     * back from the slow pass' stale copy, and a root the user added was
+     * deleted from the index because the slow pass' copy had never held
+     * it. Now every change to a slice happens under that provider's
+     * [sliceLocks] entry, on the current slice, so no walk can undo
+     * another's.
+     */
+    private val slices = ConcurrentHashMap<String, LibrarySlice>()
+    private val sliceLocks = ConcurrentHashMap<String, Mutex>()
+
+    /** What the play-history and favourites stores say about the ids the library has shown; one for every walk and publication. */
+    private val facts = LibraryFacts()
+
+    /**
+     * Moves on every [keepOnlyRoots]. A walk remembers the value it
+     * started under, and a step of it that belongs to a games root is
+     * dropped if the roots changed since: that walk is reading the old
+     * set, and its step would put a removed root's games back.
+     */
+    private val rootsGeneration = java.util.concurrent.atomic.AtomicInteger()
+
+    /** Ordinary walks (a first scan, a rescan) running now. The slow pass never runs beside one. */
+    private val activeWalks = MutableStateFlow(0)
+
+    /** The slow pass' round in progress, cancelled by any ordinary walk that starts. */
+    @Volatile
+    private var slowRound: Job? = null
 
     // The slow rebuild pass' own dispatcher (docs/SPEC.md 7g, step 4):
     // a dedicated, single, MIN_PRIORITY thread rather than the shared
@@ -651,6 +691,8 @@ class Library(
      */
     suspend fun rebuildIndexFromRecords(): Int {
         val rebuilt = index.rebuildFromRecords()
+        // The slices held in memory are what the index USED to say.
+        slices.clear()
         for (kinds in backgroundScanStates.keys.toList()) {
             scanInBackground(kinds, rescan = false, restart = true)
         }
@@ -756,45 +798,142 @@ class Library(
      * Starts the slow rebuild pass' recurring loop, once per process
      * (docs/SPEC.md 7g, step 4: "kept honest ... over time," not a
      * one-shot): a short delay after the FIRST ordinary scan starts, then
-     * again every [SLOW_REBUILD_INTERVAL_MS] for as long as the process
+     * a round every [SLOW_REBUILD_INTERVAL_MS] for as long as the process
      * lives, so a games root someone edits while droidtop keeps running
      * (adds a game, deletes one) is picked up without the user ever
-     * pressing "Rescan library." Covers every [LibraryEntryKind], not
-     * just whichever kinds the FIRST [scanInBackground] call happened to
-     * ask about -- see that call site's own doc comment for the real
-     * race this avoids.
+     * pressing "Rescan library." Covers every provider, not just whichever
+     * kinds the FIRST [scanInBackground] call happened to ask about -- see
+     * that call site's own doc comment for the real race this avoids.
      *
-     * Every indexed provider is re-walked each round, but
-     * [LibraryProvider.slowRebuildProgressive]'s own mtime check (fed
-     * from [LibraryIndexStore.folderMtimes]) is what makes a round cheap
-     * in the common case: a part whose folder has not changed is not
-     * re-detected at all, only the parts that changed since the index
-     * last saw them are. Publishes into the SAME [backgroundScanState] a
-     * normal scan of [kinds] would -- the slow pass keeps the index
-     * honest, it does not add a second, separate view of it.
+     * A round never runs beside an ordinary walk: it waits for every
+     * walk in flight to finish, and a walk that starts during a round
+     * cancels the round. On a first start, with no index yet, that walk
+     * reads the whole library, and a round beside it used to read the
+     * whole library a second time while the person was first looking at
+     * it. See [runSlowRound] for what one round does.
      */
     private fun startSlowRebuildOnce() {
         if (!slowRebuildStarted.compareAndSet(false, true)) return
-        // The whole library, not whichever kinds happened to trigger
-        // this call -- see the doc comment above and [scanInBackground]'s
-        // own call site for why.
-        val key = LibraryEntryKind.entries.toSet()
         scanScope.coroutineLaunch {
             delay(SLOW_REBUILD_START_DELAY_MS)
             while (true) {
-                try {
-                    libraryProgressive(key, rescan = false, slow = true).collect { entries ->
-                        backgroundScanStates.getOrPut(key) { MutableStateFlow(null) }.value = entries
+                activeWalks.first { it == 0 }
+                val round = scanScope.coroutineLaunch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
+                    try {
+                        runSlowRound()
+                    } catch (t: kotlinx.coroutines.CancellationException) {
+                        throw t
+                    } catch (t: Throwable) {
+                        Log.e("droidtop.Library", "Slow rebuild pass failed", t)
                     }
-                } catch (t: kotlinx.coroutines.CancellationException) {
-                    throw t
-                } catch (t: Throwable) {
-                    Log.e("droidtop.Library", "Slow rebuild pass failed", t)
                 }
+                slowRound = round
+                // A walk that started between the wait and here found no
+                // round to cancel; this round then yields to it instead.
+                if (activeWalks.value == 0) round.start() else round.cancel()
+                round.join()
                 delay(SLOW_REBUILD_INTERVAL_MS)
             }
         }
     }
+
+    /**
+     * One slow round: every provider the index already holds a slice for
+     * is asked, through [LibraryProvider.slowRebuildProgressive], for the
+     * parts whose change stamp moved since the index took it (fed from
+     * [LibraryIndexStore.folderMtimes]). A round over an unchanged library
+     * is a handful of folder `stat`s, not a walk.
+     *
+     * Not a provider with no slice (the ordinary walk is what reads a
+     * provider the first time), and not one outside the index, whose
+     * every ordinary scan already walks it (the app list).
+     *
+     * What a round finds reaches the shell through [republish], into
+     * every list on screen that shows the provider's kinds -- it keeps
+     * the lists honest, it does not add a second, separate view of them.
+     * It runs on [slowDispatcher], one provider at a time.
+     */
+    private suspend fun runSlowRound() = withContext(slowDispatcher) {
+        val generation = rootsGeneration.get()
+        var changed = false
+        var lastRepublishedAt = 0L
+        for (provider in providers.filter { it.indexed }) {
+            if (sliceOf(provider) == null) continue
+            try {
+                provider.slowRebuildProgressive(index.folderMtimes(provider.indexKey), SLOW_REBUILD_PAUSE_MS)
+                    .collect { step ->
+                        if (!applyStep(provider, step, generation)) return@collect
+                        changed = true
+                        if (step is ScanStep.Segment) facts.learn(step.entries)
+                        val now = System.nanoTime() / 1_000_000
+                        if (now - lastRepublishedAt >= PUBLISH_INTERVAL_MS) {
+                            republish()
+                            lastRepublishedAt = now
+                        }
+                    }
+            } catch (t: kotlinx.coroutines.CancellationException) {
+                throw t
+            } catch (t: Throwable) {
+                Log.e("droidtop.Library", "Slow rebuild of ${provider::class.simpleName} failed", t)
+            }
+        }
+        if (changed) republish()
+    }
+
+    /**
+     * Every list the shell observes, rebuilt from the current slices. The
+     * ordinary walks publish their own lists as they go; this is for a
+     * change nothing else is publishing (the slow pass). A list nothing
+     * has asked for yet is left for its own first scan.
+     */
+    private suspend fun republish() {
+        facts.relearn(changedFactIds)
+        for ((kinds, state) in backgroundScanStates) {
+            if (state.value == null) continue
+            state.value = facts.apply(entriesOf(providers.filter { provider -> provider.kinds.any { it in kinds } }))
+        }
+    }
+
+    private fun entriesOf(matching: List<LibraryProvider>): List<LibraryEntry> =
+        matching.flatMap { slices[it.indexKey]?.entries().orEmpty() }
+
+    private fun lockOf(provider: LibraryProvider): Mutex = sliceLocks.getOrPut(provider.indexKey) { Mutex() }
+
+    /** The current slice, read from the index the first time; call with [lockOf] held. */
+    private suspend fun currentSlice(provider: LibraryProvider): LibrarySlice? =
+        slices[provider.indexKey] ?: if (provider.indexed) {
+            index.load(provider.indexKey)?.also { slices[provider.indexKey] = it }
+        } else {
+            null
+        }
+
+    /** [provider]'s current slice, or null when the index has none for it yet. */
+    private suspend fun sliceOf(provider: LibraryProvider): LibrarySlice? =
+        lockOf(provider).withLock { currentSlice(provider) }
+
+    /**
+     * Merges one finished [step] into [provider]'s current slice and
+     * writes it, under the provider's lock. Returns whether the slice
+     * changed.
+     *
+     * Not cancellable once it has the lock: a write that has started
+     * finishes, so the slice in memory and the index on disk never
+     * disagree about a step. A step of a walk that started before the
+     * roots last changed is dropped when it belongs to a games root
+     * ([rootsGeneration]).
+     */
+    private suspend fun applyStep(provider: LibraryProvider, step: ScanStep, walkGeneration: Int): Boolean =
+        withContext(kotlinx.coroutines.NonCancellable) {
+            lockOf(provider).withLock {
+                if (step.root != null && walkGeneration != rootsGeneration.get()) return@withLock false
+                val current = currentSlice(provider) ?: LibrarySlice()
+                val next = current.merge(step)
+                if (next == current) return@withLock false
+                if (provider.indexed) index.save(provider.indexKey, next)
+                slices[provider.indexKey] = next
+                true
+            }
+        }
 
     /**
      * Real, streaming counterpart to [scanKinds] -- emits a growing
@@ -848,34 +987,25 @@ class Library(
     private fun libraryProgressive(
         kinds: Set<LibraryEntryKind>,
         rescan: Boolean,
-        // The slow rebuild pass (docs/SPEC.md 7g, step 4): re-walks every
-        // indexed provider even though it already has a slice (an
-        // ordinary scan never does -- see the indexedSlot check below),
-        // but through slowRebuildProgressive rather than scanProgressive,
-        // so a provider that supports it skips its own unchanged parts.
-        slow: Boolean = false,
     ): Flow<List<LibraryEntry>> = channelFlow {
+        val walkGeneration = rootsGeneration.get()
         val matchingProviders = providers.filter { provider -> provider.kinds.any { it in kinds } }
-        val slices = MutableList(matchingProviders.size) { LibrarySlice() }
         val indexedSlot = BooleanArray(matchingProviders.size)
         matchingProviders.forEachIndexed { i, provider ->
             if (!provider.indexed) return@forEachIndexed
-            val known = index.load(provider.indexKey) ?: return@forEachIndexed
-            slices[i] = known
+            val known = sliceOf(provider) ?: return@forEachIndexed
             indexedSlot[i] = true
             ScanLog.write(
                 "index: ${provider.indexKey} ${known.entries().size} entries in ${known.segments.size} parts" +
                     if (rescan) ", walking again" else "",
             )
         }
-        val lock = Any()
-        fun published(): List<LibraryEntry> = synchronized(lock) { slices.flatMap { it.entries() } }
+        fun published(): List<LibraryEntry> = entriesOf(matchingProviders)
         // Play history and favourites are asked about ONCE for what the
         // index holds, and after that only for the ids a finished part
         // brings. Every finished part used to ask about every id in the
         // library again: a walk of F folders over N games made F queries of
         // N ids each (docs/SPEC.md 7g, "what was wrong underneath").
-        val facts = LibraryFacts()
         facts.learn(published())
         // A walk finishes parts far faster than a person reads a list, and
         // every publication is the whole list for the shell to diff and
@@ -899,54 +1029,57 @@ class Library(
             }
         }
         if (indexedSlot.any { it }) publish(force = true)
-        coroutineScope {
-            matchingProviders.forEachIndexed { slot, provider ->
-                if (indexedSlot[slot] && !rescan && !slow) return@forEachIndexed
-                coroutineLaunch {
-                    // No whole-provider timeout, deliberately. There was
-                    // one (60 s), and the rig showed exactly what it cost
-                    // (build 523): one slow subtree under a games root ran
-                    // past it and every game the provider had already
-                    // found was discarded. A budget belongs to the unit of
-                    // work it can bound, which is one folder, not one
-                    // provider: see ScanBudget. A provider that never
-                    // returns costs the parts it never reached and
-                    // nothing else.
-                    try {
-                        val stream = when {
-                            rescan -> provider.rescanProgressive()
-                            slow -> provider.slowRebuildProgressive(
-                                this@Library.index.folderMtimes(provider.indexKey),
-                                SLOW_REBUILD_PAUSE_MS,
-                            )
-                            else -> provider.scanProgressive()
-                        }
-                        stream.collect { step ->
-                            val merged = synchronized(lock) {
-                                val next = slices[slot].merge(step)
-                                slices[slot] = next
-                                next
+        val walking = matchingProviders.filterIndexed { slot, _ -> rescan || !indexedSlot[slot] }
+        if (walking.isNotEmpty()) {
+            activeWalks.update { it + 1 }
+            slowRound?.cancel()
+        }
+        try {
+            coroutineScope {
+                walking.forEach { provider ->
+                    coroutineLaunch {
+                        // A provider outside the index starts from nothing
+                        // each walk, as it always did: its walk is the
+                        // whole answer, and an app that was uninstalled is
+                        // gone, not missing.
+                        if (!provider.indexed) lockOf(provider).withLock { slices[provider.indexKey] = LibrarySlice() }
+                        // No whole-provider timeout, deliberately. There was
+                        // one (60 s), and the rig showed exactly what it cost
+                        // (build 523): one slow subtree under a games root ran
+                        // past it and every game the provider had already
+                        // found was discarded. A budget belongs to the unit of
+                        // work it can bound, which is one folder, not one
+                        // provider: see ScanBudget. A provider that never
+                        // returns costs the parts it never reached and
+                        // nothing else.
+                        try {
+                            val stream = if (rescan) provider.rescanProgressive() else provider.scanProgressive()
+                            stream.collect { step ->
+                                applyStep(provider, step, walkGeneration)
+                                if (step is ScanStep.Segment) facts.learn(step.entries)
+                                publish(force = false)
                             }
-                            if (provider.indexed) this@Library.index.save(provider.indexKey, merged)
-                            if (step is ScanStep.Segment) facts.learn(step.entries)
-                            publish(force = false)
+                        } catch (t: kotlinx.coroutines.CancellationException) {
+                            throw t
+                        } catch (t: Throwable) {
+                            Log.e("droidtop.Library", "Provider ${provider::class.simpleName} failed to scan", t)
                         }
-                    } catch (t: kotlinx.coroutines.CancellationException) {
-                        throw t
-                    } catch (t: Throwable) {
-                        Log.e("droidtop.Library", "Provider ${provider::class.simpleName} failed to scan", t)
                     }
                 }
             }
+        } finally {
+            if (walking.isNotEmpty()) activeWalks.update { it - 1 }
         }
         publish(force = true)
-    }.flowOn(if (slow) slowDispatcher else Dispatchers.IO)
+    }.flowOn(Dispatchers.IO)
 
     /**
-     * What the play-history and favourites stores say about the ids seen so
-     * far in one progressive scan, so that publishing the library again is
-     * a pass over a list in memory and not two database queries over every
-     * id it holds.
+     * What the play-history and favourites stores say about the ids the
+     * library has seen, so that publishing the library again is a pass
+     * over a list in memory and not two database queries over every id it
+     * holds. One for the whole library: [changedFactIds] is consumed by
+     * whichever publication asks first, so a copy per walk would leave
+     * every other copy with the old answer.
      */
     private inner class LibraryFacts {
         private val history = java.util.concurrent.ConcurrentHashMap<String, PlayHistoryRecord>()
@@ -996,14 +1129,24 @@ class Library(
      * never touched by it.
      */
     suspend fun keepOnlyRoots(rootPaths: Set<String>) = withContext(Dispatchers.IO) {
+        // Every walk already running is reading the old roots: from here
+        // on its steps under a games root are dropped (see applyStep), and
+        // the caller starts the walk of the new set.
+        rootsGeneration.incrementAndGet()
+        slowRound?.cancel()
         val dropped = mutableSetOf<String>()
         for (provider in providers.filter { it.indexed }) {
-            val slice = index.load(provider.indexKey) ?: continue
-            val kept = slice.keepOnlyRoots(rootPaths)
-            if (kept == slice) continue
-            dropped += slice.entries().map { it.id } - kept.entries().map { it.id }.toSet()
-            index.save(provider.indexKey, kept)
-            ScanLog.write("index: ${provider.indexKey} dropped the parts of roots that are no longer configured")
+            withContext(kotlinx.coroutines.NonCancellable) {
+                lockOf(provider).withLock {
+                    val slice = currentSlice(provider) ?: return@withLock
+                    val kept = slice.keepOnlyRoots(rootPaths)
+                    if (kept == slice) return@withLock
+                    dropped += slice.entries().map { it.id } - kept.entries().map { it.id }.toSet()
+                    index.save(provider.indexKey, kept)
+                    slices[provider.indexKey] = kept
+                    ScanLog.write("index: ${provider.indexKey} dropped the parts of roots that are no longer configured")
+                }
+            }
         }
         if (dropped.isNotEmpty()) {
             backgroundScanStates.values.forEach { state ->
@@ -1035,9 +1178,15 @@ class Library(
         changedFactIds += listOf(missing.id, replacement.id)
         providers.filterIsInstance<EntryFactsOwner>().forEach { it.moveEntryFacts(missing.id, replacement.id) }
         for (provider in providers.filter { it.indexed }) {
-            val slice = index.load(provider.indexKey) ?: continue
-            val without = slice.without(missing.id)
-            if (without != slice) index.save(provider.indexKey, without)
+            withContext(kotlinx.coroutines.NonCancellable) {
+                lockOf(provider).withLock {
+                    val slice = currentSlice(provider) ?: return@withLock
+                    val without = slice.without(missing.id)
+                    if (without == slice) return@withLock
+                    index.save(provider.indexKey, without)
+                    slices[provider.indexKey] = without
+                }
+            }
         }
         backgroundScanStates.values.forEach { state ->
             val current = state.value ?: return@forEach

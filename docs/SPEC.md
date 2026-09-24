@@ -4356,6 +4356,18 @@ not only in a commit message.**
   already hands it) and diffs it against what it last wrote, so only the
   segments that actually changed become a `replacePart` transaction --
   "updates are the size of the change" without a second public API.
+- One writer per provider (2026-09-24). `Library` holds ONE current slice
+  per provider in memory, loaded from the index the first time anything
+  asks, and every walk merges its steps into that slice under the
+  provider's own lock before saving it; publications read it. Each walk
+  used to keep a private copy loaded at its own start and save it whole
+  after every step, so two walks of one provider at once (the slow pass
+  and a rescan) overwrote each other: a removed root's games came back
+  from the older copy, and a newly added root's records and rows were
+  deleted because the older copy had never held them. Removing a root
+  also moves a generation counter; a step from a walk that started
+  before it, under a games root, is dropped, because that walk is
+  reading the old root set.
 - "Lists never read the record" means the *published* list never does:
   `RoomLibraryIndexStore.load()` hydrates each row's full `LibraryEntry`
   from its record ONCE, when a part is loaded or replaced, and caches the
@@ -4372,33 +4384,47 @@ not only in a commit message.**
   keep the existing `Flow<List<LibraryEntry>>` API so shell consumers
   need minimal edits. A changed-ids stream for the shell itself is not
   built.
-- `parts.folderMtime` is 0 for any part whose key is not itself a
-  directory (a console system's part is several folders, not one --
-  see `ConsoleRomProvider`'s own doc comment). Step 4's slow pass must
-  read 0 as "unknown, walk it," never "unchanged since forever."
+- `parts.folderMtime` is the part's change stamp. For a part that is one
+  folder the index reads that folder's own modification time; a part
+  that is several folders stamps itself (`ScanStep.Segment.folderMtime`,
+  see the slow pass below). 0 is "unknown", which step 4's slow pass
+  reads as "walk it," never "unchanged since forever."
 - Removing a root (`Library.keepOnlyRoots`) is the one case where a
   segment disappears from a slice entirely rather than being replaced;
   `RoomLibraryIndexStore.save` detects a previously-known segment that
   is no longer present and deletes both its index rows and its
   records there, matching "removing a root still drops its rows and
   records; nothing else deletes a record."
-- Step 4's slow pass is real per-folder skipping for
-  `EngineGameProvider` (each part genuinely is one folder, so its own
-  modification time is meaningful) and a plain full re-walk for
-  `ConsoleRomProvider`, which does not override `slowRebuildProgressive`:
-  its parts are several folders each, its own `folderMtime` is
-  therefore always 0 ("unknown"), and the interface's own default
-  reads that as "walk it," the same safe default every other
-  non-folder-shaped provider gets. `ConsoleRomProvider` already has
-  its own separate, permanent "already scanned" cache
-  (`RomDatabase`'s `scan_metadata`), which the pass's `rescanProgressive()`
-  fallback deliberately bypasses -- correct (never stale), not free.
+- Step 4's slow pass skips unchanged parts in both folder-walking
+  providers. `EngineGameProvider`'s parts are one folder each, so a
+  part's own modification time is its stamp. `ConsoleRomProvider`'s part
+  is a system under a root, several folders, and it stamps itself: one
+  number over the modification times of the system's folders and of
+  every folder its known ROMs sit in (a system may be sorted into
+  subfolders). A ROM added, removed or renamed in any of those folders,
+  or a subfolder added to one, moves the stamp; a ROM dropped into a
+  subfolder that held none before does not, and "Rescan library" is the
+  answer there. A folder that changed while it was being walked stamps
+  the part "unknown", so it is walked again next round. The stamps are
+  keyed by part AND root (`PartRef`), because a system id names a part
+  under every root that holds that system. This replaced a full re-walk
+  of every system folder every round (headers re-read, media re-resolved)
+  for a library that had not changed.
 - The slow pass is a recurring loop, not a one-shot: it starts once,
   5 seconds after the first ordinary scan a shell asks for, and then
   repeats every 30 minutes for the life of the process (`Library`'s
   `SLOW_REBUILD_START_DELAY_MS`/`SLOW_REBUILD_INTERVAL_MS`), because
   "kept honest ... over time" describes an ongoing process, not a
-  single pass after start. It runs on its own dedicated,
+  single pass after start. A round never runs beside an ordinary walk:
+  it waits until none is running, and a walk that starts cancels the
+  round in progress (on a first start the ordinary walk IS the whole
+  library, and the round used to read it all a second time beside it).
+  A round covers only providers the index already holds a slice for;
+  the app list, outside the index, is walked by every ordinary scan
+  anyway. What a round changes is published into every list the shell
+  observes whose kinds the provider covers; it used to go to an
+  all-kinds list nothing observed, so its findings showed only after a
+  restart. It runs on its own dedicated,
   `Thread.MIN_PRIORITY` single-thread dispatcher (`Library.slowDispatcher`)
   rather than the shared `Dispatchers.IO` pool every ordinary scan
   uses, so "low thread priority" is a property of the thread the walk
@@ -4461,6 +4487,14 @@ one call site that has drawn nothing yet (the first frame after start)
 still parses in place, once, because the alternative is drawing the
 unthemed fallback and swapping the theme in, a visible flash at every
 start.
+
+**The slow pass reads only what changed, one writer at a time.** Its
+round was a full rescan of every console system every 30 minutes and 5 s
+after every start, beside the first walk, into a list nothing observed,
+racing a rescan's writes. What replaced that (a change stamp per console
+system, one current slice per provider, rounds that yield to ordinary
+walks and publish into the observed lists) is recorded with the rest of
+step 4's decisions in "One file per game is the truth" above.
 
 ### The scan's unit of work is a folder (directed by the rig, 2026-09-11)
 

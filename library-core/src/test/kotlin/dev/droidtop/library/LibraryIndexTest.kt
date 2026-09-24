@@ -1,5 +1,7 @@
 package dev.droidtop.library
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -238,6 +240,70 @@ class LibraryIndexTest {
     }
 
     @Test
+    fun `a walk that started before a root was removed cannot put the root back`() = runBlocking {
+        val started = CompletableDeferred<Unit>()
+        val gate = CompletableDeferred<Unit>()
+        val provider = object : LibraryProvider {
+            override val kinds = setOf(LibraryEntryKind.RENPY)
+            override suspend fun scan(): List<LibraryEntry> = emptyList()
+            override suspend fun launch(entry: LibraryEntry) {}
+            override fun scanProgressive(): Flow<ScanStep> = flow {
+                started.complete(Unit)
+                gate.await()
+                emit(ScanStep.Segment(adult, root, listOf(game("$adult/Here"))))
+                emit(ScanStep.RootDone(root, listOf(adult)))
+            }
+        }
+        val store = FakeIndexStore(
+            mapOf(provider.indexKey to sliceOf(ScanStep.Segment(adult, root, listOf(game("$adult/Old"))))),
+        )
+        val library = Library(listOf(provider), index = store)
+
+        val walk = async { library.rescanKindsProgressive(provider.kinds).toList() }
+        started.await()
+        library.keepOnlyRoots(emptySet())
+        gate.complete(Unit)
+        walk.await()
+
+        assertEquals(emptyList<LibraryEntry>(), store.slices[provider.indexKey]?.entries().orEmpty())
+    }
+
+    @Test
+    fun `two walks of one provider merge into one slice instead of overwriting each other`() = runBlocking {
+        val first = game("$adult/First")
+        val second = game("$steam/Second")
+        val gate = CompletableDeferred<Unit>()
+        val started = CompletableDeferred<Unit>()
+        var walk = 0
+        val provider = object : LibraryProvider {
+            override val kinds = setOf(LibraryEntryKind.RENPY)
+            override suspend fun scan(): List<LibraryEntry> = emptyList()
+            override suspend fun launch(entry: LibraryEntry) {}
+            override fun scanProgressive(): Flow<ScanStep> = flow {
+                if (++walk == 1) {
+                    // The slow one: holds its step until the other walk
+                    // has saved a folder of its own.
+                    started.complete(Unit)
+                    gate.await()
+                    emit(ScanStep.Segment(adult, root, listOf(first)))
+                } else {
+                    emit(ScanStep.Segment(steam, root, listOf(second)))
+                }
+            }
+        }
+        val store = FakeIndexStore(mapOf(provider.indexKey to LibrarySlice()))
+        val library = Library(listOf(provider), index = store)
+
+        val slow = async { library.rescanKindsProgressive(provider.kinds).toList() }
+        started.await()
+        library.rescanKindsProgressive(provider.kinds).toList()
+        gate.complete(Unit)
+        slow.await()
+
+        assertEquals(setOf(first.id, second.id), store.slices[provider.indexKey]?.entries().orEmpty().map { it.id }.toSet())
+    }
+
+    @Test
     fun `a provider that does not override slowRebuildProgressive behaves like rescanProgressive`() = runBlocking {
         val provider = FolderProvider(LibraryEntryKind.RENPY, root, listOf(adult to listOf(found)))
         val rescanSteps = provider.rescanProgressive().toList()
@@ -248,7 +314,7 @@ class LibraryIndexTest {
     @Test
     fun `a store that does not track folder mtimes reports none`() = runBlocking {
         val store = FakeIndexStore()
-        assertEquals(emptyMap<String, Long>(), store.folderMtimes("anything"))
+        assertEquals(emptyMap<PartRef, Long>(), store.folderMtimes("anything"))
     }
 
     @Test
