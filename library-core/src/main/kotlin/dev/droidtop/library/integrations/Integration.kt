@@ -10,10 +10,9 @@ import org.json.JSONObject
  * call and what to hand it, with no new code running.
  *
  * This is the **JSON** half of the two integration types. The PLUGIN half
- * (an APK or Python module, for things a bare Intent call genuinely
- * cannot express) is deliberately not built here -- nothing in the first
- * real use case needs it, and a sandbox/trust model for running foreign
- * code is a much larger design than a declarative Intent description.
+ * (for a result droidtop needs back, which a one-way Intent cannot give)
+ * is an enginehost subplugin reached through enginehost's own surface
+ * (SPEC §12a), not code in this package.
  *
  * The template is an `am start`-style argument string, exactly the format
  * `players-database.json` already uses for emulators, and it is parsed by
@@ -118,7 +117,11 @@ object IntegrationPlaceholders {
     /** Absolute path of the folder droidtop scans for that system's games. */
     const val SYSTEM_FOLDER = "{system.folder}"
 
-    /** A user-supplied search string, when the surface collected one. */
+    /**
+     * A search string the person typed. An acquire_content integration
+     * whose template uses it is offered as a text field rather than a
+     * button, so it never runs without one.
+     */
     const val QUERY = "{query}"
 
     /**
