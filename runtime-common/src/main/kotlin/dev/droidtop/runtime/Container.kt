@@ -124,6 +124,23 @@ interface ContainerRuntime {
     suspend fun exec(container: Container, command: List<String>, env: Map<String, String> = emptyMap()): ContainerExecResult
 
     /**
+     * Why this backend cannot share a device node (a USB serial adapter, a
+     * scanner) with a container, in words for the container manager's
+     * Devices row; null when it can (docs/SPEC.md 4b).
+     */
+    val deviceSharingUnavailableReason: String?
+
+    /** The host device nodes bound into [container], by path (`/dev/bus/usb/001/004`). */
+    suspend fun sharedDevices(container: Container): List<String>
+
+    /**
+     * Records the device nodes bound into [container], each at the same
+     * path inside it; they are bound from its next start. Only called
+     * when [deviceSharingUnavailableReason] is null.
+     */
+    suspend fun setSharedDevices(container: Container, devicePaths: List<String>)
+
+    /**
      * Host-visible filesystem path to the primary container's Wayland
      * socket — what `:host-bridge`'s `HostBridge.connect()` needs. Only
      * meaningful after `createPrimary()`/`start()` on the PRIMARY
