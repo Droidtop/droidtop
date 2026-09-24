@@ -106,7 +106,7 @@ class ScrapeReportingTest {
     }
 
     @Test
-    fun `a refusal with no body still tells the reader where to look`() {
+    fun `a refusal with no body says the server gave no reason`() {
         val summary = formatScrapeSummary(
             systemName = "PSP",
             targeted = 3,
@@ -120,7 +120,7 @@ class ScrapeReportingTest {
             lastRefusal = ScrapeLookup.Refused("ScreenScraper", 403, null),
         )
         assertTrue(summary, summary.contains("HTTP 403"))
-        assertTrue(summary, summary.contains("droidtop.Scraper"))
+        assertTrue(summary, summary.contains("the server gave no reason"))
     }
 
     // ---- the reason the server gave -------------------------------------
