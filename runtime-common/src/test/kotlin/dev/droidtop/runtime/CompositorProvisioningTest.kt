@@ -61,4 +61,27 @@ class CompositorProvisioningTest {
             assertTrue("$os/$de must install ${ContainerTerminal.PACKAGE}", words.contains(ContainerTerminal.PACKAGE))
         }
     }
+
+    @Test
+    fun `printing adds CUPS, points it at the shared socket, and starts it`() {
+        val off = CompositorProvisioning.plan("debian", "sway")!!
+        val on = CompositorProvisioning.plan("debian", "sway", printing = true)!!
+        assertTrue(on.installCommand.startsWith(off.installCommand))
+        assertTrue(on.installCommand.contains("apt-get install -y --no-install-recommends cups"))
+        assertTrue(on.installCommand.contains("Listen ${ContainerLayout.SOCKET_DIR}/${ContainerLayout.CUPS_SOCKET}"))
+        assertEquals(listOf("cupsd"), on.daemons)
+        assertTrue(off.daemons.isEmpty())
+        // A different plan, so a container provisioned without it re-runs.
+        assertFalse(ContainerLayout.planId(on) == ContainerLayout.planId(off))
+        assertTrue(CompositorProvisioning.plan("alpine", "labwc", printing = true)!!.installCommand.contains("apk add --no-cache cups"))
+    }
+
+    @Test
+    fun `the boot script starts each daemon before the compositor`() {
+        val script = ContainerLayout.primaryInitScript(CompositorProvisioning.plan("alpine", "sway", printing = true)!!)
+        val cupsd = script.indexOf("cupsd || echo")
+        assertTrue(cupsd >= 0)
+        assertTrue(cupsd < script.indexOf("exec sway"))
+        assertEquals("exec sway", script.trimEnd().lines().last())
+    }
 }
