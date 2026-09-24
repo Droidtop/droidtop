@@ -30,7 +30,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,12 +42,12 @@ import dev.droidtop.input.DesktopInputRouter
 import dev.droidtop.input.InputSeats
 import dev.droidtop.input.PointerTransform
 import dev.droidtop.library.Library
-import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.LaunchResult
+import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.runtime.ContainerApp
 import dev.droidtop.runtime.DisplayOutput
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -97,6 +96,8 @@ fun DesktopShell(
     onLaunchLinuxApp: ((ContainerApp) -> Unit)? = null,
     launchFailure: String? = null,
     onDismissLaunchFailure: () -> Unit = {},
+    /** A Start-menu launch that was refused: shown in the same banner as [launchFailure]. */
+    onLaunchFailure: (String) -> Unit = {},
 ) {
     var startMenuOpen by remember { mutableStateOf(false) }
 
@@ -121,6 +122,7 @@ fun DesktopShell(
                 library = library,
                 loadLinuxApps = loadLinuxApps,
                 onLaunchLinuxApp = onLaunchLinuxApp,
+                onLaunchFailure = onLaunchFailure,
                 onDismiss = { startMenuOpen = false },
             )
         }
@@ -495,17 +497,20 @@ private fun BoxScope.StartMenu(
     library: Library,
     loadLinuxApps: (suspend () -> List<ContainerApp>)?,
     onLaunchLinuxApp: ((ContainerApp) -> Unit)?,
+    onLaunchFailure: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
-    var entries by remember { mutableStateOf<List<LibraryEntry>?>(null) }
+    // The library as its index holds it (docs/SPEC.md 7g): shown at once
+    // from the saved index, walking only what the index does not cover
+    // (the app list), in the library's own scope rather than this menu's.
+    val entries by library.backgroundScanState(START_MENU_KINDS).collectAsState()
     var linuxApps by remember { mutableStateOf<List<ContainerApp>>(emptyList()) }
     var linuxAppsError by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
     val taskbarAtTop = DesktopPrefs.taskbarAtTop(context)
 
     LaunchedEffect(library) {
-        entries = library.scanAll()
+        library.scanInBackground(START_MENU_KINDS)
     }
     // Read again every time the menu opens: what is installed in the
     // container changes whenever the user installs something in it.
@@ -579,7 +584,11 @@ private fun BoxScope.StartMenu(
                             .fillMaxWidth()
                             .padding(vertical = 4.dp, horizontal = 8.dp)
                             .clickable {
-                                scope.launch { library.launch(entry) }
+                                // In the library's scope: closing the menu,
+                                // which this same tap does, must not cancel it.
+                                library.launchInBackground(entry.id) { result ->
+                                    if (result is LaunchResult.Refused) onLaunchFailure(result.reason)
+                                }
                                 onDismiss()
                             },
                     )
@@ -588,6 +597,9 @@ private fun BoxScope.StartMenu(
         }
     }
 }
+
+/** Everything the library holds: the Start menu is the Desktop's one list of it. */
+private val START_MENU_KINDS: Set<LibraryEntryKind> = LibraryEntryKind.entries.toSet()
 
 @Composable
 private fun StartMenuHeader(title: String) {

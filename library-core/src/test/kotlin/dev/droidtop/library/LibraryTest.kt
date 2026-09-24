@@ -196,6 +196,117 @@ class LibraryTest {
         assertFalse(library.replaceMissing(replacement, missing.copy(missing = false)))
         assertTrue(provider.moved.isEmpty())
     }
+
+    private val renpyGame = LibraryEntry(id = "/games/renpy/Known", title = "Known", kind = LibraryEntryKind.RENPY)
+
+    @Test
+    fun `a launch by id reads the game's record and walks nothing`() = runBlocking {
+        val provider = KeyedProvider("engine", LibraryEntryKind.RENPY, listOf(renpyGame))
+        val records = FakeRecordStore(GameRecord(entry = renpyGame, provider = "engine"))
+        val library = Library(listOf(provider), records = records)
+
+        assertEquals(LaunchResult.Launched, library.launch(renpyGame.id))
+
+        assertEquals(listOf(renpyGame), provider.launched)
+        assertEquals(0, provider.scans)
+    }
+
+    @Test
+    fun `a launch by id with no record finds the game in the index and walks nothing`() = runBlocking {
+        val provider = KeyedProvider("engine", LibraryEntryKind.RENPY, listOf(renpyGame))
+        val index = FakeFoldIndexStore(
+            mutableMapOf("engine" to LibrarySlice(listOf(ScanStep.Segment(ScanStep.WHOLE, entries = listOf(renpyGame))))),
+        )
+        val library = Library(listOf(provider), index = index)
+
+        assertEquals(LaunchResult.Launched, library.launch(renpyGame.id))
+
+        assertEquals(listOf(renpyGame), provider.launched)
+        assertEquals(0, provider.scans)
+    }
+
+    @Test
+    fun `a launch by id the index cannot answer walks only the providers that could hold it`() = runBlocking {
+        // The engine provider's slice is known and does not list the app;
+        // the app list is outside the index, so only it is walked.
+        val engine = KeyedProvider("engine", LibraryEntryKind.RENPY, listOf(renpyGame))
+        val apps = KeyedProvider("apps", LibraryEntryKind.NATIVE_ANDROID_APP, listOf(nativeEntry), indexed = false)
+        val index = FakeFoldIndexStore(
+            mutableMapOf("engine" to LibrarySlice(listOf(ScanStep.Segment(ScanStep.WHOLE, entries = listOf(renpyGame))))),
+        )
+        val library = Library(listOf(engine, apps), index = index)
+
+        assertEquals(LaunchResult.Launched, library.launch(nativeEntry.id))
+
+        assertEquals(listOf(nativeEntry), apps.launched)
+        assertEquals(1, apps.scans)
+        assertEquals(0, engine.scans)
+    }
+
+    @Test
+    fun `a launch by id refuses a game marked missing`() = runBlocking {
+        val provider = KeyedProvider("engine", LibraryEntryKind.RENPY, listOf(renpyGame))
+        val records = FakeRecordStore(GameRecord(entry = renpyGame.copy(missing = true), provider = "engine"))
+        val playHistory = FakePlayHistoryStore()
+        val library = Library(listOf(provider), playHistory, records = records)
+
+        val result = library.launch(renpyGame.id)
+
+        assertTrue(result is LaunchResult.Refused)
+        assertTrue((result as LaunchResult.Refused).reason.contains("missing"))
+        assertTrue(provider.launched.isEmpty())
+        assertTrue(playHistory.recordCalls.isEmpty())
+    }
+
+    @Test
+    fun `a launch by an unknown id is refused, not thrown`() = runBlocking {
+        val provider = KeyedProvider("engine", LibraryEntryKind.RENPY, listOf(renpyGame))
+        val library = Library(listOf(provider))
+
+        val result = library.launch("/games/renpy/Nobody")
+
+        assertTrue(result is LaunchResult.Refused)
+        assertTrue(provider.launched.isEmpty())
+    }
+
+    @Test
+    fun `a launch by id whose provider throws is refused, not thrown`() = runBlocking {
+        val failing = FakeProvider(LibraryEntryKind.NATIVE_ANDROID_APP, listOf(nativeEntry), failLaunch = true)
+        val library = Library(listOf(failing))
+
+        assertTrue(library.launch(nativeEntry.id) is LaunchResult.Refused)
+    }
+}
+
+/** A provider with its own index key, counting its walks. */
+private class KeyedProvider(
+    override val indexKey: String,
+    kind: LibraryEntryKind,
+    private val entries: List<LibraryEntry>,
+    override val indexed: Boolean = true,
+) : LibraryProvider {
+    override val kinds = setOf(kind)
+    var scans = 0
+    val launched = mutableListOf<LibraryEntry>()
+    override suspend fun scan(): List<LibraryEntry> {
+        scans++
+        return entries
+    }
+    override suspend fun launch(entry: LibraryEntry) {
+        launched += entry
+    }
+}
+
+private class FakeRecordStore(vararg initial: GameRecord) : GameRecordStore {
+    private val records = initial.associateBy { it.entry.id }.toMutableMap()
+    override fun get(id: String): GameRecord? = records[id]
+    override fun put(record: GameRecord) {
+        records[record.entry.id] = record
+    }
+    override fun delete(id: String) {
+        records.remove(id)
+    }
+    override fun all(): List<GameRecord> = records.values.toList()
 }
 
 /** A provider that keeps facts of its own, like the ROM provider's database does. */

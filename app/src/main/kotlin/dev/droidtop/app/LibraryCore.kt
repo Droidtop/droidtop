@@ -89,6 +89,8 @@ object LibraryCore {
             // derived entirely from `records`, so this never needs to
             // hold anything the record files don't already have.
             index = RoomLibraryIndexStore(LibraryIndexDatabase.get(app), records),
+            // A launch by id reads the game's record before anything else.
+            records = records,
         )
     }
 }

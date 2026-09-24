@@ -626,11 +626,19 @@ interface EntryFactsOwner {
     suspend fun moveEntryFacts(fromId: String, toId: String)
 }
 
+/** What [Library.launch] by id did: the game was dispatched, or why it was not, in words a person can read. */
+sealed interface LaunchResult {
+    data object Launched : LaunchResult
+    data class Refused(val reason: String) : LaunchResult
+}
+
 class Library(
     private val providers: List<LibraryProvider>,
     private val playHistory: PlayHistoryStore = NoOpPlayHistoryStore,
     private val favorites: FavoritesStore = NoOpFavoritesStore,
     private val index: LibraryIndexStore = NoOpLibraryIndexStore,
+    /** The per-game records (docs/SPEC.md 7g); a launch by id reads the one it needs first. */
+    private val records: GameRecordStore = NoOpGameRecordStore,
 ) {
     private val scanScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val backgroundScanStates = ConcurrentHashMap<Set<LibraryEntryKind>, MutableStateFlow<List<LibraryEntry>?>>()
@@ -1264,6 +1272,69 @@ class Library(
             playHistory.recordPlay(entry.id, System.currentTimeMillis())
             changedFactIds += entry.id
         }
+    }
+
+    /**
+     * Launches the game with [id], for a caller that holds only the id (a
+     * pinned icon, the Desktop's Start menu). Never throws: whatever goes
+     * wrong comes back as [LaunchResult.Refused] with a reason to show.
+     *
+     * Finding the game costs what the game costs, not what the library
+     * costs (docs/SPEC.md 7g, "one file per game is the truth"): its
+     * record first, then the index as the library holds it, and only then
+     * a walk, of just the providers the index cannot answer for (the app
+     * list, which is outside the index, and a provider the index has no
+     * slice for yet). A provider whose slice does not list the id is not
+     * walked: as of its last walk it does not hold the game, and a game
+     * added since is the rescan's job. A game marked missing is refused;
+     * its files are not where the library last found them.
+     */
+    suspend fun launch(id: String): LaunchResult = withContext(Dispatchers.IO) {
+        val entry = try {
+            find(id)
+        } catch (t: kotlinx.coroutines.CancellationException) {
+            throw t
+        } catch (t: Throwable) {
+            Log.e("droidtop.Library", "Looking up $id to launch it failed", t)
+            return@withContext LaunchResult.Refused("Couldn't look up that game (${t.message ?: t.javaClass.simpleName})")
+        }
+        when {
+            entry == null -> LaunchResult.Refused("That game isn't in the library. If it was added recently, rescan the library.")
+            entry.missing -> LaunchResult.Refused("${entry.title} is missing: its files aren't where the library last found them.")
+            else -> try {
+                launch(entry)
+                LaunchResult.Launched
+            } catch (t: kotlinx.coroutines.CancellationException) {
+                throw t
+            } catch (t: Throwable) {
+                Log.e("droidtop.Library", "Launch of ${entry.title} failed", t)
+                LaunchResult.Refused("${entry.title} could not be launched (${t.message ?: t.javaClass.simpleName})")
+            }
+        }
+    }
+
+    /**
+     * [launch] by id in the library's own scope, so the launch outlives
+     * whatever screen asked for it: the Start menu closes on the same tap.
+     * [onResult] is called on the IO dispatcher.
+     */
+    fun launchInBackground(id: String, onResult: (LaunchResult) -> Unit = {}) {
+        scanScope.coroutineLaunch { onResult(launch(id)) }
+    }
+
+    private suspend fun find(id: String): LibraryEntry? {
+        records.get(id)?.let { return it.entry }
+        slices.values.firstNotNullOfOrNull { slice -> slice.entries().firstOrNull { it.id == id } }?.let { return it }
+        val unanswered = providers.filter { provider ->
+            // Loads the slice from the index if nothing has asked yet.
+            val slice = if (provider.indexed) sliceOf(provider) else null
+            slice?.entries()?.firstOrNull { it.id == id }?.let { return it }
+            slice == null
+        }
+        for (provider in unanswered) {
+            scanProviderSafely(provider).firstOrNull { it.id == id }?.let { return it }
+        }
+        return null
     }
 
     /**

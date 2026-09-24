@@ -280,6 +280,7 @@ class MainActivity : AppCompatActivity() {
                         },
                         launchFailure = desktopLaunchFailure,
                         onDismissLaunchFailure = { DesktopSessionService.dismissLaunchFailure() },
+                        onLaunchFailure = { DesktopSessionService.reportLaunchFailure(it) },
                     )
                 }
                 // Nothing to render: both app-hosted modes are off, and

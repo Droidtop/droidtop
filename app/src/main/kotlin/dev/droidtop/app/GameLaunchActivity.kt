@@ -5,12 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
+import dev.droidtop.library.LaunchResult
 import dev.droidtop.library.LibraryEntry
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * Launching one library entry, with no mode attached.
@@ -26,10 +22,10 @@ import kotlinx.coroutines.withContext
  *   adb shell am start -n dev.droidtop.app/.GameLaunchActivity \
  *     -e dev.droidtop.app.extra.ENTRY_ID '<entry id>'
  *
- * No window of its own: it resolves, dispatches through
- * [dev.droidtop.library.Library.launch] (play history, launch-screen
- * memory and error logging included, the same as every other entry point)
- * and finishes.
+ * No window of its own: it hands the id to
+ * [dev.droidtop.library.Library.launchInBackground] (the game's record,
+ * play history, launch-screen memory and error logging included, the same
+ * as every other entry point), shows a refusal as a toast, and finishes.
  */
 class GameLaunchActivity : Activity() {
 
@@ -41,17 +37,7 @@ class GameLaunchActivity : Activity() {
             finish()
             return
         }
-        val library = LibraryCore.library(applicationContext)
-        val app = applicationContext
-        launchScope.launch {
-            val entry = runCatching { library.scanAll() }.getOrNull()
-                ?.firstOrNull { it.id == entryId }
-            if (entry == null) {
-                withContext(Dispatchers.Main) { report(app, "No game with id $entryId") }
-                return@launch
-            }
-            dispatch(app, entry)
-        }
+        dispatch(this, entryId)
         finish()
     }
 
@@ -61,27 +47,24 @@ class GameLaunchActivity : Activity() {
         const val EXTRA_ENTRY_ID = "dev.droidtop.app.extra.ENTRY_ID"
 
         /**
-         * A launch outlives whichever screen asked for it (this Activity
-         * finishes at once; the Games screen is left as the game comes
-         * up), so it cannot hang off a lifecycle scope; the shared core
-         * outlives them all.
-         */
-        private val launchScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-        /**
-         * The one way a surface outside Gaming launches an entry it
-         * already holds: [dev.droidtop.library.Library.launch], with a
-         * failure logged and shown rather than swallowed. The Launcher's
-         * Games screen calls this directly; a pinned game icon comes
-         * through [intentFor] and this Activity.
+         * The one way a surface outside Gaming launches an entry:
+         * [dev.droidtop.library.Library.launchInBackground], which runs in
+         * the library's own scope (this Activity finishes at once, and the
+         * Games screen is left as the game comes up) and finds the game
+         * from its record rather than walking the library. A failure is
+         * shown rather than swallowed. The Launcher's Games screen calls
+         * this directly; a pinned game icon comes through [intentFor] and
+         * this Activity.
          */
         fun dispatch(context: Context, entry: LibraryEntry) {
+            dispatch(context, entry.id)
+        }
+
+        private fun dispatch(context: Context, entryId: String) {
             val app = context.applicationContext
-            val library = LibraryCore.library(app)
-            launchScope.launch {
-                runCatching { library.launch(entry) }.onFailure {
-                    android.util.Log.e(TAG, "Launch of ${entry.title} failed", it)
-                    withContext(Dispatchers.Main) { report(app, "${entry.title} could not be launched") }
+            LibraryCore.library(app).launchInBackground(entryId) { result ->
+                if (result is LaunchResult.Refused) {
+                    android.os.Handler(android.os.Looper.getMainLooper()).post { report(app, result.reason) }
                 }
             }
         }
