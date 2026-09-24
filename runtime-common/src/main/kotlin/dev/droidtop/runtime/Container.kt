@@ -134,6 +134,15 @@ interface ContainerRuntime {
     fun primaryWaylandSocketPath(): String
 
     /**
+     * The host side of [ContainerLayout.SOCKET_DIR]: the one directory
+     * every container this backend runs sees there. A socket a container
+     * serves at `SOCKET_DIR/<name>` is the file `<this>/<name>` to
+     * droidtop, which is how the device VPN reaches
+     * [ContainerLayout.VPN_SOCKET] (docs/SPEC.md 4a).
+     */
+    fun hostSocketDir(): File
+
+    /**
      * Translates a host-visible path under the app's own private storage
      * (`Context.getFilesDir()` or a subtree of it) into the equivalent
      * path visible *inside* a running container.

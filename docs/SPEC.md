@@ -1363,47 +1363,70 @@ bridges packets to/from the container's VPN:
 - Per-app routing (Android's own `VpnService.Builder.addAllowedApplication`)
   is a natural setting once the base works — "route only these apps
   through the container VPN."
-- **Not designed in implementation detail yet**: which packet-bridge
-  implementation (fork vs. write), config UX (import a .conf/.ovpn into
-  the container vs. point droidtop at an already-running container VPN),
-  and kill-switch semantics are open. The product decision — containers
-  can be the device's VPN — is settled.
-- **The shape, decided (2026-09-24), so it can be built rather than
-  re-opened.** `DroidtopVpnService` lives in `:app`, is a Desktop-mode
-  piece in `ModePiece` (a VPN that a container serves needs the container
-  session), and is one foreground service with the system's own VPN
-  notification. Its tun fd is fed by a userspace IP stack compiled into
-  droidtop as a native library (a tun2socks implementation such as
-  hev-socks5-tunnel, packaged in `nativeLibraryDir` like crane and proot,
-  §3) that forwards every device packet to a SOCKS5 endpoint. **The
-  container's VPN is whatever the person installed in it**; what droidtop
-  asks of it is one thing every VPN client can provide, a SOCKS5 proxy
-  bound on a Unix socket in the shared socket directory
-  (`/run/droidtop-sockets/vpn.sock`, `ContainerLayout`): WireGuard through
+- **The shape, decided (2026-09-24), and as built.** `DroidtopVpnService`
+  (`:app`, `vpn/`) is a Desktop-mode piece (`ModePiece.DESKTOP_VPN`: the
+  component is offered to the system only with Desktop on, and stopped
+  when Desktop goes off), because a VPN a container serves needs the
+  container. It is a plain `VpnService` bound by the system, so the
+  system's own VPN indicator and notification are what the person sees;
+  it is not a foreground service of droidtop's. Its tun fd is fed to
+  vendor/hev-socks5-tunnel, a userspace IP stack built by
+  `build-vendor-deps.sh` into `libhev-socks5-tunnel.so` in the APK (a JNI
+  library, `vpn/TunnelNative`, rather than an executable: it takes the fd
+  directly, and Android does not pass fds across an exec). Every device
+  connection becomes a SOCKS5 connection. **The container's VPN is
+  whatever the person installed in it**; what droidtop asks of it is one
+  thing every VPN client can provide, a SOCKS5 proxy bound on a Unix
+  socket in the shared socket directory
+  (`/run/droidtop-sockets/vpn.sock`, `ContainerLayout.VPN_SOCKET`; the
+  host side is `ContainerRuntime.hostSocketDir()`): WireGuard through
   `wireproxy`, OpenVPN through its own client plus a local `microsocks`,
-  or any commercial client's proxy mode. Root does not change the device
-  side; with real namespaces (`DroidSpacesRuntime`) the container may
-  additionally own a real tun and route its own traffic, which is a
-  per-container setting and never required.
-- **Configuration is per container, in the container manager (§3d)**:
-  a "VPN" row on the container's page names the socket the container is
-  expected to serve, a switch turns the device VPN on and off, and the
-  row's value states the live state (connected, no endpoint at the socket,
-  container stopped). droidtop does not import `.conf` or `.ovpn` files:
-  the VPN client is configured inside the container with that client's
-  own tools, in the terminal (§3d), because a config format is the
-  client's and a second importer per client would be exactly the
-  duplication the socket contract avoids.
-- **Kill switch and per-app routing are the platform's.** With the VPN
-  on, `VpnService.Builder.setBlocking(true)` is set, so traffic never
-  bypasses the tunnel while it is up; when the container stops or the
-  endpoint disappears the service stays up and blocking until the person
-  turns it off (a silent fall-through to the bare network is the failure
-  mode). "Route only these apps" is the builder's own allowed-apps list,
-  edited on the same row, with droidtop itself always excluded so a
-  container's own downloads are never routed through the tunnel it
+  or any commercial client's proxy mode.
+- **The relay.** hev speaks SOCKS5 over TCP only, so `vpn/SocksUnixRelay`
+  listens on a loopback port and copies each connection to `vpn.sock`,
+  byte for byte. A loopback port is open to every app; from API 29 the
+  relay asks Android who owns each connection
+  (`ConnectivityManager.getConnectionOwnerUid`, allowed to the VPN app)
+  and refuses anything but droidtop's own stack. Below 29 there is no way
+  to tell, and the port is open while the VPN is.
+- **DNS and UDP.** DNS is answered by hev's mapped DNS on the device
+  (`vpn/TunnelConfig`): a query gets an address from a private range, and
+  a connection to it reaches the proxy by name, so resolution needs only
+  TCP CONNECT, which every SOCKS5 server has. Other UDP needs the proxy's
+  UDP ASSOCIATE and works where the proxy offers it (wireproxy and
+  microsocks are TCP-only).
+- **Root.** Nothing on the device side changes with root. With real
+  namespaces (`DroidSpacesRuntime`) the container may additionally own a
+  real tun and route its own traffic, a per-container setting and never
+  required. Unverified on a rooted device: a droidspaces container's
+  processes run as root rather than as droidtop's uid, so its VPN
+  client's own traffic is not covered by droidtop's exclusion below, and
+  root-created sockets in the shared directory may not be connectable by
+  the app.
+- **Configuration is per container, in the container manager (§3d)**: a
+  "VPN" row on each container's entry names the socket the container is
+  expected to serve, a switch makes that container the device's VPN
+  (another container's VPN is replaced, not stacked; Android's own
+  consent is asked the first time), and the row states the live state:
+  connected, or nothing serving the socket (the container or its VPN
+  client is not running), or why it could not start. droidtop does not
+  import `.conf` or `.ovpn` files: the VPN client is configured inside the
+  container with that client's own tools, in the terminal (§3d), because a
+  config format is the client's and a second importer per client would be
+  exactly the duplication the socket contract avoids.
+- **Kill switch and per-app routing are the platform's.** While the VPN is
+  on, every route points into the tunnel, so when the endpoint disappears
+  traffic is held back rather than leaving on the bare network; the
+  service stays up until the person turns it off (a silent fall-through
+  is the failure mode). This is the routes, not
+  `VpnService.Builder.setBlocking`, which only sets the fd's blocking mode.
+  "Route only these apps" is the builder's own allowed-apps list, edited
+  on the same row, with droidtop itself never among them (and, with no
+  list, the one disallowed app), so a proot container's VPN client, which
+  is a droidtop process, never routes its own traffic into the tunnel it
   serves. Android's own "always-on VPN" and "block connections without
-  VPN" settings are linked, not reimplemented.
+  VPN" settings are linked from the row, not reimplemented; an always-on
+  start uses the container recorded in `VpnPrefs`.
 
 ## 4b. PC-parity requirements: printing, USB peripherals, "open with droidtop"
 

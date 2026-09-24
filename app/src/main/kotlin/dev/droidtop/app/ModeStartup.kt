@@ -85,6 +85,9 @@ object ModeStartup {
         // mode, which runs what it opens, is on.
         setComponentEnabled(app, OpenWithActivity::class.java.name, on(ModePiece.DESKTOP_OPEN_WITH))
 
+        if (!on(ModePiece.DESKTOP_VPN)) dev.droidtop.app.vpn.DroidtopVpnService.stop(app)
+        setComponentEnabled(app, dev.droidtop.app.vpn.DroidtopVpnService::class.java.name, on(ModePiece.DESKTOP_VPN))
+
         if (on(ModePiece.WINDOWS_BACKBONE)) ensureGamenative(app)
     }
 

@@ -308,6 +308,25 @@
         </activity>
 
         <!--
+          The device VPN a container serves (docs/SPEC.md 4a). Bound by the
+          system only (BIND_VPN_SERVICE). Disabled here and enabled by
+          ModeStartup only while Desktop mode is on (ModePiece.DESKTOP_VPN).
+          Always-on starts it with no extras; it then uses VpnPrefs.
+        -->
+        <service
+            android:name="dev.droidtop.app.vpn.DroidtopVpnService"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:exported="false"
+            android:enabled="false">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.net.VpnService.SUPPORTS_ALWAYS_ON"
+                android:value="true" />
+        </service>
+
+        <!--
           Runs the primary container's host-bridge session (connect + present
           outputs) as a foreground service so the desktop survives the
           launcher Activity being backgrounded - see docs/SPEC.md.

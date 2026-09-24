@@ -302,6 +302,8 @@ class DroidSpacesRuntime(
         (ContainerLayout.findWaylandSocket(socketsDir) ?: error("the primary compositor has no socket in ${socketsDir.path}"))
             .absolutePath
 
+    override fun hostSocketDir(): File = socketsDir
+
     override fun hostStorageToContainerPath(hostPath: File): String =
         ContainerLayout.hostStorageToContainerPath(appStorageDir, hostPath)
 

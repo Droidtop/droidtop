@@ -150,6 +150,7 @@ private fun ContainersScreen() {
                     items(list, key = { it.container.id }) { info ->
                         ContainerRow(
                             info = info,
+                            hostSocketDir = runtime?.hostSocketDir(),
                             actionsEnabled = busyMessage == null,
                             confirmingDelete = confirmDeleteId == info.container.id,
                             onStart = { runAction("Starting ${info.container.id}") { it.start(info.container) } },
@@ -171,6 +172,7 @@ private fun ContainersScreen() {
 @Composable
 private fun ContainerRow(
     info: ContainerInfo,
+    hostSocketDir: java.io.File?,
     actionsEnabled: Boolean,
     confirmingDelete: Boolean,
     onStart: () -> Unit,
@@ -227,6 +229,7 @@ private fun ContainerRow(
                 else -> TextButton(onClick = onDeleteRequested, enabled = actionsEnabled) { Text("Delete") }
             }
         }
+        dev.droidtop.app.vpn.ContainerVpnRow(info.container.id, hostSocketDir, enabled = actionsEnabled)
     }
 }
 
