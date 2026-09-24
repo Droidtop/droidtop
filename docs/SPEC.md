@@ -3779,8 +3779,11 @@ fixed, not guessed — see git history for the individual commits):
   fixed live: the metadata sidebar and description text both render now.
 
 **Favourites are a library fact, not a console-ROM fact.** A console
-ROM's favourite is ES-DE metadata (`GameMetadataEntity`, written back to
-its `gamelist.xml`). Every other kind — an engine game, a PC game, an
+ROM's favourite is ES-DE metadata (`GameMetadataEntity`, the field ES-DE's
+`gamelist.xml` carries; droidtop reads gamelists and never writes one —
+the record and the metadata store are the truth, and a gamelist is
+written only by the explicit export of §7b's library sync, so a person's
+own ES-DE gamelists are never edited behind their back). Every other kind — an engine game, a PC game, an
 app — has no gamelist, so its favourite lives in the library's own
 `FavoritesStore` (a `favorites` table beside play history, keyed by entry
 id) and is merged into the scanned entries the way play history is.
