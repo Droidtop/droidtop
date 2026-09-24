@@ -6974,24 +6974,57 @@ gamenative's. `:runtime-windows` now builds the x86_64 half of the ones
 whose source is in the fork and is the source of what ships (virglrenderer,
 patchelf, asurface_renderer, ahbimage, xconnectorpatch, plus the NDK's
 libc++_shared) with AGP's CMake, restricted to x86_64 so arm64 stays
-upstream's prebuilt set (`runtime-windows/native/CMakeLists.txt`). The rest
-cannot be built from the tree as it stands, so the set is not complete
-and the splits stay until the owner decides each of these:
+upstream's prebuilt set (`runtime-windows/native/CMakeLists.txt`).
 
-- no source at all: `libkgslshim` and `libsteambootstrap` (GameNative
-  withholds the source, its THIRD_PARTY_NOTICES), `libvortekrenderer` and
-  `libwinlator_11` (Winlator 11 binaries);
-- source that is not what ships: `libwinlator` (the fork's
-  `patchelf_wrapper.cpp` is empty TODO bodies and its CMakeLists names a
-  `winlator/drawable.c` that does not exist);
-- arm64-only by design: `libextras`, `libvulkan_renderer`, `libhook_impl`,
-  `libmain_hook` link adrenotools, whose CMakeLists refuses every ABI but
-  arm64-v8a (Adreno driver loading);
-- upstream projects outside the tree, buildable but not yet built:
-  PulseAudio 13.0 (`libpulse`, `libpulseaudio`, `libpulsecommon-13.0`,
-  `libpulsecore-13.0`) with libsndfile 1.0.28 and libltdl, the OpenXR
-  loader, lsfg-vk (`liblsfg-vk-layer`, a submodule of the fork), and
-  `libevshim` (needs SDL2 headers the fork does not carry).
+**The x86_64 Windows runtime (user, 2026-09-24).** arm64 keeps upstream
+GameNative's binaries untouched. An x86_64 device runs real x86_64 Wine,
+not box64: `Droidtop/proton-wine-tux` already builds an Android/bionic
+x86_64 Proton (`--host=x86_64-linux-android28`) as the same `.wcp` module
+ContentsManager installs, and on x86_64 it runs natively. The arm64
+libraries with no x86_64 source are not reimplemented; each gets an
+x86_64 build that does that job on x86_64's own stack, read from what
+gamenative's code actually calls:
+
+- `libwinlator_11`: Java calls only `GPUHelper` (Vulkan version and
+  extensions) and `Drawable`/`Pixmap`; built from the fork's
+  `winlator/gpu_helper.c` and `asurfacerenderer/drawable.c`.
+- `libwinlator`: built from the fork's sources without the empty
+  `patchelf_wrapper.cpp`; nothing constructs `PatchElf`.
+- `libextras`, `libvulkan_renderer`: built from the fork's sources against
+  an adrenotools shim whose `adrenotools_open_libvulkan` opens the system
+  `libvulkan.so`, the only adrenotools call they make.
+- `libhook_impl`, `libmain_hook`: pass-through `android_dlopen_ext` hooks;
+  x86 has no Adreno driver to redirect to.
+- `libkgslshim`: an `ioctl` that forwards to libc; x86 has no KGSL.
+- `libvortekrenderer`: its JNI reports no context, so
+  `VortekRendererComponent` never starts; x86_64 Wine reaches Vulkan
+  directly.
+- `libsteambootstrap`: see Steam below.
+- upstream projects: PulseAudio 13.0 (`libpulse`, `libpulseaudio`,
+  `libpulsecommon-13.0`, `libpulsecore-13.0`) with libsndfile 1.0.28 and
+  libltdl, the OpenXR loader, lsfg-vk (`liblsfg-vk-layer`), and
+  `libevshim` (with the SDL2 headers), built for x86_64.
+
+**Steam on x86_64 is the Linux client in proot (user, 2026-09-24).** On
+arm64, `libsteambootstrap` brings up Valve's Android arm64
+`libsteamclient.so` (`steam-androidarm64-*.tzst`, fetched by
+`BionicSteamAssetsDependency`) and Proton's `lsteamclient` bridge talks to
+it, the same shape as Proton on Linux. No x86_64 Android client is known,
+and the bootstrap's source is withheld. So on x86_64 the Linux x86_64
+Steam client runs in a proot glibc rootfs (the non-root container path)
+and Proton's x86_64 `lsteamclient` talks to it; the Windows Steam client
+inside Wine is never used. What this costs, stated so nobody mistakes it
+for free: proot traces every syscall of the client (two stops each), and
+the Steam client is syscall-heavy (network, files, threads, futexes);
+every Steamworks call a game makes (many poll callbacks every frame)
+crosses a process boundary instead of an in-process call; a second
+libc's userland stays resident beside Wine; and bring-up adds proot's
+start to the launch. It does not work where the kernel refuses
+`ptrace(PTRACE_TRACEME)` (the BlueStacks rig, §3); there the Steam path is
+unavailable and says so.
+
+The splits block, the x86_64-only artifact and the proot check's
+install-the-other-APK text go when `abi_sets.py` reports nothing missing.
 
 Copying an arm64 binary into the x86_64 set does not count: the picker
 treats an x86_64 set that holds an ELF of another machine type as invalid.
