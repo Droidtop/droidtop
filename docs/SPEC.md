@@ -5769,6 +5769,13 @@ identity line.
 
 ## 7h. Scraper honesty, and what counts as a game (directed 2026-09-02)
 
+**PC games get PC-native sources (directed 2026-09-24).** PC and engine games are scraped from the
+sources that actually cover them, tied into the same pipeline as the ROM scrapers (one mechanism):
+SteamGridDB (grids, heroes, logos, icons; it needs the user's own free API key, entered once and
+stored like the ScreenScraper login) and Lutris (game metadata and art from its public game
+database), alongside the Steam store data already used for games with a Steam app id. Which
+source won for each field is recorded per game, as for ROMs.
+
 An overnight ScreenScraper pass over the user's real library — 46 ROMs
 across 11 systems — returned HTTP 403 for **all 46** requests: zero
 successes, zero exceptions, zero files written. The app reported it as
