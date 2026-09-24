@@ -1596,7 +1596,25 @@ object AppSettingsCatalogs {
             subtitle = existing?.let { "Id \"${it.id}\" is permanent (it names the ROMs subfolder)" },
             groups = { context ->
                 val dao = ConsoleSystemsDatabase.get(context).consoleSystemDao()
-                val entity = existing?.id?.let { id -> dao.getAll().firstOrNull { it.id == id } } ?: existing
+                val entity = existing?.id?.let { id -> dao.getAll().firstOrNull { it.id == id } }
+                // Deleted (by this page's own "Delete platform" or elsewhere):
+                // no fields, because editing one would upsert the row back.
+                if (existing != null && entity == null) {
+                    return@CatalogScreen listOf(
+                        CatalogGroup(
+                            id = "platform_fields",
+                            title = null,
+                            items = listOf(
+                                ActionItem(
+                                    id = "platform_deleted",
+                                    title = "${existing.displayName} was deleted",
+                                    subtitle = "Go back to the platform list",
+                                    run = {},
+                                ),
+                            ),
+                        ),
+                    )
+                }
                 listOf(
                     CatalogGroup(
                         id = "platform_fields",
