@@ -49,7 +49,7 @@ its group, is placed in numeric order, and gets a line in the contents below.
 - [7m. One game, its versions and its segments (directed 2026-09-16)](#7m-one-game-its-versions-and-its-segments-directed-2026-09-16)
 - [8. Licensing](#8-licensing)
 - [9. Module map](#9-module-map)
-- [10. Suggested build order](#10-suggested-build-order)
+- [10. Build order](#10-build-order)
 - [10a. Build environment](#10a-build-environment)
 - [10b. Releases and updates (directed 2026-09-02)](#10b-releases-and-updates-directed-2026-09-02)
 - [11. Open risks to verify hands-on, not assume](#11-open-risks-to-verify-hands-on-not-assume)
@@ -5874,113 +5874,76 @@ vendor manifest's components into the module manifest, and real entry
 points from droidtop settings into gamenative's container-config UI
 (§7c).
 
-## 10. Suggested build order
+## 10. Build order
 
-1. **Prototype `:host-bridge` first**, before investing in the runtime
-   modules — confirm wlroots' headless backend + `wlr-screencopy` can
-   actually deliver frames to an Android `Surface` at acceptable latency,
-   and that virtual-pointer/virtual-keyboard injection works round-trip.
-   This is the one piece nothing in the prior-art research directly proves;
-   everything else in the plan depends on it working.
-2. `runtime-common` interfaces (already scaffolded) + a minimal
-   `RootfsPuller` on `vendor/crane`, proven against one OCI image pull.
-3. `runtime-linux-root`'s primary-container bootstrap (DroidSpaces + sway),
-   since it's the backend with real prior art to fork from.
-4. `runtime-windows`, once a container can already present a desktop —
-   strip Winlator's XServer, confirm Wine's Wayland driver against sway.
-5. `runtime-linux-noroot` — built on vendor/proot with the shared
-   `ContainerLayout` (§3); proceeds in parallel with 3-4.
-6. `input-seat` (second-screen trackpad/keyboard), in parallel with 3-5.
-   Done: §6b built the desktop surface's own input, §6c the second screen's.
-7. `library-core` + `shell-default` — first real end-to-end usable app.
-8. `shell-gamepad` — last, deliberately, and only once `library-core` has a
-   working `LibraryProvider` to build a real UI against.
+The order work lands in, where one piece depends on another:
+
+1. **Non-root first.** Gaming and Launcher features never need root.
+   Desktop mode's containers run on the no-root backend (`ProotRuntime`,
+   §3) unless root is available, when `ContainerRuntimeFactory` picks
+   `:runtime-linux-root` (DroidSpaces), the only place root is used.
+2. **The library before the shells.** Every mode shows games from
+   `:library-core`;
+   a shell feature that needs something the library does not carry adds it
+   there first (§7g), so no shell grows a private copy of library data.
+3. **Desktop mode's frame path before its polish.** host-bridge's
+   `wlr-screencopy` capture and virtual-input injection were the one piece
+   no prior art proved; they are shown working against sway on the stock
+   emulator (§3). Whether they hold up on the handheld is §11's first risk.
+4. **Windows games through gamenative's own presentation** (§5b):
+   `:runtime-windows` compiles the whole vendored gamenative tree and
+   presents a Wine guest in gamenative's X server view, so Wine for games
+   does not wait on anything in the container stack.
 
 ## 10a. Build environment
 
-Two build environments exist and are both real, not aspirational:
+**Builds are CI.** Nothing is built locally for a change to count:
 
-- **Local**: a dedicated WSL2 distro (`droidtop-dev`), entirely on non-OS
-  storage, with Android SDK/NDK 27.0.12077973, Gradle 8.9, Go, and the
-  Meson/CMake/autotools/musl-cross toolchains needed by
-  `build-scripts/build-vendor-deps.sh`.
-- **CI**: GitHub Actions (`.github/workflows/android-build.yml`), mirroring
-  the local setup, uploading a debug APK artifact on every push to `main`.
-  Getting this green took six distinct, real CI-only bugs (missing
-  `libltdl-dev`, an `ANDROID_HOME`/`ANDROID_SDK_ROOT` conflict with the
-  runner's preinstalled SDK, `ANDROID_DEPS_PREFIX` never actually reaching
-  CMake, and a multi-attempt apt-lock hang that needed real diagnostics —
-  not more guessing — to actually fix) — see the workflow file's own
-  comments for the specifics of each.
+- `.github/workflows/android-build.yml` builds the release and debug APKs
+  on every push to `main` that touches more than docs (a single
+  `./gradlew :app:assembleRelease :app:assembleDebug`), uploads them as the `droidtop-apk` artifact, runs
+  the class-load API gate against the release dex
+  (`build-scripts/check_class_load_api.py`), and publishes to the release
+  channel (§10b); pull requests build but do not publish.
+- `.github/workflows/android-checks.yml` runs on the same push as its own
+  run: lint (`:app:lintDebug`) and every module's unit tests.
+- `.github/workflows/commit-hygiene.yml` rejects commits carrying AI
+  attribution.
 
-Every module now builds and links for real:
-- `:host-bridge` — cross-compiled `libffi` + `libwayland-client` (Meson, a
-  native-scanner-then-cross-library two-step approach), confirmed linked
-  for real (`readelf -d` shows `NEEDED libwayland-client.so`). Frame
-  passthrough (`wlr-screencopy` capture loop → `ANativeWindow`) and input
-  injection (virtual pointer/keyboard, with a statically embedded XKB
-  keymap — see that module's README for why) are both implemented, not
-  just scaffolded. Verified against a live sway on the API 34 emulator
-  (§3, dq-desktop-08).
-- `:runtime-linux-root` — cross-compiles the `droidspaces` binary itself (a
-  single static musl executable, ~430KB, genuinely simple compared to the
-  above: no shared-library deps at all). `DroidSpacesRuntime` drives it as
-  a subprocess (`su -c`, matching how droidspaces is actually designed to
-  be used — a CLI tool, not a library), with the primary/sibling
-  Wayland-socket-sharing bind-mount design from §3 implemented against
-  droidspaces' real, documented `.config` format. `CraneRootfsPuller`/
-  `CraneImageCatalogResolver` are real and wired (an earlier "no
-  RootfsPuller implementation" note here was stale). **First real
-  on-device executions (2026-08-30, rooted RP5, root AND su-denied
-  non-root paths both exercised)**: root check + `droidspaces check`
-  pass; both paths then stop at the same first real blocker — the
-  bundled `crane` binary's pure-Go DNS resolver is dead on Android (no
-  /etc/resolv.conf → falls back to localhost:53; cgo resolver confirmed
-  compiled out via GODEBUG). **Fixed (2026-08-30, later same day):**
-  build-vendor-deps.sh now builds crane `CGO_ENABLED=1` against the NDK
-  clang on EVERY ABI (arm64 included — x86_64 already required it), and
-  the workflow's deps-cache key is bumped (v7) so the cached no-cgo
-  binary can't keep being served. **VERIFIED on-device**: the rebuilt
-  binary, run directly from the installed APK on the RP5, selects the
-  cgo resolver (`GODEBUG=netdns=2`: `hostLookupOrder(index.docker.io) =
-  cgo`) and `crane ls docker.io/library/alpine` returns real tags.
-  Verifying it surfaced a second, independent bug in the same class as
-  the theme staleness: `CraneBinary`/`DroidSpacesBinary` extraction (crane
-  has since moved to `nativeLibraryDir`, §3) was
-  gated on bare `dest.exists()`, so the device kept EXECUTING a
-  three-day-old no-cgo extraction while the fixed binary sat unread in
-  the newly installed APK — both now share one `BundledBinary` helper
-  whose marker is keyed on the APK's `lastUpdateTime` (versionCode is
-  pinned at 1, so it can't be the key). Also found and since fixed (same
-  day, from the second live run — which got further than ever: the
-  resolver worked end-to-end inside the real pipeline for the first
-  time): (a) first-listed-tag selection picked `alpine:2.6`, a 2015
-  image with long-dead package repos — `selectPrimaryImage` now prefers
-  the registry's real `latest` tag; (b) `writeInit` failed with
-  "Read-only file system" because instances leaked by the 08-27 run
-  still held droidspaces mounts over the rootfs — the stale-instance
-  reap now also runs at the top of `createContainer`, before anything
-  touches the rootfs, not only in `start()`; (c) `pullAndUnpack`
-  extracted over whatever the destination already held, silently
-  merging images — it now keeps a digest marker (written last), skips
-  extraction when the destination already matches, and wipes anything
-  else first. Separately: `droidspaces` child processes leaked past app force-stop
-  (force-stop skips onDestroy, so no lifecycle hook can reap; fixed by
-  a best-effort stale-instance stop at the next `start()` — container
-  names are deterministic — plus a real `onDestroy` reap for normal
-  teardown), and the pipeline had no logging (every stage and every
-  failure now logs under `droidtop.DesktopSession`, with stack traces).
+Both Android workflows run on `ubuntu-24.04` with a pinned SDK
+(platform 36, build-tools 36.0.0) and NDK 27.0.12077973, JDK 17 and 21, Go,
+and the Gradle wrapper (`gradle/wrapper/gradle-wrapper.properties`, 9.3.1).
+The workflow files' own comments record why each setup step is the way it
+is.
 
-The APK is a single fat build covering both `arm64-v8a` (real hardware —
-Retroid Pocket 5 and similar) and `x86_64` (emulators/x86 devices), rather
-than separate per-ABI builds — one file, works on either. Every
-cross-compiled artifact (libffi, libwayland-client, droidspaces) is built
-twice by `build-scripts/build-vendor-deps.sh` (once per ABI) and
-`DroidSpacesBinary` resolves which asset to extract at runtime against the
-device's actual primary ABI (`Build.SUPPORTED_ABIS`), not a hardcoded one.
-Verified: a real built APK contains distinct `lib/arm64-v8a/` and
-`lib/x86_64/` native libraries plus both `droidspaces-arm64-v8a` and
-`droidspaces-x86_64` assets (confirmed via `unzip -l`, not assumed).
+**Native vendor code** is cross-compiled by
+`build-scripts/build-vendor-deps.sh`, once per ABI, before Gradle runs; the
+result is cached keyed on the vendor submodules' commits and
+`build-scripts/proot-patches/`:
+
+- `libffi` and `libwayland-client` (Meson, a native scanner then the
+  cross library) for `:host-bridge`;
+- `droidspaces`, a static musl executable, into `:runtime-linux-root`'s
+  assets (`assets/bin/droidspaces-<abi>`). It is the one binary that runs
+  through `su`, so it can be extracted to app storage; `BundledBinary`
+  re-extracts it whenever the APK's `lastUpdateTime` changes and picks the
+  asset for the device's primary ABI from `Build.SUPPORTED_ABIS`;
+- `crane` (vendor/go-containerregistry), built `CGO_ENABLED=1` against the
+  NDK clang on every ABI -- Go's pure-Go resolver finds no
+  `/etc/resolv.conf` on Android and falls back to localhost:53 -- into
+  `:runtime-common`'s `jniLibs` as `libcrane.so`;
+- `proot` and its two loaders, patched from `build-scripts/proot-patches/`,
+  into `:runtime-linux-noroot`'s `jniLibs`.
+
+Everything the app executes as itself (crane, proot) ships in
+`nativeLibraryDir`, because Android refuses exec() of a file an app
+extracted to its own storage above targetSdk 28 (§3).
+
+**ABIs.** droidtop ships `arm64-v8a` (real hardware) and `x86_64` (x86
+devices and emulators). The release channel publishes one universal APK
+holding both; ABI splits also build an `x86_64`-only APK, uploaded but not
+published, for x86 devices whose package manager installs the universal
+APK as arm64 under ARM translation (`app/build.gradle.kts`, `splits`).
 
 ## 10b. Releases and updates (directed 2026-09-02)
 
@@ -6165,16 +6128,17 @@ one-command act.
 ## 11. Open risks to verify hands-on, not assume
 
 - Whether sway's headless backend + `wlr-screencopy` performs well enough
-  for gaming-relevant latency/framerate on Android hardware — untested by
-  anyone as far as research surfaced; this is genuinely novel usage.
+  for gaming-relevant latency and framerate on the handheld. It is shown
+  working on the stock x86_64 emulator (§3); an arm64 device is untested,
+  and this is novel usage no prior art measured.
 - Whether Wine's native Wayland driver (as opposed to Xwayland) is solid
-  enough to depend on; Xwayland-inside-the-container is the fallback if not.
-- Exact mechanism the Retroid Dual-Screen Add-On uses to expose its panel to
-  Android (assumed to be a standard secondary `Display`, not confirmed
-  against Retroid-specific documentation).
-- Whether DroidSpaces' namespace/cgroup model tolerates two containers
-  (primary + sibling) sharing a Wayland socket via bind mount cleanly, or
-  whether that needs patching in DroidSpaces itself.
+  enough for Wine run inside Desktop mode's container; Xwayland inside the
+  container is the fallback. Wine games launched from the library do not
+  depend on it: they present through gamenative's X server (§5b).
+- Whether a sibling container can share the primary's Wayland socket
+  cleanly. The bind-mount design is implemented for DroidSpaces (§3); the
+  proot backend's hardware run lists sibling containers as not yet
+  verified.
 
 ## 12. Third-party app integration system
 
