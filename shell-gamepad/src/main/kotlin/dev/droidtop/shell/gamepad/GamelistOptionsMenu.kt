@@ -17,10 +17,8 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
-import dev.droidtop.library.consoles.SystemOverridePrefs
 import dev.droidtop.library.scraper.importGamelistXml
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.library.scraper.scrapeSystemArtwork
@@ -189,12 +187,9 @@ internal fun GamelistOptionsMenu(
 
     suspend fun consoleFoldersFor(id: String): List<java.io.File> {
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
-        return GamesRoots.current(context).flatMap { root ->
-            (root.listFiles() ?: emptyArray()).filter { folder ->
-                folder.isDirectory &&
-                    SystemOverridePrefs.resolveForFolder(context, folder.absolutePath, folder.name, systemsById)?.id == id
-            }
-        }
+        return dev.droidtop.library.consoles.SystemFolders.all(context, systemsById)
+            .filter { (_, system) -> system.id == id }
+            .map { (folder, _) -> folder }
     }
 
     fun jumpToLetter(index: Int) {
@@ -220,17 +215,7 @@ internal fun GamelistOptionsMenu(
                 scope.launch {
                     val summary = withContext(Dispatchers.IO) {
                         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
-                        val folders = GamesRoots.current(context).flatMap { root ->
-                            (root.listFiles() ?: emptyArray()).filter { it.isDirectory }
-                        }
-                        val targets = folders.mapNotNull { folder ->
-                            SystemOverridePrefs.resolveForFolder(
-                                context,
-                                folder.absolutePath,
-                                folder.name,
-                                systemsById,
-                            )?.let { folder to it }
-                        }
+                        val targets = dev.droidtop.library.consoles.SystemFolders.all(context, systemsById)
                         if (targets.isEmpty()) {
                             "No game folders to scrape."
                         } else {

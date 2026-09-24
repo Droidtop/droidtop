@@ -4,7 +4,6 @@ import android.content.Context
 import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.consoles.RomDatabase
-import dev.droidtop.library.consoles.SystemOverridePrefs
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -52,6 +51,8 @@ object OrphanedMedia {
         val orphanFiles = mutableListOf<File>()
         var bytes = 0L
 
+        // Walked once per root, then asked per system.
+        val systemFolders = HashMap<File, List<Pair<File, dev.droidtop.library.consoles.ConsoleSystemDef>>>()
         roots.forEach { root ->
             val mediaRoots = listOf(
                 File(root.parentFile ?: root, "ES-DE/downloaded_media"),
@@ -65,15 +66,9 @@ object OrphanedMedia {
                     val liveBaseNames = if (system != null) {
                         // The folder holding this system's games, resolved
                         // the same way the scan resolves it.
-                        val gameFolders = (root.listFiles() ?: emptyArray()).filter { folder ->
-                            folder.isDirectory &&
-                                SystemOverridePrefs.resolveForFolder(
-                                    context,
-                                    folder.absolutePath,
-                                    folder.name,
-                                    systemsById,
-                                )?.id == systemId
-                        }
+                        val gameFolders = systemFolders.getOrPut(root) {
+                            dev.droidtop.library.consoles.SystemFolders.under(context, root, systemsById).found
+                        }.filter { (_, folderSystem) -> folderSystem.id == systemId }.map { (folder, _) -> folder }
                         // No folder for this system at all: the games may
                         // simply not be mounted. Leave it alone.
                         if (gameFolders.isEmpty()) return@forEach
