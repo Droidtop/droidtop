@@ -468,8 +468,11 @@ its own.
 
 **One layout, both backends** (`ContainerLayout`, `runtime-common`): the
 host socket directory at `/run/droidtop-sockets` (`XDG_RUNTIME_DIR`), the
-app's storage at `/run/droidtop-app-storage`, `WAYLAND_DISPLAY=wayland-0`
-for every client, and the PRIMARY's boot script. The script provisions
+app's storage at `/run/droidtop-app-storage`, `WAYLAND_DISPLAY` set to the
+compositor's own socket name for every client, and the PRIMARY's boot
+script. The socket is found in the socket directory, never assumed: sway
+deliberately skips `wayland-0` (`sway/server.c` starts at `wayland-1`), and
+every compositor names its own. The script provisions
 once (a marker in `/var/lib`; the install is tested explicitly, because
 `set -e` ignores a failure inside an `&&` chain) and then `exec`s the
 compositor. droidspaces writes it to `/sbin/init`; proot runs it as the
@@ -531,6 +534,27 @@ dq-desktop-03). So the build also produces per-ABI APKs (§10b): such a
 device installs the x86_64-only one. The proot check names this case
 outright (installed ABI versus `Build.SUPPORTED_64_BIT_ABIS[0]`) and says
 which APK to install. A real arm64 device (the Retroid) is unaffected.
+
+**Not every Android lets an app trace its children.** The BlueStacks rig
+refuses `ptrace(PTRACE_TRACEME)` to app processes (dq-desktop-04: "proot
+error: ptrace(TRACEME): Operation not permitted"), while the identical
+x86_64 proot runs as the shell user there (dq-desktop-05: SELinux disabled,
+no Yama, the app untraced and without seccomp). That is BlueStacks' kernel,
+and proot has no way around it; the proot check reports it and Desktop mode
+is unavailable there. Container work is verified on the stock-Android
+emulator (API 34), which, like the user's Android 13 console, also applies
+the exec restrictions on app-private files.
+
+**What the pipeline did off-device (2026-09-24).** Termux's proot built for
+x86_64 Linux, a stock Alpine rootfs owned by an unprivileged user, the exact
+proot options and boot script this backend uses (less `--ashmem-memfd`,
+which exists only on Android): `apk add` provisioned sway, sway came up
+headless, a second session's `exec` answered, the container's desktop
+entries listed foot, and `grim` (a wlr-screencopy client) connecting from
+outside proot through the bound socket directory captured sway's desktop
+with swaybar and a foot window at a root prompt. It also found two defects
+fixed in the same change: the hardcoded `wayland-0` (sway made `wayland-1`)
+and no font on Alpine.
 
 Both expose the same `ContainerRole` split — exactly one `PRIMARY` container
 per device (boots the compositor + base desktop), everything else `SIBLING`

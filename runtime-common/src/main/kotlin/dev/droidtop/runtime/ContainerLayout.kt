@@ -26,21 +26,37 @@ object ContainerLayout {
     /** Where the app's private storage root (`Context.getFilesDir()`) appears inside every container. */
     const val APP_STORAGE_DIR = "/run/droidtop-app-storage"
 
-    /**
-     * The compositor's socket name. The socket directory is emptied before
-     * the primary starts, so a wlroots compositor's automatic naming picks
-     * the first free name, which is this one.
-     */
-    const val WAYLAND_SOCKET_NAME = "wayland-0"
-
     /** Written once the provisioning command has succeeded; its presence skips provisioning on later boots. */
     const val PROVISIONED_MARKER = "/var/lib/droidtop-provisioned"
 
-    /** Environment every process droidtop starts in a container gets, so a Wayland client reaches the primary compositor. */
-    val clientEnvironment: Map<String, String> = mapOf(
-        "XDG_RUNTIME_DIR" to SOCKET_DIR,
-        "WAYLAND_DISPLAY" to WAYLAND_SOCKET_NAME,
-    )
+    private val WAYLAND_SOCKET = Regex("wayland-(\\d+)")
+
+    /**
+     * The compositor's socket in the host side of [SOCKET_DIR], found
+     * rather than assumed: every compositor names its own socket, and sway
+     * deliberately never uses `wayland-0` (vendor/sway/sway/server.c,
+     * "Avoid using wayland-0 as display socket", starting at `wayland-1`).
+     * A hardcoded `wayland-0` was a socket that never appeared (found
+     * running the primary boot off-device, 2026-09-24). The directory is
+     * emptied before the primary starts, so the lowest-numbered socket is
+     * the one compositor's. Null until it exists.
+     */
+    fun findWaylandSocket(hostSocketDir: File): File? =
+        hostSocketDir.listFiles()
+            ?.mapNotNull { file -> WAYLAND_SOCKET.matchEntire(file.name)?.let { it.groupValues[1].toInt() to file } }
+            ?.minByOrNull { it.first }
+            ?.second
+
+    /**
+     * Environment every process droidtop starts in a container gets, so a
+     * Wayland client reaches the primary compositor: [SOCKET_DIR] as
+     * `XDG_RUNTIME_DIR`, and the socket's name ([findWaylandSocket]) as
+     * `WAYLAND_DISPLAY` once the compositor has created it.
+     */
+    fun clientEnvironment(waylandSocketName: String?): Map<String, String> = buildMap {
+        put("XDG_RUNTIME_DIR", SOCKET_DIR)
+        waylandSocketName?.let { put("WAYLAND_DISPLAY", it) }
+    }
 
     /**
      * The compositor's environment. Everything here is wlroots' own, read

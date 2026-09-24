@@ -130,7 +130,9 @@ class DroidSpacesRuntime(
         socketsDir.mkdirs()
         val envFile = File(configsDir, "$name.env")
         envFile.parentFile?.mkdirs()
-        envFile.writeText(ContainerLayout.clientEnvironment.entries.joinToString("") { (key, value) -> "$key=$value\n" })
+        // The socket's name is only known once the compositor has made it,
+        // so WAYLAND_DISPLAY is added per exec (see [exec]), not here.
+        envFile.writeText(ContainerLayout.clientEnvironment(null).entries.joinToString("") { (key, value) -> "$key=$value\n" })
 
         val config = DroidSpacesContainerConfig(
             name = name,
@@ -240,7 +242,8 @@ class DroidSpacesRuntime(
      * CLI docs use (`run sh -c "id && env"`).
      */
     override suspend fun exec(container: Container, command: List<String>, env: Map<String, String>): ContainerExecResult {
-        val envPrefix = env.entries.joinToString(" ") { (k, v) -> "$k=${shellQuote(v)}" }
+        val fullEnv = ContainerLayout.clientEnvironment(ContainerLayout.findWaylandSocket(socketsDir)?.name) + env
+        val envPrefix = fullEnv.entries.joinToString(" ") { (k, v) -> "$k=${shellQuote(v)}" }
         val commandLine = command.joinToString(" ") { shellQuote(it) }
         val shellScript = if (envPrefix.isEmpty()) commandLine else "$envPrefix $commandLine"
 
@@ -280,7 +283,8 @@ class DroidSpacesRuntime(
     }
 
     override fun primaryWaylandSocketPath(): String =
-        File(socketsDir, ContainerLayout.WAYLAND_SOCKET_NAME).absolutePath
+        (ContainerLayout.findWaylandSocket(socketsDir) ?: error("the primary compositor has no socket in ${socketsDir.path}"))
+            .absolutePath
 
     override fun hostStorageToContainerPath(hostPath: File): String =
         ContainerLayout.hostStorageToContainerPath(appStorageDir, hostPath)

@@ -28,6 +28,12 @@ data class PrimaryProvisioning(
  * No seat daemon: the compositor runs on wlroots' headless backend, which
  * never opens a session (see [ContainerLayout.compositorEnvironment]).
  *
+ * A font, named explicitly: Alpine's fontconfig installs none, and with no
+ * font swaybar dies computing a garbage buffer height and foot refuses to
+ * start ("failed to match font"), both seen running the alpine plan
+ * off-device (2026-09-24). Debian's fontconfig-config already depends on
+ * fonts-dejavu-core; it is named anyway so neither plan relies on it.
+ *
  * Debian's command first installs a `policy-rc.d` that refuses every
  * service start. That is Debian's own documented mechanism for package
  * installation inside a chroot or container with no init (invoke-rc.d
@@ -49,15 +55,15 @@ object CompositorProvisioning {
         return when (os to desktopEnvironment) {
             "debian" to "sway" -> PrimaryProvisioning(
                 installCommand = "$DEBIAN_NO_SERVICE_STARTS && export DEBIAN_FRONTEND=noninteractive && " +
-                    "apt-get update && apt-get install -y --no-install-recommends sway xwayland $terminal",
+                    "apt-get update && apt-get install -y --no-install-recommends sway xwayland fonts-dejavu-core $terminal",
                 compositorCommand = "sway",
             )
             "alpine" to "sway" -> PrimaryProvisioning(
-                installCommand = "apk add --no-cache sway xwayland $terminal",
+                installCommand = "apk add --no-cache sway xwayland font-dejavu $terminal",
                 compositorCommand = "sway",
             )
             "alpine" to "labwc" -> PrimaryProvisioning(
-                installCommand = "apk add --no-cache labwc $terminal",
+                installCommand = "apk add --no-cache labwc font-dejavu $terminal",
                 compositorCommand = "labwc",
             )
             else -> null
