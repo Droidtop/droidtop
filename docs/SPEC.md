@@ -6594,7 +6594,7 @@ implementation work beyond scaffolding.
 ## 9. Module map
 
 [settings.gradle.kts](../settings.gradle.kts) is the authoritative list and
-carries each module's rationale; each module also has its own README. The
+carries each module's rationale; most modules also have their own README. The
 dependencies below are the `project(...)` lines in each module's build file.
 
 ```
@@ -6604,8 +6604,9 @@ app                    → the application: DesktopSessionService, MainActivity,
 host-bridge            → native Wayland client + JNI: frame passthrough, input injection,
                           and the host<->container clipboard bridge (§6d);
                           depends on runtime-common
-runtime-common         → shared types and interfaces (Container, DisplayOutput,
-                          RootfsImage, ProotRuntime's layout, …); depends on nothing
+runtime-common         → shared types and interfaces (ContainerRuntime, ContainerLayout,
+                          DisplayOutput, RootfsImage, modes, settings catalogs, …);
+                          depends on nothing
 runtime-windows        → Wine/Box64, compiling the whole vendored gamenative tree
                           (vendor/gamenative, see below); no display code of its own;
                           depends on runtime-common and library-core (it supplies the
