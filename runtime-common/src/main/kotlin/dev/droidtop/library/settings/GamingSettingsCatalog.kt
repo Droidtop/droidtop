@@ -270,6 +270,7 @@ object GamingSettingsCatalog {
                         id = ID_KEYBOARD_PICK,
                         title = "Keyboard",
                         subtitle = keyboardSubtitle(context),
+                        value = Keyboards.enabled(context).firstOrNull { it.isCurrent }?.label,
                         run = { ctx -> Keyboards.showPicker(ctx) },
                     ),
                 )
@@ -754,15 +755,16 @@ object GamingSettingsCatalog {
 }
 
 /**
- * Names the active keyboard, and says plainly when it is not droidtop's
- * own -- rather than nagging, or silently doing nothing about it.
+ * What the Keyboard row does, and whether the active keyboard is
+ * droidtop's own -- said plainly rather than nagged about. The keyboard's
+ * name is the row's value, not part of this line (UI pass 2026-09-24,
+ * M14: "Android Keyboard (AOSP) - tap to switch").
  */
 private fun keyboardSubtitle(context: android.content.Context): String {
-    val keyboards = Keyboards.enabled(context)
-    val current = keyboards.firstOrNull { it.isCurrent }
+    val current = Keyboards.enabled(context).firstOrNull { it.isCurrent }
     return when {
         current == null -> "Choose which keyboard to use"
-        current.isDroidtops -> "${current.label} - full desktop key set"
-        else -> "${current.label} - tap to switch"
+        current.isDroidtops -> "Has the full desktop key set. Select to switch"
+        else -> "Select to switch keyboards"
     }
 }

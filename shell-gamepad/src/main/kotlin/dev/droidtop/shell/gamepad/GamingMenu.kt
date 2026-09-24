@@ -3,6 +3,7 @@ package dev.droidtop.shell.gamepad
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -234,6 +235,12 @@ internal fun MenuRow(
     danger: Boolean = false,
     accent: Color? = null,
     onClick: (() -> Unit)? = null,
+    // Long-press is the touch route to Y on a row (the same convention
+    // the shell's cards use for their detail).
+    onLongClick: (() -> Unit)? = null,
+    // A row that is a status read-out rather than a setting (an action's
+    // multi-line result) may take more lines; a setting's row takes one.
+    subtitleLines: Int = 1,
     // An [adjustable] row is stepped with Left/Right on the pad. A touch
     // screen has no Left/Right, so on one the two arrows this row
     // already draws become the two targets that call this -- without it
@@ -254,7 +261,13 @@ internal fun MenuRow(
             .selectionFrame(selected, MenuTokens.RowShape)
             // Touch works on every row, always -- the shell is
             // gamepad-first, never gamepad-only.
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(
+                when {
+                    onClick != null && onLongClick != null -> Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
+                    onClick != null -> Modifier.clickable(onClick = onClick)
+                    else -> Modifier
+                },
+            )
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
         if (accent != null) {
@@ -276,12 +289,15 @@ internal fun MenuRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            // One line, so every row with a subtitle is the same height
+            // (UI pass 2026-09-24, M14: rows of 84, 93 and more px down one
+            // screen). The whole sentence is on the row's Info sheet.
             subtitle?.let {
                 Text(
                     it,
                     color = MenuTokens.OnSurfaceMuted,
                     style = MaterialTheme.typography.bodySmall,
-                    maxLines = 2,
+                    maxLines = subtitleLines,
                     overflow = TextOverflow.Ellipsis,
                 )
             }

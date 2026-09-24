@@ -66,6 +66,8 @@ import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.library.settings.SubScreenItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
+import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.theme.ThemeBrowserScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -117,6 +119,9 @@ fun CatalogNavigator(
     var confirmArmedId by remember { mutableStateOf<String?>(null) }
     var editingText by remember { mutableStateOf<TextInputItem?>(null) }
     var pickingChoice by remember { mutableStateOf<ChoiceItem?>(null) }
+    // Y's Info sheet: the selected row's whole text. Rows show one line
+    // of explanation; this is where the rest of it is.
+    var infoRow by remember { mutableStateOf<CatalogItem?>(null) }
     var pendingFolderPick by remember { mutableStateOf<FolderPickItem?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -271,9 +276,15 @@ fun CatalogNavigator(
         return
     }
 
+    infoRow?.let { item ->
+        CatalogInfoSheet(item = item, status = statusById[item.id], onDismiss = { infoRow = null })
+    }
+
     val listState = rememberLazyListState()
     val listFocus = remember { FocusRequester() }
-    LaunchedEffect(screen, textItem == null) { if (textItem == null) requestFocusWhenAttached(listFocus, "Settings catalog") }
+    LaunchedEffect(screen, textItem == null, infoRow == null) {
+        if (textItem == null && infoRow == null) requestFocusWhenAttached(listFocus, "Settings catalog")
+    }
     LaunchedEffect(selected, screen) { if (rows.isNotEmpty()) listState.animateScrollToItem(selected.coerceIn(0, rows.lastIndex)) }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -303,6 +314,12 @@ fun CatalogNavigator(
                     // H3).
                     if (event.key == Key.ButtonB || event.key == Key.Escape) {
                         if (event.type == KeyEventType.KeyUp) pop()
+                        return@onKeyEvent true
+                    }
+                    // Y: the selected row's Info sheet, on the UP edge like
+                    // B, with the DOWN edge consumed so it goes nowhere else.
+                    if (GamepadKeyMap.actionFor(event.key) == GamepadAction.Y) {
+                        if (event.type == KeyEventType.KeyUp) rows.getOrNull(selected)?.let { infoRow = it.item }
                         return@onKeyEvent true
                     }
                     if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
@@ -344,6 +361,10 @@ fun CatalogNavigator(
                         onClick = {
                             setSelected(index)
                             activate(row.item)
+                        },
+                        onLongClick = {
+                            setSelected(index)
+                            infoRow = row.item
                         },
                         // The touch route to Left/Right. A SliderItem
                         // does nothing at all on activate (there is no
@@ -446,6 +467,7 @@ private fun CatalogRowView(
     confirmArmed: Boolean,
     status: String?,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
     onAdjust: ((Int) -> Unit)? = null,
 ) {
     val item = row.item
@@ -477,8 +499,49 @@ private fun CatalogRowView(
         danger = confirmArmed,
         accent = (item as? NestedScreenItem)?.accent?.let { Color(it) },
         onClick = onClick,
+        onLongClick = onLongClick,
         onAdjust = onAdjust,
     )
+}
+
+/**
+ * A settings row in full: its name, what it is set to, and every word of
+ * its explanation, which the row itself cuts to one line. Opened by Y on
+ * the row, or a long press; closed by B, A or Y.
+ */
+@Composable
+private fun CatalogInfoSheet(item: CatalogItem, status: String?, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        MenuPanel(
+            modifier = Modifier.width(LocalShellWindow.current.panelWidth(520.dp)),
+            focusLabel = "Settings info",
+            onKey = { event ->
+                val action = GamepadKeyMap.actionFor(event.key)
+                val closes = action == GamepadAction.B || action == GamepadAction.BACK ||
+                    action == GamepadAction.A || action == GamepadAction.Y || event.key == Key.Escape
+                if (closes && event.type == KeyEventType.KeyUp) onDismiss()
+                closes
+            },
+        ) {
+            Text(item.title, color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            val value = when (item) {
+                is ChoiceItem -> item.currentLabel()
+                is ToggleItem -> if (item.current) "On" else "Off"
+                is SliderItem -> item.current.toString()
+                else -> item.value
+            }
+            value?.let { Text(it, color = MenuTokens.Value, style = MaterialTheme.typography.bodyMedium) }
+            item.subtitle?.let {
+                Text(it, color = MenuTokens.OnSurface, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
+            }
+            status?.let { Text(it, color = MenuTokens.Value, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp)) }
+            TouchHintBar(
+                hints = listOf(GamepadAction.B to "Close"),
+                background = Color.Transparent,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+    }
 }
 
 /** Full-screen option list for large [ChoiceItem]s (system pickers etc.). */
