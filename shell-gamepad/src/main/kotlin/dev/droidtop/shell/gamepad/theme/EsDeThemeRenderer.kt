@@ -121,6 +121,7 @@ import dev.droidtop.library.theme.boolOrNull
 import dev.droidtop.library.theme.colorOrNull
 import dev.droidtop.library.theme.floatOrNull
 import dev.droidtop.library.theme.pairOrNull
+import dev.droidtop.library.theme.existingPathOrNull
 import dev.droidtop.library.theme.pathOrNull
 import dev.droidtop.library.theme.strOrNull
 import dev.droidtop.library.theme.uintOrNull
@@ -719,8 +720,7 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         // then modulate the gradient over the drawn content. Elements
         // with a gradient but NO existing image file keep the flat
         // gradient box (that is what they really are).
-        val gradientImagePath = element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved
-            ?.takeIf { File(it).exists() }
+        val gradientImagePath = element.existingPathOrNull("path")
         val gradientModifier = Modifier
             .absoluteOffset(x = offsetX, y = offsetY)
             .size(width = width, height = height)
@@ -766,7 +766,7 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // default, clamped to the selector's game count, SystemView.cpp:1069
     // -1072), which is the currently selected game.
     val path = if (imageTypes.isNotEmpty()) {
-        gameSelection.getOrNull(gameselectorEntry ?: 0)?.mediaForImageTypes(imageTypes)
+        rememberGameMedia(gameSelection.getOrNull(gameselectorEntry ?: 0), imageTypes)
         // Nothing resolved: real ES-DE calls setImage("") and the
         // element's own `default` is what remains (GamelistView.cpp:1331
         // -1334). `path` is deliberately NOT consulted -- a game-driven
@@ -775,7 +775,7 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         // tried here first. Same removal, same reason, as the primary
         // components' own chain: a theme asking for a marquee and getting
         // the cover back is not the theme.
-            ?: element.valueOrNull<EsDeThemeValue.Path>("default")?.resolved?.takeIf { File(it).exists() }
+            ?: element.existingPathOrNull("default")
     } else if (gameselectorEntry != null) {
         gameSelection.getOrNull(gameselectorEntry)?.artworkUri
     } else {
@@ -795,16 +795,24 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         // -- it parses the property only for an element with no
         // `imageType`, under the source comment "it's by design not
         // possible to override scraped media".
-        val declared = element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved
-            ?.takeIf { File(it).exists() }
+        // The override is a file per game, so it is looked for on IO like
+        // the game's own media (see rememberOffMain).
+        val declared = element.existingPathOrNull("path")
         val locator = gameSelection.getOrNull(0)?.mediaLocator
-        esDeGameOverrideImage(
-            gameOverridePath = element.valueOrNull<EsDeThemeValue.Path>("gameOverridePath")?.resolved,
-            system = locator?.system,
-            baseName = locator?.baseName,
-            originalPath = declared,
-        )
-            ?: element.valueOrNull<EsDeThemeValue.Path>("default")?.resolved?.takeIf { File(it).exists() }
+        val gameOverridePath = element.pathOrNull("gameOverridePath")
+        val overridden = if (gameOverridePath != null && locator != null) {
+            rememberOffMain(gameOverridePath, locator) {
+                esDeGameOverrideImage(
+                    gameOverridePath = gameOverridePath,
+                    system = locator.system,
+                    baseName = locator.baseName,
+                    originalPath = null,
+                )
+            }
+        } else {
+            null
+        }
+        overridden ?: declared ?: element.existingPathOrNull("default")
     } ?: return
     // Real ImageComponent::resize (ImageComponent.cpp:775-828): the
     // element's own mSize is NOT always the declared box. For `maxSize`
@@ -998,6 +1006,36 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
  * here: an SVG tile falls back to the plain stretched draw rather than
  * being rendered as something invented.
  */
+/**
+ * [entry]'s media for [imageTypes] ([LibraryEntry.mediaForImageTypes]),
+ * looked up on IO rather than in composition. See [rememberOffMain].
+ */
+@Composable
+private fun rememberGameMedia(entry: LibraryEntry?, imageTypes: List<String>): String? {
+    val locator = entry?.mediaLocator ?: return null
+    return rememberOffMain(locator, imageTypes) { entry.mediaForImageTypes(imageTypes) }
+}
+
+/**
+ * A per-game file question ([resolve]) answered on [Dispatchers.IO],
+ * never in composition. The media folders are listed and re-checked by
+ * [dev.droidtop.library.EsDeArtwork] (a listing, then a `stat` every
+ * two seconds), and a themed element used to ask on every
+ * recomposition, on the main thread. Keyed on [key1] and [key2] and on
+ * the media folders' generation, so media written or found later is
+ * picked up. Until the first answer lands the element draws what a miss
+ * draws; after that, moving to another game keeps the previous answer
+ * on screen for the moment the next one takes rather than flashing
+ * empty.
+ */
+@Composable
+private fun rememberOffMain(key1: Any?, key2: Any?, resolve: () -> String?): String? {
+    val answer by produceState<String?>(null, key1, key2, dev.droidtop.library.EsDeArtwork.mediaGeneration) {
+        value = withContext(Dispatchers.IO) { resolve() }
+    }
+    return answer
+}
+
 /**
  * The source image's own intrinsic pixel size, for the two
  * [dev.droidtop.library.theme.esDeImageFittedSize] branches that need it.
@@ -2057,8 +2095,7 @@ private fun EsDeThemedAnimation(element: EsDeThemeElement, viewWidth: Dp, viewHe
     // No gameSelection parameter, unlike image/video: the real animation
     // schema has no gameselectorEntry property at all (ThemeData.cpp:
     // 415-438) -- an animation is always its own declared file.
-    val path = element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved
-    if (path == null || !File(path).exists()) return
+    val path = element.existingPathOrNull("path") ?: return
     val kind = esDeAnimationKind(path)
     if (kind == EsDeAnimationKind.UNSUPPORTED) {
         // Same real outcome as ES-DE's own "Invalid theme configuration"
@@ -2350,18 +2387,18 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
         // EsDeThemedImage's -- real ES-DE runs the identical
         // setGameImage call over its video components as over its image
         // ones (GamelistView.cpp:836-838).
-        gameSelection.getOrNull(gameselectorEntry ?: 0)?.mediaForImageTypes(imageTypes)
-            ?: element.valueOrNull<EsDeThemeValue.Path>("default")?.resolved?.takeIf { File(it).exists() }
-            ?: element.valueOrNull<EsDeThemeValue.Path>("defaultImage")?.resolved?.takeIf { File(it).exists() }
+        rememberGameMedia(gameSelection.getOrNull(gameselectorEntry ?: 0), imageTypes)
+            ?: element.existingPathOrNull("default")
+            ?: element.existingPathOrNull("defaultImage")
     } else if (gameselectorEntry != null) {
         gameSelection.getOrNull(gameselectorEntry)?.artworkUri
     } else {
         // Same real apply-time existence checks as EsDeThemedImage's own
         // path/default chain (see that comment) -- a dead templated path
         // must fall through, not shadow the next candidate.
-        element.valueOrNull<EsDeThemeValue.Path>("default")?.resolved?.takeIf { File(it).exists() }
-            ?: element.valueOrNull<EsDeThemeValue.Path>("defaultImage")?.resolved?.takeIf { File(it).exists() }
-            ?: element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved?.takeIf { File(it).exists() }
+        element.existingPathOrNull("default")
+            ?: element.existingPathOrNull("defaultImage")
+            ?: element.existingPathOrNull("path")
     } ?: return
     // Real `imageSize`/`imageMaxSize`/`imageCropSize` -- a video element's
     // STATIC image has its own size group, separate from the playing
@@ -2831,10 +2868,10 @@ private fun EsDeThemedBadges(element: EsDeThemeElement, viewWidth: Dp, viewHeigh
         // controller glyph, and stacking a second one on it would be
         // invented art rather than missing art.
         val overlayIcon = when (slot) {
-            "controller" -> element.pathOrNull("controller_${EsDeControllers.byShortName(entry.controllerShortName).shortName}")
-            "folder" -> element.pathOrNull("customFolderLinkIcon")
+            "controller" -> element.existingPathOrNull("controller_${EsDeControllers.byShortName(entry.controllerShortName).shortName}")
+            "folder" -> element.existingPathOrNull("customFolderLinkIcon")
             else -> null
-        }?.takeIf { File(it).isFile }
+        }
         if (overlayIcon != null) {
             // Real clamps, which differ per slot: BadgeComponent.cpp:480-490
             // (folderLink) and :493-506 (controller).
@@ -2957,7 +2994,7 @@ private fun EsDeThemedSystemStatus(element: EsDeThemeElement, viewWidth: Dp, vie
     // measured themes that ship a full status-icon set still rendered
     // unicode glyphs.
     fun customIcon(name: String): String? =
-        element.valueOrNull<EsDeThemeValue.Path>("customIcon_icon_$name")?.resolved?.takeIf { File(it).exists() }
+        element.existingPathOrNull("customIcon_icon_$name")
 
     // Real battery-level bands, transcribed from
     // SystemStatusComponent.cpp:88-97: charging wins outright, then
@@ -3398,8 +3435,7 @@ private fun EsDeThemedHelpSystem(
                 // mapping from a help entry to that attribute value.
                 val buttonArt = esDeHelpButton(action)
                     ?.let { esDeHelpButtonIconKey(it, controllerFamily) }
-                    ?.let { element.pathOrNull("customButtonIcon_$it") }
-                    ?.takeIf { File(it).isFile }
+                    ?.let { element.existingPathOrNull("customButtonIcon_$it") }
                 val icon = @Composable {
                     if (buttonArt != null) {
                         // The art is drawn at the icon's own line height,

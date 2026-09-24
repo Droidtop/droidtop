@@ -126,6 +126,19 @@ fun EsDeThemeElement?.strOrNull(name: String): String? =
 fun EsDeThemeElement?.pathOrNull(name: String): String? =
     this?.valueOrNull<EsDeThemeValue.Path>(name)?.resolved
 
+/** [pathOrNull], but only when that file exists (see [EsDeThemeValue.Path.isFile]). */
+fun EsDeThemeElement?.existingPathOrNull(name: String): String? =
+    this?.valueOrNull<EsDeThemeValue.Path>(name)?.takeIf { it.isFile }?.resolved
+
+/** Asks every path in this parse whether it exists, so drawing never has to; see [EsDeThemeValue.Path.isFile]. */
+internal fun EsDeTheme.checkPaths() {
+    for (view in views.values) {
+        for (element in view.elements.values) {
+            for (value in element.properties.values) (value as? EsDeThemeValue.Path)?.isFile
+        }
+    }
+}
+
 /** Real NORMALIZED_PAIR property, or null when the theme didn't set it. */
 fun EsDeThemeElement?.pairOrNull(name: String): EsDeThemeValue.Pair? =
     this?.valueOrNull<EsDeThemeValue.Pair>(name)
@@ -141,7 +154,18 @@ fun EsDeThemeElement?.uintOrNull(name: String): Long? =
 sealed interface EsDeThemeValue {
     data class Pair(val x: Float, val y: Float) : EsDeThemeValue
     data class Rect(val left: Float, val top: Float, val right: Float, val bottom: Float) : EsDeThemeValue
-    data class Path(val resolved: String) : EsDeThemeValue
+    data class Path(val resolved: String) : EsDeThemeValue {
+        /**
+         * Whether [resolved] is a file, asked once and kept. ES-DE checks
+         * a path exists when it applies the theme, not while drawing; a
+         * theme's files do not change under a parse (a theme update drops
+         * the parse), so [ThemeAssets.loadTheme] asks every path of a
+         * parse once, off the main thread, and the renderer only reads
+         * the answer. It used to `stat` in composition, per element, on
+         * every recomposition.
+         */
+        val isFile: Boolean by lazy { java.io.File(resolved).isFile }
+    }
     data class Str(val value: String) : EsDeThemeValue
     /** Packed RRGGBBAA, same bit layout as ES-DE's own `getHexColor` (6-digit input gets 0xFF alpha appended). */
     data class Color(val argbLikeRgba: Long) : EsDeThemeValue

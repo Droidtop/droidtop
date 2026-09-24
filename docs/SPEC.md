@@ -5282,6 +5282,19 @@ system, one current slice per provider, rounds that yield to ordinary
 walks and publish into the observed lists) is recorded with the rest of
 the slow pass's decisions in "One file per game is the truth" above.
 
+**Drawing asks the disk nothing.** Whether a theme's file exists is a
+fact of the parse: each parsed path answers once
+(`EsDeThemeValue.Path.isFile`), and `ThemeAssets.loadTheme` asks every
+path of a parse before caching it, so the renderer only reads answers
+(it used to `stat` per element on every recomposition, audit P-Low). A
+themed element's per-game media and a `gameOverridePath` file are looked
+up on IO (`rememberOffMain` in the renderer), keeping the previous
+game's answer on screen for the moment the next one takes. The console
+game detail lists its scraped media, checks its manual and video files
+and reads the systems for a scrape on IO, as the PC detail already did.
+Onboarding's Appearance step reads its theme list and parses its
+previews on IO.
+
 **A key press recomposes nothing but what shows it.** The Gaming shell's
 screensaver idle time was Compose state read as a `LaunchedEffect` key
 in the shell body, so every key press and every touch recomposed the

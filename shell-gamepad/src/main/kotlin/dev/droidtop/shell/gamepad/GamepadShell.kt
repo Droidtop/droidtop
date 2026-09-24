@@ -39,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -947,36 +948,42 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
     var pickingMatch by remember(entry) { mutableStateOf(false) }
     var scrapeStatus by remember(entry) { mutableStateOf<String?>(null) }
     var scrapeResult by remember(entry) { mutableStateOf<String?>(null) }
-    // Everything scraped for this game, for the media viewer. Read off
-    // the filesystem once per entry rather than per frame.
-    val media = remember(entry) {
-        val romFile = java.io.File(entry.id)
-        val gamesRoot = dev.droidtop.library.GamesRoots.current(context)
-            .firstOrNull { romFile.absolutePath.startsWith(it.absolutePath) }
-        val systemId = entry.systemId
-        if (gamesRoot != null && systemId != null) {
-            dev.droidtop.library.EsDeArtwork.allMedia(gamesRoot, systemId, romFile.nameWithoutExtension)
-        } else {
-            emptyList()
+    // Everything scraped for this game, for the media viewer: listed on
+    // IO once per entry, never while drawing (the same as PcGameDetail).
+    val media by produceState(emptyList<Pair<String, String>>(), entry) {
+        value = withContext(Dispatchers.IO) {
+            val romFile = java.io.File(entry.id)
+            val gamesRoot = dev.droidtop.library.GamesRoots.current(context)
+                .firstOrNull { romFile.absolutePath.startsWith(it.absolutePath) }
+            val systemId = entry.systemId
+            if (gamesRoot != null && systemId != null) {
+                dev.droidtop.library.EsDeArtwork.allMedia(gamesRoot, systemId, romFile.nameWithoutExtension)
+            } else {
+                emptyList()
+            }
         }
     }
     var editingCollections by remember { mutableStateOf(false) }
 
     // The user's own "open with" hooks (docs/SPEC.md section 12), paired
     // with the real files on this entry droidtop itself cannot open.
-    // Resolved off the main thread: this reads the integrations folder and asks the
-    // PackageManager whether each declared target app is installed.
-    val openWithTargets = remember(entry) { openWithTargetsFor(entry) }
+    // Resolved off the main thread: which of the entry's files exist,
+    // the integrations folder, and whether the PackageManager has each
+    // declared target app.
+    var openWithTargets by remember(entry) { mutableStateOf<List<dev.droidtop.library.integrations.OpenWithTarget>>(emptyList()) }
     var openWith by remember(entry) { mutableStateOf<List<Integration>>(emptyList()) }
     var integrationError by remember(entry) { mutableStateOf<String?>(null) }
-    LaunchedEffect(entry, openWithTargets) {
-        openWith = if (openWithTargets.isEmpty()) {
-            emptyList()
-        } else {
-            withContext(Dispatchers.IO) {
+    LaunchedEffect(entry) {
+        val (targets, integrations) = withContext(Dispatchers.IO) {
+            val targets = openWithTargetsFor(entry)
+            targets to if (targets.isEmpty()) {
+                emptyList()
+            } else {
                 IntegrationStore.available(context, IntegrationCapability.OPEN_WITH)
             }
         }
+        openWithTargets = targets
+        openWith = integrations
     }
 
     // Console ROMs and native apps only: a PC or engine game never
@@ -1111,8 +1118,9 @@ private fun EntryDetailScreen(entry: LibraryEntry, library: Library, onLaunch: (
                             detailScope.launch {
                                 val romFile = java.io.File(entry.id)
                                 val folder = romFile.parentFile
-                                val systemsById = dev.droidtop.library.consoles.ConsoleSystemsRepository
-                                    .allSystems(context).associateBy { it.id }
+                                val systemsById = withContext(Dispatchers.IO) {
+                                    dev.droidtop.library.consoles.ConsoleSystemsRepository.allSystems(context)
+                                }.associateBy { it.id }
                                 val system = entry.systemId?.let { systemsById[it] }
                                 scrapeResult = if (folder == null || system == null) {
                                     "Can't resolve this game's system folder."

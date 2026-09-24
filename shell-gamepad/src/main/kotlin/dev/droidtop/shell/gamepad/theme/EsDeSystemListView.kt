@@ -81,7 +81,7 @@ import dev.droidtop.library.theme.EsDeThemeElement
 import dev.droidtop.library.theme.EsDeThemeValue
 import dev.droidtop.library.theme.colorOrNull
 import dev.droidtop.library.theme.floatOrNull
-import dev.droidtop.library.theme.pathOrNull
+import dev.droidtop.library.theme.existingPathOrNull
 import dev.droidtop.library.theme.strOrNull
 import dev.droidtop.library.theme.esDeCarouselConfig
 import dev.droidtop.library.theme.esDeEntryLabel
@@ -310,7 +310,7 @@ fun EsDeSystemListView(
     // a missing file falls through to text rather than to a blank.
     val defaultImage = remember(element) {
         if (element?.type == "carousel" || element?.type == "grid") {
-            element.pathOrNull("defaultImage")?.takeIf { java.io.File(it).isFile }
+            element.existingPathOrNull("defaultImage")
         } else {
             null
         }
