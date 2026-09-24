@@ -109,11 +109,6 @@ dependencies {
     implementation(project(":IconLoader"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
-    // Real android.support.v4.media (MediaBrowserCompat/MediaControllerCompat)
-    // -- MediaAppBrowserClient's own local, credential-free control of an
-    // installed media app (Spotify/YouTube/Jellyfin, per KnownMediaApps),
-    // the same mechanism Android Auto/Wear/Assistant use.
-    implementation(libs.androidx.media)
     // RomDetectUtils/SerialScanner's own real Timber.d/i logging, forked
     // from Lemuroid unmodified -- see SerialScanner.kt's own doc comment.
     implementation(libs.timber)
