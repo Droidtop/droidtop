@@ -94,6 +94,13 @@ object GamingSettingsCatalog {
     const val DEFAULT_APPS_GRID_COLUMNS = 5
 
     /**
+     * What a Settings renderer shows: the catalog without its quick-only
+     * groups (docs/SPEC.md 7f, "Where things live"). The Quick Menu reads
+     * [groups] whole.
+     */
+    fun settingsGroups(context: Context): List<CatalogGroup> = groups(context).filterNot { it.quickOnly }
+
+    /**
      * Builds the live catalog. Values are read fresh on every call --
      * renderers rebuild after applying a change (cheap: a few pref reads
      * plus the active theme's already-cached capabilities).
@@ -199,47 +206,38 @@ object GamingSettingsCatalog {
                         registryId = "windows_games",
                     ),
                 )
-                add(rescanLibraryItem())
+                // Rescan library is not a row here: it is a one-shot
+                // library action, and lives in the Games section's options
+                // menu and on Game folders (the same item, by id).
             },
         ),
+        // Settings' own System group is configuration only: which screen
+        // is which, and the two screens that manage droidtop and the
+        // device. The live controls are the quick-only group below.
         CatalogGroup(
             id = GROUP_SCREENS,
-            title = "Screens",
+            title = "System",
             items = buildList {
                 add(displayShellTargetItem(context))
                 add(displayGameLaunchTargetItem(context))
                 add(secondScreenRoleItem(context, MODE_GAMING))
                 add(secondScreenRoleItem(context, MODE_DESKTOP))
-                // Detection can only guess which physical panel is which --
-                // Android exposes no position signal -- so the correction
-                // is an action, right here in the Quick Menu's System tab,
-                // reachable from whichever screen the user is looking at.
                 add(
-                    AsyncActionItem(
-                        id = ID_DISPLAY_SWAP,
-                        title = "Swap screens",
-                        subtitle = "Move the shell to the other panel when droidtop guessed wrong",
-                        run = { ctx, _ -> dev.droidtop.runtime.DisplayArrangement.swap(ctx) },
+                    NestedScreenItem(
+                        id = ID_SYSTEM_UPDATES,
+                        title = "Software updates",
+                        subtitle = "Check for and install newer droidtop builds",
+                        // Owned by :app (which this module cannot depend on),
+                        // resolved through the registry like android_settings.
+                        registryId = "updates",
                     ),
                 )
-                // A second screen stuck in its low safe mode (docs/SPEC.md
-                // section 4) is named here, where the fix is finished.
-                val degraded = dev.droidtop.runtime.DisplayOutputRepository(context)
-                    .currentOutputsSnapshot()
-                    .firstOrNull {
-                        it.kind == dev.droidtop.runtime.DisplayOutputKind.SECOND_SCREEN && it.isInFallbackMode
-                    }
                 add(
-                    ActionItem(
-                        id = ID_DISPLAY_REINIT,
-                        title = "Reinitialize displays",
-                        subtitle = if (degraded != null) {
-                            "The second screen is in a low-resolution mode: turn it off and on again, then reinitialize"
-                        } else {
-                            "Detect connected screens again and re-place the shell"
-                        },
-                        value = degraded?.modeSummary(),
-                        run = { _ -> dev.droidtop.runtime.DisplayArrangement.reinitialize() },
+                    NestedScreenItem(
+                        id = ID_SYSTEM_ANDROID_LINKS,
+                        title = "Android settings",
+                        subtitle = "Every reachable system screen, and droidtop's own permission grants",
+                        registryId = "android_settings",
                     ),
                 )
             },
@@ -331,9 +329,13 @@ object GamingSettingsCatalog {
                 add(appsGridColumnsItem(context))
             },
         ),
+        // Live device state and one-shot device actions: the Quick Menu's
+        // System tab draws these, and Settings does not (quickOnly). They
+        // used to be listed in both, row for row (UI pass 2026-09-24, M2).
         CatalogGroup(
             id = GROUP_SYSTEM,
             title = "System",
+            quickOnly = true,
             items = buildList {
                 val status = dev.droidtop.runtime.systemstatus.SystemStatus.snapshot(context)
                 val controls = dev.droidtop.runtime.systemstatus.SystemControls
@@ -344,12 +346,8 @@ object GamingSettingsCatalog {
                     dev.droidtop.runtime.systemstatus.NetworkKind.CELLULAR -> "Mobile data"
                     dev.droidtop.runtime.systemstatus.NetworkKind.NONE -> "Offline"
                 }
-                val battery = status.batteryPercent
-                    ?.let { "$it%" + if (status.charging) ", charging" else "" }
-                    ?: "unknown"
                 val noInternet = status.network != dev.droidtop.runtime.systemstatus.NetworkKind.NONE &&
                     !status.validated
-                val vpnLine = if (status.vpnActive) " VPN active." else ""
                 add(
                     ActionItem(
                         id = ID_SYSTEM_NETWORK,
@@ -372,16 +370,46 @@ object GamingSettingsCatalog {
                         // The system's own internet panel -- apps lost
                         // programmatic Wi-Fi toggling in API 29, and
                         // opening the real control beats faking one.
-                        subtitle = "Battery $battery.$vpnLine" +
-                            if (noInternet) {
-                                " Connected but nothing gets through -- a captive portal may be waiting." +
-                                    " Select to open Wi-Fi and data controls"
-                            } else {
-                                " Select to open Wi-Fi and data controls"
-                            },
+                        subtitle = if (noInternet) {
+                            "Connected, but nothing gets through: a sign-in page may be waiting. Opens Wi-Fi and data controls"
+                        } else {
+                            "Opens Wi-Fi and data controls"
+                        },
                         run = { ctx ->
                             ctx.startActivity(controls.internetPanelIntent())
                         },
+                    ),
+                )
+                // Detection can only guess which physical panel is which --
+                // Android exposes no position signal -- so the correction
+                // is an action, in the Quick Menu's System tab, reachable
+                // from whichever screen the user is looking at.
+                add(
+                    AsyncActionItem(
+                        id = ID_DISPLAY_SWAP,
+                        title = "Swap screens",
+                        subtitle = "Move the shell to the other panel when droidtop guessed wrong",
+                        run = { ctx, _ -> dev.droidtop.runtime.DisplayArrangement.swap(ctx) },
+                    ),
+                )
+                // A second screen stuck in its low safe mode (docs/SPEC.md
+                // section 4) is named here, where the fix is finished.
+                val degraded = dev.droidtop.runtime.DisplayOutputRepository(context)
+                    .currentOutputsSnapshot()
+                    .firstOrNull {
+                        it.kind == dev.droidtop.runtime.DisplayOutputKind.SECOND_SCREEN && it.isInFallbackMode
+                    }
+                add(
+                    ActionItem(
+                        id = ID_DISPLAY_REINIT,
+                        title = "Reinitialize displays",
+                        subtitle = if (degraded != null) {
+                            "The second screen is in a low-resolution mode: turn it off and on again, then reinitialize"
+                        } else {
+                            "Detect connected screens again and re-place the shell"
+                        },
+                        value = degraded?.modeSummary(),
+                        run = { _ -> dev.droidtop.runtime.DisplayArrangement.reinitialize() },
                     ),
                 )
                 add(
@@ -506,24 +534,6 @@ object GamingSettingsCatalog {
                         title = "Bluetooth",
                         subtitle = "Pair controllers and audio in the system Bluetooth screen",
                         run = { ctx -> ctx.startActivity(controls.bluetoothSettingsIntent()) },
-                    ),
-                )
-                add(
-                    NestedScreenItem(
-                        id = ID_SYSTEM_UPDATES,
-                        title = "Software updates",
-                        subtitle = "Check for and install newer droidtop builds",
-                        // Owned by :app (which this module cannot depend on),
-                        // resolved through the registry like android_settings.
-                        registryId = "updates",
-                    ),
-                )
-                add(
-                    NestedScreenItem(
-                        id = ID_SYSTEM_ANDROID_LINKS,
-                        title = "Android settings",
-                        subtitle = "Every reachable system screen, one hop away -- plus droidtop's own permission grants",
-                        registryId = "android_settings",
                     ),
                 )
             },

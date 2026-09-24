@@ -160,58 +160,9 @@ object AppSettingsCatalogs {
                         subtitle = "Engine-game runtimes, like an emulator's core list; its own settings and save storage",
                         registryId = SCREEN_ENGINEHOST,
                     ),
-                    AsyncActionItem(
-                        id = "console_systems_orphans_find",
-                        title = "Find orphaned media",
-                        subtitle = "Artwork and metadata left behind by games that are no longer here",
-                        run = { ctx, onStatus ->
-                            onStatus("Looking...")
-                            val report = dev.droidtop.library.scraper.OrphanedMedia.find(ctx)
-                            if (report.isEmpty) {
-                                report.describe()
-                            } else {
-                                report.describe() + " Use \"Delete orphaned media\" to remove them."
-                            }
-                        },
-                    ),
-                    AsyncActionItem(
-                        id = "console_systems_orphans_delete",
-                        title = "Delete orphaned media",
-                        subtitle = "Permanently removes what the check above found",
-                        run = { ctx, onStatus ->
-                            // Recomputed rather than carried over from
-                            // the check: acting on a report the library
-                            // may have moved on from is how the wrong
-                            // files get deleted.
-                            onStatus("Checking again before deleting...")
-                            val report = dev.droidtop.library.scraper.OrphanedMedia.find(ctx)
-                            dev.droidtop.library.scraper.OrphanedMedia.clean(ctx, report)
-                        },
-                    ),
-                    AsyncActionItem(
-                        id = "console_systems_scrape_all",
-                        title = "Scrape all systems",
-                        subtitle = "Runs the artwork & metadata scrape for every game folder, one system at a time",
-                        run = { ctx, onStatus ->
-                            val systemsById = ConsoleSystemsRepository.allSystems(ctx).associateBy { it.id }
-                            val folders = scrapeTargets(ctx, systemsById)
-                            if (folders.isEmpty()) {
-                                "No game folders found to scrape."
-                            } else {
-                                val summaries = mutableListOf<String>()
-                                folders.forEachIndexed { index, (folder, system) ->
-                                    onStatus("[${index + 1}/${folders.size}] ${system.displayName}\u2026")
-                                    val summary = runCatching {
-                                        scrapeSystemArtwork(ctx, folder, system) { done, total ->
-                                            onStatus("[${index + 1}/${folders.size}] ${system.displayName}: $done/$total")
-                                        }
-                                    }.getOrElse { "${system.displayName}: failed (${it.message})" }
-                                    summaries += summary
-                                }
-                                summaries.joinToString("\n")
-                            }
-                        },
-                    ),
+                    // Find orphaned media and Scrape all systems are
+                    // one-shot library actions, in the Games section's
+                    // options menu (docs/SPEC.md 7f, "Where things live").
                     AsyncActionItem(
                         id = "console_systems_update_players",
                         title = "Update platform databases",
@@ -295,17 +246,6 @@ object AppSettingsCatalogs {
             ),
         )
     }
-
-    /**
-     * Every console system folder, paired with its system: the library's
-     * own walk ([SystemFolders]), because a scrape needs a system to
-     * scrape AS. Used by "Scrape all systems".
-     */
-    private fun scrapeTargets(
-        context: Context,
-        systemsById: Map<String, ConsoleSystemDef>,
-    ): List<Pair<File, ConsoleSystemDef>> =
-        SystemFolders.all(context, systemsById).sortedBy { it.first.name.lowercase() }
 
     private fun folderScreen(folder: File) = CatalogScreen(
         id = "console_folder_${folder.absolutePath}",

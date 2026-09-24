@@ -57,17 +57,19 @@ enum class QuickMove { UP, DOWN, LEFT, RIGHT }
 object QuickTiles {
 
     /**
-     * The display-role rows the System tab shows besides the catalog's
-     * own System group. They live in the Gaming group (they are shell
-     * configuration, and the Settings section wants them beside the
-     * other shell settings) but they are exactly what someone opens this
-     * menu for after plugging a screen in, so the tab takes a view of
-     * them too -- by id, the same items, never a copy.
+     * The configuration rows the System tab shows besides the catalog's
+     * own quick-only System group: the two display roles, and the two
+     * screens that manage droidtop and the device. They live in Settings'
+     * System group (they are configuration), but they are exactly what
+     * someone opens this menu for after plugging a screen in or when an
+     * update is due, so the tab takes a view of them too -- by id, the
+     * same items, never a copy.
      */
-    val DISPLAY_ROLE_IDS = listOf(
+    val CONFIGURATION_IDS = listOf(
         GamingSettingsCatalog.ID_DISPLAY_SHELL_TARGET,
         GamingSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET,
-        GamingSettingsCatalog.ID_DISPLAY_SWAP,
+        GamingSettingsCatalog.ID_SYSTEM_UPDATES,
+        GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS,
     )
 
     /**
@@ -80,8 +82,8 @@ object QuickTiles {
         val displays = all
             .filter { it.id != GamingSettingsCatalog.GROUP_SYSTEM }
             .flatMap { it.items }
-            .filter { it.id in DISPLAY_ROLE_IDS }
-            .sortedBy { DISPLAY_ROLE_IDS.indexOf(it.id) }
+            .filter { it.id in CONFIGURATION_IDS }
+            .sortedBy { CONFIGURATION_IDS.indexOf(it.id) }
         return listOf(CatalogGroup(id = "quick_system", title = null, items = system + displays))
     }
 
@@ -141,6 +143,7 @@ object QuickTiles {
         GamingSettingsCatalog.ID_DISPLAY_SHELL_TARGET -> QuickGlyph.DISPLAY
         GamingSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET -> QuickGlyph.GAMEPAD
         GamingSettingsCatalog.ID_DISPLAY_SWAP -> QuickGlyph.SWAP
+        GamingSettingsCatalog.ID_DISPLAY_REINIT -> QuickGlyph.DISPLAY
         // An item this file has never heard of still gets a real tile --
         // that is the point of rendering the catalog rather than a
         // hand-listed set.

@@ -108,6 +108,8 @@ object GamelistSortPrefs {
 
 /** The one label for the PC/engine scrape action, shared by the list that offers it and the handler that runs it. */
 private const val SCRAPE_PC_GAMES = "Scrape PC & engine games"
+private const val ORPHANS_FIND = "Find orphaned media"
+private const val ORPHANS_DELETE = "Delete orphaned media: press A again"
 
 /**
  * The in-gamelist options overlay (the ES-DE GuiGamelistOptions
@@ -156,12 +158,19 @@ internal fun GamelistOptionsMenu(
         }.distinct().sorted()
     }
 
+    // Orphaned media is one row with a two-step confirm: the first A
+    // finds and reports, the second deletes (recomputed, never the report
+    // the first press made). Moving to another row disarms it.
+    var orphansArmed by remember { mutableStateOf(false) }
+    val orphansLabel = if (orphansArmed) ORPHANS_DELETE else ORPHANS_FIND
+
     val libraryScope = groupKey.isEmpty()
     val actions = buildList {
         if (libraryScope) {
             // The library-wide actions that used to live in Settings.
             add("Rescan library")
             add("Scrape all systems")
+            add(orphansLabel)
             add("Update platform databases")
         } else {
             add("Sort: ${sort.label}")
@@ -231,6 +240,35 @@ internal fun GamelistOptionsMenu(
                         }
                     }
                     status = summary
+                    busy = false
+                    onScraped()
+                }
+            }
+            ORPHANS_FIND -> {
+                if (busy) return
+                busy = true
+                scope.launch {
+                    status = "Looking for orphaned media\u2026"
+                    val report = dev.droidtop.library.scraper.OrphanedMedia.find(context)
+                    status = if (report.isEmpty) {
+                        report.describe()
+                    } else {
+                        report.describe() + "\nPress A again to delete them."
+                    }
+                    orphansArmed = !report.isEmpty
+                    busy = false
+                }
+            }
+            ORPHANS_DELETE -> {
+                if (busy) return
+                busy = true
+                orphansArmed = false
+                scope.launch {
+                    status = "Checking again before deleting\u2026"
+                    status = withContext(Dispatchers.IO) {
+                        val report = dev.droidtop.library.scraper.OrphanedMedia.find(context)
+                        dev.droidtop.library.scraper.OrphanedMedia.clean(context, report)
+                    }
                     busy = false
                     onScraped()
                 }
@@ -347,11 +385,13 @@ internal fun GamelistOptionsMenu(
                     val itemCount = if (pickingLetter) letters.size else actions.size
                     when (GamepadKeyMap.actionFor(event.key)) {
                         GamepadAction.UP -> {
+                            orphansArmed = false
                             if (itemCount > 0) focusIndex = (focusIndex - 1 + itemCount) % itemCount
                             EsDeNavigationSounds.play("scroll")
                             true
                         }
                         GamepadAction.DOWN -> {
+                            orphansArmed = false
                             if (itemCount > 0) focusIndex = (focusIndex + 1) % itemCount
                             EsDeNavigationSounds.play("scroll")
                             true
@@ -398,7 +438,9 @@ internal fun GamelistOptionsMenu(
                     MenuRow(
                         title = label,
                         selected = index == focusIndex,
+                        danger = label == ORPHANS_DELETE,
                         onClick = {
+                            if (focusIndex != index) orphansArmed = false
                             focusIndex = index
                             activate(index)
                         },

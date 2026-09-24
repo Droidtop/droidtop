@@ -388,7 +388,7 @@ internal fun SettingsCatalogView(
         CatalogScreen(
             id = "gaming_settings",
             title = "Settings",
-            groups = { ctx -> GamingSettingsCatalog.groups(ctx) },
+            groups = { ctx -> GamingSettingsCatalog.settingsGroups(ctx) },
         )
     }
     CatalogNavigator(
