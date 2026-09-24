@@ -797,7 +797,7 @@ private fun PcDetailHeader(entry: LibraryEntry, grouping: dev.droidtop.library.L
     val ownName = remember(entry) {
         if (entry.id.startsWith("/")) dev.droidtop.library.GameNaming.derive(entry.id).name.ifEmpty { entry.title } else entry.title
     }
-    val title = grouping?.game?.name ?: ownName
+    val title = dev.droidtop.library.GameNaming.displayName(grouping?.game?.name ?: ownName)
     val copyLine = grouping?.let { copyLabel(it, entry) }
     Box(modifier = Modifier.fillMaxWidth().height(220.dp).padding(top = 24.dp)) {
         if (entry.artworkUri != null) {

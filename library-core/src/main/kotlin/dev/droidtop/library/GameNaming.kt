@@ -266,6 +266,25 @@ object GameNaming {
      * added, so `GoodbyeEternity` and `Goodbye Eternity` are one game and
      * one library entry with two versions.
      */
+    /**
+     * A name as droidtop's own chrome draws it. A folder name is often a
+     * slug rather than a title -- `Anomalous_Coffee_Machine_2`,
+     * `LUST-ACADEMY-BOOK1` -- and showing it as it is on disk puts a
+     * directory listing where a title should be (UI pass 2026-09-24, M5).
+     * Only a name with no spaces is read as a slug: underscores become
+     * spaces, and dashes do too when there are two or more of them, so
+     * `Half-Life` and `Spider-Man` keep theirs. Case is left alone: there
+     * is no telling `DIVINEDAWN` apart from an acronym. Display only --
+     * the stored title, and every key derived from it, stay as they are.
+     */
+    fun displayName(name: String): String {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty() || trimmed.contains(' ')) return trimmed
+        var spaced = trimmed.replace('_', ' ')
+        if (!spaced.contains(' ') && spaced.count { it == '-' } >= 2) spaced = spaced.replace('-', ' ')
+        return spaced.replace(Regex("""\s+"""), " ").trim().ifEmpty { trimmed }
+    }
+
     fun sameGame(a: String, b: String): Boolean = nameKey(a) == nameKey(b) && nameKey(a).isNotEmpty()
 
     /** [sameGame]'s comparison key. */
