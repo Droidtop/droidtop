@@ -501,21 +501,6 @@ class ConsoleRomProvider(
         )
     }
 
-    /**
-     * Real, explicit "my ROMs changed, look again" action, non-streaming
-     * variant -- kept alongside [rescanProgressive] for any real future
-     * caller that just wants the final list, not a growing stream.
-     */
-    suspend fun rescan(): List<LibraryEntry> {
-        val romsRoots = GamesRoots.current(context)
-        val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
-        romsRoots.forEach { root ->
-            dao.clearRoot(root.absolutePath)
-            dao.clearScanMetadata(root.absolutePath)
-        }
-        return scanRootsFresh(romsRoots, systemsById)
-    }
-
     private suspend fun scanRootsFresh(
         roots: List<File>,
         systemsById: Map<String, ConsoleSystemDef>,
