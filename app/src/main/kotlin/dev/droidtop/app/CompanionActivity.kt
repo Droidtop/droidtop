@@ -23,7 +23,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
@@ -211,7 +210,7 @@ internal fun CompanionNotifications() {
                 ) {
                     Text(
                         listOfNotNull(item.appLabel, item.title).joinToString(": "),
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onBackground,
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
                     )
@@ -219,7 +218,7 @@ internal fun CompanionNotifications() {
                     // properties don't smart-cast.
                     val body = item.text
                     if (!body.isNullOrBlank()) {
-                        Text(body, color = Color.Gray, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                        Text(body, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, maxLines = 1)
                     }
                 }
                 if (item.clearable) {
@@ -230,7 +229,7 @@ internal fun CompanionNotifications() {
             }
         }
         if (items.size > 4) {
-            Text("+" + (items.size - 4) + " more in the Quick Menu", color = Color.DarkGray, style = MaterialTheme.typography.labelSmall)
+            Text("+" + (items.size - 4) + " more in the Quick Menu", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
         }
     }
 }

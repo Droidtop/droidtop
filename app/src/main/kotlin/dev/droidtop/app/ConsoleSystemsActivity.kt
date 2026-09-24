@@ -6,8 +6,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Box
+import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.app.settings.AppSettingsCatalogs
 import dev.droidtop.library.consoles.ConsoleSystemDef
 import dev.droidtop.library.EsDeArtwork
@@ -47,7 +47,7 @@ class ConsoleSystemsActivity : AppCompatActivity() {
         val screen = SettingsScreenRegistry.get(AppSettingsCatalogs.SCREEN_CONSOLE_SYSTEMS)!!
         setContent {
             dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
-                Box(Modifier.fillMaxSize().background(Color.Black)) {
+                Box(Modifier.fillMaxSize().background(MenuTokens.Ground)) {
                     CatalogNavigator(root = screen, onExit = { finish() })
                 }
             }

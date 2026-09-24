@@ -21,7 +21,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -57,7 +56,7 @@ internal fun CompanionRecents() {
         Text(
             "Continue playing",
             style = MaterialTheme.typography.labelLarge,
-            color = Color.White.copy(alpha = 0.7f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 6.dp),
         )
         LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -88,7 +87,7 @@ private fun RecentCard(entry: LibraryEntry) {
         modifier = Modifier
             .width(120.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(Color.White.copy(alpha = 0.06f))
+            .background(MaterialTheme.colorScheme.surface)
             .clickable { CompanionState.onLaunchEntry?.invoke(entry) }
             .padding(6.dp),
     ) {
@@ -97,7 +96,7 @@ private fun RecentCard(entry: LibraryEntry) {
                 .fillMaxWidth()
                 .height(150.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(Color.White.copy(alpha = 0.08f)),
+                .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
             if (!entry.artworkUri.isNullOrBlank()) {
                 AsyncImage(
@@ -112,7 +111,7 @@ private fun RecentCard(entry: LibraryEntry) {
                 Text(
                     entry.title,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.75f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(8.dp).align(androidx.compose.ui.Alignment.Center),
                     maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
@@ -122,7 +121,7 @@ private fun RecentCard(entry: LibraryEntry) {
         Text(
             entry.title,
             style = MaterialTheme.typography.bodySmall,
-            color = Color.White.copy(alpha = 0.85f),
+            color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 4.dp),
