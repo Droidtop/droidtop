@@ -36,10 +36,10 @@ import dev.droidtop.runtime.BundledImageRepositories
 import dev.droidtop.runtime.ContainerInfo
 import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.ContainerRuntime
+import dev.droidtop.runtime.CraneImageCatalogResolver
 import dev.droidtop.runtime.ImageCatalogRole
 import dev.droidtop.runtime.KnownImageRepository
 import dev.droidtop.runtime.RootfsImage
-import dev.droidtop.runtime.linux.root.CraneImageCatalogResolver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

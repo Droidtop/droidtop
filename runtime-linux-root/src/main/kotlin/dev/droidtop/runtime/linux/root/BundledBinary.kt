@@ -5,18 +5,20 @@ import android.os.Build
 import java.io.File
 
 /**
- * Shared extract-a-bundled-binary-from-APK-assets implementation behind
- * [CraneBinary] and [DroidSpacesBinary] (one mechanism, not two copies of
- * it -- they only differ by asset/destination name).
+ * Extracts a binary bundled as an APK asset to app storage, for
+ * [DroidSpacesBinary]. Only a binary that runs through `su` can live like
+ * this: Android refuses the app itself exec() of a file it extracted when
+ * targetSdk is above 28, so everything the app runs as itself (crane,
+ * proot) ships in nativeLibraryDir instead (docs/SPEC.md §3).
  *
  * Extraction is keyed on the APK's own `lastUpdateTime` (same real
  * pattern, for the same confirmed-live reason, as ThemeAssets'
  * bundled-theme extraction): a bare `dest.exists()` check kept serving a
  * binary extracted by an OLD install forever. The real case that forced
  * this: the crane cgo-DNS fix shipped in a new APK while the device kept
- * executing the three-day-old no-cgo extraction, reproducing the exact
- * failure the new build had fixed. versionCode is pinned at 1 in this
- * project, so it can't be the key.
+ * executing the three-day-old no-cgo extraction (crane was an asset then),
+ * reproducing the exact failure the new build had fixed. versionCode is
+ * pinned at 1 in this project, so it can't be the key.
  */
 internal object BundledBinary {
     /**

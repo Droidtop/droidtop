@@ -1,6 +1,8 @@
 #!/bin/bash
 # Cross-compiles the native dependencies Gradle's CMake builds can't build
-# themselves: libffi + libwayland-client (for :host-bridge) and mbedTLS
+# themselves: libffi + libwayland-client (for :host-bridge), droidspaces
+# (:runtime-linux-root), crane (:runtime-common), proot
+# (:runtime-linux-noroot) and mbedTLS
 # (for :runtime-remote-stream, via moonlight-common-c's USE_MBEDTLS option
 # — that one's wired up directly in runtime-remote-stream's CMakeLists.txt
 # via add_subdirectory, so it needs no separate step here).
@@ -246,7 +248,13 @@ cp "$VENDOR/droidspaces/output/droidspaces" "$DS_ASSETS/droidspaces-$ABI"
 
 echo "=== crane ($ABI) ==="
 # vendor/go-containerregistry's CLI — the OCI registry client
-# CraneRootfsPuller shells out to (runtime-linux-root). Go cross-compiles
+# CraneRootfsPuller shells out to (runtime-common; both container backends
+# pull through it). Packaged as runtime-common's jniLibs/$ABI/libcrane.so,
+# not an asset: Android refuses exec() of a binary the app extracted into
+# its own data directory once targetSdk is above 28 (droidtop targets 34;
+# docs/SPEC.md 5b), and crane runs as the app itself on an unrooted
+# device. nativeLibraryDir is the one place an app may exec from, and
+# only files named lib*.so land there. Go cross-compiles
 # to Android natively (no separate cross-toolchain download needed, unlike
 # droidspaces' musl-cross toolchains above): GOOS=android + GOARCH is
 # enough — but CGO_ENABLED=1 (with the same NDK clang already resolved
@@ -270,12 +278,70 @@ fi
     # arm64 produced a crane whose DNS was dead on-device.
     export CGO_ENABLED=1
     export CC="$CC"
+    mkdir -p "$REPO_ROOT/runtime-common/src/main/jniLibs/$ABI"
     GOOS=android GOARCH="$GOARCH" go build -trimpath -ldflags="-s -w" \
-        -o "$REPO_ROOT/runtime-linux-root/src/main/assets/bin/crane-$ABI" \
+        -o "$REPO_ROOT/runtime-common/src/main/jniLibs/$ABI/libcrane.so" \
         ./cmd/crane
+)
+
+echo "=== proot ($ABI) ==="
+# vendor/proot is Termux's PRoot (the build Termux and proot-distro run
+# full distributions on), consumed unmodified. It is what ProotRuntime
+# (runtime-linux-noroot) runs every container process through on a device
+# without root. gamenative's own proot is not usable for this: its only
+# binaries are an armeabi-v7a pair under src/legacy, its source's arch.h
+# rejects every architecture but ARM (no x86_64 at all), and it lacks the
+# fake-root and link2symlink extensions a stock distro's package manager
+# needs (docs/SPEC.md 3).
+#
+# Built with its own GNUmakefile and the NDK clang already resolved above.
+# talloc is proot's one library dependency; the single-file copy vendored
+# with gamenative's proot tree is compiled into a static archive and
+# linked in, so the result needs nothing beyond bionic.
+#
+# PROOT_UNBUNDLE_LOADER keeps the loader a separate executable instead of
+# embedding it and extracting it to disk at run time (which is again an
+# exec of an extracted file). ProotRuntime points PROOT_LOADER and
+# PROOT_LOADER_32 at the packaged copies in nativeLibraryDir; the path
+# compiled in here is only the fallback when those are unset, so it names
+# the mistake instead of a real location.
+#
+# Outputs, all into runtime-linux-noroot/src/main/jniLibs/$ABI/ so they
+# land in nativeLibraryDir: libproot.so (proot itself), libproot-loader.so
+# (the 64-bit loader) and libproot-loader32.so (the 32-bit one arm64 and
+# x86_64 both have, for 32-bit guest binaries).
+(
+    PROOT_WORK="$WORK/proot"
+    rm -rf "$PROOT_WORK"
+    mkdir -p "$PROOT_WORK/talloc"
+    TALLOC_SRC="$VENDOR/gamenative/app/src/main/cpp/proot/talloc"
+    "$CC" -O2 -fPIC -c "$TALLOC_SRC/talloc.c" -I"$TALLOC_SRC" -o "$PROOT_WORK/talloc/talloc.o"
+    "$TOOLCHAIN_BIN/llvm-ar" rcs "$PROOT_WORK/talloc/libtalloc.a" "$PROOT_WORK/talloc/talloc.o"
+    # Out-of-tree copy: the GNUmakefile writes objects and build.h beside
+    # the sources, and the vendored submodule stays untouched.
+    cp -r "$VENDOR/proot/src" "$PROOT_WORK/src"
+    cd "$PROOT_WORK/src"
+    # CPPFLAGS/LDFLAGS through the environment, not as make arguments:
+    # the makefile appends to both with +=, and a command-line assignment
+    # would replace its own -I. -D_GNU_SOURCE instead of adding to them.
+    # ARG_MAX is what termux-packages defines for bionic, which lacks it.
+    CPPFLAGS="-I$TALLOC_SRC -DARG_MAX=131072" LDFLAGS="-L$PROOT_WORK/talloc" \
+        make -j"$(nproc)" \
+        CC="$CC" \
+        STRIP="$TOOLCHAIN_BIN/llvm-strip" \
+        OBJCOPY="$TOOLCHAIN_BIN/llvm-objcopy" \
+        OBJDUMP="$TOOLCHAIN_BIN/llvm-objdump" \
+        PROOT_UNBUNDLE_LOADER=/PROOT_LOADER-was-not-set \
+        proot loader/loader loader/loader-m32
+    PROOT_OUT="$REPO_ROOT/runtime-linux-noroot/src/main/jniLibs/$ABI"
+    mkdir -p "$PROOT_OUT"
+    cp proot "$PROOT_OUT/libproot.so"
+    cp loader/loader "$PROOT_OUT/libproot-loader.so"
+    cp loader/loader-m32 "$PROOT_OUT/libproot-loader32.so"
 )
 
 echo "=== Done. Deps installed under $DEPS_DIR ==="
 find "$DEPS_DIR" -iname "*wayland-client*" -o -iname "libffi.a"
 file "$DS_ASSETS/droidspaces-$ABI"
-file "$REPO_ROOT/runtime-linux-root/src/main/assets/bin/crane-$ABI"
+file "$REPO_ROOT/runtime-common/src/main/jniLibs/$ABI/libcrane.so"
+file "$REPO_ROOT/runtime-linux-noroot/src/main/jniLibs/$ABI/"lib*.so

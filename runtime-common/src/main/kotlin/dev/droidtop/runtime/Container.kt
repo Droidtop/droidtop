@@ -67,22 +67,36 @@ interface ContainerRuntime {
      * [image] is caller-chosen — from the live-resolved catalog
      * ([ResolvedImage.toRootfsImage], see docs/SPEC.md §3a) or a hand-typed
      * custom OCI reference alike. [image] is expected to be a stock distro
-     * image with no compositor preinstalled — [provisionCommand] (see
+     * image with no compositor preinstalled — [provisioning] (see
      * [CompositorProvisioning]) is what a backend runs, once, on the
-     * container's first boot to actually install one, so the same "any OCI
+     * container's first boot to install one, and the compositor it then
+     * starts ([ContainerLayout.primaryInitScript]), so the same "any OCI
      * image works" story (§3a) holds for the PRIMARY role too, not just
-     * siblings. Null means "assume [image] already has a working
-     * compositor + init" (e.g. a hand-typed custom reference) — this
-     * interface doesn't validate either way, the caller is responsible for
-     * picking a PRIMARY-appropriate entry and the matching command.
+     * siblings. This interface doesn't validate the pairing; the caller is
+     * responsible for picking a PRIMARY-appropriate entry and its plan.
      */
-    suspend fun createPrimary(image: RootfsImage, provisionCommand: String? = null): Container
+    suspend fun createPrimary(image: RootfsImage, provisioning: PrimaryProvisioning): Container
 
     /** [image] is any SIBLING/BOTH-appropriate reference — no compositor needed. */
     suspend fun createSibling(image: RootfsImage): Container
 
-    suspend fun start(container: Container)
+    /**
+     * Boots [container]. For the PRIMARY this returns once the compositor's
+     * socket accepts connections (a first boot provisions it first, which
+     * can take many minutes); [onProgress] receives human-readable lines
+     * about what it is waiting on, for a caller that shows them. A backend
+     * with nothing to report never calls it.
+     */
+    suspend fun start(container: Container, onProgress: (String) -> Unit = {})
     suspend fun stop(container: Container)
+
+    /**
+     * Whether this device can run this backend at all, answered by running
+     * something real rather than inferred: droidspaces' own `check`
+     * (namespaces, cgroups), or a trivial process under proot (ptrace and
+     * the packaged loader). A failure's output says why.
+     */
+    suspend fun checkSystemRequirements(): ContainerExecResult
     suspend fun destroy(container: Container)
 
     /**

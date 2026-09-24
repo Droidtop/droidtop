@@ -57,14 +57,11 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * container's compositor output, which :host-bridge presents onto a real
  * Android [Surface] (see [HostBridge.presentOutput]).
  *
- * [hostBridge] and [primaryOutput] are nullable on purpose, but no longer
- * because nothing fills them: dev.droidtop.app.DesktopSessionService does
- * real orchestration (root detection, backend selection, container
- * create/start, HostBridge connect) and MainActivity passes its live
- * values through. They stay nullable because the session can genuinely be
- * absent — not started, or failed — and because the non-root ProotRuntime
- * path is still `TODO()` throughout, so on an unrooted device there is
- * really nothing to connect to. Passing null renders this shell's
+ * [hostBridge] and [primaryOutput] are nullable on purpose:
+ * dev.droidtop.app.DesktopSessionService does the orchestration (backend
+ * selection, container create/start, HostBridge connect) and MainActivity
+ * passes its live values through, but the session can genuinely be
+ * absent — not started yet, still booting, or failed. Passing null renders this shell's
  * real chrome — taskbar, start menu, launching library entries all work
  * right now — with an honest "no desktop session" placeholder standing in
  * for the live output, rather than faking a connection that doesn't exist.
@@ -172,7 +169,8 @@ private fun BoxScope.TerminalErrorBanner(message: String, onDismiss: () -> Unit)
 /** Mirrors dev.droidtop.app.DesktopSessionState without :shell-desktop depending on :app. */
 sealed interface DesktopSessionMessage {
     data object Idle : DesktopSessionMessage
-    data object Connecting : DesktopSessionMessage
+    /** [detail]: the latest line the booting container reported (a first boot installs the desktop), if any. */
+    data class Connecting(val detail: String? = null) : DesktopSessionMessage
     data class Failed(val reason: String) : DesktopSessionMessage
 }
 
@@ -263,13 +261,24 @@ private fun BoxScope.DesktopViewport(
                 is DesktopSessionMessage.Connecting -> {
                     Text("Starting the desktop session…", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
                     Text(
-                        "If a permission prompt appears (root access is required to run " +
-                            "the container), grant it to continue.",
+                        "The first start downloads a Linux system and installs the desktop " +
+                            "into it, which takes several minutes. On a rooted device, grant " +
+                            "root access if droidtop asks for it.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(top = 8.dp),
                     )
+                    sessionMessage.detail?.let { detail ->
+                        Text(
+                            detail,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            modifier = Modifier.padding(top = 16.dp),
+                        )
+                    }
                 }
                 is DesktopSessionMessage.Failed -> {
                     Text("Desktop session failed to start", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)

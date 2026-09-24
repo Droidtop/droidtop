@@ -47,9 +47,8 @@ enum class RootAccess(val description: String) {
  * that could not be started: that is reported as
  * [RootProcessResult.launched] being false, with the failure message as
  * stderr. The one place in the repo that starts a command and reads its
- * output -- [RootProcess] and
- * `dev.droidtop.runtime.linux.root.PlainProcess` are the root and
- * non-root faces of it, not two implementations.
+ * output. [RootProcess] is its root face; crane and proot run through
+ * it directly as the app itself.
  */
 object ProcessRunner {
     /** [RootProcessResult.exitCode] when the process never started. */

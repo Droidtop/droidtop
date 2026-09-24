@@ -34,9 +34,10 @@ class ContainerTerminalTest {
         }
 
         override suspend fun listContainers(): List<ContainerInfo> = error("not used")
-        override suspend fun createPrimary(image: RootfsImage, provisionCommand: String?): Container = error("not used")
+        override suspend fun createPrimary(image: RootfsImage, provisioning: PrimaryProvisioning): Container = error("not used")
         override suspend fun createSibling(image: RootfsImage): Container = error("not used")
-        override suspend fun start(container: Container) = error("not used")
+        override suspend fun start(container: Container, onProgress: (String) -> Unit) = error("not used")
+        override suspend fun checkSystemRequirements(): ContainerExecResult = error("not used")
         override suspend fun stop(container: Container) = error("not used")
         override suspend fun destroy(container: Container) = error("not used")
         override fun primaryWaylandSocketPath(): String = error("not used")
@@ -82,9 +83,9 @@ class ContainerTerminalTest {
     @Test
     fun `the provisioned package is the binary that gets launched`() {
         for (command in listOf(
-            CompositorProvisioning.installCommand("debian", "sway"),
-            CompositorProvisioning.installCommand("alpine", "sway"),
-            CompositorProvisioning.installCommand("alpine", "labwc"),
+            CompositorProvisioning.plan("debian", "sway")?.installCommand,
+            CompositorProvisioning.plan("alpine", "sway")?.installCommand,
+            CompositorProvisioning.plan("alpine", "labwc")?.installCommand,
         )) {
             assertNotNull(command)
             assertTrue(

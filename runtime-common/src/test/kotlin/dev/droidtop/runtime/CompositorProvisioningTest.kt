@@ -1,61 +1,64 @@
 package dev.droidtop.runtime
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CompositorProvisioningTest {
     @Test
-    fun `debian plus sway resolves to a real apt install command`() {
-        val command = CompositorProvisioning.installCommand("debian", "sway")
-        assertTrue(command != null && command.contains("apt-get install") && command.contains("sway"))
+    fun `debian plus sway installs sway with apt and starts sway`() {
+        val plan = CompositorProvisioning.plan("debian", "sway")!!
+        assertTrue(plan.installCommand.contains("apt-get install") && plan.installCommand.contains(" sway "))
+        assertEquals("sway", plan.compositorCommand)
     }
 
     @Test
-    fun `alpine plus sway resolves to a real apk install command`() {
-        val command = CompositorProvisioning.installCommand("alpine", "sway")
-        assertTrue(command != null && command.contains("apk add") && command.contains("sway"))
+    fun `alpine plus sway installs sway with apk and starts sway`() {
+        val plan = CompositorProvisioning.plan("alpine", "sway")!!
+        assertTrue(plan.installCommand.contains("apk add") && plan.installCommand.contains(" sway "))
+        assertEquals("sway", plan.compositorCommand)
     }
 
     @Test
-    fun `alpine plus labwc resolves to a real apk install command`() {
-        val command = CompositorProvisioning.installCommand("alpine", "labwc")
-        assertTrue(command != null && command.contains("apk add") && command.contains("labwc"))
+    fun `alpine plus labwc starts the labwc it installed, not sway`() {
+        val plan = CompositorProvisioning.plan("alpine", "labwc")!!
+        assertTrue(plan.installCommand.contains("apk add") && plan.installCommand.contains(" labwc "))
+        assertEquals("labwc", plan.compositorCommand)
     }
 
     @Test
-    fun `unsupported combinations return null instead of a guessed command`() {
-        assertNull(CompositorProvisioning.installCommand("alpine", "hyprland"))
-        assertNull(CompositorProvisioning.installCommand("fedora", "sway"))
-        assertNull(CompositorProvisioning.installCommand("debian", "labwc"))
+    fun `unsupported combinations return null instead of a guessed plan`() {
+        assertNull(CompositorProvisioning.plan("alpine", "hyprland"))
+        assertNull(CompositorProvisioning.plan("fedora", "sway"))
+        assertNull(CompositorProvisioning.plan("debian", "labwc"))
     }
 
     @Test
-    fun `every catalog PRIMARY entry that is provisionable actually resolves`() {
-        // Real regression guard: known-image-repositories.json's own
-        // per-entry notes claim which combinations are provisionable --
-        // this catches the two silently drifting apart (e.g. a catalog
-        // entry added for a compositor CompositorProvisioning never
-        // learned, or vice versa).
-        //
-        // The trailing terminal package comes from ContainerTerminal rather
-        // than being spelled out again: provisioning installs it and
-        // ContainerTerminal launches it, and one constant naming both is
-        // what stops a primary container provisioning one terminal and
-        // trying to run another (docs/SPEC.md 3d).
-        val terminal = ContainerTerminal.PACKAGE
-        assertEquals(
-            "apt-get update && apt-get install -y --no-install-recommends sway seatd xwayland " + terminal,
-            CompositorProvisioning.installCommand("debian", "sway"),
-        )
-        assertEquals(
-            "apk add --no-cache sway seatd xwayland " + terminal,
-            CompositorProvisioning.installCommand("alpine", "sway"),
-        )
-        assertEquals(
-            "apk add --no-cache labwc seatd " + terminal,
-            CompositorProvisioning.installCommand("alpine", "labwc"),
-        )
+    fun `a headless compositor needs no seat daemon, so none is installed`() {
+        // wlroots only opens a session for its drm and libinput backends;
+        // the compositor runs headless (ContainerLayout.compositorEnvironment).
+        for ((os, de) in listOf("debian" to "sway", "alpine" to "sway", "alpine" to "labwc")) {
+            assertFalse(CompositorProvisioning.plan(os, de)!!.installCommand.contains("seatd"))
+        }
+    }
+
+    @Test
+    fun `debian refuses service starts before installing`() {
+        // Debian's policy-rc.d contract: exit 101 means "do not start".
+        val install = CompositorProvisioning.plan("debian", "sway")!!.installCommand
+        assertTrue(install.indexOf("policy-rc.d") in 0 until install.indexOf("apt-get"))
+        assertTrue(install.contains("exit 101"))
+    }
+
+    @Test
+    fun `every provisionable combination installs the terminal ContainerTerminal launches`() {
+        // One constant names both, so a primary container never provisions
+        // one terminal and tries to run another (docs/SPEC.md 3d).
+        for ((os, de) in listOf("debian" to "sway", "alpine" to "sway", "alpine" to "labwc")) {
+            val words = CompositorProvisioning.plan(os, de)!!.installCommand.split(" ")
+            assertTrue("$os/$de must install ${ContainerTerminal.PACKAGE}", words.contains(ContainerTerminal.PACKAGE))
+        }
     }
 }

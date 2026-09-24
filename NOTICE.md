@@ -32,6 +32,11 @@ This project is distributed under the GNU General Public License v3.0 (see
   Core protocol headers and `wayland-scanner` codegen inputs only.
 - **go-containerregistry** — `vendor/go-containerregistry`, https://github.com/google/go-containerregistry — Apache-2.0.
   `crane` is used for OCI image pulling in the rootfs image acquisition path.
+- **PRoot (Termux)** — `vendor/proot`, https://github.com/termux/proot — GPL-2.0-or-later.
+  Built unmodified into `libproot.so` and its loaders, the separate
+  executables `runtime-linux-noroot` runs containers through on a device
+  without root. Linked with the single-file talloc (LGPL-3.0-or-later)
+  vendored at `vendor/gamenative/app/src/main/cpp/proot/talloc`.
 - **moonlight-common-c** — `vendor/moonlight-common-c`, https://github.com/moonlight-stream/moonlight-common-c — GPL-3.0.
   `runtime-remote-stream` is built directly on this for GameStream/Sunshine
   protocol support (pairing, app-list retrieval, stream launch). Includes its

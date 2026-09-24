@@ -1,15 +1,12 @@
-package dev.droidtop.runtime.linux.root
+package dev.droidtop.runtime
 
 import android.content.Context
-import dev.droidtop.runtime.ImageCatalogResolver
-import dev.droidtop.runtime.KnownImageRepository
-import dev.droidtop.runtime.ResolvedImage
 import java.io.File
 
 /**
- * [ImageCatalogResolver] backed by vendor/crane (see [CraneBinary]/
- * [CraneRootfsPuller] — same binary, same "plain network call" privilege
- * level, no root needed). This is where droidtop's "populate the catalog
+ * [ImageCatalogResolver] backed by [Crane] (the same binary
+ * [CraneRootfsPuller] pulls with, same "plain network call" privilege
+ * level, no root needed, on either container backend). This is where droidtop's "populate the catalog
  * at runtime, don't prepopulate it" model (docs/SPEC.md §3a) actually
  * talks to a real registry:
  *
@@ -36,7 +33,7 @@ class CraneImageCatalogResolver(
     /** How long a `crane ls` tag listing stays fresh on disk. Tag lists move slowly (a distro cuts releases weekly at most), so an hour is conservative. */
     private val listTagsTtlMs: Long = 60L * 60L * 1000L,
 ) : ImageCatalogResolver {
-    private val binaryPath: String by lazy { CraneBinary.ensureExtracted(context) }
+    private val binaryPath: String by lazy { Crane.binaryPath(context) }
 
     override suspend fun listTags(repository: KnownImageRepository): List<String> {
         val reference = "${repository.registry}/${repository.repository}"
@@ -54,7 +51,7 @@ class CraneImageCatalogResolver(
         if (cachedTags != null && System.currentTimeMillis() - cacheFile.lastModified() < listTagsTtlMs) {
             return cachedTags
         }
-        val result = PlainProcess.run(binaryPath, "ls", reference)
+        val result = ProcessRunner.run(listOf(binaryPath, "ls", reference))
         if (!result.succeeded && cachedTags != null) return cachedTags
         check(result.succeeded) { "crane ls failed for $reference: ${result.stderr}" }
         val tags = result.stdout.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
@@ -67,6 +64,6 @@ class CraneImageCatalogResolver(
 
     override suspend fun resolve(repository: KnownImageRepository, tag: String): ResolvedImage {
         val reference = "${repository.registry}/${repository.repository}:$tag"
-        return ResolvedImage(repository = repository, tag = tag, digest = CraneCli.digest(binaryPath, reference))
+        return ResolvedImage(repository = repository, tag = tag, digest = Crane.digest(binaryPath, reference))
     }
 }

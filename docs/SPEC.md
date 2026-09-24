@@ -363,22 +363,127 @@ backends selected automatically by root availability:
 
 | | Rooted (`:runtime-linux-root`) | No root (`:runtime-linux-noroot`) |
 |---|---|---|
-| Fork base | [vendor/droidspaces](../vendor/droidspaces) (GPL-3.0) | [vendor/gamenative](../vendor/gamenative)'s own `DefaultProotContainerBackend.java` + bundled native proot (`libproot.so`/`libproot-loader.so`) |
+| Fork base | [vendor/droidspaces](../vendor/droidspaces) (GPL-3.0) | [vendor/proot](../vendor/proot) — Termux's PRoot (GPL-2.0), unmodified, built for arm64-v8a and x86_64 |
 | Isolation | Real kernel namespaces + cgroups | ptrace-based (proot), no true isolation |
 | Requires | KernelSU / APatch / Magisk (Daemon Mode) | nothing |
-| Pattern | DroidSpaces' own LXC-like model | gamenative's own real, working proot backend — port/adapt, not design from nothing |
+| Pattern | DroidSpaces' own LXC-like model | proot-distro's model (fake root, link2symlink), with droidtop's shared-socket layout |
 
-`ProotRuntime` (`runtime-linux-noroot`) is not a from-scratch design: gamenative-tux
-already ships a real, working ptrace-based container backend
-(`app/src/main/java/com/winlator/linux/DefaultProotContainerBackend.java`,
-plus its vendored native proot binaries under `app/src/legacy/jniLibs/`)
-that `:runtime-windows` is already forking from for Wine support — the
-same porting relationship extends to `ProotRuntime` itself rather than
-writing a second, independent proot integration. gamenative-tux's `app`
-module is `com.android.application`, not a library (same constraint hit
-porting the enginehost KiriKiri plugin — see HANDOFF.md), so this is a
-source port into `runtime-linux-noroot`, not a Gradle `project(...)`
-dependency.
+### The no-root backend: `ProotRuntime` (built 2026-09-24)
+
+The earlier plan here was to port gamenative-tux's
+`com.winlator.linux.DefaultProotContainerBackend` and its bundled proot
+binaries. Checked against the vendor tree, neither can run a stock distro
+on droidtop's targets:
+
+- **The binaries do not exist for droidtop's ABIs.** The only proot pair in
+  the fork is `app/src/legacy/jniLibs/armeabi-v7a/`; the modern flavor
+  ships none (the arm64 pair was deleted upstream, §5b), and droidtop
+  ships arm64-v8a and x86_64 only.
+- **The source cannot build them.** `app/src/main/cpp/proot/src/arch.h`
+  `#error`s on every architecture but ARM (no x86_64 at all, which the
+  BlueStacks rig is), and its CMake build is commented out upstream.
+- **The Java backend cannot drive a distro.** `DefaultProotContainerBackend`
+  passes no fake-root or link2symlink option and pins `--cwd` to Winlator's
+  `/home/xuser`: a stock image's package manager refuses to run without
+  root, and dpkg's hard links fail on Android.
+
+So the no-root backend runs **[vendor/proot](../vendor/proot)**, Termux's
+PRoot (the build Termux and proot-distro run whole distributions on),
+pinned to the release termux-packages ships and consumed unmodified.
+`build-scripts/build-vendor-deps.sh` builds it with its own GNUmakefile and
+the NDK, linking the single-file talloc vendored beside gamenative's proot,
+into `runtime-linux-noroot/src/main/jniLibs/<abi>/`: `libproot.so`,
+`libproot-loader.so` and `libproot-loader32.so` (the loader kept separate,
+`PROOT_UNBUNDLE_LOADER`, rather than embedded and extracted at run time).
+These are the file names and environment variables (`PROOT_LOADER`,
+`PROOT_LOADER_32`, `PROOT_TMP_DIR`) gamenative's own backend already uses, so
+that class now finds a working proot too; `ProotRuntime` does not route
+through it for the reasons above, and gamenative's
+`LinuxContainerBackendRegistry` stays the seam if Wine ever needs to run
+inside a container rather than on the ImageFs (§5b says it does not).
+
+**Everything the app executes as itself lives in `nativeLibraryDir`.**
+Android refuses an app `exec()` of a file it extracted into its own data
+directory once targetSdk is above 28 (droidtop targets 34, §5b). proot and
+its loaders are packaged as `lib*.so` for that reason, and so is `crane`
+(`runtime-common`'s `libcrane.so`), which used to be an APK asset
+extracted into `filesDir` and only worked where root ran it. Only
+droidspaces, which always runs through `su`, remains an extracted asset.
+
+**How a container is made.** Both backends pull through one
+`CraneRootfsPuller` (`runtime-common`) and one `FileImageCache`; they
+differ only in the `RootfsUnpacker` that writes the tree. droidspaces
+extracts as root with `tar` (`RootTarUnpacker`), keeping the image's real
+ownership. proot extracts in-process (`RootfsTarExtractor`): the tree is
+owned by the app, the image's ownership is dropped because `--root-id`
+presents everything as root's to the guest, permission bits are kept plus
+owner read/write, hard links become hard links where Android allows the
+app one and copies otherwise, device nodes and FIFOs are skipped (the
+guest's `/dev` is the host's). Nothing is written through a symlink:
+every parent component is checked with lstat and an entry beneath a
+symlink is skipped, because an image's absolute links (Debian's
+`/var/run -> /run`) point into Android's own filesystem on the host.
+Removal (`TreeDelete`) walks without following links and refuses any path
+outside the backend's containers directory — the defect class of the
+2026-09-02 storage wipe (§5b).
+
+**How a process runs.** Every guest process is one proot session:
+`--kill-on-exit --root-id --link2symlink --sysvipc --ashmem-memfd`, the
+rootfs, `/dev` `/proc` `/sys` bound through, and droidtop's own binds
+(below), then `/usr/bin/env -i` with a clean Linux environment so nothing
+of Android's leaks in. `--ashmem-memfd` matters on Android 9: its app
+seccomp policy predates bionic's memfd_create (API 30), and wlroots,
+libwayland and every Wayland client allocate shared memory with memfd;
+proot probes and only substitutes ashmem where memfd is refused. `exec`
+waits for its session (a GUI program returns when its window closes, as
+`ContainerTerminal` expects) and captures its output. A sibling has no
+init under proot: starting one is a no-op and each `exec` is a session of
+its own.
+
+**One layout, both backends** (`ContainerLayout`, `runtime-common`): the
+host socket directory at `/run/droidtop-sockets` (`XDG_RUNTIME_DIR`), the
+app's storage at `/run/droidtop-app-storage`, `WAYLAND_DISPLAY=wayland-0`
+for every client, and the PRIMARY's boot script. The script provisions
+once (a marker in `/var/lib`; the install is tested explicitly, because
+`set -e` ignores a failure inside an `&&` chain) and then `exec`s the
+compositor. droidspaces writes it to `/sbin/init`; proot runs it as the
+primary's one long-lived session, and `start()` returns when the
+compositor's socket accepts a connection (it fails with the script's last
+output if the script exits first, or prints nothing for fifteen minutes).
+The proot backend also binds a generated `/etc/resolv.conf` (the active
+Android network's own DNS servers, read at every start; a stock image has
+none and Android has no `/etc/resolv.conf` to inherit) and `/etc/hosts`.
+Diagnostics go to logcat (`droidtop.proot`) and
+`<external files>/logs/desktop-container.log`, readable on an unrooted
+device without `run-as`.
+
+**The compositor environment** is wlroots' own and holds for sway and labwc
+alike: `WLR_BACKENDS=headless`, `WLR_HEADLESS_OUTPUTS=1` (the headless
+backend starts with no output otherwise; sway's own FALLBACK output is
+never advertised), `WLR_RENDERER=pixman` (no DRM render node exists in a
+container on Android, and screencopy's shm path is what `:host-bridge`
+reads). No seat daemon: wlroots' `backend/backend.c` creates a session only
+for its drm and libinput backends, so `seatd` was dropped from
+provisioning. The provisioning plan (`CompositorProvisioning.plan`) names
+both the packages and the compositor command, so the compositor started
+is the one installed (labwc used to be installed and `sway` started).
+Debian's plan installs a `policy-rc.d` that refuses service starts first —
+Debian's own mechanism for package installs in a chroot or container with
+no init; dbus's and polkitd's maintainer scripts otherwise try to start
+daemons and fail the install.
+
+**The primary container is the user's desktop and persists.** The desktop
+session reuses the existing PRIMARY while it was made from the image the
+user still has chosen, and only pulls and recreates when that choice
+changed. Resolving the catalog's `latest` on every session start (the
+earlier behaviour) meant a registry publishing a new `latest` silently
+replaced the whole container, and everything installed in it, on the
+next start.
+
+**Onboarding's Desktop step** asks the selected backend to prove itself
+(`ContainerRuntime.checkSystemRequirements`: droidspaces' own `check`, or a
+trivial program run under proot against the device's root), instead of
+treating an unrooted device as unable to run Desktop mode.
 
 Both expose the same `ContainerRole` split — exactly one `PRIMARY` container
 per device (boots the compositor + base desktop), everything else `SIBLING`
@@ -571,8 +676,9 @@ instead of a full VM guest kernel:
   optional, FEX for x86 Linux software is closer to a natural extension of
   §3's existing container model), but nothing here is built: no
   `binfmt_misc` registration code, no FEX binary bundling/cross-compile
-  step (would follow the same pattern as `CraneBinary`/`DroidSpacesBinary`
-  — bundled as an APK asset, extracted at first use), no UI surface.
+  step (it would ship in `nativeLibraryDir` like crane and proot, §3 —
+  an extracted asset cannot be executed above targetSdk 28), no UI
+  surface.
 
 ## 3d. User-facing container/distro management (directed 2026-08-30)
 
@@ -1344,7 +1450,8 @@ rather than through Winlator.
   per-invocation env vars aren't a `run` flag droidspaces exposes, so
   they're prepended as inline POSIX shell assignments instead (matches
   droidspaces' own CLI-doc examples, e.g. `run sh -c "id && env"`).
-  `ProotRuntime.exec()` is still `TODO()`, same as the rest of that class.
+  `ProotRuntime.exec()` runs the command as its own proot session in the
+  container's rootfs (§3).
 - `runtime-common`'s `GameDepotPlatform`/`GameDepotOption`/
   `selectBestDepot()` implement this section's actual decision rule
   (Linux > Windows, never macOS) as small, pure, unit-tested logic —
@@ -1413,6 +1520,8 @@ is now wrong:
   survives under the legacy flavor, and `src/main/cpp/proot`'s CMake
   build is commented out upstream with a note that a cmake-built proot
   fails on `ld-2.31.so`. There is no arm64 proot binary to port to.
+  (droidtop's own no-root Linux containers use vendor/proot, Termux's
+  build, instead; §3.)
 
 So the no-root Windows path does not need proot at all. It needs the
 bionic direct-exec model that gamenative already uses everywhere modern
@@ -4405,13 +4514,6 @@ resolves identically every scan.
   `LibraryEntryKind.REMOTE_STREAM` **stays** — it is how a
   windowcast-launched entry appears in the same library model as
   everything else, which is the point of that model.
-- **`runtime-linux-noroot`** is 7 `TODO()`s. The obvious repair (port
-  `DefaultProotContainerBackend` out of the fork) does not apply on this
-  target — see §5b: droidtop builds `MODERN_ANDROID`, that path uses the
-  bionic variant's direct exec rather than proot, and no arm64 proot
-  binary exists in the vendor tree to port to. The class still needs
-  filling in for Linux containers generally; it is not what stands
-  between droidtop and a Windows game.
 - **Lemuroid** is no longer a submodule: nothing built from it, and its
   detection code lives forked-in at `library-core/.../romdetect/` (four
   files) with its community ROM database bundled as
@@ -4432,8 +4534,6 @@ resolves identically every scan.
 6. Cloud saves across the four stores.
 7. Delete the dead streaming module. (The `winlator-upstream` and
    `lemuroid` submodules are gone; nothing consumed either.)
-8. Give `runtime-linux-noroot` a real no-root backend (§5b for why
-   that is not simply a `DefaultProotContainerBackend` port).
 
 ## 7i. The PC surface — "a PC in a box", not an ES-DE system (directed 2026-09-10)
 
@@ -4704,8 +4804,8 @@ host-bridge             → native Wayland client + JNI; frame passthrough, inpu
 runtime-common          → shared types (Container, DisplayOutput, RootfsImage); no deps
 runtime-windows         → Wine/Box64 (fork: vendor/gamenative), no display code of its own
 runtime-linux-root      → DroidSpaces fork (vendor/droidspaces), namespaces/cgroups, needs root
-runtime-linux-noroot    → proot-based, ported from vendor/gamenative's own
-                          DefaultProotContainerBackend (see §3), no root required
+runtime-linux-noroot    → proot-based (vendor/proot, Termux's PRoot, packaged in
+                          nativeLibraryDir; see §3), no root required
 input-seat              → unified seat; depends on host-bridge
 library-core            → Playnite-style unified library/metadata; depends on runtime-common
 display                 → secondary-display behavior for every mode, in one place (the
@@ -4823,8 +4923,8 @@ and make B mean "the previous game" -- which is not what B means here.
    since it's the backend with real prior art to fork from.
 4. `runtime-windows`, once a container can already present a desktop —
    strip Winlator's XServer, confirm Wine's Wayland driver against sway.
-5. `runtime-linux-noroot` — the largest genuinely-new piece; can proceed in
-   parallel with 3-4 once the shared container contract is stable.
+5. `runtime-linux-noroot` — built on vendor/proot with the shared
+   `ContainerLayout` (§3); proceeds in parallel with 3-4.
 6. `input-seat` (second-screen trackpad/keyboard), in parallel with 3-5.
    Done: §6b built the desktop surface's own input, §6c the second screen's.
 7. `library-core` + `shell-default` — first real end-to-end usable app.
@@ -4880,7 +4980,8 @@ Every module now builds and links for real:
   cgo resolver (`GODEBUG=netdns=2`: `hostLookupOrder(index.docker.io) =
   cgo`) and `crane ls docker.io/library/alpine` returns real tags.
   Verifying it surfaced a second, independent bug in the same class as
-  the theme staleness: `CraneBinary`/`DroidSpacesBinary` extraction was
+  the theme staleness: `CraneBinary`/`DroidSpacesBinary` extraction (crane
+  has since moved to `nativeLibraryDir`, §3) was
   gated on bare `dest.exists()`, so the device kept EXECUTING a
   three-day-old no-cgo extraction while the fixed binary sat unread in
   the newly installed APK — both now share one `BundledBinary` helper
