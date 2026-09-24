@@ -2825,42 +2825,18 @@ detail.
 `vendor/moonlight-common-c` and `vendor/mbedtls` were removed along with
 `:runtime-remote-stream` (nothing else in droidtop used either).
 
-### PC-side helper (`pc-helper/`)
+### No PC-side helper in droidtop
 
-**Needs reconsideration** now that GameStream/Sunshine-specific streaming
-is out of scope here — the sections below describe `pc-helper` as it was
-designed *for* the removed Sunshine-specific approach (auto-registering
-apps with Sunshine's own REST API). Whether `pc-helper` still has a real
-job once windowcast is the actual streaming path (e.g. a
-protocol-agnostic "trigger a game install on this PC" helper windowcast
-itself calls into) hasn't been re-scoped yet — keeping the prior
-description below for reference, not as a still-current plan.
-
-A separate Go service (not an Android module — runs natively on the gaming
-PC) with two capabilities of deliberately different confidence, confirmed
-via research rather than assumed:
-
-- **Auto-registering a newly-installed game with Sunshine — solid.**
-  Sunshine's `POST /api/apps` REST endpoint does exactly this; no manual
-  `apps.json` editing. `pc-helper/internal/sunshine` wraps it directly.
-- **Remotely triggering a Steam install — genuinely limited, state this
-  honestly in product UI, don't oversell it.** `steam://install/<appid>`
-  requires Steam already running and the user already logged in on that PC,
-  and surfaces its own UI (not headless). SteamCmd can be scripted
-  unattended, but only after a one-time interactive Steam Guard login on
-  that specific machine, and getting the result recognized by the normal
-  Steam client requires replicating its `steamapps/common/` layout, which
-  isn't SteamCmd's default behavior. **There is no known mechanism for a
-  true zero-touch first-time remote install** — every avenue researched
-  requires either the user being at the PC or a one-time manual setup step
-  on it. Design the feature around that constraint rather than promising
-  "tap install on your phone" as fully automatic.
-
-`pc-helper` also has no pairing/auth designed yet for its own local API
-(the endpoint the Android app calls over LAN) — since every endpoint does
-something consequential, this needs the same kind of one-time pairing-code
-exchange as Sunshine itself before it can safely listen on anything but
-localhost. See `pc-helper/README.md`.
+droidtop carries no program for the gaming PC. The Go scaffold that once
+sat in `pc-helper/` (a Sunshine `POST /api/apps` client and a Steam install
+trigger) was built for the removed Sunshine-specific streaming path, was
+never built or run, and was deleted: anything that runs on the remote PC
+belongs to windowcast. The one finding worth keeping for whoever builds it
+there: a remote Steam install has no zero-touch first-time path.
+`steam://install/<appid>` needs Steam running and logged in on that PC and
+shows its own UI; SteamCmd runs unattended only after a one-time
+interactive Steam Guard login on that machine, and its default layout is
+not the client's `steamapps/common/`. Product copy must not promise more.
 
 ## 7b. Onboarding
 
@@ -6604,10 +6580,7 @@ labwc (§2's second compositor preset alongside sway — installed as a package
 inside the container image, not vendored/compiled by droidtop itself) is
 GPL-2.0; combining it doesn't change the project's overall GPL-3.0
 position, license-compatible the same way the other GPL sources already
-are. `pc-helper` is a separate program, not
-statically linked into the Android app — its own license can be chosen
-independently (default assumption: also GPL-3.0 for consistency, revisit if
-that's not actually desired for a standalone PC service).
+are.
 
 Combining GPL-3.0 sources with the rest is license-compatible, but it means
 **the combined project must be distributed under GPL-3.0** — no closed-
@@ -6662,9 +6635,6 @@ input-keyboard         → forked Hacker's Keyboard: a real Android IME, and (§
                           second screen; no project dependencies
 
 Outside the Gradle build:
-pc-helper/             → separate Go program for the remote gaming PC, not an Android
-                          module — Sunshine REST API client + (limited) Steam install
-                          trigger; see §7a
 build-scripts/         → build-vendor-deps.sh (cross-compiles the native vendor code),
                           proot patches, and the CI checks (XML comments, class-load API)
 vendor/                → upstream trees, as git submodules (.gitmodules); see NOTICE.md

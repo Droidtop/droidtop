@@ -90,6 +90,5 @@ they contain are copyright of their respective owners.
 Moonlight Android (input interaction model, LAN host discovery approach),
 KDE Connect Android (remote input reference), Playnite (library/plugin
 model), distrobox (host-integration mechanism), Qubes OS (dom0/AppVM
-architectural split). Sunshine's REST API (https://docs.lizardbyte.dev) is
-called over HTTP by `pc-helper`, not vendored or linked. See
-[docs/SPEC.md](docs/SPEC.md) for how each informed the design.
+architectural split). See [docs/SPEC.md](docs/SPEC.md) for how each
+informed the design.

@@ -89,9 +89,6 @@ These are droidtop's own modules:
 
 These directories are in the repository but are not Gradle modules:
 
-- `pc-helper/` is a separate Go program meant to run on a gaming PC. Its
-  README says it is a scaffold that has not been built. SPEC §7a says it
-  needs reconsideration now that streaming belongs to windowcast.
 - `build-scripts/` holds `build-vendor-deps.sh`, which cross-compiles
   libffi, libwayland-client, droidspaces and crane for both ABIs. It also
   holds the CI checks: the XML-comment check and the minSdk class-load
