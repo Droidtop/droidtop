@@ -2958,6 +2958,10 @@ gap. droidtop has a first-run tutorial for what onboarding cannot ask about (con
 sections, launching, the Quick Menu, switching modes, where help is); its content comes from the
 rig's new-user passes, which try to break onboarding on purpose.
 
+**Themes are chosen during setup (directed 2026-09-24).** Onboarding includes the theme
+downloader (the same Browse themes screen Settings opens, one mechanism), so a person can pick and
+download another ES-DE theme before they first see the Gaming shell, not only the bundled default.
+
 ### What onboarding is for
 
 droidtop onboards the **device**, not one mode. Configuring a mode and choosing the
