@@ -85,6 +85,7 @@ runs:
           autoconf automake libtool libltdl-dev texinfo \
           libexpat1-dev libffi-dev libxml2-utils \
           wayland-protocols libwayland-bin glslang-tools \
+          autopoint gettext patchelf zstd \
           unzip curl
 
     - name: Cache Android SDK/NDK
@@ -115,7 +116,7 @@ runs:
           "platform-tools" "platforms;android-34" "build-tools;34.0.0" \
           "platforms;android-36" "build-tools;36.0.0" "ndk;${NDK_VERSION}"
 
-    - name: Cache cross-compiled vendor deps (libffi, libwayland-client, droidspaces, crane, proot, hev-socks5-tunnel)
+    - name: Cache cross-compiled vendor deps (libffi, libwayland-client, droidspaces, crane, proot, hev-socks5-tunnel, PulseAudio)
       id: deps-cache
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
@@ -136,6 +137,8 @@ runs:
           runtime-common/src/main/jniLibs
           runtime-linux-noroot/src/main/jniLibs
           app/src/main/jniLibs
+          runtime-windows/src/main/jniLibs
+          runtime-windows/src/main/assets/pulseaudio-gamenative-x86_64.tzst
           ${{ github.workspace }}/.android-deps
         # Keyed on every vendored submodule the script builds from, so a
         # submodule bump invalidates it. The suffix is bumped when what the
@@ -146,10 +149,11 @@ runs:
         # cannot be exec'd above targetSdk 28) and built vendor/proot into
         # runtime-linux-noroot/src/main/jniLibs; v9 put
         # build-scripts/proot-patches into the key; v10 added
-        # hev-socks5-tunnel into app/src/main/jniLibs.
-        key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD', '.git/modules/vendor/proot/HEAD', '.git/modules/vendor/hev-socks5-tunnel/HEAD', 'build-scripts/proot-patches/**') }}-v10
+        # hev-socks5-tunnel into app/src/main/jniLibs; v11 added PulseAudio 13.0,
+        # libsndfile and libltdl for x86_64 (runtime-windows/src/main).
+        key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD', '.git/modules/vendor/proot/HEAD', '.git/modules/vendor/hev-socks5-tunnel/HEAD', '.git/modules/vendor/pulseaudio/HEAD', '.git/modules/vendor/libsndfile/HEAD', 'build-scripts/proot-patches/**', 'build-scripts/pulseaudio-patches/**') }}-v11
 
-    - name: Build cross-compiled vendor deps (libffi, libwayland-client, droidspaces, crane, proot, hev-socks5-tunnel)
+    - name: Build cross-compiled vendor deps (libffi, libwayland-client, droidspaces, crane, proot, hev-socks5-tunnel, PulseAudio)
       if: steps.deps-cache.outputs.cache-hit != 'true'
       shell: bash
       # Run with `bash` explicitly: this repo is developed partly on Windows,

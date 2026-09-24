@@ -45,6 +45,17 @@ This project is distributed under the GNU General Public License v3.0 (see
   with its submodules hev-task-system, hev-socks5-core and yaml (MIT) and lwIP
   (BSD-3-Clause). Built into `libhev-socks5-tunnel.so`, the userspace IP
   stack behind droidtop's device VPN.
+- **PulseAudio** — `vendor/pulseaudio` (v13.0), https://github.com/pulseaudio/pulseaudio —
+  LGPL-2.1-or-later (the libraries and modules built here). Built for x86_64 by
+  `build-scripts/build-vendor-deps.sh` with Termux's Android patches and its
+  `module-aaudio-sink.c` (termux-packages, https://github.com/termux/termux-packages,
+  `packages/pulseaudio` at 39437706663c), kept in `build-scripts/pulseaudio-patches/`.
+- **libsndfile** — `vendor/libsndfile` (1.0.28), https://github.com/libsndfile/libsndfile — LGPL-2.1-or-later.
+- **libltdl** — GNU libtool's libltdl, from the build host's `libltdl-dev` — LGPL-2.1-or-later.
+- **OpenXR-SDK** — `vendor/OpenXR-SDK` (release-1.1.63), https://github.com/KhronosGroup/OpenXR-SDK —
+  Apache-2.0. Built into `libopenxr_loader.so` for x86_64.
+- **SDL2** — `vendor/SDL2` (release-2.32.10), https://github.com/libsdl-org/SDL — zlib.
+  Headers only, for building gamenative's `libevshim.so` for x86_64.
 - **libffi** — `vendor/libffi`, https://github.com/libffi/libffi — MIT.
   Runtime dependency of `libwayland-client`, cross-compiled by
   `build-scripts/build-vendor-deps.sh`.
