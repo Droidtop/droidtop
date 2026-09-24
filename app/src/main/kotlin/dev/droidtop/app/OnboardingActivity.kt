@@ -57,11 +57,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
@@ -1400,8 +1399,13 @@ private fun ControllerStep(
     // otherwise look at a step that says it is already decided.
     var answered by remember { mutableStateOf(ControllerPrefs.asked(context)) }
     var pressed by remember { mutableStateOf<String?>(null) }
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    // Focus does NOT start in the test box. It used to, and inside the box
+    // every button is a test press, B included: opened from Settings, the
+    // screen read B as "the right face button" and did not go back, which is
+    // what B means on every other screen (UI pass 2026-09-24, screenshots
+    // 41-42). The box tests buttons only once a person moves into it, and
+    // says so while it has focus; everywhere else on the step B is back.
+    var testing by remember { mutableStateOf(false) }
 
     fun choose(value: Boolean) {
         swapped = value
@@ -1448,7 +1452,7 @@ private fun ControllerStep(
                 .fillMaxWidth()
                 .heightIn(min = currentShellWindow().minTouchTarget + Space.Lg)
                 .background(MenuTokens.Surface, MenuTokens.RowShape)
-                .focusRequester(focus)
+                .onFocusChanged { testing = it.isFocused }
                 .focusable()
                 .onKeyEvent { event ->
                     if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
@@ -1460,7 +1464,12 @@ private fun ControllerStep(
             contentAlignment = Alignment.CenterStart,
         ) {
             Text(
-                pressed?.let { "droidtop read $it." } ?: "Press any button on your controller.",
+                when {
+                    !testing && pressed == null -> "Move here with the d-pad to test your buttons."
+                    !testing -> "droidtop read $pressed. Move here again to test another."
+                    pressed == null -> "Press any button, B too: droidtop names the one it read. The d-pad moves on."
+                    else -> "droidtop read $pressed. The d-pad moves on."
+                },
                 color = if (pressed != null) MenuTokens.Accent else MenuTokens.OnSurfaceMuted,
                 style = TypeRole.supporting,
             )

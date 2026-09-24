@@ -2292,18 +2292,18 @@ private fun GamesSection(
                             (entryGroup as? GameGroup.Collection)?.id
                                 ?.let { it == AutoCollections.FAVORITES_ID || it == AutoCollections.LAST_PLAYED_ID } == true
                         val focusedSystemEntries = entriesOf(orderedGroups.getOrNull(elementSystemIndex))
-                        // Real hints for THIS exact screen state, matching what
-                        // ButtonHintFooter would compute for it (canGoBack=false,
-                        // showInfo=true, showSectionSwitch=true, showSystemSwitch=
-                        // false -- there's no drilled-into system yet to switch
-                        // siblings of). L/R and the old compound "L/R" glyph
-                        // collapse to a single representative L icon here -- a
-                        // real, deliberate simplification (see
-                        // EsDeThemedHelpSystem's own doc comment), not a hack.
+                        // The hints this screen can keep (docs/SPEC.md 7j: a hint
+                        // row promises only what dispatches). No Y: on the
+                        // carousel nothing is focused that has info -- Y acts on
+                        // a focused GAME, in a gamelist or on a card -- and the
+                        // row said "Info" to a button that did nothing (UI pass
+                        // 2026-09-24, screenshots 01/06). One shoulder stands for
+                        // L/R here (see EsDeThemedHelpSystem's doc comment); it
+                        // is R, the same button every other screen's hint row
+                        // names for switching section, where this one said L.
                         val systemListHints = listOf(
                             GamepadAction.A to "Select",
-                            GamepadAction.Y to "Info",
-                            GamepadAction.L to "Switch section",
+                            GamepadAction.R to "Switch section",
                         )
                         val systemView = theme?.views?.get("system")
                         // Same rule as the gamelist's own claim above: a

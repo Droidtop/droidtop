@@ -1317,9 +1317,12 @@ object AppSettingsCatalogs {
     private fun scraperScreen() = CatalogScreen(
         id = SCREEN_SCRAPER,
         title = "Artwork & metadata scraper",
-        subtitle = "One source at a time, like real ES-DE. TheGamesDB needs its own free API key; " +
-            "ScreenScraper needs a registered developer ID, which droidtop does not have yet. " +
-            "The libretro database needs no account at all",
+        // The ScreenScraper sentence used to say droidtop had no developer ID,
+        // long after one was registered (ScreenScraperDevCredentials), so the
+        // page argued against its own default (UI pass 2026-09-24, finding H7).
+        subtitle = "One source at a time, like real ES-DE. ScreenScraper works without an account; " +
+            "your own ScreenScraper login raises how much you can scrape per day. TheGamesDB needs " +
+            "its own free API key. The libretro database needs no account at all",
         groups = { context ->
             listOf(
                 CatalogGroup(
