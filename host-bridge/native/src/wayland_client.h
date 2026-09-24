@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 
@@ -23,6 +24,7 @@ namespace hostbridge {
 struct WaylandGlobals;
 struct OutputCapture;
 struct ClipboardState;
+struct DispatchTasks;
 
 /**
  * Called on a hostbridge-owned worker thread (NOT the Wayland dispatch
@@ -68,6 +70,14 @@ public:
     // its lifetime via ANativeWindow_acquire/release around the JNI call.
     bool presentPrimaryOutput(ANativeWindow* window);
     void stopPresenting();
+
+    // Asks the compositor, over wlr-output-management, to give its output
+    // this exact size (a custom mode: a headless output accepts any). The
+    // Android view showing the desktop calls this with its own size, so a
+    // captured frame maps 1:1 onto the view instead of being stretched.
+    // Applied as soon as the compositor has announced its output; returns
+    // false only when it offers no output management at all.
+    bool setOutputSize(int32_t width, int32_t height);
 
     // Input injection — safe to call from a thread other than the one that
     // called connect()/runs the dispatch loop. libwayland-client's requests
@@ -120,10 +130,25 @@ private:
     ClipboardState* clipboard_ = nullptr;
 
     void* dispatchThreadHandle_ = nullptr; // pthread_t, opaque here to avoid pulling <pthread.h> into the header
-    bool dispatchThreadRunning_ = false;
+    std::atomic<bool> dispatchThreadRunning_{false};
+
+    // Wakes the dispatch thread out of poll(): posted tasks, shutdown.
+    int wakeFd_ = -1;
+    DispatchTasks* tasks_ = nullptr;
 
     void startDispatchThread();
     void stopDispatchThread();
+
+    // Runs `task` on the dispatch thread and waits for it: everything that
+    // touches capture or output-configuration state goes through here, so
+    // that state has exactly one thread. Runs inline when there is no
+    // dispatch thread (before connect() finishes, after it has exited).
+    void runOnDispatchThread(void (*task)(WaylandClient*, void*), void* arg);
+    void runPendingTasks();
+    void wake();
+
+    void stopPresentingOnDispatchThread();
+    void applyOutputSizeOnDispatchThread();
 };
 
 } // namespace hostbridge

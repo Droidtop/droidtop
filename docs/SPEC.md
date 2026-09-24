@@ -155,9 +155,35 @@ Android side — that broke the actual intent:
   API) — resizable, movable windows sitting alongside Wine/Linux windows
   in the same Desktop shell, not a separate "Android apps" mode.
 
-Nothing in this section is implemented yet — the in-container launcher
-doesn't exist as software, the injection channel isn't designed in detail,
-and the helper process is a concept, not code.
+The in-container launcher doesn't exist as software yet, the injection
+channel isn't designed in detail, and the helper process is a concept,
+not code.
+
+**Until it does (built 2026-09-24): droidtop's Start menu lists the primary
+container's own applications.** `ContainerApplications` (`runtime-common`)
+reads the freedesktop desktop entries the container's packages installed
+(`/usr/share/applications`, `/usr/local/share/applications`) through
+`ContainerRuntime.exec` — the same list any Linux desktop's menu shows, so
+anything the user installs appears without droidtop knowing about it — and
+parses them per the Desktop Entry Specification (the `[Desktop Entry]`
+group only, `Type=Application`, `NoDisplay`/`Hidden` honoured, `Exec`
+unquoted per the spec with its field codes dropped, `Terminal=true`
+programs run inside the provisioned terminal). The list is read every time
+the menu opens, above the library's own entries. Launching is an `exec` in
+the primary container, so the window appears on the shared desktop. These
+are session objects, not library entries: they exist only while the
+session runs and launching one needs the live session, whereas the library
+is an index persisted per game (§7g). When the container-side launcher
+lands it replaces this list rather than joining it.
+
+**A program's lifetime belongs to the session, not a screen.** A launched
+program's `exec` lasts as long as its window, and ending that wait ends
+the program (under proot the session is killed). The terminal button used
+to wait inside the desktop shell's composition, so rotating the device
+would have killed every open window. Both the terminal and Start menu
+launches now go through `DesktopSessionService.runInPrimary`, which waits
+in the service's own scope and reports a failure (the program's last
+output) back to the shell.
 
 **Chrome theming (decided 2026-08-30)**: droidtop's own Compose chrome
 (Onboarding, Desktop shell panels, Console systems, etc.) follows the
@@ -1794,16 +1820,41 @@ with the extent they were scaled against. The transform is rebuilt in
 read honestly there: it is not the panel size (the taskbar takes 48dp of it)
 and it is not the output size.
 
-The default fit is `STRETCH`, because that is what the present path actually
-does — `presentPrimaryOutput` sets the buffer geometry to the output size and
-SurfaceFlinger scales that buffer to fill the view's bounds, per axis, with no
-letterboxing anywhere. Under `STRETCH` only the ratio x/x_extent reaches the
-compositor, so the fact that Kotlin only knows the *Android panel* size and
-not the true compositor output size (which arrives natively, in the screencopy
-`buffer` event) cannot produce a scale error. A `LETTERBOX` fit exists and is
-tested alongside it, for the moment the present path grows an
-aspect-preserving mode; that mode makes the aspect ratio load-bearing, so
-taking it requires plumbing the real output size up from native first.
+The output is sized to the view. In `surfaceChanged` the viewport asks the
+compositor, through `HostBridge.setOutputSize`, to give its headless output
+exactly the surface's size (a custom mode over
+`wlr-output-management-unstable-v1`; a headless output accepts any), so a
+captured frame lands 1:1 on the view. That is compositor-neutral: any
+wlroots compositor implements the protocol, where `swaymsg` would have tied
+the viewport to sway.
+
+The fit stays `STRETCH`, because that is still what the present path does
+until the new mode is applied (and permanently, for a compositor without
+output management) — `presentPrimaryOutput` sets the buffer geometry to the
+output size and SurfaceFlinger scales that buffer to fill the view's
+bounds, per axis, with no letterboxing anywhere. Under `STRETCH` only the
+ratio x/x_extent reaches the compositor, so a mismatch between the size
+Kotlin assumes and the true output size cannot produce a scale error. A
+`LETTERBOX` fit exists and is tested alongside it, for the moment the
+present path grows an aspect-preserving mode; that mode makes the aspect
+ratio load-bearing, so taking it requires plumbing the real output size up
+from native first.
+
+**The frame path's threading (rebuilt 2026-09-24).** `:host-bridge`'s native
+client has one dispatch thread, and it owns everything the compositor's
+events touch: the capture loop and the output configuration. It waits on
+the display fd and an eventfd together (libwayland's
+`prepare_read`/`read_events` protocol) and flushes before every wait;
+starting and stopping a capture and requesting a size are tasks posted to
+it, and input requests flush as they are made. The loop it replaced
+blocked in `wl_display_dispatch()`, which flushes only when an event
+arrives: a capture request made from the UI thread against an idle
+compositor was never sent, `disconnect()` joined a thread that could wait
+forever, and stopping a capture from the UI thread raced the frame
+callback still drawing with it. Capture uses `copy_with_damage` (screencopy
+v2+), so the compositor holds each frame until something on the output
+changed and an idle desktop costs nothing; a buffer is reallocated when the
+frame's geometry changes, not just its byte count.
 
 **Keys.** Android keycodes are translated to Linux evdev codes and injected
 raw. There is no second layout table: the layout is entirely the XKB keymap
@@ -2180,8 +2231,10 @@ app-drawer icon or a floating switcher button:
   Android-side taskbar + start menu) is a first pass predating §2a's
   design and needs reworking to match it: drop the in-app-launcher
   UI in favor of a real task manager, since the app launcher belongs in
-  the primary container instead. The live desktop connection itself is
-  blocked on `DesktopSessionService` (still a TODO — see `:app`).
+  the primary container instead. Until then its start menu lists the
+  primary container's installed applications (§2a). The live desktop
+  connection is `DesktopSessionService` (`:app`), over either backend
+  (§3).
 - **`:shell-gamepad` ("Gaming")** — full-screen, D-pad-navigable, reading
   the same `Library`; optional and toggleable, never the assumed default
   experience. **Superseded design decision (2026-08-29): a single real

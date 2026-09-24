@@ -20,6 +20,8 @@ import dev.droidtop.hostbridge.ClipboardBridge
 import dev.droidtop.library.Library
 import dev.droidtop.library.settings.Mode
 import dev.droidtop.library.settings.Modes
+import dev.droidtop.runtime.ContainerApp
+import dev.droidtop.runtime.ContainerApplications
 import dev.droidtop.runtime.ContainerTerminal
 import dev.droidtop.runtime.DisplayOutputKind
 import dev.droidtop.runtime.DisplayOutputRepository
@@ -240,6 +242,7 @@ class MainActivity : AppCompatActivity() {
                 )
                 Mode.DESKTOP -> {
                     val sessionState by DesktopSessionService.state.collectAsState()
+                    val desktopLaunchFailure by DesktopSessionService.launchFailure.collectAsState()
                     val connected = sessionState as? DesktopSessionState.Connected
                     DesktopShell(
                         library = library,
@@ -251,20 +254,32 @@ class MainActivity : AppCompatActivity() {
                             is DesktopSessionState.Connected -> DesktopSessionMessage.Idle
                             is DesktopSessionState.Failed -> DesktopSessionMessage.Failed(state.message)
                         },
-                        // Only offered when there is a live session to open a
-                        // terminal in -- see DesktopShell's own comment on
+                        // Programs (the terminal, the Start menu's Linux apps)
+                        // run in the session, not in this screen: see
+                        // DesktopSessionService.runInPrimary. Only offered with
+                        // a live session -- see DesktopShell's own comment on
                         // why the button is absent rather than disabled.
-                        // Suspends until the terminal window is closed, since
-                        // it is an ordinary foreground process on the shared
-                        // desktop, and reports whatever went wrong if it
-                        // never appeared.
-                        onOpenTerminal = connected?.let { session ->
-                            suspend {
-                                ContainerTerminal.failureMessage(
-                                    ContainerTerminal.open(session.runtime, session.container),
-                                )
+                        onOpenTerminal = connected?.let {
+                            {
+                                DesktopSessionService.runInPrimary { runtime, container ->
+                                    ContainerTerminal.failureMessage(ContainerTerminal.open(runtime, container))
+                                }
+                                Unit
                             }
                         },
+                        loadLinuxApps = connected?.let { session ->
+                            suspend { ContainerApplications.list(session.runtime, session.container) }
+                        },
+                        onLaunchLinuxApp = connected?.let {
+                            { app: ContainerApp ->
+                                DesktopSessionService.runInPrimary { runtime, container ->
+                                    ContainerApplications.launch(runtime, container, app)
+                                }
+                                Unit
+                            }
+                        },
+                        launchFailure = desktopLaunchFailure,
+                        onDismissLaunchFailure = { DesktopSessionService.dismissLaunchFailure() },
                     )
                 }
                 // Nothing to render: both app-hosted modes are off, and

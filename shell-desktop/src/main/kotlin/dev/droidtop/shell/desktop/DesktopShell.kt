@@ -44,9 +44,12 @@ import dev.droidtop.input.InputSeats
 import dev.droidtop.input.PointerTransform
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.runtime.ContainerApp
 import dev.droidtop.runtime.DisplayOutput
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -89,19 +92,13 @@ fun DesktopShell(
     hostBridge: HostBridge?,
     primaryOutput: DisplayOutput?,
     sessionMessage: DesktopSessionMessage = DesktopSessionMessage.Idle,
-    onOpenTerminal: (suspend () -> String?)? = null,
+    onOpenTerminal: (() -> Unit)? = null,
+    loadLinuxApps: (suspend () -> List<ContainerApp>)? = null,
+    onLaunchLinuxApp: ((ContainerApp) -> Unit)? = null,
+    launchFailure: String? = null,
+    onDismissLaunchFailure: () -> Unit = {},
 ) {
     var startMenuOpen by remember { mutableStateOf(false) }
-    var terminalError by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
-
-    val openTerminal: (() -> Unit)? = onOpenTerminal?.let { open ->
-        {
-            terminalError = null
-            scope.launch { terminalError = open() }
-            Unit
-        }
-    }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         DesktopViewport(hostBridge, primaryOutput, sessionMessage)
@@ -112,16 +109,18 @@ fun DesktopShell(
             // Absent rather than disabled when there is no live session:
             // a Terminal button that cannot open a terminal is a lie about
             // what the desktop can do right now.
-            onOpenTerminal = openTerminal,
+            onOpenTerminal = onOpenTerminal,
         )
 
-        terminalError?.let { message ->
-            TerminalErrorBanner(message = message, onDismiss = { terminalError = null })
+        launchFailure?.let { message ->
+            LaunchFailureBanner(message = message, onDismiss = onDismissLaunchFailure)
         }
 
         if (startMenuOpen) {
             StartMenu(
                 library = library,
+                loadLinuxApps = loadLinuxApps,
+                onLaunchLinuxApp = onLaunchLinuxApp,
                 onDismiss = { startMenuOpen = false },
             )
         }
@@ -129,13 +128,15 @@ fun DesktopShell(
 }
 
 /**
- * A terminal that never appeared has to say why. The failure text comes
- * from [dev.droidtop.runtime.ContainerTerminal.failureMessage], which
- * distinguishes "the package isn't in this container" from anything else,
- * rather than being invented here.
+ * A program that never appeared (or exited badly) has to say why. The
+ * text comes from where the failure is understood --
+ * [dev.droidtop.runtime.ContainerTerminal.failureMessage] tells "the
+ * package isn't in this container" apart from anything else,
+ * [dev.droidtop.runtime.ContainerApplications.launch] quotes the program's
+ * own last output -- rather than being invented here.
  */
 @Composable
-private fun BoxScope.TerminalErrorBanner(message: String, onDismiss: () -> Unit) {
+private fun BoxScope.LaunchFailureBanner(message: String, onDismiss: () -> Unit) {
     Column(
         modifier = Modifier
             .align(Alignment.TopCenter)
@@ -146,7 +147,7 @@ private fun BoxScope.TerminalErrorBanner(message: String, onDismiss: () -> Unit)
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            "Couldn't open a terminal",
+            "A program didn't run",
             color = MaterialTheme.colorScheme.onErrorContainer,
             style = MaterialTheme.typography.titleMedium,
         )
@@ -212,23 +213,30 @@ private fun BoxScope.DesktopViewport(
                             presentFailed = !hostBridge.presentOutput(primaryOutput, holder.surface)
                         }
 
-                        // The only place the input transform can be built
-                        // honestly: width/height here are the surface's real
-                        // size, which is not the panel size (the taskbar
-                        // takes 48dp) and not necessarily the output size
-                        // either. Rebuilt on every change, so a rotation or
-                        // a lapdock resize cannot leave a stale scale behind.
+                        // The only place the view's real size is known:
+                        // width/height here are the surface's, which is not
+                        // the panel size (the taskbar takes 48dp). The
+                        // compositor is asked to make its output exactly
+                        // this size, so a frame lands 1:1 on the view rather
+                        // than being stretched, and the input transform is
+                        // rebuilt with it. Both on every change, so a
+                        // rotation or a lapdock resize cannot leave a stale
+                        // size behind. Until the compositor has applied the
+                        // new size the frame is scaled to fit, which the
+                        // STRETCH transform already accounts for (it only
+                        // hands the compositor ratios).
                         override fun surfaceChanged(
                             holder: SurfaceHolder,
                             format: Int,
                             width: Int,
                             height: Int,
                         ) {
+                            val sized = hostBridge.setOutputSize(width, height)
                             router.transform = PointerTransform(
                                 viewWidth = width,
                                 viewHeight = height,
-                                outputWidth = primaryOutput.widthPx,
-                                outputHeight = primaryOutput.heightPx,
+                                outputWidth = if (sized) width else primaryOutput.widthPx,
+                                outputHeight = if (sized) height else primaryOutput.heightPx,
                             )
                         }
 
@@ -483,14 +491,34 @@ private fun formatClock(): String =
     SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date())
 
 @Composable
-private fun BoxScope.StartMenu(library: Library, onDismiss: () -> Unit) {
+private fun BoxScope.StartMenu(
+    library: Library,
+    loadLinuxApps: (suspend () -> List<ContainerApp>)?,
+    onLaunchLinuxApp: ((ContainerApp) -> Unit)?,
+    onDismiss: () -> Unit,
+) {
     val context = LocalContext.current
     var entries by remember { mutableStateOf<List<LibraryEntry>?>(null) }
+    var linuxApps by remember { mutableStateOf<List<ContainerApp>>(emptyList()) }
+    var linuxAppsError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val taskbarAtTop = DesktopPrefs.taskbarAtTop(context)
 
     LaunchedEffect(library) {
         entries = library.scanAll()
+    }
+    // Read again every time the menu opens: what is installed in the
+    // container changes whenever the user installs something in it.
+    LaunchedEffect(loadLinuxApps) {
+        val load = loadLinuxApps ?: return@LaunchedEffect
+        try {
+            linuxApps = withContext(Dispatchers.IO) { load() }
+            linuxAppsError = null
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            linuxAppsError = t.message ?: t.toString()
+        }
     }
 
     Box(
@@ -501,16 +529,49 @@ private fun BoxScope.StartMenu(library: Library, onDismiss: () -> Unit) {
             .background(MaterialTheme.colorScheme.surfaceVariant),
     ) {
         val currentEntries = entries
-        when {
-            currentEntries == null -> Text("Loading…", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(16.dp))
-            currentEntries.isEmpty() -> Text(
-                "Nothing in the library yet.",
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(16.dp),
-            )
-
-            else -> LazyColumn(modifier = Modifier.padding(8.dp)) {
-                items(currentEntries, key = { it.id }) { entry ->
+        LazyColumn(modifier = Modifier.padding(8.dp)) {
+            // The primary container's own applications first: they are
+            // what the desktop runs. Launched into the session, so their
+            // windows appear on the desktop behind this menu.
+            if (loadLinuxApps != null) {
+                item(key = "linux-apps-header") { StartMenuHeader("Linux apps") }
+                linuxAppsError?.let { message ->
+                    item(key = "linux-apps-error") {
+                        Text(
+                            "Couldn't read the installed apps: $message",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        )
+                    }
+                }
+                items(linuxApps, key = { "linux:" + it.id }) { app ->
+                    Text(
+                        app.name,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onLaunchLinuxApp?.invoke(app)
+                                onDismiss()
+                            }
+                            .padding(vertical = 4.dp, horizontal = 8.dp),
+                    )
+                }
+                item(key = "library-header") { StartMenuHeader("Library") }
+            }
+            when {
+                currentEntries == null -> item(key = "library-loading") {
+                    Text("Loading…", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(8.dp))
+                }
+                currentEntries.isEmpty() -> item(key = "library-empty") {
+                    Text(
+                        "Nothing in the library yet.",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(8.dp),
+                    )
+                }
+                else -> items(currentEntries, key = { it.id }) { entry ->
                     Text(
                         entry.title,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -526,4 +587,14 @@ private fun BoxScope.StartMenu(library: Library, onDismiss: () -> Unit) {
             }
         }
     }
+}
+
+@Composable
+private fun StartMenuHeader(title: String) {
+    Text(
+        title,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.labelMedium,
+        modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 4.dp),
+    )
 }

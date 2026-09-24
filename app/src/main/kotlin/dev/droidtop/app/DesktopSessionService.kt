@@ -77,6 +77,7 @@ class DesktopSessionService : Service() {
     override fun onCreate() {
         super.onCreate()
         startForeground(NOTIFICATION_ID, buildNotification())
+        sessionScope = scope
         _stateHolder.value = DesktopSessionState.Connecting()
         scope.launch { connect() }
     }
@@ -95,6 +96,7 @@ class DesktopSessionService : Service() {
             }
         }
         _stateHolder.value = DesktopSessionState.Idle
+        sessionScope = null
         // The seat belongs to the bridge that has just gone away. Dropped
         // here so no surface -- the desktop viewport or the second screen
         // -- can be handed one pointing at a dead connection.
@@ -289,5 +291,45 @@ class DesktopSessionService : Service() {
 
         /** Observed by DesktopShell/MainActivity instead of a null/null placeholder. */
         val state: StateFlow<DesktopSessionState> = _stateHolder.asStateFlow()
+
+        @Volatile
+        private var sessionScope: CoroutineScope? = null
+
+        private val _launchFailure = MutableStateFlow<String?>(null)
+
+        /** Why the last program started with [runInPrimary] did not run (or exited badly), until dismissed. */
+        val launchFailure: StateFlow<String?> = _launchFailure.asStateFlow()
+
+        fun dismissLaunchFailure() {
+            _launchFailure.value = null
+        }
+
+        /**
+         * Runs a program in the primary container for as long as the
+         * desktop session lives. A program's `exec` lasts as long as its
+         * window, and ending that wait ends the program (under proot the
+         * session is killed), so the wait belongs to the session, not to a
+         * screen: waiting in the desktop shell's own composition would have
+         * killed every open window on a rotation. [block] returns a failure
+         * message or null; a message lands in [launchFailure]. Returns false
+         * when there is no connected session to run in.
+         */
+        fun runInPrimary(block: suspend (ContainerRuntime, Container) -> String?): Boolean {
+            val session = _stateHolder.value as? DesktopSessionState.Connected ?: return false
+            val scope = sessionScope ?: return false
+            _launchFailure.value = null
+            scope.launch {
+                val failure = try {
+                    block(session.runtime, session.container)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (t: Throwable) {
+                    android.util.Log.w(TAG, "Running a program in the primary container failed", t)
+                    t.message ?: t.toString()
+                }
+                if (failure != null) _launchFailure.value = failure
+            }
+            return true
+        }
     }
 }
