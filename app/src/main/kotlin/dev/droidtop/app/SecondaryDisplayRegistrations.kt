@@ -1,8 +1,6 @@
 package dev.droidtop.app
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import dev.droidtop.display.SecondaryDisplayContent
 
 /**
@@ -54,7 +52,7 @@ object SecondaryDisplayRegistrations {
         if (SecondScreenInputPrefs.role(context, mode) == SecondScreenInputPrefs.Role.INPUT) {
             SecondScreenInputSurface(mode)
         } else {
-            val entry by CompanionState.focusedEntry.collectAsState()
+            val entry = settledFocusedEntry()
             dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
                 CompanionSurfaceHost(entry)
             }
