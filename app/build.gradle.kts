@@ -246,7 +246,7 @@ dependencies {
     // SavedStateRegistryOwner on its own the way an Activity is) -- not resolvable
     // transitively via lifecycle-runtime-ktx alone, needs the base artifacts explicitly.
     implementation("androidx.lifecycle:lifecycle-runtime:2.8.4")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.4")
+    implementation(libs.androidx.lifecycle.runtime.compose)
     // OnboardingActivity's own OnboardingRun (androidx.lifecycle.ViewModel
     // + `by viewModels()`): the onboarding run's answers have to outlive
     // the Activity across a rotation. Both artifacts arrive transitively

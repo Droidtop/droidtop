@@ -19,6 +19,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
@@ -639,6 +643,8 @@ class Library(
     private val index: LibraryIndexStore = NoOpLibraryIndexStore,
     /** The per-game records (docs/SPEC.md 7g); a launch by id reads the one it needs first. */
     private val records: GameRecordStore = NoOpGameRecordStore,
+    /** Asked before each slow round; false (battery saver) skips that round (docs/SPEC.md 7g). */
+    private val slowRoundAllowed: () -> Boolean = { true },
 ) {
     private val scanScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val backgroundScanStates = ConcurrentHashMap<Set<LibraryEntryKind>, MutableStateFlow<List<LibraryEntry>?>>()
@@ -699,13 +705,34 @@ class Library(
         }.asCoroutineDispatcher()
     private val slowRebuildStarted = java.util.concurrent.atomic.AtomicBoolean(false)
 
+    /** Every key [backgroundScanStates] holds; moves when a list is first asked for, so [observed] covers it. */
+    private val stateKeys = MutableStateFlow<Set<Set<LibraryEntryKind>>>(emptySet())
+
+    /**
+     * Whether any surface collects one of the library's lists right now
+     * (docs/SPEC.md 2c): a Gaming or Desktop shell on screen, the
+     * Launcher's Games grid open. The slow pass runs only while this is
+     * true, so a process whose every observer is gone -- Gaming turned
+     * off, the grid closed -- walks no games root.
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val observed: Flow<Boolean> = stateKeys.flatMapLatest { keys ->
+        val counts = keys.mapNotNull { backgroundScanStates[it]?.subscriptionCount }
+        if (counts.isEmpty()) flowOf(false) else combine(counts) { each -> each.any { it > 0 } }
+    }.distinctUntilChanged()
+
+    private fun stateFor(key: Set<LibraryEntryKind>): MutableStateFlow<List<LibraryEntry>?> =
+        backgroundScanStates.getOrPut(key) { MutableStateFlow(null) }.also {
+            if (key !in stateKeys.value) stateKeys.update { keys -> keys + key }
+        }
+
     /**
      * Process-owned scan results. The Library instance belongs to LibraryCore and
      * outlives every Activity/Compose screen, so collectors may come and go
      * without cancelling the filesystem walk that produces these values.
      */
     fun backgroundScanState(kinds: Set<LibraryEntryKind>): StateFlow<List<LibraryEntry>?> =
-        backgroundScanStates.getOrPut(kinds.toSet()) { MutableStateFlow(null) }.asStateFlow()
+        stateFor(kinds.toSet()).asStateFlow()
 
     /**
      * Start (or explicitly restart) a scan in [scanScope], never in a UI
@@ -749,7 +776,7 @@ class Library(
         // ones this step exists for -- never rebuilt at all.
         if (!rescan) startSlowRebuildOnce()
         val key = kinds.toSet()
-        val state = backgroundScanStates.getOrPut(key) { MutableStateFlow(null) }
+        val state = stateFor(key)
         lateinit var job: Job
         job = scanScope.coroutineLaunch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
             try {
@@ -834,12 +861,22 @@ class Library(
      * Starts the slow rebuild pass' recurring loop, once per process
      * (docs/SPEC.md 7g, step 4: "kept honest ... over time," not a
      * one-shot): a short delay after the FIRST ordinary scan starts, then
-     * a round every [SLOW_REBUILD_INTERVAL_MS] for as long as the process
-     * lives, so a games root someone edits while droidtop keeps running
-     * (adds a game, deletes one) is picked up without the user ever
-     * pressing "Rescan library." Covers every provider, not just whichever
-     * kinds the FIRST [scanInBackground] call happened to ask about -- see
-     * that call site's own doc comment for the real race this avoids.
+     * a round every [SLOW_REBUILD_INTERVAL_MS], so a games root someone
+     * edits while droidtop keeps running (adds a game, deletes one) is
+     * picked up without the user ever pressing "Rescan library." Covers
+     * every provider, not just whichever kinds the FIRST
+     * [scanInBackground] call happened to ask about -- see that call
+     * site's own doc comment for the real race this avoids.
+     *
+     * Rounds run only while something [observed] the library
+     * (docs/SPEC.md 2c): the loop waits for an observer before a round,
+     * and the last observer leaving cancels the round in progress. It
+     * used to run for the life of the process, so turning Gaming off
+     * left a walk of every games root every 30 minutes behind it. An
+     * observer coming back after [SLOW_REBUILD_RETURN_MS] or more away
+     * gets a round at once rather than at the end of the interval (a
+     * game copied over USB appears when the person comes back), and a
+     * round [slowRoundAllowed] refuses (battery saver) is skipped.
      *
      * A round never runs beside an ordinary walk: it waits for every
      * walk in flight to finish, and a walk that starts during a round
@@ -853,22 +890,49 @@ class Library(
         scanScope.coroutineLaunch {
             delay(SLOW_REBUILD_START_DELAY_MS)
             while (true) {
+                observed.first { it }
                 activeWalks.first { it == 0 }
-                val round = scanScope.coroutineLaunch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
-                    try {
-                        runSlowRound()
-                    } catch (t: kotlinx.coroutines.CancellationException) {
-                        throw t
-                    } catch (t: Throwable) {
-                        Log.e("droidtop.Library", "Slow rebuild pass failed", t)
-                    }
-                }
-                slowRound = round
-                // A walk that started between the wait and here found no
-                // round to cancel; this round then yields to it instead.
-                if (activeWalks.value == 0) round.start() else round.cancel()
-                round.join()
-                delay(SLOW_REBUILD_INTERVAL_MS)
+                if (slowRoundAllowed()) runObservedRound()
+                waitForNextRound()
+            }
+        }
+    }
+
+    /** One round, cancelled by an ordinary walk starting or by the last observer leaving. */
+    private suspend fun runObservedRound() = coroutineScope {
+        val round = scanScope.coroutineLaunch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
+            try {
+                runSlowRound()
+            } catch (t: kotlinx.coroutines.CancellationException) {
+                throw t
+            } catch (t: Throwable) {
+                Log.e("droidtop.Library", "Slow rebuild pass failed", t)
+            }
+        }
+        slowRound = round
+        val unobserved = coroutineLaunch {
+            observed.first { !it }
+            round.cancel()
+        }
+        // A walk that started between the wait and here found no
+        // round to cancel; this round then yields to it instead.
+        if (activeWalks.value == 0) round.start() else round.cancel()
+        round.join()
+        unobserved.cancel()
+    }
+
+    /**
+     * Returns after [SLOW_REBUILD_INTERVAL_MS], or sooner when the
+     * library goes unobserved and is observed again after
+     * [SLOW_REBUILD_RETURN_MS] or more away.
+     */
+    private suspend fun waitForNextRound() {
+        kotlinx.coroutines.withTimeoutOrNull(SLOW_REBUILD_INTERVAL_MS) {
+            while (true) {
+                observed.first { !it }
+                val leftAt = System.nanoTime()
+                observed.first { it }
+                if ((System.nanoTime() - leftAt) / 1_000_000 >= SLOW_REBUILD_RETURN_MS) break
             }
         }
     }
@@ -1456,6 +1520,9 @@ class Library(
 
         /** docs/SPEC.md 7g, step 4: how long the slow pass waits between rounds once it has run -- "kept honest ... over time." */
         const val SLOW_REBUILD_INTERVAL_MS = 30 * 60_000L
+
+        /** docs/SPEC.md 7g: how long nothing must have observed the library for its return to start a round at once. */
+        const val SLOW_REBUILD_RETURN_MS = 5 * 60_000L
 
         /** docs/SPEC.md 7g, step 4: the pause between parts the slow pass takes and "Rescan library" deliberately does not. */
         const val SLOW_REBUILD_PAUSE_MS = 500L
