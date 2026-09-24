@@ -641,6 +641,22 @@ class Library(
      * whatever it finds. Everything else (a configuration change replaying
      * a rescan intent) joins the running job instead.
      */
+    /**
+     * Rebuilds the index from the per-game records and shows the result,
+     * without walking any folder: every running or remembered background
+     * collection is restarted against the rebuilt index as a plain
+     * (non-rescan) scan, which for indexed providers means "load and
+     * publish", not "walk". Returns how many records the index was rebuilt
+     * from.
+     */
+    suspend fun rebuildIndexFromRecords(): Int {
+        val rebuilt = index.rebuildFromRecords()
+        for (kinds in backgroundScanStates.keys.toList()) {
+            scanInBackground(kinds, rescan = false, restart = true)
+        }
+        return rebuilt
+    }
+
     fun scanInBackground(kinds: Set<LibraryEntryKind>, rescan: Boolean = false, restart: Boolean = false) {
         // "A low-priority pass after start" (docs/SPEC.md 7g, step 4):
         // hooked onto the first ordinary (non-rescan) scan a shell ever
