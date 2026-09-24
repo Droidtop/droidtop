@@ -25,6 +25,9 @@ data class EsDeAnimationDirection(val reverseStart: Boolean, val alternate: Bool
  * `::render` (GIFAnimComponent.cpp:444-570), expressed as a function of
  * elapsed time instead of an accumulator, because that is the same answer
  * without the frame-skipping repair ES-DE needs and Compose does not.
+ * `LottieAnimComponent::update`/`::render` (LottieAnimComponent.cpp:
+ * 410-459, :480-518) carries the same bookkeeping line for line, so a
+ * Lottie animation's frame comes from here too.
  *
  * The rules that are not obvious from the property names:
  *
@@ -94,4 +97,111 @@ fun esDeAnimationFrame(
 fun esDeAnimationPacingMs(frameIntervalMs: Int, speed: Float?): Int {
     val modifier = (speed ?: 1f).coerceIn(0.2f, 3.0f)
     return (frameIntervalMs / modifier).toInt().coerceAtLeast(1)
+}
+
+/**
+ * The drawn size of a Lottie `animation` element, and the size it is
+ * rasterised at, in pixels.
+ */
+data class EsDeLottieSize(val width: Int, val height: Int, val rasterWidth: Int, val rasterHeight: Int)
+
+/**
+ * A port of `LottieAnimComponent`'s sizing, which is not the image
+ * element's: the animation's own viewport supplies the aspect ratio.
+ *
+ *  * `size` (LottieAnimComponent.cpp:276-289): each axis clamped to
+ *    0.01..1 of the screen when positive; `0 0` is a theme error ES-DE
+ *    turns into `0.01 0.01`. One axis left at zero is derived from the
+ *    viewport's aspect ratio (:165-172), the other is exact.
+ *  * `maxSize` (:290-295, :139-164): fitted inside the box, aspect kept.
+ *  * Neither: ES-DE's constructor default of a fifth of the screen on
+ *    each axis (:64), stretched.
+ *  * `scaleFactor` (:297-298, :185-188), clamped 0.1..1, rasterises at a
+ *    fraction of the drawn size, which is then scaled up to it.
+ *
+ * Every pixel figure is truncated to a whole number, as ES-DE's `size_t`
+ * casts do.
+ */
+fun esDeLottieSize(
+    size: Pair<Float, Float>?,
+    maxSize: Pair<Float, Float>?,
+    scaleFactor: Float?,
+    viewportWidth: Int,
+    viewportHeight: Int,
+    screenWidth: Float,
+    screenHeight: Float,
+): EsDeLottieSize {
+    var targetIsMax = false
+    val boxWidth: Float
+    val boxHeight: Float
+    if (size != null) {
+        var x = size.first
+        var y = size.second
+        if (x == 0f && y == 0f) {
+            x = 0.01f
+            y = 0.01f
+        }
+        if (x > 0f) x = x.coerceIn(0.01f, 1f)
+        if (y > 0f) y = y.coerceIn(0.01f, 1f)
+        boxWidth = x.coerceAtLeast(0f) * screenWidth
+        boxHeight = y.coerceAtLeast(0f) * screenHeight
+    } else if (maxSize != null) {
+        boxWidth = maxSize.first.coerceIn(0.01f, 1f) * screenWidth
+        boxHeight = maxSize.second.coerceIn(0.01f, 1f) * screenHeight
+        targetIsMax = true
+    } else {
+        boxWidth = 0.2f * screenWidth
+        boxHeight = 0.2f * screenHeight
+    }
+
+    // :140-144 guards a zero viewport only on the maxSize path; the ratio
+    // below divides by it on every path, so it is guarded for all.
+    val viewportW = viewportWidth.coerceAtLeast(1).toFloat()
+    val viewportH = viewportHeight.coerceAtLeast(1).toFloat()
+    val ratio = viewportW.toDouble() / viewportH.toDouble()
+    val width: Int
+    val height: Int
+    when {
+        targetIsMax -> {
+            val scaleX = boxWidth / viewportW
+            val scaleY = boxHeight / viewportH
+            if (scaleX < scaleY) {
+                width = (viewportW * scaleX).toInt()
+                height = minOf(viewportH * scaleX, boxHeight).toInt()
+            } else {
+                val h = viewportH * scaleY
+                height = h.toInt()
+                width = minOf((h / viewportH) * viewportW, boxWidth).toInt()
+            }
+        }
+        boxWidth == 0f -> {
+            width = (boxHeight.toDouble() * ratio).toInt()
+            height = boxHeight.toInt()
+        }
+        boxHeight == 0f -> {
+            width = boxWidth.toInt()
+            height = (boxWidth.toDouble() / ratio).toInt()
+        }
+        else -> {
+            width = boxWidth.toInt()
+            height = boxHeight.toInt()
+        }
+    }
+    val factor = scaleFactor?.coerceIn(0.1f, 1f) ?: 1f
+    val rasterWidth = if (factor != 1f) (width * factor).toInt() else width
+    val rasterHeight = if (factor != 1f) (height * factor).toInt() else height
+    return EsDeLottieSize(width, height, rasterWidth, rasterHeight)
+}
+
+/**
+ * A Lottie animation's frame interval: `(1000 / frameRate) / speed`,
+ * truncated, with the same 0.2..3.0 `speed` clamp as a GIF
+ * (LottieAnimComponent.cpp:204, :319-320). Unlike a GIF, the rate is the
+ * file's own declared frame rate, so it is not first rounded to whole
+ * milliseconds; zero when the file declares no usable rate.
+ */
+fun esDeLottiePacingMs(frameRate: Float, speed: Float?): Int {
+    if (frameRate <= 0f || frameRate.isNaN()) return 0
+    val modifier = (speed ?: 1f).coerceIn(0.2f, 3.0f)
+    return ((1000.0 / frameRate) / modifier).toInt().coerceAtLeast(1)
 }

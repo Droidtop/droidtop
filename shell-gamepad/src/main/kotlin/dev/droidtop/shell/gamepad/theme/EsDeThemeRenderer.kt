@@ -2015,10 +2015,11 @@ internal fun esDeAnimationKind(path: String): EsDeAnimationKind {
  * animation schema, unlike image/video -- confirmed against
  * ThemeData.cpp:415-438's property list).
  *
- * Lottie (".json") is parsed but deliberately NOT rendered: real ES-DE
- * treats it as a genuinely separate component class
- * (LottieAnimComponent, an rlottie integration) -- logged once per path
- * so a theme author sees why, not silently dropped.
+ * Lottie (".json") is its own component in ES-DE too
+ * (LottieAnimComponent), with its own sizing from the file's viewport and
+ * a `scaleFactor` the GIF path has no use for -- see [EsDeLottieAnimation].
+ * The colour, rotation, opacity and corner properties below reach it
+ * through the same modifier and colour filter.
  *
  * Real properties applied: pos/size/maxSize/origin/rotation/opacity via
  * the same [sizeOf]/[positionOf]/graphicsLayer helpers every other
@@ -2059,17 +2060,15 @@ private fun EsDeThemedAnimation(element: EsDeThemeElement, viewWidth: Dp, viewHe
     val path = element.valueOrNull<EsDeThemeValue.Path>("path")?.resolved
     if (path == null || !File(path).exists()) return
     val kind = esDeAnimationKind(path)
-    if (kind == EsDeAnimationKind.LOTTIE || kind == EsDeAnimationKind.UNSUPPORTED) {
+    if (kind == EsDeAnimationKind.UNSUPPORTED) {
         // Same real outcome as ES-DE's own "Invalid theme configuration"
-        // warning path (SystemView.cpp:667-675): no component.
+        // warning path (SystemView.cpp:666-675): no component.
         android.util.Log.w(
             "droidtop.EsDeTheme",
-            "animation element ${element.key}: ${if (kind == EsDeAnimationKind.LOTTIE) "Lottie (.json) animations are not implemented" else "unsupported animation extension"} ($path)",
+            "animation element ${element.key}: unsupported animation extension ($path)",
         )
         return
     }
-    val (width, height) = sizeOf(element, viewWidth, viewHeight)
-    val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
     val tint = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) }
     // Real `colorEnd`/`gradientType` (GIFAnimComponent.cpp:408-425): the far
@@ -2109,19 +2108,45 @@ private fun EsDeThemedAnimation(element: EsDeThemeElement, viewWidth: Dp, viewHe
     val hasExactSize = element.valueOrNull<EsDeThemeValue.Pair>("size") != null
     // The shared modifier both playback paths place themselves with, so
     // the two really are the same element drawn two ways.
-    val animationModifier = Modifier
-        .absoluteOffset(x = offsetX, y = offsetY)
-        .size(width = width, height = height)
-        .esDeRotation(element)
-        .graphicsLayer { alpha = opacity }
-        .esDeColorShiftGradient(tint, tintEnd, gradientHorizontal)
-        .let { if (cornerRadius > 0.dp) it.clip(RoundedCornerShape(cornerRadius)) else it }
+    val placeAnimation = { width: Dp, height: Dp ->
+        val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
+        Modifier
+            .absoluteOffset(x = offsetX, y = offsetY)
+            .size(width = width, height = height)
+            .esDeRotation(element)
+            .graphicsLayer { alpha = opacity }
+            .esDeColorShiftGradient(tint, tintEnd, gradientHorizontal)
+            .let { if (cornerRadius > 0.dp) it.clip(RoundedCornerShape(cornerRadius)) else it }
+    }
     val animationColorFilter = esDeImageColorFilter(
         if (esDeHasColorGradient(tint, tintEnd)) null else tint,
         saturation,
         brightness,
         dimming = 1f,
     )
+    if (kind == EsDeAnimationKind.LOTTIE) {
+        EsDeLottieAnimation(
+            path = path,
+            size = element.pairOrNull("size")?.let { it.x to it.y },
+            maxSize = element.pairOrNull("maxSize")?.let { it.x to it.y },
+            scaleFactor = element.floatOrNull("scaleFactor"),
+            direction = animationDirection,
+            speed = animationSpeed,
+            iterationCount = iterationCount,
+            // ES-DE's Lottie texture magnifies nearest unless the theme says
+            // linear or the element is rotated off a right angle
+            // (LottieAnimComponent.cpp:355-376); the unset case keeps Compose's
+            // filtered default for the reason recorded at esDeFilterQuality.
+            filterQuality = animationFilterQuality ?: FilterQuality.Low,
+            colorFilter = animationColorFilter,
+            viewWidth = viewWidth,
+            viewHeight = viewHeight,
+            place = placeAnimation,
+        )
+        return
+    }
+    val (width, height) = sizeOf(element, viewWidth, viewHeight)
+    val animationModifier = placeAnimation(width, height)
     if (drivenPlayback) {
         EsDeDrivenAnimation(
             path = path,

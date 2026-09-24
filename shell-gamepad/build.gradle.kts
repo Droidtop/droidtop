@@ -78,6 +78,10 @@ dependencies {
     // theme's own SVGs -- coil3's default decoders are raster-only, so this
     // is needed for AsyncImage to actually render them rather than fail.
     implementation(libs.coil.svg)
+    // Lottie (.json) `animation` elements, ES-DE's LottieAnimComponent.
+    // The same artifact :shell-default already ships, so nothing new lands
+    // in the APK.
+    implementation(libs.lottie)
     // Real "video" theme element playback -- see
     // theme/EsDeThemeRenderer.kt's own EsDeThemedVideo doc comment.
     implementation(libs.androidx.media3.exoplayer)

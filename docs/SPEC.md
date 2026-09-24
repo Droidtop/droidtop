@@ -3601,7 +3601,7 @@ summary):
   per-folder scrape action, single-selected-source only (real ES-DE has
   no automatic multi-source fallback chain).
 - Real element rendering: `image`/`text`/`carousel`/`grid`/`textlist`/
-  `video`+`animation` (static-fallback only, no real playback yet)/
+  `video`/`animation` (both played, see below)/
   `clock`/`datetime`/`rating`/`helpsystem`/`badges` (a real, full
   `FlexboxComponent`-ported layout — grid/direction/alignment/itemMargin/
   lines/itemsPerLine math, not an approximation — rendering 7 of real
@@ -3732,12 +3732,19 @@ wavs live in `./assets/sounds/`). `animation` — real GIF playback plus
 APNG (APNG4Android, the same library/version the vendored gamenative
 catalog pins), dispatched by extension exactly like real ES-DE
 (SystemView.cpp:648-676: .json→Lottie, .gif→GIF, else refused), with
-.png/.apng as droidtop's one deliberate widening of that set; Lottie
-(.json) is parsed but rendered as nothing with a logged warning — real
-ES-DE treats it as a separate component class (rlottie) and it stays
-out of scope. Animation properties speed/direction/interpolation/
-colorEnd-gradient/stationary/metadataElement are parsed but not
-applied (no decoder-level control for them) — honest gaps documented at
+.png/.apng as droidtop's one deliberate widening of that set. Lottie
+(.json) plays too, as of 2026-09-24: ES-DE's `LottieAnimComponent`
+renders through rlottie, droidtop through the Lottie library the
+launcher shell already ships (`EsDeLottieAnimation`). What is ES-DE's is
+the sizing, which comes from the file's own viewport rather than the
+image rules, including `scaleFactor` (rasterise smaller, draw scaled
+up), and the clock: frames advance at the file's frame rate divided by
+`speed`, through the same frame bookkeeping the GIF path ports, since
+LottieAnimComponent.cpp:410-518 is the GIF component's line for line;
+both are pure Kotlin in `EsDeAnimationPlayback.kt`, unit tested.
+ES-DE's per-file frame cache is not carried over. `speed`/`direction`/
+`interpolation`/`colorEnd`/`gradientType` are applied on both paths;
+`stationary`/`metadataElement` are not, as recorded at
 `EsDeThemedAnimation`.
 Generalizing the
 real gamelist list-widget path (`EsDeListItem`) to badge/rating overlays
