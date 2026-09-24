@@ -62,6 +62,100 @@ internal fun RunnerPicker(
     val offered = options.filter { it.state != RunnerState.NOT_FOR_THIS_GAME }
     val hidden = options.filter { it.state == RunnerState.NOT_FOR_THIS_GAME }
 
+    PickerPage(title = "Runs with", onDismiss = onDismiss) {
+        if (overridden) {
+            item {
+                RunnerRow(
+                    title = "Use droidtop's default again",
+                    detail = "Clears your choice for this game",
+                    enabled = true,
+                    selected = false,
+                    onSelect = { onPick(null) },
+                )
+            }
+        }
+        items(offered, key = { it.strategy.name }) { option ->
+            RunnerRow(
+                title = option.strategy.displayName(engine),
+                detail = listOfNotNull(
+                    option.reason,
+                    option.caveat,
+                    if (option.state == RunnerState.NEEDS_SETUP && option.reason == null) "Needs setup" else null,
+                ).joinToString(" - ").ifBlank { "Ready" },
+                enabled = option.selectable,
+                selected = option.strategy == current,
+                onSelect = { if (option.selectable) onPick(option.strategy) },
+            )
+        }
+        if (hidden.isNotEmpty()) {
+            item {
+                RunnerRow(
+                    title = if (showWhyNot) "Hide why the rest don't apply" else "Why not the others?",
+                    detail = "${hidden.size} runners this game doesn't offer",
+                    enabled = true,
+                    selected = false,
+                    onSelect = { showWhyNot = !showWhyNot },
+                )
+            }
+            if (showWhyNot) {
+                items(hidden, key = { "why:" + it.strategy.name }) { option ->
+                    Text(
+                        "${option.strategy.displayName(engine)} - ${option.reason.orEmpty()}",
+                        color = Color.Gray,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Which engine one game folder is — docs/SPEC.md §7e2b's pin, for a
+ * folder detection got wrong or could not name. [engines] are the engines
+ * database's ids, one per engine, in the database's order. Like the runner
+ * picker, clearing the pin is its own row, so a pin is never a one-way door.
+ */
+@Composable
+internal fun EnginePicker(
+    engines: List<Pair<String, GameEngine>>,
+    current: GameEngine?,
+    pinned: Boolean,
+    onPick: (String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    PickerPage(title = "Engine", onDismiss = onDismiss) {
+        if (pinned) {
+            item {
+                RunnerRow(
+                    title = "Detect it again",
+                    detail = "Clears your choice; the engines database decides",
+                    enabled = true,
+                    selected = false,
+                    onSelect = { onPick(null) },
+                )
+            }
+        }
+        items(engines, key = { it.first }) { (id, engine) ->
+            RunnerRow(
+                title = engine.displayName(),
+                detail = if (engine == current) "What this folder is now" else "Treat this folder as ${engine.displayName()}",
+                enabled = true,
+                selected = engine == current,
+                onSelect = { onPick(id) },
+            )
+        }
+    }
+}
+
+/** The full-screen page both pickers are: a title, a list, B to leave. */
+@Composable
+private fun PickerPage(
+    title: String,
+    onDismiss: () -> Unit,
+    content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -78,7 +172,7 @@ internal fun RunnerPicker(
             },
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("Runs with", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+        Text(title, color = Color.White, style = MaterialTheme.typography.headlineSmall)
         LazyColumn(
             modifier = Modifier.fillMaxWidth().weight(1f),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -86,53 +180,8 @@ internal fun RunnerPicker(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(
                 bottom = dev.droidtop.shell.gamepad.MenuTokens.HintBarRoom,
             ),
-        ) {
-            if (overridden) {
-                item {
-                    RunnerRow(
-                        title = "Use droidtop's default again",
-                        detail = "Clears your choice for this game",
-                        enabled = true,
-                        selected = false,
-                        onSelect = { onPick(null) },
-                    )
-                }
-            }
-            items(offered, key = { it.strategy.name }) { option ->
-                RunnerRow(
-                    title = option.strategy.displayName(engine),
-                    detail = listOfNotNull(
-                        option.reason,
-                        option.caveat,
-                        if (option.state == RunnerState.NEEDS_SETUP && option.reason == null) "Needs setup" else null,
-                    ).joinToString(" - ").ifBlank { "Ready" },
-                    enabled = option.selectable,
-                    selected = option.strategy == current,
-                    onSelect = { if (option.selectable) onPick(option.strategy) },
-                )
-            }
-            if (hidden.isNotEmpty()) {
-                item {
-                    RunnerRow(
-                        title = if (showWhyNot) "Hide why the rest don't apply" else "Why not the others?",
-                        detail = "${hidden.size} runners this game doesn't offer",
-                        enabled = true,
-                        selected = false,
-                        onSelect = { showWhyNot = !showWhyNot },
-                    )
-                }
-                if (showWhyNot) {
-                    items(hidden, key = { "why:" + it.strategy.name }) { option ->
-                        Text(
-                            "${option.strategy.displayName(engine)} - ${option.reason.orEmpty()}",
-                            color = Color.Gray,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-                        )
-                    }
-                }
-            }
-        }
+            content = content,
+        )
     }
 }
 

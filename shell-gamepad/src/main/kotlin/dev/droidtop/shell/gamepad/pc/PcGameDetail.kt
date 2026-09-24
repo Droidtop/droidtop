@@ -38,6 +38,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.library.EngineHost
+import dev.droidtop.library.EngineOverridePrefs
+import dev.droidtop.library.EnginesDatabase
+import dev.droidtop.library.GameEngine
 import dev.droidtop.library.GameLaunchStrategy
 import dev.droidtop.library.LaunchStrategyOverridePrefs
 import dev.droidtop.library.Library
@@ -47,6 +50,7 @@ import dev.droidtop.library.PcRunnerOptions
 import dev.droidtop.library.PcRunners
 import dev.droidtop.library.ResolvedRunner
 import dev.droidtop.library.RunnerState
+import dev.droidtop.library.displayName
 import dev.droidtop.library.scraper.PcScraper
 import dev.droidtop.shell.gamepad.CollectionMembershipEditor
 import dev.droidtop.shell.gamepad.ManualMatchPicker
@@ -107,6 +111,8 @@ internal fun PcGameDetail(
     var pickingMatch by remember(entry) { mutableStateOf(false) }
     var editingCollections by remember(entry) { mutableStateOf(false) }
     var pickingReplacement by remember(entry) { mutableStateOf(false) }
+    var pickingEngine by remember(entry) { mutableStateOf(false) }
+    var engineChoice by remember(entry) { mutableStateOf(EngineChoice.NONE) }
 
     LaunchedEffect(entry, reloadToken) {
         loaded = false
@@ -117,6 +123,26 @@ internal fun PcGameDetail(
         runners = computed.first
         resolved = computed.second
         loaded = true
+    }
+
+    // The engine pin (docs/SPEC.md 7e2b): which folder it is keyed by,
+    // whether one is set, and the engines it can name -- prefs and the
+    // engines database, so read on IO.
+    LaunchedEffect(entry, reloadToken) {
+        engineChoice = withContext(Dispatchers.IO) {
+            val folder = PcRunnerOptions.gameFolderFor(entry)
+            if (folder == null) {
+                EngineChoice.NONE
+            } else {
+                EngineChoice(
+                    folder = folder.absolutePath,
+                    pinned = EngineOverridePrefs.get(context, folder.absolutePath) != null,
+                    engines = EnginesDatabase.defs(context)
+                        .mapNotNull { def -> def.engine?.let { def.id to it } }
+                        .distinctBy { it.second },
+                )
+            }
+        }
     }
 
     // The game this entry is one folder of: the game's own name for the
@@ -174,6 +200,26 @@ internal fun PcGameDetail(
         )
         return
     }
+    val engineFolder = engineChoice.folder
+    if (pickingEngine && engineFolder != null) {
+        EnginePicker(
+            engines = engineChoice.engines,
+            current = runners.engine,
+            pinned = engineChoice.pinned,
+            onPick = { id ->
+                EngineOverridePrefs.set(context, engineFolder, id)
+                pickingEngine = false
+                status = if (id == null) {
+                    "Detecting this folder again. The library's label follows on its next scan."
+                } else {
+                    "Pinned. The library's label follows on its next scan."
+                }
+                reloadToken++
+            },
+            onDismiss = { pickingEngine = false },
+        )
+        return
+    }
     if (viewingMedia) {
         MediaViewer(title = entry.title, media = media, onClose = { viewingMedia = false })
         return
@@ -220,6 +266,21 @@ internal fun PcGameDetail(
         onChooseMatch = { pickingMatch = true },
         onViewMedia = { viewingMedia = true },
         onCollections = { editingCollections = true },
+        engineRow = runners.engine.let { engine ->
+            if (engineChoice.folder == null || !loaded) {
+                null
+            } else {
+                PcActionRow(
+                    "Engine",
+                    when {
+                        engine == null -> "Not detected as an engine game; pick one if it is"
+                        engineChoice.pinned -> "${engine.displayName()} - your choice"
+                        else -> "${engine.displayName()} - detected; pick another if that is wrong"
+                    },
+                    { pickingEngine = true },
+                )
+            }
+        },
         onEnginehost = { intent ->
             status = runCatching {
                 context.startActivity(intent)
@@ -407,6 +468,13 @@ private data class PcActionGroup(val title: String, val rows: List<PcActionRow>)
 /** [onSelect] null means the row is shown disabled, with [detail] saying why. */
 private data class PcActionRow(val title: String, val detail: String, val onSelect: (() -> Unit)?)
 
+/** What the Engine row needs: the pin's folder key, whether it is set, and the engines it can name. */
+private data class EngineChoice(val folder: String?, val pinned: Boolean, val engines: List<Pair<String, GameEngine>>) {
+    companion object {
+        val NONE = EngineChoice(null, false, emptyList())
+    }
+}
+
 @Composable
 private fun rememberPcActions(
     group: dev.droidtop.library.LibraryGameGroup?,
@@ -421,6 +489,7 @@ private fun rememberPcActions(
     onChooseMatch: () -> Unit,
     onViewMedia: () -> Unit,
     onCollections: () -> Unit,
+    engineRow: PcActionRow?,
     onEnginehost: (android.content.Intent) -> Unit,
     onOpenAppScreen: (className: String, extras: Map<String, String>) -> Unit,
     hasWindowsRoute: Boolean,
@@ -464,6 +533,9 @@ private fun rememberPcActions(
                     )
                     else -> null
                 },
+                // Which engine this folder is, and the pin that corrects
+                // detection (docs/SPEC.md 7e2b).
+                engineRow,
                 // One row, not three: install, verify, update, DLC and
                 // delete are one screen on the store's side, and that
                 // screen is the store's own (gamenative's AppScreen for

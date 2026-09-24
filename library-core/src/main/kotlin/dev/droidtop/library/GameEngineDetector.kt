@@ -1247,11 +1247,16 @@ class EngineGameProvider(
         val facts = records.get(entry.id)?.launch as? LaunchFacts.Engine
         if (facts != null) {
             val engine = runCatching { GameEngine.valueOf(facts.engine) }.getOrNull()
-            if (engine != null) {
+            // A pin set after the record was written (docs/SPEC.md 7e2b,
+            // EngineOverridePrefs) wins over the record: detect again
+            // rather than launch as the engine the person just corrected.
+            val pinned = EngineOverridePrefs.engineFor(context, entry.id)
+                ?: EngineOverridePrefs.engineFor(context, facts.gameRoot)
+            if (engine != null && (pinned == null || pinned == engine)) {
                 return ResolvedEntry(File(facts.gameRoot), engine, facts.engineVersion, facts.enginehostTarget)
             }
         }
-        ScanLog.write("record: ${entry.id} has no engine launch facts; detecting again from the folder")
+        ScanLog.write("record: ${entry.id} has no engine launch facts, or its engine is pinned; detecting again from the folder")
         val displayFolder = File(entry.id)
         // Through GameEngineDetector.detectGame, the same call scan()
         // itself uses, so this can never resolve a different folder than
