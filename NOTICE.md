@@ -5,8 +5,10 @@ This project is distributed under the GNU General Public License v3.0 (see
 
 ## Vendored / forked sources
 
-- **GameNative** — `vendor/gamenative`, https://github.com/utkarshdalal/GameNative — GPL-3.0.
-  `runtime-windows` is forked from its `com.winlator` runtime tree.
+- **GameNative** — `vendor/gamenative`, droidtop's fork
+  https://github.com/bi0shacker001/gamenative-tux of
+  https://github.com/utkarshdalal/GameNative — GPL-3.0.
+  `runtime-windows` compiles the whole vendored tree (docs/SPEC.md §9).
 - **Winlator** — https://github.com/brunodev85/winlator — LGPL-2.1.
   The upstream of GameNative's `com.winlator` runtime tree, and so of
   `runtime-windows`. Not vendored in this repository (the reference checkout
@@ -22,8 +24,9 @@ This project is distributed under the GNU General Public License v3.0 (see
 - **DroidSpaces** — `vendor/droidspaces`, https://github.com/ravindu644/Droidspaces-OSS — GPL-3.0.
   `runtime-linux-root` is forked from this.
 - **sway** — `vendor/sway`, https://github.com/swaywm/sway — MIT.
-  Runs unmodified (aside from headless-backend build configuration) inside
-  the primary container as the desktop compositor.
+  Source reference only; not built by droidtop. The compositor that runs
+  inside the primary container is the container distribution's own sway
+  package, installed at provisioning.
 - **wlroots** — `vendor/wlroots`, https://gitlab.freedesktop.org/wlroots/wlroots — MIT.
   Only protocol XML definitions are used (for `wayland-scanner` codegen in
   `host-bridge`); the library itself is not compiled for Android.
@@ -33,27 +36,28 @@ This project is distributed under the GNU General Public License v3.0 (see
 - **go-containerregistry** — `vendor/go-containerregistry`, https://github.com/google/go-containerregistry — Apache-2.0.
   `crane` is used for OCI image pulling in the rootfs image acquisition path.
 - **PRoot (Termux)** — `vendor/proot`, https://github.com/termux/proot — GPL-2.0-or-later.
-  Built unmodified into `libproot.so` and its loaders, the separate
+  Built, with the patches in `build-scripts/proot-patches/`, into
+  `libproot.so` and its loaders, the separate
   executables `runtime-linux-noroot` runs containers through on a device
   without root. Linked with the single-file talloc (LGPL-3.0-or-later)
   vendored at `vendor/gamenative/app/src/main/cpp/proot/talloc`.
-- **moonlight-common-c** — `vendor/moonlight-common-c`, https://github.com/moonlight-stream/moonlight-common-c — GPL-3.0.
-  `runtime-remote-stream` is built directly on this for GameStream/Sunshine
-  protocol support (pairing, app-list retrieval, stream launch). Includes its
-  pinned ENet fork (`vendor/moonlight-common-c/enet`,
-  https://github.com/cgutman/enet) as a nested submodule — required as-is,
-  not substitutable with a generic ENet build.
-- **mbedTLS** — `vendor/mbedtls` (pinned to v3.6.2), https://github.com/Mbed-TLS/mbedtls — Apache-2.0.
-  TLS backend for moonlight-common-c, in place of OpenSSL — CMake-native,
-  cross-compiles through the same NDK toolchain file Gradle already uses.
 - **libffi** — `vendor/libffi`, https://github.com/libffi/libffi — MIT.
   Runtime dependency of `libwayland-client`, cross-compiled by
   `build-scripts/build-vendor-deps.sh`.
 - **Hacker's Keyboard** — `input-keyboard`, https://github.com/klausw/hackerskeyboard — Apache-2.0.
-  Forked in unmodified (aside from build-compat fixes) as the second
-  screen's future persistent keyboard (docs/SPEC.md §4/§6) — vendored
-  and made to compile as its own module; not yet wired up to any real
-  input surface.
+  Forked in as its own module (not a submodule): the upstream Java tree is
+  unchanged apart from build-compat fixes and one hook in `LatinIME`, and
+  droidtop's additions (the second-screen keyboard, docs/SPEC.md §6c) are
+  separate Kotlin files.
+- **Murine Launcher** — `shell-default`, https://github.com/alesimula/Murine-launcher — Apache-2.0.
+  Itself derived from AOSP Launcher3 (Apache-2.0). Forked in as
+  `shell-default` and its sub-projects (not a submodule) and edited
+  directly; its `LICENSE` travels with it.
+- **droidtop-platforms** — `vendor/droidtop-platforms`, https://github.com/Droidtop/droidtop-platforms.
+  droidtop's own platform, player, engine and BIOS database, kept in its
+  own repository so it can be updated between builds. `library-core`
+  copies the pinned commit's databases into its generated assets at build
+  time. The repository carries no licence file of its own.
 
 ## Bundled themes
 
