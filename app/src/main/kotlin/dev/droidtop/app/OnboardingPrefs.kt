@@ -127,7 +127,7 @@ object GamesRootPrefs {
         if (!canonical.exists()) return "$trimmed does not exist"
         if (!canonical.isDirectory) return "$trimmed is a file, not a folder"
         if (canonical.listFiles() == null) {
-            return "droidtop cannot read $trimmed -- grant storage access first, " +
+            return "droidtop cannot read $trimmed — grant storage access first, " +
                 "or add it with the folder picker instead"
         }
         if (canonical.absolutePath in gamesRootPaths(context)) {

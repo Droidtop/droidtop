@@ -297,7 +297,7 @@ private fun LibraryPanel(username: String?) {
                         if (provisioned == false) {
                             // Offer the environment instead of starting a
                             // download that cannot be played.
-                            setupStatus = "Set up the Windows environment first -- the button is above the list."
+                            setupStatus = "Set up the Windows environment first — the button is above the list."
                             return@TextButton
                         }
                         val started = SteamAccess.startDownload(game.appId) { value -> progress[game.appId] = value }

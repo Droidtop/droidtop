@@ -1310,7 +1310,7 @@ class EngineGameProvider(
         val overrideStrategy = LaunchStrategyOverridePrefs.get(context, entry.id)
         val strategy = available.firstOrNull { it.name == overrideStrategy } ?: available.firstOrNull()
             ?: error(
-                "No way to launch ${entry.title} -- install enginehost (Ren'Py/RPG Maker/etc) " +
+                "No way to launch ${entry.title} — install enginehost (Ren'Py/RPG Maker/etc) " +
                     "or Kirikiroid2 (Kirikiri), or point it at a Windows .exe (Wine) or a Linux " +
                     "build (Linux container) once those are wired to a running session.",
             )
@@ -1356,7 +1356,7 @@ class EngineGameProvider(
             )
         check(runtime.isAvailable) {
             if (windows) {
-                "The Windows environment isn't set up yet -- run \"Set up Windows games\" in Settings."
+                "The Windows environment isn't set up yet — run \"Set up Windows games\" in Settings."
             } else {
                 "Start Desktop mode first: a native Linux build runs inside a live container, " +
                     "and none is connected right now."
@@ -1368,7 +1368,7 @@ class EngineGameProvider(
         } else {
             GameExecutableResolver.linuxExecutable(gameRoot)
         } ?: error(
-            "Couldn't identify which file to run in ${gameRoot.name} -- it has no single obvious " +
+            "Couldn't identify which file to run in ${gameRoot.name} — it has no single obvious " +
                 (if (windows) "Windows executable" else "Linux launcher") +
                 ". Set one explicitly with a custom player.",
         )

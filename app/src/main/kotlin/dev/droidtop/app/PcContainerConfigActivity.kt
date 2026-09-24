@@ -114,7 +114,7 @@ private fun ContainerConfig(entryId: String?, gameTitle: String?, onClose: () ->
         ) {
             Text("No Windows prefix yet", style = MaterialTheme.typography.titleMedium)
             Text(
-                "Run \"Set up Windows games\" first -- there is no container to configure until " +
+                "Run \"Set up Windows games\" first — there is no container to configure until " +
                     "one exists.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
