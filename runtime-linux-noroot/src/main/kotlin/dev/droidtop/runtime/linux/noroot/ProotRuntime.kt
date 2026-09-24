@@ -113,12 +113,9 @@ class ProotRuntime(
             val config = Properties()
             config[KEY_ROLE] = role.name
             config[KEY_IMAGE] = image.reference
-            provisioning?.let {
-                config[KEY_INSTALL] = it.installCommand
-                config[KEY_COMPOSITOR] = it.compositorCommand
-            }
             configOf(name).outputStream().use { config.store(it, "droidtop proot container") }
         }
+        provisioning?.let { recordProvisioning(name, it) }
         log.line("created $name")
         return Container(id = name, role = role, backend = backend, rootfsPath = rootfs.absolutePath)
     }
@@ -132,12 +129,13 @@ class ProotRuntime(
      * appearing. A first boot provisions the desktop first; that is many
      * minutes of package installation, reported through [onProgress].
      */
-    override suspend fun start(container: Container, onProgress: (String) -> Unit) {
+    override suspend fun start(container: Container, provisioning: PrimaryProvisioning?, onProgress: (String) -> Unit) {
         requireRootfs(container)
         if (container.role != ContainerRole.PRIMARY) return
         stopProcess(container.id)
 
-        val provisioning = readProvisioning(container.id)
+        if (provisioning != null) recordProvisioning(container.id, provisioning)
+        val plan = readProvisioning(container.id)
             ?: error("${container.id} has no provisioning plan recorded; recreate it")
         withContext(Dispatchers.IO) {
             prepareSharedDirectories()
@@ -147,8 +145,8 @@ class ProotRuntime(
             writeNetworkFiles()
         }
 
-        val script = ContainerLayout.primaryInitScript(provisioning)
-        log.line("starting ${container.id}: ${provisioning.compositorCommand}")
+        val script = ContainerLayout.primaryInitScript(plan)
+        log.line("starting ${container.id}: ${plan.compositorCommand}")
         val process = withContext(Dispatchers.IO) {
             startSession(rootfsOf(container.id), listOf("/bin/sh", "-c", script), emptyMap(), mergeStderr = true)
         }
@@ -421,6 +419,13 @@ class ProotRuntime(
 
     private fun readConfig(name: String): Properties =
         Properties().apply { configOf(name).inputStream().use { load(it) } }
+
+    private suspend fun recordProvisioning(name: String, provisioning: PrimaryProvisioning) = withContext(Dispatchers.IO) {
+        val config = readConfig(name)
+        config[KEY_INSTALL] = provisioning.installCommand
+        config[KEY_COMPOSITOR] = provisioning.compositorCommand
+        configOf(name).outputStream().use { config.store(it, "droidtop proot container") }
+    }
 
     private suspend fun readProvisioning(name: String): PrimaryProvisioning? = withContext(Dispatchers.IO) {
         val config = readConfig(name)

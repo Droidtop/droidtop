@@ -86,8 +86,17 @@ interface ContainerRuntime {
      * can take many minutes); [onProgress] receives human-readable lines
      * about what it is waiting on, for a caller that shows them. A backend
      * with nothing to report never calls it.
+     *
+     * [provisioning], for the PRIMARY, is the plan to boot with, replacing
+     * the one recorded at creation: the plan is the catalog entry's
+     * current one, and a container made earlier must pick up what has
+     * been added to it since (a font, in practice: dq-desktop-07's reused
+     * container provisioned with its creation-time command and had none).
+     * The boot script re-runs the install whenever the plan it last
+     * completed differs ([ContainerLayout.primaryInitScript]). Null keeps
+     * the recorded plan.
      */
-    suspend fun start(container: Container, onProgress: (String) -> Unit = {})
+    suspend fun start(container: Container, provisioning: PrimaryProvisioning? = null, onProgress: (String) -> Unit = {})
     suspend fun stop(container: Container)
 
     /**

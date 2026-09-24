@@ -182,7 +182,9 @@ class DroidSpacesRuntime(
         check(result.succeeded) { "Writing /sbin/init into $rootfsPath failed: ${result.stderr}" }
     }
 
-    override suspend fun start(container: Container, onProgress: (String) -> Unit) {
+    override suspend fun start(container: Container, provisioning: PrimaryProvisioning?, onProgress: (String) -> Unit) {
+        // The current plan replaces the /sbin/init written at creation.
+        if (provisioning != null && container.role == ContainerRole.PRIMARY) writeInit(container.rootfsPath, provisioning)
         // Best-effort stop of a stale same-name instance first. Real,
         // confirmed on-device leak this recovers from: droidspaces child
         // processes survive an app force-stop (force-stop skips every

@@ -15,7 +15,7 @@ class ContainerLayoutTest {
         // `apt-get update`.
         val script = ContainerLayout.primaryInitScript(plan)
         val guard = script.indexOf("if ! { false && true; }; then")
-        val marker = script.indexOf("touch ${ContainerLayout.PROVISIONED_MARKER}")
+        val marker = script.indexOf("echo ${ContainerLayout.planId(plan)} > ${ContainerLayout.PROVISIONED_MARKER}")
         assertTrue(guard >= 0)
         assertTrue(marker > guard)
         assertTrue(script.substring(guard, marker).contains("exit 1"))
@@ -66,5 +66,15 @@ class ContainerLayoutTest {
     @Test(expected = IllegalArgumentException::class)
     fun `a path outside app storage is a caller bug`() {
         ContainerLayout.hostStorageToContainerPath(File("/data/user/0/dev.droidtop.app/files"), File("/sdcard/x"))
+    }
+
+    @Test
+    fun `a changed plan provisions again, the same plan does not`() {
+        val a = PrimaryProvisioning("apk add sway foot", "sway")
+        val b = PrimaryProvisioning("apk add sway font-dejavu foot", "sway")
+        val script = ContainerLayout.primaryInitScript(a)
+        assertTrue(script.contains("!= \"${ContainerLayout.planId(a)}\" ]; then"))
+        assertTrue(ContainerLayout.planId(a) != ContainerLayout.planId(b))
+        assertEquals(ContainerLayout.planId(a), ContainerLayout.planId(a.copy(compositorCommand = "labwc")))
     }
 }
