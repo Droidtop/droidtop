@@ -350,8 +350,8 @@ it plus the integrations only that surface can offer.
 
 The slow rebuild pass is core, not Gaming's: every surface that shows the
 library reads the same index (the Launcher's Games grid, Gaming's rows,
-Desktop's objects), and it starts only when one of them first asks for a
-scan, never at process start.
+Desktop's objects), and it runs only while one of them is observing the
+library (`Library.observed`, §7g), never merely because the process is up.
 
 The core is why "with Gaming off a game still launches" is true rather
 than a claim: the library and its resolution never belonged to Gaming, and
