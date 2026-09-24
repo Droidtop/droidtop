@@ -78,8 +78,21 @@ object ThemeAssets {
      * theme shadows a bundled one, matching real ES-DE's own scan order
      * (user theme directory scanned last, so `sThemes[name] = theme`
      * naturally lets it win).
+     *
+     * Discovered once and kept: every theme load asks which theme is
+     * active, and that used to list the APK's theme assets and the user
+     * theme folder again each time, once per carousel system. The set
+     * changes only when a theme is downloaded or updated, which fires
+     * [ThemePrefs.notifyThemesChanged]; that listener (see `init`) drops
+     * the list with the parse caches.
      */
-    fun discoverThemes(context: Context): List<ThemeDescriptor> {
+    fun discoverThemes(context: Context): List<ThemeDescriptor> =
+        discoveredThemes ?: scanThemes(context).also { discoveredThemes = it }
+
+    @Volatile
+    private var discoveredThemes: List<ThemeDescriptor>? = null
+
+    private fun scanThemes(context: Context): List<ThemeDescriptor> {
         val byName = linkedMapOf<String, ThemeDescriptor>()
         val bundledFolders = try {
             context.assets.list(BUNDLED_THEMES_ASSET_ROOT) ?: emptyArray()
@@ -252,7 +265,10 @@ object ThemeAssets {
             .joinToString(" ") { part -> part.replaceFirstChar { it.uppercase() } }
             .ifBlank { id }
 
-    private val capabilitiesCache = mutableMapOf<String, EsDeThemeCapabilities>()
+    // Concurrent maps, not plain ones: the shell parses themes on
+    // background threads (every carousel system's at once) while
+    // composition reads them on the main thread.
+    private val capabilitiesCache = java.util.concurrent.ConcurrentHashMap<String, EsDeThemeCapabilities>()
 
     /** Public read of [resolveActiveTheme]'s own name -- the real, resolved active theme, for UI display/cycling, not just the raw (possibly unset) [ThemePrefs] value. */
     fun activeThemeName(context: Context): String? = resolveActiveTheme(context)?.name
@@ -301,18 +317,59 @@ object ThemeAssets {
         val screenAspectRatio: Float,
     )
 
-    private val systemThemeCache = mutableMapOf<ThemeCacheKey, EsDeTheme>()
+    private val systemThemeCache = java.util.concurrent.ConcurrentHashMap<ThemeCacheKey, EsDeTheme>()
 
     init {
         // A theme selection change -- or a theme re-downloaded/updated in
         // place under the same name (ThemePrefs.notifyThemesChanged, fired
         // by ThemeBrowserScreen after a real download) -- must drop every
         // cached parse: entries are keyed by theme NAME, so an updated
-        // theme's stale parse would otherwise keep serving forever.
+        // theme's stale parse would otherwise keep serving forever. A
+        // download is also the one event that changes which themes exist.
         ThemePrefs.addOnChangeListener {
+            discoveredThemes = null
             systemThemeCache.clear()
             capabilitiesCache.clear()
         }
+    }
+
+    private fun cacheKey(
+        context: Context,
+        theme: ThemeDescriptor,
+        systemId: String?,
+        collectionThemeFolder: String?,
+        systemFullName: String?,
+        collectionKind: EsDeCollectionKind,
+    ): ThemeCacheKey {
+        // Real device screen ratio (landscape width/height, matching
+        // ES_DE_ASPECT_RATIO_MAP's own convention), part of what
+        // identifies a parse -- see [ThemeCacheKey].
+        val metrics = context.resources.displayMetrics
+        return ThemeCacheKey(
+            themeName = theme.name,
+            systemId = systemId,
+            collectionThemeFolder = collectionThemeFolder,
+            systemFullName = systemFullName,
+            collectionKind = collectionKind,
+            screenAspectRatio = metrics.widthPixels.toFloat() / metrics.heightPixels.toFloat(),
+        )
+    }
+
+    /**
+     * [loadActiveTheme]'s answer if it is already parsed, and null rather
+     * than a parse if it is not. This is what composition asks: a parse
+     * is XML and file reads, which belong on a background thread, and the
+     * shell does those through [loadActiveTheme] off the main thread.
+     */
+    fun cachedActiveTheme(
+        context: Context,
+        systemId: String? = null,
+        collectionThemeFolder: String? = null,
+        systemFullName: String? = null,
+        collectionKind: EsDeCollectionKind = EsDeCollectionKind.NONE,
+    ): EsDeTheme? {
+        val active = resolveActiveTheme(context) ?: return null
+        return systemThemeCache[cacheKey(context, active, systemId, collectionThemeFolder, systemFullName, collectionKind)]
     }
 
     /**
@@ -377,25 +434,15 @@ object ThemeAssets {
         systemFullName: String? = null,
         collectionKind: EsDeCollectionKind = EsDeCollectionKind.NONE,
     ): EsDeTheme? {
-        // Real device screen ratio (landscape width/height, matching
-        // ES_DE_ASPECT_RATIO_MAP's own convention) -- resolves a real
-        // theme's own "automatic" aspectRatio capability to whichever
-        // declared ratio is actually closest to THIS device, instead of a
-        // droidtop-invented fallback. See parseWithCapabilities' own doc
-        // comment for why skipping this silently breaks any theme using
-        // that common real convention. Read BEFORE the cache is consulted
-        // because it is part of what identifies a parse -- see
-        // [ThemeCacheKey].
-        val metrics = context.resources.displayMetrics
-        val screenAspectRatio = metrics.widthPixels.toFloat() / metrics.heightPixels.toFloat()
-        val cacheKey = ThemeCacheKey(
-            themeName = active.name,
-            systemId = systemId,
-            collectionThemeFolder = collectionThemeFolder,
-            systemFullName = systemFullName,
-            collectionKind = collectionKind,
-            screenAspectRatio = screenAspectRatio,
-        )
+        // The live screen ratio resolves a real theme's own "automatic"
+        // aspectRatio capability to whichever declared ratio is actually
+        // closest to THIS device, instead of a droidtop-invented fallback.
+        // See parseWithCapabilities' own doc comment for why skipping this
+        // silently breaks any theme using that common real convention. It
+        // is part of the cache key, so it is read before the cache is
+        // consulted.
+        val cacheKey = cacheKey(context, active, systemId, collectionThemeFolder, systemFullName, collectionKind)
+        val screenAspectRatio = cacheKey.screenAspectRatio
         systemThemeCache[cacheKey]?.let { return it }
 
         val themeDir = when {
@@ -520,8 +567,9 @@ object ThemeAssets {
         if (markerCurrent()) return themeDir
         // Real, confirmed-live regression this synchronized/atomic shape
         // fixes: post-install, the first Gaming composition parses the
-        // theme WHILE extraction is still running (systemLogoPath alone
-        // calls loadActiveTheme once per carousel item, concurrently) --
+        // theme WHILE extraction is still running (the shell parses
+        // every carousel system's theme, concurrently with its own
+        // focused-system parse) --
         // unsynchronized callers each saw a stale marker and wiped/
         // re-extracted over each other, and a parse that ran against the
         // half-extracted tree lost real content (decaffe's per-system
@@ -573,17 +621,6 @@ object ThemeAssets {
     }
 
     /**
-     * Real per-system carousel/syslogo art, resolved generically from
-     * whichever theme is active -- NOT a hardcoded decaffe-specific asset
-     * path. Real ES-DE themes declare their system-logo image as a
-     * `staticImage` property (or a `<syslogo>`-named `<image>`'s `path`,
-     * for themes using the older split-element convention) on the
-     * "system" view's own primary browsing element (carousel/grid/
-     * textlist), already resolved per-system by [loadActiveTheme]'s own
-     * `${system.theme}` substitution -- this just reads that value back
-     * out instead of maintaining a second, separate lookup.
-     */
-    /**
      * The ACTIVE theme's declared capabilities (colorSchemes/variants with
      * their labels) — what the Settings colorScheme/variant pickers list.
      * Null when no theme resolves.
@@ -598,8 +635,24 @@ object ThemeAssets {
         return EsDeThemeParser.parseCapabilities(File(themeDir, "capabilities.xml"))
     }
 
-    fun systemLogoPath(context: Context, systemId: String): String? {
-        val theme = loadActiveTheme(context, systemId) ?: return null
+    /**
+     * Real per-system carousel/syslogo art, resolved generically from
+     * whichever theme is active -- NOT a hardcoded decaffe-specific asset
+     * path. Real ES-DE themes declare their system-logo image as a
+     * `staticImage` property (or a `<syslogo>`-named `<image>`'s `path`,
+     * for themes using the older split-element convention) on the
+     * "system" view's own primary browsing element (carousel/grid/
+     * textlist), already resolved per-system by [loadActiveTheme]'s own
+     * `${system.theme}` substitution -- this just reads that value back
+     * out instead of maintaining a second, separate lookup.
+     *
+     * Takes the system's own parse rather than loading one, so the logo
+     * comes from the same per-system parse ES-DE gives that system (its
+     * collection folder and `${system.*}` values included) and costs no
+     * second parse. It checks files exist, so it is asked off the main
+     * thread.
+     */
+    fun systemLogoPath(theme: EsDeTheme): String? {
         val listElement = theme.views["system"]?.primaryListElement() ?: return null
         // Real CarouselComponent::addEntry fallback chain, transcribed:
         // the per-system item image IF its file exists, else the

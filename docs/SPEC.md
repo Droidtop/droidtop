@@ -4446,6 +4446,22 @@ answers are worked out again only when `EsDeArtwork.mediaGeneration`
 says a media folder actually changed, so a publish during a walk costs
 the games it added and nothing else.
 
+**Themes are parsed off the main thread; composition reads the parse
+cache.** The system carousel parsed the active theme once per system
+inside `remember`, on the main thread, before its first frame, and every
+parse first re-listed the APK's theme assets and the user theme folder to
+find out which theme was active. Now the discovered theme list is kept
+until a theme is downloaded or the selection changes (the same
+`ThemePrefs` listener that drops the parse caches), both caches are
+concurrent maps, and the shell parses every carousel system's theme on
+`Dispatchers.Default`, reading each system's logo out of that same parse
+(one parse per system, not a separate one for the logo). A call site
+whose parse is not ready yet keeps drawing the theme it last drew; the
+one call site that has drawn nothing yet (the first frame after start)
+still parses in place, once, because the alternative is drawing the
+unthemed fallback and swapping the theme in, a visible flash at every
+start.
+
 ### The scan's unit of work is a folder (directed by the rig, 2026-09-11)
 
 Pointing droidtop at a whole-library root — the rig's games root is the

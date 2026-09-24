@@ -1499,6 +1499,71 @@ private fun GameGroup.esDeCollectionKind(): EsDeCollectionKind = when {
 }
 
 /**
+ * What one group's theme parse is keyed on: the arguments
+ * [ThemeAssets.loadActiveTheme] takes for it. The system view, its
+ * neighbour slots, the gamelist and the carousel's logos all ask for a
+ * group's theme through this one key, so they share one parse.
+ */
+private data class GroupThemeKey(
+    val systemId: String?,
+    val collectionThemeFolder: String?,
+    val systemFullName: String?,
+    val collectionKind: EsDeCollectionKind,
+) {
+    fun load(context: android.content.Context) = ThemeAssets.loadActiveTheme(
+        context, systemId, collectionThemeFolder, systemFullName, collectionKind,
+    )
+
+    fun cached(context: android.content.Context) = ThemeAssets.cachedActiveTheme(
+        context, systemId, collectionThemeFolder, systemFullName, collectionKind,
+    )
+}
+
+private fun GameGroup.themeKey() = GroupThemeKey(
+    systemId = systemThemeFolder,
+    collectionThemeFolder = (this as? GameGroup.Collection)?.themeFolder,
+    systemFullName = label,
+    collectionKind = esDeCollectionKind(),
+)
+
+/**
+ * [group]'s theme parse, read in composition but parsed off it.
+ *
+ * A parse is XML and file reads (includes, `${system.*}` substitution),
+ * and these used to run inside `remember` on the main thread, once per
+ * carousel system, before the first frame. Now composition only reads
+ * the parse cache. On a miss it keeps drawing the theme this call site
+ * last drew (a neighbouring system's, for the moment a parse takes)
+ * while [Dispatchers.Default] parses the new one. The one exception is a
+ * call site that has drawn nothing yet: it parses in place, once,
+ * because drawing droidtop's unthemed fallback for a frame and then
+ * swapping in the theme would be a visible flash on every start. The
+ * system view's logo loop parses every group in the background, so
+ * after start every site hits the cache.
+ *
+ * [wanted] false is "no group is open": no parse, and null.
+ */
+@Composable
+private fun rememberActiveTheme(group: GameGroup?, wanted: Boolean = true): dev.droidtop.library.theme.EsDeTheme? {
+    val context = LocalContext.current
+    val key = group?.themeKey() ?: GroupThemeKey(null, null, null, EsDeCollectionKind.NONE)
+    val version = ThemePrefs.version
+    var drawn by remember { mutableStateOf<dev.droidtop.library.theme.EsDeTheme?>(null) }
+    val cached = remember(key, version, wanted) {
+        when {
+            !wanted -> null
+            else -> key.cached(context) ?: if (drawn == null) key.load(context) else null
+        }
+    }
+    LaunchedEffect(key, version, wanted) {
+        if (!wanted) return@LaunchedEffect
+        drawn = cached ?: withContext(Dispatchers.Default) { key.load(context) }
+    }
+    if (!wanted) return null
+    return cached ?: drawn
+}
+
+/**
  * One system's own contribution to the system view, for the element layer
  * that draws several of them at once while they slide past each other.
  *
@@ -1518,17 +1583,7 @@ private fun rememberEsDeSystemSlot(
     entries: List<LibraryEntry>,
     countsOnly: Boolean,
 ): EsDeSystemSlot? {
-    val context = LocalContext.current
-    val themeFolder = (group as? GameGroup.Collection)?.themeFolder
-    val theme = remember(group?.systemThemeFolder, themeFolder, group?.label, ThemePrefs.version) {
-        ThemeAssets.loadActiveTheme(
-            context,
-            group?.systemThemeFolder,
-            themeFolder,
-            systemFullName = group?.label,
-            collectionKind = group?.esDeCollectionKind() ?: EsDeCollectionKind.NONE,
-        )
-    }
+    val theme = rememberActiveTheme(group)
     val view = theme?.views?.get("system") ?: return null
     return EsDeSystemSlot(
         view = view,
@@ -1718,23 +1773,8 @@ private fun GamesSection(
     // updated doc comment). Reset whenever the drilled-into system
     // changes, matching real ES-DE's own "selection resets per gamelist"
     // convention.
-    val selectedGroupSystemId = selectedGroup?.systemThemeFolder
-    val selectedGroupThemeFolder = (selectedGroup as? GameGroup.Collection)?.themeFolder
     val selectedGroupLabel = selectedGroup?.label
-    val selectedGroupCollectionKind = selectedGroup?.esDeCollectionKind() ?: EsDeCollectionKind.NONE
-    val gamelistTheme = remember(selectedGroup, selectedGroupSystemId, selectedGroupThemeFolder, ThemePrefs.version) {
-        if (selectedGroup != null) {
-            ThemeAssets.loadActiveTheme(
-                context,
-                selectedGroupSystemId,
-                selectedGroupThemeFolder,
-                systemFullName = selectedGroupLabel,
-                collectionKind = selectedGroupCollectionKind,
-            )
-        } else {
-            null
-        }
-    }
+    val gamelistTheme = rememberActiveTheme(selectedGroup, wanted = selectedGroup != null)
     // Real navigation-sound (re)binding -- <sound> elements are parsed
     // like any other themed element (declared under the special `all`
     // view, expanded into system+gamelist by the parser), so whichever
@@ -2196,23 +2236,8 @@ private fun GamesSection(
                             }
                         }
                         val focusedGroup = orderedGroups.getOrNull(elementSystemIndex)
-                        val focusedSystemId = focusedGroup?.systemThemeFolder
-                        val focusedThemeFolder = (focusedGroup as? GameGroup.Collection)?.themeFolder
-                        // Keyed by ThemePrefs.version too, not just
-                        // focusedSystemId -- otherwise switching the active
-                        // theme from Settings has no effect until some
-                        // unrelated recomposition happens to also fire (see
-                        // ThemePrefs.version's own doc comment).
                         val focusedGroupLabel = focusedGroup?.label
-                        val theme = remember(focusedSystemId, focusedThemeFolder, ThemePrefs.version) {
-                            ThemeAssets.loadActiveTheme(
-                                context,
-                                focusedSystemId,
-                                focusedThemeFolder,
-                                systemFullName = focusedGroupLabel,
-                                collectionKind = focusedGroup?.esDeCollectionKind() ?: EsDeCollectionKind.NONE,
-                            )
-                        }
+                        val theme = rememberActiveTheme(focusedGroup)
                         // Same real navigation-sound rebinding as the gamelist
                         // screen's own hook (see that LaunchedEffect's comment)
                         // -- this is the site that runs FIRST after app start /
@@ -2220,18 +2245,41 @@ private fun GamesSection(
                         // gamelist is ever entered.
                         LaunchedEffect(theme) { EsDeNavigationSounds.load(theme) }
                         val listElement = remember(theme) { theme?.views?.get("system")?.primaryListElement() }
-                        // remember(): building this list runs systemLogoPath/
-                        // SystemThemeColors per group -- cache-hit lookups, but
-                        // still N of them per recomposition, and the carousel
-                        // recomposes every animation frame. Keyed on
-                        // ThemePrefs.version so a live theme switch still
-                        // rebuilds the logo paths.
-                        val items = remember(orderedGroups, ThemePrefs.version) {
+                        // Every group's theme parse, and the carousel logo
+                        // read out of it, worked out in the background: a
+                        // parse per carousel system used to run in
+                        // composition, all of them before the first frame,
+                        // and the logo's file checks again on every library
+                        // publish. Keyed on the groups' theme keys, not on
+                        // the group list, which is a new list on every
+                        // publish of a walk. Each logo lands as its group is
+                        // done; until then that group draws its name, which
+                        // is what a logo-less system draws anyway. The same
+                        // loop warms the parse cache rememberActiveTheme
+                        // reads, so moving to another system or opening its
+                        // gamelist does not parse.
+                        val groupThemeKeys = remember(orderedGroups) {
+                            orderedGroups.map { it.key to it.themeKey() }
+                        }
+                        var logos by remember { mutableStateOf<Map<String, String?>>(emptyMap()) }
+                        LaunchedEffect(groupThemeKeys, ThemePrefs.version) {
+                            for ((groupKey, themeKey) in groupThemeKeys) {
+                                val logo = withContext(Dispatchers.Default) {
+                                    if (themeKey.systemId == null) null
+                                    else themeKey.load(context)?.let { ThemeAssets.systemLogoPath(it) }
+                                }
+                                logos = logos + (groupKey to logo)
+                            }
+                        }
+                        // remember(): the carousel recomposes every
+                        // animation frame, and this list only changes with
+                        // the groups or their logos.
+                        val items = remember(orderedGroups, logos) {
                             orderedGroups.map { entryGroup ->
                                 EsDeListItem(
                                     key = entryGroup.key,
                                     label = entryGroup.label,
-                                    logoPath = entryGroup.systemThemeFolder?.let { ThemeAssets.systemLogoPath(context, it) },
+                                    logoPath = logos[entryGroup.key],
                                     // Real `letterCaseAutoCollections` /
                                     // `letterCaseCustomCollections`: ES-DE cases a
                                     // collection's own name by which KIND of
