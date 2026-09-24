@@ -115,6 +115,11 @@ page_16k(steambootstrap)
 # its CMakeLists.txt builds it for GameNative. Upstream ships the result
 # as liblsfg-vk-layer.so (LsfgVkManager.kt's LIB_FILENAME).
 set(LSFGVK_ANDROID_WINE ON CACHE BOOL "" FORCE)
+# framegen's AHardwareBuffer import (src/core/image.cpp) needs the
+# VK_ANDROID_* types, which vulkan.h declares only under the Android
+# platform define. volk takes its platform defines from this variable and
+# passes them on PUBLIC to lsfg-vk-framegen and lsfg-vk.
+set(VOLK_STATIC_DEFINES VK_USE_PLATFORM_ANDROID_KHR CACHE STRING "" FORCE)
 add_subdirectory(${GAMENATIVE_CPP}/lsfg-vk-android lsfg-vk EXCLUDE_FROM_ALL)
 set_target_properties(lsfg-vk PROPERTIES OUTPUT_NAME "lsfg-vk-layer")
 page_16k(lsfg-vk)
