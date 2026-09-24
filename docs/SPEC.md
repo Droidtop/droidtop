@@ -5907,13 +5907,21 @@ The order work lands in, where one piece depends on another:
   channel (§10b); pull requests build but do not publish.
 - `.github/workflows/android-checks.yml` runs on the same push as its own
   run: lint (`:app:lintDebug`) and every module's unit tests.
+- `.github/workflows/release-promote.yml`, run by hand, publishes an
+  existing build to `testing` or `stable` (§10b).
 - `.github/workflows/commit-hygiene.yml` rejects commits carrying AI
   attribution.
+
+The two Android workflows share one setup, `.github/actions/android-setup`
+(JDKs, Go, apt toolchain, SDK/NDK cache, vendor-deps cache, and
+`gradle/actions/setup-gradle`, which caches the Gradle user home: wrapper,
+dependencies, and the local build cache that `org.gradle.caching` turns on).
+Cache entries are written only by runs on `main` and read by every run.
 
 Both Android workflows run on `ubuntu-24.04` with a pinned SDK
 (platform 36, build-tools 36.0.0) and NDK 27.0.12077973, JDK 17 and 21, Go,
 and the Gradle wrapper (`gradle/wrapper/gradle-wrapper.properties`, 9.3.1).
-The workflow files' own comments record why each setup step is the way it
+The comments in the workflow files and the setup action record why each setup step is the way it
 is.
 
 **Native vendor code** is cross-compiled by
@@ -5951,10 +5959,19 @@ Distribution is three different problems wearing one word, and each gets the
 strongest mechanism that is actually available to it -- nothing pretends to a
 capability Android does not grant.
 
-**Versioning.** "Is this newer" must be answerable by machines. The CI run
-number (already the `-dev-N` suffix in `versionName`) is now also the
-`versionCode`: a plain monotonic integer, so Android itself refuses
-downgrades and the update check is a single integer comparison. The rolling
+**Versioning.** "Is this newer" must be answerable by machines. The
+`versionCode` (also the `-dev-N` suffix in `versionName`) is a plain monotonic
+integer, so Android itself refuses downgrades and the update check is a
+single integer comparison. Until 2026-09-24 it was `github.run_number`, which
+belongs to the workflow file: renaming or splitting `android-build.yml` would
+have restarted it at 1 and every installed build would have refused every
+later one. It is now the number of commits reachable from the built commit
+(`build-scripts/release_channel.py version-code`, counted through the GitHub
+API because CI checks out one commit): it belongs to the commit, grows with
+every commit on `main` as long as `main` is never rewritten (the rule is
+rebase and push, never force), and a rebuild of a commit gets the same
+number. The switch moved the number up, not down (run 587, commit count
+about 700), so no installed build saw a downgrade. The rolling
 `latest` release carries `release-info.json` -- formatVersion, versionCode,
 versionName, apkName, apkSha256, commit -- published by the same workflow
 run that built the APK. Enginehost mirrors this exactly (its
@@ -5984,10 +6001,28 @@ The user: "add two toggles to the update and etc checker: branch (so, stable,
 unstable, etc), and a debug checkbox, along with a warning if it's enabled."
 A channel is a GitHub release tag carrying its own `release-info.json` and
 both APKs: `latest` (what the updater calls Unstable, published by every push
-to main), `testing` and `stable` (published by running the workflow by hand
-and choosing the channel, which builds the current main again rather than
-copying an earlier artifact, so every channel carries a build with its own CI
-run on record). The device picks a channel in Settings; the default is
+to main), `testing` and `stable` (published by the `release-promote.yml`
+workflow, run by hand). Promotion builds nothing (changed 2026-09-24; it used
+to build the current main again, so Testing could carry bytes nobody had
+tried and a main that had moved on). The build run uploads its APKs WITH
+their `release-info.json` as the `droidtop-apk` artifact, and promotion
+publishes exactly that artifact: by default the commit `latest` carries now,
+or a commit named by hand, and only when that commit's `android-build.yml`
+and `android-checks.yml` runs on main both succeeded. Artifacts are kept for
+the repository's retention period (90 days by default), so a commit older than
+that can no longer be promoted.
+
+Publishing never deletes a release (changed 2026-09-24; it used to delete and
+recreate, and a run cancelled between the two left the channel with no
+release, which every installed build reads as "nothing here"). One script,
+`build-scripts/release_channel.py publish`, serves every channel: it moves
+the channel's tag to the commit (one ref write), uploads the new files under
+a `next.` prefix while the old ones keep serving, then swaps each asset
+(delete old, rename new, `release-info.json` last). An interrupted publish
+leaves the release in place with either build complete, or for about a second
+a new APK beside the old `release-info.json`, which the updater rejects by
+digest and retries at its next check; the next publish clears any leftover
+`next.` uploads. Asset names and `release-info.json` fields are unchanged. The device picks a channel in Settings; the default is
 Unstable, because it is the only channel droidtop has ever had, and a channel
 nothing has been promoted to yet simply reports that there is nothing there.
 

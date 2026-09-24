@@ -27,9 +27,9 @@ import java.security.MessageDigest
  * dialog appears. Signature continuity is enforced by Android: an APK not
  * signed with the persistent CI key refuses to install over this one.
  *
- * "Is this newer" is answered by versionCode, which CI sets to the workflow
- * run number (a plain monotonic integer) and publishes with the APK in
- * release-info.json on the rolling `latest` release. The check downloads
+ * "Is this newer" is answered by versionCode, which CI sets to the number of
+ * commits reachable from the built commit (a plain monotonic integer) and
+ * publishes with the APK in release-info.json on the channel's release. The check downloads
  * that one small file, unauthenticated; nothing about the device or its
  * library is ever sent. Offline or failed checks are silent.
  */

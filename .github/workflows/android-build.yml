@@ -32,33 +32,11 @@ on:
       - "LICENSE"
       - "CLAUDE.md"
       - ".claude/**"
+  # By hand it rebuilds and republishes "latest". Testing and Stable are
+  # published by release-promote.yml from an existing run's artifact.
   workflow_dispatch:
-    inputs:
-      channel:
-        description: "Release channel to publish this build to"
-        type: choice
-        default: latest
-        options: [latest, testing, stable]
 
-env:
-  NDK_VERSION: "27.0.12077973"
-  ANDROID_SDK_ROOT: ${{ github.workspace }}/.android-sdk
-  # GitHub's ubuntu-24.04 runner image preinstalls its own SDK and sets
-  # ANDROID_HOME to it (/usr/local/lib/android/sdk). AGP refuses to
-  # configure at all if ANDROID_HOME and ANDROID_SDK_ROOT disagree
-  # ("Several environment variables and/or system properties contain
-  # different paths to the SDK") — confirmed from the actual failing CI
-  # log, not a hypothetical. Pointing ANDROID_HOME at the same path we
-  # install our own pinned SDK/NDK to (rather than trying to reuse the
-  # runner's preinstalled one, which isn't guaranteed to have NDK
-  # 27.0.12077973) resolves the conflict by making both variables agree.
-  ANDROID_HOME: ${{ github.workspace }}/.android-sdk
-  # Not /opt/android-deps (this repo's local-dev default, see
-  # build-scripts/build-vendor-deps.sh) — that needs root on a fresh
-  # runner. $HOME needs no sudo and is just as reproducible.
-  ANDROID_DEPS_PREFIX: ${{ github.workspace }}/.android-deps
-
-# gh release create/delete needs write access to repo contents — the
+# Publishing the "latest" release needs write access to repo contents; the
 # default GITHUB_TOKEN is read-only unless granted this explicitly.
 permissions:
   contents: write
@@ -70,14 +48,10 @@ permissions:
 # and pull requests never cancel each other.
 #
 # This applies to main as well, where roughly two thirds of this repo's
-# runs happen. The one thing at risk there is the rolling "latest" release
-# published at the very end of the job: it is deleted and recreated, so a
-# cancellation inside that few-second window can leave "latest" missing.
-# That is recoverable by construction, because the only thing that can
-# cancel a main run is a newer main run, and that newer run republishes
-# "latest" when it finishes. Trading a seconds-wide window on a rare
-# interleaving against two thirds of the wasted builds is the right side
-# of that bargain.
+# runs happen. A cancellation during the publish step cannot leave "latest"
+# missing: build-scripts/release_channel.py swaps assets inside the existing
+# release instead of deleting it, and the only thing that can cancel a main
+# run is a newer main run, which republishes when it finishes.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -101,157 +75,18 @@ jobs:
         # times, so it fails fast here instead (see the script's doc).
         run: python3 build-scripts/check_xml_comments.py
 
-      - name: Set up JDK 17 + 21
-        # 21 is needed for shell-default's forked-in sub-modules (Murine
-        # Launcher/Launcher3) — several of them request a Gradle toolchain
-        # matching JDK 21, confirmed by a real
-        # ToolchainProvisioningException locally ("Cannot find a Java
-        # installation... matching: {languageVersion=21, ...}"). Installing
-        # both means Gradle's toolchain auto-detection can satisfy whichever
-        # each module asks for; the rest of droidtop stays on 17.
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: |
-            17
-            21
+      - name: Set up the Android build
+        uses: ./.github/actions/android-setup
 
-      - name: Set up Go
-        # For cross-compiling crane (vendor/go-containerregistry), the OCI
-        # registry client CraneRootfsPuller shells out to — see
-        # build-scripts/build-vendor-deps.sh's crane section.
-        # go-containerregistry's go.mod requires >= 1.25; not assuming the
-        # runner's own preinstalled Go meets that.
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.25"
-
-      - name: Install build dependencies
-        env:
-          DEBIAN_FRONTEND: noninteractive
-          NEEDRESTART_MODE: a
-        run: |
-          # Three prior runs hung with ZERO visible output before being
-          # cancelled -- including one AFTER adding the apt-daily-timer
-          # stop + DPkg::Lock::Timeout fix, which didn't help either. The
-          # real problem so far has been that `-qq` suppresses literally
-          # all diagnostic output, so every "fix" up to now has been a
-          # guess with no evidence to confirm or rule it out. Fixing that
-          # first: `set -x` echoes each command as it starts (pinpoints
-          # exactly which one is stuck), dropped `-qq` so apt's own
-          # progress streams instead of being swallowed, and `timeout`
-          # wraps each command so a hang fails loudly with a clear signal
-          # after a bounded wait instead of running indefinitely and
-          # needing manual cancellation to even notice.
-          set -x
-          sudo systemctl stop apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
-          sudo systemctl stop apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
-          timeout 120 sudo apt-get update -o DPkg::Lock::Timeout=300
-          timeout 300 sudo apt-get install -y -o DPkg::Lock::Timeout=300 \
-            build-essential cmake ninja-build meson pkg-config git python3 \
-            autoconf automake libtool libltdl-dev texinfo \
-            libexpat1-dev libffi-dev libxml2-utils \
-            wayland-protocols libwayland-bin \
-            unzip curl
-
-      - name: Cache Android SDK/NDK
-        id: sdk-cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.ANDROID_SDK_ROOT }}
-          # v2: added platforms;android-36 + build-tools;36.0.0 — shell-default
-          # (forked-in Murine Launcher) and its sub-modules compile against 36;
-          # several of their AndroidX deps require :app to compile against 35+
-          # too (AAR-metadata check), confirmed locally, so :app is now on
-          # compileSdk 36 as well. 34 is kept for the rest of droidtop's modules.
-          key: android-sdk-ndk${{ env.NDK_VERSION }}-v2
-
-      - name: Install Android SDK + NDK
-        if: steps.sdk-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
-          curl -sL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o /tmp/cmdline-tools.zip
-          unzip -q /tmp/cmdline-tools.zip -d "$ANDROID_SDK_ROOT/cmdline-tools"
-          mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
-          rm /tmp/cmdline-tools.zip
-
-          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-          yes | "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" --licenses > /dev/null
-          "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" \
-            "platform-tools" "platforms;android-34" "build-tools;34.0.0" \
-            "platforms;android-36" "build-tools;36.0.0" "ndk;${NDK_VERSION}"
-
-      - name: Cache cross-compiled vendor deps (libffi, libwayland-client, droidspaces, crane, proot)
-        id: deps-cache
-        uses: actions/cache@v4
-        with:
-          # Caches the final packaged output (assets/bin) *and* the
-          # ANDROID_DEPS_PREFIX build dir. assets/bin alone isn't enough: on
-          # a cache hit the "Build cross-compiled vendor deps" step is
-          # skipped entirely, but host-bridge's own CMake build (via
-          # ANDROID_DEPS_PREFIX) still needs wayland-client.h/
-          # wayland-util.h/libffi.a from that prefix at compile time, every
-          # run, cache hit or not. Run 32405390718 hit exactly this: cache
-          # hit skipped the deps step, .android-deps was never populated,
-          # and host-bridge's ninja build failed with "'wayland-util.h' file
-          # not found". Covers both ABIs since they all live under these
-          # same parent directories.
-          #
-          # host-bridge/src/main/jniLibs is NOT cached (or populated by the
-          # build step) — libwayland-client.so is packaged via CMake's own
-          # prebuilt-shared-lib linking instead (see host-bridge/native/
-          # CMakeLists.txt and build-scripts/build-vendor-deps.sh); a
-          # separate copy into jniLibs duplicated that same APK path and
-          # broke :host-bridge:mergeDebugNativeLibs.
-          path: |
-            runtime-linux-root/src/main/assets/bin
-            runtime-common/src/main/jniLibs
-            runtime-linux-noroot/src/main/jniLibs
-            ${{ env.ANDROID_DEPS_PREFIX }}
-          # Keyed on every vendored submodule this script actually builds
-          # from, not just a static string — a submodule bump on any of
-          # them should invalidate this. go-containerregistry added for
-          # crane (v6); bumping the version suffix too, since the v5 key
-          # (unaffected by this submodule addition) would otherwise cache-hit
-          # on an old assets/bin that never had crane-* built into it at all.
-          # v7: crane is now built CGO_ENABLED=1 on arm64 too (the v6
-          # binary's pure-Go DNS resolver was dead on-device — see
-          # build-vendor-deps.sh's crane section); the cached v6 assets/bin
-          # would keep serving that broken binary forever otherwise.
-          # v8: crane moved to runtime-common/src/main/jniLibs as
-          # libcrane.so (exec from nativeLibraryDir; an extracted asset
-          # cannot be exec'd above targetSdk 28), and vendor/proot builds
-          # into runtime-linux-noroot/src/main/jniLibs. A v7 hit would
-          # restore neither.
-          # v9: proot is built with build-scripts/proot-patches applied, so
-          # the patches are part of the key.
-          key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD', '.git/modules/vendor/proot/HEAD', 'build-scripts/proot-patches/**') }}-v9
-
-      - name: Build cross-compiled vendor deps (libffi, libwayland-client, droidspaces, crane, proot)
-        if: steps.deps-cache.outputs.cache-hit != 'true'
-        # Invoked via `bash` explicitly, not `./build-scripts/build-vendor-deps.sh`
-        # — this repo is developed partly on Windows, where the executable
-        # bit doesn't reliably survive a commit, and relying on it here
-        # failed CI outright ("Permission denied") the first time.
-        #
-        # One fat APK covers both arm64-v8a (real hardware) and x86_64
-        # (emulators/x86 devices) — the script builds one ABI per
-        # invocation, so run it once per target here.
-        #
-        # GH_TOKEN is required because the script now pulls the musl
-        # cross-compiler toolchains from our own mirrored "build-toolchains"
-        # release via `gh release download` instead of musl.cc directly —
-        # musl.cc proved unreachable from GitHub-hosted runners often enough
-        # (curl exit 28, timed out after 6 retries over 12+ minutes on run
-        # 32400505729) that self-hosting the tarballs was the only reliable
-        # fix. The repo is private, so authentication is required even for
-        # read-only release downloads.
+      - name: Version code
+        # The number of commits reachable from this commit; see
+        # build-scripts/release_channel.py for why it and not run_number.
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for abi in arm64-v8a x86_64; do
-            bash build-scripts/build-vendor-deps.sh "$abi"
-          done
+          code=$(python3 build-scripts/release_channel.py version-code "$GITHUB_SHA")
+          echo "versionCode $code"
+          echo "VERSION_REVISION=$code" >> "$GITHUB_ENV"
 
       - name: Decode signing keystore
         # Only decodes when the secret actually exists — PR builds from
@@ -280,11 +115,6 @@ jobs:
 
       - name: Build release and debug APKs
         env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/${{ env.NDK_VERSION }}
-          # github.run_number: a plain incrementing integer (per workflow
-          # file, monotonic across runs) — exactly the "-(revision)" tag
-          # requested, not a git SHA. Read by app/build.gradle.kts.
-          VERSION_REVISION: ${{ github.run_number }}
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
@@ -294,6 +124,11 @@ jobs:
         # play on: it is not compiled ahead of time and Android runs it
         # without inlining, which is what made droidtop slow before 558.
         run: ./gradlew :app:assembleRelease :app:assembleDebug --stacktrace
+
+      - name: Write release-info.json
+        # Beside the APKs, in the same artifact, so that release-promote.yml
+        # can later publish exactly this run's bytes to Testing or Stable.
+        run: python3 build-scripts/release_channel.py info app/build/outputs "$VERSION_REVISION" "$GITHUB_SHA"
 
       - name: Upload APK
         # The universal APKs are what the channel publishes. The x86_64-only
@@ -309,6 +144,7 @@ jobs:
             app/build/outputs/apk/debug/app-universal-debug.apk
             app/build/outputs/apk/release/app-x86_64-release.apk
             app/build/outputs/apk/debug/app-x86_64-debug.apk
+            app/build/outputs/release-info.json
           if-no-files-found: error
 
       - name: Class-load API gate (minSdk)
@@ -327,65 +163,16 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 build-scripts/check_class_load_api.py app/build/outputs/apk/release/app-universal-release.apk
 
-      - name: Publish to the release channel
-        # Workflow artifacts (the step above) are ephemeral — ~90-day
-        # retention, buried under the Actions tab, awkward to hand someone
-        # a direct link to. A GitHub Release is the actual "give this to
-        # someone to install" mechanism: permanent, listed on the repo's
-        # main page, one clean download URL. Only publish from real pushes
-        # to main, not PRs — a PR's build isn't something to hand out yet.
-        #
-        # A push publishes the "latest" channel, which is what the in-app
-        # updater calls Unstable. Running this workflow by hand publishes
-        # the chosen channel instead, which is how a build reaches Testing
-        # or Stable: it is the current main built again, not a copy of an
-        # earlier artifact, so what a channel carries is always a build
-        # whose own CI run is on record.
+      - name: Publish to the latest channel
+        # A GitHub Release is the "give this to someone to install"
+        # mechanism: permanent, one clean download URL, and what the in-app
+        # updater reads. Workflow artifacts are ephemeral and buried. Only
+        # real pushes to main (or a hand-started run on main) publish; a
+        # PR's build is not something to hand out yet. This is the "latest"
+        # channel, which the updater calls Unstable. Testing and Stable are
+        # published by release-promote.yml, which takes an earlier run's
+        # artifact rather than building main again.
         if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         env:
           GH_TOKEN: ${{ github.token }}
-          CHANNEL: ${{ github.event.inputs.channel || 'latest' }}
-        run: |
-          cp app/build/outputs/apk/release/app-universal-release.apk droidtop-latest.apk
-          cp app/build/outputs/apk/debug/app-universal-debug.apk droidtop-latest-debug.apk
-
-          # release-info.json is the in-app update check's one probe
-          # (app/.../update/AppSelfUpdate.kt): the app downloads this small
-          # file unauthenticated, compares versionCode (the run number, the
-          # same value baked into the APK) with its own, and verifies any
-          # downloaded APK against apkSha256 before handing it to the
-          # Android installer.
-          python3 - <<'PY'
-          import hashlib, json
-          def sha256(name):
-              return hashlib.sha256(open(name, "rb").read()).hexdigest().upper()
-
-          json.dump(
-              {
-                  "formatVersion": 1,
-                  "versionCode": ${{ github.run_number }},
-                  "versionName": "0.1.0-dev-${{ github.run_number }}",
-                  "apkName": "droidtop-latest.apk",
-                  "apkSha256": sha256("droidtop-latest.apk"),
-                  # Added keys, not a new formatVersion: a build from before
-                  # the debug channel existed reads this same document and
-                  # sees exactly the release APK it always did.
-                  "debugApkName": "droidtop-latest-debug.apk",
-                  "debugApkSha256": sha256("droidtop-latest-debug.apk"),
-                  "commit": "${{ github.sha }}",
-              },
-              open("release-info.json", "w"),
-              indent=2,
-          )
-          PY
-
-          # Rolling release, not one-per-commit: this project is under
-          # active development with no version numbers yet, so "latest"
-          # always pointing at the newest working build is more useful
-          # than accumulating dozens of stale per-commit releases. Delete
-          # + recreate rather than `gh release upload --clobber` onto an
-          # existing release, so the notes/timestamp stay accurate too.
-          gh release delete "$CHANNEL" --yes --cleanup-tag 2>/dev/null || true
-          gh release create "$CHANNEL" droidtop-latest.apk droidtop-latest-debug.apk release-info.json \
-            --title "DroidTop $CHANNEL channel" \
-            --notes "Automatically built from commit ${{ github.sha }} to the $CHANNEL channel. Two APKs: droidtop-latest.apk is the build to use (release, not debuggable, no code shrinking yet) and droidtop-latest-debug.apk is the same code built debuggable, for inspecting droidtop with adb and several times slower to start and to navigate. Both are signed with the persistent DroidTop dev key, so either installs over an earlier build of this channel without uninstalling first; arm64-v8a + x86_64 fat APKs. Not for production use, and functionality is still early: see docs/SPEC.md for current status."
+        run: python3 build-scripts/release_channel.py publish latest app/build/outputs

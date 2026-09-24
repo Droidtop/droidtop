@@ -147,11 +147,14 @@ On a push to `main`, the build replaces the rolling GitHub release named
 
 Both APKs are fat APKs for arm64-v8a and x86_64. Both are signed with the
 same persistent key, so a newer build installs over an older one.
-`versionCode` is the CI run number, and `versionName` is
-`0.1.0-dev-<run number>`.
+`versionCode` is the number of commits reachable from the built commit, and
+`versionName` is `0.1.0-dev-<versionCode>`.
 
-Starting the workflow by hand (`workflow_dispatch`) publishes the current
-`main` to the `testing` or `stable` release instead.
+The `testing` and `stable` releases are published by running the
+**Release promote** workflow by hand. It builds nothing: it publishes the
+APKs that a commit's own **Android build** run made (by default, the commit
+`latest` carries now), and only if that commit's build and checks both
+passed.
 
 ## In-app updater
 
