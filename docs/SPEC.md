@@ -6842,6 +6842,38 @@ native library the arm64 set ships (gamenative's included) is built for
 x86_64 too. The AGP `splits` block and the x86_64-only artifact that were
 added the same day as a stopgap are removed once the set is complete.
 
+The list of what is missing is read from each build, not kept here:
+`build-scripts/abi_sets.py` runs on the universal release APK in
+`android-build.yml` and prints every arm64 name with no x86_64 build. It
+reports while the splits exist and becomes a failing gate
+(`--require-complete`) in the change that removes them. On 2026-09-24
+(build of `ce75426`) 24 of the 39 arm64 libraries were missing, all
+gamenative's. `:runtime-windows` now builds the x86_64 half of the ones
+whose source is in the fork and is the source of what ships (virglrenderer,
+patchelf, asurface_renderer, ahbimage, xconnectorpatch, plus the NDK's
+libc++_shared) with AGP's CMake, restricted to x86_64 so arm64 stays
+upstream's prebuilt set (`runtime-windows/native/CMakeLists.txt`). The rest
+cannot be built from the tree as it stands, so the set is not complete
+and the splits stay until the owner decides each of these:
+
+- no source at all: `libkgslshim` and `libsteambootstrap` (GameNative
+  withholds the source, its THIRD_PARTY_NOTICES), `libvortekrenderer` and
+  `libwinlator_11` (Winlator 11 binaries);
+- source that is not what ships: `libwinlator` (the fork's
+  `patchelf_wrapper.cpp` is empty TODO bodies and its CMakeLists names a
+  `winlator/drawable.c` that does not exist);
+- arm64-only by design: `libextras`, `libvulkan_renderer`, `libhook_impl`,
+  `libmain_hook` link adrenotools, whose CMakeLists refuses every ABI but
+  arm64-v8a (Adreno driver loading);
+- upstream projects outside the tree, buildable but not yet built:
+  PulseAudio 13.0 (`libpulse`, `libpulseaudio`, `libpulsecommon-13.0`,
+  `libpulsecore-13.0`) with libsndfile 1.0.28 and libltdl, the OpenXR
+  loader, lsfg-vk (`liblsfg-vk-layer`, a submodule of the fork), and
+  `libevshim` (needs SDL2 headers the fork does not carry).
+
+Copying an arm64 binary into the x86_64 set does not count: the picker
+treats an x86_64 set that holds an ELF of another machine type as invalid.
+
 **The minSdk gate in CI.** droidtop's minSdk is 26 and every module
 declares it, but until 2026-09-11 nothing checked it, and two calls that do
 not exist on API 26 shipped and crashed the app on an Android 9 rig. CI now
