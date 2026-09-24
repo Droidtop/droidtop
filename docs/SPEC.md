@@ -6924,6 +6924,15 @@ digest and retries at its next check; the next publish clears any leftover
 Unstable, because it is the only channel droidtop has ever had, and a channel
 nothing has been promoted to yet simply reports that there is nothing there.
 
+The token that can write releases never shares a job with the build (decided
+2026-09-24, Droidtop/enginehost `docs/security/2026-09-24-ci-supply-chain.md`
+H3). `android-build.yml`'s build job, which runs Gradle, its plugins and the
+vendor-deps scripts, has a read-only token and checks out without leaving it
+in `.git/config`; a separate `publish` job with `contents: write` downloads the
+`droidtop-apk` artifact and runs only `release_channel.py publish`, exactly as
+`release-promote.yml` does. Every action is pinned to a commit SHA; moving one
+is a reviewed commit.
+
 Every build publishes BOTH variants: `droidtop-latest.apk` (release) and
 `droidtop-latest-debug.apk` (the same code, debuggable). The debug APK exists
 because making the published build a release build took `adb shell run-as`
