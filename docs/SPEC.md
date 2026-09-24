@@ -4982,10 +4982,18 @@ data, and any index can be rebuilt from them.
   for a library that had not changed.
 - The slow pass is a recurring loop, not a one-shot: it starts once,
   5 seconds after the first ordinary scan a shell asks for, and then
-  repeats every 30 minutes for the life of the process (`Library`'s
+  repeats every 30 minutes (`Library`'s
   `SLOW_REBUILD_START_DELAY_MS`/`SLOW_REBUILD_INTERVAL_MS`), because
   "kept honest ... over time" describes an ongoing process, not a
-  single pass after start. A round never runs beside an ordinary walk:
+  single pass after start. It runs only while something collects one of
+  the library's lists (`Library.observed`, the lists' subscription
+  counts; §2c): a round waits for an observer, and the last observer
+  leaving cancels the round in progress. The Gaming shell and the
+  Launcher's Games grid collect with the lifecycle, so a shell in the
+  back stack is not an observer; the Desktop Start menu collects only
+  while it is open. An observer returning after five minutes or more
+  away gets a round at once (`SLOW_REBUILD_RETURN_MS`), and a round due
+  in battery saver is skipped (`LibraryCore`'s `slowRoundAllowed`). A round never runs beside an ordinary walk:
   it waits until none is running, and a walk that starts cancels the
   round in progress (on a first start the ordinary walk IS the whole
   library, and the round used to read it all a second time beside it).

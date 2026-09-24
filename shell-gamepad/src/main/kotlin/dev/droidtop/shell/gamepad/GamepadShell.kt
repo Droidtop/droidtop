@@ -34,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -191,8 +192,11 @@ fun GamepadShell(
     // leaving/recreating this composition cannot cancel either scan.
     val gameScanState = remember(library) { library.backgroundScanState(GAME_KINDS) }
     val appScanState = remember(library) { library.backgroundScanState(APP_KINDS) }
-    val processGameEntries by gameScanState.collectAsState()
-    val processAppEntries by appScanState.collectAsState()
+    // Collected only while the shell is started: a shell left in the back
+    // stack is not observing the library, and the slow pass stops for it
+    // (docs/SPEC.md 2c).
+    val processGameEntries by gameScanState.collectAsStateWithLifecycle()
+    val processAppEntries by appScanState.collectAsStateWithLifecycle()
     var gameEntries by remember { mutableStateOf<List<LibraryEntry>?>(processGameEntries) }
     var appEntries by remember { mutableStateOf<List<LibraryEntry>?>(processAppEntries) }
     // Bumped by the real, user-facing "Rescan library" Settings action --

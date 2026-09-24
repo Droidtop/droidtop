@@ -72,6 +72,10 @@ dependencies {
     // leaves the foreground. That needs the host activity's real
     // Lifecycle, named here directly rather than relied on transitively.
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    // The shell collects the library's lists only while it is on screen,
+    // which is what "observes the library" means to the slow pass
+    // (docs/SPEC.md 2c).
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.coil.compose)
     implementation(libs.coil.android)
     // Real system logos (see theme/ThemeAssets.kt) are the bundled DEcaffe

@@ -91,6 +91,11 @@ object LibraryCore {
             index = RoomLibraryIndexStore(LibraryIndexDatabase.get(app), records),
             // A launch by id reads the game's record before anything else.
             records = records,
+            // No slow round starts while the device is in battery saver
+            // (docs/SPEC.md 7g).
+            slowRoundAllowed = {
+                app.getSystemService(android.os.PowerManager::class.java)?.isPowerSaveMode != true
+            },
         )
     }
 }
