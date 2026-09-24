@@ -83,7 +83,6 @@ object GamingSettingsCatalog {
     const val ID_THEME_COLOR_SCHEME = "pref_gaming_theme_colorscheme"
     const val ID_THEME_VARIANT = "pref_gaming_theme_variant"
     const val ID_THEME_ASPECT_RATIO = "pref_gaming_theme_aspect_ratio"
-    const val ID_SYNC_THEME_INDEX = "pref_gaming_sync_theme_index"
     const val ID_BROWSE_THEMES = "pref_gaming_browse_themes"
     const val ID_APPS_GRID_COLUMNS = "pref_gaming_apps_grid_columns"
     const val ID_DESKTOP_SETTINGS = "pref_gaming_desktop_settings"
@@ -295,27 +294,10 @@ object GamingSettingsCatalog {
                 themeVariantItem(context)?.let { add(it) }
                 themeAspectRatioItem(context)?.let { add(it) }
                 add(
-                    AsyncActionItem(
-                        id = ID_SYNC_THEME_INDEX,
-                        title = "Sync theme index",
-                        subtitle = "Update the real ES-DE theme list; run this before Browse themes if that list is empty",
-                        run = { ctx, _ ->
-                            val result = ThemeDownloader.syncThemesList(ThemeAssets.userThemesDir(ctx))
-                            when (result.status) {
-                                ThemeDownloader.ThemeSyncStatus.CLONED -> "Theme index downloaded"
-                                ThemeDownloader.ThemeSyncStatus.UPDATED -> "Theme index updated"
-                                ThemeDownloader.ThemeSyncStatus.UP_TO_DATE -> "Theme index already up to date"
-                                ThemeDownloader.ThemeSyncStatus.DIVERGED -> "Theme index has local changes -- skipped"
-                                ThemeDownloader.ThemeSyncStatus.FAILED -> "Failed: ${result.error?.message ?: "unknown error"}"
-                            }
-                        },
-                    ),
-                )
-                add(
                     ActionItem(
                         id = ID_BROWSE_THEMES,
                         title = "Browse themes",
-                        subtitle = "Download or update an individual theme from the real ES-DE community index",
+                        subtitle = "Download or update a theme from the ES-DE community's theme list",
                         // Default fulfillment: deep-link into the shell's
                         // ThemeBrowserScreen. The in-shell renderer opens
                         // the browser inline instead (by id).
