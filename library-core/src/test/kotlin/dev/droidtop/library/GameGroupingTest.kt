@@ -169,27 +169,12 @@ class GameGroupingTest {
         assertEquals(listOf("1.1.9f", "0.5.11c"), games.single { it.name == "love_of_magic_book3" }.versions.map { it.version })
 
         // The three Love of Magic books are three games, not one, although
-        // their names are 0.95 alike -- the reason similarity suggests and
-        // never merges. Same for Lust Academy and Lust Theory (0.61) and
-        // for ARTEMIS and RTS (0.60).
+        // their names are 0.95 alike -- the reason similarity never merges.
+        // Same for Lust Academy and Lust Theory (0.61) and for ARTEMIS and
+        // RTS (0.60).
         for (name in listOf("love_of_magic_book1", "love_of_magic_book2", "love_of_magic_book3", "Lust Academy", "Lust Theory", "ARTEMIS", "RTS")) {
             assertEquals(name, 1, games.count { it.name == name })
         }
-    }
-
-    @Test
-    fun `similar names are offered as suggestions, never merged`() {
-        val games = GameGrouping.group(corpus.map { GameGrouping.Found("/games/adult/renpy/$it") })
-        val suggestions = GameGrouping.suggestions(games)
-
-        assertTrue(
-            suggestions.toString(),
-            suggestions.any { it.name == "love_of_magic_book1" && it.other == "love_of_magic_book2" },
-        )
-        assertTrue(suggestions.all { it.score >= GameNaming.NAME_SIMILARITY_THRESHOLD })
-        // Suggestions are strongest first, so a UI that shows three shows
-        // the three worth asking about.
-        assertEquals(suggestions.map { it.score }.sortedDescending(), suggestions.map { it.score })
     }
 
     // --- the library layer over it ----------------------------------------
