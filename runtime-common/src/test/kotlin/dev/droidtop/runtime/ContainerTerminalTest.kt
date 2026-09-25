@@ -35,7 +35,8 @@ class ContainerTerminalTest {
 
         override suspend fun listContainers(): List<ContainerInfo> = error("not used")
         override suspend fun createPrimary(image: RootfsImage, provisioning: PrimaryProvisioning): Container = error("not used")
-        override suspend fun createSibling(image: RootfsImage): Container = error("not used")
+        override suspend fun createSibling(image: RootfsImage, name: String?): Container = error("not used")
+        override suspend fun rename(container: Container, name: String) = error("not used")
         override suspend fun start(container: Container, provisioning: PrimaryProvisioning?, onProgress: (String) -> Unit) = error("not used")
         override suspend fun checkSystemRequirements(): ContainerExecResult = error("not used")
         override suspend fun stop(container: Container) = error("not used")
@@ -64,6 +65,13 @@ class ContainerTerminalTest {
 
         assertEquals(primary, runtime.lastContainer)
         assertEquals(listOf(ContainerTerminal.PACKAGE), runtime.lastCommand)
+    }
+
+    @Test
+    fun `a terminal window is titled with its container's name`() = runBlocking {
+        val runtime = RecordingRuntime(ok())
+        ContainerTerminal.open(runtime, primary, "Debian")
+        assertEquals(listOf(ContainerTerminal.PACKAGE, "--title=Debian"), runtime.lastCommand)
     }
 
     /**

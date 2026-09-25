@@ -133,12 +133,12 @@ private fun ContainersScreen() {
      * brought forward to show it.
      */
     fun openTerminal(info: ContainerInfo) {
-        runAction("Getting a terminal ready in ${info.container.id} (the first time installs one)") { rt ->
+        runAction("Getting a terminal ready in ${info.displayName} (the first time installs one)") { rt ->
             val container = info.container
             if (container.role == ContainerRole.SIBLING && rt.siblingsNeedStart && !info.running) rt.start(container)
             ContainerTerminal.ensureInstalled(rt, container)?.let { error(it) }
             val started = DesktopSessionService.runInPrimary { sessionRuntime, _ ->
-                ContainerTerminal.failureMessage(ContainerTerminal.open(sessionRuntime, container))
+                ContainerTerminal.failureMessage(ContainerTerminal.open(sessionRuntime, container, info.displayName))
             }
             check(started) { "the desktop stopped. Start it again, then open the terminal." }
             withContext(Dispatchers.Main) { openDesktop(context) }
@@ -212,11 +212,11 @@ private fun ContainersScreen() {
                             if (isPrimary) {
                                 openDesktop(context)
                             } else {
-                                runAction("Starting ${info.container.id}") { it.start(info.container) }
+                                runAction("Starting ${info.displayName}") { it.start(info.container) }
                             }
                         },
                         onStop = {
-                            runAction(if (isPrimary) "Stopping the desktop" else "Stopping ${info.container.id}") { rt ->
+                            runAction(if (isPrimary) "Stopping the desktop" else "Stopping ${info.displayName}") { rt ->
                                 // The session first, so it does not report
                                 // its compositor vanishing as a failure; the
                                 // runtime's own stop then ends anything the
@@ -226,11 +226,12 @@ private fun ContainersScreen() {
                             }
                         },
                         onTerminal = { openTerminal(info) },
+                        onRename = { name -> runAction("Renaming ${info.displayName}") { it.rename(info.container, name) } },
                         onOpenDesktop = { openDesktop(context) },
                         onDeleteRequested = { confirmDeleteId = info.container.id },
                         onDeleteConfirmed = {
                             confirmDeleteId = null
-                            runAction("Deleting ${info.container.id}") { it.destroy(info.container) }
+                            runAction("Deleting ${info.displayName}") { it.destroy(info.container) }
                         },
                         onDeleteCancelled = { confirmDeleteId = null },
                     )
@@ -252,6 +253,7 @@ private fun ContainerRow(
     onStart: () -> Unit,
     onStop: () -> Unit,
     onTerminal: () -> Unit,
+    onRename: (String) -> Unit,
     onOpenDesktop: () -> Unit,
     onDeleteRequested: () -> Unit,
     onDeleteConfirmed: () -> Unit,
@@ -270,10 +272,14 @@ private fun ContainerRow(
         startable -> "STOPPED"
         else -> "READY"
     }
-    // The PRIMARY container hosts the live desktop compositor -- deleting
-    // it out from under a session would tear the desktop down as a side
-    // effect of a list row. Guarded here (stop the desktop first).
-    val primaryGuarded = isPrimary && (session is DesktopSessionState.Connected || starting)
+    // One rule for every container: a running one is stopped before it
+    // can be deleted. Deleting the primary under a live session would tear
+    // the desktop down as a side effect of a list row, and a sibling's
+    // programs (a terminal, an install) are the same kind of work in
+    // progress; the primary used to be guarded and a running sibling not
+    // (rig, dq-desk2-01).
+    val deleteGuarded = running
+    var renaming by remember { mutableStateOf<String?>(null) }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -282,7 +288,7 @@ private fun ContainerRow(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(container.id, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text(info.displayName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                 Text(
                     if (isPrimary) "primary: the desktop" else "sibling",
                     style = MaterialTheme.typography.bodySmall,
@@ -335,14 +341,24 @@ private fun ContainerRow(
                     TextButton(onClick = onDeleteCancelled) { Text("Keep") }
                     TextButton(onClick = onDeleteConfirmed, enabled = actionsEnabled) { Text("Delete") }
                 }
-                primaryGuarded -> Text(
-                    "Live desktop — stop it to delete",
+                deleteGuarded -> Text(
+                    if (isPrimary) "Live desktop: stop it to delete" else "Running: stop it to delete",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
                 else -> TextButton(onClick = onDeleteRequested, enabled = actionsEnabled) { Text("Delete") }
             }
         }
+        RenameRow(
+            name = info.displayName,
+            editing = renaming,
+            enabled = actionsEnabled,
+            onEdit = { renaming = it },
+            onSave = { value ->
+                renaming = null
+                if (value.trim() != info.displayName) onRename(value)
+            },
+        )
         dev.droidtop.app.vpn.ContainerVpnRow(container.id, runtime?.hostSocketDir(), enabled = actionsEnabled)
         ContainerDevicesRow(runtime, container, enabled = actionsEnabled)
         if (isPrimary) {
@@ -351,6 +367,51 @@ private fun ContainerRow(
                 hostSocketDir = runtime?.hostSocketDir(),
                 desktopRunning = session is DesktopSessionState.Connected,
             )
+        }
+    }
+}
+
+/**
+ * The container's name, which the person chooses (docs/SPEC.md §3d): a
+ * default from the image when it is made ("Debian"), changed here. The
+ * backend refuses an empty name, one over the length limit, or another
+ * container's, and the reason shows in the screen's error line.
+ */
+@Composable
+private fun RenameRow(
+    name: String,
+    editing: String?,
+    enabled: Boolean,
+    onEdit: (String?) -> Unit,
+    onSave: (String) -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 48.dp),
+    ) {
+        if (editing == null) {
+            Column(Modifier.weight(1f)) {
+                Text("Name", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                Text(name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            TextButton(onClick = { onEdit(name) }, enabled = enabled) { Text("Rename") }
+        } else {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+            ) {
+                BasicTextField(
+                    value = editing,
+                    onValueChange = { onEdit(it.take(dev.droidtop.runtime.ContainerNames.MAX_LENGTH)) },
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            TextButton(onClick = { onEdit(null) }) { Text("Cancel") }
+            TextButton(onClick = { onSave(editing) }, enabled = enabled && editing.isNotBlank()) { Text("Save") }
         }
     }
 }

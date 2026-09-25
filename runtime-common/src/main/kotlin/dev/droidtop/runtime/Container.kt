@@ -55,7 +55,16 @@ data class ContainerInfo(
     val running: Boolean,
     val image: String? = null,
     val digest: String? = null,
-)
+    /** The name the person knows it by ([ContainerNames]); backends always fill it in. */
+    val name: String? = null,
+) {
+    /** What to call the container anywhere a person reads it: its name, never its id when a name exists. */
+    val displayName: String get() = name ?: container.id
+}
+
+/** [container]'s name ([ContainerInfo.displayName]), or its id when the backend no longer lists it. */
+suspend fun ContainerRuntime.nameOf(container: Container): String =
+    listContainers().firstOrNull { it.container.id == container.id }?.displayName ?: container.id
 
 /** Common lifecycle surface both container backends implement. */
 interface ContainerRuntime {
@@ -84,8 +93,15 @@ interface ContainerRuntime {
      */
     suspend fun createPrimary(image: RootfsImage, provisioning: PrimaryProvisioning): Container
 
-    /** [image] is any SIBLING/BOTH-appropriate reference — no compositor needed. */
-    suspend fun createSibling(image: RootfsImage): Container
+    /**
+     * [image] is any SIBLING/BOTH-appropriate reference — no compositor
+     * needed. [name] is what the person calls it; null gives the default
+     * from the image ([ContainerNames.defaultName]).
+     */
+    suspend fun createSibling(image: RootfsImage, name: String? = null): Container
+
+    /** Gives [container] the name [name], refused with the reason when it cannot be used ([ContainerNames.problemWith]). */
+    suspend fun rename(container: Container, name: String)
 
     /**
      * Boots [container]. For the PRIMARY this returns once the compositor's

@@ -7,6 +7,7 @@ import dev.droidtop.runtime.Container
 import dev.droidtop.runtime.ContainerBackend
 import dev.droidtop.runtime.ContainerExecResult
 import dev.droidtop.runtime.ContainerLayout
+import dev.droidtop.runtime.ContainerNames
 import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.ImageCachePolicy
@@ -78,6 +79,7 @@ class DroidSpacesRuntime(
     private val rootDir = File(context.filesDir, "droidspaces")
     private val configsDir = File(rootDir, "configs")
     private val rootfsDir = File(rootDir, "rootfs")
+    private val names = ContainerNames(File(rootDir, ContainerNames.FILE_NAME))
 
     /**
      * The host-visible directory every container's `ContainerLayout.SOCKET_DIR`
@@ -104,12 +106,24 @@ class DroidSpacesRuntime(
     override suspend fun createPrimary(image: RootfsImage, provisioning: PrimaryProvisioning): Container =
         createContainer(name = PRIMARY_NAME, role = ContainerRole.PRIMARY, image = image, provisioning = provisioning)
 
-    override suspend fun createSibling(image: RootfsImage): Container =
-        createContainer(
+    override suspend fun createSibling(image: RootfsImage, name: String?): Container {
+        val existing = listContainers()
+        val chosen = name?.trim()?.takeIf { it.isNotEmpty() }
+            ?: ContainerNames.defaultName(ContainerRole.SIBLING, image.reference, existing.map { it.displayName })
+        ContainerNames.problemWith(chosen, existing.map { it.displayName })?.let { error(it) }
+        val container = createContainer(
             name = "droidtop-sibling-${UUID.randomUUID().toString().take(8)}",
             role = ContainerRole.SIBLING,
             image = image,
         )
+        withContext(Dispatchers.IO) { names.set(container.id, chosen) }
+        return container
+    }
+
+    override suspend fun rename(container: Container, name: String) {
+        val existing = listContainers()
+        withContext(Dispatchers.IO) { names.rename(container.id, name, existing) }
+    }
 
     private suspend fun createContainer(
         name: String,
@@ -236,7 +250,7 @@ class DroidSpacesRuntime(
         val configs = configsDir.listFiles { f -> f.isFile && f.name.endsWith(".config") }.orEmpty()
         if (configs.isEmpty()) return emptyList()
         val showOutput = RootProcess.run(binaryPath, "show").stdout
-        return configs.map { configFile ->
+        return names.named(configs.map { configFile ->
             val name = configFile.name.removeSuffix(".config")
             val rootfsPath = configFile.readLines()
                 .firstOrNull { it.startsWith("rootfs_path=") }
@@ -251,7 +265,7 @@ class DroidSpacesRuntime(
                 ),
                 running = showOutput.lineSequence().any { it.contains(name) },
             )
-        }
+        })
     }
 
     /**
@@ -283,6 +297,7 @@ class DroidSpacesRuntime(
 
         File(configsDir, "${container.id}.config").delete()
         File(configsDir, "${container.id}.env").delete()
+        names.remove(container.id)
         // Root-owned tree, symlinks inside, possible live bind mounts
         // over it: exactly the job RootfsDelete exists for. A refusal
         // (something still mounted) must fail the destroy loudly --

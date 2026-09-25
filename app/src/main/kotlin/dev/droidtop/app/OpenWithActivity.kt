@@ -42,7 +42,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import dev.droidtop.app.ui.SelectableRow
 import dev.droidtop.library.settings.Mode
-import dev.droidtop.runtime.ContainerBackend
 import dev.droidtop.runtime.ContainerLayout
 import dev.droidtop.runtime.ContainerOpenWith
 import dev.droidtop.runtime.ContainerPackageManager
@@ -340,7 +339,7 @@ private suspend fun containerChoices(context: Context, file: File, kind: OpenWit
         val container = info.container
         // proot runs each exec as its own session; droidspaces needs the
         // container up.
-        val reachable = runtime.backend == ContainerBackend.PROOT || info.running
+        val reachable = !runtime.siblingsNeedStart || info.running
         val manager: ContainerPackageManager? = if (reachable && kind.isInstall()) {
             runCatching { ContainerOpenWith.packageManagerFrom(runtime.exec(container, ContainerOpenWith.PROBE_COMMAND)) }.getOrNull()
         } else {
@@ -350,7 +349,7 @@ private suspend fun containerChoices(context: Context, file: File, kind: OpenWit
         val role = if (container.role == ContainerRole.PRIMARY) "The desktop's container" else "Container"
         OpenWithChoice(
             key = "container:${container.id}",
-            title = container.id,
+            title = info.displayName,
             supporting = when {
                 !reachable -> "$role · stopped: start it in Containers"
                 !accepts -> "$role · has no package manager for .${kind.extension} files"
