@@ -2135,6 +2135,52 @@ What "the addon is the better screen" concretely means in each mode:
   so the default-highlighted choice is the better screen
   (`DualScreenOrchestration.chooserCandidates`, unit-tested).
 
+### A buried game, root-caused on the live console (2026-09-25)
+
+Live-console review (owner's own Retroid Pocket 5, dual-screen: built-in
++ an external "DP Screen" over the add-on port): launching a game with
+two displays attached and the launch-target preference at its default
+(`GameLaunchTarget.ASK`) could land the game on the addon display with
+real activity focus (`dumpsys activity activities` showed it as
+`topResumedActivity`) while the live companion `Presentation` stayed
+drawn on top of it, holding the real input focus
+(`dumpsys window displays` -> `mCurrentFocus`) and hiding the game
+entirely. The game sat there, reachable by nothing but a manual Back
+press, until the user noticed. Root cause: `LaunchDisplay.startOn`
+launched the "default display" decision (`displayId == null`) with NO
+`ActivityOptions` at all, so Android resolved the launch against
+whichever display was ambiently current rather than the built-in panel
+-- and `coverVacatedDisplays` had just placed `SecondaryDisplayActivity`
+on the addon a line earlier in the same call, so the game rode that same
+ambient placement onto the addon. Meanwhile `parkedDisplayId` recorded
+the *requested* `null`, never the addon's real id, so the role
+orchestration never learned the addon was taken and kept showing the
+companion there. **Fixed**: `startOn` now always resolves an explicit
+display (`displayId ?: Display.DEFAULT_DISPLAY`) and always passes
+`ActivityOptions.setLaunchDisplayId` -- the launch, and `parkedDisplayId`,
+now always land where droidtop actually asked, never wherever Android's
+ambient default happens to be.
+
+### G6 status: store consolidated, relocation logic still in `:app` (2026-09-25)
+
+The "one persisted answer" decision above (`MainScreen`, 2026-09-24)
+already finished the store half of the gap-audit's G6 item: there is one
+role-model store, not two -- `DisplayRolePrefs.kt` only holds the
+orthogonal per-launch `GameLaunchTarget` preference, and `MainScreen.kt`
+carries one-time migration code off the old per-display-id
+`dual_screen_assignment` file, confirming that store is retired, not
+live. What is still open is the other half of G6 and of "one module owns
+secondary-display behaviour... `:app` hosts it, the shells contribute
+only their own content" above: roughly 350 lines of live
+relocation/companion/idle-cover orchestration
+(`MainActivity.observeSecondScreen`, `onStop`'s idle-cover-on-stop,
+`onNewIntent`'s reinit branch, the `DisplayRelocation` companion object)
+still live in `app/.../MainActivity.kt` rather than in `:display`
+alongside `SecondaryDisplayActivity`. Moving it touches this Activity's
+own lifecycle callbacks, `lifecycleScope`, `ForegroundShell` and
+`CompanionState`, and was not attempted in the same session as the
+buried-game fix above -- recorded here as the remaining scope, not done.
+
 ## 4d. The companion screen, designed (research 2026-09-01)
 
 droidtop's companion currently renders a status bar, notifications and
