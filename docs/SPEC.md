@@ -7367,19 +7367,64 @@ inline: a hex value or a named platform colour in a screen is a defect. Every te
 pair in both palettes is covered by a contrast test — each text role over each ground and card
 it is drawn on, not only the menu overlay.
 
-**One anatomy per thing.** One row (title, optional supporting line cut to one line, optional
-value, optional chevron; a chevron means "this opens", a value means "this is set to", and neither stands in
-for the other). One selectable choice row. One tile. One section label. One empty state. One
-selection idiom — an accent ring over a raised fill (`Modifier.selectionFrame`, ring width
-`MenuTokens.FocusRingWidth`) — on every droidtop-drawn focusable: rows, chips, tabs, buttons,
-cards and tiles alike; a focus rectangle in one place and a card in another is two answers to
-one question, and a brightened card alone is too faint to find at arm's length (UI pass
-2026-09-24, M1). The ring means "the pad is here" and nothing else: a current tab keeps only
-the raised fill, and a filter that is on is filled with the accent and carries a check, so
-neither reads as focus. One chip (`ShellChip`). One help/hint bar per screen, positioned
-inside the window. A settings row's whole text is on its Info sheet: Y on the row, or a long
-press, shows its name, value, full explanation and last status; the row itself keeps one line,
-so every row with a supporting line is the same height (UI pass 2026-09-24, M14).
+**One anatomy per thing.** One row (optional leading category icon, title, optional supporting
+line cut to one line, optional value, optional chevron; a chevron means "this opens", a value
+means "this is set to", and neither stands in for the other). One selectable choice row. One
+tile. One section label. One empty state. One selection idiom — an accent ring over a raised
+fill (`Modifier.selectionFrame`, ring width `MenuTokens.FocusRingWidth`) — on every
+droidtop-drawn focusable: rows, chips, tabs, buttons, cards and tiles alike; a focus rectangle
+in one place and a card in another is two answers to one question, and a brightened card alone
+is too faint to find at arm's length (UI pass 2026-09-24, M1). The ring means "the pad is here"
+and nothing else: a current tab keeps only the raised fill, and a filter that is on is filled
+with the accent and carries a check, so neither reads as focus. One chip (`ShellChip`). One
+help/hint bar per screen, positioned inside the window. A settings row's whole text is on its
+Info sheet: Y on the row, or a long press, shows its name, value, full explanation and last
+status; the row itself keeps one line, so every row with a supporting line is the same height
+(UI pass 2026-09-24, M14).
+
+**Settings polish: category icons, real grouping, search (owner direction 2026-09-25, "settings
+needs significant improvements to polish, layout, and all of that"; built by settingsui).** The
+consolidated catalog/row-component shell (H4, above) was the foundation; the owner looked at it
+running on the console and asked for the visual pass on top of it. Decided and built:
+
+- **A category icon, on rows that open something.** `CatalogItem.icon` (`CatalogIcon`, an enum
+  in `:runtime-common` so the model stays renderer-agnostic) is drawn once per
+  `NestedScreenItem`/`SubScreenItem` — never on a leaf toggle/choice/slider, which would compete
+  with the value column instead of helping the list scan by shape (Switch and Steam Deck icon
+  categories, not every control). The Gaming shell's `MenuRow` (`:shell-gamepad`) maps it to a
+  real Material Symbols glyph via `CatalogIconGlyphs.kt`'s one `CatalogIcon -> ImageVector`
+  table, drawn in the same leading slot a row's accent rail uses (a row carries at most one of
+  the two). The glyphs come from `androidx.compose.material:material-icons-extended`, pinned by
+  the same Compose BOM every other Compose dependency here is, so a name this module references
+  either compiles or fails the build — nothing hand-drawn, matching the "no fabricated assets"
+  rule. **Not yet on the touch/Preference surface**: `CatalogPreferenceBuilder`
+  (`:shell-default`) still sets `isIconSpaceReserved = false` on every preference it builds. Real
+  vendored Murine/launcher3 drawables exist for some of these concepts (`ic_settings_general`,
+  `round_rect_folder`, `ic_palette`, `ic_allapps_search`, `cloud_download_24px`…) but picking the
+  right one per `CatalogIcon` needs a working build-and-screenshot loop to confirm they read
+  right at row size, which this pass did not have; left open rather than shipped unverified.
+- **Real section grouping wherever a screen had gone flat.** Console systems (`AppSettingsCatalogs.
+  consoleSystemsGroups`) was the one management screen with no section label at all — six rows in
+  one undifferentiated run, the same shape the Gaming settings home itself had before the
+  2026-09-24 UI pass split it into `SHELL`/`LIBRARY`/`System`/`Input`/`Appearance` (`GROUP_GAMING`
+  etc., `GamingSettingsCatalog`). Split into `Management`/`Integrations`/`Platform database`, the
+  same section-label component every other screen already draws.
+- **Search across settings, on the settings home, by pad and by touch.** `SettingsSearchIndex`
+  (`:runtime-common`) builds a flat index ONCE per search session (`build`, suspend, IO-bound —
+  the same real cost as opening every top-level settings screen once) by walking the root's own
+  groups (depth 0) and, for a `NestedScreenItem` found there, one level into whatever
+  `CatalogScreen` it opens (depth 1) — never further, and never into a screen a catalog builds
+  for one instance (a single ROM folder, one platform, one container), which is what keeps this
+  flat against the size of anyone's library instead of growing with it (the performance rule:
+  no work that grows with the square of the library). `search` is then a pure, in-memory
+  substring filter, safe on every keystroke. In the Gaming shell, a synthetic "Search settings"
+  row (`SEARCH_ROW_ID`) is prepended to the settings home's own row list — it rides the exact
+  same focus order, Up/Down, A/touch and icon slot as every real row instead of a second
+  mechanism beside them — and opens a full-screen `SettingsSearchOverlay` (a text field plus
+  matching rows, each showing which screen it lives on); picking a result pushes that screen
+  onto the settings home's own navigation stack, so B from it returns to Settings same as
+  opening the row by hand would have. Not yet built on the touch/Preference surface, which has
+  no search entry point of its own yet — left open with the icon work above.
 
 **Copy is part of the system.** Sentence case, one dash convention (a spaced em dash, never
 `--`), one name per concept, verb labels on buttons, no developer notation and no backend error

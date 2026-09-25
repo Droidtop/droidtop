@@ -115,6 +115,7 @@ object GamingSettingsCatalog {
                     title = "Global settings",
                     subtitle = "Home role, modes, and droidtop's settings as a whole",
                     registryId = "global_settings",
+                    icon = CatalogIcon.GLOBAL,
                 ),
             ),
         ),
@@ -177,6 +178,7 @@ object GamingSettingsCatalog {
                         title = "Scraper",
                         subtitle = "Sources, filters, and content options for artwork and metadata",
                         registryId = "rom_scraper",
+                        icon = CatalogIcon.SCRAPER,
                     ),
                 )
                 add(
@@ -185,6 +187,7 @@ object GamingSettingsCatalog {
                         title = "Console systems",
                         subtitle = "Folders, per-system emulators, artwork scraping, platforms",
                         registryId = "console_systems",
+                        icon = CatalogIcon.CONSOLE_SYSTEMS,
                     ),
                 )
                 add(
@@ -193,6 +196,7 @@ object GamingSettingsCatalog {
                         title = "Game folders",
                         subtitle = "Add or remove the folders droidtop scans for games",
                         registryId = "rom_folders",
+                        icon = CatalogIcon.GAME_FOLDERS,
                     ),
                 )
                 add(
@@ -204,6 +208,7 @@ object GamingSettingsCatalog {
                         // there and here must stay in step.
                         subtitle = "Set up the Wine environment Windows games run inside",
                         registryId = "windows_games",
+                        icon = CatalogIcon.WINDOWS_GAMES,
                     ),
                 )
                 // Rescan library is not a row here: it is a one-shot
@@ -230,6 +235,7 @@ object GamingSettingsCatalog {
                         // Owned by :app (which this module cannot depend on),
                         // resolved through the registry like android_settings.
                         registryId = "updates",
+                        icon = CatalogIcon.SYSTEM_UPDATES,
                     ),
                 )
                 add(
@@ -238,6 +244,7 @@ object GamingSettingsCatalog {
                         title = "Android settings",
                         subtitle = "Every reachable system screen, and droidtop's own permission grants",
                         registryId = "android_settings",
+                        icon = CatalogIcon.ANDROID_SETTINGS,
                     ),
                 )
             },
@@ -543,6 +550,7 @@ object GamingSettingsCatalog {
                     title = "Desktop mode",
                     subtitle = "Settings for the Desktop shell",
                     registryId = "desktop_settings",
+                    icon = CatalogIcon.DESKTOP,
                 ),
                 SubScreenItem(
                     id = ID_STANDARD_SETTINGS,
@@ -552,6 +560,7 @@ object GamingSettingsCatalog {
                     title = "Home settings",
                     subtitle = "Standard mode's home screen, icons and app drawer",
                     fragmentClassName = "app.murinelauncher.settings.SettingsRootFragment",
+                    icon = CatalogIcon.STANDARD,
                 ),
             ),
         ),
