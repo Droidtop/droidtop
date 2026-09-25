@@ -2181,6 +2181,29 @@ own lifecycle callbacks, `lifecycleScope`, `ForegroundShell` and
 `CompanionState`, and was not attempted in the same session as the
 buried-game fix above -- recorded here as the remaining scope, not done.
 
+### "Reinitialize displays", made findable (2026-09-25)
+
+Confirmed live: an addon display can go empty, and so mirror the built-in panel, through
+a door `LaunchDisplay.coverVacatedDisplays` does not watch -- an app running on it exits
+on its own (the user backs out of it directly, not through any droidtop-owned flow),
+while droidtop's own shell never loses foreground on ITS OWN display, so nothing re-runs
+the role orchestration. The existing HARD reinit
+(`BackButtonMenu.EXTRA_DISPLAY_REINIT_FORCE`, already wired since the 2026-09-02 mirror
+fix) recovers from this once it runs -- verified live, screencap before/after -- but it
+was reachable only by double-tapping Home, a gesture the UI never tells anyone exists.
+**Fixed the reachability, not the plumbing**: "Reinitialize displays" is now a row in
+`BackButtonMenu`'s mode switcher, the one dialog already reachable from every mode (a
+long-press of Back, the Gaming Quick Menu's System tab, the Desktop taskbar, Android's
+own home long-press menu, and droidtop's games screen -- see that object's own class
+doc). It sends the same intent extra the double-tap already sends, with no `EXTRA_MODE`,
+so it never changes which mode is showing, only forces the display-role reinit.
+Self-detection (droidtop noticing the addon has gone empty and surfacing this action, or
+running it, without the user having to notice a mirror first) is NOT built -- recorded
+as open scope, not attempted alongside this reachability fix. A dedicated hardware
+shortcut (chord) was considered and dropped for this pass: everywhere this menu already
+opens from is reachable without inventing new key-combo plumbing to audit against every
+bundled emulator's own hotkeys first.
+
 ## 4d. The companion screen, designed (research 2026-09-01)
 
 droidtop's companion currently renders a status bar, notifications and
