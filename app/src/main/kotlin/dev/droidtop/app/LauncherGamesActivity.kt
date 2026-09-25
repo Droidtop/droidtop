@@ -76,7 +76,8 @@ class LauncherGamesActivity : AppCompatActivity() {
             finish()
             return
         }
-        if (Modes.isEnabled(Mode.GAMING) || Modes.isEnabled(Mode.DESKTOP)) {
+        val gamesAsked = intent?.action == ACTION_SHOW_GAMES
+        if (!gamesAsked && (Modes.isEnabled(Mode.GAMING) || Modes.isEnabled(Mode.DESKTOP))) {
             startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             finish()
             return
@@ -115,15 +116,21 @@ class LauncherGamesActivity : AppCompatActivity() {
         }
     }
 
-    private companion object {
+    companion object {
+        /**
+         * Opens the games grid whatever modes are on: the icon's "Games"
+         * app shortcut and the home screen's "droidtop games" menu entry.
+         */
+        const val ACTION_SHOW_GAMES = "dev.droidtop.app.action.SHOW_GAMES"
+
         /** Off the process scope: an icon being built must not die with the screen that asked. */
-        val pinScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        private val pinScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
         /** Pixel edge of a pinned icon's bitmap; the launcher scales it to its own icon size. */
-        const val ICON_PX = 192
+        private const val ICON_PX = 192
 
         /** What the grid lists: games that can be launched, by name. */
-        fun shown(entries: List<LibraryEntry>): List<LibraryEntry> =
+        private fun shown(entries: List<LibraryEntry>): List<LibraryEntry> =
             entries.filter { !it.hidden && !it.missing }
                 .sortedBy { (it.sortName ?: it.title).lowercase() }
 
@@ -132,7 +139,7 @@ class LauncherGamesActivity : AppCompatActivity() {
          * own confirmation (Launcher3's AddItemActivity in Launcher mode)
          * and places the icon; a launcher that cannot pin says so here.
          */
-        fun pin(context: Context, entry: LibraryEntry) {
+        private fun pin(context: Context, entry: LibraryEntry) {
             if (!ShortcutManagerCompat.isRequestPinShortcutSupported(context)) {
                 Toast.makeText(context, "This home screen cannot pin games", Toast.LENGTH_LONG).show()
                 return
@@ -165,7 +172,7 @@ class LauncherGamesActivity : AppCompatActivity() {
          * Only local art: a remote cover would mean a network fetch to
          * build an icon, and the app icon is an honest stand-in.
          */
-        fun artworkIcon(context: Context, entry: LibraryEntry): IconCompat? {
+        private fun artworkIcon(context: Context, entry: LibraryEntry): IconCompat? {
             val art = entry.artworkUri?.takeIf { it.isNotBlank() } ?: return null
             val uri = Uri.parse(art)
             val open: () -> java.io.InputStream? = when (uri.scheme) {

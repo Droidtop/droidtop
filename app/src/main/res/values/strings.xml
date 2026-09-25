@@ -8,4 +8,6 @@
          `aapt dump badging`. A distinct name avoids the resource-name
          collision entirely rather than fighting it. -->
     <string name="droidtop_app_name">droidtop</string>
+    <!-- The app shortcut on droidtop's icon that opens the games grid (res/xml/shortcuts.xml). -->
+    <string name="shortcut_games">Games</string>
 </resources>

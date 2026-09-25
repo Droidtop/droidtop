@@ -8,7 +8,7 @@
     <string name="pref_group_qsb_transparency_desc">Set transparency effects for quick search box</string>
 
     <string name="pref_category_general_title">General</string>
-    <string name="pref_category_general_desc">Global preferences</string>
+    <string name="pref_category_general_desc">Light or dark theme, screen mode and blur</string>
     <string name="pref_category_icons_title">Icons</string>
     <string name="pref_category_icons_desc">Set icon size and appearance</string>
     <string name="pref_category_home_title">Home screen</string>
@@ -173,5 +173,6 @@
     <string name="pref_restart_summary">Restart the launcher</string>
     <!-- droidtop: the home screen's long-press menu entry that opens the mode switcher (BackButtonMenu). -->
     <string name="droidtop_modes_option">droidtop modes</string>
+    <string name="droidtop_games_option">droidtop games</string>
     <string name="pref_global_settings_desc">Modes, your home screen, setup and the tutorial</string>
 </resources>

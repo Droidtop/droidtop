@@ -216,6 +216,19 @@ public class OptionsPopupView<T extends Context & ActivityContext> extends Arrow
                     dev.droidtop.shell.standard.BackButtonMenu.show(Launcher.getLauncher(v.getContext()));
                     return true;
                 }));
+        // droidtop patch: the library's games grid, whatever modes are on
+        // (with Gaming on, the droidtop icon opens Gaming instead).
+        options.add(new OptionItem(launcher,
+                R.string.droidtop_games_option,
+                R.drawable.ic_widget,
+                IGNORE,
+                v -> {
+                    Intent games = new Intent("dev.droidtop.app.action.SHOW_GAMES")
+                            .setClassName(v.getContext().getPackageName(), "dev.droidtop.app.LauncherGamesActivity")
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    v.getContext().startActivity(games);
+                    return true;
+                }));
         options.add(new OptionItem(launcher,
                 R.string.styles_wallpaper_button_text,
                 R.drawable.ic_palette,
