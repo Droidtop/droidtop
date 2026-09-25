@@ -10,4 +10,8 @@
     <string name="droidtop_app_name">droidtop</string>
     <!-- The app shortcut on droidtop's icon that opens the games grid (res/xml/shortcuts.xml). -->
     <string name="shortcut_games">Games</string>
+    <!-- ContinuePlayingWidgetProvider: home-screen widget title, and its
+         empty state before any game has been played. -->
+    <string name="widget_continue_playing_title">Continue playing</string>
+    <string name="widget_continue_playing_empty">No games played yet</string>
 </resources>

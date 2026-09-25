@@ -525,7 +525,83 @@ list and of Desktop's settings as well as Gaming's; turning a mode off is
 always reversible from the UI (it once took a data clear, dq-coordinator-23
 F5).
 
+### "Full computer", and where Launcher mode stands against Nova/Apex (survey + decided 2026-09-25)
+
+The owner's direction: droidtop on the console "needs to make the android
+device really feel like a full computer, that means being a real
+enhancement every way it can", and Launcher mode specifically "needs to
+look better, have more features (all the stuff nova and apex added, for
+instance...)".
+
+**The survey's finding reframes the work.** `:shell-default` is not a bare
+Launcher3 checkout; it is Murine Launcher (github.com/alesimula/Murine-launcher)
+forked in whole (`826fb3bb`), and Murine is already a Nova/Apex-class
+launcher in its own right. Checked directly against the fork's own
+sources rather than assumed from Nova/Apex's feature lists:
+
+| Feature | State | Where |
+|---|---|---|
+| Dock, folders, drawer, widgets, rotation, grid size | HAVE (stock Launcher3 + Murine) | `com.android.launcher3.Workspace`/`CellLayout`/`Folder`; grid size `SettingsHomeFragment.GRID_SIZE_WIDTH`/`HEIGHT` |
+| Icon packs, including **per-app** override | HAVE | `app/murinelauncher/icons/IconPackManager.kt:1067` (`buildIconPackEntries(perAppComponent)`), `SettingsIconPackFragment.kt` |
+| Notification badges/dots | HAVE, wired | `NotificationBadgeCounter.kt`, consumed by `BubbleTextView.java` and `FolderIcon.java` |
+| Hidden apps / app lock | HAVE | `settings/hiddenapps/{AppLock,HiddenAppsRepository}.kt` |
+| Backup/restore | HAVE, wired to Settings | `backup/BackupHelper.kt`, `SettingsMiscFragment.BACKUP_EXPORT`/`BACKUP_IMPORT` |
+| Smartspace/clock widget | HAVE | `widget/smartspace/{MurineClockView,SmartspaceMode}.kt` |
+| Configurable QSB with web search providers | HAVE | `widget/search/{SearchProvider,MurineSearchBarView}.kt` (8 providers + custom) |
+| Gestures: double-tap to sleep, swipe-down to notifications | HAVE, exposed in Settings | `LauncherPrefs.GESTURE_DOUBLE_TAP_SLEEP`/`GESTURE_SWIPE_DOWN_NOTIFICATIONS`, toggled from `SettingsHomeFragment` (`DOUBLE_TAP_TO_SLEEP`, `SWIPE_DOWN_NOTIFICATIONS`), applied in `WorkspaceTouchListener.java`/`NotificationSwipeController.kt` |
+| Assignable gesture *actions* (Nova's "map any gesture to any action", not just the two fixed ones above) | **LACK** | no such mapping layer exists; backlog |
+| App-drawer/QSB search over droidtop's own library (games, not just installed apps) | **LACK** | `DefaultAppSearchAlgorithm.java` only ever produces `AdapterItem.asApp`; backlog |
+| A home-screen widget of droidtop's own (a "full computer" feature neither Nova nor Apex can offer, since they have no game library) | **built this change** | `ContinuePlayingWidgetProvider.kt` (see below) |
+| Global settings, Desktop settings rendered in the shell's own row component, pad-navigable | HAVE (fixed 2026-09-24/25, UI pass H4) | `DroidtopWideSettings.kt`, `SettingsGlobalFragment.kt`'s `CatalogPreferenceNavigator` |
+| Icon-pack/drawer/hidden-apps settings pages left as stock Android preference UI | HAVE, and correct: H4's own fix text scopes the shell's row component to Global/Desktop only, and explicitly keeps these stock | `docs/audit-2026-09-24/ui-assessment.md` H4 |
+| Plugin contributions in the launcher (status tiles, search providers, app actions, launcher widgets from third-party engines/tools) | **not yet buildable** — plugin API is being rebuilt (agent `plugins`, §12/12a) | seam only, see below |
+
+**The target feature set, decided:** Launcher mode keeps inheriting Nova/Apex-class
+functionality from Murine wholesale rather than droidtop reimplementing any
+of the rows marked HAVE above — the vendored-tree rule (hook or extend, never
+rewrite) applies here as much as anywhere. droidtop's own work is the rows
+marked LACK, plus the "full computer" rows that are droidtop's alone because
+they need the shared library: a games-aware search algorithm, and
+launcher-native surfaces (widgets now, plugin-fed tiles once §12a lands) that
+no general-purpose launcher can offer since it has no library to draw from.
+
+**How plugin contributions reach the launcher (seam, not built here).** Once
+§12a's plugin API exists, a plugin-contributed status tile, search provider,
+app action or widget reaches Launcher mode through the same catalog pattern
+`DroidtopWideSettings`/`SettingsScreenRegistry` already uses for Global
+settings: a registry `:app` (or a new small module both `:shell-default` and
+the Gaming shell can see) populates from installed plugins, and each surface
+(the QSB's search results, a home-screen widget slot, a long-press app
+action) reads that registry rather than knowing about plugins directly. This
+keeps Launcher mode buildable now and the plugin surface pluggable in later
+without a second registration mechanism. Left undone deliberately: no
+plugin-facing API, no plugin search results, no plugin widgets. Agent
+`plugins` owns when §12a is ready for this to be wired up for real.
+
+**Handheld constraint, restated for this work specifically:** every row above
+must work by controller AND touch, pointer and focus as one selection (§7j),
+same as the rest of droidtop's chrome — Murine's stock pages already satisfy
+this by inheriting Launcher3's own d-pad/keyboard navigation, and
+`ContinuePlayingWidgetProvider`'s rows are ordinary focusable/clickable
+widget views, reachable the same way any home-screen widget is. Root stays
+what it has always been for the launcher: never used, never required: none
+of Launcher mode's rows above touch `runtime-linux-root`.
+
+**Built this change: the "Continue playing" home-screen widget.** A tap-to-launch
+list of the library's most recently played games (up to four), placed on
+the home screen like any other app's widget through Launcher3's own stock
+widget picker (no droidtop-specific picker UI needed). It reads the same
+in-RAM index every other surface reads (`Library.backgroundScanState`,
+never a folder walk from the widget itself — the perf rule in §7g), and a
+tap dispatches through the same `GameLaunchActivity.intentFor` path a
+pinned game icon already uses (launch-screen memory and play history
+included, no second launch mechanism). `GameLaunchActivity.dispatch` pushes
+an immediate widget refresh on `LaunchResult.Launched` so the widget shows
+the just-played game without waiting for the next 30-minute system tick.
+
 ### Gaming mode — the gaming-focused shell (renamed from Handheld)
+
+
 
 The mode was never about the form factor; it is the gaming shell, and it
 is offered on devices that are not handhelds. It contributes:

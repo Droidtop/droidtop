@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Plain rounded dark card, matching the system widget-surface convention (no droidtop ChromeColors: see widget_continue_playing.xml). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#CC1A1A1A" />
+    <corners android:radius="16dp" />
+</shape>

@@ -184,6 +184,27 @@
         </activity>
 
         <!--
+          "Continue playing" home-screen widget (docs/SPEC.md Launcher mode,
+          "full computer" direction): the library's own recently-played
+          games, placeable like any Nova/Apex widget from the Standard
+          launcher's widget picker, no droidtop-specific picker UI needed,
+          Launcher3's stock one already lists every app's widgets. Not
+          exported beyond the widget-host contract (no exported="true": the
+          platform delivers AppWidgetManager broadcasts to a receiver with
+          no intent-filter category exposed for others to target).
+        -->
+        <receiver
+            android:name="dev.droidtop.app.ContinuePlayingWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_continue_playing_info" />
+        </receiver>
+
+        <!--
           droidtop's ONE drawer icon, in every launcher including droidtop's
           own (docs/SPEC.md 2c, "One droidtop icon"). It resumes unfinished
           onboarding, else opens Gaming or Desktop through MainActivity, else
