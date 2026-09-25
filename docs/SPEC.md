@@ -1634,7 +1634,17 @@ not settled designs):
   on the primary's entry in the container manager, §3d, kept in
   `DesktopSetupPrefs`). Switching it changes the plan, so the next desktop
   start installs and configures CUPS, and the boot script starts `cupsd`
-  (the plan's `daemons`) before the compositor. cupsd also listens on
+  (the plan's `daemons`) before the compositor. **No daemon ever holds up
+  the desktop (decided 2026-09-25, rig dq-desk2-01):** a daemon is given
+  as a foreground command (`cupsd -f`), and the script starts it as a
+  background job with its output in `/var/log/droidtop/<name>.log`, never
+  waiting for it; a watcher reports after 15 s whether it is still running
+  ("cupsd is running", or "cupsd stopped: <its last lines>") in the
+  desktop log. The script used to run `cupsd` in line and trust it to
+  detach, and under proot cupsd's parent never returned: sway never
+  started and the desktop hung on "provisioning finished". While the
+  desktop runs, the Printing row says whether CUPS is up (its socket
+  exists) and offers "Add a printer" only then. cupsd also listens on
   `cups.sock` in the shared socket directory (`ContainerLayout.CUPS_SOCKET`)
   and every container's processes get `CUPS_SERVER` pointing at it
   (`ContainerLayout.clientEnvironment`), so a program in any container
