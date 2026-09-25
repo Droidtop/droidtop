@@ -1,6 +1,5 @@
 package dev.droidtop.shell.gamepad
 
-import android.content.Context
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -35,7 +34,6 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.library.LibraryEntry
 import kotlinx.coroutines.delay
-import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * Idle screensaver: a slow slideshow of the library's own artwork (real
@@ -45,33 +43,10 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * Deliberately NOT a screen blanker: Android's own display timeout
  * already does that and does it better (it actually powers the panel
  * down). This is the thing that happens BEFORE that -- the shell stops
- * showing a menu and starts showing the library.
+ * showing a menu and starts showing the library. When it shows is
+ * `ScreensaverPrefs` (runtime-common), the one definition the settings
+ * row writes and the shell's timer observes.
  */
-enum class ScreensaverMode(val label: String, val idleSeconds: Int) {
-    OFF("Off", 0),
-    AFTER_2("After 2 minutes", 120),
-    AFTER_5("After 5 minutes", 300),
-    AFTER_10("After 10 minutes", 600),
-}
-
-object ScreensaverPrefs {
-    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
-    private const val KEY_MODE = "droidtop_screensaver_mode"
-
-    // OFF by default (directed): a slideshow that appears on its own
-    // is an interruption unless somebody asked for it.
-    fun mode(context: Context): ScreensaverMode {
-        val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(KEY_MODE, null) ?: return ScreensaverMode.OFF
-        return runCatching { ScreensaverMode.valueOf(raw) }.getOrDefault(ScreensaverMode.OFF)
-    }
-
-    fun setMode(context: Context, mode: ScreensaverMode) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().putString(KEY_MODE, mode.name).apply()
-    }
-}
-
 /**
  * One artwork at a time, crossfaded, changing every [SLIDE_SECONDS].
  * Any input dismisses it -- the caller owns that, because the shell

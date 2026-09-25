@@ -308,14 +308,17 @@ fun GamepadShell(
         kotlinx.coroutines.flow.MutableStateFlow(android.os.SystemClock.elapsedRealtime())
     }
     var screensaverOn by remember { mutableStateOf(false) }
-    val screensaverMode = remember { ScreensaverPrefs.mode(context) }
+    // Observed, not read once: the row that sets it is in this shell's
+    // own Settings section (see ScreensaverPrefs.changes).
+    val screensaverMode by remember { dev.droidtop.library.settings.ScreensaverPrefs.changes(context) }
+        .collectAsState(initial = dev.droidtop.library.settings.ScreensaverPrefs.mode(context))
     LaunchedEffect(uiMode) {
         if (uiMode.hidesSettings && section == GamingSection.SETTINGS) {
             nav.openSection(GamingSection.GAMES)
         }
     }
     LaunchedEffect(screensaverMode, launching) {
-        if (screensaverMode == ScreensaverMode.OFF || launching != null) return@LaunchedEffect
+        if (screensaverMode == dev.droidtop.library.settings.ScreensaverMode.OFF || launching != null) return@LaunchedEffect
         lastInputMs.collectLatest {
             kotlinx.coroutines.delay(screensaverMode.idleSeconds * 1000L)
             screensaverOn = true
