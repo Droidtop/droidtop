@@ -220,8 +220,16 @@ internal fun GamelistOptionsMenu(
     fun activate(index: Int) {
         when (actions[index]) {
             "Rescan library" -> {
-                onScraped()
-                onDismiss()
+                // Says it started and what it found, like the settings row
+                // it is the same action as (LibraryRescan).
+                if (busy) return
+                busy = true
+                scope.launch {
+                    status = withContext(Dispatchers.IO) {
+                        dev.droidtop.library.settings.LibraryRescan.run(context) { status = it }
+                    }
+                    busy = false
+                }
             }
             "Scrape all systems" -> {
                 if (busy) return

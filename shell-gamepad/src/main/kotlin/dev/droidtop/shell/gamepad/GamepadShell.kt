@@ -817,7 +817,6 @@ fun GamepadShell(
                             canGoBack = true
                             SettingsCatalogView(
                                 onBack = { nav.openSection(GamingPrefs.defaultSection(context)) },
-                                onRescan = { rescanTrigger++ },
                                 browseThemesToken = browseThemesRequest,
                                 onHelpRowClaim = { claim ->
                                     if (screenKey == currentScreenKey) {

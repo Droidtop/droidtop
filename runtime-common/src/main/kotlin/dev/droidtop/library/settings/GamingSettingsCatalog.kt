@@ -741,17 +741,13 @@ object GamingSettingsCatalog {
      * get the real in-place rescan rather than one of them getting a
      * second, weaker mechanism.
      */
-    fun rescanLibraryItem(): ActionItem = ActionItem(
+    fun rescanLibraryItem(): AsyncActionItem = AsyncActionItem(
         id = ID_RESCAN_LIBRARY,
         title = "Rescan library",
         subtitle = "Look for new or changed games and apps again",
-        // Default fulfillment: the real deep-link relaunch (the only
-        // mechanism available from outside the shell's own composition).
-        run = launchComponent(
-            "dev.droidtop.app.MainActivity",
-            "dev.droidtop.app.EXTRA_MODE" to "gaming",
-            "dev.droidtop.app.EXTRA_GAMING_RESCAN" to true,
-        ),
+        // One action wherever the row is: it says it started, and what it
+        // found when it finished (LibraryRescan).
+        run = { ctx, onStatus -> LibraryRescan.run(ctx, onStatus) },
     )
 
     private fun launchComponent(className: String, vararg extras: Pair<String, Any>): (Context) -> Unit = { ctx ->
