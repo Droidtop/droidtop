@@ -107,4 +107,97 @@ class DualScreenOrchestrationTest {
         assertEquals("The other screen (add-on)", shellOnBuiltIn.first().label)
         assertEquals("This screen (built-in)", shellOnBuiltIn[1].label)
     }
+
+    @Test
+    fun `no second display means nothing to reinit`() {
+        assertFalse(
+            DualScreenOrchestration.secondScreenNeedsReinit(
+                secondDisplayId = null,
+                parkedDisplayId = null,
+                shellOnSecond = false,
+                presentationDisplayId = null,
+                idleCoverDisplayId = null,
+            ),
+        )
+    }
+
+    @Test
+    fun `a parked addon (an app the user launched) is never broken`() {
+        assertFalse(
+            DualScreenOrchestration.secondScreenNeedsReinit(
+                secondDisplayId = 9,
+                parkedDisplayId = 9,
+                shellOnSecond = false,
+                presentationDisplayId = null,
+                idleCoverDisplayId = null,
+            ),
+        )
+    }
+
+    @Test
+    fun `the shell itself on the addon needs no separate cover`() {
+        assertFalse(
+            DualScreenOrchestration.secondScreenNeedsReinit(
+                secondDisplayId = 9,
+                parkedDisplayId = null,
+                shellOnSecond = true,
+                presentationDisplayId = null,
+                idleCoverDisplayId = null,
+            ),
+        )
+    }
+
+    @Test
+    fun `a live presentation on the addon means it is covered`() {
+        assertFalse(
+            DualScreenOrchestration.secondScreenNeedsReinit(
+                secondDisplayId = 9,
+                parkedDisplayId = null,
+                shellOnSecond = false,
+                presentationDisplayId = 9,
+                idleCoverDisplayId = null,
+            ),
+        )
+    }
+
+    @Test
+    fun `the idle cover activity on the addon means it is covered`() {
+        assertFalse(
+            DualScreenOrchestration.secondScreenNeedsReinit(
+                secondDisplayId = 9,
+                parkedDisplayId = null,
+                shellOnSecond = false,
+                presentationDisplayId = null,
+                idleCoverDisplayId = 9,
+            ),
+        )
+    }
+
+    @Test
+    fun `the addon with neither a presentation nor an idle cover is broken -- the mirroring recurrence`() {
+        // The exact confirmed-live case: an app on the addon exited on
+        // its own, and nothing droidtop tracks is left on that display.
+        assertTrue(
+            DualScreenOrchestration.secondScreenNeedsReinit(
+                secondDisplayId = 9,
+                parkedDisplayId = null,
+                shellOnSecond = false,
+                presentationDisplayId = null,
+                idleCoverDisplayId = null,
+            ),
+        )
+    }
+
+    @Test
+    fun `a presentation tracked on a DIFFERENT display does not count`() {
+        assertTrue(
+            DualScreenOrchestration.secondScreenNeedsReinit(
+                secondDisplayId = 9,
+                parkedDisplayId = null,
+                shellOnSecond = false,
+                presentationDisplayId = 12,
+                idleCoverDisplayId = null,
+            ),
+        )
+    }
 }

@@ -103,6 +103,21 @@ object CompanionState {
      * tap on the companion looking like it did nothing.
      */
     val launchError = MutableStateFlow<String?>(null)
+
+    /**
+     * Whether the add-on display currently looks broken -- mirroring, a
+     * missing live companion, or a foreign app left behind after it
+     * exits -- per
+     * [dev.droidtop.runtime.DualScreenOrchestration.secondScreenNeedsReinit].
+     * Published by [MainActivity]'s own display-role orchestration (the
+     * one place that already knows the addon's id, the parked-display
+     * state, the live Presentation and the idle-cover Activity), read by
+     * the "Reinitialize displays" pill wherever it is drawn -- the same
+     * process-wide-flow pattern as [focusedEntry] and [libraryEntries],
+     * for the same reason: the pill can be drawn from a Compose tree
+     * that has none of that orchestration state of its own.
+     */
+    val dualScreenBroken = MutableStateFlow(false)
 }
 
 /**

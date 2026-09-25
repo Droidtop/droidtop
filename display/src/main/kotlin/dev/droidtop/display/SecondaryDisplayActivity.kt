@@ -29,6 +29,24 @@ import androidx.compose.ui.graphics.Color
  */
 class SecondaryDisplayActivity : ComponentActivity() {
 
+    companion object {
+        /**
+         * Which display this idle SECONDARY_HOME surface is actually
+         * resumed on right now -- read by
+         * [dev.droidtop.runtime.DualScreenOrchestration.secondScreenNeedsReinit]
+         * alongside [dev.droidtop.app.SecondScreenPresentation]'s own
+         * `display` to tell "the addon has droidtop's idle cover on it"
+         * from "nothing of ours is there," the same way
+         * `CompanionActivity.visible` already does for the built-in
+         * companion. Null while this Activity is not resumed anywhere --
+         * a home activity can exist without being the resumed one, e.g.
+         * a live Presentation drawn above it on the same display.
+         */
+        @Volatile
+        var resumedDisplayId: Int? = null
+            private set
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         render()
@@ -41,7 +59,21 @@ class SecondaryDisplayActivity : ComponentActivity() {
         // resumed rather than recreated, so the content is re-resolved
         // here rather than only at creation.
         render()
+        resumedDisplayId = displayIdCompat()
     }
+
+    override fun onPause() {
+        if (resumedDisplayId == displayIdCompat()) resumedDisplayId = null
+        super.onPause()
+    }
+
+    private fun displayIdCompat(): Int? =
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            display?.displayId
+        } else {
+            @Suppress("DEPRECATION")
+            windowManager.defaultDisplay?.displayId
+        }
 
     private fun render() {
         val mode = SecondaryDisplayContent.currentMode(this)
