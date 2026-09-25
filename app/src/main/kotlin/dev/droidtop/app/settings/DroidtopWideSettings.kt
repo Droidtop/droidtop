@@ -76,6 +76,12 @@ object DroidtopWideSettings {
                     title = "Data",
                     items = listOf(
                         ActionItem(
+                            id = "pref_global_show_tutorial",
+                            title = "Show the tutorial",
+                            subtitle = "The controls, the sections, the Quick Menu, switching modes and where help is",
+                            run = { ctx -> dev.droidtop.app.TutorialActivity.start(ctx) },
+                        ),
+                        ActionItem(
                             id = "pref_global_rerun_onboarding",
                             title = "Rerun onboarding",
                             subtitle = "Go through first-run setup again from the start; nothing is reset until you change it there",
@@ -123,7 +129,7 @@ object DroidtopWideSettings {
                         NestedScreenItem(
                             id = "pref_desktop_global_settings",
                             title = "Global settings",
-                            subtitle = "Modes, your home screen and setup",
+                            subtitle = "Modes, your home screen, setup and the tutorial",
                             registryId = SCREEN_GLOBAL,
                         ),
                     ),
