@@ -97,6 +97,7 @@ object BackButtonMenu {
             if (Modes.isEnabled(Mode.DESKTOP)) add(Mode.DESKTOP.label)
             if (Modes.isEnabled(Mode.GAMING)) add(Mode.GAMING.label)
             add(SETTINGS_ITEM)
+            add(REINIT_DISPLAYS_ITEM)
         }
         // DroidtopDialog: the same dark chrome palette as DroidtopTheme
         // (docs/SPEC.md section 2a chrome theming). This menu used to
@@ -110,6 +111,7 @@ object BackButtonMenu {
                     Mode.DESKTOP.label -> launchAppMode(activity, Mode.DESKTOP)
                     Mode.GAMING.label -> launchAppMode(activity, Mode.GAMING)
                     SETTINGS_ITEM -> openGlobalSettings(activity)
+                    REINIT_DISPLAYS_ITEM -> reinitializeDisplays(activity)
                 }
             }
             .setOnDismissListener { onDismiss?.invoke() }
@@ -119,6 +121,40 @@ object BackButtonMenu {
 
     /** Names the screen it opens: Global settings is where the modes live. */
     private const val SETTINGS_ITEM = "Modes and settings"
+
+    /**
+     * Confirmed live on a real dual-screen console (2026-09-25): an addon
+     * display can go empty -- and so mirror the built-in panel -- through
+     * a door the pre-launch cover (LaunchDisplay.coverVacatedDisplays)
+     * does not watch: an app that was on it exits on its own, with
+     * droidtop's own shell never losing foreground on ITS display, so
+     * nothing re-runs the role orchestration. The HARD reinit
+     * (EXTRA_DISPLAY_REINIT_FORCE) already fixes this once it runs -- it
+     * was reachable only by double-tapping Home, a gesture nobody is told
+     * exists. Naming it here, in the one menu already reachable from every
+     * mode (see the class doc), is the fix: no new detection, no new
+     * shortcut plumbing, just making the existing recovery findable.
+     */
+    private const val REINIT_DISPLAYS_ITEM = "Reinitialize displays"
+
+    /**
+     * Re-sends the existing HARD display reinit
+     * ([EXTRA_DISPLAY_REINIT_FORCE], docs/SPEC.md 4c) that a double-tap of
+     * Home already triggers, so it is reachable without knowing that
+     * gesture exists. No [EXTRA_MODE]: [resolveMode] only changes the
+     * active mode when that extra is present, so this leaves whichever
+     * mode is already showing alone and only forces the display-role
+     * orchestration to re-run and re-assert droidtop's surfaces.
+     */
+    fun reinitializeDisplays(context: Context) {
+        context.startActivity(
+            Intent(Intent.ACTION_MAIN).apply {
+                setClassName(context.packageName, APP_MAIN_ACTIVITY)
+                putExtra(EXTRA_DISPLAY_REINIT_FORCE, true)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+        )
+    }
 
     /**
      * Opens the Android home screen droidtop holds -- its own launcher, or
