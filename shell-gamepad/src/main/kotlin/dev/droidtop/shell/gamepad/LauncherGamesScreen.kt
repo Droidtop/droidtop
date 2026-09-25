@@ -84,7 +84,21 @@ fun LauncherGamesScreen(
         ) {
             if (foldersOpen && foldersScreen != null) {
                 BackHandler { foldersOpen = false }
-                CatalogNavigator(root = foldersScreen, onExit = { foldersOpen = false })
+                // Its own hint row, as every screen has one: the settings
+                // navigator draws none, and inside the Gaming shell that
+                // row is the shell's (rig, dq-shell2-01: no hint row here).
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        CatalogNavigator(root = foldersScreen, onExit = { foldersOpen = false })
+                    }
+                    TouchHintBar(
+                        hints = listOf(
+                            GamepadAction.A to "Select",
+                            GamepadAction.Y to "Info",
+                            GamepadAction.B to "Back",
+                        ),
+                    )
+                }
             } else {
                 GamesGrid(
                     games = games,
