@@ -2385,6 +2385,71 @@ other screen.
 While no shell is alive to launch through, a tap does nothing rather
 than half-launching outside that path.
 
+### Focused-game detail, filled in with real data (built 2026-09-25)
+
+The owner's own framing (dq-dualscreen review, 2026-09-25): the companion was "a bunch
+of images and some white text" with no per-game detail at all -- `info_d0.png`/
+`info_d5.png` from that review show the addon not even changing when the main screen's
+own game-info view opened. `CompanionContent`'s focused-entry panel now carries, all from
+data the library already has (never re-scraped, never fabricated):
+
+- a real artwork thumbnail beside the text column (`entry.artworkUri`, falling back to
+  `heroUri`) -- previously text-only, the concrete gap the review's captures showed;
+- title, system/engine, developer/publisher/year/genre, series, rating, description --
+  already built before this pass;
+- play time (already built) and last played, now added, formatted with Android's own
+  `DateUtils.getRelativeTimeSpanString` ("3 days ago") rather than a raw epoch or a
+  hand-rolled duration;
+- an available-update line, reusing the existing F95/update tracking
+  (`LibraryEntry.availableUpdate`, docs/SPEC.md §7g) rather than building a second
+  "is this current" check;
+- which player will actually run it, for console ROMs: `ConsoleRomProvider.resolvePlayer`
+  -- the SAME resolution `Library.launch` itself uses (the game's own `altEmulator`, then
+  the system's override, then the first installed candidate) -- read here, not
+  duplicated, so the line can never claim a player launch would not actually use. PC
+  entries already carry their own source line (`PcInfo`); engine games are named by the
+  system line, since their engine already IS what droidtop calls the "system" for them.
+
+**Explicitly not built, because droidtop has no real data source for them today, and the
+owner's own rule against fabricated content rules out inventing one for this pass:**
+
+- **Save states.** No droidtop code discovers or reads emulator save-state files today --
+  each bundled emulator's own save/state directory convention is undocumented in this
+  codebase and would need to be confirmed per emulator (accuracy-over-deference: it needs
+  the same source-citation standard as the players database itself, not a guess), and the
+  save-location policy already directs droidtop to make SYSTEM locations mean somewhere
+  else without changing save logic -- a save-state reader is real, separate scope, not a
+  companion-screen afternoon.
+- **Achievements.** DuckStation's own in-game menu has an Achievements row, which is
+  RetroAchievements support living entirely inside that emulator's own process; droidtop
+  has no RetroAchievements client of its own and no channel to read that emulator's
+  in-process achievement state from outside it. Nothing to surface without inventing data.
+- **Per-core controls/hotkeys.** Each bundled emulator owns and lets the user reconfigure
+  its own key bindings; droidtop has no reader for any of their configuration formats.
+  Showing droidtop's own shell bindings here (A/B/Select/etc.) would be showing the WRONG
+  thing -- those are shell navigation, not what the running emulator answers to.
+
+All three are real, scoped gaps for a follow-up pass, not oversights folded into this
+one -- each needs its own real data source before it can honestly appear here at all.
+
+### Browsing/idle status strip: what is real today, what still is not
+
+`CompanionSystemBar` (built) already carries clock, network (with signal level and
+"no internet" for the captive-portal case), VPN, battery, and an expandable Controls row
+(volume, brightness where granted, DND, Wi-Fi/Bluetooth panels) -- the real status strip
+this section's design called for, not Android's notification shade bleeding through.
+Two items from the same design remain genuinely unbuilt, for the same reason as the
+per-game gaps above -- no real data source exists yet, not a placeholder standing in for
+one:
+
+- **Now playing** (Spotify/Discord ambient presence, §7e) -- that section is scoped, not
+  built; there is no now-playing store this screen could read.
+- **Running jobs and downloads** -- no droidtop-owned `ScanProgress`/download-queue store
+  exists for any surface to read yet (Settings' own scan rows read provider state
+  directly, not a shared live-progress store); a companion tile for it needs that store
+  built first, wherever it is built, so every surface reads the one thing rather than the
+  companion inventing its own.
+
 ## 5. Windows compatibility — no real virtualization
 
 Confirmed via research, treat as settled: genuine hardware-accelerated x86
