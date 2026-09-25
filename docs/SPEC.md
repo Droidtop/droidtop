@@ -869,7 +869,10 @@ next start.
 (decided 2026-09-24).** `DesktopSessionService` is a foreground service
 with the system's notification (a real icon, the container's name and a
 Stop action; on API 33+ the notification permission is asked when the
-session is first started, §7b, and a refusal only hides the notification).
+session is first started, §7b, and a refusal only hides the notification;
+built 2026-09-25 as `DesktopNotificationPermission`: droidtop's own dialog
+gives the reason, Android's prompt follows only "Allow", the question is
+asked once, and the session starts without waiting for the answer).
 Under `DroidSpacesRuntime` the container outlives droidtop's process, so
 a process that starts with a PRIMARY still running re-attaches to it
 (`start` finds the compositor's socket accepting connections and

@@ -23,6 +23,7 @@ import dev.droidtop.library.settings.Modes
 import dev.droidtop.runtime.ContainerApp
 import dev.droidtop.runtime.ContainerApplications
 import dev.droidtop.runtime.ContainerTerminal
+import dev.droidtop.runtime.nameOf
 import dev.droidtop.runtime.DisplayOutputKind
 import dev.droidtop.runtime.DisplayOutputRepository
 import dev.droidtop.shell.desktop.DesktopSessionMessage
@@ -113,6 +114,14 @@ class MainActivity : AppCompatActivity() {
      * to report.
      */
     private var clipboardBridge: ClipboardBridge? = null
+
+    /** Whether the desktop's notification-permission question is on screen (Desktop mode only). */
+    private var askDesktopNotifications by mutableStateOf(false)
+
+    // Android's own prompt, after droidtop's reason. The desktop runs
+    // either way, so the answer needs no handling here.
+    private val notificationPermission =
+        registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { }
 
     // The LIVE companion window on the second screen, owned by this
     // foreground shell. :display's SecondaryDisplayActivity is the IDLE
@@ -268,7 +277,7 @@ class MainActivity : AppCompatActivity() {
                         onOpenTerminal = connected?.let {
                             {
                                 DesktopSessionService.runInPrimary { runtime, container ->
-                                    ContainerTerminal.failureMessage(ContainerTerminal.open(runtime, container))
+                                    ContainerTerminal.failureMessage(ContainerTerminal.open(runtime, container, runtime.nameOf(container)))
                                 }
                                 Unit
                             }
@@ -288,6 +297,19 @@ class MainActivity : AppCompatActivity() {
                         onDismissLaunchFailure = { DesktopSessionService.dismissLaunchFailure() },
                         onLaunchFailure = { DesktopSessionService.reportLaunchFailure(it) },
                     )
+                    if (askDesktopNotifications) {
+                        DesktopNotificationPermission.Dialog(
+                            onAllow = {
+                                DesktopNotificationPermission.markAsked(this@MainActivity)
+                                askDesktopNotifications = false
+                                notificationPermission.launch(DesktopNotificationPermission.PERMISSION)
+                            },
+                            onDecline = {
+                                DesktopNotificationPermission.markAsked(this@MainActivity)
+                                askDesktopNotifications = false
+                            },
+                        )
+                    }
                 }
                 // Nothing to render: both app-hosted modes are off, and
                 // refreshModeIfUndecided has already handed back to the
@@ -424,6 +446,10 @@ class MainActivity : AppCompatActivity() {
     private fun startDesktopSessionIfDesktop() {
         if (mode != Mode.DESKTOP) return
         DesktopSessionService.start(this)
+        // The first start asks for the notification the session shows,
+        // reason first (DesktopNotificationPermission). The session does
+        // not wait for the answer.
+        if (DesktopNotificationPermission.shouldAsk(this)) askDesktopNotifications = true
     }
 
     /**
