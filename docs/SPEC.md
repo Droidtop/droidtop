@@ -8338,141 +8338,207 @@ or a destination, and extras are simply ignored. Making that case work
 needs an intent surface added to the *target* app, not more integration
 machinery here.
 
-### 12a. Plugin half — DECIDED (2026-09-02)
+### 12a. Plugin half — REDECIDED (2026-09-25)
 
-The one line already decided in §12 is the constraint that shapes
-everything else: *integrations do not reach into droidtop's internals;
-droidtop exposes a surface and the integration talks to that surface.*
+**This replaces the whole of the previous 12a (2026-09-02/09-24).** That
+text routed integration plugins through Enginehost as signed subplugins
+running in Enginehost's own process, reached over its capabilities
+`ContentProvider`. The owner withdrew that on 2026-09-25: droidtop and
+Enginehost are separate apps, and nothing in droidtop's plugin system may
+depend on Enginehost, run inside it, or be installed through it — to
+droidtop, Enginehost stays just another emulator (§7d). What survives
+from the old text: the JSON/plugin split from §12 ("a plugin exists
+where droidtop needs something back"), and the trust-boundary checklist
+below, now applied to droidtop's own install path instead of
+Enginehost's.
 
-**Where the JSON/plugin line falls.** JSON owns everything expressible as
-one outbound, fire-and-forget Intent — "go do this over there". A plugin
-exists only where droidtop needs something **back**: a search that returns
-results droidtop renders, a now-playing state it polls, a metadata source
-it queries. Every example in §12 sorts cleanly under that, so no case is
-served by both halves.
+**Plugins are installed, approved and run in droidtop's own context.**
+droidtop downloads or accepts nothing through Enginehost's apparatus; it
+has its own manifest format, its own signing/pinning, its own install
+path, and its own approval screen (Settings → App integrations →
+Plugins, beside the JSON integrations §12 already built — the two are
+the same idea, "hook something into droidtop", at different trust
+levels, and belong on the same path for that reason).
 
-**Form: a downloadable SUBPLUGIN, distributed and verified by exactly the
-same engine that distributes engine plugins. Not a separate APK, not a
-bound Service, not a third-party app droidtop talks to.**
+**The sandbox is for compatibility and stability, not security.** A
+plugin here can do anything droidtop's own UID can do — there is no
+second permission model, no dropped capability, no [SecurityManager].
+What droidtop buys instead is crash containment: a `native_bundle`
+plugin's code runs in an isolated `:pluginhost` process (same UID,
+separate process), reached over one binder interface
+(`IPluginRuntime`/`IPluginRuntimeCallback`, `plugin-host` module). A
+plugin that throws, hangs, or native-crashes takes `:pluginhost` down,
+never `:app`; the binder `DeathRecipient` and a per-plugin crash
+callback both funnel into `PluginCrashPolicy`, which disables that one
+plugin and shows why, and the launcher keeps working. This is
+deliberately weaker than Enginehost's own "no internet, no arbitrary
+file access" runtime sandbox direction (§7d) — droidtop's plugins share
+droidtop's actual permissions — and every doc comment on the binder
+boundary says so again, so nobody mistakes crash containment for a
+security boundary later.
 
-An earlier proposal here argued for an installed APK exposing a bound
-Service, on the grounds that a separate app is a separate uid and
-therefore the only sandbox Android gives for free. That is rejected. The
-reason is the directive this project keeps returning to: one mechanism
-per job, and shared modules wherever a capability already exists. The
-project already has a complete apparatus for distributing third-party
-extension code — enginehost's signed `.enginehost.tar.xz` bundles,
-per-origin pinned keys certified under one root, an install path that
-verifies every payload file, and a trust screen the user approves before
-anything runs. Tying integrations to APKs would mean a second
-distribution channel, a second trust model, a second install flow and a
-second failure mode, to solve a problem the first one already solves.
-Python modules are out for the same reason, and for a worse one: running
-foreign source inside droidtop's own process, with droidtop's
-permissions, is the opposite of a sandbox.
+**Plugin kinds, and the one that's built.** `PluginKind` is an open set,
+one runner per kind:
 
-So an integration plugin is a subplugin: the same bundle format, the
-same signing and pinning, the same catalogue and download path, the same
-approval. The subplugin concept is not integration-specific — it exists
-because engine plugins need extensions too (the Godot Spine runtime is
-the first), and integrations are simply another consumer of it.
+- **`native_bundle`** — real Android/Kotlin code: a dex payload
+  (`classes.jar`, a zip containing `classes.dex`) plus optional native
+  `.so` libraries, loaded by `DexClassLoader` in `:pluginhost` and driven
+  through `DroidtopPlugin` (`onLoad`/`invoke`/`startJob`/`onUnload`).
+  Native code ships arm64-v8a AND x86_64 whenever it ships any `.so` at
+  all — the standing bundle rule (§7d) — enforced by
+  `PluginBundleInstaller.structuralProblems()`. **This is the only kind
+  with a working runner today.**
+- **`python`** — documented, not built. droidtop vendors no Python
+  runtime; bundling one (Chaquopy, python-for-android) is real, scoped
+  follow-up work, not a stub worth shipping now. A manifest declaring it
+  validates like any other and is refused ACTIVATION with a clear reason
+  — never silently ignored.
+- **`flutter_embed`** — documented, not built, added 2026-09-25 for a
+  real forthcoming case: an existing Flutter/Dart app the owner wants to
+  turn into a plugin rather than rewrite natively. Same treatment as
+  `python`: validates, refused at activation.
 
-Consequences that follow and are therefore also decided: a plugin is
-never "an app the user already installed", so discovery is a catalogue
-question rather than a package-manager query; not-installed still means
-hidden rather than offered-and-broken; and the trust boundary is the one
-that already exists, so discovery does not equal activation — a
-downloaded subplugin is approved before it runs, per the existing trust
-screen.
+**The API surface** (`PluginCapability`, a closed set — the trust shape
+differs per capability, same reasoning §12's `IntegrationCapability`
+already uses):
 
-**Where the code runs and how droidtop reaches it (2026-09-24).** The
-apparatus above lives in enginehost, and droidtop never downloads or
-side-loads extension code itself (§7d). An integration subplugin is
-therefore installed, approved and run by enginehost, in enginehost's
-process, and droidtop reaches it the way it already reaches everything
-enginehost owns: through enginehost's exported surface — the
-capabilities ContentProvider it already reads installed bundles from
-(`EnginehostCapabilities`) for discovery, and a request/response call on
-that same provider for the "something back" a plugin exists to give.
-droidtop passes values out and takes values back; it never hands over a
-handle to the library, the database or a directory, and file access
-stays what the JSON half already does: a read-only per-call `content://`
-grant for one named file. With enginehost absent, no plugin integration
-is shown, the same rule as a JSON integration whose app is missing.
+- `acquire_content` — search a source, download into a configured
+  library folder, report progress. The plugin form of the JSON half's
+  `acquire_content`: droidtop hands over the destination folder PATH and
+  the query, never a database handle, and results become games only
+  because droidtop's own scan finds the files afterward — a plugin never
+  registers a second `LibraryProvider` and never contributes a library
+  entry directly. (This resolves §12a's old "may a plugin contribute
+  library entries" question: no, only by writing real files into a real
+  folder droidtop already scans, same as the JSON half.)
+- `metadata_source` — a scrape source: given a game's known facts,
+  returns candidate metadata/media alongside droidtop's built-in
+  scrapers.
+- `library_action` — an action on a game's own entry, the plugin
+  analogue of `open_with` for cases a bare Intent can't cover.
+- `status_tile` — a status/control on droidtop's quick surfaces
+  (network, VPN, a reading), refreshed on droidtop's own schedule, never
+  a background loop the plugin owns.
+- `settings_rows` — rows rendered in droidtop's own settings style (the
+  existing `CatalogScreen`/`CatalogItem` model), never plugin-drawn UI.
+- `app_status` — status and actions for ONE OTHER INSTALLED APP the
+  plugin manages, distinct from `status_tile` (droidtop's own ambient
+  state) and from a per-system/per-library-entry row. Added 2026-09-25
+  for a real cross-cutting need: an app-management/patch-tool-shaped
+  plugin reporting what it knows about a specific package and offering
+  actions on it.
 
-**Trust boundary: the checklist plugin-install code must meet (decided
-2026-09-25, before any of it exists).** It comes from an audit of another
-launcher's plugin loader, which shipped with every one of the gaps these
-points close. Each is a requirement, checked in review, on enginehost's
-subplugin install path and on droidtop's side of the call; none is
-satisfied by "the catalogue is ours".
+A plugin declares the subset it implements; droidtop never calls a
+capability a plugin didn't declare.
 
-1. **A hash is always required and always verified.** The signed
-   manifest lists every payload file with its SHA-256. A file present in
-   the bundle but not in the manifest, a manifest entry with no hash, and
-   a hash that does not match are each a refused install. There is no
-   "no hash recorded, so nothing to check" path: a missing hash is a
-   failure, not a skip. The hashes are checked again before every
-   activation, not only at install, so a file changed on disk after
-   approval is a plugin that does not run.
-2. **No plugin may shadow a protected or built-in id.** Built-in ids
-   (droidtop's own integrations and capabilities, the closed
-   `IntegrationCapability` set, enginehost's engine and bundle ids) are
-   resolved first and are never replaceable by a plugin. A plugin that
-   declares one, or declares an id another origin already owns, is
-   refused at install; it is never "resolved" by load order or by which
-   was installed last. Plugin ids are namespaced by origin.
-3. **Everything is validated before any plugin code runs.** Signature
-   against the pinned origin key, every hash, the manifest schema, the
-   declared capabilities against the closed set, the contract version,
-   and both ABIs (arm64-v8a and x86_64, the standing bundle rule) are all
-   checked first. A plugin that fails any step never has its code loaded,
-   not even to ask it to describe itself: its name, capabilities and
-   settings come from the validated manifest, never from running it.
-4. **Signing and trust are at least as strict as the engine bundles'.**
-   The same per-origin pinned P-256 keys certified under the one root,
-   the same approval bound to the exact archive digest and signer, the
-   same trust screen before first run, and approval that never carries
-   over to a new digest (§7d). No unsigned or "developer" bypass exists
-   in a release build, and an install never replaces a newer installed
-   version of the same id unless the person asks for that downgrade.
-5. **droidtop treats what a plugin returns as untrusted input.** Values
-   coming back through enginehost's provider are size-capped, parsed
-   against the capability's own schema, and never used as a path, a URI
-   on droidtop's own FileProvider authority, an intent target or a
-   launch template; a malformed answer is that call's failure, shown on
-   the row that asked.
-6. **Disable and uninstall leave nothing running.** A disabled or
-   removed plugin's rows disappear with it and no call reaches it again.
-   What becomes of data it already contributed is the open question
-   below; whatever the answer, that data is never re-labelled as
-   something droidtop found itself.
+**The long-running job shape.** `invoke()` is a single request/response
+call bounded end to end by a watchdog (`PluginRunner.CALL_TIMEOUT_MS`,
+15s). A real job — a patch, an install, a multi-minute scan — needs more:
+`IPluginRuntime.startJob` returns a `jobId` immediately and the plugin
+reports progress/completion later through
+`IPluginRuntimeCallback.onJobProgress`/`onJobComplete`, running on its
+own thread in `:pluginhost` between binder calls, not bounded by the
+per-call watchdog. `DroidtopPlugin.startJob` defaults to throwing
+`UnsupportedOperationException`, which the runner turns into a clean "no
+job support" result rather than a crash — most plugins only ever
+implement `invoke`.
 
-**What this waits on.** enginehost has no subplugin mechanism yet (the
-Spine runtime is still compiled into the Godot plugins), so droidtop has
-nothing to discover or call. droidtop's half — the provider reader, the
-integrations-screen rows and the per-capability call sites — is built
-against enginehost's published contract once that exists, not ahead of
-it against a guessed one.
+**A plugin may declare it holds a live connection to another app.**
+`PluginManifest.boundServiceTargets` names package(s) a plugin may bind
+a live service/binder connection to, alongside its one-shot
+`PluginContext` calls. Declaring a target is not itself a grant droidtop
+can enforce technically (the isolation is process-crash containment, not
+a permission system, as above) — it is what the approval screen shows
+before the user approves, exactly like `requestsRoot`, so "this plugin
+talks to app X in the background" is never a silent surprise.
 
-**Still open, for the user to settle:**
+**A shared Shizuku-availability check.** `PluginContext.hasShizukuAccess()`
+answers "is Shizuku's manager installed and has the user granted
+droidtop its permission" with one lightweight, no-client-library check
+(package presence + `checkSelfPermission` on Shizuku's own granted
+permission string), so plugins that want a privileged call without full
+root don't each reimplement the pairing handshake. It only answers
+whether the path is available; a plugin still declares `requestsRoot` or
+`boundServiceTargets` for what it actually intends to do with it.
 
-- May a plugin contribute **library entries** — things that show up as
-  games — or only metadata, media and actions attached to entries
-  droidtop found itself? This is the largest open question, because
-  "yes" turns plugins into a second library-source mechanism alongside
-  the existing `LibraryProvider`s, and §7g just spent a whole pass
-  unifying those.
-- Does a plugin get to declare a capability outside the closed
-  `IntegrationCapability` set, and if so, what stops the trust model
-  from becoming per-plugin freeform?
-- What happens to entries or state a plugin contributed once the user
-  uninstalls or disables it.
+**Root is an opt-in, per-plugin enhancement — never a requirement, never
+standard.** droidtop's own launcher and handheld code still never needs
+root (§3d, §7); that standing rule is unchanged. The one exception is
+plugin-level and narrow: a plugin may declare `requestsRoot` and, when
+the user approves BOTH the plugin and its root request
+(`PluginRecord.rootApproved`), use root on a device that actually has it
+— an example being a plugin built from an existing ROM-downloader app's
+own code, where root lets it interface directly with other apps' code
+and data instead of only through droidtop's narrower API. Three things
+hold this to "enhancement, not mechanism" (owner directive, 2026-09-25):
 
-§12's original open questions — the shape of the internal API surface,
-how a plugin is sandboxed and invoked, how droidtop discovers what is
-installed and integration-capable, and what the permission/trust model
-is — are answered above for the plugin half, and in fact for the JSON
-half by what is built: the surface is the closed `IntegrationCapability`
-set plus the placeholders each one is given, the manifest is the `.json`
-file, and the trust model is per-capability rather than per-app.
+1. A plugin that never declares `requestsRoot` never gets it — there is
+   no implicit or ambient root for plugin code.
+2. A plugin's CORE function must keep working on a device with no root
+   and on one where the user declined the root grant; `PluginContext.
+   hasRootApproval()` folds "device has root" and "user approved" into
+   one check specifically so a plugin can gate the enhancement cleanly
+   rather than building two divergent code paths that both have to work.
+3. droidtop never treats root as the normal path anywhere in the plugin
+   host itself — `PluginRuntimeService` and `PluginStore` need no root
+   for anything they do; only plugin code that explicitly asked, and was
+   explicitly granted, ever calls into it.
+
+**Install sources.** Today: a user-picked file through the system picker
+(`PluginStore.importFromPicker`), the same "Add integration file" shape
+§12's JSON half already uses. A catalog-repo source — the "official
+origin + third-party key" idea droidtop-platforms already uses for its
+own lists — fits the same shape later (an origin is already a first-class
+concept in the manifest and the pinned-key map) but is not built: nothing
+today resolves a plugin id against a remote catalog, so adding one is a
+`PluginOriginKeys` entry and a fetch step in front of the same install
+path, not a redesign.
+
+**The trust-boundary checklist** (unchanged in substance from the
+2026-09-02 text, now checked against `PluginBundleInstaller` and
+`PluginStore` instead of Enginehost's install path):
+
+1. A hash is always required and always verified — every payload file's
+   SHA-256, checked at install AND re-checked before every activation
+   (`PluginBundleInstaller.verifyInstalled`), so a file edited on disk
+   after approval is a plugin that stops running, not one that keeps
+   going unverified.
+2. No plugin may shadow a protected id (`PluginBundleInstaller.
+   PROTECTED_IDS`) or an id another origin already installed under;
+   plugin ids are namespaced `<origin>.<name>` and the namespace is
+   itself a structural validation failure, not a runtime check.
+3. Everything validates before any plugin code runs: signature, every
+   hash, the manifest schema, capabilities against the closed set, the
+   contract version, both ABIs when native libraries ship. A plugin that
+   fails any step never has its code loaded, not even to ask it to
+   describe itself.
+4. Signing is real, not a placeholder gesture: ECDSA P-256/SHA-256 over
+   the exact manifest bytes, verified against a per-origin pinned public
+   key (`BundleSignature`, `PluginOriginKeys`). Approval is bound to the
+   exact archive digest (`PluginRecord.archiveDigest`, a SHA-256 over the
+   signed manifest) and never carries over to a new digest — an update
+   with different bytes starts back at PENDING, even for an id already
+   approved.
+5. droidtop treats what a plugin returns as untrusted input: every
+   binder payload is capped (`PluginRunner.MAX_RESULT_BYTES`, 256 KiB),
+   parsed against the capability's own shape, and never used as a path,
+   a FileProvider URI, an intent target or a launch template without
+   droidtop's own validation.
+6. Disable and uninstall leave nothing running: `PluginStore.setEnabled`/
+   `uninstall` and `PluginCrashPolicy`'s own disable path all go through
+   the one `PluginRecord`, and `PluginStore.runnableFor` is the only
+   thing a real call site should iterate, so a disabled plugin's rows
+   simply stop appearing rather than needing every caller to re-check.
+
+**What is built vs. open.** Built: the manifest format and validation,
+signing/hashing, install/uninstall/enable/approve, the approval screen,
+the `native_bundle` runner (isolated process, binder API, crash
+containment via `PluginCrashPolicy`), the job shape, and a sample plugin
+(`samples/plugin-sample-statustile`) exercising `status_tile` end to end,
+including a deliberate forced crash for testing the disable path. Open:
+the `python` and `flutter_embed` runners; a catalog-repo install source;
+and producing/signing the sample's actual bundle, which needs a compiled
+`:plugin-host` classpath and a dex compiler this change's session did not
+have without a local Gradle build (against this project's own "CI
+builds, never local" rule) — `samples/plugin-sample-statustile/build.sh`
+is the real, unexecuted recipe.
