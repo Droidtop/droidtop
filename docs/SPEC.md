@@ -456,11 +456,11 @@ into Gaming at all (rig, dq-coordinator-24). The alias and its mode piece
 are gone. The icon is not mode-gated: it runs nothing until someone opens
 it, and Android requires an enabled launcher activity before it accepts a
 pinned shortcut from droidtop at all. The class keeps its old name because
-every pinned game names it. It runs in a task of its own
-(`taskAffinity=""`), so every tap runs it and it decides again; as part of
-the app's task, a tap brought back whatever droidtop screen was last in
+every pinned game names it. It runs in a task of its own (its own task
+affinity), so every tap runs it and it decides again; as part of the
+app's task, a tap brought back whatever droidtop screen was last in
 front, a Gaming shell whose mode had been switched off included
-(dq-onboard-01). The games grid is reachable whatever modes are on: the
+(dq-onboard-01, dq-shell2-01). The games grid is reachable whatever modes are on: the
 icon's app shortcut "Games" (a long press) and the home screen's
 long-press menu entry "droidtop games" open it (`ACTION_SHOW_GAMES`).
 Launcher3's pin sheet (`AddItemActivity`) also runs in a task of its own,
