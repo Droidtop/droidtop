@@ -149,18 +149,18 @@ object GamingSettingsCatalog {
                     ChoiceItem(
                         id = ID_SCREENSAVER,
                         title = "Screensaver",
-                        subtitle = "Shows your library's artwork when the shell sits idle",
-                        options = listOf(
-                            ChoiceOption("OFF", "Off"),
-                            ChoiceOption("AFTER_2", "After 2 minutes"),
-                            ChoiceOption("AFTER_5", "After 5 minutes"),
-                            ChoiceOption("AFTER_10", "After 10 minutes"),
-                        ),
-                        current = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
-                            .getString("droidtop_screensaver_mode", null) ?: "OFF",
+                        // Android's own screen timeout still turns the
+                        // panel off, and it wins when it is the shorter
+                        // (docs/SPEC.md 7f, "Screensaver").
+                        subtitle = "Shows your library's artwork when the shell sits idle, " +
+                            "if Android's screen timeout is longer",
+                        options = ScreensaverMode.entries.map { ChoiceOption(it.name, it.label) },
+                        current = ScreensaverPrefs.mode(context).name,
                         onSelect = { ctx, value ->
-                            ctx.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
-                                .edit().putString("droidtop_screensaver_mode", value).apply()
+                            ScreensaverPrefs.setMode(
+                                ctx,
+                                runCatching { ScreensaverMode.valueOf(value) }.getOrDefault(ScreensaverMode.OFF),
+                            )
                         },
                     ),
                 )
