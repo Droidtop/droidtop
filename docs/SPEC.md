@@ -7910,6 +7910,54 @@ stays what the JSON half already does: a read-only per-call `content://`
 grant for one named file. With enginehost absent, no plugin integration
 is shown, the same rule as a JSON integration whose app is missing.
 
+**Trust boundary: the checklist plugin-install code must meet (decided
+2026-09-25, before any of it exists).** It comes from an audit of another
+launcher's plugin loader, which shipped with every one of the gaps these
+points close. Each is a requirement, checked in review, on enginehost's
+subplugin install path and on droidtop's side of the call; none is
+satisfied by "the catalogue is ours".
+
+1. **A hash is always required and always verified.** The signed
+   manifest lists every payload file with its SHA-256. A file present in
+   the bundle but not in the manifest, a manifest entry with no hash, and
+   a hash that does not match are each a refused install. There is no
+   "no hash recorded, so nothing to check" path: a missing hash is a
+   failure, not a skip. The hashes are checked again before every
+   activation, not only at install, so a file changed on disk after
+   approval is a plugin that does not run.
+2. **No plugin may shadow a protected or built-in id.** Built-in ids
+   (droidtop's own integrations and capabilities, the closed
+   `IntegrationCapability` set, enginehost's engine and bundle ids) are
+   resolved first and are never replaceable by a plugin. A plugin that
+   declares one, or declares an id another origin already owns, is
+   refused at install; it is never "resolved" by load order or by which
+   was installed last. Plugin ids are namespaced by origin.
+3. **Everything is validated before any plugin code runs.** Signature
+   against the pinned origin key, every hash, the manifest schema, the
+   declared capabilities against the closed set, the contract version,
+   and both ABIs (arm64-v8a and x86_64, the standing bundle rule) are all
+   checked first. A plugin that fails any step never has its code loaded,
+   not even to ask it to describe itself: its name, capabilities and
+   settings come from the validated manifest, never from running it.
+4. **Signing and trust are at least as strict as the engine bundles'.**
+   The same per-origin pinned P-256 keys certified under the one root,
+   the same approval bound to the exact archive digest and signer, the
+   same trust screen before first run, and approval that never carries
+   over to a new digest (§7d). No unsigned or "developer" bypass exists
+   in a release build, and an install never replaces a newer installed
+   version of the same id unless the person asks for that downgrade.
+5. **droidtop treats what a plugin returns as untrusted input.** Values
+   coming back through enginehost's provider are size-capped, parsed
+   against the capability's own schema, and never used as a path, a URI
+   on droidtop's own FileProvider authority, an intent target or a
+   launch template; a malformed answer is that call's failure, shown on
+   the row that asked.
+6. **Disable and uninstall leave nothing running.** A disabled or
+   removed plugin's rows disappear with it and no call reaches it again.
+   What becomes of data it already contributed is the open question
+   below; whatever the answer, that data is never re-labelled as
+   something droidtop found itself.
+
 **What this waits on.** enginehost has no subplugin mechanism yet (the
 Spine runtime is still compiled into the Godot plugins), so droidtop has
 nothing to discover or call. droidtop's half — the provider reader, the
