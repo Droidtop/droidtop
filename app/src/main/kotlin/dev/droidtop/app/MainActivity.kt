@@ -186,6 +186,15 @@ class MainActivity : AppCompatActivity() {
 
         refreshModeIfUndecided()
 
+        // A mode switched off while its shell is on screen leaves it: for
+        // the other app-hosted mode if that one is on, else for the Android
+        // home screen. Turning Gaming off in Global settings used to leave
+        // the running Gaming shell fully usable, and droidtop's icon kept
+        // bringing it back, until a force-stop (rig, dq-onboard-01).
+        lifecycleScope.launch {
+            Modes.enabledFlow.collect { enabled -> leaveIfSwitchedOff(enabled) }
+        }
+
         // Tap-to-launch from the companion surface (its recent-games
         // rail): the companion renders on a screen the user is not
         // driving with the gamepad, so touch is its input, and a launch
@@ -379,6 +388,24 @@ class MainActivity : AppCompatActivity() {
         // deliver keys into a window the user has navigated away from.
         if (ForegroundShell.current() === this) ForegroundShell.set(null)
         super.onPause()
+    }
+
+    private fun leaveIfSwitchedOff(enabled: Set<Mode>) {
+        val current = mode ?: return
+        if (current in enabled || isFinishing) return
+        if (current == Mode.DESKTOP) DesktopSessionService.stop(this)
+        val next = Modes.resolveAppMode(this, null)
+        if (next != null) {
+            Modes.setLastMode(this, next)
+            mode = next
+            startDesktopSessionIfDesktop()
+        } else {
+            Modes.setLastMode(this, Mode.LAUNCHER)
+            finish()
+            startActivity(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
     }
 
     private fun refreshModeIfUndecided() {

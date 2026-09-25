@@ -283,8 +283,15 @@
         <meta-data android:name="android.nfc.disable_beam_default"
                        android:value="true" />
 
+        <!--
+          droidtop: taskAffinity "" so the pin sheet opens in a task of its
+          own and Cancel or Back returns to the screen that asked for it,
+          not into whatever older droidtop screens (Settings, the setup's
+          leftovers) sat in the app's own task (rig, dq-onboard-01).
+        -->
         <activity android:name="com.android.launcher3.dragndrop.AddItemActivity"
             android:theme="@style/AddItemActivityTheme"
+            android:taskAffinity=""
             android:excludeFromRecents="true"
             android:autoRemoveFromRecents="true"
             android:exported="true">

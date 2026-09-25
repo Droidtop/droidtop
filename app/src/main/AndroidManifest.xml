@@ -197,6 +197,10 @@
           screen was last left there, and B from the games grid or Cancel on
           the pin sheet dropped the person into it (rig, dq-shell2-01).
         -->
+        <!--
+          The app shortcut "Games" (res/xml/shortcuts.xml, a long press on
+          the icon) opens the games grid whatever modes are on.
+        -->
         <activity
             android:name="dev.droidtop.app.LauncherGamesActivity"
             android:exported="true"
@@ -207,6 +211,9 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
 
         <!--

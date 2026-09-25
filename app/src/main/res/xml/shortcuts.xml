@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A long press on droidtop's icon. "Games" opens the library's games grid
+  (LauncherGamesActivity with SHOW_GAMES) whatever modes are on; without it
+  the grid could only be reached with Gaming and Desktop both off.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="games"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_games">
+        <intent
+            android:action="dev.droidtop.app.action.SHOW_GAMES"
+            android:targetPackage="dev.droidtop.app"
+            android:targetClass="dev.droidtop.app.LauncherGamesActivity" />
+    </shortcut>
+</shortcuts>

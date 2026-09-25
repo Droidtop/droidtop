@@ -191,6 +191,9 @@ internal object TutorialPages {
                             add(TutorialRow("From your launcher", "The droidtop icon opens " + opensLabel(gaming, desktop)))
                         }
                     }
+                    if (gaming || desktop) {
+                        add(TutorialRow("Hold the droidtop icon", "Games: your games in a plain grid, without opening a mode"))
+                    }
                     add(TutorialRow("Anywhere", "Hold Back, on devices whose Back button can be held"))
                     if (home != HomeRolePrefs.HomeImplementation.NONE) {
                         add(
