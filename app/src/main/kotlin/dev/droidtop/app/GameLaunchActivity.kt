@@ -63,8 +63,14 @@ class GameLaunchActivity : Activity() {
         private fun dispatch(context: Context, entryId: String) {
             val app = context.applicationContext
             LibraryCore.library(app).launchInBackground(entryId) { result ->
-                if (result is LaunchResult.Refused) {
-                    android.os.Handler(android.os.Looper.getMainLooper()).post { report(app, result.reason) }
+                when (result) {
+                    is LaunchResult.Refused ->
+                        android.os.Handler(android.os.Looper.getMainLooper()).post { report(app, result.reason) }
+                    // Play history just moved, so the "Continue playing"
+                    // widget (docs/SPEC.md Launcher mode) shows this game
+                    // as most-recent now rather than at its next 30-minute
+                    // system tick.
+                    LaunchResult.Launched -> ContinuePlayingWidgetProvider.requestUpdate(app)
                 }
             }
         }
