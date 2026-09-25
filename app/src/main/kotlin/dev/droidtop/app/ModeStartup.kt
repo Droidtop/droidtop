@@ -85,6 +85,10 @@ object ModeStartup {
         // mode, which runs what it opens, is on.
         setComponentEnabled(app, OpenWithActivity::class.java.name, on(ModePiece.DESKTOP_OPEN_WITH))
 
+        // Desktop switched off takes its running session with it: the
+        // compositor and everything on the desktop, not only the next start.
+        if (!on(ModePiece.DESKTOP_SESSION)) DesktopSessionService.stop(app)
+
         if (!on(ModePiece.DESKTOP_VPN)) dev.droidtop.app.vpn.DroidtopVpnService.stop(app)
         setComponentEnabled(app, dev.droidtop.app.vpn.DroidtopVpnService::class.java.name, on(ModePiece.DESKTOP_VPN))
 

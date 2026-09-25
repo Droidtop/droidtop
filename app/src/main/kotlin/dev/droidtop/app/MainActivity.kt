@@ -313,7 +313,12 @@ class MainActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         applyGamingDeepLink(intent)
+        val previous = mode
         mode = resolveMode(intent)
+        // Leaving Desktop for another shell ends the desktop session: it is
+        // Desktop mode's, and a compositor nobody can see must not keep
+        // running behind Gaming (rig, dq-coordinator-23 F9).
+        if (previous == Mode.DESKTOP && mode != Mode.DESKTOP) DesktopSessionService.stop(this)
         startDesktopSessionIfDesktop()
         // Display reinit on every re-entry (a HOME press routes here via
         // Launcher.onNewIntent's forwarding, carrying EXTRA_DISPLAY_REINIT).
@@ -388,7 +393,7 @@ class MainActivity : AppCompatActivity() {
      */
     private fun startDesktopSessionIfDesktop() {
         if (mode != Mode.DESKTOP) return
-        startForegroundService(Intent(this, DesktopSessionService::class.java))
+        DesktopSessionService.start(this)
     }
 
     /**

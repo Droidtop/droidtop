@@ -46,9 +46,16 @@ data class ContainerExecResult(val exitCode: Int, val stdout: String, val stderr
 /**
  * One row of [ContainerRuntime.listContainers] — a known container (running
  * or not) plus the live state a management surface needs to render it
- * (docs/SPEC.md §3d's container manager is the real consumer).
+ * (docs/SPEC.md §3d's container manager is the real consumer). [image] is
+ * the reference it was made from and [digest] the digest that pinned it,
+ * where the backend recorded them.
  */
-data class ContainerInfo(val container: Container, val running: Boolean)
+data class ContainerInfo(
+    val container: Container,
+    val running: Boolean,
+    val image: String? = null,
+    val digest: String? = null,
+)
 
 /** Common lifecycle surface both container backends implement. */
 interface ContainerRuntime {
@@ -97,7 +104,21 @@ interface ContainerRuntime {
      * the recorded plan.
      */
     suspend fun start(container: Container, provisioning: PrimaryProvisioning? = null, onProgress: (String) -> Unit = {})
+
+    /**
+     * Ends everything running in [container]: for the PRIMARY its
+     * compositor and every program on the desktop, for a sibling every
+     * program running in it. Returns once they are gone.
+     */
     suspend fun stop(container: Container)
+
+    /**
+     * Whether a SIBLING has to be started before [exec] can run in it.
+     * droidspaces boots a sibling's own init; under proot a sibling has
+     * none, so it is only ever its programs and "start" does nothing a
+     * person could see (the container manager offers no Start for it).
+     */
+    val siblingsNeedStart: Boolean get() = true
 
     /**
      * Whether this device can run this backend at all, answered by running

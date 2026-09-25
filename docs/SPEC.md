@@ -669,7 +669,30 @@ proot probes and only substitutes ashmem where memfd is refused. `exec`
 waits for its session (a GUI program returns when its window closes, as
 `ContainerTerminal` expects) and captures its output. A sibling has no
 init under proot: starting one is a no-op and each `exec` is a session of
-its own.
+its own, so the interface says so (`ContainerRuntime.siblingsNeedStart`
+is false here) and the container manager offers no Start for one.
+
+**Stopping is a stop (decided 2026-09-25, rig dq-coordinator-23 F9).**
+proot ignores SIGTERM (`src/tracee/event.c` sets every terminating signal
+but SIGQUIT and the fault signals to SIG_IGN) and sets no
+`PTRACE_O_EXITKILL`, so the old stop (`destroy()`, then `destroyForcibly()`)
+did nothing and then killed proot alone, detaching its tracees: sway,
+swaybar and foot kept running after Containers > Stop and after leaving
+Desktop, and the next start booted a second sway beside the first. Every
+proot droidtop starts, and every guest process under it, now carries two
+environment entries, `DROIDTOP_CONTAINER=<id>` and
+`DROIDTOP_SESSION=<uuid>` (proot through its own environment, the guest
+through the `env -i` list, inherited by everything it starts).
+`ProotProcesses` ends a session or a container by SIGKILLing every
+process of the app's uid whose `/proc/<pid>/environ` holds the entry,
+and every descendant of those (a program that cleared its environment
+is still a child of one that did not), repeating until none is left; a
+tracee is killable while ptrace-stopped, and proot exits with its last
+tracee. `stop` is that for the whole container and is not cancellable
+half way; a cancelled `exec` is that for its session; `start` of the
+PRIMARY begins with it, so a compositor left by a dead app process can
+never run beside the new one. A container is "running" while any
+process of it is alive, which is what the container manager shows.
 
 **One layout, both backends** (`ContainerLayout`, `runtime-common`): the
 host socket directory at `/run/droidtop-sockets` (`XDG_RUNTIME_DIR`), the
@@ -740,6 +763,21 @@ process-lifetime worker and returns. Nothing starts at boot: the
 desktop session, like the VPN it may serve (§4a), starts when a person
 opens Desktop mode or turns on "start with droidtop" on the container's
 page (§3d), never from a boot receiver.
+
+**The session is Desktop mode's, and it ends with it (decided
+2026-09-25).** It ends when the shell leaves Desktop for Gaming
+(`MainActivity` switching mode; pressing Home into another launcher does
+not end it), when Desktop mode is switched off (`ModePiece.DESKTOP_SESSION`,
+through `ModeStartup`), when the PRIMARY is stopped in Containers, and
+from the notification's Stop. Ending it stops the PRIMARY with everything
+on the desktop, including a primary still booting (the service tracks
+the container it is booting, not only a connected one). The service is
+not sticky: a process Android killed does not come back as a desktop
+nobody opened. The PRIMARY's running state in the container manager IS
+the session: Start opens Desktop (which starts the session with the
+current plan, Printing included) and Stop ends the session; a raw
+`ContainerRuntime.start` from the manager used to boot the recorded plan
+with no host bridge attached, a second desktop nobody could see.
 
 **Every external process droidtop runs is bounded.** crane, proot,
 droidspaces and `su` run through one `ProcessRunner` that drains stdout
