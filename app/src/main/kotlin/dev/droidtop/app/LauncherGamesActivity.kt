@@ -20,7 +20,10 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.GameNaming
+import dev.droidtop.library.LibraryGrouping
 import dev.droidtop.library.LibraryKinds
+import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.library.scanFollowingGamesRoots
 import dev.droidtop.library.settings.Mode
 import dev.droidtop.library.settings.Modes
@@ -83,6 +86,23 @@ class LauncherGamesActivity : AppCompatActivity() {
             finish()
             return
         }
+        // B goes back to the home screen the grid was opened from. Opened
+        // from droidtop's own home screen (its icon or the icon's "Games"
+        // shortcut), plain finishing handed the person to Android, which
+        // recreated droidtop's home screen with a fresh Home intent -- and a
+        // fresh Home intent forwards to the default mode, so B landed in
+        // Gaming (rig, dq-shell2-02). That home screen is reopened as the
+        // explicit "Android" one, which never forwards.
+        val openedFromDroidtopHome = referrer?.host == packageName
+        onBackPressedDispatcher.addCallback(this) {
+            if (openedFromDroidtopHome) {
+                dev.droidtop.shell.standard.BackButtonMenu.openHome(
+                    this@LauncherGamesActivity,
+                    dev.droidtop.shell.standard.HomeRolePrefs.activeHomeImplementation(this@LauncherGamesActivity),
+                )
+            }
+            finish()
+        }
         val library = LibraryCore.library(applicationContext)
         // The same scan the Gaming shell's Games section runs, following
         // the games roots as they change (Library.scanFollowingGamesRoots),
@@ -137,10 +157,20 @@ class LauncherGamesActivity : AppCompatActivity() {
         /** Pixel edge of a pinned icon's bitmap; the launcher scales it to its own icon size. */
         private const val ICON_PX = 192
 
-        /** What the grid lists: games that can be launched, by name. */
-        private fun shown(entries: List<LibraryEntry>): List<LibraryEntry> =
-            entries.filter { !it.hidden && !it.missing }
-                .sortedBy { (it.sortName ?: it.title).lowercase() }
+        /**
+         * What the grid lists: games that can be launched, by name, one card
+         * per game under the name Gaming gives it. PC and engine games are
+         * grouped exactly as Gaming's PC grid groups them (docs/SPEC.md 7m:
+         * a game found in several folders is one card, named for the game,
+         * not "30YearOldVirgin 0.37.dv pc"; rig, dq-shell2-02), and a tap
+         * plays the copy that card's Play would.
+         */
+        private fun shown(entries: List<LibraryEntry>): List<LibraryEntry> {
+            val playable = entries.filter { !it.hidden && !it.missing }
+            val (pc, others) = playable.partition { it.isPcOrEngineGame }
+            return (LibraryGrouping.group(pc).map { it.displayEntry } + others)
+                .sortedBy { GameNaming.displayName(it.title).lowercase() }
+        }
 
         /**
          * Asks the home screen to pin [entry]. The home screen shows its
