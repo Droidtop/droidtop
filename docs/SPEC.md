@@ -38,7 +38,7 @@ its group, is placed in numeric order, and gets a line in the contents below.
 - [7e. Second-screen / ambient integrations (Spotify now-playing, Discord presence)](#7e-second-screen--ambient-integrations-spotify-now-playing-discord-presence)
 - [7e2. Data-driven player/platform database (directed 2026-08-30)](#7e2-data-driven-playerplatform-database-directed-2026-08-30)
 - [7e2b. Launch resolution FROM the platforms database (directed 2026-08-31)](#7e2b-launch-resolution-from-the-platforms-database-directed-2026-08-31)
-- [7e3. Lutris install-script integration (directed 2026-08-30, backlog)](#7e3-lutris-install-script-integration-directed-2026-08-30-backlog)
+- [7e3. Lutris install-script integration (directed 2026-08-30, scoped and built 2026-09-25)](#7e3-lutris-install-script-integration-directed-2026-08-30-scoped-and-built-2026-09-25)
 - [7e4. Emulator setup helpers (directed 2026-08-31, EmuDeck-style)](#7e4-emulator-setup-helpers-directed-2026-08-31-emudeck-style)
 - [7f. Gaming mode: real, generic ES-DE theme engine](#7f-gaming-mode-real-generic-es-de-theme-engine)
 - [7g. One library across every source (audit + plan, directed 2026-09-01)](#7g-one-library-across-every-source-audit--plan-directed-2026-09-01)
@@ -4080,20 +4080,83 @@ otherwise it changes nothing for anyone who has already scanned.
 `game_metadata` and the collection tables are preserved -- favorites,
 completed flags and collection membership are real user data.
 
-## 7e3. Lutris install-script integration (directed 2026-08-30, backlog)
+## 7e3. Lutris install-script integration (directed 2026-08-30, scoped and built 2026-09-25)
 
 Beyond cover art (§7h's Lutris scraper source), lutris.net's real public
 install-script database is a fit for the PC side: per-game scripts that
 declare how a game from an arbitrary source (user-provided installers,
 GOG/itch builds, engine games) gets set up — files, Wine settings,
-required runtime pieces. Consuming those would let droidtop/gamenative-tux
-auto-configure games the user supplies themselves instead of only what
-GameNative's own community-config backend covers, diversifying away from
-a single config source. Standing note, not started: evaluate Lutris first
-but not exclusively (its coverage/format may not be the best fit); any
-runner-execution mapping goes through the existing strategy resolver
-(§7e2) and gamenative-tux's container backends, never a new parallel
-launch path.
+required runtime pieces. The standing risk this backlog note flagged —
+consuming a script the way Lutris does means running an unsigned
+installer from whoever last edited its page — is why the importer is
+built as a DATA TRANSLATION step and never a live interpreter; its full
+threat model, written before any of this code, is
+`docs/security/2026-09-25-lutris-importer.md`. Format reference:
+`github.com/lutris/lutris`, `docs/installers.rst`.
+
+**What is imported.** `LutrisImport.translate` (`:library-core`,
+`library/lutris/LutrisImport.kt`) reads one Lutris installer's `script`
+JSON into two closed shapes and nothing else: a `WineGameSettings`
+(executable, arguments, working directory — all relative paths inside
+the game's own folder, re-validated against it canonically on every
+launch by `WindowsLaunchResolver`, never only at import time) and a
+`WinePrefixChanges` (DXVK, esync, a fixed set of gamenative Windows
+components reached only through a closed `winetricks`-verb table, DLL
+overrides, and an environment-variable allowlist). Every directive that
+would execute, fetch, write a file, touch the registry or ask the
+installer a question (`execute`, `task: wineexec`, `write_file`,
+`write_config`, `write_json`, `extract`/`move`/`merge`/`copy`,
+`insert-disc`, `input_menu`, `gogdl_setup`, `set_regedit*`) is refused
+and listed to the person as **not imported, needs manual setup**, in
+plain words, never run, emulated or partially run. Only `runner: wine`
+scripts are offered; every other runner is shown, named, and cannot be
+picked, because §7i's own runner resolution is the authority on how a
+game runs. Runner-execution mapping goes through the existing launch
+path (`WindowsLaunchResolver`, `PcGameRuntime.launchWindows`) and
+gamenative's own container save path (`ContainerUtils`), never a new
+parallel launch path — the same rule this section always had, now with
+code behind it.
+
+**Entry point (§7i, beside the per-game overrides).** "Import a Lutris
+install script" is a row in the PC detail's "Runs on Windows" runner
+section (`PcGameDetail.kt`, `runnerGroup`), reached the user way from the
+game whose settings it would change — never a global screen, because an
+import is always for one game. `LutrisImportScreen` (`:shell-gamepad`)
+walks: search lutris.net for the game's own name, pick one of its
+installers (Wine ones pickable, others shown with their runner and
+disabled), then a preview that is the whole point. The preview lists,
+before anything is written: what changes for this game, what changes on
+the prefix (named, and stated as shared with every other Windows game
+without a prefix of its own when it is), what the script asked for that
+droidtop already does its own way, and everything not imported with why.
+Apply writes both; "This game only" writes just the game's own settings
+and leaves the prefix alone. Nothing is written on open, on search, or in
+the background. A game an import touched shows its own "Program: …" row
+in the same section, naming the import as its source and clearing back
+to detection on selection — the per-game override this section already
+promises, now with a second way to set it besides picking a file by
+hand.
+
+**Where the settings live.** `WineGameSettings` (`:library-core`,
+per-game, keyed like `LaunchStrategyOverridePrefs`) is read by both PC
+launch paths — `PcGameProvider` and `GameEngineDetector`'s
+`EngineGameProvider` — through the one `WindowsLaunchResolver.resolve`,
+so an imported game and a detected one share the same launch code past
+that point. `PcGameRuntime.applyPrefixChanges` writes prefix-wide changes
+through gamenative's own `ContainerUtils.toContainerData`/
+`applyToContainer` round trip, the same path its own configuration
+dialog saves through, so an import and a hand edit land in the prefix
+identically.
+
+**Confirmed against the real API.** `LutrisInstallerClient` reads
+`GET https://lutris.net/api/installers/<slug>`, keyless like the
+existing `LutrisScraperClient` search it reuses to find the slug from
+the game's own name. The response is read to 2 MiB and refused past it;
+at most 500 installer steps and 200 files are read per script, each
+string capped at 4 KiB (threat model, decision 8) — a script over a
+limit is refused whole, never half-read.
+
+Needs a rig check: dq-lutrisimp-01.
 
 ## 7e4. Emulator setup helpers (directed 2026-08-31, EmuDeck-style)
 
@@ -6721,6 +6784,21 @@ other people's results on other hardware. It is shown factually, it may be
 filtered on by the user's own act, and it may never hide an entry, reorder
 the library, or block a download (directed 2026-09-01).
 
+**ProtonDB, read-only, asked for rather than fetched (§7e3, built
+2026-09-25).** For a game with a Windows route or a known Steam app id,
+the detail offers a "ProtonDB" row; selecting it looks up
+`protondb.com`'s own public summary endpoint and, once found, opens
+ProtonDB's own page for that app rather than droidtop rendering a
+verdict of its own. The lookup runs only on selection, never on open —
+the same "asked for, not fetched" rule gamenative's compatibility badge
+already follows — and every outcome, including no reports, no known
+Steam app id, or the request being refused, is a sentence on the row
+itself rather than a silent blank. The Steam app id it looks up is the
+game's own when it is a Steam entry, otherwise the id Lutris lists for a
+game of EXACTLY the same name (`ProtonDbClient.steamAppIdFor`) — a
+similar name is a suggestion, not an automatic identity, so it is never
+guessed.
+
 **First run.** An empty PC library offers concrete repairs — sign in to a
 store, add a games folder, set up Windows games, see what is downloading
 — never an empty grid. They are optional, skippable, and reachable again
@@ -6811,6 +6889,18 @@ runner section at all, because the primary button already says a game
 cannot run and a section of dead rows repeating that is not information.
 No section is titled like its own first row -- "Prefix and graphics" over
 a row called "Prefix and graphics" says one thing twice.
+
+**The Lutris import entry point sits beside the per-game override it
+sets (§7e3, built 2026-09-25).** A game taking the Windows route gets an
+"Import a Lutris install script" row in its "Runs on Windows" section,
+next to "Prefix and graphics" — the same section, because setting a
+game's program from an imported script is the same kind of act as
+picking one by hand, not a separate mechanism. Once an import has set a
+game's program, that same section shows it as its own row ("Program:
+…", naming the import as its source), selectable to clear back to what
+droidtop detects on its own. This is the Daijishō default-with-override
+model this section already commits to (see "Overrides" above), reached
+by a second path.
 
 ## 7j. Portrait and touch-first chrome (directed 2026-09-10)
 

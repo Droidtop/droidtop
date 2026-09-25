@@ -1336,8 +1336,8 @@ class EngineGameProvider(
             // used to be dead error() stubs, so a game could be offered
             // Wine and then fail on activation with "not wired up yet";
             // now it either really launches or says specifically why not.
-            GameLaunchStrategy.WINE_PREFIX -> launchOnPcRuntime(gameRoot, windows = true)
-            GameLaunchStrategy.LINUX_CONTAINER -> launchOnPcRuntime(gameRoot, windows = false)
+            GameLaunchStrategy.WINE_PREFIX -> launchOnPcRuntime(entry.id, gameRoot, windows = true)
+            GameLaunchStrategy.LINUX_CONTAINER -> launchOnPcRuntime(entry.id, gameRoot, windows = false)
         }
     }
 
@@ -1348,7 +1348,7 @@ class EngineGameProvider(
      * couldn't be identified -- rather than the old blanket "not
      * implemented".
      */
-    private suspend fun launchOnPcRuntime(gameRoot: File, windows: Boolean) {
+    private suspend fun launchOnPcRuntime(entryId: String, gameRoot: File, windows: Boolean) {
         val runtime = PcGameRuntimeRegistry.runtime
             ?: error(
                 "droidtop's PC runtime isn't registered in this process. Launch from the main " +
@@ -1363,8 +1363,11 @@ class EngineGameProvider(
             }
         }
 
+        // The game's own Wine settings (docs/SPEC.md 7i) name its program
+        // when it has them; detection otherwise, as before.
+        val windowsLaunch = if (windows) WindowsLaunchResolver.resolve(context, entryId, gameRoot) else null
         val executable = if (windows) {
-            GameExecutableResolver.windowsExecutable(gameRoot)
+            windowsLaunch?.executable
         } else {
             GameExecutableResolver.linuxExecutable(gameRoot)
         } ?: error(
@@ -1374,7 +1377,7 @@ class EngineGameProvider(
         )
 
         val result = if (windows) {
-            runtime.launchWindows(executable, gameRoot)
+            runtime.launchWindows(executable, gameRoot, windowsLaunch?.workingDir ?: gameRoot, windowsLaunch?.arguments.orEmpty())
         } else {
             runtime.launchLinux(executable, gameRoot)
         }
