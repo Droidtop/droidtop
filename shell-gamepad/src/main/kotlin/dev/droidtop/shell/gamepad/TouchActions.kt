@@ -164,6 +164,28 @@ private fun TouchHint(action: GamepadAction, label: String, onPress: () -> Unit)
 }
 
 /**
+ * A tiny shoulder-button glyph ("L1"/"R1") beside a tab or section row it
+ * switches, replacing a pill in the hint bar for the one thing every
+ * screen with tabs does the same way (owner, 2026-09-25: "Can remove the
+ * next/previous section pills"). It is not a pill -- no border, no
+ * background, no tap target of its own -- because the row it sits beside
+ * already IS the switch's visible state, and L1/R1 keep working exactly
+ * as before; this only says which buttons step it. One composable, used
+ * beside every tab row L1/R1 drives (the shell's top-level section tabs,
+ * the Quick Menu's own Notifications/System tabs), so all of them read
+ * the same way and none of them repeats the label text or the styling.
+ */
+@Composable
+fun ShoulderGlyph(label: String, modifier: Modifier = Modifier) {
+    Text(
+        label,
+        style = MaterialTheme.typography.labelSmall,
+        color = MenuTokens.OnSurfaceMuted,
+        modifier = modifier,
+    )
+}
+
+/**
  * Swipe a themed list the way the D-pad steps it.
  *
  * The carousel, textlist and grid all own their own cursor and move it

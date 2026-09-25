@@ -7486,6 +7486,35 @@ uses), so the drawn pill shrinks without shrinking what a finger can hit. On a p
 (no `heightIn` on that outer `Box`) the chip is simply the compact legend, no invisible padding
 at all. One set of tokens, so every screen with a hint bar changed at once.
 
+**Section switching is named beside the tabs, not as a hint-bar pill (owner direction
+2026-09-25, "Can remove the next/previous section pills").** L1/R1 still cycle the top-level
+Games/Apps/Settings tabs exactly as before; only where that fact was SHOWN changed. `ShoulderGlyph`
+(`:shell-gamepad`, `TouchActions.kt`) draws a small, unbordered "L1"/"R1" label -- no pill, no tap
+target of its own, since the tab row it flanks already shows the switch's state -- and
+`SectionTabBar` places one on each side of the scrolling tab row (`GamepadShell.kt`) whenever
+there is more than one section to switch to. `ButtonHintFooter`'s `showSectionSwitch` hints
+("Previous section"/"Next section" pills) are gone; the one place a screen names how to reach a
+top-level tab row is now this one glyph, reused everywhere L1/R1 switches tabs (the shell's
+section tabs, and the Quick Menu's own Notifications/System tabs, `QuickMenu.kt`, which dropped
+its own ad hoc `tabHint` pill for the same `ShoulderGlyph`). The themed system carousel's own
+`<helpsystem>` legend text ("R Switch section") is unchanged: that text is the THEME's own
+render, styled by the theme rather than droidtop's pill chrome, so it was never one of the pills
+being asked about.
+
+**D-pad Up never leaves a grid for the top menu; the top menu has its own button (owner direction
+2026-09-25, "don't let dpad up navigate to the top menu, it needs to be separate").** The Games
+grid's own key handler used real ES-DE's own "no default arrow-key focus movement" gap as licence
+to call `FocusManager.moveFocus(FocusDirection.Up)` at the TOP row, which does not stop at that
+grid: Compose's focus search kept going and landed on `SectionTabBar`, so a D-pad press meant to
+mean "there is nothing further up" instead silently reassigned the pad to switching
+Games/Apps/Settings. Up at the grid's top row is now simply consumed and left there
+(`GamepadShell.kt`'s `GamesSection`); nothing before this shell had a bound way to reach the tab
+row by pad at all, since the row does not receive focus during ordinary play, so none was taken
+away. The tab row's own control is L1/R1, unconditionally, whether or not anything is focused on
+it (`esDeHelpRowOwner`/`GamingMenu`'s pad routing is untouched by this) -- the same binding
+[ShoulderGlyph] now names on-screen. Pointer/touch is untouched either way: a tab is always a real
+tap target of its own.
+
 **Settings polish: category icons, real grouping, search (owner direction 2026-09-25, "settings
 needs significant improvements to polish, layout, and all of that"; built by settingsui).** The
 consolidated catalog/row-component shell (H4, above) was the foundation; the owner looked at it
