@@ -240,23 +240,7 @@ val LibraryEntry.isPcOrEngineGame: Boolean
  */
 object PcScraper {
 
-    /**
-     * Why the configured source cannot run right now, or null when it
-     * can. Named settings, not codes: a user who has never opened the
-     * scraper screen should be able to act on this sentence alone.
-     */
-    fun unavailableReason(context: Context): String? = when (PcScraperSourcePrefs.get(context)) {
-        PcScraperSource.LUTRIS -> null
-        PcScraperSource.IGDB -> if (ScraperPrefs.isConfigured(context)) {
-            null
-        } else {
-            "IGDB needs your own free API credentials: create an application at dev.twitch.tv/console, " +
-                "then enter its Client ID and Client Secret under $SCRAPER_SETTINGS > IGDB. " +
-                "Lutris needs no account at all if you would rather not."
-        }
-    }
-
-    /** The live source for the current selection, or null when it is not usable (see [unavailableReason]). */
+    /** The live source for the current selection, or null when it is not usable (see [ScraperReadiness.pcSourceProblem]). */
     fun source(context: Context): PcMetadataSource? = when (PcScraperSourcePrefs.get(context)) {
         PcScraperSource.LUTRIS -> LutrisSource
         PcScraperSource.IGDB -> {
@@ -320,7 +304,7 @@ object PcScraper {
      * anything: the user chooses, then [apply] writes.
      */
     suspend fun candidates(context: Context, entry: LibraryEntry): Candidates = withContext(Dispatchers.IO) {
-        unavailableReason(context)?.let { return@withContext Candidates.Unavailable(it) }
+        ScraperReadiness.pcSourceProblem(context)?.let { return@withContext Candidates.Unavailable(it) }
         val source = source(context) ?: return@withContext Candidates.Unavailable("No PC scraper source is configured.")
         val title = PcScrapeTitle.clean(baseNameFor(entry))
         val lookup = runCatching { source.search(title) }.getOrElse { error ->
@@ -369,7 +353,7 @@ object PcScraper {
         onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
     ): String = withContext(Dispatchers.IO) {
         if (entries.isEmpty()) return@withContext "No PC or engine games to scrape."
-        unavailableReason(context)?.let { return@withContext it }
+        ScraperReadiness.pcSourceProblem(context)?.let { return@withContext it }
         val source = source(context) ?: return@withContext "No PC scraper source is configured."
         val wantMetadata = ScrapeOptionsPrefs.scrapeMetadata(context)
         val wantArtwork = ScrapeOptionsPrefs.scrapeArtwork(context)
