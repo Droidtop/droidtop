@@ -790,6 +790,19 @@ class Library(
         return IndexRebuild(records = rebuilt, keptWithoutRecord = kept)
     }
 
+    /**
+     * Walks [kinds] again now and returns once that walk has finished, with
+     * how many entries [kinds] then holds: "Rescan library", which reports
+     * when it is done rather than starting a walk nobody can see. A walk
+     * already in flight is replaced, because the person asked for a fresh one.
+     */
+    suspend fun rescanNow(kinds: Set<LibraryEntryKind>): Int {
+        val key = kinds.toSet()
+        scanInBackground(key, rescan = true, restart = true)
+        synchronized(backgroundScanJobs) { backgroundScanJobs[key] }?.join()
+        return stateFor(key).value?.size ?: 0
+    }
+
     fun scanInBackground(
         kinds: Set<LibraryEntryKind>,
         rescan: Boolean = false,

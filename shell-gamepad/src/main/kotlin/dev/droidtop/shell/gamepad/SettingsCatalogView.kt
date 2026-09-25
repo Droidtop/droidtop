@@ -408,14 +408,13 @@ fun CatalogNavigator(
 /**
  * Gaming's Settings section: the Gaming settings catalog rendered by
  * [CatalogNavigator], with the shell's renderer-native fulfillments
- * (rescan bumps the scan trigger via [onRescan]; Browse themes opens
+ * (Browse themes opens
  * [ThemeBrowserScreen] inline, also reachable by deep link via
  * [browseThemesToken]).
  */
 @Composable
 internal fun SettingsCatalogView(
     onBack: () -> Unit,
-    onRescan: () -> Unit,
     browseThemesToken: Int = 0,
     onHelpRowClaim: (HelpRowClaim) -> Unit = {},
 ) {
@@ -447,7 +446,6 @@ internal fun SettingsCatalogView(
         root = root,
         onExit = onBack,
         nativeActions = mapOf(
-            GamingSettingsCatalog.ID_RESCAN_LIBRARY to onRescan,
             GamingSettingsCatalog.ID_BROWSE_THEMES to { browseThemes = true },
         ),
     )

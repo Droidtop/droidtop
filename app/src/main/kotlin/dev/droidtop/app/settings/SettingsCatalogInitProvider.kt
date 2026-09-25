@@ -30,6 +30,16 @@ class SettingsCatalogInitProvider : ContentProvider() {
         // where the one-time Handheld -> Gaming preference migration runs.
         Modes.load(appContext)
         AppSettingsCatalogs.ensureRegistered()
+        dev.droidtop.library.settings.LibraryRescan.handler = { ctx, onStatus ->
+            onStatus("Looking for new or changed games and apps\u2026")
+            val started = android.os.SystemClock.elapsedRealtime()
+            val library = dev.droidtop.app.LibraryCore.library(ctx)
+            val games = library.rescanNow(dev.droidtop.library.LibraryKinds.GAMES)
+            onStatus("Games done, looking at apps\u2026")
+            val apps = library.rescanNow(dev.droidtop.library.LibraryKinds.APPS)
+            val seconds = (android.os.SystemClock.elapsedRealtime() - started + 500) / 1000
+            "Rescan finished in $seconds s: $games game folders and store entries, $apps apps."
+        }
         // The at-most-daily release probe (one small unauthenticated
         // download, off switch in Settings > Software updates). Process
         // start is the honest trigger: droidtop is a launcher, so its
