@@ -132,4 +132,25 @@ class ContainerTerminalTest {
         )
         assertEquals("The terminal exited with code 3.", message)
     }
+
+    @Test
+    fun `a container gets a terminal through whichever package manager it has`() = runBlocking {
+        val runtime = RecordingRuntime(ok())
+        assertNull(ContainerTerminal.ensureInstalled(runtime, primary))
+        val script = runtime.lastCommand!!.last()
+        assertTrue(script.startsWith("command -v ${ContainerTerminal.PACKAGE} >/dev/null 2>&1 && exit 0;"))
+        for (manager in listOf("apk", "apt-get", "dnf", "zypper", "pacman", "xbps-install")) {
+            assertTrue("$manager missing: $script", script.contains("command -v $manager >/dev/null 2>&1; then"))
+        }
+        assertTrue(script.endsWith("exit 2; fi"))
+    }
+
+    @Test
+    fun `a failed install says which container and what the package manager said`() = runBlocking {
+        val runtime = RecordingRuntime(ContainerExecResult(exitCode = 2, stdout = "", stderr = "No package manager droidtop knows"))
+        val message = ContainerTerminal.ensureInstalled(runtime, primary)
+        assertNotNull(message)
+        assertTrue(message!!.contains("droidtop-primary"))
+        assertTrue(message.contains("No package manager"))
+    }
 }

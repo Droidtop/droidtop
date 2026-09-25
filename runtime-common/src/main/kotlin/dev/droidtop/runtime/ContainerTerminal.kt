@@ -48,11 +48,11 @@ package dev.droidtop.runtime
  *
  * ### Scope
  *
- * The PRIMARY container only, today. Sibling containers share the primary's
- * Wayland socket, so a terminal launched in one would appear on the same
- * desktop — but siblings are not compositor-provisioned and so do not have
- * [PACKAGE] installed. Per-container terminal provisioning is the follow-up
- * that makes §3d's "a terminal into ANY container" true.
+ * Any container. Siblings share the primary's Wayland socket, so a terminal
+ * launched in one appears on the same desktop as a window of its own; the
+ * primary gets [PACKAGE] with its compositor, and any other container gets
+ * it the first time a terminal is asked for ([ENSURE_COMMAND], run from the
+ * container manager's Terminal action before [open]).
  */
 object ContainerTerminal {
 
@@ -70,6 +70,58 @@ object ContainerTerminal {
      * keeps this from hardcoding a shell the image may not have.
      */
     val LAUNCH_COMMAND: List<String> = listOf(PACKAGE)
+
+    /**
+     * Each package manager's command for [PACKAGE] and a font, by the
+     * binary that identifies it. Declared before [ENSURE_COMMAND], which is
+     * built from it when the object initialises.
+     */
+    private val TERMINAL_INSTALLS: Map<String, String> = linkedMapOf(
+        "apk" to "apk add --no-cache $PACKAGE font-dejavu",
+        "apt-get" to "export DEBIAN_FRONTEND=noninteractive && apt-get update && " +
+            "apt-get install -y --no-install-recommends $PACKAGE fonts-dejavu-core",
+        "dnf" to "dnf install -y $PACKAGE dejavu-sans-mono-fonts",
+        "zypper" to "zypper --non-interactive install $PACKAGE dejavu-fonts",
+        "pacman" to "pacman -Sy --noconfirm $PACKAGE ttf-dejavu",
+        "xbps-install" to "xbps-install -Sy $PACKAGE dejavu-fonts-ttf",
+    )
+
+    /**
+     * Installs [PACKAGE] and a font into a container that has no terminal
+     * yet, through whichever package manager the image ships, and does
+     * nothing when [PACKAGE] is already there. The package manager is
+     * found in the container rather than inferred from the image's name,
+     * so a Custom reference gets a terminal too. A font is named for the
+     * same reason as in [CompositorProvisioning]: without one foot refuses
+     * to start ("failed to match font"). Exits 2, saying so, when the image
+     * has none of the package managers listed.
+     */
+    val ENSURE_COMMAND: List<String> = listOf(
+        "/bin/sh",
+        "-c",
+        buildString {
+            append("command -v $PACKAGE >/dev/null 2>&1 && exit 0; ")
+            TERMINAL_INSTALLS.entries.forEachIndexed { index, (manager, install) ->
+                append(if (index == 0) "if" else "elif")
+                append(" command -v $manager >/dev/null 2>&1; then $install; ")
+            }
+            append("else echo 'No package manager droidtop knows (")
+            append(TERMINAL_INSTALLS.keys.joinToString(", "))
+            append(") is in this container, so a terminal cannot be installed in it.' >&2; exit 2; fi")
+        },
+    )
+
+    /**
+     * Makes sure [container] has a terminal ([ENSURE_COMMAND]); null when it
+     * has one, else why not, with the package manager's last words.
+     */
+    suspend fun ensureInstalled(runtime: ContainerRuntime, container: Container): String? {
+        val result = runtime.exec(container, ENSURE_COMMAND)
+        if (result.succeeded) return null
+        val detail = result.stderr.ifBlank { result.stdout }.trim().lines().takeLast(6).joinToString("\n")
+        return "Couldn't install a terminal in ${container.id} (code ${result.exitCode})" +
+            if (detail.isEmpty()) "." else ":\n$detail"
+    }
 
     /**
      * Runs a terminal in [container] and suspends until it exits — the
@@ -95,9 +147,9 @@ object ContainerTerminal {
         if (detail.contains("not found", ignoreCase = true) ||
             detail.contains("No such file", ignoreCase = true)
         ) {
-            return "No terminal in this container: '$PACKAGE' isn't installed. It is " +
-                "provisioned on a primary container's first boot, so a container created " +
-                "before that provisioning existed needs it installed by hand."
+            return "No terminal in this container: '$PACKAGE' isn't installed. The primary " +
+                "gets it when the desktop is provisioned; for any container, Containers > " +
+                "Terminal installs it."
         }
         return "The terminal exited with code ${result.exitCode}" +
             if (detail.isEmpty()) "." else ": $detail"

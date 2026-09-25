@@ -1,5 +1,7 @@
 package dev.droidtop.app
 
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
@@ -7,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,15 +37,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.droidtop.library.settings.Mode
 import dev.droidtop.runtime.BundledImageRepositories
 import dev.droidtop.runtime.ContainerInfo
 import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.ContainerRuntime
+import dev.droidtop.runtime.ContainerTerminal
 import dev.droidtop.runtime.CraneImageCatalogResolver
 import dev.droidtop.runtime.ImageCatalogRole
 import dev.droidtop.runtime.KnownImageRepository
 import dev.droidtop.runtime.RootfsImage
 import dev.droidtop.runtime.resolveCurrent
+import dev.droidtop.shell.standard.BackButtonMenu
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -50,15 +57,23 @@ import kotlinx.coroutines.withContext
  * The user-facing container/distro manager (docs/SPEC.md §3d — explicit
  * direction: containers are the user's machines, managed first-class, not
  * internal plumbing). Distrobox is the interaction model: a flat list of
- * every container this device has (role, backend, live running state) with
- * start/stop/delete, plus creation from the live-resolved image catalog
- * (§3a "Recommended") or a hand-typed OCI reference ("Custom").
+ * every container this device has (role, image, live running state) with
+ * start/stop/terminal/delete, plus creation from the live-resolved image
+ * catalog (§3a "Recommended") or a hand-typed OCI reference ("Custom").
  *
  * Sits directly on [ContainerRuntime] via [ContainerRuntimeFactory] — the
- * same backend the desktop session uses, no separate management path. The
- * PRIMARY container is listed like everything else but delete is guarded
- * while it's the live desktop (stopping the desktop out from under the
- * compositor is DesktopSessionService's job, not a list row's).
+ * same backend the desktop session uses, no separate management path —
+ * except for the PRIMARY, whose running state IS the desktop session:
+ * starting it opens Desktop (which starts [DesktopSessionService]) and
+ * stopping it stops that session, so the plan it boots with is always the
+ * current one and nothing runs a compositor the desktop is not showing.
+ * A raw `start` of the primary from here used to boot the recorded plan
+ * (no CUPS after Printing was switched on) with no host bridge attached,
+ * which is a second desktop nobody can see (rig, dq-coordinator-23 F9).
+ *
+ * One scrolling list holds the whole screen, the create panel included:
+ * the panel used to sit above a list of its own and ran off the bottom of
+ * a landscape screen, taking "Custom OCI reference" with it (F13).
  */
 class ContainersActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,10 +82,20 @@ class ContainersActivity : AppCompatActivity() {
     }
 }
 
+/** Desktop mode, which starts the desktop session if none runs; where every terminal and container window appears. */
+private fun openDesktop(context: Context) {
+    context.startActivity(
+        Intent(context, MainActivity::class.java)
+            .putExtra(BackButtonMenu.EXTRA_MODE, Mode.DESKTOP.id)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+    )
+}
+
 @Composable
 private fun ContainersScreen() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
+    val session by DesktopSessionService.state.collectAsState()
     var runtime by remember { mutableStateOf<ContainerRuntime?>(null) }
     var containers by remember { mutableStateOf<List<ContainerInfo>?>(null) }
     var busyMessage by remember { mutableStateOf<String?>(null) }
@@ -85,7 +110,8 @@ private fun ContainersScreen() {
             .getOrDefault(emptyList())
     }
 
-    LaunchedEffect(Unit) { withContext(Dispatchers.IO) { refresh() } }
+    // Again whenever the session changes state: the primary's row reads it.
+    LaunchedEffect(session::class) { withContext(Dispatchers.IO) { refresh() } }
 
     fun runAction(label: String, action: suspend (ContainerRuntime) -> Unit) {
         val rt = runtime ?: return
@@ -99,69 +125,115 @@ private fun ContainersScreen() {
         }
     }
 
-    Column(
+    /**
+     * A terminal in [container], as a window on the desktop: the sibling
+     * started if its backend needs that, a terminal installed on first use
+     * (here, where the person can see it happening), then the terminal run
+     * in the desktop session, which outlives this screen, and Desktop
+     * brought forward to show it.
+     */
+    fun openTerminal(info: ContainerInfo) {
+        runAction("Getting a terminal ready in ${info.container.id} (the first time installs one)") { rt ->
+            val container = info.container
+            if (container.role == ContainerRole.SIBLING && rt.siblingsNeedStart && !info.running) rt.start(container)
+            ContainerTerminal.ensureInstalled(rt, container)?.let { error(it) }
+            val started = DesktopSessionService.runInPrimary { sessionRuntime, _ ->
+                ContainerTerminal.failureMessage(ContainerTerminal.open(sessionRuntime, container))
+            }
+            check(started) { "the desktop stopped. Start it again, then open the terminal." }
+            withContext(Dispatchers.Main) { openDesktop(context) }
+        }
+    }
+
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(20.dp),
+            .background(MaterialTheme.colorScheme.background),
+        // Content padding, not a padding modifier: the last row scrolls
+        // clear of the edge instead of ending under it.
+        contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Containers", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onBackground)
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = { scope.launch(Dispatchers.IO) { refresh() } }) { Text("Refresh") }
-            Button(onClick = { showCreate = !showCreate }) { Text(if (showCreate) "Close" else "New container") }
+        item(key = "header") {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Containers", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onBackground)
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = { scope.launch(Dispatchers.IO) { refresh() } }) { Text("Refresh") }
+                Button(onClick = { showCreate = !showCreate }) { Text(if (showCreate) "Close" else "New container") }
+            }
         }
-        busyMessage?.let {
-            Text(it, color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.padding(vertical = 6.dp))
+        busyMessage?.let { message ->
+            item(key = "busy") { Text(message, color = MaterialTheme.colorScheme.tertiary) }
         }
-        errorMessage?.let {
-            Text(it, color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.padding(vertical = 6.dp))
+        errorMessage?.let { message ->
+            item(key = "error") { Text(message, color = MaterialTheme.colorScheme.tertiary) }
         }
         if (showCreate) {
-            CreateContainerPanel(
-                enabled = busyMessage == null,
-                onCreateFromRepository = { repo ->
-                    runAction("Creating from ${repo.repository}") { rt ->
-                        rt.createSibling(CraneImageCatalogResolver(context).resolveCurrent(repo).toRootfsImage())
-                    }
-                    showCreate = false
-                },
-                onCreateFromReference = { reference ->
-                    runAction("Creating from $reference") { rt ->
-                        rt.createSibling(RootfsImage(reference = reference))
-                    }
-                    showCreate = false
-                },
-            )
+            item(key = "create") {
+                CreateContainerPanel(
+                    enabled = busyMessage == null,
+                    onCreateFromRepository = { repo ->
+                        runAction("Creating a ${repo.os} container from ${repo.registry}/${repo.repository}") { rt ->
+                            rt.createSibling(CraneImageCatalogResolver(context).resolveCurrent(repo).toRootfsImage())
+                        }
+                        showCreate = false
+                    },
+                    onCreateFromReference = { reference ->
+                        runAction("Creating from $reference") { rt ->
+                            rt.createSibling(RootfsImage(reference = reference))
+                        }
+                        showCreate = false
+                    },
+                )
+            }
         }
 
         when (val list = containers) {
-            null -> Text("Loading…", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 16.dp))
+            null -> item(key = "loading") { Text("Loading…", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             else -> {
                 if (list.isEmpty()) {
-                    Text(
-                        "No containers yet. Create one to give this device a real Linux distro.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 16.dp),
-                    )
-                }
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 12.dp)) {
-                    items(list, key = { it.container.id }) { info ->
-                        ContainerRow(
-                            info = info,
-                            runtime = runtime,
-                            actionsEnabled = busyMessage == null,
-                            confirmingDelete = confirmDeleteId == info.container.id,
-                            onStart = { runAction("Starting ${info.container.id}") { it.start(info.container) } },
-                            onStop = { runAction("Stopping ${info.container.id}") { it.stop(info.container) } },
-                            onDeleteRequested = { confirmDeleteId = info.container.id },
-                            onDeleteConfirmed = {
-                                confirmDeleteId = null
-                                runAction("Deleting ${info.container.id}") { it.destroy(info.container) }
-                            },
-                            onDeleteCancelled = { confirmDeleteId = null },
+                    item(key = "empty") {
+                        Text(
+                            "No containers yet. Create one to give this device a real Linux distro.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                }
+                items(list, key = { it.container.id }) { info ->
+                    val isPrimary = info.container.role == ContainerRole.PRIMARY
+                    ContainerRow(
+                        info = info,
+                        runtime = runtime,
+                        session = if (isPrimary) session else null,
+                        desktopConnected = session is DesktopSessionState.Connected,
+                        actionsEnabled = busyMessage == null,
+                        confirmingDelete = confirmDeleteId == info.container.id,
+                        onStart = {
+                            if (isPrimary) {
+                                openDesktop(context)
+                            } else {
+                                runAction("Starting ${info.container.id}") { it.start(info.container) }
+                            }
+                        },
+                        onStop = {
+                            runAction(if (isPrimary) "Stopping the desktop" else "Stopping ${info.container.id}") { rt ->
+                                // The session first, so it does not report
+                                // its compositor vanishing as a failure; the
+                                // runtime's own stop then ends anything the
+                                // session did not start.
+                                if (isPrimary) DesktopSessionService.stop(context)
+                                rt.stop(info.container)
+                            }
+                        },
+                        onTerminal = { openTerminal(info) },
+                        onOpenDesktop = { openDesktop(context) },
+                        onDeleteRequested = { confirmDeleteId = info.container.id },
+                        onDeleteConfirmed = {
+                            confirmDeleteId = null
+                            runAction("Deleting ${info.container.id}") { it.destroy(info.container) }
+                        },
+                        onDeleteCancelled = { confirmDeleteId = null },
+                    )
                 }
             }
         }
@@ -172,20 +244,36 @@ private fun ContainersScreen() {
 private fun ContainerRow(
     info: ContainerInfo,
     runtime: ContainerRuntime?,
+    /** The desktop session, for the PRIMARY's row only: its state is the primary's state. */
+    session: DesktopSessionState?,
+    desktopConnected: Boolean,
     actionsEnabled: Boolean,
     confirmingDelete: Boolean,
     onStart: () -> Unit,
     onStop: () -> Unit,
+    onTerminal: () -> Unit,
+    onOpenDesktop: () -> Unit,
     onDeleteRequested: () -> Unit,
     onDeleteConfirmed: () -> Unit,
     onDeleteCancelled: () -> Unit,
 ) {
+    val container = info.container
+    val isPrimary = container.role == ContainerRole.PRIMARY
+    val starting = session is DesktopSessionState.Connecting
+    val running = info.running || session is DesktopSessionState.Connected || starting
+    // A proot sibling has nothing to start: it is its programs, and each
+    // runs on its own (ContainerRuntime.siblingsNeedStart).
+    val startable = isPrimary || runtime?.siblingsNeedStart != false
+    val state = when {
+        starting -> "STARTING"
+        running -> "RUNNING"
+        startable -> "STOPPED"
+        else -> "READY"
+    }
     // The PRIMARY container hosts the live desktop compositor -- deleting
-    // it out from under a Connected session would tear the desktop down as
-    // a side effect of a list row. Guarded here (stop the session first);
-    // a stopped/idle primary is deletable like anything else.
-    val primaryGuarded = info.container.role == ContainerRole.PRIMARY &&
-        DesktopSessionService.state.value is DesktopSessionState.Connected
+    // it out from under a session would tear the desktop down as a side
+    // effect of a list row. Guarded here (stop the desktop first).
+    val primaryGuarded = isPrimary && (session is DesktopSessionState.Connected || starting)
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -194,24 +282,51 @@ private fun ContainerRow(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(info.container.id, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text(container.id, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                 Text(
-                    "${info.container.role.name.lowercase()} · ${info.container.backend.name.lowercase()}",
+                    if (isPrimary) "primary: the desktop" else "sibling",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                info.image?.let { image ->
+                    Text(
+                        image + (info.digest?.let { " · ${it.removePrefix("sha256:").take(12)}" } ?: ""),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             Text(
-                if (info.running) "RUNNING" else "STOPPED",
+                state,
                 style = MaterialTheme.typography.labelMedium,
-                color = if (info.running) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (running) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        (session as? DesktopSessionState.Connecting)?.detail?.let { detail ->
+            Text(
+                detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         Row(modifier = Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (info.running) {
-                TextButton(onClick = onStop, enabled = actionsEnabled) { Text("Stop") }
-            } else {
-                TextButton(onClick = onStart, enabled = actionsEnabled) { Text("Start") }
+            when {
+                running -> TextButton(onClick = onStop, enabled = actionsEnabled) {
+                    Text(if (isPrimary) "Stop the desktop" else "Stop")
+                }
+                startable -> TextButton(onClick = onStart, enabled = actionsEnabled) {
+                    Text(if (isPrimary) "Start the desktop" else "Start")
+                }
+            }
+            // A terminal is a window on the desktop, so it needs one.
+            if (desktopConnected) {
+                TextButton(onClick = onTerminal, enabled = actionsEnabled) { Text("Terminal") }
+            } else if (!isPrimary) {
+                TextButton(onClick = onOpenDesktop, enabled = actionsEnabled) { Text("Start the desktop for a terminal") }
             }
             Spacer(Modifier.weight(1f))
             when {
@@ -221,16 +336,16 @@ private fun ContainerRow(
                     TextButton(onClick = onDeleteConfirmed, enabled = actionsEnabled) { Text("Delete") }
                 }
                 primaryGuarded -> Text(
-                    "Live desktop — stop the session to delete",
+                    "Live desktop — stop it to delete",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
                 else -> TextButton(onClick = onDeleteRequested, enabled = actionsEnabled) { Text("Delete") }
             }
         }
-        dev.droidtop.app.vpn.ContainerVpnRow(info.container.id, runtime?.hostSocketDir(), enabled = actionsEnabled)
-        ContainerDevicesRow(runtime, info.container, enabled = actionsEnabled)
-        if (info.container.role == ContainerRole.PRIMARY) PrintingRow(enabled = actionsEnabled)
+        dev.droidtop.app.vpn.ContainerVpnRow(container.id, runtime?.hostSocketDir(), enabled = actionsEnabled)
+        ContainerDevicesRow(runtime, container, enabled = actionsEnabled)
+        if (isPrimary) PrintingRow(enabled = actionsEnabled)
     }
 }
 
@@ -293,9 +408,10 @@ private fun CreateContainerPanel(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     // Same live-catalog model as onboarding's desktop step (docs/SPEC.md
-    // §3a): the seed list only names repositories; versions resolve at
-    // create time. arm64 is the hard filter -- droidtop only targets ARM64
-    // hardware, a repo without it can't run here at all.
+    // §3a): the seed list only names repositories; the current tag
+    // (ImageTags.current) resolves at create time. arm64 is the hard
+    // filter -- droidtop only targets ARM64 hardware, a repo without it
+    // can't run here at all.
     val candidates = remember {
         BundledImageRepositories.load(context).repositories
             .filter { it.arm64Available }
@@ -305,11 +421,15 @@ private fun CreateContainerPanel(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 10.dp)
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
             .padding(14.dp),
     ) {
         Text("Recommended", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+        Text(
+            "Each is created from the distribution's current release.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         candidates.forEach { repo ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,

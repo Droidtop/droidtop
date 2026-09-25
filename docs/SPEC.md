@@ -1112,11 +1112,29 @@ the `ContainerRuntime` interface that already exists (§3):
   when a shell would help most for debugging. No second non-interactive
   path is built to cover that, deliberately; a container that will not
   boot is this section's container-manager problem, not the terminal's.
-  Today it opens on the PRIMARY container only — siblings share the
-  Wayland socket but are not compositor-provisioned, so per-container
-  terminal provisioning is what makes "any container" literally true.
+  It opens in any container (built 2026-09-25). Siblings share the
+  Wayland socket, so a terminal in one is a window on the same desktop;
+  the container manager's Terminal installs `foot` and a font on first
+  use through whichever package manager the container has (apk, apt-get,
+  dnf, zypper, pacman, xbps-install; found in the container, so a Custom
+  image gets one too), starts a sibling first where the backend needs
+  that, runs the terminal in the desktop session and brings Desktop
+  forward to show it. Without a running desktop the row offers "Start the
+  desktop for a terminal" instead, since there is nowhere to show one.
 - The desktop session's PRIMARY container is listed like everything else
   but guarded (can't be deleted while it's the active desktop).
+- **What the screen is today (2026-09-25).** `ContainersActivity` is still
+  the flat list below, not the catalog screen designed next: one
+  scrolling list holding the header, the create panel and one card per
+  container (the create panel used to sit above a list of its own and ran
+  off a landscape screen, taking "Custom OCI reference" with it). A card
+  shows the name, primary or sibling, `image:tag` with the digest's first
+  twelve characters, and a state: STARTING (with the boot's latest line)
+  and RUNNING for the primary from the session, RUNNING for a sibling
+  with programs in it, STOPPED for one that must be started, READY for a
+  proot sibling, which needs no start. Actions: Start or Stop the desktop
+  (primary), Start (a sibling that needs it) or Stop (ends its programs),
+  Terminal, Delete; then the VPN, Devices and Printing rows.
 - **The surface, precisely (decided 2026-09-24).** The container manager
   is one catalog screen (`containers`, registered by `:app`) rendered by
   the same navigator as every other settings screen, in every mode that
