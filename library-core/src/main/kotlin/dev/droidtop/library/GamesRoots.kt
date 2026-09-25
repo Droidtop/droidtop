@@ -100,3 +100,36 @@ object GamesRoots {
     private fun signature(context: Context): String =
         current(context).map { it.absolutePath }.sorted().joinToString(File.pathSeparator)
 }
+
+/**
+ * Keeps [kinds] scanned against the games roots as they are now, for as
+ * long as the caller is collecting (docs/SPEC.md 7g): every surface that
+ * lists games runs this one loop rather than its own copy of it.
+ *
+ * A changed root set invalidates what the providers cached about the old
+ * one, so the first scan after a folder is added is a real walk rather
+ * than a replay of an empty index, and a walk already in flight -- which
+ * is walking the old folders -- is restarted. A root the user took away
+ * takes its games with it, before the walk, so the list never shows a
+ * removed root's games while the new set is read. Collected rather than
+ * checked once: onboarding and Settings add a folder while the surface's
+ * composition is alive and hand back through onResume, which recomposes
+ * nothing. The Launcher's Games grid used to ask for one plain scan
+ * instead, joined whatever walk was already running over the old roots,
+ * and stayed on "No games yet" until Gaming had run this loop (rig, build
+ * 814).
+ */
+suspend fun Library.scanFollowingGamesRoots(
+    context: Context,
+    kinds: Set<LibraryEntryKind>,
+    rescan: Boolean = false,
+) {
+    GamesRoots.changes(context).collect {
+        val rootsChanged = GamesRoots.rootsChangedSinceLastScan(context)
+        if (rootsChanged) {
+            keepOnlyRoots(GamesRoots.current(context).map { root -> root.absolutePath }.toSet())
+        }
+        scanInBackground(kinds, rescan = rescan || rootsChanged, restart = rootsChanged)
+        if (rootsChanged) GamesRoots.markScanned(context)
+    }
+}

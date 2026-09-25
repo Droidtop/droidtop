@@ -89,6 +89,7 @@ import dev.droidtop.library.integrations.openWithTargetsFor
 import dev.droidtop.library.theme.SystemThemeColors
 import dev.droidtop.library.theme.EsDeCollectionKind
 import dev.droidtop.library.theme.ThemeAssets
+import dev.droidtop.library.scanFollowingGamesRoots
 import dev.droidtop.library.theme.EsDeTransitionAnimation
 import dev.droidtop.library.theme.primaryListElement
 import dev.droidtop.shell.gamepad.input.GamepadAction
@@ -417,33 +418,9 @@ fun GamepadShell(
     // screen fill in gradually as real results arrive, without this file
     // needing to know anything about how the underlying scan is chunked.
     LaunchedEffect(library, rescanTrigger) {
-        // A changed root set invalidates what the providers cached about
-        // the old one, so the first scan after onboarding adds a folder
-        // is a real walk and not a replay of an empty cache. Collected
-        // for as long as this shell is composed rather than checked once:
-        // onboarding adds the folder while this composition is alive and
-        // hands back through onResume, which recomposes nothing (see
-        // GamesRoots.changes for the rig evidence).
-        dev.droidtop.library.GamesRoots.changes(context).collect {
-            val rootsChanged = dev.droidtop.library.GamesRoots.rootsChangedSinceLastScan(context)
-            if (rootsChanged) {
-                // A root the user took away takes its games with it --
-                // the one case where the index drops instead of marking
-                // missing (docs/SPEC.md 7g). Before the walk, so the
-                // library never shows a removed root's games while the
-                // new set is being read.
-                library.keepOnlyRoots(
-                    dev.droidtop.library.GamesRoots.current(context).map { root -> root.absolutePath }.toSet(),
-                )
-            }
-            library.scanInBackground(
-                GAME_KINDS,
-                rescan = rescanTrigger != 0 || rootsChanged,
-                // A walk already in flight is walking the old folders.
-                restart = rootsChanged,
-            )
-            if (rootsChanged) dev.droidtop.library.GamesRoots.markScanned(context)
-        }
+        // Collected for as long as this shell is composed: see
+        // scanFollowingGamesRoots for why a changed root set is a walk.
+        library.scanFollowingGamesRoots(context, GAME_KINDS, rescan = rescanTrigger != 0)
     }
     LaunchedEffect(library, rescanTrigger) {
         library.scanInBackground(APP_KINDS, rescan = rescanTrigger != 0)
@@ -3045,7 +3022,7 @@ private fun HomeSectionRow(
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun GameCard(
+internal fun GameCard(
     entry: LibraryEntry,
     modifier: Modifier = Modifier,
     onLaunch: () -> Unit,

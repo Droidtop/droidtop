@@ -8,38 +8,19 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryKinds
+import dev.droidtop.library.scanFollowingGamesRoots
+import dev.droidtop.shell.gamepad.LauncherGamesScreen
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -51,9 +32,10 @@ import java.io.File
 
 /**
  * Launcher mode's view of the library (docs/SPEC.md, "Launcher mode"): the
- * "Games" icon in the app drawer opens a plain grid of every game the
- * shared library holds, a tap launches it, and a long press pins it to the
- * home screen as an ordinary icon.
+ * "Games" icon in the app drawer opens a grid of every game the shared
+ * library holds, drawn by the shell's own [LauncherGamesScreen] so it is
+ * recognisably droidtop's; A or a tap plays, Y or a long press pins the
+ * game to the home screen as an ordinary icon.
  *
  * Nothing here is a second library or a second launch path. The list is
  * [dev.droidtop.library.Library.backgroundScanState] for the same kinds
@@ -74,19 +56,29 @@ class LauncherGamesActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val library = LibraryCore.library(applicationContext)
-        // Joins the Gaming shell's scan when one is running (same key);
-        // otherwise it is the ordinary non-rescan scan, which for indexed
-        // providers loads the index rather than walking folders.
-        library.scanInBackground(LibraryKinds.GAMES)
+        // The same scan the Gaming shell's Games section runs, following
+        // the games roots as they change (Library.scanFollowingGamesRoots),
+        // so with both modes on there is one scan, and a folder added from
+        // this screen's Game folders is walked at once. While the screen
+        // is started: a grid nobody can see does not keep a walk going.
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                library.scanFollowingGamesRoots(applicationContext, LibraryKinds.GAMES)
+            }
+        }
         val games = library.backgroundScanState(LibraryKinds.GAMES)
             .map { entries -> entries?.let { shown(it) } }
             .flowOn(Dispatchers.Default)
+        // droidtop's own chrome owns the whole window, as the shells do:
+        // the black ground runs under the status bar instead of a stock
+        // app's bar colour, and the content keeps clear of the bars.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent {
             dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
                 val shown by games.collectAsStateWithLifecycle(initialValue = null)
-                GamesGrid(
+                LauncherGamesScreen(
                     games = shown,
-                    onLaunch = { GameLaunchActivity.dispatch(this, it) },
+                    onPlay = { GameLaunchActivity.dispatch(this, it) },
                     onPin = { pin(applicationContext, it) },
                 )
             }
@@ -167,81 +159,5 @@ class LauncherGamesActivity : AppCompatActivity() {
                 IconCompat.createWithBitmap(Bitmap.createScaledBitmap(square, ICON_PX, ICON_PX, true))
             }.getOrNull()
         }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun GamesGrid(
-    games: List<LibraryEntry>?,
-    onLaunch: (LibraryEntry) -> Unit,
-    onPin: (LibraryEntry) -> Unit,
-) {
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        when {
-            games == null -> Message("Reading the library…")
-            games.isEmpty() -> Message("No games yet. Add a games folder in droidtop's settings.")
-            else -> LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 128.dp),
-                contentPadding = PaddingValues(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(games, key = { it.id }) { entry ->
-                    Column(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(MaterialTheme.colorScheme.surface)
-                            .combinedClickable(
-                                onClick = { onLaunch(entry) },
-                                onLongClick = { onPin(entry) },
-                                onLongClickLabel = "Pin to home screen",
-                            )
-                            .padding(6.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(0.75f)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
-                        ) {
-                            if (!entry.artworkUri.isNullOrBlank()) {
-                                AsyncImage(
-                                    model = entry.artworkUri,
-                                    contentDescription = entry.title,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop,
-                                )
-                            } else {
-                                Text(
-                                    entry.title,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(8.dp).align(Alignment.Center),
-                                    maxLines = 4,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                        Text(
-                            entry.title,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun Message(text: String) {
-    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
     }
 }
