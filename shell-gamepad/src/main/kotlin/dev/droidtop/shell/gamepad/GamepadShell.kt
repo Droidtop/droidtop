@@ -819,6 +819,11 @@ fun GamepadShell(
                                 onBack = { nav.openSection(GamingPrefs.defaultSection(context)) },
                                 onRescan = { rescanTrigger++ },
                                 browseThemesToken = browseThemesRequest,
+                                onHelpRowClaim = { claim ->
+                                    if (screenKey == currentScreenKey) {
+                                        helpRowClaimant = screenKey to claim
+                                    }
+                                },
                             )
                         }
                         // Each section now gates on its own scan only (see

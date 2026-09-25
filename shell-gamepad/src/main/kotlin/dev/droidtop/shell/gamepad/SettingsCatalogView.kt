@@ -417,8 +417,15 @@ internal fun SettingsCatalogView(
     onBack: () -> Unit,
     onRescan: () -> Unit,
     browseThemesToken: Int = 0,
+    onHelpRowClaim: (HelpRowClaim) -> Unit = {},
 ) {
     var browseThemes by remember { mutableStateOf(false) }
+    // Browse themes draws its own hint row (its A is "Download or update"),
+    // so while it is up the shell's row stands down: both were drawn,
+    // stacked (rig, dq-shell2-02). One row per screen (SPEC 7j).
+    LaunchedEffect(browseThemes) {
+        onHelpRowClaim(if (browseThemes) HelpRowClaim.SCREEN else HelpRowClaim.NONE)
+    }
 
     LaunchedEffect(browseThemesToken) {
         if (browseThemesToken > 0) browseThemes = true
