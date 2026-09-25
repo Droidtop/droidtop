@@ -77,10 +77,8 @@ object BackButtonMenu {
     const val EXTRA_DISPLAY_REINIT_FORCE = "dev.droidtop.app.EXTRA_DISPLAY_REINIT_FORCE"
 
     /**
-     * "Android" is only offered when droidtop actually holds a HOME role
-     * (see [HomeRolePrefs]) — a user who chose "neither" during onboarding
-     * has nothing for this entry to point to, so it's hidden rather than
-     * shown broken. A mode that is off is not listed; "Settings" opens
+     * "Android" is always offered: it is the home screen the Home button
+     * opens, droidtop's or not. A mode that is off is not listed; "Settings" opens
      * Global settings, where every mode is switched on and off, so turning
      * a mode off is always reversible from here (dq-coordinator-23, F5: it
      * used to open the launcher's Home settings, which have no Modes, and
@@ -91,7 +89,11 @@ object BackButtonMenu {
     fun show(activity: Activity, onDismiss: (() -> Unit)? = null) {
         val homeImplementation = HomeRolePrefs.activeHomeImplementation(activity)
         val items = buildList {
-            if (homeImplementation != HomeRolePrefs.HomeImplementation.NONE) add(Mode.LAUNCHER.label)
+            // Always: with droidtop's launcher not the Home app, "Android"
+            // is the home screen the Home button does open ([openHome]).
+            // It used to vanish then, leaving no way from droidtop to the
+            // home screen but the Home key (rig, dq-onboard-02).
+            add(Mode.LAUNCHER.label)
             if (Modes.isEnabled(Mode.DESKTOP)) add(Mode.DESKTOP.label)
             if (Modes.isEnabled(Mode.GAMING)) add(Mode.GAMING.label)
             add(SETTINGS_ITEM)
@@ -112,6 +114,7 @@ object BackButtonMenu {
             }
             .setOnDismissListener { onDismiss?.invoke() }
             .show()
+            .listView?.selector = activity.getDrawable(com.android.launcher3.R.drawable.droidtop_list_selector)
     }
 
     /** Names the screen it opens: Global settings is where the modes live. */
@@ -129,10 +132,10 @@ object BackButtonMenu {
         val activityName = when (implementation) {
             HomeRolePrefs.HomeImplementation.STANDARD -> STANDARD_LAUNCHER_ACTIVITY
             HomeRolePrefs.HomeImplementation.ALTERNATIVE -> ALTERNATIVE_LAUNCHER_ACTIVITY
-            HomeRolePrefs.HomeImplementation.NONE -> return
+            HomeRolePrefs.HomeImplementation.NONE -> null
         }
         Modes.setLastMode(context, Mode.LAUNCHER)
-        if (!HomeRolePrefs.isDroidtopHome(context)) {
+        if (activityName == null || !HomeRolePrefs.isDroidtopHome(context)) {
             // droidtop's home activity is enabled but Android's Home opens
             // another app: "Android" is that app's home screen, which is
             // what the Home button shows. Starting droidtop's own launcher
@@ -175,7 +178,9 @@ object BackButtonMenu {
             Intent(Intent.ACTION_MAIN).apply {
                 component = ComponentName(context.packageName, "com.android.launcher3.settings.SettingsActivity")
                 putExtra(":settings:fragment", GLOBAL_SETTINGS_FRAGMENT)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                // Settings has its own task: a fresh page, never the one
+                // left open last time, and never on top of a shell.
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             },
         )
     }

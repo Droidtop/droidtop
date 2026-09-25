@@ -112,7 +112,17 @@ object HomeRolePrefs {
                 return roles.createRequestRoleIntent(android.app.role.RoleManager.ROLE_HOME)
             }
         }
-        return homeSettingsIntent()
+        // Below 10 there is no role request. When no Home app has been
+        // chosen "Always" yet, Home itself resolves to Android's chooser,
+        // which is the Home choice with droidtop in it: open that. Only when
+        // another app is already the default does Android's settings screen
+        // have to do it; on BlueStacks that screen is the Default apps list,
+        // one level above the Home choice (rig, dq-onboard-02).
+        val home = android.content.Intent(android.content.Intent.ACTION_MAIN)
+            .addCategory(android.content.Intent.CATEGORY_HOME)
+        val resolved = context.packageManager.resolveActivity(home, PackageManager.MATCH_DEFAULT_ONLY)
+        val noDefaultYet = resolved == null || resolved.activityInfo?.packageName == "android"
+        return if (noDefaultYet) home else homeSettingsIntent()
     }
 
     /** Android's own Default home app screen, for a caller that cannot wait for a result. */

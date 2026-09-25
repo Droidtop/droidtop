@@ -71,6 +71,12 @@ class TutorialActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+        // The ground runs under the bars; the theme would paint them grey
+        // over it (rig, BlueStacks, dq-onboard-02).
+        @Suppress("DEPRECATION")
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        @Suppress("DEPRECATION")
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
         GamepadKeyMap.load(this)
         val pages = TutorialPages.forThisDevice(this)
         setContent {

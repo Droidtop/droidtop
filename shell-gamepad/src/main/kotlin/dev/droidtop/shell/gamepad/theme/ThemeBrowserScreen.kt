@@ -64,7 +64,13 @@ import kotlinx.coroutines.withContext
  * no separate registration step.
  */
 @Composable
-fun ThemeBrowserScreen(onDismiss: () -> Unit) {
+fun ThemeBrowserScreen(
+    onDismiss: () -> Unit,
+    // False inside the Gaming shell, whose own hint row is already drawn
+    // under this screen; two rows stacked read as a glitch (rig,
+    // dq-onboard-02).
+    showHints: Boolean = true,
+) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var entries by remember { mutableStateOf<List<ThemeDownloader.ThemeDownloadEntry>>(emptyList()) }
@@ -248,7 +254,7 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
         // list already leaves it its room (MenuTokens.HintBarRoom). It had
         // none on its own, opened from Settings or onboarding (rig,
         // dq-onboard-01).
-        dev.droidtop.shell.gamepad.TouchHintBar(
+        if (showHints) dev.droidtop.shell.gamepad.TouchHintBar(
             hints = listOf(
                 GamepadAction.A to "Download or update",
                 GamepadAction.B to "Back",

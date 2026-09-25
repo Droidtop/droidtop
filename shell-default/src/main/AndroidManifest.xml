@@ -323,9 +323,16 @@
         <!--
         The settings activity. To extend point settings_fragment_name to appropriate fragment class
         -->
+        <!--
+          droidtop: Settings keeps a task of its own. In the app's shared
+          task, "Home settings" (opened with CLEAR_TASK) cleared a running
+          Gaming or Desktop shell with it, and a page left open was what the
+          next opening showed (rig, dq-onboard-02).
+        -->
         <activity
             android:name="com.android.launcher3.settings.SettingsActivity"
             android:label="@string/settings_button_text"
+            android:taskAffinity="dev.droidtop.app.settings"
             android:theme="@style/HomeSettings.Theme"
             android:exported="true"
             android:autoRemoveFromRecents="true">
