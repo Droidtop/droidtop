@@ -89,7 +89,9 @@ for its own invented systems lives outside the theme, in the separate
 they contain are copyright of their respective owners.
 
 - **DEcaffe (decaffe-es-de)** — https://github.com/DEcaffe/decaffe-es-de —
-  CC-BY-NC-SA 4.0. droidtop's default theme on a landscape display.
+  CC-BY-NC-SA 4.0. droidtop's offline-fallback landscape theme: what a
+  fresh install renders before, or instead of, Art Book Next's own setup
+  download below (docs/SPEC.md §7f).
 - **Slate (slate-es-de)** — https://gitlab.com/es-de/themes/slate,
   vendored at upstream commit `c072efc`, by Leon Styhre and
   contributors (itself based on recalbox-multi by the Recalbox
@@ -99,6 +101,24 @@ they contain are copyright of their respective owners.
   ES-DE's own default theme, and the only bundled theme that declares
   vertical aspect-ratio variants (`16:9_vertical`, `4:3_vertical`), so
   it is droidtop's default on a portrait display (docs/SPEC.md §7f).
+
+## Downloaded default theme
+
+Not shipped inside the APK: droidtop's onboarding downloads this one theme
+through the real ES-DE theme downloader (`ThemeDownloader`, the same
+`gitlab.com/es-de/themes/themes-list.git` mechanism "Browse themes" uses)
+during setup, and activates it in place of DEcaffe once the download has
+actually finished. droidtop makes no changes to its files.
+
+- **Art Book Next (art-book-next-es-de)** — https://github.com/anthonycaccese/art-book-next-es-de,
+  by anthonycaccese — **CC-BY-NC-SA** (the theme's own README License
+  section: "Creative Commons CC-BY-NC-SA", no separate `LICENSE` file in
+  its repository). droidtop's recommended Gaming default (docs/SPEC.md
+  §7f, "Default theme"), chosen for its aspect-ratio coverage and because
+  it is the theme droidtop's own carousel/grid/textlist renderer parity
+  work was measured against. Offered with no per-franchise character art;
+  the logos and trademarks any theme's own bundled art contains remain
+  copyright of their respective owners, same as the bundled themes above.
 
 ## Design references (not vendored, no code copied)
 
