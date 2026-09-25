@@ -98,7 +98,11 @@ bouncycastle = "1.78.1"
 # and per-theme repos real ES-DE itself clones (GuiThemeDownloader.cpp),
 # via libgit2 there -- JGit is the pure-Java equivalent for Android, no
 # native git binding available.
-jgit = "7.7.1.202607240634-r"
+# 5.13.x, the last JGit line built for Java 8: 6.x and 7.x call Java 11+
+# library methods (InputStream.readNBytes(int) among them) that Android
+# only has from API 33, and the theme downloader crashed with
+# NoSuchMethodError on Android 9 (rig, dq-onboard-01). minSdk is 26.
+jgit = "5.13.3.202401111512-r"
 
 [libraries]
 # Lawnchair-TODO: Migrate it to the latest version once jitpack publishing is fixed

@@ -117,6 +117,10 @@ object ThemeDownloader {
             ThemeSyncResult(ThemeSyncStatus.FAILED, t)
         } catch (t: Exception) {
             ThemeSyncResult(ThemeSyncStatus.FAILED, t)
+        } catch (t: LinkageError) {
+            // A library method this Android version does not have is a
+            // failed download, not a crashed app (rig, dq-onboard-01).
+            ThemeSyncResult(ThemeSyncStatus.FAILED, t)
         }
     }
 
