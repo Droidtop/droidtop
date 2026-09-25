@@ -483,8 +483,7 @@ front, a Gaming shell whose mode had been switched off included
 icon's app shortcut "Games" (a long press) and the home screen's
 long-press menu entry "droidtop games" open it (`ACTION_SHOW_GAMES`).
 Launcher3's pin sheet (`AddItemActivity`) also runs in a task of its own,
-so Cancel returns to the grid rather than into older droidtop screens, and
-Back from the grid goes to the home screen.
+so Cancel returns to the grid rather than into older droidtop screens.
 Finishing onboarding with droidtop's own launcher as Home asks for this
 icon on the home screen (`HomeRolePrefs.placeDroidtopIcon`), and the
 launcher queues it through its own install queue when its home screen
