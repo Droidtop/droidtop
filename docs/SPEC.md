@@ -5415,7 +5415,15 @@ hash of Launcher3's own icon state for the app (`AppIconFiles`: locale,
 SDK, themed-icon setting, resource hash, the day for a dynamic
 calendar), so an app whose file already exists costs no drawing at all,
 and a changed icon is a new path rather than a stale picture under an
-old one. Files are written to a temporary name and renamed, and a
+old one. The drawing itself is `DrawableBitmaps.render`, the one
+drawable-to-bitmap path for app icons (the Apps scan and the rows that
+show an app's icon): on API 28+ it records the drawable into a `Picture`
+and has `Bitmap.createBitmap(picture, w, h, ARGB_8888)` render it, which
+goes through the hardware renderer when the picture holds a hardware
+bitmap. A plain software `Canvas` refuses those ("Software rendering
+doesn't support hardware bitmaps"), and Android 14's Clock icon
+(Launcher3's `ClockDrawableWrapper`) is one: it listed with a blank plate
+(rig dq-coordinator-23 F1). Files are written to a temporary name and renamed, and a
 finished scan deletes every file no current app names (uninstalled
 apps, older versions, the old `<package>.png` names, unfinished
 writes); one scan at a time owns the folder.
