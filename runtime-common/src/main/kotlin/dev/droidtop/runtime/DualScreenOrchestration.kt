@@ -76,4 +76,40 @@ object DualScreenOrchestration {
                 ChooserCandidate(null, "This screen (built-in)"),
             )
         }
+
+    /**
+     * Whether the add-on display looks like it needs a hard reinit right
+     * now -- the "Reinitialize displays" pill's own visibility condition
+     * (docs/SPEC.md section 4c, "Reinitialize displays" made automatic).
+     *
+     * Confirmed live (2026-09-25): mirroring can recur through a door
+     * [displaysNeedingIdleCover] does not watch -- an app on the addon
+     * exits on its own, with droidtop's own shell never losing foreground
+     * on ITS display, so nothing re-runs role orchestration and the addon
+     * is left with neither a live [dev.droidtop.app.SecondScreenPresentation]
+     * nor the idle SECONDARY_HOME cover -- which is exactly when Android
+     * falls back to mirroring it. This is the same "is anything of ours
+     * actually on the addon" question [displaysNeedingIdleCover] asks
+     * before a launch, asked continuously instead of only pre-launch.
+     *
+     * A display the user launched an app onto ([parkedDisplayId] ==
+     * [secondDisplayId]) is deliberately excluded: droidtop keeps its
+     * hands off a display an app is running on, by design, not by
+     * accident, so that is never "broken."
+     */
+    fun secondScreenNeedsReinit(
+        secondDisplayId: Int?,
+        parkedDisplayId: Int?,
+        shellOnSecond: Boolean,
+        presentationDisplayId: Int?,
+        idleCoverDisplayId: Int?,
+    ): Boolean {
+        if (secondDisplayId == null || secondDisplayId == parkedDisplayId) return false
+        // The shell itself is the content there (Gaming/Desktop on the
+        // addon as the main output) -- nothing else needs to cover it.
+        if (shellOnSecond) return false
+        if (presentationDisplayId == secondDisplayId) return false
+        if (idleCoverDisplayId == secondDisplayId) return false
+        return true
+    }
 }
