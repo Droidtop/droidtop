@@ -3,6 +3,8 @@ package dev.droidtop.library
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * The index database, in RAM (docs/SPEC.md 7g, step 3): [LibraryIndexDatabase]
@@ -29,6 +31,7 @@ class RoomLibraryIndexStore(
 ) : LibraryIndexStore {
 
     private val lastWritten = ConcurrentHashMap<String, LibrarySlice>()
+    private val writerLocks = ConcurrentHashMap<String, Mutex>()
     private val seeded = AtomicBoolean(false)
 
     /**
@@ -47,27 +50,27 @@ class RoomLibraryIndexStore(
     }
 
     override suspend fun load(providerKey: String): LibrarySlice? {
-        ensureSeeded()
-        val parts = db.dao().partsFor(providerKey)
-        if (parts.isEmpty()) return null
-        val gamesByPart = db.dao().gamesFor(providerKey).groupBy { it.part }
-        val segments = parts.map { part ->
-            // Single-game hydration happens HERE, once per part at load
-            // time -- never per list draw, which is what "lists never
-            // read the record" (docs/SPEC.md 7g) means in practice: the
-            // published Flow<List<LibraryEntry>> below serves this
-            // in-memory result, it does not re-read anything.
-            val entries = gamesByPart[part.key].orEmpty().mapNotNull { row -> records.get(row.id)?.entry }
-            ScanStep.Segment(key = part.key, root = part.root, entries = entries)
+        val lock = writerLocks.getOrPut(providerKey) { Mutex() }
+        return lock.withLock {
+            ensureSeeded()
+            val parts = db.dao().partsFor(providerKey)
+            if (parts.isEmpty()) return@withLock null
+            val gamesByPart = db.dao().gamesFor(providerKey).groupBy { it.part }
+            val segments = parts.map { part ->
+                val entries = gamesByPart[part.key].orEmpty().mapNotNull { row -> records.get(row.id)?.entry }
+                ScanStep.Segment(key = part.key, root = part.root, entries = entries)
+            }
+            val slice = LibrarySlice(segments)
+            lastWritten[providerKey] = slice
+            slice
         }
-        val slice = LibrarySlice(segments)
-        lastWritten[providerKey] = slice
-        return slice
     }
 
     override suspend fun save(providerKey: String, slice: LibrarySlice) {
-        val previousByKey = lastWritten[providerKey]?.segments?.associateBy { it.key to it.root }.orEmpty()
-        val keptKeys = slice.segments.mapTo(HashSet()) { it.key to it.root }
+        val lock = writerLocks.getOrPut(providerKey) { Mutex() }
+        lock.withLock {
+            val previousByKey = lastWritten[providerKey]?.segments?.associateBy { it.key to it.root }.orEmpty()
+            val keptKeys = slice.segments.mapTo(HashSet()) { it.key to it.root }
         // A segment this save no longer carries at all is one
         // [Library.keepOnlyRoots] dropped, not one a walk emptied (a walk
         // never removes a segment, only marks its games missing) -- so
@@ -113,6 +116,7 @@ class RoomLibraryIndexStore(
             )
         }
         lastWritten[providerKey] = slice
+        }
     }
 
     override suspend fun folderMtimes(providerKey: String): Map<PartRef, Long> =
