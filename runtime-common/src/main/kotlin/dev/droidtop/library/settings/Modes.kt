@@ -190,6 +190,9 @@ object Modes {
     private const val KEY_DEFAULT_MODE = "droidtop_default_mode"
     private const val KEY_ENABLED_PREFIX = "droidtop_mode_enabled_"
 
+    /** Written by onboarding when it finishes (`GamesRootPrefs.markOnboardingComplete`). */
+    private const val KEY_ONBOARDING_COMPLETE = "droidtop_onboarding_complete"
+
     /**
      * The Launcher3 fork's HOME activity. Defined here rather than in
      * `:shell-default` so mode gating and
@@ -197,8 +200,16 @@ object Modes {
      */
     const val LAUNCHER_ACTIVITY = "com.android.launcher3.Launcher"
 
-    @Volatile
-    private var snapshot: Set<Mode> = Mode.entries.toSet()
+    private val state = kotlinx.coroutines.flow.MutableStateFlow<Set<Mode>>(Mode.entries.toSet())
+
+    private val snapshot: Set<Mode> get() = state.value
+
+    /**
+     * The same set as [enabled], as something a screen can watch: a shell
+     * whose mode is switched off while it is on screen leaves (MainActivity),
+     * instead of running on until the process dies (rig, dq-onboard-01).
+     */
+    val enabledFlow: kotlinx.coroutines.flow.StateFlow<Set<Mode>> get() = state
 
     /**
      * What to (re)start when the snapshot changes. `:app` installs the
@@ -232,10 +243,17 @@ object Modes {
     @JvmStatic
     fun reload(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        snapshot = ModeGate.enabledModes(
+        // Gaming and Desktop are on once setup has turned them on, not
+        // before (docs/SPEC.md 2c): until onboarding finishes nothing has
+        // been chosen, so neither mode's pieces run. The Windows backbone
+        // used to boot in Application.onCreate on a fresh install and
+        // crashed droidtop's very first launch on Android 14 (rig,
+        // dq-onboard-01).
+        val setUp = prefs.getBoolean(KEY_ONBOARDING_COMPLETE, false)
+        state.value = ModeGate.enabledModes(
             launcherIsDroidtopHome = launcherIsDroidtopHome(context),
-            gamingEnabled = prefs.getBoolean(KEY_ENABLED_PREFIX + Mode.GAMING.id, true),
-            desktopEnabled = prefs.getBoolean(KEY_ENABLED_PREFIX + Mode.DESKTOP.id, true),
+            gamingEnabled = setUp && prefs.getBoolean(KEY_ENABLED_PREFIX + Mode.GAMING.id, true),
+            desktopEnabled = setUp && prefs.getBoolean(KEY_ENABLED_PREFIX + Mode.DESKTOP.id, true),
         )
         val toNotify = synchronized(listeners) { listeners.toList() }
         toNotify.forEach { it() }
