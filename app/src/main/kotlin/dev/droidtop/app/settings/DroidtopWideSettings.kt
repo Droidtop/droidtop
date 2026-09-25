@@ -13,6 +13,7 @@ import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.Mode
 import dev.droidtop.library.settings.Modes
+import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.shell.standard.HomeRolePrefs
 import org.json.JSONArray
@@ -111,6 +112,22 @@ object DroidtopWideSettings {
         subtitle = "Settings for the Desktop shell",
         groups = { context ->
             listOf(
+                // The same first row Gaming's settings lead with: from
+                // Desktop, Global settings (and the Modes in it) was only
+                // an unlabelled action-bar icon, and with Gaming turned off
+                // the rig found no way back to it (dq-coordinator-23, F5).
+                CatalogGroup(
+                    id = dev.droidtop.library.settings.GamingSettingsCatalog.GROUP_GLOBAL,
+                    title = null,
+                    items = listOf(
+                        NestedScreenItem(
+                            id = "pref_desktop_global_settings",
+                            title = "Global settings",
+                            subtitle = "Modes, your home screen and setup",
+                            registryId = SCREEN_GLOBAL,
+                        ),
+                    ),
+                ),
                 CatalogGroup(
                     id = "desktop",
                     title = null,
@@ -152,10 +169,19 @@ object DroidtopWideSettings {
         },
     )
 
-    /** Only enabled modes are offered; a stored default naming a disabled one reads as "last used". */
+    /**
+     * Only modes that are on are offered; a stored default naming one that
+     * is off reads as "last used". Android is one of them whenever droidtop
+     * holds the home screen: onboarding's "Opens into Android" is stored
+     * here, and without the option this row read "Whichever was used
+     * last" right after that answer (rig, dq-coordinator-23, F6).
+     */
     private fun defaultModeItem(context: Context): ChoiceItem {
         val options = buildList {
             add(ChoiceOption("", "Whichever was used last"))
+            if (HomeRolePrefs.activeHomeImplementation(context) != HomeRolePrefs.HomeImplementation.NONE) {
+                add(ChoiceOption(Mode.LAUNCHER.id, Mode.LAUNCHER.label))
+            }
             listOf(Mode.DESKTOP, Mode.GAMING)
                 .filter { Modes.isEnabledInStorage(context, it) }
                 .forEach { add(ChoiceOption(it.id, it.label)) }
@@ -163,7 +189,7 @@ object DroidtopWideSettings {
         return ChoiceItem(
             id = "pref_global_default_mode",
             title = "Default mode",
-            subtitle = "Which mode droidtop starts in when launched fresh",
+            subtitle = "Where droidtop opens, and where the Home button takes you",
             options = options,
             current = Modes.defaultMode(context)?.takeIf { id -> options.any { it.value == id } } ?: "",
             onSelect = { ctx, value -> Modes.setDefaultMode(ctx, Mode.byId(value.ifEmpty { null })) },
@@ -173,7 +199,7 @@ object DroidtopWideSettings {
     private fun modeToggle(context: Context, mode: Mode) = ToggleItem(
         id = if (mode == Mode.DESKTOP) "pref_global_enable_desktop" else "pref_global_enable_gaming",
         title = "Enable ${mode.label} mode",
-        subtitle = "Show ${mode.label} as a choice in the shell switcher",
+        subtitle = "Off: ${mode.label} runs nothing and leaves the mode switcher. Turn it back on here.",
         current = Modes.isEnabledInStorage(context, mode),
         onToggle = { ctx, on -> Modes.setEnabled(ctx, mode, on) },
     )

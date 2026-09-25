@@ -140,6 +140,7 @@ object QuickTiles {
         GamingSettingsCatalog.ID_SYSTEM_UPDATES -> QuickGlyph.UPDATE
         GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS -> QuickGlyph.ANDROID
         GamingSettingsCatalog.ID_SYSTEM_LEAVE_UI_MODE -> QuickGlyph.EXIT
+        GamingSettingsCatalog.ID_SYSTEM_SWITCH_MODE -> QuickGlyph.SWAP
         GamingSettingsCatalog.ID_DISPLAY_SHELL_TARGET -> QuickGlyph.DISPLAY
         GamingSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET -> QuickGlyph.GAMEPAD
         GamingSettingsCatalog.ID_DISPLAY_SWAP -> QuickGlyph.SWAP

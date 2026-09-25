@@ -203,6 +203,19 @@ public class OptionsPopupView<T extends Context & ActivityContext> extends Arrow
      */
     public static ArrayList<OptionItem> getOptions(Launcher launcher) {
         ArrayList<OptionItem> options = new ArrayList<>();
+        // droidtop patch (not upstream): the mode switcher, where a person
+        // looking at the home screen's own menu will look for it. Its only
+        // other route from here was a long-press of Back, which nothing on
+        // screen names and BlueStacks never delivers (rig,
+        // dq-coordinator-24, finding 3).
+        options.add(new OptionItem(launcher,
+                R.string.droidtop_modes_option,
+                R.drawable.ic_apps,
+                IGNORE,
+                v -> {
+                    dev.droidtop.shell.standard.BackButtonMenu.show(Launcher.getLauncher(v.getContext()));
+                    return true;
+                }));
         options.add(new OptionItem(launcher,
                 R.string.styles_wallpaper_button_text,
                 R.drawable.ic_palette,

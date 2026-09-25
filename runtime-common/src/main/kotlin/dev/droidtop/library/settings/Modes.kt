@@ -97,15 +97,6 @@ enum class ModePiece(vararg owners: Mode) {
      * one idempotent entry point rather than started twice.
      */
     WINDOWS_BACKBONE(Mode.GAMING, Mode.DESKTOP),
-
-    /**
-     * droidtop's own icon in another launcher's drawer, which opens the
-     * app-hosted shells. It is how a person whose Home is "Alternative" or
-     * "Neither" reaches Gaming or Desktop at all (they have no droidtop home
-     * screen to long-press Back on), and with both of those modes off it
-     * would open onto nothing, so it goes with them.
-     */
-    APP_SHELLS_ICON(Mode.GAMING, Mode.DESKTOP),
     ;
 
     val owners: Set<Mode> = owners.toSet()
@@ -161,6 +152,24 @@ object ModeGate {
             Mode.byId(id)?.takeIf { it != Mode.LAUNCHER && it in enabled }
         return usable(explicitId) ?: usable(defaultId) ?: usable(lastId)
             ?: enabled.firstOrNull { it != Mode.LAUNCHER }
+    }
+
+    /**
+     * Where the Home key takes a person (docs/SPEC.md 2c, "Home goes to
+     * the default mode"): the default mode they chose, when they chose one
+     * and it is on; otherwise the mode they last used; otherwise the
+     * Android home screen, which is where a Home press already is.
+     *
+     * The default wins over the last-used mode because that is what the
+     * choice MEANS. On the rig (dq-coordinator-24, finding 4) a person who
+     * answered "Opens into Android" opened Gaming once, and from then on
+     * every Home press forwarded straight back into Gaming, because Home
+     * followed only the last-used mode.
+     */
+    fun homeTarget(defaultId: String?, lastId: String?, enabled: Set<Mode>): Mode {
+        fun usable(id: String?): Mode? =
+            Mode.byId(id)?.takeIf { it == Mode.LAUNCHER || it in enabled }
+        return usable(defaultId) ?: usable(lastId) ?: Mode.LAUNCHER
     }
 }
 
@@ -285,4 +294,16 @@ object Modes {
         lastId = lastMode(context),
         enabled = snapshot,
     )
+
+    /**
+     * Where a Home press goes, as a mode id; see [ModeGate.homeTarget].
+     * Read by the HOME activities (the Launcher3 fork and the Alternative
+     * forwarder), which is why it answers in the wire id Java can compare.
+     */
+    @JvmStatic
+    fun homeTarget(context: Context): String = ModeGate.homeTarget(
+        defaultId = defaultMode(context),
+        lastId = lastMode(context),
+        enabled = snapshot,
+    ).id
 }

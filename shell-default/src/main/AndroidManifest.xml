@@ -175,6 +175,20 @@
             </intent-filter>
         </activity>
 
+        <!--
+          The mode switcher (BackButtonMenu) for a caller with no Activity
+          of its own: a settings row, the Desktop taskbar, droidtop's games
+          screen. Its own task, so opening it never brings another droidtop
+          task forward behind the dialog; translucent, so the dialog sits
+          over whatever was on screen.
+        -->
+        <activity
+            android:name="dev.droidtop.shell.standard.ModeSwitcherActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <activity android:name="com.android.launcher3.widgetpicker.WidgetPickerActivity"
             android:theme="@style/WidgetPickerActivityTheme"
             android:excludeFromRecents="true"

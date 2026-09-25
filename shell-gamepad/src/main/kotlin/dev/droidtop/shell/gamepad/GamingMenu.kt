@@ -109,7 +109,7 @@ internal val MenuListContentPadding: PaddingValues
  * [rest] is the fill while not selected; [restOutline] is an optional
  * hairline kept while not selected (the cards keep [MenuTokens.CardOutline]).
  */
-internal fun Modifier.selectionFrame(
+fun Modifier.selectionFrame(
     selected: Boolean,
     shape: Shape,
     rest: Color = MenuTokens.Surface,

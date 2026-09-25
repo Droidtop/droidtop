@@ -18,22 +18,34 @@ import android.os.Looper
  * [HomeRolePrefs.setActiveHomeImplementation] when the user picks
  * "Alternative" during onboarding or in Settings.
  *
- * Mirrors `com.android.launcher3.Launcher`'s own real cold-boot redirect
- * (its `mDroidtopPendingModeRedirect` handling, already built and shipping)
- * -- without this, picking Alternative as the home implementation but
- * Desktop/Gaming as the *default mode* would always forward to the other
- * launcher instead, since this activity (not Launcher.java) is what
- * actually runs on boot when Alternative is active.
+ * A Home press goes where `com.android.launcher3.Launcher` sends it too
+ * ([dev.droidtop.library.settings.Modes.homeTarget]): the default mode
+ * when one was chosen, else the last one used. Without this, picking
+ * Alternative as the home implementation but Desktop/Gaming as the
+ * default mode would always forward to the other launcher instead, since
+ * this activity (not Launcher.java) is what actually runs on boot when
+ * Alternative is active. An explicit "Android" from the mode switcher
+ * ([BackButtonMenu.openHome]) forwards to the other launcher as asked.
  */
 class AlternativeLauncherActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val lastMode = dev.droidtop.library.settings.Modes.lastMode(this)
-        if (savedInstanceState == null && isTaskRoot && lastMode != dev.droidtop.library.settings.Mode.LAUNCHER.id) {
+        // Unfinished setup comes first, whichever home activity is live
+        // (docs/SPEC.md 7b).
+        if (OnboardingGate.resumeIfUnfinished(this, fromHome = true)) {
+            finish()
+            return
+        }
+
+        val target = dev.droidtop.library.settings.Modes.homeTarget(this)
+        if (savedInstanceState == null &&
+            !BackButtonMenu.isExplicitHome(intent) &&
+            target != dev.droidtop.library.settings.Mode.LAUNCHER.id
+        ) {
             val redirect = Intent(Intent.ACTION_MAIN).apply {
                 setClassName(packageName, "dev.droidtop.app.MainActivity")
-                putExtra(BackButtonMenu.EXTRA_MODE, lastMode)
+                putExtra(BackButtonMenu.EXTRA_MODE, target)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             startActivity(redirect)
@@ -41,8 +53,8 @@ class AlternativeLauncherActivity : Activity() {
             return
         }
 
-        val target = HomeRolePrefs.alternativeTarget(this)
-        if (target == null || !isInstalled(target)) {
+        val forwardTo = HomeRolePrefs.alternativeTarget(this)
+        if (forwardTo == null || !isInstalled(forwardTo)) {
             // Nothing valid configured -- send the user back to pick one
             // rather than looping forever or crashing on a bad component.
             HomeRolePrefs.setActiveHomeImplementation(this, HomeRolePrefs.HomeImplementation.NONE)
@@ -54,7 +66,10 @@ class AlternativeLauncherActivity : Activity() {
             return
         }
 
-        val forwardIntent = intent.apply { component = target }
+        val forwardIntent = intent.apply {
+            component = forwardTo
+            removeExtra(BackButtonMenu.EXTRA_MODE)
+        }
         startActivity(forwardIntent)
         // Fired a second time via a Handler.post -- same real fix
         // farmerbb/Taskbar's HSLActivity uses (its own comment: "to fix

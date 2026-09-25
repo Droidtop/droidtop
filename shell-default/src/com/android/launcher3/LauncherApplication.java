@@ -65,10 +65,10 @@ public class LauncherApplication extends Application {
 
         app.murinelauncher.theme.ThemeOverride.syncNightMode(this);
         MainProcessInitializer.initialize(this);
-
-        // First-run only (see OnboardingGate's own doc comment) -- no-ops
-        // on every launch after the user finishes or skips it once.
-        dev.droidtop.shell.standard.OnboardingGate.launchIfNeeded(this);
+        // Onboarding is resumed by droidtop's entry activities, not here
+        // (OnboardingGate): a process also starts for a broadcast, a bound
+        // service or a pinned game, none of which is a person opening
+        // droidtop.
     }
 
     @Override

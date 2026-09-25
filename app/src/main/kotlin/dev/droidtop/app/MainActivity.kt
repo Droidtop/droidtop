@@ -169,13 +169,15 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         applyGamingDeepLink(intent)
 
-        // Real gap this closes: OnboardingGate was only ever called from
-        // LauncherApplication.java (Standard's own boot) -- a user who
-        // launches straight into Desktop/Gaming (droidtop not set as
-        // system HOME, or opened via BackButtonMenu/EXTRA_MODE directly)
-        // never saw onboarding at all. Both real entry points need this,
-        // not just one.
-        OnboardingGate.launchIfNeeded(this)
+        // Unfinished setup is resumed instead of drawing a shell under it
+        // (docs/SPEC.md 7b): onboarding ends by opening the mode it set up,
+        // so there is nothing for this instance to be until then, and a
+        // Gaming shell composed underneath started its library scan and
+        // recorded itself as the last mode before any of that was chosen.
+        if (OnboardingGate.resumeIfUnfinished(this)) {
+            finish()
+            return
+        }
 
         // One library per process, built by the shared core rather than
         // here: launch resolution must work with Gaming and Desktop both
@@ -345,8 +347,9 @@ class MainActivity : AppCompatActivity() {
     /**
      * Real bug this closes, confirmed on a real device: `mode` used to be
      * resolved exactly once, in `onCreate`, and never re-checked. When
-     * `OnboardingGate.launchIfNeeded` (called just above, in `onCreate`)
-     * pushes `OnboardingActivity` on top of this same task *before*
+     * onboarding (then launched from `onCreate`; it now finishes this
+     * Activity instead, see `OnboardingGate.resumeIfUnfinished`) pushed
+     * `OnboardingActivity` on top of this same task *before*
      * onboarding has actually set the last mode to anything real,
      * [resolveMode] has nothing to resolve to yet and returns `null` --
      * which the `when(mode)` below's `else` branch silently treats as
