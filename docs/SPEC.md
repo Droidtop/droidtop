@@ -393,13 +393,24 @@ package had no launcher activity, and the fork hid everything in its own
 package from the drawer. It now works like this:
 
 - A **Games** icon in the drawer (`LauncherGamesActivity`, `:app`) opens a
-  plain grid of the library's games — the same `LibraryKinds.GAMES` scan
-  the Gaming shell's Games section reads, so with both on there is one
-  scan, and hidden or missing games are left out. No themes, no scraped
-  detail views, no Quick Menu: those are Gaming's.
-- A tap launches through `GameLaunchActivity.dispatch`, which is
+  grid of the library's games — the same `LibraryKinds.GAMES` scan the
+  Gaming shell's Games section reads, run by the same loop
+  (`Library.scanFollowingGamesRoots`, which follows the games roots as they
+  change), so with both on there is one scan, and hidden or missing games
+  are left out. No themes, no scraped detail views, no Quick Menu: those
+  are Gaming's.
+- **It is droidtop's own chrome, not a stock screen** (decided 2026-09-25,
+  after the rig's user did not recognise the first version as droidtop's).
+  It is drawn by the shell (`LauncherGamesScreen`, `:shell-gamepad`) from
+  the shell's own pieces: the Games section's card with the one selection
+  idiom (§7k), the black ground drawn under the system bars, a screen header
+  named "Games" with the count, and a hint row — A Play, Y Pin to home
+  screen, Select Game folders, B Back — whose every hint dispatches (§7j).
+  Game folders opens in place through the settings navigator, and an empty
+  grid offers "Add a games folder" rather than a sentence.
+- A tap or A launches through `GameLaunchActivity.dispatch`, which is
   `Library.launch` (play history and launch-screen memory included).
-- A long press pins the game to the home screen as an ordinary icon: a
+- Y or a long press pins the game to the home screen as an ordinary icon: a
   launcher shortcut whose intent is `GameLaunchActivity` with the entry's
   id, so a pinned game keeps working with Gaming off. Its icon is the
   entry's local artwork cropped square, or droidtop's icon when there is
@@ -4881,6 +4892,10 @@ collection), interval, and a name overlay as their own rows. A on a
 slideshow or video launches the game shown; any other key wakes the
 shell. Android's own display timeout still powers the panel down, and
 the row says the screensaver shows only when its timer is the shorter.
+The setting has one definition (`ScreensaverPrefs`) that the row writes
+and the shell's idle timer OBSERVES: the row lives inside the shell, so a
+value read once at start left a newly chosen timer on Off until the app
+restarted (rig, build 814).
 
 **Media viewer.** One pager per game over every media type droidtop has
 for it: images (built), the preview video (ExoPlayer, unmuted, with
@@ -5217,7 +5232,15 @@ date), the artwork a grid shows, and where the record is. Plus one row per
 part: its folder's modification time and when it was last walked. It is
 DERIVED: every column comes from a record, so a schema change is "drop and
 rebuild from the records", which touches no games root and takes seconds;
-that is what "format changes don't hurt" means. It is small enough to read
+that is what "format changes don't hurt" means. **A rebuild never shows a
+smaller library than the one on screen** (decided 2026-09-25): it walks no
+folder, so it cannot know a game is gone, and a game whose record cannot be
+read (never written, an older shape, a corrupt file) is kept as it is shown
+(`LibrarySlice.including`) and written back, which writes its record from
+the list. Only a walk decides a game is missing. Settings' "Rebuild the
+library index" says how many listed games had no record. It used to publish
+the records alone, and 168 engine games became 6 until the next walk (rig,
+build 814). It is small enough to read
 once at start and keep in memory, and that in-memory index is what the shell
 draws from; the database is its persistence.
 
@@ -5890,7 +5913,24 @@ themselves are still never logged — only whether they are present.
 
 **A repeated refusal ends the pass.** Five consecutive refusals stop the
 run and report, in the ROM pass and the PC pass alike; 46 refusals paced
-~11s apart buy no information that the first five did not.
+~11s apart buy no information that the first five did not. A whole-library
+pass (Scrape all systems) reports each system's own sentence and stops at
+the first system whose source refused everything, since every later system
+would be refused the same way; it never reports a bare count of systems
+"scraped".
+
+**A source that cannot be asked refuses before it is asked, and says how to
+fix it** (decided 2026-09-25, after "Scraped 3 systems." with TheGamesDB
+selected and no key). `ScraperReadiness` is the one check: a selected source
+whose key or account is not set (TheGamesDB's API key, IGDB's Twitch
+credentials, ScreenScraper with no application credentials) returns a
+sentence naming where to get the key, the setting it goes in (Settings >
+Library > Scraper > the source's group) and the sources that need none,
+before any folder is walked or any request made; every ROM and PC pass, the
+manual match and the picker ask it. A 401 or 403 from a source that takes a
+key or an account adds that same setting to the refusal
+(`ScraperReadiness.credentialFix`); any other refusal (a quota, an outage)
+is not presented as the person's to fix.
 
 **Not decided here, deliberately:** the cause of the 2026-09-01 403s.
 Credentials were verified present, verified to descramble, and the
@@ -6224,8 +6264,19 @@ instead of offering a launch that cannot work. Root remains desktop-only.
 
 ### Views
 
-**Entry point.** The theme's `pc` system card, using the theme's own `pc`
-art and the theme's own transition. B returns to the carousel with focus
+**Entry point.** The theme's system card for the PC group, with the
+theme's own transition. **The card never wears DOS or IBM branding**
+(decided 2026-09-25): ES-DE's `pc` system is IBM PC and DOS and every theme
+draws it that way, so the group themes as `windows` (ES-DE's Microsoft
+Windows system) when the active theme's system view declares `windows` art
+that exists, and otherwise as a folder no theme ships
+(`ThemeAssets.NEUTRAL_PC_THEME_FOLDER`), so every per-system element falls
+through to the theme's own defaults and the carousel draws the plain name
+"PC". droidtop fabricates no art for it. The same folder is what the
+system view, its neighbour slots and the accent read, since they all ask
+through the group's one theme key; the companion screen and Desktop name
+the group in text only. The `pc` id itself stays the group's: its system
+id, its `downloaded_media` folder and its scrape. B returns to the carousel with focus
 on that card. Nothing else in the system view changes.
 
 **Library.** One grid over one list, with a header line of plain facts,
@@ -6236,6 +6287,12 @@ already on the entry. **Runner state is deliberately not a chip.**
 Working it out means a filesystem walk and a provider query per game,
 which is right for one open game and wrong for a whole grid, so it is
 stated where it is needed rather than filtered on where it is not.
+The chip row is reached and left by the pad like the grid: Up from the
+grid's top row lands on Sort, the first chip; Left and Right move along
+the chips and never leave the surface (at the grid's own edges they are
+ES-DE's switch-system); one key handler above the chips and the grid owns
+every direction (rig, build 814: Sort was touch-only, and Left from a chip
+opened All games).
 
 A game's actions live on the game's own screen, opened with A, rather
 than in a separate in-context menu over the grid: there is exactly one
@@ -6282,7 +6339,8 @@ models "a game and its metadata" rather than "a game, four runners and an
 override"; and the screens droidtop reuses here are Compose, so theming
 them would mean rewriting them.
 
-Because every real theme already ships `pc` art, this needs no theme patch.
+It needs no theme patch: a theme's `windows` art where it has some, its
+own defaults where it does not.
 Engine games fold into this one PC entry, with engine as a filter inside
 it, rather than appearing as invented per-engine systems in the carousel:
 the shell has ONE group for the PC category, and it owns the `pc` system
