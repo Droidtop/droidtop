@@ -3,6 +3,7 @@ package dev.droidtop.library
 import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
+import android.view.Display
 
 /**
  * Launcher-wide launch-display targeting (docs/SPEC.md section 4,
@@ -120,12 +121,23 @@ object LaunchDisplay {
 
     private fun startOn(context: Context, intent: Intent, displayId: Int?) {
         coverVacatedDisplays?.invoke(displayId)
-        if (displayId != null) {
-            context.startActivity(intent, ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle())
-        } else {
-            context.startActivity(intent)
-        }
-        parkedDisplayId = displayId
-        onLaunched?.invoke(displayId)
+        // Always pin an explicit display, even for the "default display"
+        // decision (displayId == null): leaving ActivityOptions off
+        // entirely lets Android resolve the launch against whatever
+        // display is AMBIENTLY current rather than the built-in panel --
+        // confirmed live on the console (2026-09-25): coverVacatedDisplays had
+        // just placed SecondaryDisplayActivity on the addon a moment
+        // earlier in this same call, and the following no-options
+        // startActivity landed the GAME there too, while parkedDisplayId
+        // was set to the requested null and so never matched the addon's
+        // real display id -- the live companion Presentation was never
+        // told the addon was taken and stayed shown, on top of the game,
+        // holding real input focus, until the user pressed Back on it.
+        // An explicit DEFAULT_DISPLAY closes the ambiguity: the game
+        // lands where we actually asked, and parkedDisplayId tracks it.
+        val resolvedDisplayId = displayId ?: Display.DEFAULT_DISPLAY
+        context.startActivity(intent, ActivityOptions.makeBasic().setLaunchDisplayId(resolvedDisplayId).toBundle())
+        parkedDisplayId = resolvedDisplayId
+        onLaunched?.invoke(resolvedDisplayId)
     }
 }
