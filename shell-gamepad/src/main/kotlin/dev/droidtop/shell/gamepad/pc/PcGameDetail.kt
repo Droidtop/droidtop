@@ -56,9 +56,15 @@ import dev.droidtop.library.PcRunnerOptions
 import dev.droidtop.library.PcRunners
 import dev.droidtop.library.ResolvedRunner
 import dev.droidtop.library.RunnerState
+import dev.droidtop.library.WineGameSettings
+import dev.droidtop.library.WineGameSettingsPrefs
 import dev.droidtop.library.displayName
 import dev.droidtop.library.SimilarGames
 import dev.droidtop.library.scraper.PcScraper
+import dev.droidtop.library.scraper.ProtonDbClient
+import dev.droidtop.library.scraper.ProtonDbSummary
+import dev.droidtop.library.scraper.ScrapeLookup
+import dev.droidtop.library.scraper.line
 import dev.droidtop.shell.gamepad.CollectionMembershipEditor
 import dev.droidtop.shell.gamepad.ManualMatchPicker
 import dev.droidtop.shell.gamepad.MenuTokens
@@ -129,6 +135,9 @@ internal fun PcGameDetail(
     var editingThread by remember(entry) { mutableStateOf(false) }
     var pickingEngine by remember(entry) { mutableStateOf(false) }
     var engineChoice by remember(entry) { mutableStateOf(EngineChoice.NONE) }
+    var importingLutris by remember(entry) { mutableStateOf(false) }
+    var wineSettings by remember(entry) { mutableStateOf<WineGameSettings?>(null) }
+    var protonDb by remember(entry) { mutableStateOf<ProtonDbState>(ProtonDbState.NotAsked) }
 
     LaunchedEffect(entry, reloadToken) {
         loaded = false
@@ -139,6 +148,12 @@ internal fun PcGameDetail(
         runners = computed.first
         resolved = computed.second
         loaded = true
+    }
+
+    // The game's own Wine settings (docs/SPEC.md 7i), when an import set
+    // some: a preferences read, so on IO.
+    LaunchedEffect(entry, reloadToken) {
+        wineSettings = withContext(Dispatchers.IO) { WineGameSettingsPrefs.get(context, entry.id) }
     }
 
     // The engine pin (docs/SPEC.md 7e2b): which folder it is keyed by,
@@ -188,6 +203,9 @@ internal fun PcGameDetail(
     // for the folder it was worked out for, not this one.
     val names = worked.takeIf { it.forId == entry.id } ?: DetailNames.NONE
     val grouping = names.grouping
+    // The game's name as the header shows it, which is what a lookup by
+    // name (Lutris, ProtonDB) asks for.
+    val gameName = dev.droidtop.library.GameNaming.displayName(grouping?.game?.name ?: ownNameOf(entry))
     val group = grouping?.takeIf { it.hasChoices }
 
     // The game's update source (docs/SPEC.md 7g): a thread link is the
@@ -247,6 +265,19 @@ internal fun PcGameDetail(
                 reloadToken++
             },
             onDismiss = { pickingEngine = false },
+        )
+        return
+    }
+    if (importingLutris) {
+        LutrisImportScreen(
+            entry = entry,
+            name = gameName,
+            onDone = { message ->
+                importingLutris = false
+                status = message
+                reloadToken++
+            },
+            onDismiss = { importingLutris = false },
         )
         return
     }
@@ -356,6 +387,9 @@ internal fun PcGameDetail(
     // The replacement row is only worth drawing when there is somebody to offer.
     val replacements = names.replacements
     val runner = resolved
+    val hasWindowsRoute = runners.options.any {
+        it.strategy == GameLaunchStrategy.WINE_PREFIX && it.state != RunnerState.NOT_FOR_THIS_GAME
+    }
     val actions = rememberPcActions(
         group = group,
         currentId = entry.id,
@@ -442,8 +476,15 @@ internal fun PcGameDetail(
                 null
             }.getOrElse { "droidtop couldn't open that screen: ${it.message}" }
         },
-        hasWindowsRoute = runners.options.any {
-            it.strategy == GameLaunchStrategy.WINE_PREFIX && it.state != RunnerState.NOT_FOR_THIS_GAME
+        hasWindowsRoute = hasWindowsRoute,
+        wineSettings = wineSettings,
+        onImportLutris = { importingLutris = true },
+        onClearWineSettings = {
+            scope.launch {
+                withContext(Dispatchers.IO) { WineGameSettingsPrefs.set(context, entry.id, null) }
+                status = "This game runs the program droidtop detects again."
+                reloadToken++
+            }
         },
     )
 
@@ -595,19 +636,55 @@ internal fun PcGameDetail(
                 }
             }
 
-            entry.pcInfo?.compatibility?.let { compat ->
-                item {
-                    Column(modifier = Modifier.padding(top = 16.dp, bottom = 32.dp)) {
+            // Compatibility: evidence, never a verdict and never a gate
+            // (docs/SPEC.md 7i). gamenative's own reports when the entry
+            // carries them, and ProtonDB for a game with a Windows route,
+            // looked up only when asked.
+            val compat = entry.pcInfo?.compatibility
+            val offersProtonDb = !entry.missing && (hasWindowsRoute || entry.pcInfo?.storeId != null)
+            if (compat != null || offersProtonDb) {
+                item(key = "group:Compatibility") {
+                    Column(modifier = Modifier.padding(top = 16.dp)) {
                         Text("Compatibility", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.labelLarge)
-                        Text(compat.summary(), color = MenuTokens.Value, style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            "Other people's results on other hardware.",
-                            color = MenuTokens.OnSurfaceDisabled,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
+                        if (compat != null) {
+                            Text(compat.summary(), color = MenuTokens.Value, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                "Other people's results on other hardware.",
+                                color = MenuTokens.OnSurfaceDisabled,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
                     }
                 }
             }
+            if (offersProtonDb) {
+                item(key = "row:ProtonDB") {
+                    val state = protonDb
+                    DetailRow(
+                        title = if (state is ProtonDbState.Found) state.summary.line() else "ProtonDB",
+                        detail = state.detail(),
+                        enabled = state !is ProtonDbState.Looking,
+                        onSelect = {
+                            when (state) {
+                                is ProtonDbState.Found -> status = runCatching {
+                                    context.startActivity(
+                                        android.content.Intent(
+                                            android.content.Intent.ACTION_VIEW,
+                                            android.net.Uri.parse(ProtonDbClient.pageUrl(state.appId)),
+                                        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                                    )
+                                    null
+                                }.getOrElse { "There is no browser on this device to open ProtonDB in." }
+                                else -> {
+                                    protonDb = ProtonDbState.Looking
+                                    scope.launch { protonDb = lookUpProtonDb(entry, gameName) }
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+            item(key = "end") { androidx.compose.foundation.layout.Spacer(Modifier.height(32.dp)) }
         }
     }
 }
@@ -687,6 +764,9 @@ private fun rememberPcActions(
     onEnginehost: (android.content.Intent) -> Unit,
     onOpenAppScreen: (className: String, extras: Map<String, String>) -> Unit,
     hasWindowsRoute: Boolean,
+    wineSettings: WineGameSettings?,
+    onImportLutris: () -> Unit,
+    onClearWineSettings: () -> Unit,
 ): List<PcActionGroup> {
     val isEngineGame = entry.kind != LibraryEntryKind.WINE_PROFILE
     val runsOnEnginehost = runner?.option?.strategy == GameLaunchStrategy.ENGINEHOST
@@ -775,6 +855,9 @@ private fun rememberPcActions(
                     mapOf(EXTRA_PC_ENTRY_ID to entry.id, EXTRA_PC_TITLE to entry.title),
                 )
             },
+            wineSettings = wineSettings,
+            onImportLutris = onImportLutris,
+            onClearWineSettings = onClearWineSettings,
         ),
         PcActionGroup(
             "Metadata and media",
@@ -890,6 +973,9 @@ private fun runnerGroup(
     isEngineGame: Boolean,
     onEnginehost: (android.content.Intent) -> Unit,
     onOpenPrefix: () -> Unit,
+    wineSettings: WineGameSettings?,
+    onImportLutris: () -> Unit,
+    onClearWineSettings: () -> Unit,
 ): PcActionGroup? = when {
     runsOnEnginehost -> PcActionGroup(
         "Runs on Enginehost",
@@ -909,11 +995,29 @@ private fun runnerGroup(
     )
     hasWindowsRoute -> PcActionGroup(
         "Runs on Windows",
-        listOf(
+        listOfNotNull(
             PcActionRow(
                 "Prefix and graphics",
                 "The Windows prefix this game runs in: graphics driver, DXVK, Box64 and FEX, components, drives and the rest",
                 onOpenPrefix,
+            ),
+            // The game's own program, when an import chose one; selecting
+            // it goes back to the program droidtop detects (docs/SPEC.md 7i).
+            wineSettings?.executable?.let { exe ->
+                PcActionRow(
+                    "Program: $exe",
+                    listOfNotNull(
+                        wineSettings.arguments.takeIf { it.isNotEmpty() }?.joinToString(" ", prefix = "With "),
+                        wineSettings.source?.let { "from $it" },
+                        "select to go back to the program droidtop detects",
+                    ).joinToString(" - "),
+                    onClearWineSettings,
+                )
+            },
+            PcActionRow(
+                "Import a Lutris install script",
+                "Reads a Wine script from lutris.net into this game's settings and shows every change first; nothing in it is run",
+                onImportLutris,
             ),
             PcActionRow("Saves", "This game's saves live inside its prefix, under Prefix and graphics", null),
             PcActionRow("Controls", "This game's controls are its prefix's controller tab, under Prefix and graphics", null),
@@ -1009,9 +1113,7 @@ private fun PcDetailHeader(entry: LibraryEntry, grouping: dev.droidtop.library.L
     // Until the grouping is worked out (off the main thread), the name
     // this one folder derives is the game's name as the grouping will say
     // it, bar casing; a store row keeps the title its store gave.
-    val ownName = remember(entry) {
-        if (entry.id.startsWith("/")) dev.droidtop.library.GameNaming.derive(entry.id).name.ifEmpty { entry.title } else entry.title
-    }
+    val ownName = remember(entry) { ownNameOf(entry) }
     val title = dev.droidtop.library.GameNaming.displayName(grouping?.game?.name ?: ownName)
     val copyLine = grouping?.let { copyLabel(it, entry) }
     // Art narrower than this, cropped across a 220dp hero, is a blur of
@@ -1199,6 +1301,38 @@ internal fun DetailRow(
         }
     }
 }
+
+/** The ProtonDB row's states: nothing is fetched until the person asks. */
+private sealed interface ProtonDbState {
+    data object NotAsked : ProtonDbState
+    data object Looking : ProtonDbState
+    data class Found(val summary: ProtonDbSummary, val appId: Long) : ProtonDbState
+    data class Unavailable(val line: String) : ProtonDbState
+
+    fun detail(): String = when (this) {
+        NotAsked -> "Look up other people's reports for this game"
+        Looking -> "Looking it up…"
+        is Found -> "Reports from Linux PCs running Proton, not from this device. Select to open ProtonDB"
+        is Unavailable -> line
+    }
+}
+
+/** Network: the IO dispatcher. Every outcome is a sentence, never a silent blank. */
+private suspend fun lookUpProtonDb(entry: LibraryEntry, name: String): ProtonDbState = withContext(Dispatchers.IO) {
+    runCatching {
+        val appId = ProtonDbClient.steamAppIdFor(entry, name)
+            ?: return@runCatching ProtonDbState.Unavailable("No Steam app id is known for $name, and ProtonDB lists only Steam games")
+        when (val lookup = ProtonDbClient.summary(appId)) {
+            is ScrapeLookup.Found -> ProtonDbState.Found(lookup.value, appId)
+            ScrapeLookup.NoMatch -> ProtonDbState.Unavailable("ProtonDB has no reports for this game yet")
+            is ScrapeLookup.Refused -> ProtonDbState.Unavailable("ProtonDB refused the request (HTTP ${lookup.httpStatus})")
+        }
+    }.getOrElse { ProtonDbState.Unavailable("ProtonDB could not be reached: ${it.message ?: it}") }
+}
+
+/** The name one folder derives for its game, before any grouping is worked out. */
+private fun ownNameOf(entry: LibraryEntry): String =
+    if (entry.id.startsWith("/")) dev.droidtop.library.GameNaming.derive(entry.id).name.ifEmpty { entry.title } else entry.title
 
 /** The narrowest artwork the detail's hero draws; below it the plate goes without. */
 private const val HERO_MIN_ART_WIDTH_PX = 320f

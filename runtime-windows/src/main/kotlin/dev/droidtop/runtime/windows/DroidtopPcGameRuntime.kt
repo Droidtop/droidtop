@@ -3,15 +3,21 @@ package dev.droidtop.runtime.windows
 import android.content.Context
 import app.gamenative.data.GameSource
 import app.gamenative.service.SteamService
+import app.gamenative.utils.ContainerUtils
 import app.gamenative.utils.LaunchDependencies
 import com.winlator.container.Container
 import com.winlator.container.ContainerManager
+import com.winlator.core.KeyValueSet
+import com.winlator.core.envvars.EnvVars
 import com.winlator.xenvironment.ImageFs
 import com.winlator.xenvironment.ImageFsInstaller
 import dev.droidtop.library.PcGameRuntime
 import dev.droidtop.library.PcLaunchResult
+import dev.droidtop.library.PcPrefixState
 import dev.droidtop.library.PcProvisionResult
 import dev.droidtop.library.WineDriveMapping
+import dev.droidtop.library.lutris.DllOverrides
+import dev.droidtop.library.lutris.WinePrefixChanges
 import dev.droidtop.runtime.NativeLinuxGameSession
 import dev.droidtop.runtime.PrimaryContainerSession
 import java.io.File
@@ -318,7 +324,12 @@ class DroidtopPcGameRuntime(
         WineDriveMapping.assign(gamesRoots.map { it.absolutePath })
             .joinToString("") { (letter, path) -> "$letter:$path" }
 
-    override suspend fun launchWindows(executable: File, gameRoot: File): PcLaunchResult {
+    override suspend fun launchWindows(
+        executable: File,
+        gameRoot: File,
+        workingDir: File,
+        arguments: List<String>,
+    ): PcLaunchResult {
         // The same rule the configuration screen resolves with, so the
         // prefix somebody edited is the prefix this starts in.
         val container = PcContainers.forGame(context, entryId = null)
@@ -331,8 +342,61 @@ class DroidtopPcGameRuntime(
                 "the Windows environment isn't set up yet -- run \"Set up Windows games\" in Settings",
             )
 
-        return launchInPrefix(wineEngine, container, executable.absolutePath, gameRoot)
+        return launchInPrefix(wineEngine, container, executable.absolutePath, workingDir, arguments)
     }
+
+    override fun prefixState(entryId: String?): PcPrefixState? {
+        val container = PcContainers.forGame(context, entryId) ?: return null
+        val env = EnvVars(container.envVars)
+        return PcPrefixState(
+            name = container.name,
+            shared = !PcContainers.isOwnPrefix(entryId, container),
+            dxvk = !container.dxWrapper.orEmpty().startsWith(WINED3D, ignoreCase = true),
+            // The launch puts WINEESYNC=1 when the prefix says nothing.
+            esync = env.get("WINEESYNC") != "0",
+            components = KeyValueSet(container.winComponents).mapNotNull { (id, on) -> id.takeIf { on == "1" } }.toSet(),
+            env = env.associateWith { env.get(it) },
+            dllOverrides = DllOverrides.parse(env.get("WINEDLLOVERRIDES")),
+        )
+    }
+
+    /**
+     * gamenative's own read-modify-write of a container
+     * ([ContainerUtils.toContainerData] then [ContainerUtils.applyToContainer]),
+     * the path its configuration dialog saves through, so an import and a
+     * hand edit land in the prefix identically.
+     */
+    override suspend fun applyPrefixChanges(entryId: String?, changes: WinePrefixChanges): PcProvisionResult =
+        withContext(Dispatchers.IO) {
+            val container = PcContainers.forGame(context, entryId)
+                ?: return@withContext PcProvisionResult(false, "There is no Windows prefix yet. Set up Windows games first.")
+            runCatching {
+                val data = ContainerUtils.toContainerData(container)
+                val env = EnvVars(data.envVars)
+                changes.esync?.let { env.put("WINEESYNC", if (it) "1" else "0") }
+                changes.env.forEach { (name, value) -> env.put(name, value) }
+                if (changes.dllOverrides.isNotEmpty()) {
+                    env.put(
+                        "WINEDLLOVERRIDES",
+                        DllOverrides.format(DllOverrides.parse(env.get("WINEDLLOVERRIDES")) + changes.dllOverrides),
+                    )
+                }
+                val components = KeyValueSet(data.wincomponents)
+                changes.components.forEach { components.put(it, "1") }
+                val dxwrapper = when (changes.dxvk) {
+                    false -> WINED3D
+                    // "On" leaves a DXVK-based wrapper (DXVK, VKD3D) as it is.
+                    true -> if (data.dxwrapper.startsWith(WINED3D, ignoreCase = true)) "dxvk" else data.dxwrapper
+                    null -> data.dxwrapper
+                }
+                ContainerUtils.applyToContainer(
+                    context,
+                    container,
+                    data.copy(dxwrapper = dxwrapper, envVars = env.toString(), wincomponents = components.toString()),
+                )
+                PcProvisionResult(true, "Saved to ${container.name}")
+            }.getOrElse { PcProvisionResult(false, "The prefix could not be saved: ${it.message ?: it}") }
+        }
 
     override suspend fun launchLinux(executable: File, gameRoot: File): PcLaunchResult {
         val session = primarySession()
@@ -354,6 +418,9 @@ class DroidtopPcGameRuntime(
         // parses a trailing numeric run out of the id, and returns 0 for
         // anything that does not parse.
         const val CONTAINER_ID = "1"
+
+        /** gamenative's id for Wine's own Direct3D, the one wrapper that is not DXVK-based. */
+        private const val WINED3D = "wined3d"
         const val CONTAINER_NAME = "droidtop"
 
         /**
@@ -408,6 +475,10 @@ object PcContainers {
         val containers = runCatching { manager.containers }.getOrNull().orEmpty()
         return containers.firstOrNull { it.id == DroidtopPcGameRuntime.CONTAINER_ID } ?: containers.firstOrNull()
     }
+
+    /** Whether [container] is [entryId]'s own prefix rather than the one every other game shares. */
+    fun isOwnPrefix(entryId: String?, container: Container): Boolean =
+        entryId?.let { gamenativeAppId(it) } == container.id
 
     /**
      * The id gamenative would have given this game's own container:

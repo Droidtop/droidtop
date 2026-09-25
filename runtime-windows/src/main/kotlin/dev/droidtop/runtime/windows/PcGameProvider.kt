@@ -8,6 +8,7 @@ import dev.droidtop.library.EnginesDatabase
 import dev.droidtop.library.GameEngineDetector
 import dev.droidtop.library.GameLaunchStrategy
 import dev.droidtop.library.GameExecutableResolver
+import dev.droidtop.library.WindowsLaunchResolver
 import dev.droidtop.library.PcGameRuntimeRegistry
 import dev.droidtop.library.PcRunnerOptions
 import dev.droidtop.library.PcInfo
@@ -355,12 +356,12 @@ class PcGameProvider(
                 runtime.launchLinux(linux, gameRoot)
             }
             GameLaunchStrategy.WINE_PREFIX -> {
-                val windows = GameExecutableResolver.windowsExecutable(gameRoot)
+                val windows = WindowsLaunchResolver.resolve(context, entry.id, gameRoot)
                     ?: error(
                         "Can't launch ${entry.title}: couldn't identify which executable to run in " +
                             "${gameRoot.absolutePath}. Pick one explicitly for this game.",
                     )
-                runtime.launchWindows(windows, gameRoot)
+                runtime.launchWindows(windows.executable, gameRoot, windows.workingDir, windows.arguments)
             }
             // An engine this provider does not own (see
             // notOwnedByAnEngine) cannot resolve here; saying so beats

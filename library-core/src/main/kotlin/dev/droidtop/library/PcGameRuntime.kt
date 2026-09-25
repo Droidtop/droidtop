@@ -88,12 +88,54 @@ interface PcGameRuntime {
      */
     suspend fun provision(gamesRoots: List<File>, onStatus: (String) -> Unit): PcProvisionResult
 
-    /** Runs a Windows executable under Wine/Box64, with [gameRoot] as its working directory. */
-    suspend fun launchWindows(executable: File, gameRoot: File): PcLaunchResult
+    /**
+     * Runs a Windows executable under Wine/Box64 from [workingDir] (the
+     * game's folder unless the game's own settings name another inside
+     * it), with [arguments] handed to it one by one, never through a
+     * shell. Which program, folder and arguments is
+     * [WindowsLaunchResolver]'s answer.
+     */
+    suspend fun launchWindows(
+        executable: File,
+        gameRoot: File,
+        workingDir: File = gameRoot,
+        arguments: List<String> = emptyList(),
+    ): PcLaunchResult
 
     /** Runs a native Linux executable directly inside the container. */
     suspend fun launchLinux(executable: File, gameRoot: File): PcLaunchResult
+
+    /**
+     * What the Wine prefix [entryId] runs in is set to -- the same
+     * prefix its "Prefix and graphics" row opens -- or null when no prefix
+     * exists yet. Disk work.
+     */
+    fun prefixState(entryId: String?): PcPrefixState?
+
+    /**
+     * Writes [changes] into that prefix, through the same save path the
+     * prefix's own configuration screen uses. Only an import's preview
+     * calls this, with the changes it showed (docs/SPEC.md 7e3).
+     */
+    suspend fun applyPrefixChanges(entryId: String?, changes: dev.droidtop.library.lutris.WinePrefixChanges): PcProvisionResult
 }
+
+/**
+ * The settings of one Wine prefix an import can touch, read back for its
+ * preview (docs/SPEC.md 7e3). [shared] is true when other Windows games
+ * run in this prefix too -- droidtop's one provisioned prefix (§5b) --
+ * which the preview says before anything prefix-wide is written.
+ */
+data class PcPrefixState(
+    val name: String,
+    val shared: Boolean,
+    val dxvk: Boolean,
+    val esync: Boolean,
+    /** gamenative component ids switched on (`direct3d`, `directsound`, ...). */
+    val components: Set<String>,
+    val env: Map<String, String>,
+    val dllOverrides: Map<String, String>,
+)
 
 /**
  * Which Wine drive letter each games root gets.
