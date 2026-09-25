@@ -19,7 +19,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.core.graphics.drawable.toBitmap
 import dev.droidtop.shell.gamepad.Measure
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.Space
@@ -69,7 +68,7 @@ internal fun SelectableRow(
         leading?.invoke()
         icon?.let { drawable ->
             val bitmap = remember(drawable) {
-                runCatching { drawable.toBitmap(width = 96, height = 96).asImageBitmap() }.getOrNull()
+                runCatching { dev.droidtop.library.DrawableBitmaps.render(drawable, 96, 96).asImageBitmap() }.getOrNull()
             }
             bitmap?.let { Image(bitmap = it, contentDescription = null, modifier = Modifier.size(Measure.rowIcon)) }
         }
