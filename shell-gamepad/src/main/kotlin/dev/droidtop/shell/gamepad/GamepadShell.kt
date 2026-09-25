@@ -1469,7 +1469,19 @@ private sealed interface GameGroup {
     object Pc : GameGroup {
         override val key get() = "system:$PC_SYSTEM_ID"
         override val label get() = PlatformsDatabase.displayNameOrNull(PC_SYSTEM_ID) ?: "PC"
-        override val systemThemeFolder get() = PC_SYSTEM_ID
+
+        /**
+         * NOT `pc`: ES-DE's `pc` system is IBM PC and DOS, and every theme
+         * draws it that way, so the PC card wore an IBM logo (rig, build
+         * 814). The theme's `windows` art where it ships some, else a
+         * folder no theme ships, which leaves the theme's own defaults and
+         * the group's plain name (docs/SPEC.md 7i). Snapshot state, worked
+         * out per theme off the main thread by [rememberPcThemeFolder].
+         * The `pc` id itself stays this group's: the system id, the
+         * downloaded_media folder and the scrape all still use it.
+         */
+        override val systemThemeFolder get() = themeFolder
+        var themeFolder by mutableStateOf(ThemeAssets.NEUTRAL_PC_THEME_FOLDER)
     }
 
     data class System(val systemId: String) : GameGroup {
@@ -1711,6 +1723,13 @@ private fun GamesSection(
     var sortVersion by remember { mutableIntStateOf(0) }
     val firstFocus = remember { FocusRequester() }
     val context = LocalContext.current
+    // Which theme folder the PC card wears under this theme (see
+    // GameGroup.Pc.systemThemeFolder): known at once when this theme has
+    // been checked before, otherwise worked out off the main thread.
+    LaunchedEffect(ThemePrefs.version) {
+        GameGroup.Pc.themeFolder = ThemeAssets.cachedPcGroupThemeFolder(context)
+            ?: withContext(Dispatchers.Default) { ThemeAssets.pcGroupThemeFolder(context, GameGroup.Pc.label) }
+    }
 
     // Real custom collections + membership, loaded once and refreshed
     // whenever collectionsVersion bumps (mirrors ThemePrefs.version's own
@@ -2283,7 +2302,7 @@ private fun GamesSection(
                         // loop warms the parse cache rememberActiveTheme
                         // reads, so moving to another system or opening its
                         // gamelist does not parse.
-                        val groupThemeKeys = remember(orderedGroups) {
+                        val groupThemeKeys = remember(orderedGroups, GameGroup.Pc.themeFolder) {
                             orderedGroups.map { it.key to it.themeKey() }
                         }
                         var logos by remember { mutableStateOf<Map<String, String?>>(emptyMap()) }
