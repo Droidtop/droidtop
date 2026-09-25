@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import dev.droidtop.shell.gamepad.TouchHintBar
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.ownPadButtons
-import dev.droidtop.shell.gamepad.input.padClick
 import dev.droidtop.shell.gamepad.theme.ThemeBrowserScreen
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.rememberScrollState
@@ -568,6 +567,17 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
         storagePermanentlyDenied = !granted && !shouldShowStorageRationale(context)
     }
 
+    // Whether Android's Home opens droidtop, read again whenever onboarding
+    // comes back to the front (Android's own screens decide it).
+    var droidtopIsHome by remember { mutableStateOf(HomeRolePrefs.isDroidtopHome(context)) }
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        droidtopIsHome = HomeRolePrefs.isDroidtopHome(context)
+        onPauseOrDispose { }
+    }
+    val requestHome = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        droidtopIsHome = HomeRolePrefs.isDroidtopHome(context)
+    }
+
     val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -631,6 +641,10 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
             }
         }
         GamesRootPrefs.markOnboardingComplete(context)
+        // The modes are on from here (Modes.reload reads the finished
+        // setup), so ModeStartup starts what they own now, not at the
+        // next process start.
+        dev.droidtop.library.settings.Modes.reload(context)
         onDone()
     }
 
@@ -699,6 +713,11 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
 
         OnboardingStep.STANDARD_SETUP -> StandardSetupStep(
             progress, back,
+            isHome = droidtopIsHome,
+            onMakeHome = {
+                HomeRolePrefs.setActiveHomeImplementation(context, HomeRolePrefs.HomeImplementation.STANDARD)
+                requestHome.launch(HomeRolePrefs.homeRequestIntent(context))
+            },
             onContinue = {
                 HomeRolePrefs.setActiveHomeImplementation(context, HomeRolePrefs.HomeImplementation.STANDARD)
                 advanceFrom(OnboardingStep.STANDARD_SETUP)
@@ -710,6 +729,11 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
             onPicked = { component ->
                 HomeRolePrefs.setAlternativeTarget(context, component)
                 HomeRolePrefs.setActiveHomeImplementation(context, HomeRolePrefs.HomeImplementation.ALTERNATIVE)
+                // droidtop forwards Home only while it IS Home: ask Android,
+                // which shows its own confirmation over the next step.
+                if (!HomeRolePrefs.isDroidtopHome(context)) {
+                    requestHome.launch(HomeRolePrefs.homeRequestIntent(context))
+                }
                 advanceFrom(OnboardingStep.ALTERNATIVE_SETUP)
             },
         )
@@ -849,6 +873,8 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
             storageGranted = storageAccessGranted,
             controllerAnswered = ControllerPrefs.asked(context),
             keyboardSkipped = configureDesktop && !dev.droidtop.library.settings.Keyboards.ownKeyboardActive(context),
+            homeHeld = droidtopIsHome,
+            noFolders = roots.isEmpty(),
             onFinish = {
                 val mode = chosenMode ?: dev.droidtop.library.settings.Mode.GAMING
                 val home = homeChoice ?: HomeRolePrefs.activeHomeImplementation(context)
@@ -1219,7 +1245,13 @@ private fun HomeChoiceStep(
 }
 
 @Composable
-private fun StandardSetupStep(progress: StepProgress?, onBack: (() -> Unit)?, onContinue: () -> Unit) {
+private fun StandardSetupStep(
+    progress: StepProgress?,
+    onBack: (() -> Unit)?,
+    isHome: Boolean,
+    onMakeHome: () -> Unit,
+    onContinue: () -> Unit,
+) {
     val context = LocalContext.current
     OnboardingScaffold(
         title = "droidtop's launcher",
@@ -1228,19 +1260,32 @@ private fun StandardSetupStep(progress: StepProgress?, onBack: (() -> Unit)?, on
             "can set it up now or leave it at its defaults and come back later.",
         progress = progress,
         onBack = onBack,
-        // Next is the step's own advance and carries full weight; opening
-        // the launcher's settings is the smaller action beside it, which
-        // is the opposite of how this step used to be weighted.
-        primary = StepAction("Next", onClick = onContinue),
-        secondary = StepAction("Open launcher settings") {
+        // A hand-off step (SPEC 7b): Android, not droidtop, decides which
+        // app Home opens, so making droidtop the Home app is the step's own
+        // work and the forward action waits beside it as the skip until
+        // Android says it took. Enabling droidtop's HOME activity alone
+        // left Pixel Launcher as Home on Android 14 (rig, dq-onboard-01).
+        primary = if (isHome) StepAction("Next", onClick = onContinue) else StepAction("Make droidtop the Home app", onClick = onMakeHome),
+        secondary = if (isHome) null else StepAction("Skip this step", onClick = onContinue),
+    ) {
+        if (isHome) {
+            StepNote("droidtop is the Home app: the Home button opens it.", accent = true)
+        } else {
+            StepNote(
+                "Android asks you to confirm which app the Home button opens; droidtop cannot " +
+                    "choose itself. Skip this and droidtop is not your home screen until you choose it " +
+                    "in Settings, Global settings.",
+            )
+        }
+        PadButton("Open launcher settings", {
             val intent = Intent(Intent.ACTION_MAIN).apply {
                 component = ComponentName(context.packageName, "com.android.launcher3.settings.SettingsActivity")
                 putExtra(":settings:fragment", "app.murinelauncher.settings.SettingsHomeFragment")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
-        },
-    )
+        })
+    }
 }
 
 @Composable
@@ -2029,12 +2074,14 @@ private fun WhatNextStep(
     storageGranted: Boolean,
     controllerAnswered: Boolean,
     keyboardSkipped: Boolean,
+    homeHeld: Boolean,
+    noFolders: Boolean,
     onFinish: () -> Unit,
 ) {
     val done = buildList {
         when (homeImplementation) {
-            HomeRolePrefs.HomeImplementation.STANDARD -> add("Home screen: droidtop's own launcher.")
-            HomeRolePrefs.HomeImplementation.ALTERNATIVE -> add("Home screen: the launcher you picked.")
+            HomeRolePrefs.HomeImplementation.STANDARD -> if (homeHeld) add("Home screen: droidtop's own launcher.")
+            HomeRolePrefs.HomeImplementation.ALTERNATIVE -> if (homeHeld) add("Home screen: the launcher you picked.")
             HomeRolePrefs.HomeImplementation.NONE -> Unit
         }
         if (gamingConfigured) {
@@ -2051,6 +2098,7 @@ private fun WhatNextStep(
                     gamesStillCounting -> "Gaming: set up, still counting your folders."
                     gamesFound > 0 ->
                         "Gaming: $gamesFound " + (if (gamesFound == 1) "game" else "games") + " found in your folders."
+                    noFolders -> "Gaming: set up, with no game folders added yet."
                     else -> "Gaming: set up, with no games found in your folders."
                 },
             )
@@ -2061,6 +2109,8 @@ private fun WhatNextStep(
     val skipped = buildList {
         if (homeImplementation == HomeRolePrefs.HomeImplementation.NONE) {
             add("Home screen — Settings, Global settings.")
+        } else if (!homeHeld) {
+            add("Home screen — Android's Home button still opens another app; Settings, Global settings.")
         }
         // Where each one lives, and whether it is on: an unticked mode is
         // switched off at the end of this step (appModesOnAfterOnboarding).

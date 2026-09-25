@@ -13,7 +13,6 @@ import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.Mode
 import dev.droidtop.library.settings.Modes
-import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.shell.standard.HomeRolePrefs
 import org.json.JSONArray
@@ -47,17 +46,26 @@ object DroidtopWideSettings {
                         // STANDARD <-> NONE only: a person on ALTERNATIVE
                         // (another launcher droidtop forwards to) chose that
                         // in onboarding, and leaves it there too.
+                        // On means droidtop's launcher IS what Home opens, as
+                        // Android says, not only that it is enabled: on the
+                        // Android 14 rig this row read "On" while Pixel
+                        // Launcher was Home (dq-onboard-01). Turning it on
+                        // hands over to Android's own Default home app
+                        // screen, the only place that choice is made.
                         ToggleItem(
                             id = "pref_global_home_role",
                             title = "Use droidtop as home screen",
-                            subtitle = "Make the Standard shell your device's Android home screen",
+                            subtitle = homeRoleSubtitle(context),
                             current = HomeRolePrefs.activeHomeImplementation(context) ==
-                                HomeRolePrefs.HomeImplementation.STANDARD,
+                                HomeRolePrefs.HomeImplementation.STANDARD && HomeRolePrefs.isDroidtopHome(context),
                             onToggle = { ctx, on ->
                                 HomeRolePrefs.setActiveHomeImplementation(
                                     ctx,
                                     if (on) HomeRolePrefs.HomeImplementation.STANDARD else HomeRolePrefs.HomeImplementation.NONE,
                                 )
+                                if (on && !HomeRolePrefs.isDroidtopHome(ctx)) {
+                                    ctx.startActivity(HomeRolePrefs.homeSettingsIntent())
+                                }
                             },
                         ),
                     ),
@@ -126,11 +134,14 @@ object DroidtopWideSettings {
                     id = dev.droidtop.library.settings.GamingSettingsCatalog.GROUP_GLOBAL,
                     title = null,
                     items = listOf(
-                        NestedScreenItem(
+                        // The Global settings page itself, titled as such: shown
+                        // in place under this page it kept the title "Desktop
+                        // mode" (rig, dq-onboard-01).
+                        ActionItem(
                             id = "pref_desktop_global_settings",
                             title = "Global settings",
                             subtitle = "Modes, your home screen, setup and the tutorial",
-                            registryId = SCREEN_GLOBAL,
+                            run = { ctx -> dev.droidtop.shell.standard.BackButtonMenu.openGlobalSettings(ctx) },
                         ),
                     ),
                 ),
@@ -202,10 +213,21 @@ object DroidtopWideSettings {
         )
     }
 
+    private fun homeRoleSubtitle(context: Context): String = when {
+        HomeRolePrefs.isDroidtopHome(context) -> "droidtop's own launcher is what the Home button opens"
+        HomeRolePrefs.activeHomeImplementation(context) == HomeRolePrefs.HomeImplementation.STANDARD ->
+            "Another app is the Home app. Turn this on to choose droidtop in Android's Default home app screen"
+        else -> "Turn this on to choose droidtop's own launcher in Android's Default home app screen"
+    }
+
     private fun modeToggle(context: Context, mode: Mode) = ToggleItem(
         id = if (mode == Mode.DESKTOP) "pref_global_enable_desktop" else "pref_global_enable_gaming",
         title = "Enable ${mode.label} mode",
-        subtitle = "Off: ${mode.label} runs nothing and leaves the mode switcher. Turn it back on here.",
+        subtitle = if (Modes.isEnabledInStorage(context, mode)) {
+            "Turn off to stop ${mode.label} and leave it out of the mode switcher"
+        } else {
+            "${mode.label} is off: it runs nothing and is not in the mode switcher"
+        },
         current = Modes.isEnabledInStorage(context, mode),
         onToggle = { ctx, on -> Modes.setEnabled(ctx, mode, on) },
     )

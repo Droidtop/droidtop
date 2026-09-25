@@ -132,6 +132,16 @@ object BackButtonMenu {
             HomeRolePrefs.HomeImplementation.NONE -> return
         }
         Modes.setLastMode(context, Mode.LAUNCHER)
+        if (!HomeRolePrefs.isDroidtopHome(context)) {
+            // droidtop's home activity is enabled but Android's Home opens
+            // another app: "Android" is that app's home screen, which is
+            // what the Home button shows. Starting droidtop's own launcher
+            // there did nothing visible (rig, Android 14, dq-onboard-01).
+            context.startActivity(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+            return
+        }
         val intent = Intent(Intent.ACTION_MAIN).apply {
             component = ComponentName(context.packageName, activityName)
             putExtra(EXTRA_MODE, Mode.LAUNCHER.id)

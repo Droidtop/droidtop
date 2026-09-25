@@ -157,7 +157,12 @@ class CatalogPreferenceNavigator(
             entries = item.options.map { it.label }.toTypedArray()
             entryValues = item.options.map { it.value }.toTypedArray()
             value = item.current
-            summary = item.subtitle ?: item.currentLabel()
+            // What it is set to, then what it is: the row used to show only
+            // its description, so "Default mode" never said which mode
+            // (rig, dq-onboard-01).
+            summary = listOfNotNull(item.currentLabel()?.takeIf { it.isNotBlank() }, item.subtitle)
+                .joinToString("  ·  ")
+                .ifBlank { null }
             setOnPreferenceChangeListener { _, newValue ->
                 item.onSelect(context, newValue as String)
                 rebuild()

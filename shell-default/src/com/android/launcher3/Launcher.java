@@ -1265,6 +1265,9 @@ public class Launcher extends StatefulActivity<LauncherState>
     protected void onDeferredResumed() {
         logStopAndResume(true /* isResume */);
 
+        // droidtop patch: droidtop's own icon, asked for at the end of
+        // setup, is queued here, where the queue can place it.
+        dev.droidtop.shell.standard.HomeRolePrefs.placePendingIcon(this);
         // Process any items that were added while Launcher was away.
         ItemInstallQueue.INSTANCE.get(this)
                 .resumeModelPush(FLAG_ACTIVITY_PAUSED);
