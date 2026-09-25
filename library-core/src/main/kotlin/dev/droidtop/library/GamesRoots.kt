@@ -176,16 +176,39 @@ object GamesRoots {
      * It acts only on a change: a root set that differs from the last one
      * a walk FINISHED, which includes, at process start, a walk the last
      * process did not live to finish. Otherwise it does nothing, and
-     * [library] is not even built, so installing this costs a process that
-     * has nothing to walk nothing else.
+     * [library] is not even built.
+     *
+     * The listener is held HERE, strongly, for the life of the process.
+     * SharedPreferences keeps its listeners in a weak map, and this used to
+     * be [changes] collected in a scope nothing referenced: the collector,
+     * its channel and the listener were garbage together, the listener
+     * silently dropped out of the map, and a folder added in setup was not
+     * walked until the next process start, twice on the rig (dq-onboard-01,
+     * dq-onboard-02). A surface's own [scanFollowingGamesRoots] never had
+     * this problem because its composition holds the collector.
      */
     fun follow(context: Context, scope: CoroutineScope, library: () -> Library) {
-        scope.launch {
-            changes(context).collect {
-                if (rootsChangedSinceLastScan(context)) walkIfChanged(context, library(), LibraryKinds.GAMES)
+        val app = context.applicationContext
+        val prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        fun walkIfNeeded() {
+            if (rootsChangedSinceLastScan(app)) {
+                scope.launch { walkIfChanged(app, library(), LibraryKinds.GAMES) }
             }
         }
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == null || key == KEY_GAMES_ROOT_PATHS) {
+                ScanLog.write("games folders changed: ${current(app).joinToString { it.absolutePath }}")
+                walkIfNeeded()
+            }
+        }
+        followListener = listener
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        walkIfNeeded()
     }
+
+    /** The process's one [follow] listener; see there for why it is held. */
+    @Volatile
+    private var followListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
 
     private fun signature(context: Context): String =
         current(context).map { it.absolutePath }.sorted().joinToString(File.pathSeparator)
