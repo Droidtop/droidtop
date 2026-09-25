@@ -28,11 +28,8 @@ import java.util.TimeZone
  */
 object SteamStoreClient {
 
-    private const val SOURCE = "Steam store"
-
-    /** `steam:<appid>` from an entry id or a [dev.droidtop.library.PcInfo.storeId], or null for anything else. */
-    fun appIdOf(storeId: String?): Int? =
-        storeId?.takeIf { it.startsWith("steam:") }?.removePrefix("steam:")?.toIntOrNull()
+    /** The name the scrape records and reports this source by. */
+    const val SOURCE = "Steam store"
 
     fun appDetails(appId: Int): ScrapeLookup<PcMatch> {
         val url = URL("https://store.steampowered.com/api/appdetails?appids=$appId&l=english")
@@ -78,6 +75,7 @@ object SteamStoreClient {
                 publisher = names("publishers"),
                 genre = names("genres", "description"),
                 releaseDate = releaseDate,
+                ids = PcGameIds(steamAppId = appId),
             ),
         )
     }

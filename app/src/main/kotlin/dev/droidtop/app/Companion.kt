@@ -163,13 +163,19 @@ internal fun CompanionContent(entry: LibraryEntry?) {
                     ?.let { id -> PlatformsDatabase.displayNameOrNull(id) }
                     ?: entry.kind.displayName()
                 Text(systemName, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
+                // The publisher is named only when it is not the developer,
+                // which for most PC and engine games it is.
                 val detailLine = listOfNotNull(
                     entry.developer,
+                    entry.publisher?.takeIf { it != entry.developer },
                     entry.releaseDate?.take(4),
                     entry.genre,
                 ).joinToString("  ·  ")
                 if (detailLine.isNotEmpty()) {
                     Text(detailLine, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
+                }
+                entry.series?.let { series ->
+                    Text("Series: $series", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
                 }
                 entry.rating?.let { rating ->
                     Text(

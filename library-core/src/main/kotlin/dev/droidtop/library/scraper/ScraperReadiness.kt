@@ -56,7 +56,14 @@ object ScraperReadiness {
                 "then enter its Client ID and Client Secret under $SCRAPER_SETTINGS > IGDB. " +
                 "Lutris needs no account at all if you would rather not."
         }
+        PcScraperSource.STEAMGRIDDB -> if (SteamGridDbPrefs.isConfigured(context)) null else STEAMGRIDDB_KEY_MISSING
     }
+
+    /** SteamGridDB selected with no key: the pass and the picker both say this. */
+    const val STEAMGRIDDB_KEY_MISSING =
+        "SteamGridDB needs your own free API key, and none is set. Sign in at steamgriddb.com and create one " +
+            "under Preferences > API (steamgriddb.com/profile/preferences/api), then enter it under " +
+            "$SCRAPER_SETTINGS > SteamGridDB > API key. Lutris needs no account at all if you would rather not."
 
     /**
      * What to change when [refusal] is a source rejecting the credentials it
@@ -70,6 +77,8 @@ object ScraperReadiness {
                 "Check the API key under $SCRAPER_SETTINGS > TheGamesDB > API key."
             refusal.source.startsWith("IGDB") ->
                 "Check the Client ID and Client Secret under $SCRAPER_SETTINGS > IGDB."
+            refusal.source == SteamGridDbScraperClient.SOURCE ->
+                "Check the API key under $SCRAPER_SETTINGS > SteamGridDB > API key."
             refusal.source == "ScreenScraper" ->
                 "Check the ScreenScraper account under $SCRAPER_SETTINGS, or choose the libretro database there."
             else -> null

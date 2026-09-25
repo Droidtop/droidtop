@@ -205,18 +205,13 @@ internal fun PcGameDetail(
     val available = GameUpdates.available(links?.latestKnown ?: entry.latestKnown, versions)
 
     // Media is a folder listing (EsDeArtwork), which is disk work: IO
-    // dispatcher, and "no media" until it answers.
+    // dispatcher, and "no media" until it answers. Read where the scrape
+    // writes it (the engine's own system folder for an engine game, the
+    // name the scrape files under), and under the game folder's own name.
     val media by produceState(emptyList<Pair<String, String>>(), entry) {
         value = emptyList()
         value = withContext(Dispatchers.IO) {
-            val folder = PcRunnerOptions.gameFolderFor(entry)
-            val roots = dev.droidtop.library.GamesRoots.current(context)
-            val root = folder?.let { f -> roots.firstOrNull { f.absolutePath.startsWith(it.absolutePath) } }
-            if (root != null && folder != null) {
-                dev.droidtop.library.EsDeArtwork.allMedia(root, "pc", folder.name)
-            } else {
-                emptyList()
-            }
+            PcScraper.scrapedMedia(context, entry, alsoUnder = PcRunnerOptions.gameFolderFor(entry)?.name)
         }
     }
 
@@ -566,6 +561,25 @@ internal fun PcGameDetail(
             }
 
             status?.let { message -> item { Text(message, color = MenuTokens.Value, style = MaterialTheme.typography.bodySmall) } }
+
+            // What the game IS, as scraped: shown to players, so it sits
+            // under Play rather than at the bottom of the management rows
+            // (docs/SPEC.md 7h). ES-DE's own hide-metadata flag hides it.
+            if (!entry.hideMetadata) {
+                pcAboutItems(
+                    entry = entry,
+                    onHint = onPrimaryFocus,
+                    onOpenLink = { link ->
+                        status = runCatching {
+                            context.startActivity(
+                                android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(link.url))
+                                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                            null
+                        }.getOrElse { "Nothing on this device opens ${link.url}" }
+                    },
+                )
+            }
 
             actions.forEach { group ->
                 item(key = "group:" + group.title) {
@@ -1003,12 +1017,25 @@ private fun PcDetailHeader(entry: LibraryEntry, grouping: dev.droidtop.library.L
     // Art narrower than this, cropped across a 220dp hero, is a blur of
     // a small icon rather than artwork (UI pass 2026-09-24, M7); the plate
     // is drawn without it, as for a game with no art at all.
-    var artTooSmall by remember(entry.artworkUri) { mutableStateOf(false) }
+    // Wide hero art (ES-DE's fanart: a SteamGridDB hero, or what ES-DE
+    // scraped) is what this wide plate is shaped for; the cover is the
+    // fallback. A logo, when there is one, names the game in its own
+    // lettering in place of the title text. Both are layout lookups, so
+    // they are read off the main thread.
+    val scraped by produceState(entry.heroUri to entry.logoUri, entry) {
+        value = withContext(Dispatchers.IO) {
+            entry.mediaForImageTypes(listOf("fanart")) to entry.mediaForImageTypes(listOf("marquee"))
+        }
+    }
+    val headerArt = scraped.first ?: entry.artworkUri
+    val logo = scraped.second
+    var logoFailed by remember(logo) { mutableStateOf(false) }
+    var artTooSmall by remember(headerArt) { mutableStateOf(false) }
     Box(modifier = Modifier.fillMaxWidth().height(220.dp).padding(top = 24.dp)) {
         Box(modifier = Modifier.fillMaxSize().background(MenuTokens.Card, RoundedCornerShape(16.dp)))
-        if (entry.artworkUri != null && !artTooSmall) {
+        if (headerArt != null && !artTooSmall) {
             AsyncImage(
-                model = entry.artworkUri,
+                model = headerArt,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 onSuccess = { state ->
@@ -1026,13 +1053,24 @@ private fun PcDetailHeader(entry: LibraryEntry, grouping: dev.droidtop.library.L
                 .padding(16.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    title,
-                    color = MenuTokens.OnSurface,
-                    style = MaterialTheme.typography.headlineSmall,
-                    maxLines = 2,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                )
+                if (logo != null && !logoFailed) {
+                    AsyncImage(
+                        model = logo,
+                        contentDescription = title,
+                        contentScale = ContentScale.Fit,
+                        alignment = Alignment.BottomStart,
+                        onError = { logoFailed = true },
+                        modifier = Modifier.height(64.dp).fillMaxWidth(0.6f),
+                    )
+                } else {
+                    Text(
+                        title,
+                        color = MenuTokens.OnSurface,
+                        style = MaterialTheme.typography.headlineSmall,
+                        maxLines = 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                }
                 if (copyLine != null) {
                     Text(
                         copyLine,
@@ -1123,7 +1161,7 @@ private fun PrimaryActionButton(
 }
 
 @Composable
-private fun DetailRow(
+internal fun DetailRow(
     title: String,
     detail: String,
     enabled: Boolean,

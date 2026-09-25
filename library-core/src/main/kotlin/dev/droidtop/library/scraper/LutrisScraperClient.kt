@@ -6,18 +6,38 @@ import java.net.URL
 import java.net.URLEncoder
 
 /**
- * Real per-game data Lutris's own public API actually returns for a
- * search result -- confirmed via a real, live call to
- * `https://lutris.net/api/games?search=...`, not assumed from docs:
- * `id, name, slug, year, banner_url, icon_url, coverart, platforms,
- * provider_games, aliases, shaders, discord_id, change_for`. No
- * description/genre/developer/publisher/rating field exists at all --
- * `year` is the only real release-date signal Lutris provides (year
- * precision only, not a full date), which is exactly why the PC scrape
- * treats Lutris as a cover-art-and-year source and IGDB as the one that
- * can fill a description.
+ * One result of Lutris's public search, `GET https://lutris.net/api/games?search=`.
+ * Checked against live answers (2026-09-24 and 2026-09-25): each result
+ * carries `id, name, slug, year, banner_url, icon_url, coverart, platforms,
+ * provider_games, aliases, shaders, discord_id, change_for` and nothing
+ * else. The search itself has no description, genre, developer, publisher
+ * or rating field, and `year` is a year with no month or day.
+ *
+ * [steamAppId] and [gogId] come from `provider_games`, Lutris's own list
+ * of the same game in other services (`{"name", "slug", "service"}`, where
+ * the slug of a `steam` row is the Steam app id and of a `gog` row the GOG
+ * product id: "Hollow Knight" lists steam 367520 and gog 1308320804). They
+ * are what lets a name match become an identity: once Lutris names the
+ * Steam app, the Steam store and IGDB answer for that exact game.
  */
-data class LutrisGameResult(val name: String, val slug: String, val coverUrl: String?, val year: Int?)
+data class LutrisGameResult(
+    val name: String,
+    val slug: String,
+    val coverUrl: String?,
+    val year: Int?,
+    val steamAppId: Int? = null,
+    val gogId: String? = null,
+)
+
+/**
+ * The flavour Lutris's per-game record carries, `GET https://lutris.net/api/games/<slug>`
+ * (keyless JSON, checked live 2026-09-25: `name, slug, year, platforms,
+ * genres, aliases, description, banner_url, icon_url, coverart, is_public,
+ * updated, steamid, gogslug, humblestoreid, id, user_count, installers,
+ * shaders, discord_id`). A description and genres, and still no
+ * developer, publisher, full date or rating.
+ */
+data class LutrisGameDetails(val description: String?, val genre: String?)
 
 /**
  * Real Lutris (lutris.net) game database client -- genuinely keyless,
@@ -33,6 +53,15 @@ data class LutrisGameResult(val name: String, val slug: String, val coverUrl: St
  * configured. Lutris is a PC/Wine database first, so its coverage of
  * exactly this category is also the best of the sources droidtop can
  * reach without a manually-approved developer account.
+ *
+ * **What Lutris can and cannot supply, definitively.** Its search gives a
+ * cover and a year; its per-game record ([details]) adds a description
+ * and genres. Neither endpoint has a developer, a publisher, a full
+ * release date, a rating, a series or links, so those come from IGDB and
+ * the Steam store (docs/SPEC.md 7h). The Lutris survey of 2026-09-24
+ * expected the per-game record to be HTML only; a live call on 2026-09-25
+ * found it is JSON. `gogslug` in that record is not used: for Hollow
+ * Knight it names the soundtrack, where `provider_games` names the game.
  */
 object LutrisScraperClient {
     private const val MAX_RESULTS = 10
@@ -60,12 +89,35 @@ object LutrisScraperClient {
         return parse(JSONObject(connection.inputStream.bufferedReader().readText()))
     }
 
+    /**
+     * The description and genres of the game Lutris files under [slug].
+     * A 404 is Lutris saying it has no such game; any other non-200 is a
+     * refusal.
+     */
+    fun details(slug: String): ScrapeLookup<LutrisGameDetails> {
+        val path = URLEncoder.encode(slug, "UTF-8").replace("+", "%20")
+        val url = URL("https://lutris.net/api/games/$path")
+        val connection = (url.openConnection() as HttpURLConnection).apply { requestMethod = "GET" }
+        val status = connection.responseCode
+        if (status == 404) return ScrapeLookup.NoMatch
+        if (status != 200) return ScrapeRefusals.refused("Lutris", connection, status, emptyList(), slug)
+        return parseDetails(JSONObject(connection.inputStream.bufferedReader().readText()))
+    }
+
     /** Pure, for the JVM tests. */
     internal fun parse(response: JSONObject): ScrapeLookup<List<LutrisGameResult>> {
         val results = response.optJSONArray("results") ?: return ScrapeLookup.NoMatch
         val parsed = (0 until minOf(results.length(), MAX_RESULTS)).mapNotNull { index ->
             val row = results.getJSONObject(index)
             val name = row.optString("name", "").ifBlank { null } ?: return@mapNotNull null
+            val providers = row.optJSONArray("provider_games")
+            fun provided(service: String): String? = providers?.let { array ->
+                (0 until array.length()).firstNotNullOfOrNull { i ->
+                    array.optJSONObject(i)
+                        ?.takeIf { it.optString("service", "") == service }
+                        ?.optString("slug", "")?.trim()?.ifBlank { null }
+                }
+            }
             LutrisGameResult(
                 name = name,
                 slug = row.optString("slug", ""),
@@ -76,8 +128,25 @@ object LutrisScraperClient {
                 // actually populated in practice.
                 coverUrl = row.optString("coverart", "").ifBlank { null },
                 year = row.optInt("year", 0).takeIf { it > 0 },
+                steamAppId = provided("steam")?.toIntOrNull(),
+                gogId = provided("gog")?.takeIf { id -> id.all { it.isDigit() } },
             )
         }
         return if (parsed.isEmpty()) ScrapeLookup.NoMatch else ScrapeLookup.Found(parsed)
+    }
+
+    /** Pure, for the JVM tests. */
+    internal fun parseDetails(record: JSONObject): ScrapeLookup<LutrisGameDetails> {
+        val description = record.optString("description", "").trim().ifBlank { null }
+        val genre = record.optJSONArray("genres")?.let { genres ->
+            (0 until genres.length())
+                .mapNotNull { genres.optJSONObject(it)?.optString("name", "")?.trim()?.ifBlank { null } }
+                .joinToString(", ").ifBlank { null }
+        }
+        return if (description == null && genre == null) {
+            ScrapeLookup.NoMatch
+        } else {
+            ScrapeLookup.Found(LutrisGameDetails(description, genre))
+        }
     }
 }
