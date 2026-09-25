@@ -8,7 +8,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -125,17 +124,45 @@ object GamesRoots {
         kinds: Set<LibraryEntryKind> = LibraryKinds.GAMES,
         rescan: Boolean = false,
     ) = walkLock.withLock {
-        val changed = rootsChangedSinceLastScan(context)
+        val now = signature(context)
+        // "Changed" means changed since the last walk that FINISHED, and
+        // not already being walked. The mark used to be written when the
+        // walk started, so a walk killed with the process (a crash, a
+        // force-stop) left the new folder marked as walked and unread
+        // until something happened to walk it for another reason (rig,
+        // dq-onboard-01: nothing logged for the share added in setup).
+        val changed = rootsChangedSinceLastScan(context) && now != walking
         if (changed) {
             // A root the user took away takes its games with it -- the one
             // case where the index drops instead of marking missing
             // (docs/SPEC.md 7g). Before the walk, so the library never
             // shows a removed root's games while the new set is read.
             library.keepOnlyRoots(current(context).map { it.absolutePath }.toSet())
+            walking = now
+            // Logged when it starts, not only when a root finishes: a walk
+            // of a big share takes minutes, and "never ran" and "still
+            // running" must not look the same in scan.log.
+            ScanLog.write("games roots changed: walking ${current(context).joinToString { it.absolutePath }}")
         }
-        library.scanInBackground(kinds, rescan = rescan || changed, restart = changed)
-        if (changed) markScanned(context)
+        library.scanInBackground(
+            kinds,
+            rescan = rescan || changed,
+            restart = changed,
+            onFinished = if (changed) {
+                {
+                    if (walking == now) walking = null
+                    if (signature(context) == now) markScanned(context)
+                    ScanLog.write("games roots walked: ${current(context).joinToString { it.absolutePath }}")
+                }
+            } else {
+                null
+            },
+        )
     }
+
+    /** The root set a walk is reading right now, so a second caller joins it instead of restarting it. */
+    @Volatile
+    private var walking: String? = null
 
     /**
      * Walks a folder the moment it is added, for the life of the process
@@ -146,15 +173,17 @@ object GamesRoots {
      * watched, because a new folder was walked only by a surface that was
      * open to follow it, and the only one that did was the Gaming shell.
      *
-     * The first emission of [changes] is its "current state" signal and is
-     * skipped: nothing changed by the process starting, and the surfaces
-     * check for a change made while the process was not running when they
-     * open. [library] is asked for only when a folder actually changes, so
-     * installing this costs a process nothing else.
+     * It acts only on a change: a root set that differs from the last one
+     * a walk FINISHED, which includes, at process start, a walk the last
+     * process did not live to finish. Otherwise it does nothing, and
+     * [library] is not even built, so installing this costs a process that
+     * has nothing to walk nothing else.
      */
     fun follow(context: Context, scope: CoroutineScope, library: () -> Library) {
         scope.launch {
-            changes(context).drop(1).collect { walkIfChanged(context, library(), LibraryKinds.GAMES) }
+            changes(context).collect {
+                if (rootsChangedSinceLastScan(context)) walkIfChanged(context, library(), LibraryKinds.GAMES)
+            }
         }
     }
 

@@ -790,7 +790,15 @@ class Library(
         return IndexRebuild(records = rebuilt, keptWithoutRecord = kept)
     }
 
-    fun scanInBackground(kinds: Set<LibraryEntryKind>, rescan: Boolean = false, restart: Boolean = false) {
+    fun scanInBackground(
+        kinds: Set<LibraryEntryKind>,
+        rescan: Boolean = false,
+        restart: Boolean = false,
+        // Called once the walk this call started has read everything, and
+        // never for a walk that was cancelled or died with the process, or
+        // when this call only joined a walk already running.
+        onFinished: (() -> Unit)? = null,
+    ) {
         // "A low-priority pass after start" (docs/SPEC.md 7g, step 4):
         // hooked onto the first ordinary (non-rescan) scan a shell ever
         // asks for, rather than a new call site in :app. Deliberately
@@ -810,6 +818,7 @@ class Library(
             try {
                 val flow = if (rescan) rescanKindsProgressive(key) else scanKindsProgressive(key)
                 flow.collect { state.value = it }
+                onFinished?.invoke()
             } finally {
                 synchronized(backgroundScanJobs) {
                     if (backgroundScanJobs[key] === job) backgroundScanJobs.remove(key)
