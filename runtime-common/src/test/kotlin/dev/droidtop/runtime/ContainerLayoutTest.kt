@@ -83,7 +83,7 @@ class ContainerLayoutTest {
         val a = PrimaryProvisioning("apk add sway foot", "sway")
         val b = PrimaryProvisioning("apk add sway font-dejavu foot", "sway")
         val script = ContainerLayout.primaryInitScript(a)
-        assertTrue(script.contains("!= \"${ContainerLayout.planId(a)}\" ]; then"))
+        assertTrue(script.contains("grep -qx ${ContainerLayout.planId(a)} "))
         assertTrue(ContainerLayout.planId(a) != ContainerLayout.planId(b))
         assertEquals(ContainerLayout.planId(a), ContainerLayout.planId(a.copy(compositorCommand = "labwc")))
     }
