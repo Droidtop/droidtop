@@ -95,6 +95,13 @@ include(":input-seat")
 // layer a future launcher shell (:shell-gamepad) will read from.
 include(":library-core")
 
+// The plugin host (docs/SPEC.md 12a): manifest validation, install/
+// uninstall/enable/approve, and the isolated :pluginhost process that
+// runs native_bundle plugin code, reached over its own AIDL binder
+// contract (IPluginRuntime). No dependency on :library-core or :app --
+// a plugin call site hands it plain values, never a database handle.
+include(":plugin-host")
+
 // Secondary-display behaviour for EVERY mode, in one place: the single
 // SECONDARY_HOME activity plus the mode registry that selects what it
 // renders. Exists because shell-default's forked Launcher3 and the
