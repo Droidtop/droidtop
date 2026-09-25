@@ -140,6 +140,15 @@ internal fun PcSurface(
     // that is, rather than a second one for the restored case.
     val openingCard = remember { FocusRequester() }
     val gridState = rememberLazyGridState()
+    // The chip row is entered at its start: Up from the grid's top row
+    // lands on Sort, the first chip, not on whichever chip happens to sit
+    // nearest the card (that was "Installed", and Sort was then reachable
+    // only by a Left that the shell read as "previous system": rig, build
+    // 814). Which card is focused, and whether the chip row holds focus,
+    // is what the one key handler below needs to know to do that.
+    val sortChip = remember { FocusRequester() }
+    var focusedCard by remember { mutableStateOf(-1) }
+    var inChips by remember { mutableStateOf(false) }
 
     // "Stores and folders": sign in to a store, add a games folder, set up
     // Windows games, see the downloads queue. It is :app's own settings
@@ -207,7 +216,52 @@ internal fun PcSurface(
     // back dispatcher, and it plays the theme's own back sound doing it.
     // A second handler would be a second mechanism for one job.
     val window = LocalShellWindow.current
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            // ONE key handler for the chip row and the grid, above both.
+            // Compose moves focus in a grid for nobody, so every direction
+            // is moved here, on the UP edge like every other press in the
+            // shell; the DOWN edge of a direction is taken too, so the
+            // framework's own focus search cannot move a second time on
+            // the same press. Left and Right at the grid's edge are left
+            // unhandled, which is ES-DE's "switch system at the edge"
+            // (the shell's own handler above this one); in the chip row
+            // they are movement along the row and never leave the surface.
+            .onKeyEvent { event ->
+                val action = GamepadKeyMap.actionFor(event.key)
+                val direction = when (action) {
+                    GamepadAction.UP -> FocusDirection.Up
+                    GamepadAction.DOWN -> FocusDirection.Down
+                    GamepadAction.LEFT -> FocusDirection.Left
+                    GamepadAction.RIGHT -> FocusDirection.Right
+                    else -> null
+                }
+                if (event.type == KeyEventType.KeyDown) return@onKeyEvent direction != null
+                if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
+                when {
+                    // The surface's options: where games come from, on
+                    // the surface they came into, from the chips as well
+                    // as the cards.
+                    action == GamepadAction.Y -> {
+                        if (storesScreen != null) onOpenOptions()
+                        storesScreen != null
+                    }
+                    direction == null -> false
+                    inChips && direction == FocusDirection.Up -> true
+                    inChips -> {
+                        focusManager.moveFocus(direction)
+                        true
+                    }
+                    direction == FocusDirection.Up &&
+                        gridState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == focusedCard }?.row == 0 -> {
+                        runCatching { sortChip.requestFocus() }
+                        true
+                    }
+                    else -> focusManager.moveFocus(direction)
+                }
+            },
+    ) {
         PcHeader(total = cards.size, shown = shown.size, entries = cards, folders = entries.size)
 
         // The filter chips outgrow a phone's width long before they
@@ -216,6 +270,7 @@ internal fun PcSurface(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .onFocusChanged { inChips = it.hasFocus }
                 .horizontalScroll(rememberScrollState())
                 .padding(horizontal = window.edgePadding, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -223,7 +278,11 @@ internal fun PcSurface(
             // Sort is one chip that cycles rather than a menu: it is a
             // single-choice setting with three values, and a menu for that
             // is a screen the pad has to walk into and back out of.
-            ShellChip("Sort: ${sort.label}", onClick = { sort = sort.next() })
+            ShellChip(
+                "Sort: ${sort.label}",
+                modifier = Modifier.focusRequester(sortChip),
+                onClick = { sort = sort.next() },
+            )
             ShellChip("Installed", on = installedOnly, onClick = { installedOnly = !installedOnly })
             allSources.forEach { source ->
                 ShellChip(source, on = source in sources, onClick = { sources = sources.toggle(source) })
@@ -253,26 +312,7 @@ internal fun PcSurface(
                     columns = GridCells.Adaptive(minSize = window.gridItemMinWidth),
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = window.edgePadding)
-                        // Compose moves focus in a grid for nobody: the
-                        // same explicit d-pad handling the shell's other
-                        // grid already needs, and for the same reason.
-                        .onKeyEvent { event ->
-                            if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
-                            when (GamepadKeyMap.actionFor(event.key)) {
-                                // The surface's options: where games come
-                                // from, on the surface they came into.
-                                GamepadAction.Y -> {
-                                    if (storesScreen != null) onOpenOptions()
-                                    storesScreen != null
-                                }
-                                GamepadAction.UP -> focusManager.moveFocus(FocusDirection.Up)
-                                GamepadAction.DOWN -> focusManager.moveFocus(FocusDirection.Down)
-                                GamepadAction.LEFT -> focusManager.moveFocus(FocusDirection.Left)
-                                GamepadAction.RIGHT -> focusManager.moveFocus(FocusDirection.Right)
-                                else -> false
-                            }
-                        },
+                        .padding(horizontal = window.edgePadding),
                     horizontalArrangement = Arrangement.spacedBy(24.dp),
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                     // The hint bar's own room at the end of the grid
@@ -287,7 +327,10 @@ internal fun PcSurface(
                             entry = entry,
                             modifier = if (index == openingIndex) Modifier.focusRequester(openingCard) else Modifier,
                             onOpen = { onOpen(entry) },
-                            onFocused = { onFocusedEntryChanged(entry) },
+                            onFocused = {
+                                focusedCard = index
+                                onFocusedEntryChanged(entry)
+                            },
                         )
                     }
                 }
