@@ -98,11 +98,13 @@ fun DesktopShell(
     onDismissLaunchFailure: () -> Unit = {},
     /** A Start-menu launch that was refused: shown in the same banner as [launchFailure]. */
     onLaunchFailure: (String) -> Unit = {},
+    /** Starts the desktop session: the button on the not-started and failed screens. */
+    onStartSession: () -> Unit = {},
 ) {
     var startMenuOpen by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        DesktopViewport(hostBridge, primaryOutput, sessionMessage)
+        DesktopViewport(hostBridge, primaryOutput, sessionMessage, onStartSession)
 
         Taskbar(
             startMenuOpen = startMenuOpen,
@@ -182,6 +184,7 @@ private fun BoxScope.DesktopViewport(
     hostBridge: HostBridge?,
     primaryOutput: DisplayOutput?,
     sessionMessage: DesktopSessionMessage,
+    onStartSession: () -> Unit,
 ) {
     if (hostBridge != null && primaryOutput != null) {
         var presentFailed by remember { mutableStateOf(false) }
@@ -299,17 +302,21 @@ private fun BoxScope.DesktopViewport(
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(top = 8.dp),
                     )
+                    Button(onClick = onStartSession, modifier = Modifier.padding(top = 16.dp)) { Text("Try again") }
                 }
                 is DesktopSessionMessage.Idle -> {
-                    Text("Desktop session not started", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+                    // The one thing to do here is start it, so the screen
+                    // offers exactly that (rig, dq-desk2-02: the taskbar's
+                    // "Start" is the Start menu, not the session).
+                    Text("The desktop is not running", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
                     Text(
-                        "The primary container (Wine/Linux desktop) isn't running yet — " +
-                            "start it to see your desktop here.",
+                        "It was stopped. Start it to see your desktop here.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(top = 8.dp),
                     )
+                    Button(onClick = onStartSession, modifier = Modifier.padding(top = 16.dp)) { Text("Start the desktop") }
                 }
             }
         }
