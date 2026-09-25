@@ -1,6 +1,10 @@
 package dev.droidtop.shell.gamepad
 
 import android.content.Context
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -472,10 +476,31 @@ internal fun GamelistOptionsMenu(
                     )
                 }
             }
-            status?.let { MenuRow(title = it.lineSequence().first(), subtitle = it.substringAfter('\n', "").ifEmpty { null }, subtitleLines = 4) }
+            // A result is read, not selected: every line of it, wrapped,
+            // never cut. The sentence that says how to fix a refusal is at
+            // its end, and a row that cut it at one line (or four) showed
+            // the problem and hid the fix (rig, dq-shell2-01). The panel
+            // scrolls, so a long result makes the panel longer instead.
+            status?.let { ResultText(it) }
             MenuHint(
                 if (pickingLetter) "Up/Down moves, A jumps, B goes back" else "Up/Down moves, A activates, B closes",
             )
+        }
+    }
+}
+
+/** An action's result: its first line as a title, the rest under it, all of it wrapped and none of it cut. */
+@Composable
+private fun ResultText(text: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Space.Lg, vertical = Space.Md),
+        verticalArrangement = Arrangement.spacedBy(Space.Xs),
+    ) {
+        Text(text.lineSequence().first(), color = MenuTokens.OnSurface, style = TypeRole.rowTitle)
+        text.substringAfter('\n', "").takeIf { it.isNotBlank() }?.let { rest ->
+            Text(rest, color = MenuTokens.OnSurfaceMuted, style = TypeRole.supporting)
         }
     }
 }
