@@ -33,7 +33,6 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.platform.LocalFocusManager
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.shell.gamepad.input.GamepadAction
@@ -106,8 +105,7 @@ private fun GamesGrid(
     onOpenFolders: (() -> Unit)?,
 ) {
     val window = LocalShellWindow.current
-    val focusManager = LocalFocusManager.current
-    val firstCard = remember { FocusRequester() }
+    val pad = rememberGridPad()
     val emptyAction = remember { FocusRequester() }
     Column(
         modifier = Modifier
@@ -129,7 +127,7 @@ private fun GamesGrid(
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
                 when {
                     direction != null -> {
-                        focusManager.moveFocus(direction)
+                        pad.move(direction)
                         true
                     }
                     action == GamepadAction.SELECT && onOpenFolders != null -> {
@@ -171,8 +169,9 @@ private fun GamesGrid(
                     }
                 }
                 else -> {
-                    LaunchedEffect(Unit) { requestFocusWhenAttached(firstCard, "Launcher games") }
+                    LaunchedEffect(Unit) { requestFocusWhenAttached(pad.requester(0), "Launcher games") }
                     LazyVerticalGrid(
+                        state = pad.state,
                         columns = GridCells.Adaptive(minSize = window.gridItemMinWidth),
                         modifier = Modifier.fillMaxSize().padding(horizontal = window.edgePadding),
                         horizontalArrangement = Arrangement.spacedBy(Space.Xl),
@@ -182,8 +181,9 @@ private fun GamesGrid(
                         itemsIndexed(games, key = { _, entry -> entry.id }) { index, entry ->
                             GameCard(
                                 entry = entry,
-                                modifier = if (index == 0) Modifier.focusRequester(firstCard) else Modifier,
+                                modifier = Modifier.focusRequester(pad.requester(index)),
                                 onLaunch = { onPlay(entry) },
+                                onFocused = { pad.focused = index },
                                 // Y and a long press: the shell's "act on this
                                 // one", which in the Launcher is pinning it.
                                 onShowDetail = { onPin(entry) },

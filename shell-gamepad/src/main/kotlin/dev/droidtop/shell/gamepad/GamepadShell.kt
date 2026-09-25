@@ -2662,7 +2662,9 @@ private fun GamesSection(
                         }
                     }
                     val focusManager = LocalFocusManager.current
+                    val pad = rememberGridPad()
                     LazyVerticalGrid(
+                        state = pad.state,
                         columns = GridCells.Adaptive(minSize = 220.dp),
                         // The hint bar's own room (MenuTokens.HintBarRoom).
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(
@@ -2688,14 +2690,24 @@ private fun GamesSection(
                         // hijacking every keypress.
                         modifier = Modifier.fillMaxSize().padding(horizontal = LocalShellWindow.current.edgePadding)
                             .onKeyEvent { event ->
-                                if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
-                                when (GamepadKeyMap.actionFor(event.key)) {
-                                    GamepadAction.UP -> focusManager.moveFocus(FocusDirection.Up)
-                                    GamepadAction.DOWN -> focusManager.moveFocus(FocusDirection.Down)
-                                    GamepadAction.LEFT -> focusManager.moveFocus(FocusDirection.Left)
-                                    GamepadAction.RIGHT -> focusManager.moveFocus(FocusDirection.Right)
-                                    else -> false
-                                }
+                                val direction = when (GamepadKeyMap.actionFor(event.key)) {
+                                    GamepadAction.UP -> FocusDirection.Up
+                                    GamepadAction.DOWN -> FocusDirection.Down
+                                    GamepadAction.LEFT -> FocusDirection.Left
+                                    GamepadAction.RIGHT -> FocusDirection.Right
+                                    else -> null
+                                } ?: return@onKeyEvent false
+                                // Both edges of a direction are this grid's
+                                // (GridPad); the UP edge moves. At an edge
+                                // it answers false and Left/Right reach the
+                                // switch-system handler above.
+                                if (event.type == KeyEventType.KeyDown) return@onKeyEvent true
+                                event.type == KeyEventType.KeyUp && (
+                                    pad.move(direction) ||
+                                        // Up from the top row: the filter
+                                        // chip and the tabs above the grid.
+                                        (direction == FocusDirection.Up && focusManager.moveFocus(FocusDirection.Up))
+                                    )
                             },
                         horizontalArrangement = Arrangement.spacedBy(24.dp),
                         verticalArrangement = Arrangement.spacedBy(24.dp),
@@ -2703,10 +2715,15 @@ private fun GamesSection(
                         gridItemsIndexed(games, key = { _, entry -> entry.id }) { index, entry ->
                             GameCard(
                                 entry = entry,
-                                modifier = if (index == 0) Modifier.focusRequester(firstFocus) else Modifier,
+                                modifier = Modifier
+                                    .focusRequester(pad.requester(index))
+                                    .then(if (index == 0) Modifier.focusRequester(firstFocus) else Modifier),
                                 onLaunch = { onLaunch(entry) },
                                 onShowDetail = { onShowDetail(entry) },
-                                onFocused = { onFocusedEntryChanged(entry) },
+                                onFocused = {
+                                    pad.focused = index
+                                    onFocusedEntryChanged(entry)
+                                },
                                 onToggleFavorite = { onToggleFavorite(entry) },
                             )
                         }
