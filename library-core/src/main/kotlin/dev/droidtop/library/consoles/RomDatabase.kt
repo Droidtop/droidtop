@@ -179,6 +179,29 @@ data class GameMetadataEntity(
     // nothing for the game. Never copied; the user's files stay theirs.
     @ColumnInfo(name = "artwork_path") val artworkPath: String? = null,
     @ColumnInfo(name = "video_path") val videoPath: String? = null,
+    /**
+     * The series (IGDB's collection, else its franchise) a game belongs
+     * to. Not an ES-DE MetaData field; droidtop's own, shown on a game's
+     * detail page and the companion screen (docs/SPEC.md 7h).
+     */
+    val series: String? = null,
+    /** The game's links as JSON ([dev.droidtop.library.GameLink.encode]); null when none were scraped. */
+    val links: String? = null,
+    /**
+     * Which source each field came from, as JSON
+     * ([dev.droidtop.library.scraper.FieldSources]): "IGDB" for a
+     * description, "SteamGridDB" for a cover, "you" for a field edited in
+     * the metadata editor. A scrape never overwrites a field whose source
+     * is "you".
+     */
+    @ColumnInfo(name = "field_sources") val fieldSources: String? = null,
+    // Scraped media for entries whose id is not a file under a games root
+    // (a store install), which have no ES-DE layout lookup: the same
+    // reason artwork_path exists. Hero art is ES-DE's `fanart`, a logo is
+    // its `marquee`; an icon has no ES-DE type and is droidtop's own.
+    @ColumnInfo(name = "hero_path") val heroPath: String? = null,
+    @ColumnInfo(name = "logo_path") val logoPath: String? = null,
+    @ColumnInfo(name = "icon_path") val iconPath: String? = null,
 )
 
 @Entity(tableName = "scan_metadata", primaryKeys = ["roms_root", "system_folder_id"])
@@ -486,12 +509,24 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
     }
 }
 
+/** A game's series, links, per-field sources and PC media paths (docs/SPEC.md 7h). Additive: user metadata survives untouched. */
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE game_metadata ADD COLUMN series TEXT")
+        db.execSQL("ALTER TABLE game_metadata ADD COLUMN links TEXT")
+        db.execSQL("ALTER TABLE game_metadata ADD COLUMN field_sources TEXT")
+        db.execSQL("ALTER TABLE game_metadata ADD COLUMN hero_path TEXT")
+        db.execSQL("ALTER TABLE game_metadata ADD COLUMN logo_path TEXT")
+        db.execSQL("ALTER TABLE game_metadata ADD COLUMN icon_path TEXT")
+    }
+}
+
 @Database(
     entities = [
         RomEntity::class, ScanMetadataEntity::class, GameMetadataEntity::class,
         CollectionEntity::class, CollectionMemberEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = false,
 )
 abstract class RomDatabase : RoomDatabase() {
@@ -516,7 +551,7 @@ abstract class RomDatabase : RoomDatabase() {
                     // because game_metadata holds real user data that
                     // must survive it -- see that migration's own doc
                     // comment.
-                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build().also { instance = it }
             }

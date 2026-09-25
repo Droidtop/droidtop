@@ -193,9 +193,8 @@ suspend fun scrapeSystemArtwork(
             val coverUrl = screenScraperResult?.coverUrl ?: gamesDbResult?.coverUrl ?: thumbnailUrl
             val mediaRoot = File(File(gamesRoot, "downloaded_media"), system.id)
             val baseName = romFile.nameWithoutExtension
-            if (wantArtwork && coverUrl != null && EsDeArtwork.resolve(gamesRoot, system.id, baseName) == null) {
-                downloadImage(coverUrl, File(mediaRoot, "covers/$baseName.png"))
-            }
+            val coverWritten = wantArtwork && coverUrl != null && EsDeArtwork.resolve(gamesRoot, system.id, baseName) == null
+            if (coverWritten) downloadImage(coverUrl!!, File(mediaRoot, "covers/$baseName.png"))
             // The full media set (real ES-DE's own Scrape* toggles, all
             // default-on): each type lands in its ES-DE downloaded_media
             // directory, skipped when the file already exists. The
@@ -265,16 +264,48 @@ suspend fun scrapeSystemArtwork(
                 }
             }
 
-            val description = screenScraperResult?.description ?: gamesDbResult?.description
-            val developer = screenScraperResult?.developer ?: gamesDbResult?.developer ?: libretroResult?.developer
-            val publisher = screenScraperResult?.publisher ?: gamesDbResult?.publisher ?: libretroResult?.publisher
-            val genre = screenScraperResult?.genre ?: gamesDbResult?.genre ?: libretroResult?.genre
-            val releaseDate = screenScraperResult?.releaseDate ?: gamesDbResult?.releaseDate ?: libretroResult?.releaseDate
-            val players = screenScraperResult?.players ?: gamesDbResult?.players ?: libretroResult?.players
-            val rating = screenScraperResult?.rating
+            // Each field records the source it came from (FieldSources).
+            val sources = mutableMapOf<String, String>()
+            fun <T> pick(field: String, vararg candidates: Pair<String, T?>): T? =
+                candidates.firstOrNull { it.second != null }?.let { (source, value) ->
+                    sources[field] = source
+                    value
+                }
+            val ss = "ScreenScraper"
+            val tgdb = "TheGamesDB"
+            val libretro = "libretro database"
+            val description = pick(FieldSources.DESCRIPTION, ss to screenScraperResult?.description, tgdb to gamesDbResult?.description)
+            val developer = pick(
+                FieldSources.DEVELOPER,
+                ss to screenScraperResult?.developer, tgdb to gamesDbResult?.developer, libretro to libretroResult?.developer,
+            )
+            val publisher = pick(
+                FieldSources.PUBLISHER,
+                ss to screenScraperResult?.publisher, tgdb to gamesDbResult?.publisher, libretro to libretroResult?.publisher,
+            )
+            val genre = pick(FieldSources.GENRE, ss to screenScraperResult?.genre, tgdb to gamesDbResult?.genre, libretro to libretroResult?.genre)
+            val releaseDate = pick(
+                FieldSources.RELEASE_DATE,
+                ss to screenScraperResult?.releaseDate, tgdb to gamesDbResult?.releaseDate, libretro to libretroResult?.releaseDate,
+            )
+            val players = pick(
+                FieldSources.PLAYERS,
+                ss to screenScraperResult?.players, tgdb to gamesDbResult?.players, libretro to libretroResult?.players,
+            )
+            val rating = pick(FieldSources.RATING, ss to screenScraperResult?.rating)
+            if (coverWritten) {
+                sources[FieldSources.COVER] = when (coverUrl) {
+                    screenScraperResult?.coverUrl -> ss
+                    gamesDbResult?.coverUrl -> tgdb
+                    else -> "libretro thumbnails"
+                }
+            }
             val hasAnyMetadata = wantMetadata &&
                 listOfNotNull(description, developer, publisher, genre, releaseDate, players, rating).isNotEmpty()
-            if (hasAnyMetadata) {
+            // Text the options switched off is neither written nor recorded.
+            if (!wantMetadata) sources.keys.retainAll(setOf(FieldSources.COVER))
+            fun <T> text(value: T?): T? = if (wantMetadata) value else null
+            if (hasAnyMetadata || coverWritten) {
                 // Real fix: this used to build a fresh GameMetadataEntity
                 // with a hardcoded favorite=false, silently wiping out a
                 // real user's favorite toggle (and, now that
@@ -286,16 +317,18 @@ suspend fun scrapeSystemArtwork(
                 // comments already establish for the filesystem-scan
                 // side of this database.
                 val existing = dao.getGameMetadataSingle(romFile.absolutePath)
+                val had = existing?.fieldSources
                 dao.upsertGameMetadata(
                     (existing ?: GameMetadataEntity(id = romFile.absolutePath)).copy(
                         scrapeConfidence = confidence ?: existing?.scrapeConfidence,
-                        description = description ?: existing?.description,
-                        developer = developer ?: existing?.developer,
-                        publisher = publisher ?: existing?.publisher,
-                        genre = genre ?: existing?.genre,
-                        releaseDate = releaseDate ?: existing?.releaseDate,
-                        rating = rating ?: existing?.rating,
-                        players = players ?: existing?.players,
+                        description = FieldSources.keep(had, FieldSources.DESCRIPTION, text(description), existing?.description),
+                        developer = FieldSources.keep(had, FieldSources.DEVELOPER, text(developer), existing?.developer),
+                        publisher = FieldSources.keep(had, FieldSources.PUBLISHER, text(publisher), existing?.publisher),
+                        genre = FieldSources.keep(had, FieldSources.GENRE, text(genre), existing?.genre),
+                        releaseDate = FieldSources.keep(had, FieldSources.RELEASE_DATE, text(releaseDate), existing?.releaseDate),
+                        rating = FieldSources.keep(had, FieldSources.RATING, text(rating), existing?.rating),
+                        players = FieldSources.keep(had, FieldSources.PLAYERS, text(players), existing?.players),
+                        fieldSources = FieldSources.merge(had, sources),
                     ),
                 )
             }
@@ -417,15 +450,30 @@ suspend fun importGamelistXml(
             ?.let { dev.droidtop.library.consoles.GamelistXml.resolve(folder, it) }
             ?.takeIf { it.isFile }?.absolutePath
         val existing = dao.getGameMetadataSingle(romFile.absolutePath)
+        val had = existing?.fieldSources
+        // An imported gamelist is recorded as the source it is: whichever
+        // scraper wrote it is not named in the file.
+        val source = "gamelist.xml"
+        val written = buildMap {
+            if (entry.description != null) put(FieldSources.DESCRIPTION, source)
+            if (entry.developer != null) put(FieldSources.DEVELOPER, source)
+            if (entry.publisher != null) put(FieldSources.PUBLISHER, source)
+            if (entry.genre != null) put(FieldSources.GENRE, source)
+            if (entry.releaseDate != null) put(FieldSources.RELEASE_DATE, source)
+            if (entry.rating != null) put(FieldSources.RATING, source)
+            if (entry.players != null) put(FieldSources.PLAYERS, source)
+            if (artwork != null) put(FieldSources.COVER, source)
+        }
         dao.upsertGameMetadata(
             (existing ?: GameMetadataEntity(id = romFile.absolutePath)).copy(
-                description = entry.description ?: existing?.description,
-                developer = entry.developer ?: existing?.developer,
-                publisher = entry.publisher ?: existing?.publisher,
-                genre = entry.genre ?: existing?.genre,
-                releaseDate = entry.releaseDate ?: existing?.releaseDate,
-                rating = entry.rating ?: existing?.rating,
-                players = entry.players ?: existing?.players,
+                description = FieldSources.keep(had, FieldSources.DESCRIPTION, entry.description, existing?.description),
+                developer = FieldSources.keep(had, FieldSources.DEVELOPER, entry.developer, existing?.developer),
+                publisher = FieldSources.keep(had, FieldSources.PUBLISHER, entry.publisher, existing?.publisher),
+                genre = FieldSources.keep(had, FieldSources.GENRE, entry.genre, existing?.genre),
+                releaseDate = FieldSources.keep(had, FieldSources.RELEASE_DATE, entry.releaseDate, existing?.releaseDate),
+                rating = FieldSources.keep(had, FieldSources.RATING, entry.rating, existing?.rating),
+                players = FieldSources.keep(had, FieldSources.PLAYERS, entry.players, existing?.players),
+                fieldSources = FieldSources.merge(had, written),
                 favorite = (existing?.favorite == true) || entry.favorite,
                 completed = (existing?.completed == true) || entry.completed,
                 artworkPath = artwork ?: existing?.artworkPath,
@@ -484,15 +532,27 @@ suspend fun applyManualMatch(
 
     val dao = RomDatabase.get(context).romDao()
     val existing = dao.getGameMetadataSingle(romFile.absolutePath)
+    val had = existing?.fieldSources
+    val source = "TheGamesDB"
+    val written = buildMap {
+        if (metadata.description != null) put(FieldSources.DESCRIPTION, source)
+        if (metadata.developer != null) put(FieldSources.DEVELOPER, source)
+        if (metadata.publisher != null) put(FieldSources.PUBLISHER, source)
+        if (metadata.genre != null) put(FieldSources.GENRE, source)
+        if (metadata.releaseDate != null) put(FieldSources.RELEASE_DATE, source)
+        if (metadata.players != null) put(FieldSources.PLAYERS, source)
+        if (gamesRoot != null && metadata.coverUrl != null) put(FieldSources.COVER, source)
+    }
     dao.upsertGameMetadata(
         (existing ?: GameMetadataEntity(id = romFile.absolutePath)).copy(
-            description = metadata.description ?: existing?.description,
-            developer = metadata.developer ?: existing?.developer,
-            publisher = metadata.publisher ?: existing?.publisher,
-            genre = metadata.genre ?: existing?.genre,
-            releaseDate = metadata.releaseDate ?: existing?.releaseDate,
-            players = metadata.players ?: existing?.players,
+            description = FieldSources.keep(had, FieldSources.DESCRIPTION, metadata.description, existing?.description),
+            developer = FieldSources.keep(had, FieldSources.DEVELOPER, metadata.developer, existing?.developer),
+            publisher = FieldSources.keep(had, FieldSources.PUBLISHER, metadata.publisher, existing?.publisher),
+            genre = FieldSources.keep(had, FieldSources.GENRE, metadata.genre, existing?.genre),
+            releaseDate = FieldSources.keep(had, FieldSources.RELEASE_DATE, metadata.releaseDate, existing?.releaseDate),
+            players = FieldSources.keep(had, FieldSources.PLAYERS, metadata.players, existing?.players),
             scrapeConfidence = "manual",
+            fieldSources = FieldSources.merge(had, written),
         ),
     )
     "Matched ${entry.title} to ${metadata.name ?: "that entry"}."
