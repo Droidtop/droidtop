@@ -1,6 +1,7 @@
 package dev.droidtop.library
 
 import android.content.Context
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -113,10 +114,91 @@ interface FavoritesDao {
     }
 }
 
-@Database(entities = [PlayHistoryEntity::class, FavoriteEntity::class], version = 2, exportSchema = false)
+/** One row per entry the user has said something about; see [GameLinks]. */
+@Entity(tableName = "game_links")
+data class GameLinkEntity(
+    @PrimaryKey val id: String,
+    @ColumnInfo(name = "game_name") val gameName: String? = null,
+    @ColumnInfo(name = "f95_thread") val f95Thread: Long? = null,
+)
+
+/** What F95Checker's index last said about one thread; see [F95ThreadCheck]. */
+@Entity(tableName = "f95_threads")
+data class F95ThreadEntity(
+    @PrimaryKey @ColumnInfo(name = "thread_id") val threadId: Long,
+    @ColumnInfo(name = "last_changed") val lastChanged: Long,
+    val version: String?,
+    @ColumnInfo(name = "checked_at") val checkedAt: Long,
+    val gone: Boolean,
+) {
+    fun toCheck() = F95ThreadCheck(threadId, lastChanged, version, checkedAt, gone)
+}
+
+@Dao
+interface GameLinksDao {
+    @Query("SELECT * FROM game_links WHERE id IN (:ids)")
+    suspend fun getLinks(ids: Collection<String>): List<GameLinkEntity>
+
+    @Query("SELECT * FROM f95_threads WHERE thread_id IN (:threads)")
+    suspend fun getThreads(threads: Collection<Long>): List<F95ThreadEntity>
+
+    @androidx.room.Insert(onConflict = androidx.room.OnConflictStrategy.REPLACE)
+    suspend fun putLink(row: GameLinkEntity)
+
+    @Query("DELETE FROM game_links WHERE id = :id")
+    suspend fun deleteLink(id: String)
+
+    @androidx.room.Insert(onConflict = androidx.room.OnConflictStrategy.REPLACE)
+    suspend fun putThread(row: F95ThreadEntity)
+
+    @Query("SELECT DISTINCT f95_thread FROM game_links WHERE f95_thread IS NOT NULL")
+    suspend fun linkedThreadIds(): List<Long>
+
+    @Query("SELECT id FROM game_links WHERE f95_thread = :thread")
+    suspend fun idsLinkedTo(thread: Long): List<String>
+
+    /** A thread nothing links any more is not worth an answer kept. */
+    @Query("DELETE FROM f95_threads WHERE thread_id NOT IN (SELECT f95_thread FROM game_links WHERE f95_thread IS NOT NULL)")
+    suspend fun pruneThreads()
+
+    @Transaction
+    suspend fun setGameName(ids: Collection<String>, name: String) {
+        val existing = getLinks(ids).associateBy { it.id }
+        for (id in ids) putOrDrop((existing[id] ?: GameLinkEntity(id)).copy(gameName = name))
+    }
+
+    @Transaction
+    suspend fun setF95Thread(ids: Collection<String>, thread: Long?) {
+        val existing = getLinks(ids).associateBy { it.id }
+        for (id in ids) putOrDrop((existing[id] ?: GameLinkEntity(id)).copy(f95Thread = thread))
+        pruneThreads()
+    }
+
+    /** See [GameLinksStore.moveTo]: only into an empty place. */
+    @Transaction
+    suspend fun moveTo(fromId: String, toId: String) {
+        val rows = getLinks(listOf(fromId, toId)).associateBy { it.id }
+        val from = rows[fromId] ?: return
+        val to = rows[toId] ?: GameLinkEntity(toId)
+        putOrDrop(to.copy(gameName = to.gameName ?: from.gameName, f95Thread = to.f95Thread ?: from.f95Thread))
+        deleteLink(fromId)
+    }
+}
+
+/** Writes [row], or drops it when it no longer says anything. */
+private suspend fun GameLinksDao.putOrDrop(row: GameLinkEntity) {
+    if (row.gameName == null && row.f95Thread == null) deleteLink(row.id) else putLink(row)
+}
+
+@Database(
+    entities = [PlayHistoryEntity::class, FavoriteEntity::class, GameLinkEntity::class, F95ThreadEntity::class],
+    version = 3,
+    exportSchema = false,
+)
 abstract class PlayHistoryDatabase : RoomDatabase() {
     abstract fun playHistoryDao(): PlayHistoryDao
     abstract fun favoritesDao(): FavoritesDao
+    abstract fun gameLinksDao(): GameLinksDao
 
     companion object {
         @Volatile private var instance: PlayHistoryDatabase? = null
@@ -130,15 +212,65 @@ abstract class PlayHistoryDatabase : RoomDatabase() {
             }
         }
 
+        // The user's links (docs/SPEC.md 7g, 7m) and the update source's
+        // answers: two new tables, nothing existing touched, for the same
+        // reason as MIGRATION_1_2.
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `game_links` (`id` TEXT NOT NULL, `game_name` TEXT, " +
+                        "`f95_thread` INTEGER, PRIMARY KEY(`id`))",
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `f95_threads` (`thread_id` INTEGER NOT NULL, " +
+                        "`last_changed` INTEGER NOT NULL, `version` TEXT, `checked_at` INTEGER NOT NULL, " +
+                        "`gone` INTEGER NOT NULL, PRIMARY KEY(`thread_id`))",
+                )
+            }
+        }
+
         fun get(context: Context): PlayHistoryDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     PlayHistoryDatabase::class.java,
                     "droidtop-play-history.db",
-                ).addMigrations(MIGRATION_1_2).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
             }
     }
+}
+
+class RoomGameLinksStore(context: Context) : GameLinksStore {
+    private val dao = PlayHistoryDatabase.get(context).gameLinksDao()
+
+    override suspend fun getAll(ids: Collection<String>): Map<String, GameLinks> {
+        if (ids.isEmpty()) return emptyMap()
+        val links = ids.chunked(MAX_IDS_PER_QUERY).flatMap { dao.getLinks(it) }
+        if (links.isEmpty()) return emptyMap()
+        val threads = links.mapNotNull { it.f95Thread }.distinct()
+        val checks = threads.chunked(MAX_IDS_PER_QUERY).flatMap { dao.getThreads(it) }.associateBy { it.threadId }
+        return links.associate { row ->
+            row.id to GameLinks(row.gameName, row.f95Thread, row.f95Thread?.let { checks[it]?.toCheck() })
+        }
+    }
+
+    override suspend fun setGameName(ids: Collection<String>, name: String) = dao.setGameName(ids, name)
+
+    override suspend fun setF95Thread(ids: Collection<String>, thread: Long?) = dao.setF95Thread(ids, thread)
+
+    override suspend fun moveTo(fromId: String, toId: String) = dao.moveTo(fromId, toId)
+
+    override suspend fun linkedThreads(): Map<Long, F95ThreadCheck?> {
+        val threads = dao.linkedThreadIds()
+        val checks = threads.chunked(MAX_IDS_PER_QUERY).flatMap { dao.getThreads(it) }.associateBy { it.threadId }
+        return threads.associateWith { checks[it]?.toCheck() }
+    }
+
+    override suspend fun idsLinkedTo(thread: Long): List<String> = dao.idsLinkedTo(thread)
+
+    override suspend fun saveCheck(check: F95ThreadCheck) = dao.putThread(
+        F95ThreadEntity(check.thread, check.lastChanged, check.version, check.checkedAtEpochMs, check.gone),
+    )
 }
 
 class RoomFavoritesStore(context: Context) : FavoritesStore {

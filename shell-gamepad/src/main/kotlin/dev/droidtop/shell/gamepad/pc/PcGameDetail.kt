@@ -40,21 +40,29 @@ import coil3.compose.AsyncImage
 import dev.droidtop.library.EngineHost
 import dev.droidtop.library.EngineOverridePrefs
 import dev.droidtop.library.EnginesDatabase
+import dev.droidtop.library.F95Thread
 import dev.droidtop.library.GameEngine
+import dev.droidtop.library.GameLinks
+import dev.droidtop.library.GameNaming
+import dev.droidtop.library.GameUpdates
 import dev.droidtop.library.GameLaunchStrategy
 import dev.droidtop.library.LaunchStrategyOverridePrefs
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
+import dev.droidtop.library.LibraryGrouping
+import dev.droidtop.library.MissingGames
 import dev.droidtop.library.PcRunnerOptions
 import dev.droidtop.library.PcRunners
 import dev.droidtop.library.ResolvedRunner
 import dev.droidtop.library.RunnerState
 import dev.droidtop.library.displayName
+import dev.droidtop.library.SimilarGames
 import dev.droidtop.library.scraper.PcScraper
 import dev.droidtop.shell.gamepad.CollectionMembershipEditor
 import dev.droidtop.shell.gamepad.ManualMatchPicker
 import dev.droidtop.shell.gamepad.MenuTokens
+import dev.droidtop.shell.gamepad.TextEditDialog
 import dev.droidtop.shell.gamepad.selectionFrame
 import dev.droidtop.shell.gamepad.MediaViewer
 import dev.droidtop.shell.gamepad.input.GamepadAction
@@ -117,6 +125,8 @@ internal fun PcGameDetail(
     var pickingMatch by remember(entry) { mutableStateOf(false) }
     var editingCollections by remember(entry) { mutableStateOf(false) }
     var pickingReplacement by remember(entry) { mutableStateOf(false) }
+    var pickingSameGame by remember(entry) { mutableStateOf(false) }
+    var editingThread by remember(entry) { mutableStateOf(false) }
     var pickingEngine by remember(entry) { mutableStateOf(false) }
     var engineChoice by remember(entry) { mutableStateOf(EngineChoice.NONE) }
 
@@ -153,19 +163,24 @@ internal fun PcGameDetail(
 
     // The game this entry is one folder of: the game's own name for the
     // header, whether or not there is anything to choose between. And who
-    // this game could be, or who could be it (docs/SPEC.md 7g). Both are
-    // names only, no filesystem, but they derive a name for and compare
-    // against every sibling -- the whole Games list -- so they are worked
-    // out on the Default dispatcher, never in composition (docs/SPEC.md
-    // 7g, "no per-item work where a list is drawn"). Until they are, the
-    // header names the game from this folder alone and no row offers a
-    // version or a replacement.
+    // this game could be, or who could be it (docs/SPEC.md 7g), and which
+    // other games it might be the same as (7m, "The same game"). All
+    // three are names only, no filesystem, but they derive a name for and
+    // compare against every sibling -- the whole Games list -- so they are
+    // worked out on the Default dispatcher, never in composition
+    // (docs/SPEC.md 7g, "no per-item work where a list is drawn"), and for
+    // THIS game only: nothing compares every game with every other. Until
+    // they are, the header names the game from this folder alone and no
+    // row offers a version, a replacement or a merge.
     val worked by produceState(DetailNames.NONE, entry, siblings) {
         value = withContext(Dispatchers.Default) {
+            val groups = LibraryGrouping.group(siblings)
+            val grouping = groups.firstOrNull { it.entriesByPath.containsKey(entry.id) }
             DetailNames(
                 forId = entry.id,
-                grouping = dev.droidtop.library.LibraryGrouping.groupOf(entry, siblings),
+                grouping = grouping,
                 replacements = replacementCandidatesFor(entry, siblings),
+                similar = if (entry.missing || grouping == null) emptyList() else SimilarGames.candidates(grouping, groups),
             )
         }
     }
@@ -174,6 +189,20 @@ internal fun PcGameDetail(
     val names = worked.takeIf { it.forId == entry.id } ?: DetailNames.NONE
     val grouping = names.grouping
     val group = grouping?.takeIf { it.hasChoices }
+
+    // The game's update source (docs/SPEC.md 7g): a thread link is the
+    // GAME's, so it is read and written for every folder of it, and read
+    // from the library rather than from [entry], which is the list's copy
+    // from before anything on this screen changed it.
+    val isFolder = entry.id.startsWith("/")
+    val gameIds = grouping?.entriesByPath?.keys ?: setOf(entry.id)
+    var linksToken by remember(entry) { mutableStateOf(0) }
+    val links by produceState<GameLinks?>(null, gameIds, linksToken) {
+        value = if (isFolder) library.gameLinks(gameIds) else null
+    }
+    val versions = grouping?.game?.allVersions?.map { it.version }
+        ?: if (isFolder) listOf(GameNaming.derive(entry.id).version) else emptyList()
+    val available = GameUpdates.available(links?.latestKnown ?: entry.latestKnown, versions)
 
     // Media is a folder listing (EsDeArtwork), which is disk work: IO
     // dispatcher, and "no media" until it answers.
@@ -238,11 +267,33 @@ internal fun PcGameDetail(
         ManualMatchPicker(entry = entry, onApplied = { status = it }, onDismiss = { pickingMatch = false })
     }
     if (pickingReplacement) {
-        MissingReplacementPicker(
-            entry = entry,
-            candidates = names.replacements,
-            library = library,
-            onFolded = { message ->
+        val candidates = names.replacements
+        SameGamePicker(
+            focusLabel = if (entry.missing) "Find its replacement" else "This replaces a missing game",
+            question = if (entry.missing) "Which game replaced ${entry.title}?" else "Which missing game is ${entry.title}?",
+            choices = candidates.map { SameGameChoice(it.entry.title, it.line()) },
+            confirmLine = { choice ->
+                if (entry.missing) {
+                    "Press again: ${entry.title} becomes ${choice.title}, and its history, favourite and collections move there"
+                } else {
+                    "Press again: ${choice.title} becomes this game, and its history, favourite and collections move here"
+                }
+            },
+            workingLine = "Moving this game's history across...",
+            onPick = { index ->
+                // Whichever side this screen is on, the missing entry is
+                // the one that goes and the present one is the one that
+                // stays.
+                val candidate = candidates[index].entry
+                val missing = if (entry.missing) entry else candidate
+                val replacement = if (entry.missing) candidate else entry
+                if (library.replaceMissing(missing, replacement)) {
+                    "${missing.title} is now ${replacement.title}."
+                } else {
+                    "${missing.title} could not be folded into ${replacement.title}."
+                }
+            },
+            onDone = { message ->
                 status = message
                 // The entry that is gone is gone: staying on its screen
                 // would be a detail of nothing. The one that remains is
@@ -250,6 +301,60 @@ internal fun PcGameDetail(
                 if (entry.missing) onClose() else pickingReplacement = false
             },
             onDismiss = { pickingReplacement = false },
+        )
+    }
+    val sameGame = grouping
+    if (pickingSameGame && sameGame != null) {
+        val candidates = names.similar
+        val here = GameNaming.displayName(sameGame.game.name)
+        SameGamePicker(
+            focusLabel = "The same game as",
+            question = "Which game is the same game as $here?",
+            choices = candidates.map { SameGameChoice(GameNaming.displayName(it.group.game.name), it.line()) },
+            confirmLine = { choice ->
+                "Press again: ${choice.title} becomes part of $here. Both folders stay; the history, favourite and collections move to one card"
+            },
+            workingLine = "Making them one game...",
+            onPick = { index ->
+                val other = candidates[index].group
+                if (library.mergeGames(sameGame, other)) {
+                    "${GameNaming.displayName(other.game.name)} is now part of $here."
+                } else {
+                    "${GameNaming.displayName(other.game.name)} could not be made part of $here."
+                }
+            },
+            onDone = { message ->
+                status = message
+                pickingSameGame = false
+            },
+            onDismiss = { pickingSameGame = false },
+        )
+    }
+    if (editingThread) {
+        TextEditDialog(
+            title = "F95zone thread",
+            subtitle = "Paste the game's thread link, or its number. droidtop asks F95Checker's public index " +
+                "for the thread's newest version; no F95zone account is needed. Clear it and save to unlink.",
+            initial = links?.f95Thread?.let { F95Thread.url(it) }.orEmpty(),
+            onCommit = { text ->
+                editingThread = false
+                val thread = F95Thread.parse(text)
+                if (text.isNotBlank() && thread == null) {
+                    status = "That is not an F95zone thread link: it should look like f95zone.to/threads/<name>.<number>/"
+                } else {
+                    scope.launch {
+                        status = if (thread == null) "Unlinking..." else "Asking about thread $thread..."
+                        val failure = library.linkF95Thread(gameIds, thread)
+                        status = when {
+                            failure != null -> "Linked thread $thread, but asking about it failed: $failure"
+                            thread == null -> "Unlinked. This game is no longer checked for updates."
+                            else -> null
+                        }
+                        linksToken++
+                    }
+                }
+            },
+            onDismiss = { editingThread = false },
         )
     }
 
@@ -262,6 +367,35 @@ internal fun PcGameDetail(
         onOpenOther = onOpenOther,
         replacements = replacements.size,
         onReplace = { pickingReplacement = true },
+        sameGameRow = names.similar.size.takeIf { it > 0 }?.let { count ->
+            PcActionRow(
+                "The same game as...",
+                "$count ${if (count == 1) "game has a similar name" else "games have similar names"}; " +
+                    "picking one makes the two one game, keeping both folders",
+                { pickingSameGame = true },
+            )
+        },
+        updateRows = if (!isFolder) {
+            emptyList()
+        } else {
+            listOfNotNull(
+                PcActionRow("F95zone thread", f95Line(links, available, versions), { editingThread = true }),
+                links?.f95Thread?.let { thread ->
+                    PcActionRow(
+                        "Check for an update now",
+                        links?.check?.let { "Last asked " + android.text.format.DateUtils.getRelativeTimeSpanString(it.checkedAtEpochMs) }
+                            ?: "Not asked yet",
+                        {
+                            scope.launch {
+                                status = "Asking about thread $thread..."
+                                status = library.checkF95ThreadNow(thread)
+                                linksToken++
+                            }
+                        },
+                    )
+                },
+            )
+        },
         entry = entry,
         runner = runner,
         media = media.size,
@@ -348,7 +482,7 @@ internal fun PcGameDetail(
             // no scraped art gets the same plate with the same title and
             // identity line over it, so the screen has the same shape
             // either way (research/ui-polish item 18).
-            item { PcDetailHeader(entry, grouping) }
+            item { PcDetailHeader(entry, grouping, available) }
 
             // A game the walk no longer finds has no runner question to
             // answer and nothing to play: the folder it was is not there.
@@ -469,7 +603,7 @@ internal fun PcGameDetail(
  * big it is -- or, for a game the walk no longer finds, the one fact
  * that matters, in the words the card uses (docs/SPEC.md 7g).
  */
-private fun LibraryEntry.identityLine(): String = if (missing) "broken - missing" else buildString {
+private fun LibraryEntry.identityLine(update: String?): String = if (missing) "broken - missing" else buildString {
     append(sourceLabel())
     engineLabel()?.let { append(" - ").append(it) }
     val size = pcInfo?.sizeBytes ?: 0L
@@ -479,6 +613,28 @@ private fun LibraryEntry.identityLine(): String = if (missing) "broken - missing
         append(if (pcInfo?.installed == true) " installed" else " to download")
     } else if (pcInfo?.installed == false) {
         append(" - not installed")
+    }
+    // The same words as the card's line (docs/SPEC.md 7g).
+    update?.let { append(" - ").append(GameUpdates.line(it)) }
+}
+
+/**
+ * What the F95zone thread row says: whether a thread is linked, and what
+ * its update source last answered, in the one wording for an update
+ * ([GameUpdates.line]).
+ */
+private fun f95Line(links: GameLinks?, available: String?, versions: List<String>): String {
+    val thread = links?.f95Thread
+        ?: return "Not linked. Paste the game's F95zone thread link to be told when a new version is out"
+    val check = links.check
+    val newest = check?.version
+    return when {
+        check == null -> "Thread $thread - not asked yet"
+        check.gone -> "Thread $thread is gone: private, moved or deleted"
+        available != null -> "${GameUpdates.line(available)} - thread $thread"
+        newest == null -> "Thread $thread gives no version"
+        versions.none { it.isNotEmpty() } -> "The thread's newest is $newest; this game's folders name no version to compare"
+        else -> "Up to date: $newest is the thread's newest - thread $thread"
     }
 }
 
@@ -502,6 +658,8 @@ private fun rememberPcActions(
     onOpenOther: (LibraryEntry) -> Unit,
     replacements: Int,
     onReplace: () -> Unit,
+    sameGameRow: PcActionRow?,
+    updateRows: List<PcActionRow>,
     entry: LibraryEntry,
     runner: ResolvedRunner?,
     media: Int,
@@ -555,9 +713,13 @@ private fun rememberPcActions(
                     )
                     else -> null
                 },
+                // Two games here that are one game (docs/SPEC.md 7m):
+                // offered only when another game's name is alike enough.
+                sameGameRow,
                 // Which engine this folder is, and the pin that corrects
                 // detection (docs/SPEC.md 7e2b).
                 engineRow,
+            ) + updateRows + listOfNotNull(
                 // One row, not three: install, verify, update, DLC and
                 // delete are one screen on the store's side, and that
                 // screen is the store's own (gamenative's AppScreen for
@@ -693,7 +855,7 @@ private fun row(
         append(if (target?.id == currentId) "Open now" else "Open this one")
         copy?.language?.let { append(" - ").append(it) }
         if (copy?.mods?.isNotEmpty() == true) append(" - ").append(copy.mods.joinToString(" "))
-        if (version.updateAvailable) append(" - ").append(version.latestKnown).append(" is available")
+        version.latestKnown?.let { append(" - ").append(GameUpdates.line(it)) }
     }
     return PcActionRow(title, detail, if (target == null || target.id == currentId) null else ({ onOpenOther(target) }))
 }
@@ -762,11 +924,30 @@ private fun missingFolderLine(entry: LibraryEntry): String =
 private data class DetailNames(
     val forId: String?,
     val grouping: dev.droidtop.library.LibraryGameGroup?,
-    val replacements: List<dev.droidtop.library.MissingGames.Candidate>,
+    val replacements: List<MissingGames.Candidate>,
+    val similar: List<SimilarGames.Candidate>,
 ) {
     companion object {
-        val NONE = DetailNames(forId = null, grouping = null, replacements = emptyList())
+        val NONE = DetailNames(forId = null, grouping = null, replacements = emptyList(), similar = emptyList())
     }
+}
+
+/**
+ * What a replacement row says under the name: whether this is the same
+ * game by name or a suggestion, and where it is. Never a bare percentage
+ * -- "0.73" is not a reason a person can act on, and the path is.
+ */
+private fun MissingGames.Candidate.line(): String {
+    val where = entry.id.takeIf { it.startsWith("/") }
+    val why = if (certain) "The same name" else "A similar name"
+    return listOfNotNull(why, where).joinToString(" - ")
+}
+
+/** The same for a game that might be this one: why, and where its folders are. */
+private fun SimilarGames.Candidate.line(): String {
+    val folders = group.entriesByPath.keys.sorted()
+    val where = folders.first() + if (folders.size > 1) " and ${folders.size - 1} more" else ""
+    return "A similar name - $where"
 }
 
 /**
@@ -778,8 +959,8 @@ private data class DetailNames(
 private fun replacementCandidatesFor(
     entry: LibraryEntry,
     siblings: List<LibraryEntry>,
-): List<dev.droidtop.library.MissingGames.Candidate> =
-    dev.droidtop.library.MissingGames.candidates(
+): List<MissingGames.Candidate> =
+    MissingGames.candidates(
         target = entry,
         among = siblings.filter { it.missing != entry.missing },
     )
@@ -805,7 +986,7 @@ private const val EXTRA_PC_TITLE = "dev.droidtop.app.extra.PC_TITLE"
  * no stand-in cover art, because a made-up cover is a lie about a game.
  */
 @Composable
-private fun PcDetailHeader(entry: LibraryEntry, grouping: dev.droidtop.library.LibraryGameGroup?) {
+private fun PcDetailHeader(entry: LibraryEntry, grouping: dev.droidtop.library.LibraryGameGroup?, update: String?) {
     // The header names the GAME and then says which folder of it is open,
     // in the words the "Parts and versions" rows use. The card in the grid
     // already said "BeingADIK"; this screen said "BeingADik - Chap3+", the
@@ -862,7 +1043,7 @@ private fun PcDetailHeader(entry: LibraryEntry, grouping: dev.droidtop.library.L
                     )
                 }
                 Text(
-                    entry.identityLine(),
+                    entry.identityLine(update),
                     color = MenuTokens.Value,
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,

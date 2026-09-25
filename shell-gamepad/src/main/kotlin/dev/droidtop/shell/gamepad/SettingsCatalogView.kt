@@ -276,7 +276,11 @@ fun CatalogNavigator(
     val textItem = editingText
     if (textItem != null) {
         TextEditDialog(
-            item = textItem,
+            title = textItem.title,
+            subtitle = textItem.subtitle,
+            initial = textItem.value,
+            multiline = textItem.multiline,
+            secret = textItem.secret,
             onCommit = { newValue ->
                 editingText = null
                 // Refresh after the write returns, so the re-read sees it.
@@ -633,13 +637,23 @@ internal fun CatalogChoicePicker(
     }
 }
 
+/**
+ * The shell's one text-entry dialog: a settings row's value, and anything
+ * else a person types or pastes (an F95zone thread link on a game's
+ * screen). Paste is there because what gets typed here is usually copied
+ * from somewhere else.
+ */
 @Composable
-private fun TextEditDialog(
-    item: TextInputItem,
+internal fun TextEditDialog(
+    title: String,
+    subtitle: String?,
+    initial: String,
     onCommit: (String) -> Unit,
     onDismiss: () -> Unit,
+    multiline: Boolean = false,
+    secret: Boolean = false,
 ) {
-    var value by remember(item) { mutableStateOf(item.value) }
+    var value by remember(title, initial) { mutableStateOf(initial) }
     Dialog(onDismissRequest = onDismiss) {
         Column(
             Modifier
@@ -647,22 +661,22 @@ private fun TextEditDialog(
                 .background(MenuTokens.OverlaySurface)
                 .padding(20.dp),
         ) {
-            Text(item.title, color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
-            item.subtitle?.let {
+            Text(title, color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
+            subtitle?.let {
                 Text(it, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
             }
             BasicTextField(
                 value = value,
                 onValueChange = { value = it },
-                singleLine = !item.multiline,
+                singleLine = !multiline,
                 // The keyboard's own Done key saves a one-line value: the
                 // on-screen keyboard can cover the dialog's Save button
                 // (rig, dq-desk2-02, a container rename in landscape).
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                    imeAction = if (item.multiline) androidx.compose.ui.text.input.ImeAction.Default else androidx.compose.ui.text.input.ImeAction.Done,
+                    imeAction = if (multiline) androidx.compose.ui.text.input.ImeAction.Default else androidx.compose.ui.text.input.ImeAction.Done,
                 ),
                 keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { onCommit(value) }),
-                visualTransformation = if (item.secret) PasswordVisualTransformation() else VisualTransformation.None,
+                visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = MenuTokens.OnSurface),
                 modifier = Modifier
                     .fillMaxWidth()

@@ -182,6 +182,31 @@ data class LibraryEntry(
      * can say.
      */
     val missing: Boolean = false,
+    /**
+     * The game the user said this folder is, by making two entries one
+     * game (docs/SPEC.md 7m, "The same game"); null is the name the
+     * folder's own name derives. A library fact ([GameLinksStore]),
+     * joined when the library publishes, like play history: no walk
+     * writes it.
+     */
+    val gameName: String? = null,
+    /**
+     * The F95zone thread the user linked to this game, by id (docs/SPEC.md
+     * 7g, "Where an update comes from"). A library fact, like [gameName].
+     */
+    val f95Thread: Long? = null,
+    /**
+     * The newest version the update source last reported for [f95Thread],
+     * as it wrote it; null until it has been asked. A library fact.
+     */
+    val latestKnown: String? = null,
+    /**
+     * Set only on the entry a list draws for a whole game
+     * ([LibraryGameGroup.displayEntry]): the version a source knows of
+     * that none of the game's folders is ([GroupedGame.availableUpdate]).
+     * One folder cannot know this; the game can.
+     */
+    val availableUpdate: String? = null,
 ) {
     /**
      * The image file this entry should show for a themed element that
@@ -627,7 +652,13 @@ interface LibraryProvider {
  * not know about.
  */
 interface EntryFactsOwner {
-    suspend fun moveEntryFacts(fromId: String, toId: String)
+    /**
+     * Moves what this provider knows about [fromId] to [toId]. With
+     * [keepSource] (two present games made one, [Library.mergeGames]) a
+     * scraped row is copied and [fromId] keeps its own, because its folder
+     * is still there; without it (a missing game folded away) it moves.
+     */
+    suspend fun moveEntryFacts(fromId: String, toId: String, keepSource: Boolean)
 }
 
 /** What [Library.launch] by id did: the game was dispatched, or why it was not, in words a person can read. */
@@ -645,7 +676,13 @@ class Library(
     private val records: GameRecordStore = NoOpGameRecordStore,
     /** Asked before each slow round; false (battery saver) skips that round (docs/SPEC.md 7g). */
     private val slowRoundAllowed: () -> Boolean = { true },
+    /** What the user said about a game (its name after a merge, its F95zone thread) and the update source's answers (docs/SPEC.md 7g, 7m). */
+    private val links: GameLinksStore = NoOpGameLinksStore,
+    /** Where a linked thread's newest version is asked (docs/SPEC.md 7g, "Where an update comes from"). */
+    f95Api: F95CheckerApi = HttpF95CheckerApi,
 ) {
+    private val updates = F95UpdateCheck(links, f95Api)
+
     private val scanScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val backgroundScanStates = ConcurrentHashMap<Set<LibraryEntryKind>, MutableStateFlow<List<LibraryEntry>?>>()
 
@@ -941,11 +978,68 @@ class Library(
             delay(SLOW_REBUILD_START_DELAY_MS)
             while (true) {
                 observed.first { it }
+                // The update check rides the same clock and the same
+                // conditions (observed, not in battery saver) but never
+                // the same coroutine: it is network, a walk is disk, and
+                // neither waits for the other (docs/SPEC.md 7g, "Where an
+                // update comes from").
+                if (slowRoundAllowed()) checkUpdatesInBackground()
                 activeWalks.first { it == 0 }
                 if (slowRoundAllowed()) runObservedRound()
                 waitForNextRound()
             }
         }
+    }
+
+    /**
+     * A round of update checks over the linked threads that are due, on
+     * [scanScope] and never awaited by anything: a walk does not wait for
+     * the network, and an answer reaches the lists when it arrives.
+     */
+    private fun checkUpdatesInBackground() {
+        scanScope.coroutineLaunch { publishUpdates(updates.round()) }
+    }
+
+    /** Hands an update round's answers to every list, when it changed anything. */
+    private suspend fun publishUpdates(outcome: F95UpdateCheck.Outcome?) {
+        if (outcome == null || outcome.changedIds.isEmpty()) return
+        changedFactIds += outcome.changedIds
+        republish()
+    }
+
+    /**
+     * What the user said about the game [ids] are the folders of, and what
+     * its update source last answered: the thread, when one is linked.
+     */
+    suspend fun gameLinks(ids: Collection<String>): GameLinks? = withContext(Dispatchers.IO) {
+        val all = links.getAll(ids)
+        all.values.firstOrNull { it.f95Thread != null } ?: all.values.firstOrNull()
+    }
+
+    /**
+     * Links [thread] to the game whose folders are [ids] -- every folder,
+     * because a thread is the game's, not one version's -- or unlinks it
+     * when [thread] is null, and asks about a newly linked thread at once
+     * (docs/SPEC.md 7g). Returns why the ask failed, or null.
+     */
+    suspend fun linkF95Thread(ids: Collection<String>, thread: Long?): String? = withContext(Dispatchers.IO) {
+        links.setF95Thread(ids, thread)
+        changedFactIds += ids
+        val outcome = thread?.let { updates.round(only = it) }
+        changedFactIds += outcome?.changedIds.orEmpty()
+        republish()
+        outcome?.error
+    }
+
+    /**
+     * Asks about [thread] now, a person's "Check now": the same round,
+     * limited to one thread and to once a minute ([F95UpdateCheck]).
+     * Returns why the ask failed, or null.
+     */
+    suspend fun checkF95ThreadNow(thread: Long): String? = withContext(Dispatchers.IO) {
+        val outcome = updates.round(only = thread) ?: return@withContext "A check is already running; try again in a moment."
+        publishUpdates(outcome)
+        outcome.error
     }
 
     /** One round, cancelled by an ordinary walk starting or by the last observer leaving. */
@@ -1234,6 +1328,7 @@ class Library(
     private inner class LibraryFacts {
         private val history = java.util.concurrent.ConcurrentHashMap<String, PlayHistoryRecord>()
         private val favorite = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+        private val linked = java.util.concurrent.ConcurrentHashMap<String, GameLinks>()
         private val asked = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
         /**
@@ -1247,9 +1342,11 @@ class Library(
             changed.removeAll(ids.toSet())
             val played = playHistory.getAll(ids)
             val favourites = favorites.getAll(ids)
+            val said = links.getAll(ids)
             for (id in ids) {
                 played[id]?.let { history[id] = it } ?: history.remove(id)
                 if (id in favourites) favorite.add(id) else favorite.remove(id)
+                said[id]?.let { linked[id] = it } ?: linked.remove(id)
             }
         }
 
@@ -1258,12 +1355,11 @@ class Library(
             if (ids.isEmpty()) return
             history.putAll(playHistory.getAll(ids))
             favorite.addAll(favorites.getAll(ids))
+            linked.putAll(links.getAll(ids))
         }
 
-        fun apply(entries: List<LibraryEntry>): List<LibraryEntry> {
-            if (history.isEmpty() && favorite.isEmpty()) return entries
-            return entries.map { entry -> entry.withFacts(history[entry.id], entry.id in favorite) }
-        }
+        fun apply(entries: List<LibraryEntry>): List<LibraryEntry> =
+            entries.map { entry -> entry.withFacts(history[entry.id], entry.id in favorite, linked[entry.id]) }
     }
 
     /**
@@ -1325,8 +1421,9 @@ class Library(
         if (!missing.missing || missing.id == replacement.id) return@withContext false
         playHistory.moveTo(missing.id, replacement.id)
         favorites.moveTo(missing.id, replacement.id)
+        links.moveTo(missing.id, replacement.id)
         changedFactIds += listOf(missing.id, replacement.id)
-        providers.filterIsInstance<EntryFactsOwner>().forEach { it.moveEntryFacts(missing.id, replacement.id) }
+        providers.filterIsInstance<EntryFactsOwner>().forEach { it.moveEntryFacts(missing.id, replacement.id, keepSource = false) }
         for (provider in providers.filter { it.indexed }) {
             withContext(kotlinx.coroutines.NonCancellable) {
                 lockOf(provider).withLock {
@@ -1343,6 +1440,49 @@ class Library(
             state.value = withLibraryFacts(current.filterNot { it.id == missing.id })
         }
         ScanLog.write("index: ${missing.id} folded into ${replacement.id}")
+        true
+    }
+
+    /**
+     * Two games in the library are one game (docs/SPEC.md 7m, "The same
+     * game"): every folder of [other] becomes a folder of [game], under
+     * [game]'s name, and stays exactly where it is. Both are here, so both
+     * stay playable, as versions or parts of one game. This is Pythia's
+     * `reconciliation.merge`, kept as the one fact it changes: the name
+     * the folders are grouped under ([GameLinksStore.setGameName]).
+     *
+     * What the two cards carried becomes the one card's, the way the fold
+     * of a missing game does it ([replaceMissing]): play history (counts
+     * added, the later last-played kept), the favourite and collection
+     * memberships move from each card's entry to the entry the merged
+     * game's card is. Unlike the fold, a scraped metadata row is only
+     * COPIED into an empty place and never taken away, because the folder
+     * it describes is still here.
+     *
+     * Returns false for a merge that is not one: a game with itself, or a
+     * game that is not folders on this device (a store row's name is the
+     * store's, not droidtop's to change).
+     */
+    suspend fun mergeGames(game: LibraryGameGroup, other: LibraryGameGroup): Boolean = withContext(Dispatchers.IO) {
+        val keep = game.entriesByPath.keys
+        val fold = other.entriesByPath.keys
+        if (keep.isEmpty() || fold.isEmpty() || keep.any { it in fold }) return@withContext false
+        if (!(keep + fold).all { it.startsWith("/") }) return@withContext false
+        val name = game.game.name
+        links.setGameName(fold, name)
+        // The card the merged game will draw, worked out the way the list
+        // will work it out, so the facts land on the entry that shows them.
+        val merged = LibraryGrouping.group(game.entriesByPath.values + other.entriesByPath.values.map { it.copy(gameName = name) })
+            .singleOrNull()
+        val target = (merged ?: game).displayEntry.id
+        for (source in setOf(game.displayEntry.id, other.displayEntry.id) - target) {
+            playHistory.moveTo(source, target)
+            favorites.moveTo(source, target)
+            providers.filterIsInstance<EntryFactsOwner>().forEach { it.moveEntryFacts(source, target, keepSource = true) }
+        }
+        changedFactIds += keep + fold
+        republish()
+        ScanLog.write("index: ${fold.size} folder(s) of ${other.game.name} are now the game $name")
         true
     }
 
@@ -1550,15 +1690,26 @@ class Library(
         val ids = entries.map { it.id }
         val history = playHistory.getAll(ids)
         val favorite = favorites.getAll(ids)
-        if (history.isEmpty() && favorite.isEmpty()) return entries
-        return entries.map { entry -> entry.withFacts(history[entry.id], entry.id in favorite) }
+        val said = links.getAll(ids)
+        return entries.map { entry -> entry.withFacts(history[entry.id], entry.id in favorite, said[entry.id]) }
     }
 
-    private fun LibraryEntry.withFacts(played: PlayHistoryRecord?, isFavorite: Boolean): LibraryEntry {
+    private fun LibraryEntry.withFacts(played: PlayHistoryRecord?, isFavorite: Boolean, said: GameLinks?): LibraryEntry {
         val withHistory = played?.let { copy(lastPlayedEpochMs = it.lastPlayedEpochMs, playCount = it.playCount) } ?: this
         // A ROM's favourite came from its provider already; this store
         // only ever holds the other kinds, so a hit is authoritative.
-        return if (isFavorite) withHistory.copy(favorite = true) else withHistory
+        val withFavourite = if (isFavorite && !withHistory.favorite) withHistory.copy(favorite = true) else withHistory
+        // The links are the library's alone, so they are set from the
+        // store every time, absent included: an entry that went through a
+        // record or the index carrying an old answer does not keep it.
+        val name = said?.gameName
+        val thread = said?.f95Thread
+        val latest = said?.latestKnown
+        return if (withFavourite.gameName == name && withFavourite.f95Thread == thread && withFavourite.latestKnown == latest) {
+            withFavourite
+        } else {
+            withFavourite.copy(gameName = name, f95Thread = thread, latestKnown = latest)
+        }
     }
 
     private companion object {

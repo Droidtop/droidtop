@@ -5427,6 +5427,68 @@ history and favourites are applied to whatever list the library hands out,
 index or walk (`withLibraryFacts`), so nothing about an entry differs by
 where it came from.
 
+### Where an update comes from (2026-09-25)
+
+`GameVersion.latestKnown` / "an update is available" (7m) has one source:
+**F95Checker's public index, `api.f95checker.dev`**, for games the user has
+linked to their F95zone thread. It is the index F95Checker itself reads
+(its `modules/api.py`, `fast_check` and `full_check`), ported through the
+user's own Pythia (`plugin_sources/library/f95/f95_update_check.py`), and
+it needs no F95zone account: neither call sends a cookie. Nothing else
+claims an update; a game with no link says nothing about updates, which is
+not the same as "up to date" and is not shown as such.
+
+**How droidtop learns a game's thread: the user tells it.** A folder game's
+detail has an "F95zone thread" row; the user pastes the thread's link (the
+browser's `f95zone.to/threads/<name>.<id>/`, the short form, or the bare
+number, `F95Thread.parse`). Nothing on disk says which thread a game is --
+a game's own files do not carry it, and a folder name is not an id -- and
+Pythia learns it the same way, from what the user told F95Checker (its
+watch list, imported), never by guessing from a name. The link is the
+GAME's, so it is written to every folder of the game at once and read from
+whichever folder holds it (`LibraryGameGroup.f95Thread`); a missing game
+folded into its replacement carries its link across (`GameLinksStore.moveTo`,
+only into an empty place).
+
+**What is kept.** Two tables in the library's own database beside play
+history and favourites (`PlayHistoryDatabase`, `game_links` and
+`f95_threads`): the user's links, and for each linked thread the index's
+last-changed stamp, the version it gave, when it was asked and whether the
+thread is gone. They are LIBRARY FACTS like play history: joined onto every
+list the library publishes (`LibraryEntry.f95Thread`, `latestKnown`), never
+written by a walk, never in a game record.
+
+**When it asks, and how little** (`F95UpdateCheck`). Rounds ride the slow
+pass's clock and its conditions -- only while something observes the
+library, never in battery saver -- but run in their own coroutine: a walk
+never waits for the network, and an answer reaches the lists when it
+arrives (`Library.checkUpdatesInBackground`, then `republish`). A thread is
+asked about at most once every six hours; linking a thread, or the detail's
+"Check for an update now", asks about that one thread at once, but not
+twice within a minute. A round is Pythia's: one fast check of up to ten
+threads per request, and a full check only for a thread whose last-changed
+stamp moved past the one kept (or that has no version yet). Requests are a
+second apart; one round runs at a time; a failure (the index down, no
+network) changes nothing it did not finish and the next round asks again.
+The index refuses a whole batch when one id in it is not a thread, so a
+refused batch is asked one thread at a time, and a thread it does not know,
+or answers 400/403/404 for, is recorded as gone.
+
+**When it is an update** (`GameUpdates.available`). Pythia's rule: the
+version the thread gives is an update when it is none of the game's own
+versions, compared as both sides write them less a leading `v`. It is the
+game's fact, so a game that already has the thread's version in any folder
+claims nothing, and every version row of a game that lacks it says so. Two
+cases claim nothing: a thread that gives no version (blank, F95Checker's
+`N/A`), and a game none of whose folders names a version, where there is
+nothing to compare -- Pythia skips that case too.
+
+**One wording, everywhere it shows** (`GameUpdates.line`, "v0.9.6 is
+available"): the card's second line (from `LibraryGameGroup.displayEntry`'s
+`availableUpdate`, which only the whole game can know), the detail's
+identity line under the title, the F95zone thread row, and every "Parts and
+versions" row.
+
 ### One file per game is the truth; the index is a light layer over it (directed 2026-09-21)
 
 The user, on the console's performance and on what the index should be: "We
@@ -7141,6 +7203,36 @@ rather than a second measure of its own. A missing folder is still one of
 the game's versions until it is folded away, so it keeps its row in
 "Parts and versions" and that row's detail is where "Find its
 replacement" lives.
+
+### The same game: two entries made one by the user (2026-09-25)
+
+A third question, and the one Pythia found live in its own library: a
+game whose folder names drifted apart -- a rename between releases, two
+roots that spell it differently -- lands as two cards, and never goes
+missing, so the fold above never offers it. Pythia answers it with
+`reconciliation.find_merge_candidates` and `merge`: pairs at least 0.6
+alike, confirmed by a person. droidtop takes the answer and not the
+all-pairs scan: a game that is here has "The same game as..." on its own
+detail, offered only when some other game's name is at least 0.6 alike
+(`SimilarGames.candidates`, `GameNaming.similarity`, most alike first),
+computed for THAT game against each other game once, from that screen,
+and nowhere else. Only games that are folders on this device are offered
+on either side (a store row's name is the store's), and not a game that is
+only missing (that is the fold's question).
+
+Picking one (`Library.mergeGames`, one-way, confirmed with a second press)
+makes the other game's every folder part of this game: the one fact kept
+is the name those folders are grouped under (`GameLinksStore.setGameName`,
+`LibraryEntry.gameName`, `GameGrouping.Found.name`), which the grouping
+takes over the name a folder derives. Both games' folders stay where they
+are and stay playable, as the merged game's versions and parts; nothing on
+disk moves. What the two cards carried becomes the one card's, as the fold
+does it: play history (counts added, the later last-played kept), the
+favourite and collection memberships move from each card's entry to the
+entry the merged card draws (its newest version). A scraped metadata row is
+COPIED into an empty place and not taken, because its folder is still here
+(`EntryFactsOwner.moveEntryFacts(keepSource = true)`). There is no unmerge
+yet.
 
 ### The UI this needs, and no more
 

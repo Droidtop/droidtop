@@ -366,9 +366,15 @@ interface RomDao {
      * one thing that is carried across regardless is the favourite,
      * which is the user's own word rather than a scrape's. Collection
      * membership is a union: a game in a collection stays in it.
+     *
+     * [keepSource] is for two present games made one
+     * ([dev.droidtop.library.Library.mergeGames]): [fromId]'s folder is
+     * still there, so its row is COPIED into an empty place and stays
+     * its own; only the favourite leaves it, because the favourite is the
+     * card's and the card is now [toId]'s.
      */
     @androidx.room.Transaction
-    suspend fun moveGameFacts(fromId: String, toId: String) {
+    suspend fun moveGameFacts(fromId: String, toId: String, keepSource: Boolean) {
         val from = getGameMetadataSingle(fromId)
         if (from != null) {
             val to = getGameMetadataSingle(toId)
@@ -377,7 +383,11 @@ interface RomDao {
             } else if (from.favorite && !to.favorite) {
                 upsertGameMetadata(to.copy(favorite = true))
             }
-            deleteGameMetadata(listOf(fromId))
+            if (!keepSource) {
+                deleteGameMetadata(listOf(fromId))
+            } else if (from.favorite) {
+                upsertGameMetadata(from.copy(favorite = false))
+            }
         }
         for (collectionId in getCollectionsOf(fromId)) {
             addCollectionMember(CollectionMemberEntity(collectionId, toId))

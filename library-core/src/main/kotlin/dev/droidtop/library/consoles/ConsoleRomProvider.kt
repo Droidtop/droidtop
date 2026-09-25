@@ -942,10 +942,11 @@ class ConsoleRomProvider(
      * metadata lives in it -- not only ROMs' -- so folding a missing
      * game into the game that replaced it moves them here, for whatever
      * kind of game it was (docs/SPEC.md 7g,
-     * [dev.droidtop.library.EntryFactsOwner]).
+     * [dev.droidtop.library.EntryFactsOwner]). Two present games made one
+     * copy the row instead ([keepSource]), since both folders stay.
      */
-    override suspend fun moveEntryFacts(fromId: String, toId: String) {
-        dao.moveGameFacts(fromId, toId)
+    override suspend fun moveEntryFacts(fromId: String, toId: String, keepSource: Boolean) {
+        dao.moveGameFacts(fromId, toId, keepSource)
     }
 
     // Players with this Daijishō-preset flag (DuckStation among them) do
