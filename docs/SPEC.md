@@ -7330,6 +7330,27 @@ Consequences:
   (`Modifier.esDeSwipeSteps`). Those widgets own a cursor and move in
   whole entries rather than scrolling, so no Compose gesture applied to
   them at all before: a themed view could only be driven by a pad.
+- **a looping carousel's wrap animates one step forward, not a dart back
+  across the list (owner, on the RP5 console, 2026-09-25: "it cycles back
+  to the beginning, but by darting back, not continuing to go
+  forward").** The carousel's cursor index already wrapped correctly by
+  modulo (`EsDeSystemListView.step`); its animated scroll position did
+  not, and animated the raw `focusedIndex.toFloat()` as the `Animatable`
+  target, so wrapping from the last entry to the first animated `camOffset`
+  backward through every entry in between. Real ES-DE's `CarouselComponent
+  ::onCursorChanged` picks the SHORTEST signed step instead (its own
+  `posMax` handling), ported as `shortestCamOffsetStep`: the target is
+  `camOffset`'s current value plus or minus one, whichever crosses fewer
+  entries, so wrapping forward continues past `entryCount` and wrapping
+  backward continues past `0` -- `camOffset` is therefore unbounded, and
+  it is the RENDERED index that wraps by modulo (`EsDeSystemSlide.wrap`,
+  `layoutEsDeCarousel`), never this animated position. Applies to all four
+  real carousel types (`horizontal`/`vertical`/`horizontalWheel`/
+  `verticalWheel`), which share the one `step`/`camOffset` mechanism. The
+  textlist and grid are deliberately excluded: both are real ES-DE
+  `ListLoopType::LIST_PAUSE_AT_END` (`EsDeSystemListView`'s own textlist
+  and grid `step()`, `coerceIn(0, items.size - 1)`) and were never meant
+  to wrap.
 - a **tap on a themed entry is one selection, not two**: it moves the
   widget's own cursor onto the entry it hit --- through that widget's own
   `step()`, so the move carries the direction and animation the D-pad
