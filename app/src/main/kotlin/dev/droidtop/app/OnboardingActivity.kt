@@ -78,6 +78,7 @@ import dev.droidtop.app.ui.SelectableRow
 import dev.droidtop.library.GamesRootReport
 import dev.droidtop.library.consoles.EsDeFolderStructure
 import dev.droidtop.library.theme.ThemeAssets
+import dev.droidtop.library.theme.ThemeDownloader
 import dev.droidtop.library.theme.ThemePrefs as LibraryThemePrefs
 import dev.droidtop.runtime.BundledImageRepositories
 import dev.droidtop.runtime.ImageCatalogRole
@@ -93,8 +94,15 @@ import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.theme.ThemeSystemPreview
 import dev.droidtop.shell.standard.BackButtonMenu
 import dev.droidtop.shell.standard.HomeRolePrefs
+import androidx.compose.runtime.collectAsState
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -647,6 +655,12 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
             }
         }
         GamesRootPrefs.markOnboardingComplete(context)
+        // Any Art Book Next download still running at this point is
+        // cancelled rather than left to finish and swap the theme in
+        // later (OnboardingThemeDownload's own doc comment) -- a
+        // succeeded download has already written LibraryThemePrefs
+        // itself, so there is nothing left to activate here.
+        OnboardingThemeDownload.cancelIfIncomplete(context)
         // The modes are on from here (Modes.reload reads the finished
         // setup), so ModeStartup starts what they own now, not at the
         // next process start.
@@ -1829,6 +1843,93 @@ private fun ControllerStep(
  * like. The choice is written down as soon as it is made, so rotating the
  * device later never moves the theme under the person.
  */
+/**
+ * droidtop's recommended Gaming default, Art Book Next (docs/SPEC.md 7f
+ * "Default theme: Art Book Next, downloaded during setup" -- CC-BY-NC-SA,
+ * github.com/anthonycaccese/art-book-next-es-de), downloaded the moment
+ * the Appearance step is shown, through the same real [ThemeDownloader]
+ * "Browse themes" uses -- not a second download mechanism. Runs on its
+ * own process-lifetime scope so leaving the step (Next, Back) never
+ * cancels it mid-clone; only [cancelIfIncomplete] does, once onboarding
+ * itself is finishing without it.
+ *
+ * A successful download writes [LibraryThemePrefs] directly -- the exact
+ * call a row's own tap makes -- but ONLY when nothing has been chosen yet
+ * (`get() == null`), so an explicit pick before or after the download
+ * finishes always wins; this is a pre-selected default, not a forced one.
+ * That write happens here, not in the Appearance step's own composition,
+ * because the download can finish after the person has already moved
+ * past that step -- a Compose LaunchedEffect tied to it would miss that.
+ */
+private object OnboardingThemeDownload {
+    const val RECOMMENDED_THEME_DIR = "art-book-next-es-de"
+
+    enum class Status { NOT_STARTED, DOWNLOADING, SUCCEEDED, FAILED }
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val mutableStatus = MutableStateFlow(Status.NOT_STARTED)
+    val status: StateFlow<Status> = mutableStatus
+    private var job: Job? = null
+
+    /** Idempotent: a second call from a re-entered or recomposed step is a no-op. */
+    fun ensureStarted(context: Context) {
+        if (job != null) return
+        val appContext = context.applicationContext
+        job = scope.launch {
+            mutableStatus.value = Status.DOWNLOADING
+            val userThemesDir = ThemeAssets.userThemesDir(appContext)
+            ThemeDownloader.syncThemesList(userThemesDir)
+            val entry = ThemeDownloader.parseThemesList(userThemesDir)
+                .firstOrNull { it.reponame == RECOMMENDED_THEME_DIR }
+            val result = entry?.let { ThemeDownloader.downloadOrUpdateTheme(userThemesDir, it) }
+            val ok = result != null && result.status in setOf(
+                ThemeDownloader.ThemeSyncStatus.CLONED,
+                ThemeDownloader.ThemeSyncStatus.UPDATED,
+                ThemeDownloader.ThemeSyncStatus.UP_TO_DATE,
+            )
+            if (ok) {
+                // Drops ThemeAssets' own discovery/parse caches, the same
+                // signal a theme downloaded from Browse themes fires --
+                // the newly cloned theme is otherwise invisible to
+                // discoverThemes until something does this.
+                LibraryThemePrefs.notifyThemesChanged()
+                if (LibraryThemePrefs.get(appContext) == null) {
+                    LibraryThemePrefs.set(appContext, RECOMMENDED_THEME_DIR)
+                }
+                mutableStatus.value = Status.SUCCEEDED
+            } else {
+                mutableStatus.value = Status.FAILED
+            }
+        }
+    }
+
+    /**
+     * Called once, from `finishOnboarding`: a download still running when
+     * setup finishes must not be left to complete and swap the theme in
+     * later, behind someone already looking at Gaming mode --
+     * [ThemeAssets.defaultThemeFor]'s own doc comment states this same
+     * rule for the portrait default ("the theme moving under the user is
+     * the one thing this rule must not do"). Cancelling here, and
+     * removing the partial clone, leaves [LibraryThemePrefs] unset, so
+     * the existing DEcaffe-or-Slate fallback in
+     * `ThemeAssets.resolveActiveTheme` applies exactly as it did before
+     * this object existed -- no second fallback mechanism.
+     */
+    fun cancelIfIncomplete(context: Context) {
+        if (mutableStatus.value != Status.DOWNLOADING) return
+        val appContext = context.applicationContext
+        val running = job
+        scope.launch {
+            // Wait for the cancelled clone to actually stop writing
+            // before deleting its directory out from under it.
+            running?.cancelAndJoin()
+            runCatching {
+                File(ThemeAssets.userThemesDir(appContext), RECOMMENDED_THEME_DIR).deleteRecursively()
+            }
+        }
+    }
+}
+
 @Composable
 private fun AppearanceStep(
     progress: StepProgress?,
@@ -1855,8 +1956,27 @@ private fun AppearanceStep(
         })
         return
     }
+    // droidtop's recommended default (SPEC.md 7f) downloads itself the
+    // moment this step is shown; see [OnboardingThemeDownload]'s own doc
+    // comment for why it does not live in this composition's own scope.
+    LaunchedEffect(Unit) { OnboardingThemeDownload.ensureStarted(context) }
+    val downloadStatus by OnboardingThemeDownload.status.collectAsState()
     val stored = remember { LibraryThemePrefs.get(context) }
     var picked by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(downloadStatus) {
+        if (downloadStatus == OnboardingThemeDownload.Status.SUCCEEDED) {
+            // The freshly cloned theme is only in [discoverThemes]'s own
+            // cache after this -- rereads the catalog to pick it up.
+            catalogVersion++
+            // The object itself already wrote LibraryThemePrefs when
+            // nothing had been chosen yet; mirrored into this
+            // composition's own state so the row reflects it immediately
+            // even if the download finished while this exact screen is
+            // still on screen (a later re-entry reads it fresh from
+            // `stored` instead).
+            if (picked == null && stored == null) picked = OnboardingThemeDownload.RECOMMENDED_THEME_DIR
+        }
+    }
     val chosen = picked ?: stored ?: catalog?.defaultTheme
 
     OnboardingScaffold(
@@ -1878,6 +1998,24 @@ private fun AppearanceStep(
         val themes = catalog?.themes
         if (themes != null && themes.isEmpty()) {
             StepNote("No themes are installed. Gaming mode will use its own plain layout.")
+        }
+        // Shown only until Art Book Next has its own row below (either it
+        // downloaded, in which case the catalog now lists it, or it
+        // never will this run) -- not a progress bar to wait on, since
+        // Next works regardless.
+        val recommendedListed = themes?.any { it.name == OnboardingThemeDownload.RECOMMENDED_THEME_DIR } == true
+        if (!recommendedListed) {
+            when (downloadStatus) {
+                OnboardingThemeDownload.Status.DOWNLOADING -> StepNote(
+                    "Downloading Art Book Next, droidtop's recommended theme… " +
+                        "You don't need to wait here — press Next and it finishes in the background.",
+                )
+                OnboardingThemeDownload.Status.FAILED -> StepNote(
+                    "Couldn't download Art Book Next (check the connection). Staying on DEcaffe for " +
+                        "now — Get more themes offers Art Book Next again later.",
+                )
+                else -> {}
+            }
         }
         themes?.forEach { theme ->
             val hasVertical = theme.hasVertical
