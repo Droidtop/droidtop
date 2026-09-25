@@ -244,6 +244,17 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
                 }
             }
         }
+        // The hint row, and on a touch screen the buttons themselves; the
+        // list already leaves it its room (MenuTokens.HintBarRoom). It had
+        // none on its own, opened from Settings or onboarding (rig,
+        // dq-onboard-01).
+        dev.droidtop.shell.gamepad.TouchHintBar(
+            hints = listOf(
+                GamepadAction.A to "Download or update",
+                GamepadAction.B to "Back",
+            ),
+            modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter),
+        )
     }
 }
 
