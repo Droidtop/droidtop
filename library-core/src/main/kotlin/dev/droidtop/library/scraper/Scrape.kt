@@ -111,6 +111,11 @@ suspend fun scrapeSystemArtwork(
     var found = 0
     var failed = 0
     var refused = 0
+    // Requests the selected source refused, whatever else then found the
+    // game: a refused ROM that the keyless thumbnails still gave a cover
+    // is counted as found below, and the refusal must not vanish with it
+    // (rig, dq-shell2-01: a wrong TheGamesDB key read "found 1").
+    var sourceRefused = 0
     var consecutiveRefusals = 0
     var lastRefusal: ScrapeLookup.Refused? = null
     var attempted = 0
@@ -156,6 +161,7 @@ suspend fun scrapeSystemArtwork(
             val refusal = (screenScraperLookup ?: gamesDbLookup) as? ScrapeLookup.Refused
             if (refusal != null) {
                 consecutiveRefusals++
+                sourceRefused++
                 lastRefusal = refusal
             } else {
                 consecutiveRefusals = 0
@@ -306,7 +312,7 @@ suspend fun scrapeSystemArtwork(
             android.util.Log.e("droidtop.Scraper", "Failed to scrape ${romFile.name}", t)
         }
     }
-    if (totalRefusalSummary(system.displayName, attempted, found, refused, lastRefusal) != null) onRefusedEverything()
+    if (attempted > 0 && sourceRefused == attempted) onRefusedEverything()
     formatScrapeSummary(
         systemName = system.displayName,
         targeted = targets.size,
@@ -318,6 +324,7 @@ suspend fun scrapeSystemArtwork(
         failed = failed,
         refused = refused,
         lastRefusal = lastRefusal,
+        sourceRefused = sourceRefused,
     )
 }
 
@@ -345,8 +352,18 @@ internal fun formatScrapeSummary(
     failed: Int,
     refused: Int,
     lastRefusal: ScrapeLookup.Refused?,
+    // Every request the source refused, including those whose game the
+    // keyless thumbnails found anyway ([refused] counts only the rest).
+    sourceRefused: Int = refused,
 ): String {
     totalRefusalSummary(systemName, attempted, found, refused, lastRefusal)?.let { return it }
+    // The source refused everything, but the keyless fallback found some
+    // covers: the refusal leads, because it is what the person has to fix.
+    if (attempted > 0 && sourceRefused == attempted && lastRefusal != null) {
+        return "$systemName: ${lastRefusal.source} refused every request" +
+            describeRefusal(sourceRefused, attempted, lastRefusal) +
+            " Only the keyless libretro thumbnails were used: $thumbnailed covers."
+    }
     // hashMatched is the ES-DE "perfect match" count -- file digest
     // identical to ScreenScraper's own dump digest. The remainder of
     // $found matched by name search only, which is worth the user
@@ -360,7 +377,7 @@ internal fun formatScrapeSummary(
         append(" (of $targeted targeted")
         if (attempted < targeted) append(", $attempted asked for before giving up")
         append(").")
-        if (refused > 0) append(describeRefusal(refused, attempted, lastRefusal))
+        if (sourceRefused > 0) append(describeRefusal(sourceRefused, attempted, lastRefusal))
     }
 }
 
