@@ -607,13 +607,17 @@ fun GamepadShell(
                 }
             },
     ) {
-        SectionTabBar(
-            current = section,
-            onSelect = selectSection,
-            currentTabFocus = tabBarFocus,
-            onQuickMenu = { quickMenuOpen = true },
-            sections = sectionsFor(uiMode),
-        )
+        // The screensaver owns the whole window: the tab bar and the hint
+        // row stood on top of the slideshow (rig, dq-shell2-01).
+        if (!screensaverOn) {
+            SectionTabBar(
+                current = section,
+                onSelect = selectSection,
+                currentTabFocus = tabBarFocus,
+                onQuickMenu = { quickMenuOpen = true },
+                sections = sectionsFor(uiMode),
+            )
+        }
         // Launch-failure banner (see onLaunch's crash boundary): visible,
         // dismisses itself after a few seconds, never blocks input.
         launchError?.let { message ->
@@ -691,7 +695,8 @@ fun GamepadShell(
         // "Stores and folders" while none dispatched there (rig, build
         // 550). The hint row promises only what dispatches (SPEC 7j).
         val overlayScreen = detailEntry != null || nav.optionsOpen
-        val shellHelpRow: @Composable (Color) -> Unit = { background ->
+        val shellHelpRow: @Composable (Color) -> Unit = shellHelpRow@{ background ->
+            if (screensaverOn) return@shellHelpRow
             ButtonHintFooter(
                 background = background,
                 // A names what it does on a detail's primary button
