@@ -84,7 +84,7 @@ internal fun ManualMatchPicker(
         }
         val apiKey = TheGamesDbPrefs.apiKey(context)
         if (apiKey.isBlank()) {
-            status = "TheGamesDB needs its API key before a search can run."
+            status = dev.droidtop.library.scraper.ScraperReadiness.THEGAMESDB_KEY_MISSING
             candidates = emptyList()
             return@LaunchedEffect
         }

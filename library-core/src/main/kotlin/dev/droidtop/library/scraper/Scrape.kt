@@ -22,8 +22,15 @@ suspend fun scrapeSystemArtwork(
     // progress callback as a trailing lambda, which binds to the LAST
     // parameter.
     onlyRom: File? = null,
+    // Told when the source refused every request this pass made: a
+    // whole-library pass stops there rather than asking the same source
+    // about every other system only to be refused again.
+    onRefusedEverything: () -> Unit = {},
     onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
 ): String = withContext(Dispatchers.IO) {
+    // A source that cannot be asked at all (a key that is not set) says
+    // so, with the fix, before anything is walked or counted.
+    ScraperReadiness.romSourceProblem(context)?.let { return@withContext it }
     val gamesRoot = folder.parentFile ?: folder
     // One walk, shared with the library scan -- see RomScanWalk for why
     // a DLC/update directory is not twelve games.
@@ -79,21 +86,24 @@ suspend fun scrapeSystemArtwork(
     if (source == ScraperSource.SCREENSCRAPER && screenScraperSystemId == null) {
         return@withContext "${system.displayName}: ScreenScraper has no platform id for this system."
     }
-    if (source == ScraperSource.THEGAMESDB && (gamesDbSystemId == null || !TheGamesDbPrefs.isConfigured(context))) {
-        return@withContext "${system.displayName}: TheGamesDB needs a configured API key and platform support for this system."
+    if (source == ScraperSource.THEGAMESDB && gamesDbSystemId == null) {
+        return@withContext "${system.displayName}: TheGamesDB has no platform id for this system."
     }
     // The keyless libretro-database source: one cached DAT set per
     // system, matched by the same No-Intro naming as the thumbnails.
     val libretroLookup = if (source == ScraperSource.LIBRETRO) {
         when (val loaded = LibretroMetadata.load(context, system.id)) {
             null -> return@withContext "${system.displayName}: no libretro database name is mapped for this system."
-            is ScrapeLookup.Refused -> return@withContext totalRefusalSummary(
-                subject = system.displayName,
-                attempted = 1,
-                found = 0,
-                refused = 1,
-                lastRefusal = loaded,
-            ).orEmpty()
+            is ScrapeLookup.Refused -> {
+                onRefusedEverything()
+                return@withContext totalRefusalSummary(
+                    subject = system.displayName,
+                    attempted = 1,
+                    found = 0,
+                    refused = 1,
+                    lastRefusal = loaded,
+                ).orEmpty()
+            }
             else -> loaded.foundOrNull
         }
     } else null
@@ -296,6 +306,7 @@ suspend fun scrapeSystemArtwork(
             android.util.Log.e("droidtop.Scraper", "Failed to scrape ${romFile.name}", t)
         }
     }
+    if (totalRefusalSummary(system.displayName, attempted, found, refused, lastRefusal) != null) onRefusedEverything()
     formatScrapeSummary(
         systemName = system.displayName,
         targeted = targets.size,
@@ -427,12 +438,13 @@ suspend fun applyManualMatch(
     val romFile = File(entry.id)
     val systemId = entry.systemId ?: return@withContext "No system for ${entry.title}."
     val apiKey = TheGamesDbPrefs.apiKey(context)
-    if (apiKey.isBlank()) return@withContext "TheGamesDB needs its API key."
+    if (apiKey.isBlank()) return@withContext ScraperReadiness.THEGAMESDB_KEY_MISSING
     val metadata = when (val lookup = TheGamesDbClient.metadataForId(apiKey, context.cacheDir, theGamesDbId)) {
         is ScrapeLookup.Found -> lookup.value
         ScrapeLookup.NoMatch -> return@withContext "TheGamesDB has no game under that id any more."
         is ScrapeLookup.Refused -> return@withContext "TheGamesDB refused the request (HTTP ${lookup.httpStatus})" +
-            (lookup.reason?.let { ": $it" } ?: ".")
+            (lookup.reason?.let { ": $it." } ?: ".") +
+            (ScraperReadiness.credentialFix(lookup)?.let { " $it" } ?: "")
     }
 
     val gamesRoot = dev.droidtop.library.GamesRoots.current(context)

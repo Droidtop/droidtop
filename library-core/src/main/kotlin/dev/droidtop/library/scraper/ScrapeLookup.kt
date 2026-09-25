@@ -165,5 +165,8 @@ internal fun describeRefusal(refused: Int, attempted: Int, lastRefusal: ScrapeLo
     if (lastRefusal == null) return ""
     val reason = lastRefusal.reason
         ?: "the server gave no reason"
-    return " ($refused of $attempted refused; ${lastRefusal.source} HTTP ${lastRefusal.httpStatus}: $reason)."
+    // A rejected key is the one refusal the person can fix, so it says
+    // where (ScraperReadiness.credentialFix).
+    val fix = ScraperReadiness.credentialFix(lastRefusal)?.let { " $it" }.orEmpty()
+    return " ($refused of $attempted refused; ${lastRefusal.source} HTTP ${lastRefusal.httpStatus}: $reason).$fix"
 }
