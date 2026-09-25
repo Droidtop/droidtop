@@ -114,6 +114,13 @@ fun CatalogNavigator(
     val stack = remember { mutableStateListOf(root) }
     // Selection is per-depth so popping restores where the user was.
     val selectionByDepth = remember { mutableStateMapOf<Int, Int>() }
+    // And so is the scroll: one list shows every depth, so coming back
+    // from a sub-screen found the list where the sub-screen had left it
+    // and scrolled the restored row to the top, and the row under the
+    // finger was no longer the one below the row just used (rig,
+    // dq-shell2-02: the Keyboard picker opened instead of Android settings).
+    val scrollByDepth = remember { mutableStateMapOf<Int, Pair<Int, Int>>() }
+    val listState = rememberLazyListState()
     // Live status text per item id (async progress/outcomes, pick errors).
     val statusById = remember { mutableStateMapOf<String, String>() }
     // Two-step confirm: the armed destructive item, reset on any move.
@@ -130,9 +137,12 @@ fun CatalogNavigator(
     val depth = stack.lastIndex
     // Suspend builder (real screens run Room queries / filesystem walks) --
     // rebuilt on every navigation and after every value change.
-    val groups by androidx.compose.runtime.produceState(initialValue = emptyList<CatalogGroup>(), screen, version) {
-        value = screen.groups(context)
+    // Tagged with the screen they belong to: right after a push or a pop
+    // the list must not treat the previous screen's rows as this one's.
+    val loaded by androidx.compose.runtime.produceState<Pair<CatalogScreen, List<CatalogGroup>>?>(null, screen, version) {
+        value = screen to screen.groups(context)
     }
+    val groups = loaded?.takeIf { it.first == screen }?.second ?: emptyList()
     val rows = remember(groups) {
         groups.flatMap { group ->
             group.items.mapIndexed { index, item ->
@@ -242,6 +252,7 @@ fun CatalogNavigator(
             is NestedScreenItem -> {
                 val child = item.resolve()
                 if (child != null) {
+                    scrollByDepth[stack.lastIndex] = listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
                     stack.add(child)
                     selectionByDepth[stack.lastIndex] = 0
                     refresh()
@@ -289,12 +300,16 @@ fun CatalogNavigator(
         CatalogInfoSheet(item = item, status = statusById[item.id], onDismiss = { infoRow = null })
     }
 
-    val listState = rememberLazyListState()
     val listFocus = remember { FocusRequester() }
     LaunchedEffect(screen, textItem == null, infoRow == null) {
         if (textItem == null && infoRow == null) requestFocusWhenAttached(listFocus, "Settings catalog")
     }
-    LaunchedEffect(selected, screen) { if (rows.isNotEmpty()) listState.keepInView(selected.coerceIn(0, rows.lastIndex)) }
+    LaunchedEffect(rows, selected) {
+        if (rows.isEmpty()) return@LaunchedEffect
+        // Back at a depth left for a sub-screen: exactly where it was.
+        scrollByDepth.remove(depth)?.let { (index, offset) -> listState.scrollToItem(index, offset) }
+        listState.keepInView(selected.coerceIn(0, rows.lastIndex))
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         if (stack.size > 1 || screen.subtitle != null) {
