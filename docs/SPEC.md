@@ -5085,6 +5085,132 @@ carousel art like `auto-allgames.png` resolve). Groups keep their own
 display names (`fullname` still says "Ren'Py" etc.) — only the art/
 metadata lookup folder is shared.
 
+### Default theme, a PROPOSAL pending owner decision (survey 2026-09-25)
+
+**Not a decision — the bundled default stays DEcaffe until the owner picks.** DEcaffe was
+chosen for testing (structurally simple, widget-less gamelist, good for shaking out the parser/
+renderer early) rather than for how it looks or how complete it is against real ES-DE's schema.
+This section surveys the well-maintained themes ES-DE's own downloader index lists
+(`gitlab.com/es-de/themes/themes-list.git`, `themes.json`, 66 entries as of this survey) and
+recommends a replacement default. Evidence sources: each theme's own GitHub repo (README/LICENSE
+files, push dates, repo size), `themes.json`'s own variant/colorScheme/aspectRatio/transition
+lists, and droidtop's renderer code (`shell-gamepad/.../theme/EsDeThemeRenderer.kt`,
+`ES_DE_PRIMARY_TYPES` at its tail confirms droidtop implements exactly ES-DE's own three list
+widgets — carousel/grid/textlist, nothing else, so no candidate's widget choice is a droidtop gap
+by itself).
+
+**Recommendation: Art Book Next (`art-book-next-es-de`, github.com/anthonycaccese/
+art-book-next-es-de).** It is the strongest candidate by every axis except size:
+
+- **Licence — clear.** `README.md`'s own License section: "Creative Commons CC-BY-NC-SA -
+  https://creativecommons.org/licenses/by-nc-sa/2.0/" (fetched 2026-09-25) — the same licence
+  class as both currently-bundled themes (DEcaffe, Slate; NOTICE.md), so bundling it changes
+  nothing about droidtop's own distribution terms. No LICENSE file in the repo, only the README
+  clause, same as most of this author's themes (see licence risk note below).
+- **droidtop renderer support — proven, not assumed.** Art Book Next was one of the two themes
+  bundled in the APK earlier in the theme engine's build specifically to stress-test the renderer
+  against a second real theme shape (this section's own opening paragraph), and one of the ten
+  real themes shallow-cloned to MEASURE which of ES-DE's 472 schema properties real themes
+  actually use (the "measured against real themes" pass above) — the carousel/grid/textlist
+  parity work in this section's R2 pass and the property-closing passes that followed were tuned
+  against it directly, more than any other non-bundled theme. Its own multi-file `<include>`
+  chain, per-aspect-ratio XML and real gamelist list widgets are exactly the shape droidtop's
+  parser/renderer were hardened on.
+- **Handheld fit — the widest aspect-ratio coverage of any surveyed theme.** `themes.json`:
+  `16:9, 16:10, 3:2, 4:3, 5:3_vertical, 5:4, 8:7, 19.5:9, 20:9, 21:9, 32:9, 1:1` — the RP5's
+  exact 16:9 is native, and it is one of the very few surveyed themes with a declared vertical
+  variant at all (`5:3_vertical`), which matters given this section's own portrait-default rule
+  (Slate is the only other one bundled). 20 variants (10 list/grid layouts × "help on"/"help off"),
+  30 colour schemes (Dark/OLED/Light/Steam OS/SNES/Famicom families × 5 metadata layouts each),
+  4 font sizes.
+- **Coverage.** Generic per-`${system.theme}` art with no per-franchise character folders — covers
+  every console `system.theme` plus the `pc` metacategory droidtop routes engine/PC/Linux/WINE
+  games through (this section, "pc as the theme metacategory") the same as any other generic
+  theme; nothing console-specific needs droidtop-side patching beyond the existing
+  `droidtop-theme-patches` gap for invented engine systems.
+- **Maintenance.** Pushed 2026-02-07 (most recent of the shortlist), actively iterated (the
+  `[Help Off]` variant family is a recent addition per its own variant list).
+- **Looks.** A clean "coffee table book" metadata-forward layout with a real box art/screenshot/
+  marquee sidebar — closer to what a handheld user actually wants to read at arm's length than a
+  dense grid.
+- **APK size cost — the real trade-off.** ~205 MB (GitHub repo size 209,605 KB), matching the
+  "roughly 220MB" this section already recorded when it was cut from the bundle the first time.
+  This is the entire reason it is not simply reinstated: a ~200MB jump in install size for the
+  DEFAULT theme (not an optional download) needs the owner's sign-off, not an agent's.
+
+**Runners-up:**
+
+- **Alekfull NX (Revisited)** (`alekfull-nx-es-de`, anthonycaccese) — CC-BY-NC-SA (same README
+  clause pattern), pushed 2026-01-23, by far the smallest of the shortlist (~85 MB, repo size
+  87,443 KB). Four list-layout variants only (Metadata+Miximage/Boxart, Miximage, Boxart — no
+  carousel/grid, so it does not exercise as much of the renderer), 4 aspect ratios covering the
+  RP5's 16:9 plus 16:10/4:3/19.5:9, no vertical variant. A real Switch-NX-style wheel look that
+  reads well controller-first. The size/coverage trade-off in the other direction from Art Book
+  Next: if the owner decides the ~200MB jump is not worth it, this is the fallback recommendation.
+- **Canvas** (`canvas-es-de`, Siddy212) — the richest variant set surveyed (16 layout variants
+  crossing Grid/Carousel × Textlist/Carousel/Grid/Row sub-widgets, 60 colour scheme entries across
+  Capsule/Controller/Logo/Screenshot/Art wallpaper families), pushed 2026-11-09 (most recently
+  maintained of the shortlist), 8 aspect ratios (no vertical). **Licence is NOT clear**: GitHub's
+  own license detector reads the repo's `LICENSE` file as CC0-1.0 Universal (public domain, more
+  permissive than every other bundled/candidate theme, no non-commercial restriction) — but the
+  README's own License section pastes the same CC-BY-NC-SA clause text as this author's other
+  themes and the two files were not checked against each other by the theme's own author (this is
+  true of `iconic-es-de` by the same author too). This is a genuine conflict inside one repo, not
+  a droidtop reading error, and it needs the author asked or the owner's own risk call before
+  Canvas is bundled as anything more than an optional downloader entry — do not treat CC0 as
+  confirmed from this survey. Also carries `mario/`, `pokemon/`, `zelda/`, `final-fantasy/`
+  subfolders (alternate wallpaper packs skinned on those franchises) — trademarked character art
+  droidtop would be redistributing regardless of the theme's own licence grant, a reason on its
+  own to not make it the DEFAULT even if the licence question resolves cleanly; fine as one of
+  many optional downloads, where a user opts in with their eyes open. ~215 MB (repo size 219,755
+  KB).
+- **Colorful (Revisited)** — CC-BY-NC-SA, but only 2 aspect ratios (16:9, 16:10), no variant list
+  (single fixed layout) and no font-size options in `themes.json` — the narrowest schema surface
+  of anything surveyed, so it says the least about renderer coverage and offers the least
+  adaptability for a portrait fallback later. Not shortlisted for the rig check on that basis.
+- **Iconic** (Siddy212) — same CC0-vs-README licence conflict as Canvas, plus per-franchise
+  folders for Mario/Pokémon/Zelda/Sonic/Final Fantasy/Sailor Moon/Tetris/Vocaloid — heaviest
+  trademark-art exposure of anything surveyed and by far the largest (~452 MB, repo size 463,163
+  KB). Not a default candidate; a downloader-only theme at most, same licence caveat as Canvas.
+- **linear-es-de** — not present in the downloader's own `themes.json` index (66 entries checked
+  2026-09-25); real ES-DE's "Linear" default theme as of ES-DE 3.0 appears to ship compiled into
+  the ES-DE binary itself rather than as a `themes-list.git` entry, so droidtop's downloader
+  cannot fetch it the way it fetches everything else in this section — would need vendoring
+  separately if the owner wants it evaluated, out of scope for this survey.
+- **Slate** — already bundled (portrait default, NOTICE.md) and evaluated when it was added
+  (this section, "Aspect ratio, and what a portrait screen gets"); not re-scored here since
+  nothing about it changed.
+
+**Scored summary** (Licence: pass/fail against "can droidtop redistribute it in the APK";
+others qualitative, 2026-09-25 evidence):
+
+| Theme | Licence | Handheld fit | Coverage | Maintenance | Renderer proof | APK cost | Looks |
+|---|---|---|---|---|---|---|---|
+| DEcaffe (current) | CC-BY-NC-SA — clear | OK, no vertical | generic, good | bundled | proven (it's the primary dev target) | bundled today | plain, widget-less |
+| **Art Book Next** | CC-BY-NC-SA — clear | best (12 ratios incl. vertical) | generic, good | active (2026-02) | proven (stress-test + 10-theme measurement subject) | ~205 MB, real cost | best of shortlist |
+| Alekfull NX (Revisited) | CC-BY-NC-SA — clear | good, 4 ratios, no vertical | generic, good | active (2026-01) | unproven, narrow (list-only) | ~85 MB, cheap | good, wheel-style |
+| Canvas | **unclear — CC0 file vs CC-BY-NC-SA README, ask author** | good, 8 ratios, no vertical | generic + franchise wallpaper packs (trademark exposure) | most active (2026-11) | unproven | ~215 MB | very good |
+| Colorful (Revisited) | CC-BY-NC-SA — clear | narrow, 2 ratios only | generic | unknown, not checked | unproven | not measured | classic, plain |
+| Iconic | **unclear — same conflict as Canvas** | good, 8 ratios, no vertical | franchise-heavy (heaviest trademark exposure) | active | unproven | ~452 MB, largest surveyed | very good |
+
+**Rig check queued, not yet run.** `dq-deftheme-01` (`/root/coordination/device/QUEUE.md`) installs
+Art Book Next, Canvas and Alekfull NX through droidtop's own theme downloader on the BlueStacks rig
+and captures the system carousel, game list, game detail and a no-art system for each, plus the
+same four for DEcaffe as the baseline. Screenshots land at `agents/deftheme/dq-deftheme-01/` once
+the rig agent runs it; not run as of this writing, so nothing above is confirmed by an on-device
+screenshot yet — the recommendation rests on repo/licence evidence and the renderer-code citations
+above, not a rendered comparison.
+
+**Renderer gaps this survey exposes as follow-up work** (filed to
+`/root/coordination/INBOX.md`, not yet built): Canvas's `[Grid]`/`[Carousel]`-prefixed variant
+names suggest a theme-level "which primary widget family" switch beyond the per-view
+carousel/grid/textlist choice droidtop already parses — worth confirming once the rig screenshots
+exist, since if it is only a variant/colorScheme axis (which the parser already handles generically)
+there is no gap at all. Art Book Next's `5:3_vertical` and other non-16:9-family aspect ratios are
+the first surveyed theme to exercise `8:7`/`20:9`/`32:9`/`1:1` against droidtop's `EsDeAspectRatio`
+port in any real, non-synthetic theme — worth a screenshot diff against those specific ratios if
+this theme is adopted, beyond the automatic-selection logic this section already verified.
+
 ### Credentials transfer (directed 2026-08-31, twice)
 
 Superseded same day: the app-private debug-credentials file below was
