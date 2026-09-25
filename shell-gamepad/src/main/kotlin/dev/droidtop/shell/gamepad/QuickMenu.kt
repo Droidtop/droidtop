@@ -223,7 +223,7 @@ private fun NotificationsTab(onDismiss: () -> Unit, tabHint: Pair<GamepadAction,
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
     LaunchedEffect(focusIndex, items.size) {
-        if (items.isNotEmpty()) listState.animateScrollToItem(focusIndex.coerceIn(0, items.size - 1))
+        if (items.isNotEmpty()) listState.keepInView(focusIndex.coerceIn(0, items.size - 1))
     }
 
     Column(

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -293,7 +294,7 @@ fun CatalogNavigator(
     LaunchedEffect(screen, textItem == null, infoRow == null) {
         if (textItem == null && infoRow == null) requestFocusWhenAttached(listFocus, "Settings catalog")
     }
-    LaunchedEffect(selected, screen) { if (rows.isNotEmpty()) listState.animateScrollToItem(selected.coerceIn(0, rows.lastIndex)) }
+    LaunchedEffect(selected, screen) { if (rows.isNotEmpty()) listState.keepInView(selected.coerceIn(0, rows.lastIndex)) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         if (stack.size > 1 || screen.subtitle != null) {
@@ -563,7 +564,7 @@ internal fun CatalogChoicePicker(
     val listState = rememberLazyListState()
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { requestFocusWhenAttached(focus, "Choice picker") }
-    LaunchedEffect(selected) { if (item.options.isNotEmpty()) listState.animateScrollToItem(selected) }
+    LaunchedEffect(selected) { if (item.options.isNotEmpty()) listState.keepInView(selected) }
     BackHandler { onDismiss() }
 
     Column(Modifier.fillMaxSize()) {
@@ -647,5 +648,29 @@ private fun TextEditDialog(
                 TextButton(onClick = { onCommit(value) }) { Text("Save", color = MenuTokens.Accent) }
             }
         }
+    }
+}
+
+/**
+ * Scrolls only as far as it takes to show row [index] whole, and not at all
+ * when it already is. Following the selection with `animateScrollToItem`
+ * put the selected row at the TOP of the list on every change, a tap
+ * included, so the rows moved under the finger and a second tap landed on
+ * a different row (rig, dq-coordinator-23 F11 and dq-shell2-01: two
+ * settings changed by accident).
+ */
+internal suspend fun androidx.compose.foundation.lazy.LazyListState.keepInView(index: Int) {
+    val info = layoutInfo
+    val row = info.visibleItemsInfo.firstOrNull { it.index == index }
+    if (row == null) {
+        // Off screen: a pad moving past the edge, or a restored selection.
+        animateScrollToItem(index)
+        return
+    }
+    val top = info.viewportStartOffset
+    val bottom = info.viewportEndOffset - info.afterContentPadding
+    when {
+        row.offset < top -> animateScrollBy((row.offset - top).toFloat())
+        row.offset + row.size > bottom -> animateScrollBy((row.offset + row.size - bottom).toFloat())
     }
 }
