@@ -11,7 +11,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -133,6 +139,16 @@ class MainActivity : AppCompatActivity() {
     // can identity-check before clearing the process-wide hook.
     private var companionLaunchSeam: ((dev.droidtop.library.LibraryEntry) -> Unit)? = null
 
+    // The "an app on the addon exited on its own" case has no event this
+    // process can listen for without a privileged task-stack API a
+    // sideloaded launcher is not guaranteed to hold (docs/SPEC.md section
+    // 4c) -- so instead, while this Activity is started, orchestration
+    // is bumped on a plain timer, which self-heals through the SAME pass
+    // every other display change already runs. Cheap: the pass reads
+    // already-observed display state and one SharedPreferences value on
+    // Dispatchers.IO, never a scan or a per-game lookup.
+    private var secondScreenHealthCheckJob: kotlinx.coroutines.Job? = null
+
     /**
      * Re-runs orchestration from scratch: drops the parked display and the
      * relocation cooldown so the next pass really acts rather than being
@@ -155,6 +171,14 @@ class MainActivity : AppCompatActivity() {
         @Volatile
         private var lastRelocationAttemptMs = 0L
         private const val RELOCATION_COOLDOWN_MS = 5000L
+
+        // How often the started Activity re-checks the addon for the
+        // "an app exited on its own and left it uncovered" case (see
+        // secondScreenHealthCheckJob). Frequent enough that a person who
+        // just backed out of a game does not sit looking at a mirror for
+        // long; infrequent enough to cost nothing on a handheld -- the
+        // pass this triggers does no disk or scan work of its own.
+        private const val SECOND_SCREEN_HEALTH_CHECK_MS = 4000L
 
         // How many relocation attempts this display topology has consumed
         // without the shell verifiably ending up on the addon. Once
@@ -240,6 +264,7 @@ class MainActivity : AppCompatActivity() {
             // is the only one. Every other mode keeps the system bars: a
             // home screen and a desktop both want them.
             LaunchedEffect(mode) { applySystemBars(mode) }
+            Box(modifier = Modifier.fillMaxSize()) {
             when (mode) {
                 Mode.GAMING -> GamepadShell(
                     library = library,
@@ -317,6 +342,21 @@ class MainActivity : AppCompatActivity() {
                 // launcher. Deliberately blank rather than falling through
                 // to Desktop, which is what this branch used to do.
                 Mode.LAUNCHER, null -> Unit
+            }
+            // Drawn OVER whichever shell is showing rather than by
+            // either shell's own chrome (docs/SPEC.md section 4c): the
+            // broken state it reports is a MainActivity-level fact,
+            // true in Gaming and Desktop alike, and it must stay
+            // reachable over a themed Gaming screen exactly as it is
+            // over Desktop's own panels.
+            if (mode == Mode.GAMING || mode == Mode.DESKTOP) {
+                ReinitializeDisplaysPill(
+                    onClick = { reinitializeDisplays() },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 72.dp),
+                )
+            }
             }
             }
         }
@@ -831,6 +871,25 @@ class MainActivity : AppCompatActivity() {
                             )
                         }
                 }
+
+                // "Reinitialize displays," made automatic (docs/SPEC.md
+                // section 4c): this pass just decided, with the same
+                // facts the mirroring fix already uses, whether anything
+                // of droidtop's own is actually on the addon --
+                // [secondScreenPresentation] above (or its own idle-cover
+                // Activity underneath it) -- or whether it is a parked
+                // display an app owns on purpose. Published so the pill
+                // (CompanionState.dualScreenBroken, drawn over both
+                // shells below) can tell a person immediately instead of
+                // them noticing a mirror with no idea what to do.
+                CompanionState.dualScreenBroken.value =
+                    dev.droidtop.runtime.DualScreenOrchestration.secondScreenNeedsReinit(
+                        secondDisplayId = second?.androidDisplayId,
+                        parkedDisplayId = parked,
+                        shellOnSecond = shellOnSecond,
+                        presentationDisplayId = secondScreenPresentation?.display?.displayId,
+                        idleCoverDisplayId = dev.droidtop.display.SecondaryDisplayActivity.resumedDisplayId,
+                    )
             }
         }
     }
@@ -880,6 +939,9 @@ class MainActivity : AppCompatActivity() {
         }
         secondScreenPresentation?.dismiss()
         secondScreenPresentation = null
+        secondScreenHealthCheckJob?.cancel()
+        secondScreenHealthCheckJob = null
+        CompanionState.dualScreenBroken.value = false
     }
 
     override fun onStart() {
@@ -887,6 +949,12 @@ class MainActivity : AppCompatActivity() {
         // Coming back to the foreground re-asserts the live companion,
         // through the same orchestration pass everything else uses.
         roleRefresh.value++
+        secondScreenHealthCheckJob = lifecycleScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(SECOND_SCREEN_HEALTH_CHECK_MS)
+                roleRefresh.value++
+            }
+        }
     }
 
     override fun onDestroy() {

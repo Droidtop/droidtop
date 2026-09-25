@@ -2204,6 +2204,65 @@ shortcut (chord) was considered and dropped for this pass: everywhere this menu 
 opens from is reachable without inventing new key-combo plumbing to audit against every
 bundled emulator's own hotkeys first.
 
+### Self-detection, built (2026-09-25): a pill, and a periodic self-heal
+
+The self-detection recorded as open scope above is now built, alongside the companion
+redesign in section 4d.
+
+`DualScreenOrchestration.secondScreenNeedsReinit` (unit-tested) is the pure decision:
+given the addon's display id, the parked-display id, whether the shell itself is the
+addon's content, and which display id (if any) each of droidtop's own two addon surfaces
+-- the live `SecondScreenPresentation` and `:display`'s `SecondaryDisplayActivity` (now
+tracking its own `resumedDisplayId`, the same pattern `CompanionActivity.visible` already
+used for the built-in screen) -- is actually on, it answers whether the addon looks
+broken: present, not parked, and covered by neither surface. This is the same "is
+anything of ours actually on the addon" question `displaysNeedingIdleCover` (the original
+mirroring fix) already asks before a launch, asked continuously rather than only
+pre-launch, which is what closes the gap that fix left open: an app on the addon exiting
+on its own, with droidtop's own shell never losing foreground on its own display, so
+nothing re-ran orchestration.
+
+`MainActivity` publishes the result to `CompanionState.dualScreenBroken` -- a
+process-wide flow, the same pattern as `focusedEntry`/`libraryEntries` -- at the end of
+every orchestration pass. Two things feed a pass: the existing display-topology/role
+triggers, and (new) a plain timer while the Activity is started
+(`secondScreenHealthCheckJob`, every 4s), because there is no event this process can
+listen for without a privileged task-stack API a sideloaded launcher is not guaranteed to
+hold -- `ActivityManager.registerTaskStackListener`'s `ITaskStackListener` is a
+`@SystemApi` surface historically gated to privileged/signature callers, and this could
+not be verified against a real dual-screen device from this environment, so it was not
+risked. The timer means self-healing usually finishes within a few seconds of the addon
+going empty, through the SAME orchestration pass every other display change already
+runs -- one mechanism, not a second recovery path. The pass this triggers does no disk,
+scan or per-game work: it reads already-observed display state and one SharedPreferences
+read on `Dispatchers.IO`.
+
+`ReinitializeDisplaysPill` (app module) reads `CompanionState.dualScreenBroken` and draws
+itself, over whichever shell is showing (Gaming or Desktop -- both put the addon in play
+by default per this section's "External screen priority"), only while the state reads
+broken; a tap calls the same `reinitializeDisplays()` the mode switcher's row and the
+double-tap-Home gesture already call. It is the backstop the design brief asked for, not
+the fix: the periodic self-heal above is the fix, and in the common case the pill either
+never appears or clears itself within one health-check tick. Drawn by `MainActivity`
+itself, over both shells' own content, rather than inside either shell's chrome (the
+Gaming hint row, the Desktop taskbar): the broken state is a MainActivity-level fact true
+in both, and neither shell needs a second copy of when to show it. Standard mode is not
+covered (Launcher3's own secondary-display handling, not this orchestration, owns that
+display there) -- the existing menu row and gestures remain its route to the same
+recovery.
+
+**Needs a rig check** (no dual-screen hardware reachable from this environment): attach
+the "DP Screen" add-on, launch a game onto it from Gaming mode with two displays
+attached, exit the game the user way (its own in-game menu, not Back-to-desktop), and
+confirm the addon recovers within a few seconds on its own with no pill ever appearing.
+Then force the recurrence if possible (or wait for it to reappear per the owner's earlier
+report) and confirm the pill DOES appear within one tick, and that tapping it clears the
+mirror the same way the existing double-tap-Home / mode-switcher row already does
+(`shots/recheck_d5.png` from the 2026-09-25 review is the known-good reference image).
+Also confirm the pill does not appear/flicker during an ordinary game launch or during
+the shell's own relocation to the addon, which both change display state through the
+same orchestration pass.
+
 ## 4d. The companion screen, designed (research 2026-09-01)
 
 droidtop's companion currently renders a status bar, notifications and
