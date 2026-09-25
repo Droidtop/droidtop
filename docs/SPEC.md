@@ -7451,6 +7451,20 @@ Info sheet: Y on the row, or a long press, shows its name, value, full explanati
 status; the row itself keeps one line, so every row with a supporting line is the same height
 (UI pass 2026-09-24, M14).
 
+**The hint bar is console-sized, not phone-sized (owner direction 2026-09-25, on the RP5
+console: "the pills are also too big").** `TouchHintBar`/`TouchHint` (`:shell-gamepad`,
+`TouchActions.kt`) draw every hint chip at one compact size regardless of `touchFirst` --
+`MenuTokens.HintChipMinHeight` (28dp), `HintGlyphTextSize`/`HintLabelTextSize` (12sp/13sp),
+tight glyph-badge padding (`HintGlyphPaddingHorizontal`/`Vertical`, 6dp/1dp) and a 14dp chip
+corner radius, inside a bar whose own vertical padding is `HintBarVerticalPadding` (6dp) and
+whose reserved room (`HintBarRoom`, the CONTENT padding every scrolling screen leaves for it)
+is 56dp, down from 72dp. The chip a finger taps and the chip that draws are two different
+sizes: on a touch-first window the chip sits centred inside an invisible `Box` sized to
+`MenuTokens.HintTouchTarget` (48dp, the same minimum every other touch control on `ShellWindow`
+uses), so the drawn pill shrinks without shrinking what a finger can hit. On a pad-only window
+(no `heightIn` on that outer `Box`) the chip is simply the compact legend, no invisible padding
+at all. One set of tokens, so every screen with a hint bar changed at once.
+
 **Settings polish: category icons, real grouping, search (owner direction 2026-09-25, "settings
 needs significant improvements to polish, layout, and all of that"; built by settingsui).** The
 consolidated catalog/row-component shell (H4, above) was the foundation; the owner looked at it

@@ -357,8 +357,43 @@ object MenuTokens {
      * build 546; a game detail's last card, build 548). As CONTENT padding
      * the same space scrolls with the list, so the end of the list is the
      * end of the list. One value, because it is one bar.
+     *
+     * Sized to the compact bar below (docs/SPEC.md 7k): a hint chip's own
+     * height, `HintChipMinHeight`, plus [HintBarVerticalPadding] on both
+     * edges -- a console-style bar, not a phone's, since the console is
+     * where this row sits closest to the theme's own content (owner, on
+     * the RP5 console, 2026-09-25: "the pills are also too big").
      */
-    val HintBarRoom = 72.dp
+    val HintBarRoom = 56.dp
+
+    /** [TouchHintBar]'s own top/bottom padding, both editions of the bar. */
+    val HintBarVerticalPadding = 6.dp
+
+    /**
+     * A hint chip's minimum drawn height, touch or not. Kept well under
+     * [dev.droidtop.shell.gamepad.ShellWindow.minTouchTarget]: the tap
+     * target is not the drawn chip (see [HintTouchTarget]) so shrinking
+     * this does not shrink what a finger can hit.
+     */
+    val HintChipMinHeight = 28.dp
+
+    /**
+     * The actual minimum tap size for a hint chip on a touch-first
+     * window -- [ShellWindow.minTouchTarget]'s own 48dp, same as every
+     * other touch control, even though the chip it surrounds draws at
+     * [HintChipMinHeight]. The chip sits centred inside this larger,
+     * invisible box, so the extra room is a bigger hit area, never a
+     * bigger pill.
+     */
+    val HintTouchTarget = 48.dp
+
+    /** A hint chip's glyph badge ("A", "B", ...): font size and padding. */
+    val HintGlyphTextSize = 12.sp
+    val HintGlyphPaddingHorizontal = 6.dp
+    val HintGlyphPaddingVertical = 1.dp
+
+    /** A hint chip's action label ("Select", "Back", ...): font size. */
+    val HintLabelTextSize = 13.sp
 
     /**
      * The width of the focus ring `selectionFrame` draws (GamingMenu.kt):

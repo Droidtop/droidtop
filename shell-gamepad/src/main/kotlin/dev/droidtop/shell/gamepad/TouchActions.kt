@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -93,8 +94,8 @@ fun TouchHintBar(
             .fillMaxWidth()
             .background(background)
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = window.edgePadding, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(if (window.compact) 12.dp else 32.dp),
+            .padding(horizontal = window.edgePadding, vertical = MenuTokens.HintBarVerticalPadding),
+        horizontalArrangement = Arrangement.spacedBy(if (window.compact) 10.dp else 24.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         hints.forEach { (action, label) ->
@@ -106,9 +107,15 @@ fun TouchHintBar(
 @Composable
 private fun TouchHint(action: GamepadAction, label: String, onPress: () -> Unit) {
     val window = LocalShellWindow.current
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    // The tap target and the drawn chip are two different sizes (owner,
+    // on the RP5 console, 2026-09-25: "the pills are also too big"): the
+    // chip draws at MenuTokens.HintChipMinHeight on every window, touch
+    // or not, and only a touch-first window wraps it in a bigger,
+    // invisible Box sized to MenuTokens.HintTouchTarget -- the same 48dp
+    // every other touch control on [ShellWindow] uses -- so shrinking the
+    // chip never shrinks what a finger can hit.
+    Box(
+        contentAlignment = Alignment.Center,
         modifier = Modifier
             // The bar is a LEGEND that happens to be tappable, never a
             // place the cursor goes: `clickable` makes a node focusable,
@@ -119,29 +126,40 @@ private fun TouchHint(action: GamepadAction, label: String, onPress: () -> Unit)
             // same chain makes exactly that node unfocusable while
             // leaving the tap intact.
             .focusProperties { canFocus = false }
-            // On a touch screen the hint is a button and has to be big
-            // enough to hit; on the console it stays the compact legend
-            // it always was.
-            .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
-            .then(
-                if (window.touchFirst) {
-                    Modifier.border(1.dp, MenuTokens.HintPillOutline, RoundedCornerShape(24.dp))
-                } else {
-                    Modifier
-                },
-            )
-            .clickable(onClick = onPress)
-            .padding(horizontal = if (window.touchFirst) 12.dp else 0.dp, vertical = 4.dp),
+            .then(if (window.touchFirst) Modifier.heightIn(min = MenuTokens.HintTouchTarget) else Modifier)
+            .clickable(onClick = onPress),
     ) {
-        Text(
-            GamepadKeyMap.labelFor(action).takeIf { it.isNotBlank() } ?: label,
-            color = MenuTokens.OnSelected,
-            style = MaterialTheme.typography.labelSmall,
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .background(MenuTokens.Selected, RoundedCornerShape(50))
-                .padding(horizontal = 8.dp, vertical = 2.dp),
-        )
-        Text(label, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.labelMedium)
+                .heightIn(min = MenuTokens.HintChipMinHeight)
+                .then(
+                    if (window.touchFirst) {
+                        Modifier.border(1.dp, MenuTokens.HintPillOutline, RoundedCornerShape(14.dp))
+                    } else {
+                        Modifier
+                    },
+                )
+                .padding(horizontal = if (window.touchFirst) 8.dp else 0.dp, vertical = 2.dp),
+        ) {
+            Text(
+                GamepadKeyMap.labelFor(action).takeIf { it.isNotBlank() } ?: label,
+                color = MenuTokens.OnSelected,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = MenuTokens.HintGlyphTextSize),
+                modifier = Modifier
+                    .background(MenuTokens.Selected, RoundedCornerShape(50))
+                    .padding(
+                        horizontal = MenuTokens.HintGlyphPaddingHorizontal,
+                        vertical = MenuTokens.HintGlyphPaddingVertical,
+                    ),
+            )
+            Text(
+                label,
+                color = MenuTokens.OnSurfaceMuted,
+                style = MaterialTheme.typography.labelMedium.copy(fontSize = MenuTokens.HintLabelTextSize),
+            )
+        }
     }
 }
 
