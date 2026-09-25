@@ -223,20 +223,41 @@ internal fun GamelistOptionsMenu(
                 busy = true
                 scope.launch {
                     val summary = withContext(Dispatchers.IO) {
+                        // A source that cannot be asked (no key) refuses
+                        // here, once, with the fix -- never a count of
+                        // systems "scraped" by nothing (rig, build 814).
+                        dev.droidtop.library.scraper.ScraperReadiness.romSourceProblem(context)
+                            ?.let { return@withContext "Nothing was scraped\n$it" }
                         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
                         val targets = dev.droidtop.library.consoles.SystemFolders.all(context, systemsById)
                         if (targets.isEmpty()) {
                             "No game folders to scrape."
                         } else {
+                            // Each system's own sentence is the result: what
+                            // was found, missed, failed or refused there.
+                            val lines = mutableListOf<String>()
                             var done = 0
-                            targets.forEach { (folder, system) ->
+                            for ((folder, system) in targets) {
                                 done++
                                 status = "[$done/${targets.size}] ${system.displayName}"
-                                scrapeSystemArtwork(context, folder, system) { fileDone, total ->
+                                var refusedEverything = false
+                                val line = scrapeSystemArtwork(
+                                    context,
+                                    folder,
+                                    system,
+                                    onRefusedEverything = { refusedEverything = true },
+                                ) { fileDone, total ->
                                     status = "[$done/${targets.size}] ${system.displayName}: $fileDone/$total"
                                 }
+                                // The source refused everything it was
+                                // asked: every further system would be
+                                // refused the same way, so stop and say so.
+                                if (refusedEverything) {
+                                    return@withContext "Stopped at system $done of ${targets.size}\n$line"
+                                }
+                                lines += line
                             }
-                            "Scraped ${targets.size} systems."
+                            "Scraped ${targets.size} systems\n" + lines.joinToString("\n")
                         }
                     }
                     status = summary
@@ -320,6 +341,10 @@ internal fun GamelistOptionsMenu(
                 scope.launch {
                     status = "Scraping $groupLabel…"
                     val results = withContext(Dispatchers.IO) {
+                        // The first line is the row's title and is cut to one
+                        // line, so a refusal leads with a short one.
+                        dev.droidtop.library.scraper.ScraperReadiness.romSourceProblem(context)
+                            ?.let { return@withContext listOf("Nothing was scraped", it) }
                         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
                         val system = systemsById[systemId] ?: return@withContext listOf("Unknown system $systemId")
                         val folders = consoleFoldersFor(system.id)

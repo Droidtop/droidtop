@@ -251,7 +251,7 @@ object PcScraper {
             null
         } else {
             "IGDB needs your own free API credentials: create an application at dev.twitch.tv/console, " +
-                "then enter its Client ID and Client Secret under Settings > Artwork & metadata scraper > IGDB. " +
+                "then enter its Client ID and Client Secret under $SCRAPER_SETTINGS > IGDB. " +
                 "Lutris needs no account at all if you would rather not."
         }
     }
