@@ -138,6 +138,12 @@ class OnboardingActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+        // The ground runs under the bars; the theme would paint them grey
+        // over it (rig, BlueStacks, dq-onboard-02).
+        @Suppress("DEPRECATION")
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        @Suppress("DEPRECATION")
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
         val startStep = intent.getStringExtra(EXTRA_START_STEP)
             ?.let { name -> OnboardingStep.entries.firstOrNull { it.name == name } }
         val firstRun = !GamesRootPrefs.isOnboardingComplete(this)

@@ -410,7 +410,7 @@ internal fun SettingsCatalogView(
     }
 
     if (browseThemes) {
-        ThemeBrowserScreen(onDismiss = { browseThemes = false })
+        ThemeBrowserScreen(onDismiss = { browseThemes = false }, showHints = false)
         return
     }
 

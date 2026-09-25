@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The mode switcher's rows (BackButtonMenu): the shell's one selection
+  idiom, an accent ring over a raised fill, on the row the pad is on. The
+  stock dialog list showed no focus at all (rig, dq-onboard-02).
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#2BFFFFFF" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#2BFFFFFF" />
+            <stroke android:width="3dp" android:color="#FF8AB4FF" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+    <item android:state_selected="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#2BFFFFFF" />
+            <stroke android:width="3dp" android:color="#FF8AB4FF" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+    <item android:drawable="@android:color/transparent" />
+</selector>

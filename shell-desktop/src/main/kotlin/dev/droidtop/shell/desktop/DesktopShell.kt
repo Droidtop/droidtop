@@ -497,7 +497,8 @@ private fun openSettings(context: Context) {
     val intent = Intent(Intent.ACTION_MAIN).apply {
         component = ComponentName(context.packageName, "com.android.launcher3.settings.SettingsActivity")
         putExtra(":settings:fragment", "app.murinelauncher.settings.SettingsDesktopFragment")
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        // Settings has its own task (SPEC 2c): open this page fresh.
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
     }
     context.startActivity(intent)
 }

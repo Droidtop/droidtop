@@ -7,6 +7,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
+import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.getValue
@@ -104,6 +105,13 @@ class LauncherGamesActivity : AppCompatActivity() {
         // paints them grey over the ground (rig, dq-shell2-01, Android 9).
         window.statusBarColor = android.graphics.Color.TRANSPARENT
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        // Back from the grid is the home screen it was opened from. Left to
+        // Android, finishing the grid's own task sometimes surfaced a Gaming
+        // task instead (rig, dq-onboard-02, the icon's "Games" shortcut).
+        onBackPressedDispatcher.addCallback(this) {
+            startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            finish()
+        }
         setContent {
             dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
                 val shown by games.collectAsStateWithLifecycle(initialValue = null)
