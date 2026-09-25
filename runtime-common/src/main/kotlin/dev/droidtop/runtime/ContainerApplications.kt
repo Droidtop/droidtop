@@ -8,12 +8,17 @@ package dev.droidtop.runtime
  * identity of an application. [command] is the entry's `Exec` line split
  * into arguments with its field codes removed. [terminal] is `Terminal=true`:
  * a console program that needs a terminal window around it.
+ * [genericName] is what kind of program it is (`GenericName`, "Terminal"),
+ * shown under its name; [icon] is its `Icon` key, which is how an entry's
+ * variants are recognised ([ContainerApplications.parseListing]).
  */
 data class ContainerApp(
     val id: String,
     val name: String,
     val command: List<String>,
     val terminal: Boolean,
+    val genericName: String? = null,
+    val icon: String? = null,
 )
 
 /**
@@ -31,6 +36,20 @@ data class ContainerApp(
  * `NoDisplay` or `Hidden` set are left out, `Exec` is unquoted per the
  * spec's rules and its field codes (`%f`, `%U`, ...) are dropped because
  * nothing is being opened with the application.
+ *
+ * Only what a person would call an app is listed (rig, dq-desk2-01: the
+ * menu offered "Foot Client", "Foot Server" and "Manage Printing"):
+ *  - `OnlyShowIn` / `NotShowIn` are honoured against the desktop droidtop
+ *    runs ([DESKTOP_NAMES]): an entry meant only for GNOME or KDE is not
+ *    this desktop's.
+ *  - An entry whose program is `xdg-open` opens a page or a file in some
+ *    other application; it is a link, not an app (CUPS's "Manage
+ *    Printing" opens its web page, which droidtop's Printing row already
+ *    opens in Android's browser, and no container has a browser).
+ *  - Entries that share an `Icon` with the entry named after that icon
+ *    are its variants, a client or a server of the same program (foot's
+ *    `footclient.desktop` and `foot-server.desktop` both carry
+ *    `Icon=foot`, beside `foot.desktop`), and fold into it.
  */
 object ContainerApplications {
     private const val FILE_MARKER = "@@droidtop-desktop-file "
@@ -85,8 +104,20 @@ object ContainerApplications {
         flush()
         // A later directory's entry with the same id wins, as in the spec's
         // lookup order; /usr/local is listed second.
-        return apps.associateBy { it.id }.values.sortedBy { it.name.lowercase() }
+        val unique = apps.associateBy { it.id }.values
+        val mainByIcon = unique.filter { it.icon != null && it.id.removeSuffix(".desktop") == it.icon }
+            .associateBy { it.icon }
+        return unique
+            .filter { app -> app.icon == null || mainByIcon[app.icon]?.let { it === app } ?: true }
+            .sortedBy { it.name.lowercase() }
     }
+
+    /**
+     * The names droidtop's desktop answers to for `OnlyShowIn`/`NotShowIn`:
+     * the compositors it provisions (sway sets `XDG_CURRENT_DESKTOP=sway`,
+     * labwc `labwc:wlroots`).
+     */
+    val DESKTOP_NAMES: Set<String> = setOf("sway", "labwc", "wlroots")
 
     /** One desktop file's [Desktop Entry] group, or null when it is not a visible application. */
     fun parseEntry(id: String, text: String): ContainerApp? {
@@ -110,13 +141,19 @@ object ContainerApplications {
         if (values["Type"] != "Application") return null
         if (values["NoDisplay"].equals("true", ignoreCase = true)) return null
         if (values["Hidden"].equals("true", ignoreCase = true)) return null
+        fun desktops(key: String) = values[key]?.split(';')?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }
+        desktops("OnlyShowIn")?.let { only -> if (only.none { it in DESKTOP_NAMES }) return null }
+        desktops("NotShowIn")?.let { not -> if (not.any { it in DESKTOP_NAMES }) return null }
         val name = values["Name"]?.takeIf { it.isNotBlank() } ?: return null
         val command = splitExec(values["Exec"] ?: return null).takeIf { it.isNotEmpty() } ?: return null
+        if (command.first().substringAfterLast('/') == "xdg-open") return null
         return ContainerApp(
             id = id,
             name = unescapeString(name),
             command = command,
             terminal = values["Terminal"].equals("true", ignoreCase = true),
+            genericName = values["GenericName"]?.let { unescapeString(it) }?.takeIf { it.isNotBlank() && it != name },
+            icon = values["Icon"]?.takeIf { it.isNotBlank() },
         )
     }
 

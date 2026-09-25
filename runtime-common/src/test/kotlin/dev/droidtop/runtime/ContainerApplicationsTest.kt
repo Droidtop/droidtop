@@ -24,7 +24,35 @@ class ContainerApplicationsTest {
     @Test
     fun `a plain application entry`() {
         val app = ContainerApplications.parseEntry("foot.desktop", foot)!!
-        assertEquals(ContainerApp("foot.desktop", "Foot", listOf("foot"), terminal = false), app)
+        assertEquals(
+            ContainerApp("foot.desktop", "Foot", listOf("foot"), terminal = false, genericName = "Terminal", icon = "foot"),
+            app,
+        )
+    }
+
+    @Test
+    fun `a client and a server of a program fold into the program`() {
+        val listing = buildString {
+            append("\n@@droidtop-desktop-file /usr/share/applications/foot.desktop\n").append(foot).append('\n')
+            append("\n@@droidtop-desktop-file /usr/share/applications/footclient.desktop\n")
+            append(foot.replace("Exec=foot", "Exec=footclient").replace("Name=Foot", "Name=Foot Client")).append('\n')
+            append("\n@@droidtop-desktop-file /usr/share/applications/foot-server.desktop\n")
+            append(foot.replace("Exec=foot", "Exec=foot --server").replace("Name=Foot", "Name=Foot Server")).append('\n')
+        }
+        assertEquals(listOf("foot.desktop"), ContainerApplications.parseListing(listing).map { it.id })
+    }
+
+    @Test
+    fun `a link that opens a page is not an app`() {
+        val cups = "[Desktop Entry]\nType=Application\nName=Manage Printing\nExec=xdg-open http://localhost:631/\nIcon=cups\n"
+        assertNull(ContainerApplications.parseEntry("cups.desktop", cups))
+    }
+
+    @Test
+    fun `entries for other desktops are not this desktop's`() {
+        assertNull(ContainerApplications.parseEntry("g.desktop", foot + "\nOnlyShowIn=GNOME;"))
+        assertNull(ContainerApplications.parseEntry("s.desktop", foot + "\nNotShowIn=sway;"))
+        assertEquals("Foot", ContainerApplications.parseEntry("w.desktop", foot + "\nOnlyShowIn=GNOME;sway;")?.name)
     }
 
     @Test

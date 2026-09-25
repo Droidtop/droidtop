@@ -221,7 +221,14 @@ anything the user installs appears without droidtop knowing about it — and
 parses them per the Desktop Entry Specification (the `[Desktop Entry]`
 group only, `Type=Application`, `NoDisplay`/`Hidden` honoured, `Exec`
 unquoted per the spec with its field codes dropped, `Terminal=true`
-programs run inside the provisioned terminal). The list is read every time
+programs run inside the provisioned terminal). Only what a person would
+call an app is listed (decided 2026-09-25, rig dq-desk2-01 listed "Foot
+Client", "Foot Server" and "Manage Printing"): `OnlyShowIn`/`NotShowIn`
+are honoured against the desktop's own names (`sway`, `labwc`,
+`wlroots`), an entry whose program is `xdg-open` is a link rather than an
+app, and entries sharing an `Icon` with the entry named after that icon
+are its variants (a client, a server) and fold into it. Each app shows its
+`GenericName` under its name ("Foot", "Terminal"). The list is read every time
 the menu opens, above the library's own entries. Launching is an `exec` in
 the primary container, so the window appears on the shared desktop. These
 are session objects, not library entries: they exist only while the
