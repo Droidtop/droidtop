@@ -78,19 +78,82 @@ object HomeRolePrefs {
             ?.let { ComponentName.unflattenFromString(it) }
 
     /**
+     * Whether droidtop is the app Android opens on Home -- the real
+     * answer, not whether one of droidtop's HOME activities is enabled.
+     * Enabling one only makes droidtop a candidate: on Android 10+ Home is
+     * a role the person grants, and on the Android 14 rig "droidtop's own
+     * launcher" in setup left Pixel Launcher as Home while Global settings
+     * read "On" (dq-onboard-01).
+     */
+    fun isDroidtopHome(context: Context): Boolean {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            val roles = context.getSystemService(android.app.role.RoleManager::class.java)
+            if (roles != null && roles.isRoleAvailable(android.app.role.RoleManager.ROLE_HOME)) {
+                return roles.isRoleHeld(android.app.role.RoleManager.ROLE_HOME)
+            }
+        }
+        val home = android.content.Intent(android.content.Intent.ACTION_MAIN)
+            .addCategory(android.content.Intent.CATEGORY_HOME)
+        val resolved = context.packageManager.resolveActivity(home, PackageManager.MATCH_DEFAULT_ONLY)
+        return resolved?.activityInfo?.packageName == context.packageName
+    }
+
+    /**
+     * What to start, FOR A RESULT, to make droidtop the Home app: Android's
+     * own Home role request on 10+ (it only works started for a result,
+     * because it asks who is calling), else Android's Default home app
+     * screen. Enable the HOME activity first ([setActiveHomeImplementation]):
+     * the request offers only an enabled one.
+     */
+    fun homeRequestIntent(context: Context): android.content.Intent {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            val roles = context.getSystemService(android.app.role.RoleManager::class.java)
+            if (roles != null && roles.isRoleAvailable(android.app.role.RoleManager.ROLE_HOME)) {
+                return roles.createRequestRoleIntent(android.app.role.RoleManager.ROLE_HOME)
+            }
+        }
+        return homeSettingsIntent()
+    }
+
+    /** Android's own Default home app screen, for a caller that cannot wait for a result. */
+    fun homeSettingsIntent(): android.content.Intent =
+        android.content.Intent(android.provider.Settings.ACTION_HOME_SETTINGS)
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /**
      * Puts droidtop's one icon on droidtop's own home screen, through the
      * launcher's own install queue (the path a newly installed app's icon
      * takes), so the way into Gaming or Desktop is on the screen the person
-     * lands on rather than only in the drawer (docs/SPEC.md 2c). The queue
-     * places it the next time the home screen is shown and skips an icon
-     * that is already there.
+     * lands on rather than only in the drawer (docs/SPEC.md 2c). Only asks:
+     * the launcher places it the next time its home screen resumes
+     * ([placePendingIcon]).
      */
     fun placeDroidtopIcon(context: Context) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_ICON_PENDING, true)
+            .apply()
+    }
+
+    /**
+     * Called by the launcher when its home screen resumes: queues the icon
+     * [placeDroidtopIcon] asked for, once. Queued from the launcher itself
+     * because the queue places items only while the launcher exists; asked
+     * for at the end of setup, in a process where droidtop's launcher was
+     * not running (it was not even Home yet on the Android 14 rig), the icon
+     * never arrived (dq-onboard-01).
+     */
+    @JvmStatic
+    fun placePendingIcon(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (!prefs.getBoolean(KEY_ICON_PENDING, false)) return
+        prefs.edit().putBoolean(KEY_ICON_PENDING, false).apply()
         runCatching {
             com.android.launcher3.model.ItemInstallQueue.INSTANCE.get(context)
                 .queueItem(context.packageName, android.os.Process.myUserHandle())
         }.onFailure { android.util.Log.w("droidtop.HomeRole", "Could not queue droidtop's icon", it) }
     }
+
+    private const val KEY_ICON_PENDING = "droidtop_home_icon_pending"
 
     fun setAlternativeTarget(context: Context, component: ComponentName) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()

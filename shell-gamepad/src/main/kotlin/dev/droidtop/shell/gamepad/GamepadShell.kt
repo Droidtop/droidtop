@@ -2196,7 +2196,7 @@ private fun GamesSection(
                 // signature was already in the device's older crash logs.
                 if (entries.isEmpty()) {
                     Column(modifier = Modifier.fillMaxSize().padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(32.dp)) {
-                        Text("No games detected yet.", color = MenuTokens.OnSurface, modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding))
+                        Text("No games yet. Add the folders your games are in under Settings, Library, Game folders.", color = MenuTokens.OnSurface, modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding))
                     }
                 } else {
                     // Box, not Column: EsDeThemedView needs to genuinely fill
