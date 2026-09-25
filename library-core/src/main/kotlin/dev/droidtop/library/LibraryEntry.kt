@@ -744,22 +744,50 @@ class Library(
      * whatever it finds. Everything else (a configuration change replaying
      * a rescan intent) joins the running job instead.
      */
+    /** What [rebuildIndexFromRecords] did: the records it read, and the games on screen it kept without one. */
+    data class IndexRebuild(val records: Int, val keptWithoutRecord: Int)
+
     /**
      * Rebuilds the index from the per-game records and shows the result,
      * without walking any folder: every running or remembered background
      * collection is restarted against the rebuilt index as a plain
      * (non-rescan) scan, which for indexed providers means "load and
-     * publish", not "walk". Returns how many records the index was rebuilt
-     * from.
+     * publish", not "walk".
+     *
+     * A rebuild never shows a smaller library than the one on screen
+     * (docs/SPEC.md 7g). It used to throw the in-memory slices away and
+     * publish whatever the records alone produced, and a library whose
+     * games mostly had no readable record went from 168 engine games to 6
+     * until the next walk (rig, build 814). Each provider's rebuilt slice
+     * is now [LibrarySlice.including] what that provider was showing, and
+     * written back, which also writes the missing games' records from the
+     * list; the next walk decides what is really gone, as it always does.
      */
-    suspend fun rebuildIndexFromRecords(): Int {
+    suspend fun rebuildIndexFromRecords(): IndexRebuild {
         val rebuilt = index.rebuildFromRecords()
-        // The slices held in memory are what the index USED to say.
-        slices.clear()
+        var kept = 0
+        withContext(kotlinx.coroutines.NonCancellable) {
+            for (provider in providers) {
+                if (!provider.indexed) continue
+                lockOf(provider).withLock {
+                    // Nothing of this provider's is on screen yet: the
+                    // rebuilt index is read the first time it is asked for.
+                    val shown = slices[provider.indexKey] ?: return@withLock
+                    val fresh = index.load(provider.indexKey) ?: LibrarySlice()
+                    val union = fresh.including(shown)
+                    kept += union.entries().size - fresh.entries().size
+                    if (union != fresh) index.save(provider.indexKey, union)
+                    slices[provider.indexKey] = union
+                }
+            }
+        }
+        if (kept > 0) {
+            ScanLog.write("index: kept $kept shown games that had no readable record, and wrote their records")
+        }
         for (kinds in backgroundScanStates.keys.toList()) {
             scanInBackground(kinds, rescan = false, restart = true)
         }
-        return rebuilt
+        return IndexRebuild(records = rebuilt, keptWithoutRecord = kept)
     }
 
     fun scanInBackground(kinds: Set<LibraryEntryKind>, rescan: Boolean = false, restart: Boolean = false) {

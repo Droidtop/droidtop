@@ -154,6 +154,31 @@ data class LibrarySlice(val segments: List<ScanStep.Segment> = emptyList()) {
     fun keepOnlyRoots(roots: Set<String>): LibrarySlice =
         copy(segments = segments.filter { it.root == null || it.root in roots })
 
+    /**
+     * This slice plus every game [shown] holds that this one does not, in
+     * the part [shown] has it in. What a rebuild of the index from the
+     * per-game records ends on: a game on screen whose record could not be
+     * read (never written, an older shape, a corrupt file) is kept as it is
+     * shown rather than dropped, because a rebuild walks no folder and so
+     * cannot know the game is gone -- the next walk decides that, as it
+     * decides it for every other game (docs/SPEC.md 7g).
+     */
+    fun including(shown: LibrarySlice): LibrarySlice {
+        val have = entries().mapTo(HashSet()) { it.id }
+        val merged = segments.toMutableList()
+        for (segment in shown.segments) {
+            val extra = segment.entries.filter { have.add(it.id) }
+            if (extra.isEmpty()) continue
+            val at = merged.indexOfFirst { it.key == segment.key && it.root == segment.root }
+            if (at >= 0) {
+                merged[at] = merged[at].copy(entries = merged[at].entries + extra)
+            } else {
+                merged += segment.copy(entries = extra)
+            }
+        }
+        return LibrarySlice(merged)
+    }
+
     /** The slice without one entry -- what folding a missing game into its replacement leaves behind. */
     fun without(id: String): LibrarySlice =
         copy(segments = segments.map { segment -> segment.copy(entries = segment.entries.filterNot { it.id == id }) })
