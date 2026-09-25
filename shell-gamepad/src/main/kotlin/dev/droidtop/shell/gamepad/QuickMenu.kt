@@ -162,6 +162,11 @@ internal fun QuickMenu(onDismiss: () -> Unit) {
                         .padding(16.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        // L1/R1 switches tabs; the glyphs beside the row say
+                        // so instead of a "Switch tab" hint-bar pill (owner,
+                        // 2026-09-25: "Can remove the next/previous section
+                        // pills").
+                        ShoulderGlyph("L1", modifier = Modifier.padding(end = 6.dp))
                         QuickTab.entries.forEach { t ->
                             Text(
                                 t.label,
@@ -181,18 +186,18 @@ internal fun QuickMenu(onDismiss: () -> Unit) {
                                     .padding(horizontal = 14.dp, vertical = 8.dp),
                             )
                         }
+                        ShoulderGlyph("R1", modifier = Modifier.padding(start = 2.dp))
                     }
                     Spacer(Modifier.padding(4.dp))
                     // Closing's touch route is the hint row's own "B Close"
                     // pill, which dispatches a real B into this window; a
                     // separate "Close" text in the corner was a second
                     // control for the same press (UI pass 2026-09-24, M12).
-                    // L1/R1 is hinted by the tab it goes to, so the switch
-                    // is discoverable on a pad and tappable on a screen.
-                    val tabHint = GamepadAction.R to tab.next().label
+                    // L1/R1 switches tabs; the ShoulderGlyph pair above the
+                    // tab row names that now, not a hint-bar pill.
                     when (tab) {
-                        QuickTab.NOTIFICATIONS -> NotificationsTab(onDismiss, tabHint)
-                        QuickTab.SYSTEM -> QuickSettingsPanel(sheetWidth.value.toInt(), onDismiss, tabHint)
+                        QuickTab.NOTIFICATIONS -> NotificationsTab(onDismiss)
+                        QuickTab.SYSTEM -> QuickSettingsPanel(sheetWidth.value.toInt(), onDismiss)
                     }
                 }
             }
@@ -209,7 +214,7 @@ private enum class QuickTab(val label: String) {
 }
 
 @Composable
-private fun NotificationsTab(onDismiss: () -> Unit, tabHint: Pair<GamepadAction, String>) {
+private fun NotificationsTab(onDismiss: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val granted = remember { NotificationsStore.isGranted(context) }
     val items by NotificationsStore.items.collectAsState()
@@ -365,7 +370,6 @@ private fun NotificationsTab(onDismiss: () -> Unit, tabHint: Pair<GamepadAction,
                     }
                 }
                 if (granted && items.any { it.clearable }) add(GamepadAction.Y to "Clear all")
-                add(tabHint)
                 add(GamepadAction.B to "Close")
             },
             background = androidx.compose.ui.graphics.Color.Transparent,

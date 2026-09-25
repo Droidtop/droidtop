@@ -51,7 +51,6 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
@@ -724,7 +723,6 @@ fun GamepadShell(
                 aLabel = detailPrimaryLabel.takeIf { detailEntry != null } ?: "Select",
                 canGoBack = canGoBack || overlayScreen,
                 showInfo = !overlayScreen,
-                showSectionSwitch = !overlayScreen,
                 showSystemSwitch = !overlayScreen && section == GamingSection.GAMES && canGoBack,
                 showOptions = !overlayScreen && section == GamingSection.GAMES,
             )
@@ -1237,7 +1235,6 @@ private fun ButtonHintFooter(
     aLabel: String = "Select",
     canGoBack: Boolean,
     showInfo: Boolean,
-    showSectionSwitch: Boolean = false,
     showSystemSwitch: Boolean = false,
     showOptions: Boolean = false,
     background: Color = MenuTokens.HintBar,
@@ -1260,10 +1257,10 @@ private fun ButtonHintFooter(
             // be tappable on its own.
             if (showSystemSwitch) add(GamepadAction.LEFT to "Previous system")
             if (showSystemSwitch) add(GamepadAction.RIGHT to "Next system")
-            // L1/R1 cycle the top-level sections from anywhere; both
-            // directions are named, each tappable on its own.
-            if (showSectionSwitch) add(GamepadAction.L to "Previous section")
-            if (showSectionSwitch) add(GamepadAction.R to "Next section")
+            // L1/R1 cycling the top-level sections is named beside the
+            // tab row itself now, not here (SectionTabBar's own
+            // ShoulderGlyph, owner 2026-09-25: "Can remove the
+            // next/previous section pills").
         },
     )
 }
@@ -1313,6 +1310,13 @@ private fun SectionTabBar(
             .padding(horizontal = window.edgePadding, vertical = if (window.compact) 10.dp else 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // L1/R1 steps the tab that's currently selected; a tiny glyph
+        // flanking the row says so, replacing the "Previous/Next section"
+        // hint-bar pills (owner, 2026-09-25: "Can remove the next/previous
+        // section pills"). No glyph when there's nothing to switch to.
+        if (sections.size > 1) {
+            ShoulderGlyph("L1", modifier = Modifier.padding(end = 6.dp))
+        }
         // The tabs scroll and the Quick Menu control stays pinned beside
         // them. On a phone the four names do not fit across 411dp, and a
         // plain Row silently pushes the last one off the edge -- which on
@@ -1366,6 +1370,9 @@ private fun SectionTabBar(
                         .padding(horizontal = 14.dp, vertical = 6.dp),
                 )
             }
+        }
+        if (sections.size > 1) {
+            ShoulderGlyph("R1", modifier = Modifier.padding(start = 6.dp))
         }
         Spacer(Modifier.width(window.tabGap))
         // On-screen indicator for the Quick Menu button (per direction):
@@ -2690,7 +2697,6 @@ private fun GamesSection(
                             ShellChip("$recentCount recent", on = recentOnly, onClick = { recentOnly = true })
                         }
                     }
-                    val focusManager = LocalFocusManager.current
                     val pad = rememberGridPad()
                     LazyVerticalGrid(
                         state = pad.state,
@@ -2717,6 +2723,17 @@ private fun GamesSection(
                         // right/left within the grid, matching ES-DE's real
                         // "switch system at the edge" convention instead of
                         // hijacking every keypress.
+                        //
+                        // Up at the TOP row is answered true and left there,
+                        // never `focusManager.moveFocus(FocusDirection.Up)`:
+                        // that used to walk straight out of the grid onto the
+                        // section tab bar above it, so a D-pad press meant for
+                        // "stop, I'm at the top" instead reassigned Left/Right/A
+                        // to switching Games/Apps/Settings (owner, 2026-09-25:
+                        // "don't let dpad up navigate to the top menu, it needs
+                        // to be separate"). The tab bar has its own control,
+                        // L1/R1 (SectionTabBar's `ShoulderGlyph`), which never
+                        // routes through focus at all.
                         modifier = Modifier.fillMaxSize().padding(horizontal = LocalShellWindow.current.edgePadding)
                             .onKeyEvent { event ->
                                 val direction = when (GamepadKeyMap.actionFor(event.key)) {
@@ -2732,10 +2749,7 @@ private fun GamesSection(
                                 // switch-system handler above.
                                 if (event.type == KeyEventType.KeyDown) return@onKeyEvent true
                                 event.type == KeyEventType.KeyUp && (
-                                    pad.move(direction) ||
-                                        // Up from the top row: the filter
-                                        // chip and the tabs above the grid.
-                                        (direction == FocusDirection.Up && focusManager.moveFocus(FocusDirection.Up))
+                                    pad.move(direction) || direction == FocusDirection.Up
                                     )
                             },
                         horizontalArrangement = Arrangement.spacedBy(24.dp),
