@@ -63,6 +63,12 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.foundation)
+    // Category glyphs for settings rows that open something (CatalogIcon,
+    // settings polish pass 2026-09-25) -- the official Material Symbols
+    // set, version-pinned by the BOM above like every other Compose
+    // artifact here, so a name this module references either compiles or
+    // fails the build; nothing hand-drawn.
+    implementation(libs.androidx.compose.material.icons.extended)
     // BackHandler (system-back dispatcher) -- see GamepadShell's back
     // handling: B doubles as KEYCODE_BACK on this hardware and arrives via
     // the dispatcher, not as a key event.

@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,6 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
+import dev.droidtop.library.settings.CatalogIcon
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 
@@ -233,6 +235,11 @@ internal fun MenuRow(
     selected: Boolean = false,
     danger: Boolean = false,
     accent: Color? = null,
+    // A category glyph (docs/SPEC.md 7k) -- rows that OPEN something carry
+    // one, so the list scans by shape the way a polished console settings
+    // list does, rather than every row reading identically (settings
+    // polish pass, 2026-09-25).
+    icon: CatalogIcon? = null,
     onClick: (() -> Unit)? = null,
     // Long-press is the touch route to Y on a row (the same convention
     // the shell's cards use for their detail).
@@ -278,6 +285,14 @@ internal fun MenuRow(
                     .background(accent),
             )
             Spacer(Modifier.width(12.dp))
+        } else if (icon != null) {
+            Icon(
+                icon.glyph(),
+                contentDescription = null,
+                tint = if (selected) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(Modifier.width(16.dp))
         }
         Column(Modifier.weight(1f)) {
             Text(

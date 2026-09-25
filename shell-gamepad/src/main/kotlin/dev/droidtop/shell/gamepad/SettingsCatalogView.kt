@@ -56,6 +56,7 @@ import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
+import dev.droidtop.library.settings.CatalogIcon
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
@@ -63,6 +64,8 @@ import dev.droidtop.library.settings.FolderPickItem
 import dev.droidtop.library.settings.GamingSettingsCatalog
 import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.SettingsSearchIndex
+import dev.droidtop.library.settings.SettingsSearchResult
 import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.library.settings.SubScreenItem
 import dev.droidtop.library.settings.TextInputItem
@@ -108,6 +111,11 @@ fun CatalogNavigator(
     root: CatalogScreen,
     onExit: () -> Unit,
     nativeActions: Map<String, () -> Unit> = emptyMap(),
+    // The settings home only (docs/SPEC.md settings architecture,
+    // "search across settings") -- a nested management screen hosted
+    // by its own CatalogNavigator (Console systems, Containers) does
+    // not get a second search entry.
+    showSearch: Boolean = false,
     /**
      * Changes when the host knows the screen's live data changed outside
      * any action taken here (the desktop session starting or stopping,
@@ -137,10 +145,18 @@ fun CatalogNavigator(
     // of explanation; this is where the rest of it is.
     var infoRow by remember { mutableStateOf<CatalogItem?>(null) }
     var pendingFolderPick by remember { mutableStateOf<FolderPickItem?>(null) }
+    var searchOpen by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var searchIndex by remember { mutableStateOf<List<SettingsSearchResult>>(emptyList()) }
     val scope = rememberCoroutineScope()
 
     val screen = stack.last()
     val depth = stack.lastIndex
+    LaunchedEffect(searchOpen) {
+        if (searchOpen && searchIndex.isEmpty()) {
+            searchIndex = withContext(Dispatchers.IO) { SettingsSearchIndex.build(context, root) }
+        }
+    }
     // Suspend builder (real screens run Room queries / filesystem walks) --
     // rebuilt on every navigation and after every value change.
     // Tagged with the screen they belong to: right after a push or a pop
@@ -149,11 +165,27 @@ fun CatalogNavigator(
         value = screen to screen.groups(context)
     }
     val groups = loaded?.takeIf { it.first == screen }?.second ?: emptyList()
-    val rows = remember(groups) {
-        groups.flatMap { group ->
+    val rows = remember(groups, showSearch, depth) {
+        val built = groups.flatMap { group ->
             group.items.mapIndexed { index, item ->
                 CatalogRow(item, headerAbove = if (index == 0) group.title else null)
             }
+        }
+        if (showSearch && depth == 0) {
+            listOf(
+                CatalogRow(
+                    ActionItem(
+                        id = SEARCH_ROW_ID,
+                        title = "Search settings",
+                        subtitle = "Find any setting by name",
+                        icon = CatalogIcon.SEARCH,
+                        run = {},
+                    ),
+                    headerAbove = null,
+                ),
+            ) + built
+        } else {
+            built
         }
     }
     val selected = (selectionByDepth[depth] ?: 0).coerceIn(0, (rows.lastIndex).coerceAtLeast(0))
@@ -211,6 +243,10 @@ fun CatalogNavigator(
     }
 
     fun activate(item: CatalogItem) {
+        if (item.id == SEARCH_ROW_ID) {
+            searchOpen = true
+            return
+        }
         val native = nativeActions[item.id]
         if (native != null) {
             native()
@@ -270,7 +306,27 @@ fun CatalogNavigator(
         }
     }
 
-    BackHandler { pop() }
+    BackHandler { if (searchOpen) { searchOpen = false; searchQuery = "" } else pop() }
+
+    if (searchOpen) {
+        SettingsSearchOverlay(
+            query = searchQuery,
+            onQueryChange = { searchQuery = it },
+            results = remember(searchIndex, searchQuery) { SettingsSearchIndex.search(searchIndex, searchQuery) },
+            onPick = { result ->
+                searchOpen = false
+                searchQuery = ""
+                if (result.target != screen) {
+                    scrollByDepth[stack.lastIndex] = listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+                    stack.add(result.target)
+                    selectionByDepth[stack.lastIndex] = 0
+                    refresh()
+                }
+            },
+            onClose = { searchOpen = false; searchQuery = "" },
+        )
+        return
+    }
 
     // Modal overlays render INSTEAD of the list so their own input wins.
     val textItem = editingText
@@ -458,6 +514,7 @@ internal fun SettingsCatalogView(
         nativeActions = mapOf(
             GamingSettingsCatalog.ID_BROWSE_THEMES to { browseThemes = true },
         ),
+        showSearch = true,
     )
 }
 
@@ -499,6 +556,9 @@ internal fun adjustCatalogItem(context: Context, item: CatalogItem, direction: I
 
 private data class CatalogRow(val item: CatalogItem, val headerAbove: String?)
 
+/** The synthetic root-level row that opens search -- never a real catalog id. */
+private const val SEARCH_ROW_ID = "__settings_search__"
+
 @Composable
 private fun CatalogRowView(
     row: CatalogRow,
@@ -537,6 +597,7 @@ private fun CatalogRowView(
         selected = isSelected,
         danger = confirmArmed,
         accent = (item as? NestedScreenItem)?.accent?.let { Color(it) },
+        icon = item.icon,
         onClick = onClick,
         onLongClick = onLongClick,
         onAdjust = onAdjust,
@@ -693,6 +754,122 @@ internal fun TextEditDialog(
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = onDismiss) { Text("Cancel", color = MenuTokens.OnSurfaceMuted) }
                 TextButton(onClick = { onCommit(value) }) { Text("Save", color = MenuTokens.Accent) }
+            }
+        }
+    }
+}
+
+/**
+ * Settings home only (docs/SPEC.md settings architecture, "search across
+ * settings"): a text field and, once two characters are typed, the
+ * matching rows from [SettingsSearchIndex], each showing which screen it
+ * lives on. Picking one navigates there -- the same [MenuRow] anatomy and
+ * the same A/B/touch input as the list it replaces, so this is one more
+ * screen in the shell's own language rather than a second search UI.
+ */
+@Composable
+private fun SettingsSearchOverlay(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    results: List<SettingsSearchResult>,
+    onPick: (SettingsSearchResult) -> Unit,
+    onClose: () -> Unit,
+) {
+    val fieldFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { requestFocusWhenAttached(fieldFocus, "Settings search") }
+    Column(modifier = Modifier.fillMaxSize()) {
+        MenuHeader("Search settings", "Type a setting's name")
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 8.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MenuTokens.SurfaceSelected)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MenuTokens.OnSurface),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(MenuTokens.Accent),
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    imeAction = androidx.compose.ui.text.input.ImeAction.Search,
+                ),
+                modifier = Modifier
+                    .weight(1f)
+                    .focusRequester(fieldFocus)
+                    .onKeyEvent { event ->
+                        // Escape closes search from the field itself --
+                        // BackHandler alone does not see key events
+                        // consumed by a focused text field.
+                        if (event.key == Key.Escape && event.type == KeyEventType.KeyUp) {
+                            onClose()
+                            true
+                        } else {
+                            false
+                        }
+                    },
+            )
+            if (query.isNotEmpty()) {
+                Text(
+                    "Clear",
+                    color = MenuTokens.Accent,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier
+                        .padding(start = 12.dp)
+                        .clickable { onQueryChange("") },
+                )
+            }
+        }
+        when {
+            query.trim().length < 2 ->
+                Text(
+                    "Keep typing -- at least two letters",
+                    color = MenuTokens.OnSurfaceMuted,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 12.dp),
+                )
+            results.isEmpty() ->
+                Text(
+                    "No settings match \"$query\"",
+                    color = MenuTokens.OnSurfaceMuted,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 12.dp),
+                )
+            else -> {
+                var selected by remember { mutableStateOf(0) }
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .focusable()
+                        .onKeyEvent { event ->
+                            if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                            when (event.key) {
+                                Key.DirectionDown -> { selected = (selected + 1).coerceAtMost(results.lastIndex); true }
+                                Key.DirectionUp -> { selected = (selected - 1).coerceAtLeast(0); true }
+                                Key.ButtonA, Key.Enter, Key.DirectionCenter, Key.NumPadEnter -> {
+                                    results.getOrNull(selected)?.let(onPick)
+                                    true
+                                }
+                                else -> false
+                            }
+                        },
+                    contentPadding = MenuListContentPadding,
+                    verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
+                ) {
+                    itemsIndexed(results) { index, result ->
+                        MenuRow(
+                            title = result.itemTitle,
+                            subtitle = "In ${result.screenTitle}" + (result.itemSubtitle?.let { " -- $it" } ?: ""),
+                            icon = result.icon,
+                            chevron = true,
+                            selected = index == selected,
+                            onClick = { selected = index; onPick(result) },
+                        )
+                    }
+                }
             }
         }
     }

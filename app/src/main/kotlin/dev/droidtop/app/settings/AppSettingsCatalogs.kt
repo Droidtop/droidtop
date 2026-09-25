@@ -42,6 +42,7 @@ import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.FolderPickItem
+import dev.droidtop.library.settings.CatalogIcon
 import dev.droidtop.library.settings.GamingSettingsCatalog
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.SettingsScreenRegistry
@@ -129,16 +130,27 @@ object AppSettingsCatalogs {
         }
 
         listOf(
+            // Regrouped from one flat run of five unrelated rows into
+            // labeled sections (settings polish pass, 2026-09-25): this
+            // was the one management screen with no section label at all
+            // while its sibling Settings screens already used them.
             CatalogGroup(
-                id = "console_systems_tools",
-                title = null,
+                id = "console_systems_management",
+                title = "Management",
                 items = listOf(
                     NestedScreenItem(
                         id = "console_systems_platforms",
                         title = "Manage platforms",
                         subtitle = "Add, edit, or delete the platforms droidtop recognizes",
                         registryId = SCREEN_PLATFORMS,
+                        icon = CatalogIcon.PLATFORMS,
                     ),
+                ),
+            ),
+            CatalogGroup(
+                id = "console_systems_integrations_group",
+                title = "Integrations",
+                items = listOf(
                     // Game folders and the Scraper are rows of Settings >
                     // Library, directly above this screen's own row; a
                     // second way in here was one setting in two places (UI
@@ -149,6 +161,7 @@ object AppSettingsCatalogs {
                         subtitle = "Hook other installed apps into droidtop, e.g. a downloader for a system's games",
                         registryId = SCREEN_INTEGRATIONS,
                         valueLabel = { if (activeIntegrations == 0) "none" else "$activeIntegrations active" },
+                        icon = CatalogIcon.INTEGRATIONS,
                     ),
                     // The plugin half (docs/SPEC.md 12a): real code
                     // droidtop installs, approves and runs itself, next
@@ -168,7 +181,14 @@ object AppSettingsCatalogs {
                         title = "Enginehost",
                         subtitle = "Engine-game runtimes, like an emulator's core list; its own settings and save storage",
                         registryId = SCREEN_ENGINEHOST,
+                        icon = CatalogIcon.ENGINEHOST,
                     ),
+                ),
+            ),
+            CatalogGroup(
+                id = "console_systems_database",
+                title = "Platform database",
+                items = listOf(
                     // Find orphaned media and Scrape all systems are
                     // one-shot library actions, in the Games section's
                     // options menu (docs/SPEC.md 7f, "Where things live").
@@ -1106,12 +1126,14 @@ object AppSettingsCatalogs {
                         subtitle = "The folders droidtop scans for games, Windows and engine games alike",
                         registryId = SCREEN_ROM_FOLDERS,
                         valueLabel = { if (folders.isEmpty()) "none yet" else "${folders.size}" },
+                        icon = CatalogIcon.GAME_FOLDERS,
                     ),
                     NestedScreenItem(
                         id = "pc_stores_windows",
                         title = "Windows games",
                         subtitle = "The Wine environment Windows games run inside, and the folders it can reach",
                         registryId = SCREEN_WINDOWS_GAMES,
+                        icon = CatalogIcon.WINDOWS_GAMES,
                     ),
                     ActionItem(
                         id = "pc_stores_downloads",
