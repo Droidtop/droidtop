@@ -345,7 +345,7 @@ it plus the integrations only that surface can offer.
 | Settings catalogs and their registry | `SettingsCatalogInitProvider`, `:runtime-common` |
 | Preferences, including the mode switches themselves | `Modes` (`:runtime-common`), one prefs file |
 | Self-update and the update-now trigger (§10b) | `AppSelfUpdate`, `UpdateNowReceiver` |
-| Crash reporting and recovery | `CrashReporting`, `LauncherApplication` |
+| Crash reporting | `CrashReporting`, `LauncherApplication` |
 | Keeping the index honest over time: the slow rebuild pass (§7g) | `Library` (`:library-core`) |
 
 The slow rebuild pass is core, not Gaming's: every surface that shows the
@@ -382,7 +382,21 @@ your home screen") that opens the system's home chooser, and the
 `SECONDARY_HOME` idle surface (§4c), which the platform places only for
 the home app, is covered by the companion's Presentation while Gaming
 runs. Nothing else changes: Launcher mode stays enabled, because the
-person may pick droidtop again from that row. droidtop registers no
+person may pick droidtop again from that row.
+
+Built 2026-09-25 (`HomeRolePrefs.isDroidtopHome`, `homeRequestIntent`),
+after the Android 14 rig answered "droidtop's own launcher" in setup and
+kept Pixel Launcher as Home while Global settings read "On"
+(dq-onboard-01): enabling the HOME activity only makes droidtop a
+candidate. Onboarding's launcher step asks Android for the role itself
+(`RoleManager.createRequestRoleIntent(ROLE_HOME)` on 10+, started for a
+result because the request asks who is calling; Android's Default home
+app screen below 10), as its hand-off work with the skip beside it; the
+Alternative choice asks the same way. Global settings' "Use droidtop as
+home screen" is On only when droidtop's launcher is enabled AND is what
+Home opens, says which app Home opens, and turning it on opens Android's
+Default home app screen. With droidtop's launcher enabled but not Home,
+the mode switcher's "Android" opens whatever Home opens. droidtop registers no
 boot receiver; the HOME role is what starts it at boot, and nothing
 else of droidtop's (the desktop session, the VPN) starts before a person
 opens it (§3).
@@ -442,10 +456,21 @@ into Gaming at all (rig, dq-coordinator-24). The alias and its mode piece
 are gone. The icon is not mode-gated: it runs nothing until someone opens
 it, and Android requires an enabled launcher activity before it accepts a
 pinned shortcut from droidtop at all. The class keeps its old name because
-every pinned game names it. Finishing onboarding with droidtop's own
-launcher as Home puts this icon on the home screen through the launcher's
-own install queue (`HomeRolePrefs.placeDroidtopIcon`), so the way into
-Gaming or Desktop is on the first screen, not only in the drawer. Every
+every pinned game names it. It runs in a task of its own
+(`taskAffinity=""`), so every tap runs it and it decides again; as part of
+the app's task, a tap brought back whatever droidtop screen was last in
+front, a Gaming shell whose mode had been switched off included
+(dq-onboard-01). The games grid is reachable whatever modes are on: the
+icon's app shortcut "Games" (a long press) and the home screen's
+long-press menu entry "droidtop games" open it (`ACTION_SHOW_GAMES`).
+Launcher3's pin sheet (`AddItemActivity`) also runs in a task of its own,
+so Cancel returns to the grid rather than into older droidtop screens.
+Finishing onboarding with droidtop's own launcher as Home asks for this
+icon on the home screen (`HomeRolePrefs.placeDroidtopIcon`), and the
+launcher queues it through its own install queue when its home screen
+next resumes (`placePendingIcon`); queued from the end of setup, in a
+process where the launcher did not exist yet, it never arrived on the
+Android 14 rig. Every
 game is not put in the drawer as its own icon: the drawer is
 `LauncherApps`, which lists installed activities only, and faking entries
 into it would mean rewriting the fork's app model.
@@ -574,7 +599,36 @@ folder added in onboarding or Settings is walked whichever mode is on and
 whichever surface is open. That walk is the person's own act, not the slow
 pass, which still runs only while something observes the library. It used
 to wait for the Gaming shell, so after "Open Android" the launcher's games
-said "No games yet" (rig, dq-coordinator-24).
+said "No games yet" (rig, dq-coordinator-24). A root set counts as walked
+only when a walk of it FINISHES (`Library.scanInBackground(onFinished)`):
+the mark used to be written when the walk started, so a walk that died
+with the process left the new folder marked walked and unread
+(dq-onboard-01). So the core follower also walks at process start when the
+last process did not finish, and a second caller joins a walk of the same
+set instead of restarting it. scan.log says when such a walk starts and
+when it ends.
+
+**Gaming and Desktop are on once setup has turned them on** (decided
+2026-09-25). Until onboarding finishes, `Modes.reload` counts neither as
+on, whatever their stored switches say, so nothing of theirs runs before
+anything was chosen: on a fresh install the Windows backbone booted in
+`Application.onCreate` and crashed droidtop's first launch on Android 14
+(a DataStore race in the vendored preferences, fixed there too). Finishing
+onboarding reloads the modes, which starts what they own.
+
+**A mode switched off leaves the screen** (decided 2026-09-25).
+`Modes.enabledFlow` is watched by `MainActivity`: when the shell on screen
+belongs to a mode that was just switched off, it changes to the other
+app-hosted mode if that one is on, and otherwise finishes for the Android
+home screen. Switching Gaming off used to leave the running Gaming shell
+fully usable until a force-stop (dq-onboard-01).
+
+**A crash ends the process; there is no recovery screen** (decided
+2026-09-25). The Murine fork's Recovery library ("Recover / Restart")
+rebuilt the activity stack after a crash into a blank white home screen
+that Home could not leave, and locked the screen to portrait
+(dq-onboard-01). It is gone; the Sentry SDK's own handler reports the
+crash (`CrashReporting`) and Android's own crash handling follows.
 
 The Gaming and Desktop switches are set in two places and read in one:
 onboarding writes them from "Anything else to set up" when it finishes
@@ -3098,7 +3152,12 @@ rig's new-user passes, which try to break onboarding on purpose.
 downloader (the same Browse themes screen Settings opens, one mechanism), so a person can pick and
 download another ES-DE theme before they first see the Gaming shell, not only the bundled default.
 Built 2026-09-25: the Appearance step's "Get more themes" draws `ThemeBrowserScreen` in place of the
-step, and the theme list is read again when it returns.
+step, and the theme list is read again when it returns. The downloader's git library is JGit 5.13,
+the last line built for Java 8: JGit 6 and 7 call Java 11+ methods (`InputStream.readNBytes(int)`)
+that Android has only from API 33, and both "Get more themes" and Settings > Browse themes crashed
+Android 9 with NoSuchMethodError (dq-onboard-01). A library method the running Android lacks is a
+failed download, never a crash (`ThemeDownloader` catches `LinkageError`). The browser has its own
+hint row.
 
 **Onboarding survives becoming Home (decided 2026-09-25).** droidtop is a Home candidate from the
 moment it is installed, and a person may make it the Home app before or during setup: in Android's
@@ -3141,8 +3200,13 @@ Onboarding is one scaffold, not a set of unrelated screens. The scaffold owns:
 - **Pad-first** (decided 2026-09-25). The pad's selection starts on the step's forward action, or on
   its first answer when the step asks something (asked again for a moment, since some answers are
   read off the main thread, then the forward action). Every button and answer takes the pad's A
-  (`padClick`; Compose's `clickable` answers Enter and DPAD_CENTER, never BUTTON_A) and draws the
-  shell's accent ring when it has focus; the window owns the pad (`ownPadButtons`), so B is Back; and
+  and draws the shell's accent ring when it has focus. Every control is `padSelectable` (built
+  2026-09-25, after dq-onboard-01): ONE focus target that holds focus in touch mode too, a key
+  handler for A, Enter and DPAD_CENTER, a tap, and button semantics. Compose's `clickable` answers
+  Enter and DPAD_CENTER but never BUTTON_A, and in touch mode its focus target refuses focus, so
+  the initial selection never landed, the first pad press only brought the ring back, the
+  tutorial's first A hit "Skip", and a tapped hint pill dispatched its key into a window with
+  nothing focused; the window owns the pad (`ownPadButtons`), so B is Back; and
   a hint row (A Select, B Back) is the touch route to both. On the rig, A did nothing on Welcome, no
   focus showed anywhere, and D-pad Down went up to Back (dq-coordinator-24).
 - **Back**, always available, stepping back through the path actually taken. System Back
@@ -3208,7 +3272,10 @@ buttons and a link. The component is the shell's existing menu row anatomy
   droidtop's one icon (§2c, "One droidtop icon") is in whichever launcher is the home screen,
   droidtop's own included, and opens the default or last-used mode like any other app.
   - *Standard* points at the Standard shell's own settings rather than re-inventing them,
-    and returns to onboarding afterwards.
+    and returns to onboarding afterwards. Its work is making droidtop the Home app, which only
+    Android can do (§2c, "Holding the role"): "Make droidtop the Home app" hands over to
+    Android's own request, the forward action is the skip beside it until Android says droidtop
+    is Home, and the summary lists Home as not done while it is not.
   - *Alternative* lists the installed home activities with their icons and their application
     labels — never a class name, never a label that names nothing.
 - **Anything else to set up.** Desktop and Gaming, each with a line saying what setting it
