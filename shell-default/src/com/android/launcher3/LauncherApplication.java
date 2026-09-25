@@ -41,14 +41,6 @@ public class LauncherApplication extends Application {
         app.murinelauncher.backup.BackupHelper.INSTANCE.applyStagedRestoreIfNeeded(this);
         mNightMode = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
 
-        // Reports every crash to droidtop's own self-hosted Bugsink instance
-        // (see dev.droidtop.shell.standard.CrashReporting) -- safe to call
-        // even before a real DSN exists (no-ops until then). A crash ends
-        // the process as Android's own crash handling does; there is no
-        // recovery screen rebuilding the activity stack (SPEC 2c).
-        dev.droidtop.shell.standard.CrashReporting.INSTANCE.init(this);
-
-
         app.murinelauncher.theme.ThemeOverride.syncNightMode(this);
         MainProcessInitializer.initialize(this);
         // Onboarding is resumed by droidtop's entry activities, not here
