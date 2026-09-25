@@ -19,6 +19,12 @@ import java.net.URLEncoder
  * reviewable: the whole point of the manual picker is a person reading
  * the candidate names, so a result whose name the user cannot see is not
  * a candidate at all.
+ *
+ * [series] is the game's IGDB collection, else its franchise; [links] are
+ * its websites, named by IGDB's own website type; [steamAppId] and
+ * [gogId] are its `external_games` rows for those stores, which let the
+ * rest of the scrape ask SteamGridDB and the Steam store for that exact
+ * game.
  */
 data class IgdbGameMetadata(
     val name: String,
@@ -29,6 +35,11 @@ data class IgdbGameMetadata(
     val genre: String?,
     val releaseDate: String?,
     val rating: Float?,
+    val id: Long? = null,
+    val series: String? = null,
+    val links: List<dev.droidtop.library.GameLink> = emptyList(),
+    val steamAppId: Int? = null,
+    val gogId: String? = null,
 )
 
 /**
@@ -131,30 +142,102 @@ object IgdbScraperClient {
      * instead of a 20-point one.
      */
     fun search(clientId: String, clientSecret: String, gameTitle: String, limit: Int = 10): ScrapeLookup<List<IgdbGameMetadata>> {
+        val escapedTitle = gameTitle.replace("\"", "\\\"")
+        return games(clientId, clientSecret, "search \"$escapedTitle\"; fields $GAME_FIELDS; limit $limit;", gameTitle)
+    }
+
+    /**
+     * The one IGDB game a store knows by [storeId] -- an identity lookup,
+     * not a search, so its answer is certain the way a Steam app id is
+     * (docs/SPEC.md 7h). Two documented queries: `external_games` for the
+     * IGDB game behind the store's id (`external_game_source` 1 is Steam,
+     * 5 is GOG, the values IGDB kept when it moved its enums to tables),
+     * then that game's full record.
+     */
+    fun byStoreId(clientId: String, clientSecret: String, storeId: PcStoreId): ScrapeLookup<IgdbGameMetadata> {
+        val source = when (storeId.store) {
+            PcStoreId.STEAM -> EXTERNAL_SOURCE_STEAM
+            PcStoreId.GOG -> EXTERNAL_SOURCE_GOG
+            else -> return ScrapeLookup.NoMatch
+        }
+        val uid = storeId.id.replace("\"", "")
+        val subject = "${storeId.store} ${storeId.id}"
+        val gameId = when (
+            val rows = post(clientId, clientSecret, "external_games", "fields game; where external_game_source = $source & uid = \"$uid\"; limit 1;", subject)
+        ) {
+            is ScrapeLookup.Found -> rows.value.optJSONObject(0)?.optLong("game", 0L)?.takeIf { it > 0 }
+                ?: return ScrapeLookup.NoMatch
+            ScrapeLookup.NoMatch -> return ScrapeLookup.NoMatch
+            is ScrapeLookup.Refused -> return rows
+        }
+        return when (val found = games(clientId, clientSecret, "fields $GAME_FIELDS; where id = $gameId; limit 1;", subject)) {
+            is ScrapeLookup.Found -> ScrapeLookup.Found(found.value.first())
+            ScrapeLookup.NoMatch -> ScrapeLookup.NoMatch
+            is ScrapeLookup.Refused -> found
+        }
+    }
+
+    // Every field droidtop shows, in one query. Only the field names IGDB
+    // kept after its 2025 move from enums to tables (`websites.type`, not
+    // the removed `category`; `external_game_source`, likewise).
+    private const val GAME_FIELDS = "name,cover.url,summary,first_release_date,rating," +
+        "genres.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher," +
+        "collections.name,franchise.name,franchises.name,websites.url,websites.type," +
+        "external_games.uid,external_games.external_game_source"
+
+    private const val EXTERNAL_SOURCE_STEAM = 1
+    private const val EXTERNAL_SOURCE_GOG = 5
+
+    /** IGDB's website types (its documented enum values, kept as the website_types table ids) and how droidtop names them. */
+    private val WEBSITE_LABELS = mapOf(
+        1 to "Official website",
+        2 to "Wiki",
+        3 to "Wikipedia",
+        4 to "Facebook",
+        5 to "Twitter",
+        6 to "Twitch",
+        8 to "Instagram",
+        9 to "YouTube",
+        13 to "Steam",
+        14 to "Reddit",
+        15 to "itch.io",
+        16 to "Epic Games Store",
+        17 to "GOG",
+        18 to "Discord",
+        19 to "Bluesky",
+    )
+
+    private fun games(clientId: String, clientSecret: String, body: String, subject: String): ScrapeLookup<List<IgdbGameMetadata>> =
+        when (val rows = post(clientId, clientSecret, "games", body, subject)) {
+            is ScrapeLookup.Found -> {
+                val parsed = (0 until rows.value.length()).mapNotNull { index -> parse(rows.value.getJSONObject(index)) }
+                if (parsed.isEmpty()) ScrapeLookup.NoMatch else ScrapeLookup.Found(parsed)
+            }
+            ScrapeLookup.NoMatch -> ScrapeLookup.NoMatch
+            is ScrapeLookup.Refused -> rows
+        }
+
+    /** One Apicalypse query against [endpoint]; an empty array is a [ScrapeLookup.NoMatch]. */
+    private fun post(clientId: String, clientSecret: String, endpoint: String, body: String, subject: String): ScrapeLookup<JSONArray> {
         val bearer = when (val token = token(clientId, clientSecret)) {
             is ScrapeLookup.Found -> token.value
             is ScrapeLookup.Refused -> return token
             ScrapeLookup.NoMatch -> return ScrapeLookup.NoMatch
         }
-        val url = URL("https://api.igdb.com/v4/games")
+        val url = URL("https://api.igdb.com/v4/$endpoint")
         val connection = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             doOutput = true
             setRequestProperty("Client-ID", clientId)
             setRequestProperty("Authorization", "Bearer $bearer")
         }
-        val escapedTitle = gameTitle.replace("\"", "\\\"")
-        val query = "search \"$escapedTitle\"; fields name,cover.url,summary,first_release_date,rating," +
-            "genres.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher; " +
-            "limit $limit;"
-        OutputStreamWriter(connection.outputStream).use { it.write(query) }
+        OutputStreamWriter(connection.outputStream).use { it.write(body) }
         val status = connection.responseCode
         if (status != 200) {
-            return ScrapeRefusals.refused("IGDB", connection, status, listOf(clientId, clientSecret, bearer), gameTitle)
+            return ScrapeRefusals.refused("IGDB", connection, status, listOf(clientId, clientSecret, bearer), subject)
         }
-        val results = JSONArray(connection.inputStream.bufferedReader().readText())
-        val parsed = (0 until results.length()).mapNotNull { index -> parse(results.getJSONObject(index)) }
-        return if (parsed.isEmpty()) ScrapeLookup.NoMatch else ScrapeLookup.Found(parsed)
+        val rows = JSONArray(connection.inputStream.bufferedReader().readText())
+        return if (rows.length() == 0) ScrapeLookup.NoMatch else ScrapeLookup.Found(rows)
     }
 
     /** Parses one `/v4/games` row; visible for the pure JVM tests, which exercise it against captured response shapes. */
@@ -195,6 +278,34 @@ object IgdbScraperClient {
         val rating = game.optDouble("rating", -1.0).takeIf { it >= 0 }
             ?.let { (kotlin.math.ceil((it / 100.0) / 0.1) / 10.0).toFloat() }
 
+        fun names(key: String): List<String> = game.optJSONArray(key)?.let { array ->
+            (0 until array.length()).mapNotNull { array.optJSONObject(it)?.optString("name", "")?.trim()?.ifBlank { null } }
+        }.orEmpty()
+        // A collection is IGDB's series ("Half-Life"); a franchise is the
+        // wider brand. The series is the more specific answer when both exist.
+        val series = names("collections").firstOrNull()
+            ?: game.optJSONObject("franchise")?.optString("name", "")?.trim()?.ifBlank { null }
+            ?: names("franchises").firstOrNull()
+
+        val links = game.optJSONArray("websites")?.let { sites ->
+            (0 until sites.length()).mapNotNull { i ->
+                val site = sites.optJSONObject(i) ?: return@mapNotNull null
+                val url = site.optString("url", "").trim().ifBlank { null } ?: return@mapNotNull null
+                val label = WEBSITE_LABELS[site.optInt("type", 0)]
+                    ?: runCatching { java.net.URI(url).host?.removePrefix("www.") }.getOrNull()
+                    ?: url
+                dev.droidtop.library.GameLink(label, url)
+            }.distinctBy { it.url }
+        }.orEmpty()
+
+        fun external(source: Int): String? = game.optJSONArray("external_games")?.let { rows ->
+            (0 until rows.length()).firstNotNullOfOrNull { i ->
+                rows.optJSONObject(i)
+                    ?.takeIf { it.optInt("external_game_source", 0) == source }
+                    ?.optString("uid", "")?.trim()?.ifBlank { null }
+            }
+        }
+
         return IgdbGameMetadata(
             name = name,
             coverUrl = coverUrl,
@@ -204,6 +315,11 @@ object IgdbScraperClient {
             genre = genre,
             releaseDate = releaseDate,
             rating = rating,
+            id = game.optLong("id", 0L).takeIf { it > 0 },
+            series = series,
+            links = links,
+            steamAppId = external(EXTERNAL_SOURCE_STEAM)?.toIntOrNull(),
+            gogId = external(EXTERNAL_SOURCE_GOG),
         )
     }
 }

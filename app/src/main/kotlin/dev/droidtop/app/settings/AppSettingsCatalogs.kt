@@ -1332,7 +1332,8 @@ object AppSettingsCatalogs {
                         ChoiceItem(
                             id = "pc_scraper_source_choice",
                             title = "PC & engine game source",
-                            subtitle = "Steam games are looked up in the Steam store by their own id first",
+                            subtitle = "Searched by name. Once a game is found, IGDB, the Steam store and SteamGridDB " +
+                                "add what they hold for that same game when they are set up",
                             options = dev.droidtop.library.scraper.PcScraperSource.entries.map {
                                 ChoiceOption(it.name, it.label)
                             },
@@ -1484,6 +1485,24 @@ object AppSettingsCatalogs {
                             value = ScraperPrefs.clientSecret(context),
                             secret = true,
                             onChange = { c, v -> ScraperPrefs.set(c, ScraperPrefs.clientId(c), v.trim()) },
+                        ),
+                    ),
+                ),
+                CatalogGroup(
+                    id = "scraper_steamgriddb",
+                    title = "SteamGridDB (PC & engine games)",
+                    items = listOf(
+                        // The user's own key, stored like every credential
+                        // on this screen: droidtop ships none, and a key
+                        // belongs to the steamgriddb.com account that made it.
+                        TextInputItem(
+                            id = "steamgriddb_api_key",
+                            title = "API key",
+                            subtitle = "Free: sign in at steamgriddb.com, then Preferences > API. " +
+                                "Covers, hero art, logos and icons for PC and engine games",
+                            value = dev.droidtop.library.scraper.SteamGridDbPrefs.apiKey(context),
+                            secret = true,
+                            onChange = { c, v -> dev.droidtop.library.scraper.SteamGridDbPrefs.set(c, v.trim()) },
                         ),
                     ),
                 ),

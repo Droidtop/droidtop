@@ -6193,14 +6193,64 @@ identity line.
 sources that actually cover them, tied into the same pipeline as the ROM scrapers (one mechanism):
 SteamGridDB (grids, heroes, logos, icons; it needs the user's own free API key, entered once and
 stored like the ScreenScraper login; droidtop's own client, not the art-only copy inside
-vendored gamenative) and Lutris (cover art and year: its public search API carries no
-descriptions, genres, developers or ratings), alongside the Steam store data already used for games with a Steam app id. Which
-source won for each field is recorded per game, as for ROMs.
-All of a game's flavour is scraped, not only art (for PC games the text comes from IGDB, as
-for ROMs, since neither Lutris nor SteamGridDB has it): descriptions, genres, developers and
+vendored gamenative) and Lutris (cover art and year from its search; a description and genres
+from its per-game record), alongside the Steam store data already used for games with a Steam app id. Which
+source won for each field is recorded per game, for ROMs and PC games alike.
+All of a game's flavour is scraped, not only art (for PC games the text comes first from IGDB, as
+for ROMs; SteamGridDB has none and Lutris only a description and genres): descriptions, genres, developers and
 publishers, release dates, ratings, series, platforms, links, and the game's profile as the source
 presents it. That text is shown to players (detail pages, the companion screen), so it is worth
 the same care as the art.
+
+**How that is built (decided 2026-09-25).**
+- **One source searches by name; every other source is asked by identity.** The selected
+  PC source (Lutris, IGDB or SteamGridDB, `PcScraperSource`) is the only one ever given a
+  game's name, so the "one source, never a silent fallback chain" rule below still holds for
+  guesses. Once a game is identified -- by its own store id, by an exact unique name match,
+  or by the person's pick -- `PcFlavour` asks every other configured source for THAT game by
+  an id: IGDB by the game's Steam or GOG id (`external_games`, `external_game_source` 1 and
+  5), the Steam store by its app id, Lutris's per-game record by its slug, SteamGridDB by its
+  own id or the game's Steam or GOG id. No source can put another game's text on this one,
+  because none of them is asked by name. A source with no key set is not asked; only the
+  selected source's missing key refuses the pass (`ScraperReadiness`).
+- **Ids travel.** Lutris's `provider_games` names a result's Steam app id and GOG product id,
+  and IGDB's `external_games` does the same, so a Lutris or IGDB match of a folder game
+  becomes a Steam/GOG identity and the keyless Steam store fills its developer, publisher and
+  date. A GOG entry is identified by IGDB's record of its GOG id when IGDB is set up, as a
+  Steam entry is by the store's own record.
+- **Which source wins each field.** Text (description, developer, publisher, genre, date,
+  rating, series, links): IGDB, then the Steam store, then Lutris's per-game record, then the
+  match itself. Covers: SteamGridDB's portrait grid, then Steam's library capsule and header,
+  then IGDB's cover, then the match's own; the first that downloads is kept. Hero, logo and
+  icon: SteamGridDB. Hero art is filed as ES-DE's `fanart` and a logo as its `marquees` (what
+  ES-DE's own scraper files a wheel logo under), so themes asking for those types find them;
+  an icon has no ES-DE type and goes to droidtop's own `icons` folder. A store install has no
+  layout lookup, so the row also carries each path (`hero_path`, `logo_path`, `icon_path`),
+  and `LibraryEntry.mediaForImageTypes` answers `fanart` and `marquee` from them.
+- **The per-field record.** `game_metadata.field_sources` (JSON, `FieldSources`) names the
+  source of every field a scrape wrote -- ScreenScraper, TheGamesDB, libretro database,
+  libretro thumbnails, gamelist.xml, IGDB, Steam store, Lutris, SteamGridDB -- and "you" for
+  a field changed in the metadata editor. A scrape never writes over a field whose source is
+  "you"; that is what makes "a rescrape keeps your edits" true for text, not only for
+  favourites.
+- **A refusal on the way is reported, not swallowed.** A source asked by identity that
+  refuses is not asked again in that pass once it rejected its key (401, 403) or refused five
+  times in a row, and the pass's summary (and a manual match's result) names it with its own
+  sentence and, for a key, the setting to fix. The game is still written with what the
+  other sources gave.
+- **Lutris, definitively.** Its search (`/api/games?search=`) carries a cover and a year and
+  nothing else; its per-game record (`/api/games/<slug>`, keyless JSON, checked live
+  2026-09-25) adds a description and genres. Neither has a developer, publisher, full date,
+  rating, series or links. The 2026-09-24 survey expected the per-game record to be HTML only;
+  it is not. Its `gogslug` is not used (for Hollow Knight it names the soundtrack), its
+  `provider_games` is.
+- **Where players see it.** A PC or engine game's detail page opens with the hero art (the
+  cover when there is none) and the logo in place of the title text, and has an "About this
+  game" section under Play: the description (a stop for the pad; A shows the rest), the
+  developer, publisher, date, genre, series and rating, each link as a row that opens it, and
+  one line saying where each field came from. ES-DE's hide-metadata flag hides the section.
+  The companion screen adds the publisher (when it is not the developer) and the series. A
+  pinned home-screen shortcut uses the scraped icon before the cover.
 
 An overnight ScreenScraper pass over the user's real library — 46 ROMs
 across 11 systems — returned HTTP 403 for **all 46** requests: zero
@@ -6248,7 +6298,7 @@ would be refused the same way; it never reports a bare count of systems
 fix it** (decided 2026-09-25, after "Scraped 3 systems." with TheGamesDB
 selected and no key). `ScraperReadiness` is the one check: a selected source
 whose key or account is not set (TheGamesDB's API key, IGDB's Twitch
-credentials, ScreenScraper with no application credentials) returns a
+credentials, SteamGridDB's API key, ScreenScraper with no application credentials) returns a
 sentence naming where to get the key, the setting it goes in (Settings >
 Library > Scraper > the source's group) and the sources that need none,
 before any folder is walked or any request made; every ROM and PC pass, the
@@ -6296,7 +6346,11 @@ never-clobber-a-user's-edits write.
 - **Title sources, one selected at a time.** Lutris (keyless; the default,
   because it works on a fresh install) returns covers and a year; IGDB
   (the user's own free Twitch application credentials, never droidtop's)
-  also returns description, developer, publisher, genre, date and rating.
+  also returns description, developer, publisher, genre, date, rating,
+  series and links; SteamGridDB (the user's own free key) returns names
+  and years, and its art once a match is chosen. Whichever is selected,
+  the rest of an identified game comes from the others by identity (see
+  "How that is built" above).
   A folder name is cleaned of version and platform tags before it is
   searched (`PcScrapeTitle`), and a result is applied without asking only
   when exactly one candidate matches the cleaned title exactly

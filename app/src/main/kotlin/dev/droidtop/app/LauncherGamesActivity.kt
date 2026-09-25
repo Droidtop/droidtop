@@ -200,11 +200,12 @@ class LauncherGamesActivity : AppCompatActivity() {
 
         /**
          * The entry's own artwork, cropped square and scaled down, or null.
-         * Only local art: a remote cover would mean a network fetch to
-         * build an icon, and the app icon is an honest stand-in.
+         * A scraped icon (SteamGridDB's, made to be one) comes first, then
+         * the cover. Only local art: a remote cover would mean a network
+         * fetch to build an icon, and the app icon is an honest stand-in.
          */
         private fun artworkIcon(context: Context, entry: LibraryEntry): IconCompat? {
-            val art = entry.artworkUri?.takeIf { it.isNotBlank() } ?: return null
+            val art = (entry.iconUri ?: entry.artworkUri)?.takeIf { it.isNotBlank() } ?: return null
             val uri = Uri.parse(art)
             val open: () -> java.io.InputStream? = when (uri.scheme) {
                 null, "file" -> { -> File(uri.path ?: art).inputStream() }

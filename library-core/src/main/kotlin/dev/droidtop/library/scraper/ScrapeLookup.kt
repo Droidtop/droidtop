@@ -69,7 +69,9 @@ object ScrapeRefusals {
     private const val ERROR_BODY_MAX_CHARS = 512
 
     /** The human sentence in a JSON error body, under the keys servers use for it. */
-    private val JSON_REASON = Regex("\"(status|message|error|error_description|reason)\"\\s*:\\s*\"([^\"]{3,})\"")
+    // SteamGridDB answers with a list, `{"success":false,"errors":["..."]}`,
+    // whose first entry is its sentence.
+    private val JSON_REASON = Regex("\"(status|message|error|error_description|reason|errors)\"\\s*:\\s*\\[?\\s*\"([^\"]{3,})\"")
 
     /**
      * Builds the [ScrapeLookup.Refused] for a connection that answered

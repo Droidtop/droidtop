@@ -30,20 +30,25 @@ import kotlinx.coroutines.withContext
 // have meant a system id it does not have and a hash that means nothing.
 
 /**
- * The sources droidtop can reach for a PC or engine title.
+ * The sources droidtop can search for a PC or engine title BY NAME.
  *
  * Deliberately a different list from [ScraperSource]: the ROM scrapers
  * index console dumps by platform id and file hash, and none of them
  * covers "some Ren'Py build in a folder". The selection model is the
  * same as ES-DE's, and as the ROM side's -- exactly ONE source is
- * queried for a given scrape, never a silent fallback chain.
+ * searched by name for a given scrape, never a silent fallback chain.
+ * What the other sources add is asked by the game's identity once it is
+ * known, never by its name (see [PcFlavour]).
  */
-enum class PcScraperSource(val label: String) {
-    /** Keyless, so it works on a fresh install with nothing configured. Covers art and release year only. */
-    LUTRIS("Lutris (no account needed)"),
+enum class PcScraperSource(val key: String, val label: String) {
+    /** Keyless, so it works on a fresh install with nothing configured. */
+    LUTRIS("lutris", "Lutris (no account needed)"),
 
-    /** Needs the user's own free Twitch/IGDB credentials, and in exchange returns descriptions, developer, publisher and genre. */
-    IGDB("IGDB (needs your own free API credentials)"),
+    /** Needs the user's own free Twitch/IGDB credentials, and in exchange returns descriptions, developer, publisher, genre, series and links. */
+    IGDB("igdb", "IGDB (needs your own free API credentials)"),
+
+    /** Needs the user's own free SteamGridDB key. Names and art only: its text comes from IGDB and the Steam store. */
+    STEAMGRIDDB("steamgriddb", "SteamGridDB (needs your own free API key)"),
 }
 
 object PcScraperSourcePrefs {
@@ -56,20 +61,79 @@ object PcScraperSourcePrefs {
         // nothing configured; a default that needs credentials would
         // make a fresh install's first scrape fail for a reason the user
         // did not choose.
-        return if (raw == "igdb") PcScraperSource.IGDB else PcScraperSource.LUTRIS
+        return PcScraperSource.entries.firstOrNull { it.key == raw } ?: PcScraperSource.LUTRIS
     }
 
     fun set(context: Context, source: PcScraperSource) {
-        val raw = if (source == PcScraperSource.IGDB) "igdb" else "lutris"
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putString(KEY_SOURCE, raw).apply()
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putString(KEY_SOURCE, source.key).apply()
+    }
+}
+
+/**
+ * A store's id for a game, `"steam:440"` or `"gog:1207658691"`: the form
+ * droidtop's PC entries are keyed by and [dev.droidtop.library.PcInfo.storeId]
+ * carries.
+ */
+data class PcStoreId(val store: String, val id: String) {
+    companion object {
+        const val STEAM = "steam"
+        const val GOG = "gog"
+
+        fun parse(raw: String?): PcStoreId? {
+            if (raw == null) return null
+            val store = raw.substringBefore(':', "").takeIf { it.isNotEmpty() } ?: return null
+            val id = raw.substringAfter(':').trim().takeIf { it.isNotEmpty() } ?: return null
+            return PcStoreId(store, id)
+        }
+    }
+}
+
+/**
+ * Every id a game is known by, gathered from wherever the scrape learned
+ * it: the entry's own store id, Lutris's `provider_games`, IGDB's
+ * `external_games`, the id of the database row a match came from. Each is
+ * an identity, so every source that can answer by one is asked by it
+ * rather than by the game's name.
+ */
+data class PcGameIds(
+    val steamAppId: Int? = null,
+    val gogId: String? = null,
+    val igdbId: Long? = null,
+    val steamGridDbId: Int? = null,
+    val lutrisSlug: String? = null,
+) {
+    /** These ids, with [other]'s filling any this one lacks. */
+    fun orFrom(other: PcGameIds) = PcGameIds(
+        steamAppId = steamAppId ?: other.steamAppId,
+        gogId = gogId ?: other.gogId,
+        igdbId = igdbId ?: other.igdbId,
+        steamGridDbId = steamGridDbId ?: other.steamGridDbId,
+        lutrisSlug = lutrisSlug ?: other.lutrisSlug,
+    )
+
+    /** The store id IGDB is asked by: Steam first, then GOG. */
+    val storeId: PcStoreId?
+        get() = steamAppId?.let { PcStoreId(PcStoreId.STEAM, it.toString()) }
+            ?: gogId?.let { PcStoreId(PcStoreId.GOG, it) }
+
+    companion object {
+        /** The ids an entry carries itself: its own id, or the store id a store-installed engine game keeps. */
+        fun of(entry: LibraryEntry): PcGameIds {
+            val stores = listOfNotNull(PcStoreId.parse(entry.id), PcStoreId.parse(entry.pcInfo?.storeId))
+            return PcGameIds(
+                steamAppId = stores.firstOrNull { it.store == PcStoreId.STEAM }?.id?.toIntOrNull(),
+                gogId = stores.firstOrNull { it.store == PcStoreId.GOG }?.id,
+            )
+        }
     }
 }
 
 /**
  * One candidate a source returned, in the shape the write path needs.
- * Sources fill what they actually have and leave the rest null -- Lutris
- * genuinely has no description or developer field at all, and inventing
- * a plausible one would be exactly the fabrication this project refuses.
+ * Sources fill what they actually have and leave the rest null -- Lutris's
+ * search genuinely has no description or developer field at all, and
+ * inventing a plausible one would be exactly the fabrication this project
+ * refuses.
  */
 data class PcMatch(
     val name: String,
@@ -84,6 +148,13 @@ data class PcMatch(
     val rating: Float? = null,
     /** A second cover to try only when [coverUrl] cannot be downloaded (see [SteamStoreClient]). */
     val alternateCoverUrl: String? = null,
+    val series: String? = null,
+    val links: List<dev.droidtop.library.GameLink> = emptyList(),
+    val heroUrl: String? = null,
+    val logoUrl: String? = null,
+    val iconUrl: String? = null,
+    /** The ids this candidate carries, which is what [PcFlavour] asks the other sources by. */
+    val ids: PcGameIds = PcGameIds(),
 )
 
 /**
@@ -200,7 +271,16 @@ object PcMatching {
 /** Where a PC/engine game's scraped media lives: ES-DE's own `downloaded_media` layout, the same one [dev.droidtop.library.EsDeArtwork] reads. */
 object PcMediaLayout {
     fun coverFile(gamesRoot: File, systemFolder: String, baseName: String): File =
-        File(File(File(gamesRoot, "downloaded_media"), systemFolder), "covers/$baseName.png")
+        mediaFile(gamesRoot, systemFolder, "covers", baseName)
+
+    /**
+     * One media file in the layout. Hero art goes to ES-DE's `fanart` and a
+     * logo to its `marquees` (what ES-DE's own scraper files a wheel/logo
+     * under), so a theme asking for those types finds them; an icon has no
+     * ES-DE type and goes to droidtop's own `icons`, which ES-DE ignores.
+     */
+    fun mediaFile(gamesRoot: File, systemFolder: String, folder: String, baseName: String): File =
+        File(File(File(gamesRoot, "downloaded_media"), systemFolder), "$folder/$baseName.png")
 
     /** [name] with every character FAT/exFAT refuses in a file name replaced by a space, collapsed. */
     fun fileSafe(name: String): String =
@@ -243,11 +323,8 @@ object PcScraper {
     /** The live source for the current selection, or null when it is not usable (see [ScraperReadiness.pcSourceProblem]). */
     fun source(context: Context): PcMetadataSource? = when (PcScraperSourcePrefs.get(context)) {
         PcScraperSource.LUTRIS -> LutrisSource
-        PcScraperSource.IGDB -> {
-            val clientId = ScraperPrefs.clientId(context)
-            val clientSecret = ScraperPrefs.clientSecret(context)
-            if (clientId.isBlank() || clientSecret.isBlank()) null else IgdbSource(clientId, clientSecret)
-        }
+        PcScraperSource.IGDB -> PcFlavour.igdbCredentials(context)?.let { (id, secret) -> IgdbSource(id, secret) }
+        PcScraperSource.STEAMGRIDDB -> SteamGridDbPrefs.apiKey(context).ifBlank { null }?.let { SteamGridDbSource(it) }
     }
 
     private object LutrisSource : PcMetadataSource {
@@ -260,13 +337,16 @@ object PcScraper {
                         sourceLabel = label,
                         year = result.year,
                         coverUrl = result.coverUrl,
-                        // Lutris's API carries no description, developer,
+                        // Lutris's search carries no description, developer,
                         // publisher, genre or rating at all, and its `year`
                         // is a year with no month or day. ES-DE's own MD_DATE
                         // is a full "YYYYMMDDT000000" string, so writing one
                         // would mean inventing a January 1st that Lutris
                         // never said: the year is shown in the picker, where
                         // it helps a person choose, and nothing is written.
+                        // Its description and genres come from its per-game
+                        // record, asked by slug once this match is chosen.
+                        ids = PcGameIds(steamAppId = result.steamAppId, gogId = result.gogId, lutrisSlug = result.slug.ifBlank { null }),
                     )
                 }
             }
@@ -275,21 +355,16 @@ object PcScraper {
     private class IgdbSource(private val clientId: String, private val clientSecret: String) : PcMetadataSource {
         override val label = "IGDB"
         override fun search(title: String): ScrapeLookup<List<PcMatch>> =
-            IgdbScraperClient.search(clientId, clientSecret, title).mapFound { results ->
-                results.map { result ->
-                    PcMatch(
-                        name = result.name,
-                        sourceLabel = label,
-                        year = result.releaseDate?.take(4)?.toIntOrNull(),
-                        coverUrl = result.coverUrl,
-                        description = result.description,
-                        developer = result.developer,
-                        publisher = result.publisher,
-                        genre = result.genre,
-                        releaseDate = result.releaseDate,
-                        rating = result.rating,
-                    )
-                }
+            IgdbScraperClient.search(clientId, clientSecret, title).mapFound { results -> results.map { it.toPcMatch() } }
+    }
+
+    private class SteamGridDbSource(private val apiKey: String) : PcMetadataSource {
+        override val label = SteamGridDbScraperClient.SOURCE
+        override fun search(title: String): ScrapeLookup<List<PcMatch>> =
+            SteamGridDbScraperClient.search(apiKey, title).mapFound { games ->
+                // Names and years only: the art is asked for once a match
+                // is chosen, not ten grids for ten candidates.
+                games.map { PcMatch(name = it.name, sourceLabel = label, year = it.year, ids = PcGameIds(steamGridDbId = it.id)) }
             }
     }
 
@@ -320,7 +395,8 @@ object PcScraper {
             // A refusal is not an empty result (docs/SPEC.md section 7h).
             is ScrapeLookup.Refused -> Candidates.Unavailable(
                 "${lookup.source} refused the search (HTTP ${lookup.httpStatus})" +
-                    (lookup.reason?.let { ": $it" } ?: "."),
+                    (lookup.reason?.let { ": $it." } ?: ".") +
+                    (ScraperReadiness.credentialFix(lookup)?.let { " $it" } ?: ""),
             )
         }
     }
@@ -331,10 +407,16 @@ object PcScraper {
      * the scraper-owned fields only -- favourites, collections, and
      * anything edited in the metadata editor survive untouched, exactly
      * as [applyManualMatch] does for ROMs.
+     *
+     * The picked match is an identity like any other, so the rest of the
+     * game's flavour and art is asked for by it ([PcFlavour]) before the
+     * write, as in the automatic pass.
      */
     suspend fun apply(context: Context, entry: LibraryEntry, match: PcMatch): String = withContext(Dispatchers.IO) {
-        write(context, entry, match, confidence = "manual", replaceExistingCover = true)
-        "Matched ${entry.title} to ${match.name} (${match.sourceLabel})."
+        val flavour = PcFlavour(context)
+        val record = flavour.complete(entry, match)
+        write(context, entry, record, confidence = "manual", replaceExisting = true)
+        "Matched ${entry.title} to ${match.name} (${match.sourceLabel})." + flavour.notes().let { if (it.isEmpty()) "" else " $it" }
     }
 
     /**
@@ -385,6 +467,7 @@ object PcScraper {
         if (targets.isEmpty()) return@withContext "Nothing matches the \"${filter.label}\" scrape filter."
 
         val counts = PcScrapeCounts(targeted = targets.size)
+        val flavour = PcFlavour(context)
         var consecutiveRefusals = 0
         for ((index, entry) in targets.withIndex()) {
             // The same rule as the ROM pass: several refusals in a row are
@@ -394,7 +477,7 @@ object PcScraper {
             onProgress(index, targets.size)
             counts.attempted++
             try {
-                val outcome = scrapeOne(context, entry, source)
+                val outcome = scrapeOne(context, entry, source, flavour)
                 if (outcome is PcOutcome.Refused) {
                     consecutiveRefusals++
                     counts.lastRefusal = outcome.refusal
@@ -414,6 +497,7 @@ object PcScraper {
                 android.util.Log.e("droidtop.Scraper", "Failed to scrape ${entry.title}", t)
             }
         }
+        counts.flavourNotes = flavour.notes()
         formatPcScrapeSummary(source.label, counts)
     }
 
@@ -427,23 +511,34 @@ object PcScraper {
     }
 
     /**
-     * One game. A Steam game is asked of Steam's own store by its app id
-     * first: that answer is certain by construction, the way a hash match
-     * is for a ROM, so nothing about it is a guess or a fallback chain.
-     * Only when the store has no public record of the app (a real miss)
-     * does the game go to the selected title source like any other; a
-     * store REFUSAL is reported as one and does not quietly turn into a
-     * name search.
+     * One game. A game a store knows is identified by that store's id
+     * first: a Steam app by Steam's own store record, a GOG game by IGDB's
+     * record of that GOG id when IGDB is set up. That answer is certain by
+     * construction, the way a hash match is for a ROM, so nothing about it
+     * is a guess or a fallback chain. Only when no store record exists (a
+     * real miss) does the game go to the selected title source like any
+     * other; a Steam store REFUSAL is reported as one and does not quietly
+     * turn into a name search.
+     *
+     * Whatever identified the game, the rest of its flavour and art is then
+     * asked for by that identity ([PcFlavour.complete]).
      */
-    private suspend fun scrapeOne(context: Context, entry: LibraryEntry, source: PcMetadataSource): PcOutcome {
-        steamAppIdOf(entry)?.let { appId ->
+    private suspend fun scrapeOne(context: Context, entry: LibraryEntry, source: PcMetadataSource, flavour: PcFlavour): PcOutcome {
+        val own = PcGameIds.of(entry)
+        own.steamAppId?.let { appId ->
             when (val lookup = SteamStoreClient.appDetails(appId)) {
                 is ScrapeLookup.Found -> {
-                    write(context, entry, lookup.value, confidence = "id", replaceExistingCover = false)
+                    write(context, entry, flavour.complete(entry, lookup.value), confidence = "id", replaceExisting = false)
                     return PcOutcome.ByStoreId
                 }
                 is ScrapeLookup.Refused -> return PcOutcome.Refused(lookup)
                 ScrapeLookup.NoMatch -> Unit
+            }
+        }
+        own.gogId?.let { gogId ->
+            flavour.igdbByStore(PcStoreId(PcStoreId.GOG, gogId))?.let { record ->
+                write(context, entry, flavour.complete(entry, record), confidence = "id", replaceExisting = false)
+                return PcOutcome.ByStoreId
             }
         }
         val title = PcScrapeTitle.clean(baseNameFor(entry))
@@ -452,7 +547,7 @@ object PcScraper {
             ScrapeLookup.NoMatch -> PcOutcome.NoMatch
             is ScrapeLookup.Found -> when (val decision = PcMatching.decide(title, lookup.value)) {
                 is PcMatching.Decision.Confident -> {
-                    write(context, entry, decision.match, confidence = "name", replaceExistingCover = false)
+                    write(context, entry, flavour.complete(entry, decision.match), confidence = "name", replaceExisting = false)
                     PcOutcome.ByName
                 }
                 is PcMatching.Decision.Ambiguous -> PcOutcome.NeedsPicking
@@ -461,60 +556,102 @@ object PcScraper {
         }
     }
 
+    /**
+     * Every image the scrape filed for [entry], labelled, for the detail
+     * page's media viewer: read from the same layout folder and under the
+     * same name [write] uses, so what was scraped is what can be viewed.
+     * [alsoUnder] is another name to look under too (the game's folder,
+     * where media placed by hand or by ES-DE is filed). Disk work: call it
+     * off the main thread.
+     */
+    fun scrapedMedia(context: Context, entry: LibraryEntry, alsoUnder: String? = null): List<Pair<String, String>> {
+        val systemFolder = PcMediaLayout.systemFolderFor(entry) ?: return emptyList()
+        val root = mediaRootFor(context, entry) ?: return emptyList()
+        val names = listOfNotNull(PcMediaLayout.fileSafe(baseNameFor(entry)), alsoUnder).distinct()
+        val found = names.flatMap { dev.droidtop.library.EsDeArtwork.allMedia(root, systemFolder, it) }
+        val icon = entry.iconUri?.let { listOf("Icon" to it) }.orEmpty()
+        return (found + icon).distinctBy { it.second }
+    }
+
     /** The Steam app id behind an entry: its own id, or the store id a store-installed engine game carries. */
-    internal fun steamAppIdOf(entry: LibraryEntry): Int? =
-        SteamStoreClient.appIdOf(entry.id) ?: SteamStoreClient.appIdOf(entry.pcInfo?.storeId)
+    internal fun steamAppIdOf(entry: LibraryEntry): Int? = PcGameIds.of(entry).steamAppId
 
     /**
      * The one write path, shared by the automatic and manual routes.
      *
-     * The cover lands in ES-DE's own `downloaded_media` layout so the
-     * next scan picks it up the same way a ROM's does, AND its path goes
-     * into the metadata row: the PC providers key entries by store id or
-     * shortcut path rather than by a file under a games root, so the row
-     * is the only thing that can carry artwork back to them.
+     * Media lands in ES-DE's own `downloaded_media` layout so the next scan
+     * picks it up the same way a ROM's does, AND its path goes into the
+     * metadata row: the PC providers key entries by store id or shortcut
+     * path rather than by a file under a games root, so the row is the only
+     * thing that can carry artwork back to them.
+     *
+     * [replaceExisting] is the manual route's: the files already there are
+     * pictures of the game the person just rejected. The automatic pass
+     * keeps a file that is already there.
+     *
+     * Every field written records its source (docs/SPEC.md 7h); a field the
+     * person edited is never written over ([FieldSources.keep]).
      */
     private suspend fun write(
         context: Context,
         entry: LibraryEntry,
-        match: PcMatch,
+        record: PcRecord,
         confidence: String,
-        replaceExistingCover: Boolean,
+        replaceExisting: Boolean,
     ) {
         val dao = RomDatabase.get(context).romDao()
         val row = dao.getGameMetadataSingle(entry.id)
-        var coverPath: String? = null
+        val had = row?.fieldSources
+        val sources = mutableMapOf<String, String>()
         val systemFolder = PcMediaLayout.systemFolderFor(entry)
         val gamesRoot = mediaRootFor(context, entry)
-        if (ScrapeOptionsPrefs.scrapeArtwork(context) && match.coverUrl != null && systemFolder != null && gamesRoot != null) {
-            // A title is not a file name: "Half-Life: Alyx" cannot be
-            // written to an exFAT SD card, which is where a handheld's
-            // games root usually is. A folder name already is one.
-            val destination = PcMediaLayout.coverFile(gamesRoot, systemFolder, PcMediaLayout.fileSafe(baseNameFor(entry)))
-            if (replaceExistingCover || !destination.isFile) {
-                val downloaded = listOfNotNull(match.coverUrl, match.alternateCoverUrl).any { url ->
-                    runCatching { downloadImage(url, destination) }
-                        .onFailure { android.util.Log.w("droidtop.Scraper", "Cover for ${entry.title} failed: ${it.message}") }
-                        .isSuccess
-                }
-                if (downloaded) coverPath = destination.absolutePath
-            } else {
-                coverPath = destination.absolutePath
-            }
+        // A title is not a file name: "Half-Life: Alyx" cannot be written
+        // to an exFAT SD card, which is where a handheld's games root
+        // usually is. A folder name already is one.
+        val baseName = PcMediaLayout.fileSafe(baseNameFor(entry))
+
+        /** Downloads the first of [candidates] that arrives into [folder]; its path, or null. */
+        fun fetch(field: String, enabled: Boolean, folder: String, candidates: List<Sourced<String>>): String? {
+            if (!enabled || candidates.isEmpty() || systemFolder == null || gamesRoot == null) return null
+            val destination = PcMediaLayout.mediaFile(gamesRoot, systemFolder, folder, baseName)
+            if (!replaceExisting && destination.isFile) return destination.absolutePath
+            val won = candidates.firstOrNull { candidate ->
+                runCatching { downloadImage(candidate.value, destination) }
+                    .onFailure { android.util.Log.w("droidtop.Scraper", "${FieldSources.LABELS[field]} for ${entry.title} failed: ${it.message}") }
+                    .isSuccess
+            } ?: return null
+            sources[field] = won.source
+            return destination.absolutePath
         }
+
+        val coverPath = fetch(FieldSources.COVER, ScrapeOptionsPrefs.scrapeArtwork(context), "covers", record.covers)
+        val heroPath = fetch(FieldSources.HERO, ScrapeOptionsPrefs.scrapeFanArt(context), "fanart", listOfNotNull(record.hero))
+        val logoPath = fetch(FieldSources.LOGO, ScrapeOptionsPrefs.scrapeMarquees(context), "marquees", listOfNotNull(record.logo))
+        val iconPath = fetch(FieldSources.ICON, ScrapeOptionsPrefs.scrapeArtwork(context), "icons", listOfNotNull(record.icon))
+
         val wantMetadata = ScrapeOptionsPrefs.scrapeMetadata(context)
-        dao.upsertGameMetadata(
-            (row ?: GameMetadataEntity(id = entry.id)).copy(
-                scrapeConfidence = confidence,
-                description = (if (wantMetadata) match.description else null) ?: row?.description,
-                developer = (if (wantMetadata) match.developer else null) ?: row?.developer,
-                publisher = (if (wantMetadata) match.publisher else null) ?: row?.publisher,
-                genre = (if (wantMetadata) match.genre else null) ?: row?.genre,
-                releaseDate = (if (wantMetadata) match.releaseDate else null) ?: row?.releaseDate,
-                rating = (if (wantMetadata) match.rating else null) ?: row?.rating,
-                artworkPath = coverPath ?: row?.artworkPath,
-            ),
+        fun <T> text(field: String, scraped: Sourced<T>?, current: T?): T? {
+            if (!wantMetadata || scraped == null || !FieldSources.writable(had, field)) return current
+            sources[field] = scraped.source
+            return scraped.value
+        }
+        val base = row ?: GameMetadataEntity(id = entry.id)
+        val updated = base.copy(
+            scrapeConfidence = confidence,
+            description = text(FieldSources.DESCRIPTION, record.description, row?.description),
+            developer = text(FieldSources.DEVELOPER, record.developer, row?.developer),
+            publisher = text(FieldSources.PUBLISHER, record.publisher, row?.publisher),
+            genre = text(FieldSources.GENRE, record.genre, row?.genre),
+            releaseDate = text(FieldSources.RELEASE_DATE, record.releaseDate, row?.releaseDate),
+            rating = text(FieldSources.RATING, record.rating, row?.rating),
+            series = text(FieldSources.SERIES, record.series, row?.series),
+            links = text(FieldSources.LINKS, record.links?.let { Sourced(dev.droidtop.library.GameLink.encode(it.value), it.source) }, row?.links),
+            artworkPath = coverPath ?: row?.artworkPath,
+            heroPath = heroPath ?: row?.heroPath,
+            logoPath = logoPath ?: row?.logoPath,
+            iconPath = iconPath ?: row?.iconPath,
         )
+        dao.upsertGameMetadata(updated.copy(fieldSources = FieldSources.merge(had, sources)))
     }
 
     /**
@@ -568,6 +705,8 @@ internal class PcScrapeCounts(val targeted: Int) {
     var failed = 0
     var refused = 0
     var lastRefusal: ScrapeLookup.Refused? = null
+    /** What the flavour lookups for matched games ran into ([PcFlavour.notes]); empty when nothing. */
+    var flavourNotes: String = ""
 }
 
 /**
@@ -591,5 +730,6 @@ internal fun formatPcScrapeSummary(sourceLabel: String, counts: PcScrapeCounts):
         if (counts.attempted < counts.targeted) append(", ${counts.targeted - counts.attempted} not asked for after the pass gave up")
         append('.')
         if (counts.refused > 0) append(describeRefusal(counts.refused, counts.attempted, counts.lastRefusal))
+        if (counts.flavourNotes.isNotEmpty()) append(' ').append(counts.flavourNotes)
     }
 }
