@@ -55,6 +55,9 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // unconditionally, in every mode; it now starts only for the two
         // modes that use it. See ModeStartup.
         ModeStartup.install(this)
+        // Shared core too: a games folder added in onboarding or Settings
+        // is walked at once, not when Gaming first opens (SPEC 2c).
+        LibraryCore.followGamesRoots(this)
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader {

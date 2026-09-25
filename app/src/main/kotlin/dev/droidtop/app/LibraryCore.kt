@@ -30,6 +30,19 @@ object LibraryCore {
     @Volatile
     private var instance: Library? = null
 
+    /**
+     * Walks a games folder the moment one is added or removed, whichever
+     * mode is on and whichever surface is open (docs/SPEC.md 2c). Called
+     * once, from [DroidtopApplication.onCreate]; builds the library only
+     * when a folder actually changes.
+     */
+    fun followGamesRoots(app: Context) {
+        dev.droidtop.library.GamesRoots.follow(
+            app,
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default),
+        ) { library(app) }
+    }
+
     /** One instance per process: providers read their roots fresh on every scan, so nothing here goes stale. */
     fun library(context: Context): Library = instance ?: synchronized(this) {
         instance ?: build(context.applicationContext).also { instance = it }

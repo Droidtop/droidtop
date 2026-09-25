@@ -4,9 +4,14 @@ import android.content.Context
 import android.content.SharedPreferences
 import java.io.File
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Real, current ROM/game root folders -- reads the same
@@ -97,6 +102,62 @@ object GamesRoots {
             .apply()
     }
 
+    /** One check-drop-walk-mark at a time: two callers must not both see "changed" and both restart the walk. */
+    private val walkLock = Mutex()
+
+    /**
+     * THE step that turns "the folders changed" into "the library has
+     * their games" (docs/SPEC.md 2c, "A games folder is walked when it is
+     * added"). When the set of roots changed since the last walk, the
+     * games of a root that went are dropped and the new set is walked
+     * (restarting a walk that is reading the old set); otherwise this is
+     * the ordinary scan of [kinds], which for indexed providers loads the
+     * index and joins a walk already running. [rescan] asks for a walk
+     * regardless (Settings' "Rescan library").
+     *
+     * Two callers, one step: every surface that lists games runs it for as
+     * long as it is open ([scanFollowingGamesRoots]), and [follow] runs it
+     * the moment a folder is added or removed, whichever surface is open.
+     */
+    suspend fun walkIfChanged(
+        context: Context,
+        library: Library,
+        kinds: Set<LibraryEntryKind> = LibraryKinds.GAMES,
+        rescan: Boolean = false,
+    ) = walkLock.withLock {
+        val changed = rootsChangedSinceLastScan(context)
+        if (changed) {
+            // A root the user took away takes its games with it -- the one
+            // case where the index drops instead of marking missing
+            // (docs/SPEC.md 7g). Before the walk, so the library never
+            // shows a removed root's games while the new set is read.
+            library.keepOnlyRoots(current(context).map { it.absolutePath }.toSet())
+        }
+        library.scanInBackground(kinds, rescan = rescan || changed, restart = changed)
+        if (changed) markScanned(context)
+    }
+
+    /**
+     * Walks a folder the moment it is added, for the life of the process
+     * (the shared core installs this once). The rig showed why the walk
+     * cannot wait for a surface to open (dq-coordinator-24, finding 2):
+     * onboarding added the games folder and opened the Android home, and
+     * droidtop's games screen said "No games yet" for as long as anyone
+     * watched, because a new folder was walked only by a surface that was
+     * open to follow it, and the only one that did was the Gaming shell.
+     *
+     * The first emission of [changes] is its "current state" signal and is
+     * skipped: nothing changed by the process starting, and the surfaces
+     * check for a change made while the process was not running when they
+     * open. [library] is asked for only when a folder actually changes, so
+     * installing this costs a process nothing else.
+     */
+    fun follow(context: Context, scope: CoroutineScope, library: () -> Library) {
+        scope.launch {
+            changes(context).drop(1).collect { walkIfChanged(context, library(), LibraryKinds.GAMES) }
+        }
+    }
+
     private fun signature(context: Context): String =
         current(context).map { it.absolutePath }.sorted().joinToString(File.pathSeparator)
 }
@@ -124,12 +185,5 @@ suspend fun Library.scanFollowingGamesRoots(
     kinds: Set<LibraryEntryKind>,
     rescan: Boolean = false,
 ) {
-    GamesRoots.changes(context).collect {
-        val rootsChanged = GamesRoots.rootsChangedSinceLastScan(context)
-        if (rootsChanged) {
-            keepOnlyRoots(GamesRoots.current(context).map { root -> root.absolutePath }.toSet())
-        }
-        scanInBackground(kinds, rescan = rescan || rootsChanged, restart = rootsChanged)
-        if (rootsChanged) GamesRoots.markScanned(context)
-    }
+    GamesRoots.changes(context).collect { GamesRoots.walkIfChanged(context, this, kinds, rescan) }
 }
