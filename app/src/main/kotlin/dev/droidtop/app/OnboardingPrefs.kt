@@ -29,6 +29,8 @@ object GamesRootPrefs {
     fun markOnboardingComplete(context: Context) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_ONBOARDING_COMPLETE, true)
+            // The run is over; nothing is left to resume.
+            .remove(OnboardingProgress.KEY)
             .apply()
     }
 
@@ -145,4 +147,26 @@ object GamesRootPrefs {
 
     fun gamesRootPaths(context: Context): Set<String> =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getStringSet(KEY_GAMES_ROOT_PATHS, emptySet()) ?: emptySet()
+}
+
+/**
+ * An unfinished first run, written down as it goes so a new process
+ * resumes it at the step it was on, with its answers (docs/SPEC.md 7b,
+ * "Onboarding survives becoming Home"). What it holds is
+ * [OnboardingRun.toJson]; the folders, grants and home role it set are
+ * real state already and are read back from where they live.
+ */
+internal object OnboardingProgress {
+    const val KEY = "droidtop_onboarding_run"
+
+    fun save(context: Context, json: String) {
+        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit()
+            .putString(KEY, json)
+            .apply()
+    }
+
+    fun load(context: Context): org.json.JSONObject? =
+        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
+            .getString(KEY, null)
+            ?.let { runCatching { org.json.JSONObject(it) }.getOrNull() }
 }

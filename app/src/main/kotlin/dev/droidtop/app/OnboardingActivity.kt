@@ -17,6 +17,19 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import dev.droidtop.shell.gamepad.TouchHintBar
+import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.ownPadButtons
+import dev.droidtop.shell.gamepad.input.padClick
+import dev.droidtop.shell.gamepad.theme.ThemeBrowserScreen
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -61,6 +74,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import dev.droidtop.app.ui.PadButton
 import dev.droidtop.app.ui.SelectableRow
 import dev.droidtop.library.GamesRootReport
 import dev.droidtop.library.consoles.EsDeFolderStructure
@@ -81,6 +95,7 @@ import dev.droidtop.shell.gamepad.theme.ThemeSystemPreview
 import dev.droidtop.shell.standard.BackButtonMenu
 import dev.droidtop.shell.standard.HomeRolePrefs
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -126,6 +141,16 @@ class OnboardingActivity : AppCompatActivity() {
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         val startStep = intent.getStringExtra(EXTRA_START_STEP)
             ?.let { name -> OnboardingStep.entries.firstOrNull { it.name == name } }
+        val firstRun = !GamesRootPrefs.isOnboardingComplete(this)
+        // The pad's face-button answer, if one was given, before the
+        // first key is read.
+        GamepadKeyMap.load(this)
+        if (firstRun && startStep == null) {
+            // Recents names what this task is. It said "Games", the label
+            // of the drawer icon that had started it (rig, dq-coordinator-24).
+            @Suppress("DEPRECATION")
+            setTaskDescription(android.app.ActivityManager.TaskDescription("droidtop setup"))
+        }
         // Seeded once per run, not once per Activity instance: both the
         // starting step and the storage answer the PLAN is built from
         // are facts about the run, and re-reading them after a rotation
@@ -135,12 +160,18 @@ class OnboardingActivity : AppCompatActivity() {
             hasStorageAccess(this),
             // A rerun starts from the modes as they are, so walking through
             // it again changes nothing that is not changed on the way.
-            modesOnBefore = if (GamesRootPrefs.isOnboardingComplete(this)) {
+            modesOnBefore = if (!firstRun) {
                 dev.droidtop.library.settings.Mode.entries
                     .filterTo(mutableSetOf()) { dev.droidtop.library.settings.Modes.isEnabledInStorage(this, it) }
             } else {
                 null
             },
+            // A first run survives the process: becoming the Home app, a
+            // kill from Recents, a crash. It resumes at the step it was
+            // on with every answer it had (SPEC 7b); the rig lost all but
+            // the folder list to one force-stop at step 5.
+            saved = if (firstRun && startStep == null) OnboardingProgress.load(this) else null,
+            persistent = firstRun && startStep == null,
         )
         setContent {
             // Onboarding is dark, like the shell it hands over to. It used
@@ -148,11 +179,15 @@ class OnboardingActivity : AppCompatActivity() {
             // a white first run that dropped into an always-dark Gaming
             // shell at the end of it (SPEC 7b).
             dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
-                OnboardingScreen(
-                    run = onboardingRun,
-                    isReEntry = onboardingRun.startStep != null,
-                    onDone = { finish() },
-                )
+                androidx.compose.runtime.CompositionLocalProvider(
+                    dev.droidtop.shell.gamepad.LocalShellWindow provides currentShellWindow(),
+                ) {
+                    OnboardingScreen(
+                        run = onboardingRun,
+                        isReEntry = onboardingRun.startStep != null,
+                        onDone = { finish() },
+                    )
+                }
             }
         }
     }
@@ -210,10 +245,13 @@ internal class OnboardingRun : androidx.lifecycle.ViewModel() {
         startStep: OnboardingStep?,
         storageGranted: Boolean,
         modesOnBefore: Set<dev.droidtop.library.settings.Mode>? = null,
+        saved: org.json.JSONObject? = null,
+        persistent: Boolean = false,
     ) {
         if (started) return
         started = true
         this.startStep = startStep
+        this.persistent = persistent
         this.storageGrantedAtEntry = storageGranted
         storageAccessGranted.value = storageGranted
         step.value = startStep ?: OnboardingStep.WELCOME
@@ -221,6 +259,51 @@ internal class OnboardingRun : androidx.lifecycle.ViewModel() {
             configureGaming.value = dev.droidtop.library.settings.Mode.GAMING in modesOnBefore
             configureDesktop.value = dev.droidtop.library.settings.Mode.DESKTOP in modesOnBefore
         }
+        saved?.let(::restore)
+    }
+
+    /**
+     * Whether this run is written down as it goes ([toJson]) so a new
+     * process resumes it: a first run walked in full. A single step
+     * re-entered from Settings, or a rerun of a finished setup, is not.
+     */
+    var persistent: Boolean = false
+        private set
+
+    /**
+     * The run's ANSWERS, not what the device holds: the folder list,
+     * storage access, the home role and the theme are real state already
+     * and are read back from where they live. The plan is rebuilt from
+     * these, so a resumed run presents the same steps it was presenting,
+     * storage question included.
+     */
+    fun toJson(): String = org.json.JSONObject().apply {
+        put("step", step.value.name)
+        put("history", org.json.JSONArray(history.map { it.name }))
+        homeChoice.value?.let { put("home", it.name) }
+        put("desktop", configureDesktop.value)
+        put("gaming", configureGaming.value)
+        put("desktopImage", desktopImageChosen.value)
+        put("desktopCapable", desktopCapable.value)
+        chosenMode.value?.let { put("mode", it.id) }
+        put("storageAtEntry", storageGrantedAtEntry)
+    }.toString()
+
+    private fun restore(saved: org.json.JSONObject) {
+        fun stepOf(name: String?) = OnboardingStep.entries.firstOrNull { it.name == name }
+        step.value = stepOf(saved.optString("step")) ?: return
+        history.clear()
+        saved.optJSONArray("history")?.let { names ->
+            for (i in 0 until names.length()) stepOf(names.optString(i))?.let(history::add)
+        }
+        homeChoice.value = HomeRolePrefs.HomeImplementation.entries
+            .firstOrNull { it.name == saved.optString("home") }
+        configureDesktop.value = saved.optBoolean("desktop")
+        configureGaming.value = saved.optBoolean("gaming")
+        desktopImageChosen.value = saved.optBoolean("desktopImage")
+        desktopCapable.value = saved.optBoolean("desktopCapable")
+        chosenMode.value = dev.droidtop.library.settings.Mode.byId(saved.optString("mode").ifEmpty { null })
+        storageGrantedAtEntry = saved.optBoolean("storageAtEntry", storageGrantedAtEntry)
     }
 
     // Each answer is a MutableState the screen delegates to (`var step by
@@ -313,9 +396,51 @@ internal fun plannedSteps(
     // person who is not setting Gaming up is not asked to pick one.
     add(OnboardingStep.CONTROLLER)
     if (configureGaming) add(OnboardingStep.APPEARANCE)
-    add(OnboardingStep.KEYBOARD)
+    // The keyboard is Desktop's: its reason is terminals and Windows
+    // programs. Asked of a Gaming-only run, it was a question about
+    // software the person had just said they did not want (rig,
+    // dq-coordinator-24, finding 10).
+    if (configureDesktop) add(OnboardingStep.KEYBOARD)
     add(OnboardingStep.DEFAULT_MODE_CHOICE)
     add(OnboardingStep.WHAT_NEXT)
+}
+
+/**
+ * The parts onboarding is made of, which is what its progress counts
+ * (docs/SPEC.md 7b, "Progress counts parts that never change"). Six, on
+ * every run, whatever is answered: the steps inside a part come and go
+ * with the answers (a launcher to pick, a storage prompt, Desktop's
+ * image), the parts do not. A part a run has nothing to ask in is passed
+ * over, and still counted.
+ *
+ * Counting STEPS against the plan was honest and still read as broken:
+ * the total moved under the person as they answered, "Step 1 of 7", then
+ * "2 of 8", then "4 of 10", and back to "of 7" after a restart (rig,
+ * dq-coordinator-24, finding 9).
+ */
+internal enum class OnboardingPart(val label: String) {
+    WELCOME("Welcome"),
+    HOME("Home screen"),
+    MODES("What to set up"),
+    GAMES("Your games"),
+    CONTROLS("Controls and look"),
+    FINISH("Finish"),
+}
+
+internal val OnboardingStep.part: OnboardingPart
+    get() = when (this) {
+        OnboardingStep.WELCOME -> OnboardingPart.WELCOME
+        OnboardingStep.HOME_CHOICE, OnboardingStep.STANDARD_SETUP, OnboardingStep.ALTERNATIVE_SETUP -> OnboardingPart.HOME
+        OnboardingStep.CONFIGURE_MORE, OnboardingStep.DESKTOP_SETUP -> OnboardingPart.MODES
+        OnboardingStep.STORAGE_PERMISSION, OnboardingStep.GAMES_FOLDERS -> OnboardingPart.GAMES
+        OnboardingStep.CONTROLLER, OnboardingStep.APPEARANCE, OnboardingStep.KEYBOARD -> OnboardingPart.CONTROLS
+        OnboardingStep.DEFAULT_MODE_CHOICE, OnboardingStep.WHAT_NEXT -> OnboardingPart.FINISH
+    }
+
+/** What the scaffold's progress line and bar show. */
+internal data class StepProgress(val part: OnboardingPart) {
+    val number: Int get() = part.ordinal + 1
+    val count: Int get() = OnboardingPart.entries.size
 }
 
 /**
@@ -462,6 +587,15 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
     // fresh reading after every rotation is exactly that.
     val plan = plannedSteps(homeChoice, configureDesktop, configureGaming, run.storageGrantedAtEntry)
 
+    // Written down as it changes, so a new process resumes this run where
+    // it was (OnboardingRun.persistent): becoming the Home app, a kill from
+    // Recents or a crash no longer costs anyone their answers.
+    if (run.persistent) {
+        LaunchedEffect(run) {
+            snapshotFlow { run.toJson() }.collect { OnboardingProgress.save(context, it) }
+        }
+    }
+
     fun goTo(next: OnboardingStep) {
         history.add(step)
         step = next
@@ -504,28 +638,45 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
 
     // System Back is the same control as the scaffold's Back, and leaving
     // is a deliberate act: one Back press on the first step used to drop
-    // the whole flow to the system home with nothing saved.
-    BackHandler(enabled = true) {
+    // the whole flow to the system home with nothing saved. The pad's B is
+    // the same control again (ownPadButtons, below).
+    fun handleBack() {
         when {
             isReEntry -> onDone()
             history.isNotEmpty() -> step = history.removeAt(history.lastIndex)
             else -> confirmLeaving = true
         }
     }
+    BackHandler(enabled = true) { handleBack() }
 
     if (confirmLeaving) {
         AlertDialog(
             onDismissRequest = { confirmLeaving = false },
             title = { Text("Leave setup?") },
-            text = { Text("droidtop will ask again next time it starts. Nothing you have set so far is lost.") },
-            confirmButton = { TextButton(onClick = { confirmLeaving = false; onDone() }) { Text("Leave") } },
+            text = {
+                Text(
+                    "Your answers are kept. Open droidtop again to carry on from this step; " +
+                        "until then the Home button shows your home screen.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmLeaving = false
+                    dev.droidtop.shell.standard.OnboardingGate.leave()
+                    onDone()
+                }) { Text("Leave") }
+            },
             dismissButton = { TextButton(onClick = { confirmLeaving = false }) { Text("Keep setting up") } },
         )
     }
 
-    val progress = if (isReEntry) null else (plan.indexOf(step).takeIf { it >= 0 }?.plus(1) ?: plan.size) to plan.size
+    val progress = if (isReEntry) null else StepProgress(step.part)
     val back: (() -> Unit)? = if (canGoBack) ({ step = history.removeAt(history.lastIndex) }) else null
 
+    // The outermost node owns the pad (ownPadButtons): B is Back here as
+    // everywhere else in droidtop, and a pad button nothing below wanted
+    // is not handed to Android to turn into a key the step never asked for.
+    Box(Modifier.fillMaxSize().ownPadButtons(::handleBack)) {
     when (step) {
         OnboardingStep.WELCOME -> WelcomeStep(progress, back, onContinue = { advanceFrom(OnboardingStep.WELCOME) })
 
@@ -637,6 +788,11 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
                     rootsVersion++
                 }
             },
+            onAddSuggested = { path ->
+                val error = GamesRootPrefs.addGamesRootByPath(context, path)
+                pathError = error
+                if (error == null) rootsVersion++
+            },
             onContinue = { advanceFrom(OnboardingStep.GAMES_FOLDERS) },
         )
 
@@ -691,15 +847,22 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
             gamesStillCounting = roots.any { it !in rootReports.keys },
             gamesSoFar = rootProgress.filterKeys { it !in rootReports.keys }.values.sumOf { it.gamesSoFar },
             storageGranted = storageAccessGranted,
+            controllerAnswered = ControllerPrefs.asked(context),
+            keyboardSkipped = configureDesktop && !dev.droidtop.library.settings.Keyboards.ownKeyboardActive(context),
             onFinish = {
                 val mode = chosenMode ?: dev.droidtop.library.settings.Mode.GAMING
+                val home = homeChoice ?: HomeRolePrefs.activeHomeImplementation(context)
                 finishOnboarding(mode)
+                // droidtop's one icon on the home screen it just set up, so
+                // the way into Gaming or Desktop is in sight rather than in
+                // a drawer or behind a gesture (SPEC 2c).
+                if (home == HomeRolePrefs.HomeImplementation.STANDARD) HomeRolePrefs.placeDroidtopIcon(context)
                 if (mode == dev.droidtop.library.settings.Mode.LAUNCHER) {
                     // The home screen is not a MainActivity shell. Sent
                     // there with "standard", MainActivity skipped it as
                     // not its own and opened Gaming, so "Open Android"
                     // landed in the game library.
-                    BackButtonMenu.openHome(context, homeChoice ?: HomeRolePrefs.activeHomeImplementation(context))
+                    BackButtonMenu.openHome(context, home)
                 } else {
                     context.startActivity(
                         Intent(Intent.ACTION_MAIN).apply {
@@ -709,8 +872,12 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
                         },
                     )
                 }
+                // The first-run tutorial, over the first frame of the mode
+                // it teaches (SPEC 7b): started last, so it is on top.
+                TutorialActivity.start(context)
             },
         )
+    }
     }
 }
 
@@ -788,16 +955,41 @@ private data class StepAction(
 private fun OnboardingScaffold(
     title: String,
     body: String?,
-    progress: Pair<Int, Int>?,
+    progress: StepProgress?,
     onBack: (() -> Unit)?,
     primary: StepAction?,
     secondary: StepAction? = null,
+    // Where the pad's selection starts: the step's forward action, or --
+    // on a step that asks something and has not been answered -- its first
+    // answer. Nothing focused meant a pad press landed nowhere: A did
+    // nothing on Welcome and D-pad Down went to the Back button
+    // (dq-coordinator-24, finding 7).
+    focusContentFirst: Boolean = false,
     content: @Composable ColumnScope.() -> Unit = {},
 ) {
     val window = currentShellWindow()
+    val primaryFocus = remember { FocusRequester() }
+    val contentFocus = remember { FocusRequester() }
+    var holdsFocus by remember { mutableStateOf(false) }
+    // Keyed on the title: a new step is a new title, and focus moves to it.
+    // A step's answers can arrive a moment after the step does (a list
+    // read off the main thread), so the preferred target is asked again
+    // until something holds the selection, and the forward action takes
+    // it when nothing else can.
+    LaunchedEffect(title) {
+        repeat(FOCUS_ATTEMPTS) {
+            runCatching {
+                if (primary != null && !focusContentFirst) primaryFocus.requestFocus() else contentFocus.requestFocus()
+            }
+            delay(FOCUS_RETRY_MS)
+            if (holdsFocus) return@LaunchedEffect
+        }
+        if (primary != null) runCatching { primaryFocus.requestFocus() }
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .onFocusChanged { holdsFocus = it.hasFocus }
             .background(MaterialTheme.colorScheme.background)
             // The action area is docked at the bottom, so it is the first
             // thing a keyboard covers: typing a games-folder path put Next
@@ -806,85 +998,117 @@ private fun OnboardingScaffold(
             // is why the activity fits its own insets rather than letting
             // the decor do it.
             .systemBarsPadding()
-            .imePadding()
-            .padding(horizontal = window.edgePadding),
+            .imePadding(),
     ) {
-        // --- progress and Back -------------------------------------
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = Space.Lg, bottom = Space.Md),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Space.Md),
-        ) {
-            if (onBack != null) {
-                TextButton(
-                    onClick = onBack,
-                    modifier = Modifier.heightIn(min = window.minTouchTarget),
-                ) { Text("Back", style = TypeRole.button) }
-            }
-            if (progress != null) {
-                Text(
-                    "Step ${progress.first} of ${progress.second}",
-                    color = MenuTokens.OnSurfaceMuted,
-                    style = TypeRole.sectionLabel,
-                )
-            }
-        }
-        if (progress != null) {
-            LinearProgressIndicator(
-                progress = { progress.first.toFloat() / progress.second.toFloat() },
-                modifier = Modifier.fillMaxWidth(),
-                color = MenuTokens.Accent,
-                trackColor = MenuTokens.Surface,
-            )
-        }
-
-        // --- content ------------------------------------------------
         Column(
             modifier = Modifier
-                .fillMaxWidth()
                 .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(top = Space.Xl, bottom = Space.Lg),
-            verticalArrangement = Arrangement.spacedBy(Space.Md),
+                .fillMaxWidth()
+                .padding(horizontal = window.edgePadding),
         ) {
-            Text(title, color = MenuTokens.OnSurface, style = TypeRole.screenTitle)
-            if (body != null) {
-                Text(
-                    body,
-                    color = MenuTokens.OnSurfaceMuted,
-                    style = TypeRole.body,
-                    modifier = Modifier.widthIn(max = Measure.bodyMaxWidth),
+            // --- progress and Back ---------------------------------
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = Space.Lg, bottom = Space.Md),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Space.Md),
+            ) {
+                if (onBack != null) {
+                    PadButton("Back", onBack)
+                }
+                if (progress != null) {
+                    Text(
+                        "Part ${progress.number} of ${progress.count}: ${progress.part.label}",
+                        color = MenuTokens.OnSurfaceMuted,
+                        style = TypeRole.sectionLabel,
+                    )
+                }
+            }
+            if (progress != null) PartsBar(progress)
+
+            // --- content --------------------------------------------
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(top = Space.Xl, bottom = Space.Lg),
+                verticalArrangement = Arrangement.spacedBy(Space.Md),
+            ) {
+                Text(title, color = MenuTokens.OnSurface, style = TypeRole.screenTitle)
+                if (body != null) {
+                    Text(
+                        body,
+                        color = MenuTokens.OnSurfaceMuted,
+                        style = TypeRole.body,
+                        modifier = Modifier.widthIn(max = Measure.bodyMaxWidth),
+                    )
+                }
+                // A focus group, so asking it for focus hands the selection
+                // to its first focusable answer.
+                Column(
+                    modifier = Modifier.fillMaxWidth().focusRequester(contentFocus).focusGroup(),
+                    verticalArrangement = Arrangement.spacedBy(Space.Md),
+                    content = content,
                 )
             }
-            content()
-        }
 
-        // --- the action area, docked --------------------------------
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = Space.Xl),
-            horizontalArrangement = Arrangement.spacedBy(Space.Md, Alignment.End),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            secondary?.let {
-                TextButton(
-                    onClick = it.onClick,
-                    modifier = Modifier.heightIn(min = window.minTouchTarget),
-                ) { Text(it.label, style = TypeRole.button) }
-            }
-            primary?.let {
-                Button(
-                    onClick = it.onClick,
-                    modifier = Modifier
-                        .heightIn(min = window.minTouchTarget)
+            // --- the action area, docked ----------------------------
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = Space.Lg),
+                horizontalArrangement = Arrangement.spacedBy(Space.Md, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                secondary?.let { PadButton(it.label, it.onClick) }
+                primary?.let {
+                    PadButton(
+                        it.label,
+                        it.onClick,
+                        filled = true,
                         // On a phone the primary fills the row; at TV
                         // distance it stays a button on the right.
-                        .then(if (window.portrait) Modifier.weight(1f) else Modifier),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MenuTokens.Accent,
-                        contentColor = MenuTokens.OverlaySurface,
-                    ),
-                ) { Text(it.label, style = TypeRole.button) }
+                        modifier = Modifier
+                            .focusRequester(primaryFocus)
+                            .then(if (window.portrait) Modifier.weight(1f) else Modifier),
+                    )
+                }
             }
+        }
+        // The shell's hint row: the legend of what the pad's buttons do
+        // here, and on a touch screen the buttons themselves.
+        TouchHintBar(
+            hints = listOf(
+                GamepadAction.A to "Select",
+                GamepadAction.B to "Back",
+            ),
+        )
+    }
+}
+
+private const val FOCUS_ATTEMPTS = 10
+private const val FOCUS_RETRY_MS = 100L
+
+/**
+ * One segment per part: filled for the parts behind and the one being
+ * answered, a track for the ones ahead. Drawn rather than Material's
+ * LinearProgressIndicator, whose end-of-track stop dot read as a stray
+ * mark at the far right (dq-coordinator-24, finding 9).
+ */
+@Composable
+private fun PartsBar(progress: StepProgress) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Space.Xs),
+    ) {
+        OnboardingPart.entries.forEach { part ->
+            Box(
+                Modifier
+                    .weight(1f)
+                    .heightIn(min = Space.Xs)
+                    .background(
+                        if (part.ordinal <= progress.part.ordinal) MenuTokens.Accent else MenuTokens.Surface,
+                        RoundedCornerShape(50),
+                    ),
+            )
         }
     }
 }
@@ -916,7 +1140,7 @@ private fun StepNote(text: String, accent: Boolean = false) {
 // ---------------------------------------------------------------------
 
 @Composable
-private fun WelcomeStep(progress: Pair<Int, Int>?, onBack: (() -> Unit)?, onContinue: () -> Unit) {
+private fun WelcomeStep(progress: StepProgress?, onBack: (() -> Unit)?, onContinue: () -> Unit) {
     OnboardingScaffold(
         title = "Welcome to droidtop",
         body = "droidtop can turn this device into a desktop, a gamepad-driven game " +
@@ -955,7 +1179,7 @@ private fun DroidtopMark() {
 
 @Composable
 private fun HomeChoiceStep(
-    progress: Pair<Int, Int>?,
+    progress: StepProgress?,
     onBack: (() -> Unit)?,
     selected: HomeRolePrefs.HomeImplementation?,
     onSelect: (HomeRolePrefs.HomeImplementation) -> Unit,
@@ -971,6 +1195,7 @@ private fun HomeChoiceStep(
         // below ARE the answer: one of them means "not now", so there is
         // nothing a skip could say that they do not (7b).
         primary = onboardingForwardWhenAnswered(selected != null, onContinue),
+        focusContentFirst = true,
     ) {
         SelectableRow(
             title = "droidtop's own launcher",
@@ -994,7 +1219,7 @@ private fun HomeChoiceStep(
 }
 
 @Composable
-private fun StandardSetupStep(progress: Pair<Int, Int>?, onBack: (() -> Unit)?, onContinue: () -> Unit) {
+private fun StandardSetupStep(progress: StepProgress?, onBack: (() -> Unit)?, onContinue: () -> Unit) {
     val context = LocalContext.current
     OnboardingScaffold(
         title = "droidtop's launcher",
@@ -1020,7 +1245,7 @@ private fun StandardSetupStep(progress: Pair<Int, Int>?, onBack: (() -> Unit)?, 
 
 @Composable
 private fun AlternativeSetupStep(
-    progress: Pair<Int, Int>?,
+    progress: StepProgress?,
     onBack: (() -> Unit)?,
     onPicked: (ComponentName) -> Unit,
 ) {
@@ -1064,6 +1289,7 @@ private fun AlternativeSetupStep(
         // Same rule as the step before it: the list is the answer, and
         // droidtop picks nobody's launcher for them (7b).
         primary = onboardingForwardWhenAnswered(selected != null) { selected?.let(onPicked) },
+        focusContentFirst = true,
     ) {
         when {
             current == null -> StepNote("Looking for installed launchers.")
@@ -1086,7 +1312,7 @@ private fun AlternativeSetupStep(
 
 @Composable
 private fun ConfigureMoreStep(
-    progress: Pair<Int, Int>?,
+    progress: StepProgress?,
     onBack: (() -> Unit)?,
     desktopChecked: Boolean,
     gamingChecked: Boolean,
@@ -1103,16 +1329,21 @@ private fun ConfigureMoreStep(
         progress = progress,
         onBack = onBack,
         primary = StepAction("Next", onClick = onContinue),
+        focusContentFirst = true,
     ) {
+        // Plain words for what each one is: "ES-DE themes" and "a distro
+        // image" meant nothing to a newcomer (dq-coordinator-24, finding 13).
         SelectableRow(
             title = "Gaming",
-            supporting = "A game library in ES-DE themes. Needs storage access and your game folders.",
+            supporting = "Your games in one library you drive with a controller or by touch, with a theme " +
+                "to choose. Needs the folders your games are in.",
             selected = gamingChecked,
             onClick = { onGamingChanged(!gamingChecked) },
         )
         SelectableRow(
             title = "Desktop",
-            supporting = "Wine and Linux containers. Needs a distro image to download.",
+            supporting = "Run Linux and Windows programs in windows, like a PC. Downloads a Linux system " +
+                "the first time it starts.",
             selected = desktopChecked,
             onClick = { onDesktopChanged(!desktopChecked) },
         )
@@ -1121,7 +1352,7 @@ private fun ConfigureMoreStep(
 
 @Composable
 private fun DesktopSetupStep(
-    progress: Pair<Int, Int>?,
+    progress: StepProgress?,
     onBack: (() -> Unit)?,
     onCapabilityKnown: (Boolean) -> Unit,
     onContinue: (imageChosen: Boolean) -> Unit,
@@ -1200,7 +1431,7 @@ private fun DesktopSetupStep(
         // unusable: when the mode cannot run here, droidtop says so and
         // does not present a choice underneath it (SPEC 7b).
         if (capable) {
-            StepSectionLabel("Distro and compositor")
+            StepSectionLabel("Linux system and desktop")
             repositories.forEach { repo ->
                 SelectableRow(
                     title = repo.desktopEnvironment?.let { "${repo.os} with $it" } ?: repo.os,
@@ -1216,7 +1447,7 @@ private fun DesktopSetupStep(
 
 @Composable
 private fun StoragePermissionStep(
-    progress: Pair<Int, Int>?,
+    progress: StepProgress?,
     onBack: (() -> Unit)?,
     legacy: Boolean,
     denied: Boolean,
@@ -1267,7 +1498,7 @@ private fun StoragePermissionStep(
 
 @Composable
 private fun GamesFoldersStep(
-    progress: Pair<Int, Int>?,
+    progress: StepProgress?,
     onBack: (() -> Unit)?,
     roots: Set<String>,
     reports: Map<String, GamesRootReport.Report>,
@@ -1281,9 +1512,16 @@ private fun GamesFoldersStep(
     pathError: String?,
     onPathEntryChange: (String) -> Unit,
     onAddPath: () -> Unit,
+    onAddSuggested: (String) -> Unit,
     onContinue: () -> Unit,
 ) {
     val window = currentShellWindow()
+    val context = LocalContext.current
+    // Looked for once per visit: a directory listing of /storage and
+    // /mnt/windows, off the main thread.
+    val found by produceState<List<String>>(initialValue = emptyList()) {
+        value = withContext(Dispatchers.IO) { suggestedGameFolders() }
+    }
     // "Game folders" is the ONE name for this concept, everywhere in
     // droidtop -- it used to be "ROM folders" in Settings and "Game
     // folders" here, two names one navigation step apart.
@@ -1308,10 +1546,7 @@ private fun GamesFoldersStep(
                     supporting = report?.let { GamesRootReport.describe(it) }
                         ?: GamesRootReport.describe(scanProgress[path]),
                     trailing = {
-                        TextButton(
-                            onClick = { onRemoveRoot(path) },
-                            modifier = Modifier.heightIn(min = window.minTouchTarget),
-                        ) { Text("Remove", color = MenuTokens.Danger, style = TypeRole.button) }
+                        PadButton("Remove", { onRemoveRoot(path) }, color = MenuTokens.Danger)
                     },
                 )
                 // ES-DE's three concrete repairs when a folder yields
@@ -1324,10 +1559,7 @@ private fun GamesFoldersStep(
                             "standard folder layout inside this one, or continue with " +
                             "an empty library.",
                     )
-                    TextButton(
-                        onClick = { onGenerateStructure(path) },
-                        modifier = Modifier.heightIn(min = window.minTouchTarget),
-                    ) { Text("Create the standard folder layout here", style = TypeRole.button) }
+                    PadButton("Create the standard folder layout here", { onGenerateStructure(path) })
                 }
             }
         }
@@ -1342,6 +1574,22 @@ private fun GamesFoldersStep(
             )
         }
 
+        // Places the picker cannot offer, found on this device: a memory
+        // card or USB drive under /storage, an emulator's shared folder
+        // under /mnt/windows. A newcomer had to already know the share's
+        // path to type it (dq-coordinator-24, finding 12).
+        val suggestions = found.filter { it !in roots }
+        if (suggestions.isNotEmpty()) {
+            StepSectionLabel("Found on this device")
+            suggestions.forEach { path ->
+                SelectableRow(
+                    title = path,
+                    supporting = "Add it to scan it for games.",
+                    trailing = { PadButton("Add", { onAddSuggested(path) }) },
+                )
+            }
+        }
+
         StepSectionLabel("Somewhere the picker cannot reach")
         // The picker can only offer what Android calls a storage volume,
         // and real libraries live outside that set: an emulator's host
@@ -1353,19 +1601,32 @@ private fun GamesFoldersStep(
             onValueChange = onPathEntryChange,
             singleLine = true,
             label = { Text("Folder path") },
-            placeholder = { Text("/mnt/windows/BstSharedFolder/Games") },
+            placeholder = { Text("A full path, starting with /") },
             isError = pathError != null,
             modifier = Modifier.fillMaxWidth().widthIn(max = Measure.bodyMaxWidth),
         )
         if (pathError != null) {
             Text(pathError, color = MenuTokens.Danger, style = TypeRole.supporting)
         }
-        TextButton(
-            onClick = onAddPath,
-            enabled = pathEntry.isNotBlank(),
-            modifier = Modifier.heightIn(min = window.minTouchTarget),
-        ) { Text("Add this path", style = TypeRole.button) }
+        if (pathEntry.isNotBlank()) PadButton("Add this path", onAddPath)
     }
+}
+
+/**
+ * Readable folders the system picker does not offer, found by listing the
+ * two places Android and the emulators mount them: removable volumes under
+ * /storage (not the emulated internal storage, which the picker reaches),
+ * and host shares under /mnt/windows. What is listed is what is there;
+ * nothing is named that this device does not have.
+ */
+internal fun suggestedGameFolders(): List<String> {
+    fun readableDirs(parent: String, skip: Set<String> = emptySet()): List<File> =
+        File(parent).listFiles()
+            ?.filter { it.isDirectory && it.name !in skip && it.listFiles() != null }
+            .orEmpty()
+    return (readableDirs("/storage", skip = setOf("emulated", "self")) + readableDirs("/mnt/windows"))
+        .map { it.absolutePath }
+        .sorted()
 }
 
 /**
@@ -1389,7 +1650,7 @@ private fun GamesFoldersStep(
  */
 @Composable
 private fun ControllerStep(
-    progress: Pair<Int, Int>?,
+    progress: StepProgress?,
     onBack: (() -> Unit)?,
     isReEntry: Boolean,
     onContinue: () -> Unit,
@@ -1519,17 +1780,29 @@ private fun ControllerStep(
  */
 @Composable
 private fun AppearanceStep(
-    progress: Pair<Int, Int>?,
+    progress: StepProgress?,
     onBack: (() -> Unit)?,
     onContinue: () -> Unit,
 ) {
     val context = LocalContext.current
     val portraitScreen = remember { ThemeAssets.isPortraitScreen(context) }
+    // The theme downloader, the same screen Settings' "Browse themes"
+    // opens (docs/SPEC.md 7b, "Themes are chosen during setup"), drawn in
+    // place of the step; a theme it downloads is in the list on return.
+    var browsing by remember { mutableStateOf(false) }
+    var catalogVersion by remember { mutableStateOf(0) }
     // Listing the themes and reading each one's capabilities.xml is asset
     // and file I/O: read off the main thread, and nothing is listed until
     // it is known (an empty list would read as "no themes installed").
-    val catalog by produceState<AppearanceCatalog?>(initialValue = null) {
+    val catalog by produceState<AppearanceCatalog?>(initialValue = null, catalogVersion) {
         value = withContext(Dispatchers.IO) { AppearanceCatalog.read(context) }
+    }
+    if (browsing) {
+        ThemeBrowserScreen(onDismiss = {
+            browsing = false
+            catalogVersion++
+        })
+        return
     }
     val stored = remember { LibraryThemePrefs.get(context) }
     var picked by remember { mutableStateOf<String?>(null) }
@@ -1538,16 +1811,18 @@ private fun AppearanceStep(
     OnboardingScaffold(
         title = "Appearance",
         body = if (portraitScreen) {
-            "Gaming mode draws itself with a real ES-DE theme. This screen is taller than it " +
-                "is wide, so themes that lay out a tall screen are marked — the others will be " +
-                "stretched sideways to fit."
+            "Gaming draws itself with a theme. This screen is taller than it is wide, so themes " +
+                "that lay out a tall screen are marked; the others will be stretched sideways to " +
+                "fit. Get more themes to download another."
         } else {
-            "Gaming mode draws itself with a real ES-DE theme. Every one droidtop has is here, " +
-                "drawing itself."
+            "Gaming draws itself with a theme. Every one droidtop has is here, drawing itself; " +
+                "Get more themes downloads another from the ES-DE community's list."
         },
         progress = progress,
         onBack = onBack,
         primary = StepAction("Next", onClick = onContinue),
+        secondary = StepAction("Get more themes") { browsing = true },
+        focusContentFirst = true,
     ) {
         val themes = catalog?.themes
         if (themes != null && themes.isEmpty()) {
@@ -1619,7 +1894,7 @@ private class AppearanceCatalog(val themes: List<Theme>, val defaultTheme: Strin
  */
 @Composable
 private fun KeyboardStep(
-    progress: Pair<Int, Int>?,
+    progress: StepProgress?,
     onBack: (() -> Unit)?,
     onEnable: () -> Unit,
     onPick: () -> Unit,
@@ -1668,7 +1943,7 @@ private fun KeyboardStep(
  */
 @Composable
 private fun DefaultModeChoiceStep(
-    progress: Pair<Int, Int>?,
+    progress: StepProgress?,
     onBack: (() -> Unit)?,
     homeImplementation: HomeRolePrefs.HomeImplementation,
     desktopUsable: Boolean,
@@ -1706,8 +1981,9 @@ private fun DefaultModeChoiceStep(
             "That is the only thing set up so far. Anything else you set up later can " +
                 "become the default from Settings."
         } else {
-            "This is what happens when droidtop starts. Everything else you set up " +
-                "stays reachable from the mode switcher (long-press Back)."
+            "This is where droidtop opens, and where the Home button takes you. Everything " +
+                "else you set up is one step away in the mode switcher; the tutorial after this " +
+                "shows where it is."
         },
         progress = progress,
         onBack = onBack,
@@ -1715,6 +1991,7 @@ private fun DefaultModeChoiceStep(
             onSelect(effective)
             onContinue()
         },
+        focusContentFirst = !single,
     ) {
         if (!single) {
             modes.forEach { (mode, supporting) ->
@@ -1739,7 +2016,7 @@ private fun DefaultModeChoiceStep(
  */
 @Composable
 private fun WhatNextStep(
-    progress: Pair<Int, Int>?,
+    progress: StepProgress?,
     onBack: (() -> Unit)?,
     mode: dev.droidtop.library.settings.Mode,
     homeImplementation: HomeRolePrefs.HomeImplementation,
@@ -1750,6 +2027,8 @@ private fun WhatNextStep(
     gamesStillCounting: Boolean,
     gamesSoFar: Int,
     storageGranted: Boolean,
+    controllerAnswered: Boolean,
+    keyboardSkipped: Boolean,
     onFinish: () -> Unit,
 ) {
     val done = buildList {
@@ -1798,6 +2077,20 @@ private fun WhatNextStep(
             else -> add("Desktop — off; turn it on in Settings, Global settings.")
         }
         if (gamingConfigured && !storageGranted) add("Storage access — Settings, Game folders.")
+        // Skipped steps are skipped things too; the summary used to list
+        // neither (dq-coordinator-24, finding 10).
+        if (!controllerAnswered) add("Controller — Settings, Input, Controller.")
+        if (keyboardSkipped) add("Keyboard — Settings, Input, Keyboard.")
+    }
+    // What a newcomer needs a minute from now and would otherwise have to
+    // find (dq-coordinator-24, finding 8): each is asked where it is used,
+    // as the permissions rule says (SPEC 7b), so here it is only named.
+    val later = buildList {
+        if (gamingConfigured) {
+            add("Pictures and descriptions for your games — Settings, Library, Scraper.")
+            add("Windows games need one download the first time — a Windows game's page offers it.")
+            add("Notifications in the Quick Menu — its Notifications tab asks for access.")
+        }
     }
 
     OnboardingScaffold(
@@ -1813,7 +2106,14 @@ private fun WhatNextStep(
             StepSectionLabel("Skipped, and where it lives")
             skipped.forEach { StepNote("• $it") }
         }
+        if (later.isNotEmpty()) {
+            StepSectionLabel("When you want them")
+            later.forEach { StepNote("• $it") }
+        }
         Spacer(modifier = Modifier.padding(top = Space.Sm))
-        StepNote("Every one of these can be changed later; nothing here is final.")
+        StepNote(
+            "Every one of these can be changed later; nothing here is final. A short tour of " +
+                "the controls and where things are follows.",
+        )
     }
 }

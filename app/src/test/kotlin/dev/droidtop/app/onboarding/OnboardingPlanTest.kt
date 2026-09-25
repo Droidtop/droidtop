@@ -1,6 +1,9 @@
 package dev.droidtop.app.onboarding
 
+import dev.droidtop.app.OnboardingPart
 import dev.droidtop.app.OnboardingStep
+import dev.droidtop.app.StepProgress
+import dev.droidtop.app.part
 import dev.droidtop.app.plannedSteps
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -13,9 +16,9 @@ import org.junit.Test
  */
 class OnboardingPlanTest {
 
-    private fun plan(gaming: Boolean, storageGranted: Boolean) = plannedSteps(
+    private fun plan(gaming: Boolean, storageGranted: Boolean, desktop: Boolean = false) = plannedSteps(
         home = null,
-        configureDesktop = false,
+        configureDesktop = desktop,
         configureGaming = gaming,
         storageGranted = storageGranted,
     )
@@ -63,7 +66,7 @@ class OnboardingPlanTest {
 
     @Test
     fun `input and appearance come after the games steps and before the keyboard`() {
-        val steps = plan(gaming = true, storageGranted = true)
+        val steps = plan(gaming = true, storageGranted = true, desktop = true)
         val folders = steps.indexOf(OnboardingStep.GAMES_FOLDERS)
         val controller = steps.indexOf(OnboardingStep.CONTROLLER)
         val appearance = steps.indexOf(OnboardingStep.APPEARANCE)
@@ -71,5 +74,24 @@ class OnboardingPlanTest {
         assertTrue(folders < controller)
         assertTrue(controller < appearance)
         assertTrue(appearance < keyboard)
+    }
+
+    @Test
+    fun `the keyboard is asked only of a run setting up Desktop`() {
+        // Its reason is terminals and Windows programs (rig, dq-coordinator-24, finding 10).
+        assertTrue(OnboardingStep.KEYBOARD !in plan(gaming = true, storageGranted = true))
+        assertTrue(OnboardingStep.KEYBOARD in plan(gaming = false, storageGranted = true, desktop = true))
+    }
+
+    @Test
+    fun `progress counts the same parts whatever is answered`() {
+        // "Step 1 of 7", "2 of 8", "4 of 10" (rig, dq-coordinator-24, finding 9):
+        // every step belongs to one part, and the parts never change.
+        val short = plan(gaming = false, storageGranted = true)
+        val long = plan(gaming = true, storageGranted = false, desktop = true)
+        val parts = OnboardingPart.entries.size
+        (short + long).forEach { step -> assertEquals(parts, StepProgress(step.part).count) }
+        // The walk never goes back a part.
+        assertEquals(long.map { it.part }, long.map { it.part }.sortedBy { it.ordinal })
     }
 }
