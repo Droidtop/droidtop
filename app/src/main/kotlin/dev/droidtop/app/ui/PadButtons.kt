@@ -1,25 +1,26 @@
 package dev.droidtop.app.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.TypeRole
 import dev.droidtop.shell.gamepad.currentShellWindow
-import dev.droidtop.shell.gamepad.input.padClick
+import dev.droidtop.shell.gamepad.Space
+import dev.droidtop.shell.gamepad.input.padSelectable
 
 /**
  * The button of droidtop's own full-screen flows outside the shells
@@ -31,9 +32,11 @@ import dev.droidtop.shell.gamepad.input.padClick
  * is drawn in the text colour, because an accent ring on an accent fill
  * is no ring at all; every other button carries the accent ring.
  *
- * Material's buttons answer Enter and DPAD_CENTER but never BUTTON_A, and
- * show focus only as a faint overlay: onboarding's Welcome ignored the
- * pad's A and showed no focus anywhere (rig, dq-coordinator-24, finding 7).
+ * Not a Material button: those answer Enter and DPAD_CENTER but never
+ * BUTTON_A, show focus only as a faint overlay, and cannot hold focus in
+ * touch mode ([padSelectable] says why that matters), so onboarding's
+ * Welcome ignored the pad's A and its hint pills did nothing (rig,
+ * dq-coordinator-24, finding 7; dq-onboard-01).
  */
 @Composable
 internal fun PadButton(
@@ -45,32 +48,23 @@ internal fun PadButton(
 ) {
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(50)
-    val framed = modifier
-        .heightIn(min = currentShellWindow().minTouchTarget)
-        .padClick(onClick)
-        .onFocusChanged { focused = it.hasFocus }
-        .border(
-            width = if (focused) MenuTokens.FocusRingWidth else 1.dp,
-            color = when {
-                !focused -> Color.Transparent
-                filled -> MenuTokens.OnSurface
-                else -> MenuTokens.Accent
-            },
-            shape = shape,
-        )
-    if (filled) {
-        Button(
-            onClick = onClick,
-            shape = shape,
-            modifier = framed,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MenuTokens.Accent,
-                contentColor = MenuTokens.OverlaySurface,
-            ),
-        ) { Text(label, style = TypeRole.button) }
-    } else {
-        TextButton(onClick = onClick, shape = shape, modifier = framed) {
-            Text(label, color = color, style = TypeRole.button)
-        }
+    Box(
+        modifier = modifier
+            .heightIn(min = currentShellWindow().minTouchTarget)
+            .padSelectable(onFocus = { focused = it }, onPress = onClick)
+            .background(if (filled) MenuTokens.Accent else Color.Transparent, shape)
+            .border(
+                width = if (focused) MenuTokens.FocusRingWidth else 1.dp,
+                color = when {
+                    !focused -> Color.Transparent
+                    filled -> MenuTokens.OnSurface
+                    else -> MenuTokens.Accent
+                },
+                shape = shape,
+            )
+            .padding(horizontal = Space.Xl, vertical = Space.Sm),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, color = if (filled) MenuTokens.OverlaySurface else color, style = TypeRole.button)
     }
 }

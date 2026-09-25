@@ -10,7 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import dev.droidtop.shell.gamepad.input.padClick
+import dev.droidtop.shell.gamepad.input.padSelectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -69,8 +69,13 @@ internal fun SelectableRow(
             // says which row the pad is on; the fill stays the "chosen"
             // cue. Onboarding showed no focus at all (dq-coordinator-24,
             // finding 7).
-            .then(if (onClick != null) Modifier.padClick(onClick) else Modifier)
-            .onFocusChanged { focused = it.isFocused }
+            .then(
+                if (onClick != null) {
+                    Modifier.padSelectable(onFocus = { focused = it }, onPress = onClick)
+                } else {
+                    Modifier
+                },
+            )
             .background(
                 if (selected) MenuTokens.SurfaceSelected else MenuTokens.Surface,
                 MenuTokens.RowShape,
@@ -80,7 +85,6 @@ internal fun SelectableRow(
                 color = if (focused) MenuTokens.Accent else Color.Transparent,
                 shape = MenuTokens.RowShape,
             )
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = Space.Lg, vertical = Space.Md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.Md),
