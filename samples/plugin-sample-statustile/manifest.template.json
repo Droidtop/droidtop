@@ -1,0 +1,13 @@
+{
+  "id": "droidtop.sample-statustile",
+  "origin": "droidtop",
+  "label": "Sample status tile",
+  "description": "Harmless sample exercising the plugin API end to end (SPEC 12a); see build.sh in this folder.",
+  "version": "1.0.0",
+  "kind": "native_bundle",
+  "capabilities": ["status_tile"],
+  "contractVersion": 1,
+  "requestsRoot": false,
+  "abis": [],
+  "entryClass": "dev.droidtop.samples.statustile.StatusTilePlugin"
+}
