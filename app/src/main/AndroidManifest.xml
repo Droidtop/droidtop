@@ -192,11 +192,15 @@
           game be pinned to the home screen at all: the platform attributes
           a pinned shortcut to a launcher activity of its package and refuses
           one from a package that has none. The class keeps its old name
-          because every pinned game names it.
+          because every pinned game names it. Its own task affinity: in the
+          package's shared task, the icon brought back whatever droidtop
+          screen was last left there, and B from the games grid or Cancel on
+          the pin sheet dropped the person into it (rig, dq-shell2-01).
         -->
         <activity
             android:name="dev.droidtop.app.LauncherGamesActivity"
             android:exported="true"
+            android:taskAffinity="dev.droidtop.app.games"
             android:label="@string/droidtop_app_name"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|navigation">
             <intent-filter>

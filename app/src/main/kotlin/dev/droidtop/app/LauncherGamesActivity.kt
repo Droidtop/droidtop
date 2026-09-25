@@ -99,6 +99,10 @@ class LauncherGamesActivity : AppCompatActivity() {
         // the black ground runs under the status bar instead of a stock
         // app's bar colour, and the content keeps clear of the bars.
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        // Drawing under the bars is not enough on its own: the theme still
+        // paints them grey over the ground (rig, dq-shell2-01, Android 9).
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
         setContent {
             dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
                 val shown by games.collectAsStateWithLifecycle(initialValue = null)
@@ -137,7 +141,8 @@ class LauncherGamesActivity : AppCompatActivity() {
                 val icon = artworkIcon(context, entry)
                     ?: IconCompat.createWithResource(context, R.mipmap.ic_launcher)
                 val shortcut = ShortcutInfoCompat.Builder(context, "game:${entry.id}")
-                    .setShortLabel(entry.title)
+                    // The name the grid shows, not the folder slug.
+                    .setShortLabel(dev.droidtop.library.GameNaming.displayName(entry.title))
                     .setIcon(icon)
                     .setIntent(GameLaunchActivity.intentFor(context, entry.id))
                     // Attributed to this activity by name: it is the
