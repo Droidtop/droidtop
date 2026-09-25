@@ -1,0 +1,18 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!--
+          The plugin sandbox is for compatibility and crash containment,
+          NOT security (docs/SPEC.md 12a): this is a same-UID, separate
+          PROCESS, not a separate app. A plugin that throws, hangs or
+          native-crashes takes down :pluginhost, :app's binder connection
+          dies (DeathRecipient), PluginCrashPolicy disables that plugin
+          and the launcher keeps running. It is not exported: only :app
+          binds to it, and only :app decides which plugin loads.
+        -->
+        <service
+            android:name="dev.droidtop.pluginhost.PluginRuntimeService"
+            android:process=":pluginhost"
+            android:exported="false"
+            android:isolatedProcess="false" />
+    </application>
+</manifest>

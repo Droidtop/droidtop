@@ -1,0 +1,192 @@
+package dev.droidtop.pluginhost
+
+import android.app.Service
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import android.os.IBinder
+import dalvik.system.DexClassLoader
+import java.io.File
+import java.util.UUID
+import java.util.concurrent.Executors
+import org.json.JSONObject
+
+/**
+ * Runs in the isolated `:pluginhost` process (this module's own
+ * AndroidManifest.xml declares it there). Everything in this class runs
+ * OUTSIDE :app's process: a plugin native-crashing, deadlocking, or
+ * throwing an uncaught exception on a binder thread takes this process
+ * down, not :app's. That is the entire point (docs/SPEC.md 12a: "for
+ * COMPATIBILITY and STABILITY, not security") -- there is no
+ * [SecurityManager], no permission drop, no separate UID here; a plugin
+ * in this process can do anything :app's own UID can do. The isolation
+ * this buys is crash containment and a clean binder boundary, nothing
+ * more, and the class-level doc comments on [IPluginRuntime] and
+ * [DroidtopPlugin] say so again so nobody mistakes what this is for.
+ */
+class PluginRuntimeService : Service() {
+    private val loaded = mutableMapOf<String, DroidtopPlugin>()
+    private var callback: IPluginRuntimeCallback? = null
+
+    // One shared pool for every plugin's jobs in this process. A job is
+    // expected to run minutes (docs/SPEC.md 12a's job shape), so it must
+    // never run on a binder thread; this is that "somewhere else".
+    private val jobExecutor = Executors.newCachedThreadPool()
+
+    private val binder = object : IPluginRuntime.Stub() {
+        override fun setCallback(cb: IPluginRuntimeCallback?) {
+            callback = cb
+        }
+
+        override fun loadPlugin(pluginId: String, installDir: String, entryClass: String): Boolean {
+            return try {
+                val dir = File(installDir)
+                val jar = File(dir, "classes.jar")
+                if (!jar.isFile) return false
+                val nativeDir = nativeLibraryDirFor(dir)
+                val optimizedDir = File(cacheDir, "dex-opt/$pluginId").apply { mkdirs() }
+                val loader = DexClassLoader(jar.absolutePath, optimizedDir.absolutePath, nativeDir, javaClass.classLoader)
+                val instance = loader.loadClass(entryClass).getDeclaredConstructor().newInstance()
+                val plugin = instance as? DroidtopPlugin ?: return false
+                plugin.onLoad(pluginContextFor(pluginId, dir))
+                loaded[pluginId] = plugin
+                true
+            } catch (t: Throwable) {
+                reportCrash(pluginId, "", "load failed: ${t.message ?: t::class.java.simpleName}")
+                false
+            }
+        }
+
+        override fun unloadPlugin(pluginId: String) {
+            runCatching { loaded.remove(pluginId)?.onUnload() }
+            loaded.remove(pluginId)
+        }
+
+        override fun invoke(pluginId: String, capability: String, argsJson: String): String? {
+            val plugin = loaded[pluginId] ?: return null
+            val cap = PluginCapability.fromId(capability) ?: return null
+            return try {
+                val argsMap = buildMap<String, String> {
+                    val obj = JSONObject(argsJson)
+                    obj.keys().forEach { key -> put(key, obj.optString(key)) }
+                }
+                val result = plugin.invoke(cap, PluginArgs(argsMap))
+                encode(result)
+            } catch (t: Throwable) {
+                reportCrash(pluginId, capability, t.message ?: t::class.java.simpleName)
+                null
+            }
+        }
+
+        override fun startJob(pluginId: String, capability: String, argsJson: String): String? {
+            val plugin = loaded[pluginId] ?: return null
+            val cap = PluginCapability.fromId(capability) ?: return null
+            val jobId = UUID.randomUUID().toString()
+            val argsMap = try {
+                buildMap<String, String> {
+                    val obj = JSONObject(argsJson)
+                    obj.keys().forEach { key -> put(key, obj.optString(key)) }
+                }
+            } catch (t: Throwable) {
+                return null
+            }
+            val progress = object : PluginJobProgress {
+                override fun report(percent: Int, statusLine: String) {
+                    runCatching { callback?.onJobProgress(pluginId, jobId, percent, statusLine) }
+                }
+
+                override fun complete(result: PluginResult) {
+                    runCatching { callback?.onJobComplete(pluginId, jobId, encode(result)) }
+                }
+            }
+            jobExecutor.execute {
+                try {
+                    plugin.startJob(cap, PluginArgs(argsMap), progress)
+                } catch (e: UnsupportedOperationException) {
+                    // A plugin that never overrode startJob() -- an
+                    // ordinary, expected shape, not a crash: report it as
+                    // a normal job failure and leave the plugin running.
+                    runCatching { callback?.onJobComplete(pluginId, jobId, encode(PluginResult.failure("this plugin does not support jobs"))) }
+                } catch (t: Throwable) {
+                    reportCrash(pluginId, capability, t.message ?: t::class.java.simpleName)
+                    runCatching { callback?.onJobComplete(pluginId, jobId, encode(PluginResult.failure(t.message ?: "job failed"))) }
+                }
+            }
+            return jobId
+        }
+
+        override fun cancelJob(pluginId: String, jobId: String) {
+            runCatching { loaded[pluginId]?.cancelJob(jobId) }
+        }
+    }
+
+    override fun onBind(intent: Intent?): IBinder = binder
+
+    private fun encode(result: PluginResult): String {
+        val json = JSONObject()
+        json.put("ok", result.ok)
+        result.error?.let { json.put("error", it) }
+        val values = JSONObject()
+        result.values.forEach { (k, v) -> values.put(k, v) }
+        json.put("values", values)
+        val text = json.toString()
+        // The other half of the size cap: even a plugin that ran fine
+        // cannot hand back more than PluginRunner.MAX_RESULT_BYTES across
+        // the binder (12a point 5).
+        return if (text.toByteArray(Charsets.UTF_8).size > PluginRunner.MAX_RESULT_BYTES) {
+            JSONObject().put("ok", false).put("error", "result exceeds size cap").put("values", JSONObject()).toString()
+        } else {
+            text
+        }
+    }
+
+    private fun reportCrash(pluginId: String, capability: String, reason: String) {
+        runCatching { callback?.onPluginCrashed(pluginId, capability, reason) }
+        loaded.remove(pluginId)
+    }
+
+    private fun nativeLibraryDirFor(installDir: File): String? {
+        val abi = if (Build.SUPPORTED_64_BIT_ABIS.contains("x86_64") && !Build.SUPPORTED_64_BIT_ABIS.contains("arm64-v8a")) {
+            "x86_64"
+        } else {
+            "arm64-v8a"
+        }
+        val dir = File(installDir, "lib/$abi")
+        return if (dir.isDirectory) dir.absolutePath else null
+    }
+
+    private fun pluginContextFor(pluginId: String, installDir: File): PluginContext = object : PluginContext {
+        override fun privateDataDir(): String = File(installDir, "data").apply { mkdirs() }.absolutePath
+        // The library-folder and root-approval questions need :app's own
+        // configured state (the systems database, the approval record);
+        // this process never reads either directly -- both are resolved
+        // by :app BEFORE the call reaches here and passed down through
+        // argsJson/PluginArgs by NativePluginRunner instead. This
+        // per-plugin PluginContext therefore only ever answers the parts
+        // that are genuinely local to this process (its own storage).
+        override fun libraryFolderPath(systemId: String): String? = null
+        override fun hasRootApproval(): Boolean = false
+        override fun hasShizukuAccess(): Boolean = checkShizukuAccess(applicationContext)
+    }
+
+    private fun checkShizukuAccess(context: Context): Boolean {
+        val installed = runCatching {
+            context.packageManager.getPackageInfo(SHIZUKU_MANAGER_PACKAGE, 0)
+            true
+        }.getOrDefault(false)
+        if (!installed) return false
+        return runCatching {
+            context.checkSelfPermission(SHIZUKU_PERMISSION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        }.getOrDefault(false)
+    }
+
+    companion object {
+        fun bindIntent(context: Context): Intent = Intent(context, PluginRuntimeService::class.java)
+
+        // The lightweight, no-client-library Shizuku check (PluginApi.kt's
+        // hasShizukuAccess doc comment): the permission Shizuku's manager
+        // grants once the user pairs and approves it there.
+        private const val SHIZUKU_MANAGER_PACKAGE = "moe.shizuku.privileged.api"
+        private const val SHIZUKU_PERMISSION = "moe.shizuku.privileged.api.permission.API_V23"
+    }
+}

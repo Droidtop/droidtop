@@ -24,6 +24,9 @@ import dev.droidtop.library.consoles.availablePlayers
 import dev.droidtop.library.integrations.IntegrationCapability
 import dev.droidtop.library.integrations.IntegrationPlaceholders
 import dev.droidtop.library.integrations.IntegrationStore
+import dev.droidtop.pluginhost.PluginStore
+import dev.droidtop.pluginhost.PluginKind
+import dev.droidtop.pluginhost.PluginTrustState
 import dev.droidtop.library.consoles.resolvePlayer
 import dev.droidtop.library.scraper.ScraperPrefs
 import dev.droidtop.library.scraper.ScraperSource
@@ -66,6 +69,7 @@ object AppSettingsCatalogs {
     const val SCREEN_SCRAPER = "rom_scraper"
     const val SCREEN_PLATFORMS = "manage_platforms"
     const val SCREEN_INTEGRATIONS = "integrations"
+    const val SCREEN_PLUGINS = "plugins"
     const val SCREEN_WINDOWS_GAMES = "windows_games"
     const val SCREEN_PC_STORES = "pc_stores"
     const val SCREEN_ANDROID_SETTINGS = "android_settings"
@@ -82,6 +86,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(scraperScreen())
         SettingsScreenRegistry.register(platformsScreen())
         SettingsScreenRegistry.register(integrationsScreen())
+        SettingsScreenRegistry.register(pluginsScreen())
         SettingsScreenRegistry.register(windowsGamesScreen())
         SettingsScreenRegistry.register(pcStoresScreen())
         SettingsScreenRegistry.register(androidSettingsScreen())
@@ -115,6 +120,13 @@ object AppSettingsCatalogs {
             .sortedBy { it.name.lowercase() }
         // Read here, on IO: a value label is drawn on the main thread.
         val activeIntegrations = IntegrationStore.available(context).size
+        val installedPlugins = PluginStore.installed(context)
+        val pluginsValueLabel = when {
+            installedPlugins.isEmpty() -> "none"
+            installedPlugins.any { it.trust == PluginTrustState.PENDING } ->
+                "${installedPlugins.count { it.trust == PluginTrustState.PENDING }} awaiting approval"
+            else -> "${installedPlugins.count { it.runnable() }} active"
+        }
 
         listOf(
             CatalogGroup(
@@ -137,6 +149,19 @@ object AppSettingsCatalogs {
                         subtitle = "Hook other installed apps into droidtop, e.g. a downloader for a system's games",
                         registryId = SCREEN_INTEGRATIONS,
                         valueLabel = { if (activeIntegrations == 0) "none" else "$activeIntegrations active" },
+                    ),
+                    // The plugin half (docs/SPEC.md 12a): real code
+                    // droidtop installs, approves and runs itself, next
+                    // to the JSON-only integrations above rather than
+                    // buried somewhere unrelated -- the two are the same
+                    // idea ("hook something into droidtop") at different
+                    // trust levels.
+                    NestedScreenItem(
+                        id = "console_systems_plugins",
+                        title = "Plugins",
+                        subtitle = "Installed plugin code -- searched, approved and run in its own process, never droidtop's databases",
+                        registryId = SCREEN_PLUGINS,
+                        valueLabel = { pluginsValueLabel },
                     ),
                     NestedScreenItem(
                         id = "console_systems_enginehost",
@@ -1155,6 +1180,125 @@ object AppSettingsCatalogs {
                                 // parsed before it is kept.
                                 mimeType = "*/*",
                                 onPicked = IntegrationStore::import,
+                            ),
+                        )
+                    },
+                ),
+            )
+        },
+    )
+
+    /**
+     * The plugin approval/management screen (docs/SPEC.md 12a). Every
+     * mutation here (approve, deny, enable/disable, uninstall) goes
+     * straight through [PluginStore], the one place allowed to change
+     * plugin trust state, and the screen is rebuilt from disk after each
+     * one -- same "no separate save step" shape [integrationsScreen]
+     * uses.
+     */
+    private fun pluginsScreen() = CatalogScreen(
+        id = SCREEN_PLUGINS,
+        title = "Plugins",
+        subtitle = "Real code, run in its own process and approved by you -- for crash containment, not as a security sandbox",
+        groups = { context ->
+            val installed = withContext(Dispatchers.IO) { PluginStore.installed(context) }
+            listOf(
+                CatalogGroup(
+                    id = "plugins_list",
+                    title = null,
+                    items = buildList {
+                        if (installed.isEmpty()) {
+                            add(
+                                ActionItem(
+                                    id = "plugins_none",
+                                    title = "No plugins installed",
+                                    subtitle = "Install a plugin bundle below. A plugin never runs until you approve it here.",
+                                    run = {},
+                                ),
+                            )
+                        }
+                        installed.forEach { record ->
+                            val m = record.manifest
+                            val statusLine = buildString {
+                                append(
+                                    when (record.trust) {
+                                        PluginTrustState.PENDING -> "Awaiting approval"
+                                        PluginTrustState.DENIED -> "Denied"
+                                        PluginTrustState.APPROVED -> if (record.disabledReason != null) {
+                                            "Disabled after a crash: ${record.disabledReason}"
+                                        } else if (record.enabled) "Running" else "Disabled"
+                                    },
+                                )
+                                append(" - ").append(m.origin).append(" - ")
+                                append(m.capabilities.joinToString { it.display })
+                                if (m.requestsRoot) {
+                                    append(if (record.rootApproved) " - uses root (approved)" else " - can use root (not granted)")
+                                }
+                                if (m.kind == PluginKind.PYTHON) append(" - no Python runner yet, cannot run")
+                            }
+                            add(ActionItem(id = "plugin_${m.id}_info", title = m.label, subtitle = statusLine, run = {}))
+                            when (record.trust) {
+                                PluginTrustState.PENDING -> {
+                                    add(
+                                        ActionItem(
+                                            id = "plugin_${m.id}_approve",
+                                            title = "Approve \"${m.label}\"",
+                                            subtitle = if (m.requestsRoot) {
+                                                "This plugin can also use root as an optional enhancement when your device has it -- its core function must still work without it. Approving here does NOT grant root; use \"Approve and allow root\" for that."
+                                            } else {
+                                                "Runs in its own process from now on"
+                                            },
+                                            run = { ctx -> PluginStore.setApproval(ctx, m.id, approved = true, grantRoot = false) },
+                                        ),
+                                    )
+                                    if (m.requestsRoot) {
+                                        add(
+                                            ActionItem(
+                                                id = "plugin_${m.id}_approve_root",
+                                                title = "Approve and allow root",
+                                                subtitle = "Only takes effect if this device actually has root; root stays an enhancement, never a requirement",
+                                                confirmTitle = "Let \"${m.label}\" use root on this device?",
+                                                run = { ctx -> PluginStore.setApproval(ctx, m.id, approved = true, grantRoot = true) },
+                                            ),
+                                        )
+                                    }
+                                    add(
+                                        ActionItem(
+                                            id = "plugin_${m.id}_deny",
+                                            title = "Deny \"${m.label}\"",
+                                            subtitle = "Stays installed but never runs. A future update (a new signed archive) can be approved again.",
+                                            run = { ctx -> PluginStore.setApproval(ctx, m.id, approved = false, grantRoot = false) },
+                                        ),
+                                    )
+                                }
+                                PluginTrustState.APPROVED -> {
+                                    add(
+                                        ToggleItem(
+                                            id = "plugin_${m.id}_enabled",
+                                            title = "Enabled",
+                                            current = record.enabled,
+                                            onToggle = { ctx, on -> PluginStore.setEnabled(ctx, m.id, on) },
+                                        ),
+                                    )
+                                }
+                                PluginTrustState.DENIED -> Unit
+                            }
+                            add(
+                                ActionItem(
+                                    id = "plugin_${m.id}_uninstall",
+                                    title = "Uninstall \"${m.label}\"",
+                                    confirmTitle = "Remove ${m.label} and its data?",
+                                    run = { ctx -> PluginStore.uninstall(ctx, m.id) },
+                                ),
+                            )
+                        }
+                        add(
+                            DocumentPickItem(
+                                id = "plugins_add",
+                                title = "Install plugin file",
+                                subtitle = "Pick a signed .droidplugin.tar.xz bundle -- validated before anything runs, never run until approved above",
+                                mimeType = "*/*",
+                                onPicked = { ctx, uri -> PluginStore.importFromPicker(ctx, uri) },
                             ),
                         )
                     },

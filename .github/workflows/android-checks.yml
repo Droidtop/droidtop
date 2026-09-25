@@ -105,7 +105,7 @@ jobs:
         # never once run in CI. Add the module here the moment it grows its
         # first test; a test nothing runs is not a test.
         if: always()
-        run: ./gradlew :app:testDebugUnitTest :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :runtime-windows:testDebugUnitTest :input-keyboard:testDebugUnitTest :host-bridge:testDebugUnitTest :runtime-linux-noroot:testDebugUnitTest --stacktrace
+        run: ./gradlew :app:testDebugUnitTest :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :runtime-windows:testDebugUnitTest :input-keyboard:testDebugUnitTest :host-bridge:testDebugUnitTest :runtime-linux-noroot:testDebugUnitTest :plugin-host:testDebugUnitTest --stacktrace
 
       - name: Upload test reports
         if: always()
@@ -121,4 +121,5 @@ jobs:
             runtime-windows/build/reports/tests/
             input-keyboard/build/reports/tests/
             host-bridge/build/reports/tests/
+            plugin-host/build/reports/tests/
           if-no-files-found: ignore
