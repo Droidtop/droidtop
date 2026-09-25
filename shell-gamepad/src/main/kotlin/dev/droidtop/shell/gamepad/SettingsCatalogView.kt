@@ -108,6 +108,12 @@ fun CatalogNavigator(
     root: CatalogScreen,
     onExit: () -> Unit,
     nativeActions: Map<String, () -> Unit> = emptyMap(),
+    /**
+     * Changes when the host knows the screen's live data changed outside
+     * any action taken here (the desktop session starting or stopping,
+     * the host coming back to the front); the screen is re-read then.
+     */
+    refreshKey: Any? = null,
 ) {
     val context = LocalContext.current
     var version by remember { mutableStateOf(0) }
@@ -139,7 +145,7 @@ fun CatalogNavigator(
     // rebuilt on every navigation and after every value change.
     // Tagged with the screen they belong to: right after a push or a pop
     // the list must not treat the previous screen's rows as this one's.
-    val loaded by androidx.compose.runtime.produceState<Pair<CatalogScreen, List<CatalogGroup>>?>(null, screen, version) {
+    val loaded by androidx.compose.runtime.produceState<Pair<CatalogScreen, List<CatalogGroup>>?>(null, screen, version, refreshKey) {
         value = screen to screen.groups(context)
     }
     val groups = loaded?.takeIf { it.first == screen }?.second ?: emptyList()
@@ -649,6 +655,13 @@ private fun TextEditDialog(
                 value = value,
                 onValueChange = { value = it },
                 singleLine = !item.multiline,
+                // The keyboard's own Done key saves a one-line value: the
+                // on-screen keyboard can cover the dialog's Save button
+                // (rig, dq-desk2-02, a container rename in landscape).
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    imeAction = if (item.multiline) androidx.compose.ui.text.input.ImeAction.Default else androidx.compose.ui.text.input.ImeAction.Done,
+                ),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { onCommit(value) }),
                 visualTransformation = if (item.secret) PasswordVisualTransformation() else VisualTransformation.None,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = MenuTokens.OnSurface),
                 modifier = Modifier

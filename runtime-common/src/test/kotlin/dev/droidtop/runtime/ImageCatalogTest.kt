@@ -130,6 +130,15 @@ class ImageCatalogTest {
     }
 
     @Test
+    fun `the version picker offers the current tag first, then versions newest first`() {
+        assertEquals(
+            listOf("latest", "13", "12", "3.10", "trixie", "bookworm"),
+            ImageTags.ordered(listOf("12", "bookworm", "latest", "3.10", "13", "trixie"), limit = 10),
+        )
+        assertEquals(listOf("latest", "13"), ImageTags.ordered(listOf("12", "latest", "13"), limit = 2))
+    }
+
+    @Test
     fun `no current tag when nothing is latest or a plain version`() {
         assertEquals(null, ImageTags.current(listOf("edge", "rolling")))
         assertEquals(null, ImageTags.current(emptyList()))
