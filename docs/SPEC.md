@@ -3120,9 +3120,37 @@ app-drawer icon or a floating switcher button:
   build and, once it is gone, shows only a row saying so: its fields
   would write the deleted row back (platform edit, 2026-09-24). Its
   field writes are Room `@Update`, never an insert-or-replace, so an
-  edit committed after a delete changes nothing. Desktop/Standard settings are still XML-declared Preference
-  screens — migrating them onto catalogs is the follow-up that makes
-  their settings renderable inside Desktop's own shell the same way.
+  edit committed after a delete changes nothing. Global settings and Desktop mode's settings are
+  catalogs too (`DroidtopWideSettings`, screens `global_settings`/`desktop_settings`), fixed onto
+  the shared model in the same UI pass (H4) that moved them off launcher3 preference XML — the
+  paragraph that used to say this was still XML is stale; `SettingsGlobalFragment`/
+  `SettingsDesktopFragment` and Gaming's in-shell Settings both chrome the same catalog now. What
+  is still stock launcher3 preferences, deliberately, is only Standard mode's OWN launcher pages
+  (icons, drawer, home screen, rotation) — the fork's settings for the fork's own surface, not a
+  droidtop-wide setting, so migrating them onto the catalog model is not the goal.
+  - **Settings polish pass (settingsui, 2026-09-25), what was already real versus what this
+    found stale.** Owner direction was "significant improvements to polish, layout, and all of
+    that" across every settings surface. Auditing against the catalog architecture above and
+    the 2026-09-24 UI assessment (H1 to H8) found the shell/row-component consolidation this
+    would otherwise have built had already landed the same day, in commits this pass rebased
+    onto rather than duplicated: the shared catalog model and its two renderers (H4); a nested
+    sub-screen restoring the list where it was instead of dropping the user at the top (H3,
+    `a4b0e295`); Browse themes claiming its own hint row instead of stacking under the shell's
+    (`eabd684d`); the mode switcher drawing a real focus ring on its rows (`c31af69b`). Build
+    861, the one `dq-onboard-02`'s rig report is against, was cut before all three landed
+    (06:55 vs 09:09-09:13), so that report's "stale sub-page"/"stacked hint row"/"no focus ring"
+    findings are already fixed on `main` and not evidence of a live gap; only a fresh rig item
+    against a post-09:13 build confirms it (`dq-settingsui-01`). What this pass found and fixed
+    instead: the paragraph above claiming Global/Desktop settings were still XML — stale, left
+    over from before H4 landed and corrected in this change.
+  - **Still open, not built in this pass**: search across settings (the design target of typing
+    a few letters and jumping to any row in any catalog, across every screen the registry
+    knows) — the catalog model's per-screen, lazily-built `groups` lambdas make a flat searchable
+    index a real feature (walk every registered `CatalogScreen`, force-build its groups, index
+    row titles/subtitles), not a small addition, and was not attempted here rather than shipped
+    partial. A `CatalogScreen`/row family is exactly the seam agent `scrape`'s SteamGridDB
+    credential row and agent `plugins`' plugin-contributed integration rows both already use —
+    no new mechanism needed for either.
   - **Known real gap, confirmed on-device**: the Standard shell as it
     ships from Murine Launcher upstream is functional but plain — first
     real-device testing surfaced this directly, not a guess. Backlog item,
