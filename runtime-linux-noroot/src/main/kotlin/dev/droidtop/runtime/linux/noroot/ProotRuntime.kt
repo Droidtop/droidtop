@@ -10,6 +10,7 @@ import dev.droidtop.runtime.ContainerBackend
 import dev.droidtop.runtime.ContainerExecResult
 import dev.droidtop.runtime.ContainerInfo
 import dev.droidtop.runtime.ContainerLayout
+import dev.droidtop.runtime.ContainerNames
 import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.Crane
@@ -101,14 +102,27 @@ class ProotRuntime(
     private val rootfsPuller = CraneRootfsPuller({ Crane.binaryPath(context) }, imageStore, ProotRootfsUnpacker(containersDir))
     private val log = ContainerLog(context)
     private val processes = ProotProcesses()
+    private val names = ContainerNames(File(baseDir, ContainerNames.FILE_NAME))
 
     override val siblingsNeedStart: Boolean = false
 
     override suspend fun createPrimary(image: RootfsImage, provisioning: PrimaryProvisioning): Container =
         createContainer(PRIMARY_NAME, ContainerRole.PRIMARY, image, provisioning)
 
-    override suspend fun createSibling(image: RootfsImage): Container =
-        createContainer("droidtop-sibling-${UUID.randomUUID().toString().take(8)}", ContainerRole.SIBLING, image, null)
+    override suspend fun createSibling(image: RootfsImage, name: String?): Container {
+        val existing = listContainers()
+        val chosen = name?.trim()?.takeIf { it.isNotEmpty() }
+            ?: ContainerNames.defaultName(ContainerRole.SIBLING, image.reference, existing.map { it.displayName })
+        ContainerNames.problemWith(chosen, existing.map { it.displayName })?.let { error(it) }
+        val container = createContainer("droidtop-sibling-${UUID.randomUUID().toString().take(8)}", ContainerRole.SIBLING, image, null)
+        withContext(Dispatchers.IO) { names.set(container.id, chosen) }
+        return container
+    }
+
+    override suspend fun rename(container: Container, name: String) {
+        val existing = listContainers()
+        withContext(Dispatchers.IO) { names.rename(container.id, name, existing) }
+    }
 
     private suspend fun createContainer(
         name: String,
@@ -207,7 +221,10 @@ class ProotRuntime(
 
     override suspend fun destroy(container: Container) {
         stopProcess(container.id)
-        withContext(Dispatchers.IO) { TreeDelete.delete(containerDir(container.id), containersDir) }
+        withContext(Dispatchers.IO) {
+            TreeDelete.delete(containerDir(container.id), containersDir)
+            names.remove(container.id)
+        }
         log.line("destroyed ${container.id}")
     }
 
@@ -218,7 +235,7 @@ class ProotRuntime(
      * boot, or a program running in a sibling.
      */
     override suspend fun listContainers(): List<ContainerInfo> = withContext(Dispatchers.IO) {
-        containersDir.listFiles().orEmpty()
+        val found = containersDir.listFiles().orEmpty()
             .filter { configOf(it.name).isFile }
             .map { dir ->
                 val config = runCatching { readConfig(dir.name) }.getOrNull()
@@ -231,6 +248,7 @@ class ProotRuntime(
                     digest = config?.getProperty(KEY_DIGEST),
                 )
             }
+        names.named(found)
     }
 
     /**

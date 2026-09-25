@@ -1258,7 +1258,19 @@ the `ContainerRuntime` interface that already exists (§3):
   with programs in it, STOPPED for one that must be started, READY for a
   proot sibling, which needs no start. Actions: Start or Stop the desktop
   (primary), Start (a sibling that needs it) or Stop (ends its programs),
-  Terminal, Delete; then the VPN, Devices and Printing rows.
+  Terminal, Delete; then Name (Rename), the VPN, Devices and Printing rows.
+  **Names (decided 2026-09-25).** A container is called by a name the
+  person chooses, never by its id (`droidtop-sibling-8993dfbd` told two
+  terminals nothing, dq-desk2-01): `ContainerNames`, one file per backend
+  beside its containers, read by both, `ContainerInfo.displayName`
+  everywhere a container is named (cards, busy lines, "Open with", a
+  terminal window's title, `foot --title=<name>`). A new sibling defaults
+  to its image's repository name, capitalised and numbered when taken
+  ("Debian", "Debian 2"); the primary is "Desktop"; a rename is refused
+  when empty, over 40 characters or another container's name.
+  **One delete rule.** Any running container is stopped before it can be
+  deleted ("Running: stop it to delete"); the primary used to be guarded
+  and a running sibling not.
 - **The surface, precisely (decided 2026-09-24).** The container manager
   is one catalog screen (`containers`, registered by `:app`) rendered by
   the same navigator as every other settings screen, in every mode that

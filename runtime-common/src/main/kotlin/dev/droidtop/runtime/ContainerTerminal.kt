@@ -133,8 +133,18 @@ object ContainerTerminal {
      * on every container droidtop creates, injected at container-config time
      * rather than per-exec.
      */
-    suspend fun open(runtime: ContainerRuntime, container: Container): ContainerExecResult =
-        runtime.exec(container, LAUNCH_COMMAND)
+    suspend fun open(runtime: ContainerRuntime, container: Container, title: String? = null): ContainerExecResult =
+        runtime.exec(container, launchCommand(title))
+
+    /**
+     * [LAUNCH_COMMAND], with the window titled [title] (the container's
+     * name) so two terminals on one desktop say which container each is
+     * in. foot's `--title` is only the initial title; neither Alpine's
+     * shell nor Debian's bashrc (which retitles only `xterm*` and `rxvt*`
+     * terminals) replaces it.
+     */
+    fun launchCommand(title: String?): List<String> =
+        LAUNCH_COMMAND + listOfNotNull(title?.let { "--title=$it" })
 
     /**
      * A human-readable failure for [result], or null if the terminal ran and
