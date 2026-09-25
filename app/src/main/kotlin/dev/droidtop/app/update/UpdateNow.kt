@@ -28,6 +28,9 @@ object UpdateNow {
     const val ACTION = "dev.droidtop.UPDATE_NOW"
     const val TAG = "DroidtopUpdateNow"
 
+    /** How long the Check now row waits on the installer's answer. */
+    private const val OUTCOME_WAIT_MS = 10 * 60 * 1000L
+
     /** The Android shell (what adb runs as) and root. Fixed platform uids. */
 
     /** What a forced pass decides, once it knows what is published. */
@@ -42,7 +45,7 @@ object UpdateNow {
      * [TAG] so the adb path can be read back with logcat. Throws nothing;
      * a failed check or download comes back as its message.
      */
-    fun runNow(context: Context, onStatus: (String) -> Unit = {}): String {
+    fun runNow(context: Context, waitForOutcome: Boolean = false, onStatus: (String) -> Unit = {}): String {
         val application = context.applicationContext
         val installed = AppSelfUpdate.installedVersionCode(application)
         onStatus("Checking for a newer build...")
@@ -60,11 +63,15 @@ object UpdateNow {
         }
         log("newer build published: " + info.versionName + " (build " + info.versionCode + "), installed " + installed)
         return try {
-            AppSelfUpdate.downloadAndInstall(application, info, onStatus)
-            log(
-                "handed " + info.versionName + " (build " + info.versionCode + ") to the Android installer; " +
-                    "the system's own confirmation is the only remaining prompt",
-            )
+            val sessionId = AppSelfUpdate.downloadAndInstall(application, info, onStatus)
+            val handed = "asked Android's installer to install " + info.versionName + " (build " + info.versionCode + ")"
+            if (!waitForOutcome) return log("$handed; its answer is logged under $TAG")
+            // The row reports what the installer really did, not that it
+            // was asked: "handed to the installer" read the same after the
+            // person had pressed Cancel (rig, dq-shell2-01).
+            onStatus("Waiting for you to confirm the install in Android's installer...")
+            AppSelfUpdate.awaitOutcome(sessionId, OUTCOME_WAIT_MS)?.let { log(it) }
+                ?: log("$handed; it has not answered yet. If nothing was asked, press Check now again.")
         } catch (error: Exception) {
             log("Update install failed: " + (error.message ?: error.javaClass.simpleName))
         }

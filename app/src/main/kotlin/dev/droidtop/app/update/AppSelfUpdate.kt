@@ -260,12 +260,51 @@ object AppSelfUpdate {
      * failure. The system takes over from the commit: either a silent
      * update where it allows one, or its confirmation UI.
      */
-    fun downloadAndInstall(context: Context, info: Info, onStatus: (String) -> Unit) {
+    fun downloadAndInstall(context: Context, info: Info, onStatus: (String) -> Unit): Int {
+        // Android 8 and later install an app's own download only once the
+        // person has allowed that app under "Install unknown apps"; without
+        // it the installer stops at "not allowed to install unknown apps
+        // from this source" and droidtop never learned why (rig,
+        // dq-shell2-01). Ask first, and open the one screen that fixes it.
+        if (!context.packageManager.canRequestPackageInstalls()) {
+            runCatching {
+                context.startActivity(
+                    Intent(
+                        android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        android.net.Uri.parse("package:" + context.packageName),
+                    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            }
+            throw IllegalStateException(UNKNOWN_APPS_BLOCKED)
+        }
         onStatus("Downloading ${info.versionName}...")
         val apk = download(context, info)
         onStatus("Handing the update to the Android installer...")
-        commitSession(context, apk)
+        return commitSession(context, apk, info)
     }
+
+    /** What the person reads when Android has not allowed droidtop to install its own updates. */
+    const val UNKNOWN_APPS_BLOCKED =
+        "Android has not allowed droidtop to install updates. In the screen that opened (Settings > Apps > " +
+            "Special app access > Install unknown apps > droidtop), turn on \"Allow from this source\", " +
+            "then press Check now again."
+
+    /**
+     * The installer's answer for each session this process committed, so
+     * the Check now row can report what really happened -- installed,
+     * cancelled, refused -- instead of "handed to the installer" after the
+     * person had already cancelled (rig, dq-shell2-01).
+     */
+    private val outcomes = java.util.concurrent.ConcurrentHashMap<Int, java.util.concurrent.CompletableFuture<String>>()
+
+    internal fun reportOutcome(sessionId: Int, message: String) {
+        android.util.Log.i(UpdateNow.TAG, "installer: " + message)
+        outcomes.remove(sessionId)?.complete(message)
+    }
+
+    /** Waits up to [timeoutMs] for the installer's answer on [sessionId]; null when none came. */
+    fun awaitOutcome(sessionId: Int, timeoutMs: Long): String? =
+        runCatching { outcomes[sessionId]?.get(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS) }.getOrNull()
 
     private fun download(context: Context, info: Info): File {
         val directory = File(context.cacheDir, "app-updates").apply { mkdirs() }
@@ -293,7 +332,7 @@ object AppSelfUpdate {
         }
     }
 
-    private fun commitSession(context: Context, apk: File) {
+    private fun commitSession(context: Context, apk: File, info: Info): Int {
         val installer = context.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
             setAppPackageName(context.packageName)
@@ -305,6 +344,8 @@ object AppSelfUpdate {
             }
         }
         val sessionId = installer.createSession(params)
+        outcomes[sessionId] = java.util.concurrent.CompletableFuture()
+        pendingNames[sessionId] = info.versionName + " (build " + info.versionCode + ")"
         installer.openSession(sessionId).use { session ->
             apk.inputStream().use { input ->
                 session.openWrite("droidtop.apk", 0, apk.length()).use { output ->
@@ -317,7 +358,11 @@ object AppSelfUpdate {
                 if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0
             session.commit(PendingIntent.getBroadcast(context, sessionId, intent, flags).intentSender)
         }
+        return sessionId
     }
+
+    /** What each committed session installs, for the outcome sentence. */
+    internal val pendingNames = java.util.concurrent.ConcurrentHashMap<Int, String>()
 
     private fun sha256(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")
@@ -340,19 +385,29 @@ object AppSelfUpdate {
  */
 class AppUpdateStatusReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        when (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
+        val sessionId = intent.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -1)
+        val name = AppSelfUpdate.pendingNames[sessionId] ?: "the update"
+        when (val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                 @Suppress("DEPRECATION")
                 val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT) ?: return
                 confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                runCatching { context.startActivity(confirm) }
+                runCatching { context.startActivity(confirm) }.onFailure {
+                    AppSelfUpdate.reportOutcome(sessionId, "Android's installer could not show its confirmation; $name was not installed.")
+                }
             }
-            PackageInstaller.STATUS_SUCCESS -> Unit
-            else -> android.widget.Toast.makeText(
-                context,
-                intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "Update failed",
-                android.widget.Toast.LENGTH_LONG,
-            ).show()
+            // The process is replaced as this lands; the sentence is for the log.
+            PackageInstaller.STATUS_SUCCESS -> AppSelfUpdate.reportOutcome(sessionId, "Installed $name.")
+            else -> {
+                val message = if (status == PackageInstaller.STATUS_FAILURE_ABORTED) {
+                    "The install was cancelled: $name was not installed. Press Check now to try again."
+                } else {
+                    "Android's installer refused $name: " +
+                        (intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "it gave no reason") + "."
+                }
+                AppSelfUpdate.reportOutcome(sessionId, message)
+                android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+            }
         }
     }
 }

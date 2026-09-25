@@ -807,7 +807,7 @@ object AppSettingsCatalogs {
                             value = update.installedVersionName(context),
                             run = { ctx, onStatus ->
                                 withContext(Dispatchers.IO) {
-                                    dev.droidtop.app.update.UpdateNow.runNow(ctx) { status ->
+                                    dev.droidtop.app.update.UpdateNow.runNow(ctx, waitForOutcome = true) { status ->
                                         onStatus(status)
                                     }
                                 }
