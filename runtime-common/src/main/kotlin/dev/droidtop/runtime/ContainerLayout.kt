@@ -51,11 +51,14 @@ object ContainerLayout {
     const val SHARED_STORAGE_DIR = "/run/droidtop-shared-storage"
 
     /**
-     * Written once the provisioning command has succeeded, holding which
-     * plan it was ([planId]); provisioning runs again whenever the current
-     * plan differs, so a package added to a plan reaches containers made
-     * before it. Package managers skip what is already installed, so a
-     * re-run costs only what changed.
+     * Every plan ([planId]) whose install has completed in this container,
+     * one per line. Provisioning runs when the current plan is not among
+     * them, so a package added to a plan reaches containers made before
+     * it, and switching back to a plan already installed (Printing off,
+     * then on again) costs nothing. It used to hold only the last plan,
+     * so every such switch re-ran the install and announced "first boot"
+     * each time (rig, dq-desk2-02). Package managers skip what is already
+     * installed, so a run costs only what changed.
      */
     const val PROVISIONED_MARKER = "/var/lib/droidtop-provisioned"
 
@@ -138,14 +141,18 @@ object ContainerLayout {
         val plan = planId(provisioning)
         appendLine("#!/bin/sh")
         appendLine("set -e")
-        appendLine("if [ \"$(cat $PROVISIONED_MARKER 2>/dev/null)\" != \"$plan\" ]; then")
-        appendLine("  echo 'droidtop: provisioning the desktop (first boot)'")
+        appendLine("if ! grep -qx $plan $PROVISIONED_MARKER 2>/dev/null; then")
+        appendLine("  if [ -f $PROVISIONED_MARKER ]; then")
+        appendLine("    echo 'droidtop: the desktop setup changed; installing what it needs now'")
+        appendLine("  else")
+        appendLine("    echo 'droidtop: provisioning the desktop (first boot)'")
+        appendLine("  fi")
         appendLine("  if ! { ${provisioning.installCommand}; }; then")
         appendLine("    echo 'droidtop: provisioning failed' >&2")
         appendLine("    exit 1")
         appendLine("  fi")
         appendLine("  mkdir -p ${PROVISIONED_MARKER.substringBeforeLast('/')}")
-        appendLine("  echo $plan > $PROVISIONED_MARKER")
+        appendLine("  echo $plan >> $PROVISIONED_MARKER")
         appendLine("  echo 'droidtop: provisioning finished'")
         appendLine("fi")
         appendLine("mkdir -p $SOCKET_DIR")

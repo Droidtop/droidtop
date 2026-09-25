@@ -15,10 +15,20 @@ class ContainerLayoutTest {
         // `apt-get update`.
         val script = ContainerLayout.primaryInitScript(plan)
         val guard = script.indexOf("if ! { false && true; }; then")
-        val marker = script.indexOf("echo ${ContainerLayout.planId(plan)} > ${ContainerLayout.PROVISIONED_MARKER}")
+        val marker = script.indexOf("echo ${ContainerLayout.planId(plan)} >> ${ContainerLayout.PROVISIONED_MARKER}")
         assertTrue(guard >= 0)
         assertTrue(marker > guard)
         assertTrue(script.substring(guard, marker).contains("exit 1"))
+    }
+
+    @Test
+    fun `a plan already installed is not installed again, and only a first install says first boot`() {
+        val script = ContainerLayout.primaryInitScript(plan)
+        assertTrue(script.contains("if ! grep -qx ${ContainerLayout.planId(plan)} ${ContainerLayout.PROVISIONED_MARKER} 2>/dev/null; then"))
+        val changed = script.indexOf("the desktop setup changed")
+        val firstBoot = script.indexOf("(first boot)")
+        assertTrue(changed in 0 until firstBoot)
+        assertTrue(script.substring(changed, firstBoot).contains("else"))
     }
 
     @Test
