@@ -136,10 +136,10 @@ internal fun PcSurface(
     var sources by remember { mutableStateOf<Set<String>>(emptySet()) }
     var engines by remember { mutableStateOf<Set<String>>(emptySet()) }
     var installedOnly by remember { mutableStateOf(false) }
-    // The card the grid opens on. One requester, moved to whichever card
-    // that is, rather than a second one for the restored case.
-    val openingCard = remember { FocusRequester() }
+    // The grid's D-pad (GridPad): one card per press, and the card the
+    // grid opens on is focused through the same per-card requesters.
     val gridState = rememberLazyGridState()
+    val pad = dev.droidtop.shell.gamepad.rememberGridPad(gridState)
     // The chip row is entered at its start: Up from the grid's top row
     // lands on Sort, the first chip, not on whichever chip happens to sit
     // nearest the card (that was "Installed", and Sort was then reachable
@@ -147,7 +147,6 @@ internal fun PcSurface(
     // 814). Which card is focused, and whether the chip row holds focus,
     // is what the one key handler below needs to know to do that.
     val sortChip = remember { FocusRequester() }
-    var focusedCard by remember { mutableStateOf(-1) }
     var inChips by remember { mutableStateOf(false) }
 
     // "Stores and folders": sign in to a store, add a games folder, set up
@@ -202,7 +201,7 @@ internal fun PcSurface(
         if (openingIndex > 0) runCatching { gridState.scrollToItem(openingIndex) }
         snapshotFlow { gridState.layoutInfo.visibleItemsInfo.any { it.index == openingIndex } }
             .first { it }
-        runCatching { openingCard.requestFocus() }
+        runCatching { pad.requester(openingIndex).requestFocus() }
     }
 
     if (optionsOpen && storesScreen != null) {
@@ -249,16 +248,21 @@ internal fun PcSurface(
                     }
                     direction == null -> false
                     inChips && direction == FocusDirection.Up -> true
+                    inChips && direction == FocusDirection.Down -> {
+                        if (shown.isNotEmpty()) pad.focus(gridState.firstVisibleItemIndex)
+                        true
+                    }
                     inChips -> {
                         focusManager.moveFocus(direction)
                         true
                     }
-                    direction == FocusDirection.Up &&
-                        gridState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == focusedCard }?.row == 0 -> {
+                    direction == FocusDirection.Up && pad.onTopRow -> {
                         runCatching { sortChip.requestFocus() }
                         true
                     }
-                    else -> focusManager.moveFocus(direction)
+                    // Left/Right at the grid's edge stay unhandled: the
+                    // shell's switch-system, as in ES-DE.
+                    else -> pad.move(direction)
                 }
             },
     ) {
@@ -325,10 +329,10 @@ internal fun PcSurface(
                     itemsIndexed(shown, key = { _, entry -> entry.id }) { index, entry ->
                         PcGameCard(
                             entry = entry,
-                            modifier = if (index == openingIndex) Modifier.focusRequester(openingCard) else Modifier,
+                            modifier = Modifier.focusRequester(pad.requester(index)),
                             onOpen = { onOpen(entry) },
                             onFocused = {
-                                focusedCard = index
+                                pad.focused = index
                                 onFocusedEntryChanged(entry)
                             },
                         )
@@ -341,7 +345,7 @@ internal fun PcSurface(
         // shell's: A opens a game here instead of launching it, because a
         // PC game's runner may need setup first and the detail screen is
         // where that is said.
-        PcHints()
+        PcHints(inChips = inChips)
     }
 }
 
@@ -385,11 +389,13 @@ private fun PcHeader(total: Int, shown: Int, entries: List<LibraryEntry>, folder
  * hints off silences this one like every other.
  */
 @Composable
-private fun PcHints() {
+private fun PcHints(inChips: Boolean) {
     if (LocalHelpRowOwner.current != HelpRowOwner.SCREEN) return
     TouchHintBar(
         hints = listOf(
-            GamepadAction.A to "Open",
+            // On a chip A changes the sort or turns a filter on or off; it
+            // opens nothing there (rig, dq-shell2-01).
+            GamepadAction.A to if (inChips) "Choose" else "Open",
             GamepadAction.B to "Back",
             GamepadAction.Y to "Stores and folders",
         ),
