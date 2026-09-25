@@ -20,6 +20,7 @@ import dev.droidtop.runtime.PrimaryProvisioning
 import dev.droidtop.runtime.RootfsImage
 import dev.droidtop.runtime.SharedVolume
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
@@ -59,11 +60,15 @@ import kotlin.concurrent.thread
  * which `:host-bridge` connects to directly.
  *
  * Where the root backend has a running container, this one has processes:
- * a sibling has no init under proot, so "starting" one is a no-op and each
- * [exec] is its own proot session. The PRIMARY's boot script is one
- * long-lived proot process, tracked in [running] (shared by every instance
- * in the app process, so the container manager and the desktop session
- * see the same one).
+ * a sibling has no init under proot, so "starting" one is a no-op
+ * ([siblingsNeedStart] is false) and each [exec] is its own proot session.
+ * The PRIMARY's boot script is one long-lived proot process, tracked in
+ * [running] (shared by every instance in the app process, so the container
+ * manager and the desktop session see the same one). A container is
+ * "running" while any process of it is alive, and stopping one kills every
+ * process it has, found by the environment each carries ([ProotProcesses]),
+ * never through the handle alone: proot ignores SIGTERM, and killing proot
+ * leaves its tracees running.
  *
  * Diagnostics go to logcat under [TAG] and to
  * `<external files>/logs/desktop-container.log`, which is readable on an
@@ -95,6 +100,9 @@ class ProotRuntime(
     private val nativeLibraryDir: String = context.applicationInfo.nativeLibraryDir
     private val rootfsPuller = CraneRootfsPuller({ Crane.binaryPath(context) }, imageStore, ProotRootfsUnpacker(containersDir))
     private val log = ContainerLog(context)
+    private val processes = ProotProcesses()
+
+    override val siblingsNeedStart: Boolean = false
 
     override suspend fun createPrimary(image: RootfsImage, provisioning: PrimaryProvisioning): Container =
         createContainer(PRIMARY_NAME, ContainerRole.PRIMARY, image, provisioning)
@@ -116,6 +124,7 @@ class ProotRuntime(
             val config = Properties()
             config[KEY_ROLE] = role.name
             config[KEY_IMAGE] = image.reference
+            image.digest?.let { config[KEY_DIGEST] = it }
             configOf(name).outputStream().use { config.store(it, "droidtop proot container") }
         }
         provisioning?.let { recordProvisioning(name, it) }
@@ -135,6 +144,10 @@ class ProotRuntime(
     override suspend fun start(container: Container, provisioning: PrimaryProvisioning?, onProgress: (String) -> Unit) {
         requireRootfs(container)
         if (container.role != ContainerRole.PRIMARY) return
+        // Everything of this container, not only a process this instance
+        // started: a compositor left by an earlier stop that did not reach
+        // it, or by an app process that died, would otherwise run beside
+        // the new one (two sways, dq-coordinator-23 F9).
         stopProcess(container.id)
 
         if (provisioning != null) recordProvisioning(container.id, provisioning)
@@ -151,7 +164,7 @@ class ProotRuntime(
         val script = ContainerLayout.primaryInitScript(plan)
         log.line("starting ${container.id}: ${plan.compositorCommand}")
         val process = withContext(Dispatchers.IO) {
-            startSession(rootfsOf(container.id), listOf("/bin/sh", "-c", script), emptyMap(), mergeStderr = true)
+            startSession(container.id, UUID.randomUUID().toString(), listOf("/bin/sh", "-c", script), emptyMap(), mergeStderr = true)
         }
         running[container.id] = process
         val tail = OutputTail()
@@ -201,17 +214,21 @@ class ProotRuntime(
     /**
      * The persisted per-container configs ARE the set of known containers
      * (every create writes one, destroy removes the whole directory);
-     * "running" means a live boot process, which only a started PRIMARY has.
+     * "running" means any live process of the container: the PRIMARY's
+     * boot, or a program running in a sibling.
      */
     override suspend fun listContainers(): List<ContainerInfo> = withContext(Dispatchers.IO) {
         containersDir.listFiles().orEmpty()
             .filter { configOf(it.name).isFile }
             .map { dir ->
-                val role = runCatching { ContainerRole.valueOf(readConfig(dir.name).getProperty(KEY_ROLE)) }
+                val config = runCatching { readConfig(dir.name) }.getOrNull()
+                val role = runCatching { ContainerRole.valueOf(config?.getProperty(KEY_ROLE).orEmpty()) }
                     .getOrDefault(ContainerRole.SIBLING)
                 ContainerInfo(
                     container = Container(dir.name, role, backend, rootfsOf(dir.name).absolutePath),
-                    running = running[dir.name]?.isAlive == true,
+                    running = running[dir.name]?.isAlive == true || processes.ofContainer(dir.name).isNotEmpty(),
+                    image = config?.getProperty(KEY_IMAGE),
+                    digest = config?.getProperty(KEY_DIGEST),
                 )
             }
     }
@@ -221,7 +238,8 @@ class ProotRuntime(
      * waits for it: a GUI program started this way returns when its window
      * closes, as [dev.droidtop.runtime.ContainerTerminal] expects. Output
      * is captured (the tail of each stream, if a program is chatty) and also
-     * logged line by line. Cancelling the caller kills the session.
+     * logged line by line. Cancelling the caller kills the session, every
+     * process of it ([ProotProcesses.killSession]), not proot alone.
      */
     override suspend fun exec(container: Container, command: List<String>, env: Map<String, String>): ContainerExecResult {
         requireRootfs(container)
@@ -231,7 +249,8 @@ class ProotRuntime(
         }
         val name = command.firstOrNull()?.substringAfterLast('/') ?: "exec"
         log.line("exec in ${container.id}: ${command.joinToString(" ")}")
-        val process = withContext(Dispatchers.IO) { startSession(rootfsOf(container.id), command, env, mergeStderr = false) }
+        val sessionId = UUID.randomUUID().toString()
+        val process = withContext(Dispatchers.IO) { startSession(container.id, sessionId, command, env, mergeStderr = false) }
         val stdout = OutputTail(maxLines = CAPTURE_LINES)
         val stderr = OutputTail(maxLines = CAPTURE_LINES)
         val outThread = pump(process.inputStream, "${container.id}/$name") { stdout.add(it) }
@@ -239,7 +258,7 @@ class ProotRuntime(
         val exitCode = try {
             runInterruptible(Dispatchers.IO) { process.waitFor() }
         } catch (t: Throwable) {
-            process.destroyForcibly()
+            withContext(NonCancellable + Dispatchers.IO) { processes.killSession(sessionId) }
             throw t
         }
         runInterruptible(Dispatchers.IO) {
@@ -345,9 +364,11 @@ class ProotRuntime(
     // ---- process plumbing ----
 
     /**
-     * One proot session: [guestCommand] inside [rootfs] as fake root, with
-     * [ContainerLayout]'s directories bound in and a clean environment
-     * ([baseGuestEnvironment], the client environment, then [env]).
+     * One proot session: [guestCommand] inside [containerId]'s rootfs as
+     * fake root, with [ContainerLayout]'s directories bound in and a clean
+     * environment ([baseGuestEnvironment], the client environment, then
+     * [env]). proot and the guest both carry the container and [sessionId]
+     * markers ([ProotProcesses]), which is how the session is ended.
      *
      *  - `--kill-on-exit`: ending the session ends everything it started.
      *  - `--root-id`: uid/gid 0 as far as the guest can tell; a distro's
@@ -361,11 +382,20 @@ class ProotRuntime(
      *    Wayland clients and libwayland itself allocate shared memory
      *    with memfd. proot probes and only steps in when memfd is refused.
      */
-    private fun startSession(rootfs: File, guestCommand: List<String>, env: Map<String, String>, mergeStderr: Boolean): Process {
+    private fun startSession(
+        containerId: String,
+        sessionId: String,
+        guestCommand: List<String>,
+        env: Map<String, String>,
+        mergeStderr: Boolean,
+    ): Process {
+        val rootfs = rootfsOf(containerId)
+        val marker = ProotProcesses.sessionEnvironment(containerId, sessionId)
         val guestEnvironment = LinkedHashMap<String, String>().apply {
             putAll(baseGuestEnvironment)
             putAll(ContainerLayout.clientEnvironment(ContainerLayout.findWaylandSocket(socketsDir)?.name))
             putAll(env)
+            putAll(marker)
         }
         val argv = buildList {
             add(File(nativeLibraryDir, PROOT).absolutePath)
@@ -394,6 +424,7 @@ class ProotRuntime(
         }
         val builder = ProcessBuilder(argv).directory(baseDir).redirectErrorStream(mergeStderr)
         builder.environment().putAll(prootEnvironment())
+        builder.environment().putAll(marker)
         return builder.start()
     }
 
@@ -416,16 +447,19 @@ class ProotRuntime(
             }
         }
 
-    private suspend fun stopProcess(name: String) {
-        val process = running.remove(name) ?: return
-        withContext(Dispatchers.IO) {
-            process.destroy()
-            if (!process.waitFor(STOP_GRACE_S, TimeUnit.SECONDS)) {
-                process.destroyForcibly()
-                process.waitFor(STOP_GRACE_S, TimeUnit.SECONDS)
-            }
-        }
-        log.line("stopped $name")
+    /**
+     * Ends every process of container [name]: the tracked boot session and
+     * anything else carrying its marker, from this app process or an
+     * earlier one. Never cancelled half way: a stop that gives up after
+     * killing proot is the leak this exists to close.
+     */
+    private suspend fun stopProcess(name: String) = withContext(NonCancellable + Dispatchers.IO) {
+        val process = running.remove(name)
+        val found = processes.ofContainer(name)
+        if (process == null && found.isEmpty()) return@withContext
+        val gone = processes.killContainer(name)
+        process?.waitFor(STOP_GRACE_S, TimeUnit.SECONDS)
+        log.line(if (gone) "stopped $name (${found.size} processes)" else "stopping $name: processes still alive after SIGKILL")
     }
 
     private fun canConnect(socket: File): Boolean = try {
@@ -541,6 +575,7 @@ class ProotRuntime(
 
         private const val KEY_ROLE = "role"
         private const val KEY_IMAGE = "image"
+        private const val KEY_DIGEST = "digest"
         private const val KEY_INSTALL = "provision.install"
         private const val KEY_COMPOSITOR = "provision.compositor"
         private const val KEY_DAEMONS = "provision.daemons"

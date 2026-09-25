@@ -70,6 +70,13 @@ enum class ModePiece(vararg owners: Mode) {
     DESKTOP_SECOND_SCREEN(Mode.DESKTOP),
 
     /**
+     * The desktop session (`DesktopSessionService`): the primary container,
+     * its compositor and everything on the desktop. Stopped when Desktop
+     * mode is switched off.
+     */
+    DESKTOP_SESSION(Mode.DESKTOP),
+
+    /**
      * "Open with droidtop" for downloaded programs and packages: it runs
      * them in Desktop mode's Wine environments and containers, so with
      * Desktop off it is not offered to other apps at all.

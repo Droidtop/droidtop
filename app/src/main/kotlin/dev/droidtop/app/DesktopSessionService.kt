@@ -67,11 +67,28 @@ sealed interface DesktopSessionState {
  *
  * [state] is how `:shell-desktop`'s `DesktopShell` and `:app`'s
  * `MainActivity` observe the session.
+ *
+ * The session is Desktop mode's (docs/SPEC.md §3, "Stopping is a stop").
+ * It ends when the person leaves Desktop for Gaming, turns Desktop mode
+ * off, stops the primary in Containers or presses the notification's
+ * Stop, and ending it stops the primary container with everything running
+ * on the desktop, whether it had finished booting or not. It is not
+ * sticky: a process Android killed does not come back as a desktop nobody
+ * opened.
  */
 class DesktopSessionService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    /** The primary being booted, before the session is [DesktopSessionState.Connected]; stopped with the service all the same. */
+    @Volatile
+    private var booting: Pair<ContainerRuntime, Container>? = null
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP) stopSelf()
+        return START_NOT_STICKY
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -90,13 +107,19 @@ class DesktopSessionService : Service() {
         // thread here (audit 2026-09-24, C4: an ANR risk); scope.cancel()
         // below cannot reach it. A session started before it finishes
         // waits for it (see connect).
-        (_stateHolder.value as? DesktopSessionState.Connected)?.let { session ->
-            session.hostBridge.disconnect()
+        // A primary still booting is stopped too: cancelling the boot's
+        // wait alone would leave its compositor coming up with nobody to
+        // stop it.
+        val connected = _stateHolder.value as? DesktopSessionState.Connected
+        connected?.hostBridge?.disconnect()
+        val live = connected?.let { it.runtime to it.container } ?: booting
+        live?.let { (runtime, container) ->
             pendingStop = reaperScope.launch {
-                runCatching { session.runtime.stop(session.container) }
+                runCatching { runtime.stop(container) }
                     .onFailure { android.util.Log.w(TAG, "Stopping primary container on destroy failed", it) }
             }
         }
+        booting = null
         _stateHolder.value = DesktopSessionState.Idle
         sessionScope = null
         // The seat belongs to the bridge that has just gone away. Dropped
@@ -142,6 +165,7 @@ class DesktopSessionService : Service() {
         }
         android.util.Log.i(TAG, "Primary container: ${primary.id}")
 
+        booting = runtime to primary
         try {
             runtime.start(primary, provisioning) { line ->
                 _stateHolder.value = DesktopSessionState.Connecting(line)
@@ -266,15 +290,33 @@ class DesktopSessionService : Service() {
                 NotificationChannel(channelId, "Desktop session", NotificationManager.IMPORTANCE_LOW),
             )
         }
+        val stop = android.app.PendingIntent.getService(
+            this,
+            0,
+            Intent(this, DesktopSessionService::class.java).setAction(ACTION_STOP),
+            android.app.PendingIntent.FLAG_IMMUTABLE,
+        )
         return Notification.Builder(this, channelId)
             .setContentTitle("droidtop desktop")
             .setContentText("Running the shared desktop session")
             .setSmallIcon(android.R.drawable.ic_menu_manage)
+            .addAction(Notification.Action.Builder(null, "Stop", stop).build())
             .build()
     }
 
     companion object {
         private const val TAG = "droidtop.DesktopSession"
+        private const val ACTION_STOP = "dev.droidtop.app.action.STOP_DESKTOP_SESSION"
+
+        /** Starts the desktop session (a no-op while one runs). */
+        fun start(context: android.content.Context) {
+            context.startForegroundService(Intent(context, DesktopSessionService::class.java))
+        }
+
+        /** Ends the desktop session, stopping the primary container and everything on the desktop. */
+        fun stop(context: android.content.Context) {
+            context.stopService(Intent(context, DesktopSessionService::class.java))
+        }
 
         /** Where a destroyed service's container stop runs; process-lifetime, never cancelled. */
         private val reaperScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
