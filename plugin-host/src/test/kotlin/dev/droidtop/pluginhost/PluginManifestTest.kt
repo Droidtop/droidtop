@@ -1,5 +1,6 @@
 package dev.droidtop.pluginhost
 
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -22,13 +23,21 @@ class PluginManifestTest {
         put("origin", origin)
         put("label", "Sample status tile")
         put("kind", kind)
-        put("capabilities", capabilities)
+        // JSONObject.put(String, Object) is what Kotlin resolves for a
+        // List<T> argument (not the Collection overload that would wrap
+        // it), so a bare `put("key", someList)` stores the raw
+        // ArrayList itself rather than a JSONArray -- the production
+        // parser's json.optJSONArray("...") then sees the wrong type and
+        // silently treats the field as absent. Every list-valued field
+        // below is wrapped in JSONArray(...) explicitly so this manifest
+        // actually round-trips the way a real plugin bundle's does.
+        put("capabilities", JSONArray(capabilities))
         put("contractVersion", contractVersion)
-        put("abis", abis)
+        put("abis", JSONArray(abis))
         put("entryClass", entryClass ?: JSONObject.NULL)
         put(
             "payload",
-            payload.map { (path, sha) -> JSONObject().put("path", path).put("sha256", sha) },
+            JSONArray(payload.map { (path, sha) -> JSONObject().put("path", path).put("sha256", sha) }),
         )
     }
 
