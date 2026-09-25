@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -489,12 +490,26 @@ internal fun GamelistOptionsMenu(
     }
 }
 
-/** An action's result: its first line as a title, the rest under it, all of it wrapped and none of it cut. */
+/**
+ * An action's result: its first line as a title, the rest under it, all of
+ * it wrapped and none of it cut. When it appears or changes, the panel
+ * scrolls it wholly into view: a long result below the actions ended
+ * under the panel's bottom edge with nothing saying there was more, and
+ * the fix sentence was in the hidden part (rig, dq-shell2-02, IGDB).
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun ResultText(text: String) {
+    val bringIntoView = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
+    androidx.compose.runtime.LaunchedEffect(text) {
+        // After this text is laid out, so the whole of it is what is shown.
+        androidx.compose.runtime.withFrameNanos { }
+        runCatching { bringIntoView.bringIntoView() }
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .bringIntoViewRequester(bringIntoView)
             .padding(horizontal = Space.Lg, vertical = Space.Md),
         verticalArrangement = Arrangement.spacedBy(Space.Xs),
     ) {
