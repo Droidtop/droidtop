@@ -68,6 +68,9 @@ object ScrapeRefusals {
      */
     private const val ERROR_BODY_MAX_CHARS = 512
 
+    /** The human sentence in a JSON error body, under the keys servers use for it. */
+    private val JSON_REASON = Regex("\"(status|message|error|error_description|reason)\"\\s*:\\s*\"([^\"]{3,})\"")
+
     /**
      * Builds the [ScrapeLookup.Refused] for a connection that answered
      * [status] (anything but 200), logging it under `droidtop.Scraper` with
@@ -123,6 +126,10 @@ object ScrapeRefusals {
         secrets.filter { it.isNotBlank() }.sortedByDescending { it.length }.forEach {
             text = text.replace(it, "[redacted]")
         }
+        // A JSON error body (TheGamesDB's `{"code":403,"status":"Invalid API
+        // key was provided.",...}`) is reduced to its own sentence: the raw
+        // object is not something a person can read (rig, dq-shell2-01).
+        JSON_REASON.find(text)?.let { text = it.groupValues[2] }
         text = text.replace(Regex("<[^>]*>"), " ").replace(Regex("\\s+"), " ").trim()
         if (text.isBlank()) return null
         return if (text.length > 200) text.take(200).trimEnd() + "..." else text
