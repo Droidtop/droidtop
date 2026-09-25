@@ -408,7 +408,10 @@ package from the drawer. It now works like this:
   named "Games" with the count, and a hint row — A Play, Y Pin to home
   screen, Select Game folders, B Back — whose every hint dispatches (§7j).
   Game folders opens in place through the settings navigator, and an empty
-  grid offers "Add a games folder" rather than a sentence.
+  grid offers "Add a games folder" rather than a sentence. It runs in a task
+  of its own (`taskAffinity`), so the icon never brings back another
+  droidtop screen left in the package's shared task, and B from the grid
+  goes home.
 - A tap or A launches through `GameLaunchActivity.dispatch`, which is
   `Library.launch` (play history and launch-screen memory included).
 - Y or a long press pins the game to the home screen as an ordinary icon: a
@@ -5007,6 +5010,10 @@ collection), interval, and a name overlay as their own rows. A on a
 slideshow or video launches the game shown; any other key wakes the
 shell. Android's own display timeout still powers the panel down, and
 the row says the screensaver shows only when its timer is the shorter.
+Holding Select for the Quick Menu is the key event's own repeat count, never
+a count of KeyDowns since the last KeyUp the root saw: the KeyUp of a short
+press is taken by the menu it opens, and the next short press opened the
+Quick Menu behind the gamelist options (rig, dq-shell2-01).
 The setting has one definition (`ScreensaverPrefs`) that the row writes
 and the shell's idle timer OBSERVES: the row lives inside the shell, so a
 value read once at start left a newly chosen timer on Off until the app
@@ -6045,7 +6052,16 @@ before any folder is walked or any request made; every ROM and PC pass, the
 manual match and the picker ask it. A 401 or 403 from a source that takes a
 key or an account adds that same setting to the refusal
 (`ScraperReadiness.credentialFix`); any other refusal (a quota, an outage)
-is not presented as the person's to fix.
+is not presented as the person's to fix. A refusal is counted per request,
+apart from what else then found the game: a ROM the source refused but the
+keyless thumbnails gave a cover is found AND refused, and a source that
+refused every request leads the summary with that refusal and its fix
+whatever the thumbnails found (rig, dq-shell2-01: a wrong key read "found
+1"). A JSON error body is reduced to its own sentence (`status`, `message`,
+`error`), never shown raw. **A result is shown whole**: the options menu
+draws an action's result as wrapped text under the actions, in a panel
+that scrolls, never as a row cut to a line, because the fix is the last
+sentence.
 
 **Not decided here, deliberately:** the cause of the 2026-09-01 403s.
 Credentials were verified present, verified to descramble, and the
@@ -6407,7 +6423,14 @@ grid's top row lands on Sort, the first chip; Left and Right move along
 the chips and never leave the surface (at the grid's own edges they are
 ES-DE's switch-system); one key handler above the chips and the grid owns
 every direction (rig, build 814: Sort was touch-only, and Left from a chip
-opened All games).
+opened All games). **Every card grid moves by index** (`GridPad`): the
+Games section's unthemed grid, this grid and the Launcher's Games grid take
+both edges of a direction and move on the UP edge one card along the row or
+straight down the column, scrolling the next row in first; at an edge they
+answer "not handled" and the screen decides what the edge means. Compose's
+own focus search moved on the DOWN edge as well (two cards per press) and,
+searching geometrically among composed cards, took Down from the second
+column to the first column of a partly visible next row (rig, dq-shell2-01).
 
 A game's actions live on the game's own screen, opened with A, rather
 than in a separate in-context menu over the grid: there is exactly one
