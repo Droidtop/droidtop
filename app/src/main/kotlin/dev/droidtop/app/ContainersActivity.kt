@@ -345,7 +345,13 @@ private fun ContainerRow(
         }
         dev.droidtop.app.vpn.ContainerVpnRow(container.id, runtime?.hostSocketDir(), enabled = actionsEnabled)
         ContainerDevicesRow(runtime, container, enabled = actionsEnabled)
-        if (isPrimary) PrintingRow(enabled = actionsEnabled)
+        if (isPrimary) {
+            PrintingRow(
+                enabled = actionsEnabled,
+                hostSocketDir = runtime?.hostSocketDir(),
+                desktopRunning = session is DesktopSessionState.Connected,
+            )
+        }
     }
 }
 
@@ -355,13 +361,27 @@ private fun ContainerRow(
  * changes the plan, which the next desktop start provisions. Printers are
  * added in CUPS's own web interface, which listens on the device's
  * loopback because a proot container shares the device's network.
+ *
+ * While the desktop runs the row says whether CUPS is actually up, read
+ * from its socket in the shared socket directory: CUPS runs beside the
+ * desktop and never holds it up, so a CUPS that did not start is only
+ * visible here (and in the desktop log), not as a desktop that hangs.
  */
 @Composable
-private fun PrintingRow(enabled: Boolean) {
+private fun PrintingRow(enabled: Boolean, hostSocketDir: java.io.File?, desktopRunning: Boolean) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     var printing by remember { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(Unit) { printing = withContext(Dispatchers.IO) { DesktopSetupPrefs.printing(context) } }
+    var cupsUp by remember { mutableStateOf(false) }
+    LaunchedEffect(desktopRunning, printing, hostSocketDir) {
+        while (desktopRunning && printing == true && hostSocketDir != null) {
+            cupsUp = withContext(Dispatchers.IO) {
+                java.io.File(hostSocketDir, dev.droidtop.runtime.ContainerLayout.CUPS_SOCKET).exists()
+            }
+            kotlinx.coroutines.delay(2_000)
+        }
+    }
     val on = printing ?: return
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -370,15 +390,19 @@ private fun PrintingRow(enabled: Boolean) {
         Column(Modifier.weight(1f)) {
             Text("Printing", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
             Text(
-                if (on) {
-                    "CUPS, for every container. Installed or removed the next time the desktop starts."
-                } else {
-                    "Off. Turn on to install CUPS the next time the desktop starts."
+                when {
+                    on && desktopRunning && cupsUp -> "CUPS is running, for every container."
+                    on && desktopRunning -> "CUPS is not running (yet). The desktop does not wait for it; " +
+                        "if this stays, why is in droidtop's desktop log and in " +
+                        "${dev.droidtop.runtime.ContainerLayout.daemonLog(dev.droidtop.runtime.CompositorProvisioning.PRINTING_DAEMON)} " +
+                        "in the desktop's container."
+                    on -> "CUPS, for every container. Installed or removed the next time the desktop starts."
+                    else -> "Off. Turn on to install CUPS the next time the desktop starts."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (on) {
+            if (on && desktopRunning && cupsUp) {
                 TextButton(onClick = {
                     context.startActivity(
                         android.content.Intent(

@@ -12,9 +12,12 @@ data class PrimaryProvisioning(
     val installCommand: String,
     val compositorCommand: String,
     /**
-     * Daemons the boot script starts before the compositor, each a
-     * command that puts itself in the background (a container has no
-     * service manager to do it). Printing's `cupsd` is the one today.
+     * Daemons the boot script starts before the compositor, each a command
+     * that stays in the FOREGROUND (`cupsd -f`): the script puts it in the
+     * background itself and never waits for it (a container has no service
+     * manager to do it). A daemon's own fork-and-detach is not trusted:
+     * under proot cupsd's never returned and the desktop never started.
+     * Printing's `cupsd` is the one today.
      */
     val daemons: List<String> = emptyList(),
 )
@@ -59,6 +62,9 @@ object CompositorProvisioning {
     /** CUPS's own package name, the same in both distros droidtop provisions. */
     const val PRINTING_PACKAGE = "cups"
 
+    /** cupsd in the foreground (`-f`), which is how [PrimaryProvisioning.daemons] are given. */
+    const val PRINTING_DAEMON = "cupsd -f"
+
     /** Where CUPS's web interface listens: a port an app may bind (Android refuses 631, below 1024). */
     const val PRINTING_WEB_PORT = 6310
 
@@ -88,7 +94,7 @@ object CompositorProvisioning {
             "alpine" -> "${base.installCommand} && apk add --no-cache $PRINTING_PACKAGE"
             else -> return base
         }
-        return base.copy(installCommand = "$install && $CUPS_CONFIGURE", daemons = base.daemons + "cupsd")
+        return base.copy(installCommand = "$install && $CUPS_CONFIGURE", daemons = base.daemons + PRINTING_DAEMON)
     }
 
     private fun basePlan(os: String, desktopEnvironment: String): PrimaryProvisioning? {

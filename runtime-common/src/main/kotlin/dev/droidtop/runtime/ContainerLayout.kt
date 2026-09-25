@@ -151,10 +151,24 @@ object ContainerLayout {
         appendLine("mkdir -p $SOCKET_DIR")
         appendLine("chmod 700 $SOCKET_DIR")
         compositorEnvironment.forEach { (key, value) -> appendLine("export $key=$value") }
-        // Each daemon backgrounds itself; one that fails to start is
-        // reported and the desktop comes up without it.
+        // A daemon never holds up the desktop. Each runs in the foreground
+        // of a background job, its output in its own log, and a watcher
+        // says after DAEMON_CHECK_SECONDS whether it is still running. The
+        // script used to run each one in line and trust it to fork itself
+        // away: under proot cupsd's parent never returned, sway was never
+        // started, and the desktop hung on "provisioning finished" (rig,
+        // dq-desk2-01).
         provisioning.daemons.forEach { daemon ->
-            appendLine("$daemon || echo 'droidtop: $daemon did not start' >&2")
+            val name = daemonName(daemon)
+            val log = daemonLog(daemon)
+            appendLine("mkdir -p ${log.substringBeforeLast('/')}")
+            appendLine("$daemon </dev/null >$log 2>&1 &")
+            appendLine("pid=$!")
+            appendLine("echo \"droidtop: started $name (pid ${'$'}pid)\"")
+            appendLine(
+                "( sleep $DAEMON_CHECK_SECONDS; if kill -0 ${'$'}pid 2>/dev/null; then echo 'droidtop: $name is running'; " +
+                    "else echo \"droidtop: $name stopped: ${'$'}(tail -n 3 $log | tr '\\n' ' ')\" >&2; fi ) </dev/null &",
+            )
         }
         // The compositor creates the socket; a WAYLAND_DISPLAY inherited
         // from the client environment would only name the one it is about
@@ -163,6 +177,15 @@ object ContainerLayout {
         appendLine("echo 'droidtop: starting ${provisioning.compositorCommand}'")
         appendLine("exec ${provisioning.compositorCommand}")
     }
+
+    /** How long after starting a daemon the boot script reports whether it is still running. */
+    const val DAEMON_CHECK_SECONDS = 15
+
+    /** A daemon's name, the program its command runs (`cupsd -f` is `cupsd`). */
+    fun daemonName(daemon: String): String = daemon.trim().substringBefore(' ').substringAfterLast('/')
+
+    /** Where the boot script sends [daemon]'s output inside the primary. */
+    fun daemonLog(daemon: String): String = "/var/log/droidtop/${daemonName(daemon)}.log"
 
     /** Host directory to in-container path, one per volume, for a backend's bind list. */
     fun sharedStorageBinds(volumes: List<SharedVolume>): List<Pair<String, String>> =

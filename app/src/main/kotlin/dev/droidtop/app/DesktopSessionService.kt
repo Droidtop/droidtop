@@ -170,6 +170,10 @@ class DesktopSessionService : Service() {
             runtime.start(primary, provisioning) { line ->
                 _stateHolder.value = DesktopSessionState.Connecting(line)
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // The session was stopped while booting (the notification's
+            // Stop, leaving Desktop): that is not a failure to report.
+            throw e
         } catch (t: Throwable) {
             fail("Couldn't start the primary container: ${t.message}", t)
             return

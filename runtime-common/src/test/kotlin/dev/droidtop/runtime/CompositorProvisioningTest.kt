@@ -69,7 +69,7 @@ class CompositorProvisioningTest {
         assertTrue(on.installCommand.startsWith(off.installCommand))
         assertTrue(on.installCommand.contains("apt-get install -y --no-install-recommends cups"))
         assertTrue(on.installCommand.contains("Listen ${ContainerLayout.SOCKET_DIR}/${ContainerLayout.CUPS_SOCKET}"))
-        assertEquals(listOf("cupsd"), on.daemons)
+        assertEquals(listOf("cupsd -f"), on.daemons)
         assertTrue(off.daemons.isEmpty())
         // A different plan, so a container provisioned without it re-runs.
         assertFalse(ContainerLayout.planId(on) == ContainerLayout.planId(off))
@@ -79,9 +79,20 @@ class CompositorProvisioningTest {
     @Test
     fun `the boot script starts each daemon before the compositor`() {
         val script = ContainerLayout.primaryInitScript(CompositorProvisioning.plan("alpine", "sway", printing = true)!!)
-        val cupsd = script.indexOf("cupsd || echo")
-        assertTrue(cupsd >= 0)
+        val cupsd = script.indexOf("cupsd -f </dev/null >/var/log/droidtop/cupsd.log 2>&1 &")
+        assertTrue(script, cupsd >= 0)
         assertTrue(cupsd < script.indexOf("exec sway"))
         assertEquals("exec sway", script.trimEnd().lines().last())
+    }
+
+    @Test
+    fun `no daemon is waited for before the compositor starts`() {
+        val script = ContainerLayout.primaryInitScript(CompositorProvisioning.plan("alpine", "sway", printing = true)!!)
+        // Every line that runs cupsd, or watches it, is a background job.
+        val jobs = script.substringBefore("exec sway").lines().filter { it.contains("cupsd -f") || it.contains("kill -0") }
+        assertEquals(2, jobs.size)
+        jobs.forEach { line -> assertTrue(line, line.trimEnd().endsWith("&")) }
+        assertTrue(script.contains("droidtop: cupsd is running"))
+        assertTrue(script.contains("droidtop: cupsd stopped"))
     }
 }
