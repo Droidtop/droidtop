@@ -1,7 +1,15 @@
 package dev.droidtop.shell.gamepad.input
 
 import android.view.KeyEvent
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
@@ -37,26 +45,42 @@ fun Modifier.ownPadButtons(onBack: () -> Unit): Modifier = onKeyEvent { event ->
 }
 
 /**
- * The pad's A on a control that is otherwise only clickable. Compose's
- * `clickable` answers Enter and DPAD_CENTER, never BUTTON_A, and a window
- * that owns its pad ([ownPadButtons]) no longer lets Android turn an
- * unhandled A into DPAD_CENTER -- so without this a button a person can
- * see and has focus on ignores the one button that means "yes" (rig,
- * dq-coordinator-24, finding 7: pad A did nothing on onboarding's Welcome).
+ * A control that the pad, a keyboard and a finger all press the same way,
+ * with ONE focus target that can hold the selection in every input mode.
  *
- * Put it AHEAD of the `clickable` in the chain: a key event travels from
- * the focused node up to the root, and `clickable` is the focus target, so
- * a handler written after it is never reached. Only pad buttons are read,
- * so an Enter the `clickable` already handled is not a second click.
+ * Why not `clickable`: in touch mode its focus target refuses focus
+ * (`focusableInNonTouchMode`), so a screen that asks for initial focus on
+ * a touch-mode device gets none, the first pad press only brings the
+ * selection back, and a tapped hint pill dispatches its key into a window
+ * with nothing focused, where it goes nowhere (rig, dq-onboard-01: A had
+ * to be pressed twice on Welcome, the hint pills did nothing, the
+ * tutorial's first A landed on "Skip"). And `clickable` answers Enter and
+ * DPAD_CENTER but never BUTTON_A, which a window that owns its pad
+ * ([ownPadButtons]) no longer lets Android turn into DPAD_CENTER.
+ *
+ * So: the key handler first (a key event travels from the focused node up,
+ * and [focusable] below is that node), then [onFocus] for the selection
+ * ring, then one [focusable], a tap, and button semantics for a screen
+ * reader.
  */
-fun Modifier.padClick(onClick: () -> Unit): Modifier = onKeyEvent { event ->
-    if (event.type == KeyEventType.KeyUp &&
-        KeyEvent.isGamepadButton(event.nativeKeyEvent.keyCode) &&
-        GamepadKeyMap.actionFor(event.key) == GamepadAction.A
-    ) {
-        onClick()
-        true
-    } else {
-        false
+fun Modifier.padSelectable(
+    onFocus: (Boolean) -> Unit = {},
+    onPress: () -> Unit,
+): Modifier = this
+    .onKeyEvent { event ->
+        val key = event.nativeKeyEvent.keyCode
+        val confirms = if (KeyEvent.isGamepadButton(key)) {
+            GamepadKeyMap.actionFor(event.key) == GamepadAction.A
+        } else {
+            key == KeyEvent.KEYCODE_ENTER || key == KeyEvent.KEYCODE_DPAD_CENTER || key == KeyEvent.KEYCODE_NUMPAD_ENTER
+        }
+        if (confirms && event.type == KeyEventType.KeyUp) onPress()
+        confirms
     }
-}
+    .onFocusChanged { onFocus(it.isFocused) }
+    .focusable()
+    .semantics {
+        role = Role.Button
+        onClick { onPress(); true }
+    }
+    .pointerInput(onPress) { detectTapGestures(onTap = { onPress() }) }
