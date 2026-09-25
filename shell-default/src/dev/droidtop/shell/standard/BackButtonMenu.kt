@@ -5,31 +5,39 @@ import android.app.AlertDialog
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import dev.droidtop.library.settings.Mode
 import dev.droidtop.library.settings.Modes
 
 /**
- * droidtop's shell switcher — Android, Desktop, Gaming, or Settings.
- * Shown from a long-press of the back key (`Activity.onKeyLongPress(
- * KeyEvent.KEYCODE_BACK, ...)`), not a plain back press: a plain press must
- * keep doing its normal job (closing all-apps/a folder in Standard,
- * whatever the current shell's own back handling does) in every shell, not
- * just when nothing else is open. Wired into both
- * com.android.launcher3.Launcher (this module) and dev.droidtop.app.
- * MainActivity (:app, which hosts the Desktop/Gaming shells) so the same
- * menu is reachable from anywhere, not just the home screen.
+ * droidtop's mode switcher — Android, Desktop, Gaming, or Settings.
  *
- * Note: long-press-of-back reliably fires on hardware back keys and
- * 3-button navigation (the standard Android onKeyLongPress mechanism); on
- * gesture navigation, whether a held back-swipe reaches onKeyLongPress at
- * all is OS-version/OEM-dependent and hasn't been verified against a real
- * device here — worth confirming on the actual Retroid Pocket 5 rather than
- * assumed to definitely work.
+ * One switcher, several ways to open it, so no mode is reachable only by a
+ * gesture a newcomer cannot see (docs/SPEC.md 2c, "Switching modes"):
+ *
+ * - a long-press of the back key (`Activity.onKeyLongPress(
+ *   KeyEvent.KEYCODE_BACK, ...)`) in the launcher and in `MainActivity`;
+ * - the Android home screen's own long-press menu ("droidtop modes");
+ * - the Gaming Quick Menu's System tab ("Switch mode");
+ * - the Desktop taskbar ("Modes");
+ * - droidtop's games screen, when it is the only droidtop surface on.
+ *
+ * All but the first open it through [ModeSwitcher.open], which hosts it in
+ * [ModeSwitcherActivity] so a surface with no Activity of its own to hand
+ * (a settings catalog row, a Compose screen in another module) opens the
+ * same dialog.
+ *
+ * The long press stays because it is the one route from anywhere, but on
+ * its own it failed the rig: BlueStacks never delivers a long-pressed Back,
+ * and a newcomer is never told it exists (dq-coordinator-24, finding 3).
+ * On gesture navigation, whether a held back-swipe reaches onKeyLongPress
+ * at all is OS-version/OEM-dependent.
  */
 object BackButtonMenu {
     private const val APP_MAIN_ACTIVITY = "dev.droidtop.app.MainActivity"
     private const val STANDARD_LAUNCHER_ACTIVITY = "com.android.launcher3.Launcher"
     private const val ALTERNATIVE_LAUNCHER_ACTIVITY = "dev.droidtop.shell.standard.AlternativeLauncherActivity"
+    private const val GLOBAL_SETTINGS_FRAGMENT = "app.murinelauncher.settings.SettingsGlobalFragment"
     const val EXTRA_MODE = "dev.droidtop.app.EXTRA_MODE"
 
     // Real, deep-link-only extras used by SettingsGamingFragment (same
@@ -72,44 +80,50 @@ object BackButtonMenu {
      * "Android" is only offered when droidtop actually holds a HOME role
      * (see [HomeRolePrefs]) — a user who chose "neither" during onboarding
      * has nothing for this entry to point to, so it's hidden rather than
-     * shown broken.
+     * shown broken. A mode that is off is not listed; "Settings" opens
+     * Global settings, where every mode is switched on and off, so turning
+     * a mode off is always reversible from here (dq-coordinator-23, F5: it
+     * used to open the launcher's Home settings, which have no Modes, and
+     * recovering Gaming took a data clear).
      */
     @JvmStatic
-    fun show(activity: Activity) {
+    @JvmOverloads
+    fun show(activity: Activity, onDismiss: (() -> Unit)? = null) {
         val homeImplementation = HomeRolePrefs.activeHomeImplementation(activity)
         val items = buildList {
-            if (homeImplementation != HomeRolePrefs.HomeImplementation.NONE) add("Android")
-            // Real, user-configurable per-mode enable/disable (Global
-            // settings, see Modes's own doc comment) --
-            // a disabled mode's own entry is hidden entirely, not shown
-            // greyed out, matching how "Android" above is already hidden
-            // (not disabled-looking) when droidtop holds no HOME role.
+            if (homeImplementation != HomeRolePrefs.HomeImplementation.NONE) add(Mode.LAUNCHER.label)
             if (Modes.isEnabled(Mode.DESKTOP)) add(Mode.DESKTOP.label)
             if (Modes.isEnabled(Mode.GAMING)) add(Mode.GAMING.label)
-            add("Settings")
+            add(SETTINGS_ITEM)
         }
         // DroidtopDialog: the same dark chrome palette as DroidtopTheme
         // (docs/SPEC.md section 2a chrome theming). This menu used to
         // render in the stock AlertDialog look, visually unrelated to
         // every other droidtop surface.
         AlertDialog.Builder(activity, com.android.launcher3.R.style.DroidtopDialog)
+            .setTitle("Switch mode")
             .setItems(items.toTypedArray()) { _, which ->
                 when (items[which]) {
-                    "Android" -> openHome(activity, homeImplementation)
+                    Mode.LAUNCHER.label -> openHome(activity, homeImplementation)
                     Mode.DESKTOP.label -> launchAppMode(activity, Mode.DESKTOP)
                     Mode.GAMING.label -> launchAppMode(activity, Mode.GAMING)
-                    "Settings" -> launchSettings(activity)
+                    SETTINGS_ITEM -> openGlobalSettings(activity)
                 }
             }
+            .setOnDismissListener { onDismiss?.invoke() }
             .show()
     }
 
+    /** Names the screen it opens: Global settings is where the modes live. */
+    private const val SETTINGS_ITEM = "Modes and settings"
+
     /**
      * Opens the Android home screen droidtop holds -- its own launcher, or
-     * the one "Alternative" forwards to -- and records it as the last mode,
-     * so the launcher's own last-mode redirect does not bounce straight
-     * back into a shell. The one way into Launcher mode: this menu's
-     * "Android" and the end of onboarding both come here.
+     * the one "Alternative" forwards to -- and records it as the last mode.
+     * The one way into Launcher mode: this menu's "Android" and the end of
+     * onboarding both come here. The intent names the mode explicitly, so
+     * the home activity shows itself instead of forwarding to the default
+     * mode the way a Home press does ([Modes.homeTarget]).
      */
     fun openHome(context: Context, implementation: HomeRolePrefs.HomeImplementation) {
         val activityName = when (implementation) {
@@ -120,10 +134,19 @@ object BackButtonMenu {
         Modes.setLastMode(context, Mode.LAUNCHER)
         val intent = Intent(Intent.ACTION_MAIN).apply {
             component = ComponentName(context.packageName, activityName)
+            putExtra(EXTRA_MODE, Mode.LAUNCHER.id)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)
     }
+
+    /**
+     * Whether [intent] is an explicit request for the Android home screen
+     * ([openHome]) rather than a Home press, which goes wherever
+     * [Modes.homeTarget] says.
+     */
+    @JvmStatic
+    fun isExplicitHome(intent: Intent?): Boolean = intent?.getStringExtra(EXTRA_MODE) == Mode.LAUNCHER.id
 
     private fun launchAppMode(activity: Activity, mode: Mode) {
         Modes.setLastMode(activity, mode)
@@ -135,9 +158,42 @@ object BackButtonMenu {
         activity.startActivity(intent)
     }
 
-    private fun launchSettings(activity: Activity) {
-        activity.startActivity(
-            Intent(activity, com.android.launcher3.settings.SettingsActivity::class.java),
+    /** Global settings, on the settings surface every mode shares. */
+    @JvmStatic
+    fun openGlobalSettings(context: Context) {
+        context.startActivity(
+            Intent(Intent.ACTION_MAIN).apply {
+                component = ComponentName(context.packageName, "com.android.launcher3.settings.SettingsActivity")
+                putExtra(":settings:fragment", GLOBAL_SETTINGS_FRAGMENT)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
         )
+    }
+}
+
+/** Opens the mode switcher from anywhere; see [BackButtonMenu]. */
+object ModeSwitcher {
+    const val ACTIVITY = "dev.droidtop.shell.standard.ModeSwitcherActivity"
+
+    @JvmStatic
+    fun open(context: Context) {
+        context.startActivity(
+            Intent(Intent.ACTION_MAIN).apply {
+                component = ComponentName(context.packageName, ACTIVITY)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+        )
+    }
+}
+
+/**
+ * Hosts [BackButtonMenu] for a caller with no Activity of its own to show
+ * a dialog from. Translucent: the dialog appears over whatever was on
+ * screen, and the activity goes when the dialog does.
+ */
+class ModeSwitcherActivity : Activity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        BackButtonMenu.show(this) { finish() }
     }
 }

@@ -53,6 +53,7 @@ object GamingSettingsCatalog {
     const val ID_SYSTEM_BLUETOOTH = "pref_gaming_system_bluetooth"
     const val ID_SYSTEM_VPN = "pref_gaming_system_vpn"
     const val ID_SYSTEM_LEAVE_UI_MODE = "pref_gaming_system_leave_ui_mode"
+    const val ID_SYSTEM_SWITCH_MODE = "pref_gaming_system_switch_mode"
     const val ID_SYSTEM_DND = "pref_gaming_system_dnd"
     const val ID_SYSTEM_DND_GRANT = "pref_gaming_system_dnd_grant"
     const val ID_SYSTEM_ADAPTIVE = "pref_gaming_system_adaptive"
@@ -331,6 +332,18 @@ object GamingSettingsCatalog {
                 }
                 val noInternet = status.network != dev.droidtop.runtime.systemstatus.NetworkKind.NONE &&
                     !status.validated
+                // The mode switcher, first: the Quick Menu is where a
+                // person in Gaming looks for "get me out of here", and the
+                // only other route was a long-press of Back that nothing
+                // names (rig, dq-coordinator-24, stuck moments).
+                add(
+                    ActionItem(
+                        id = ID_SYSTEM_SWITCH_MODE,
+                        title = "Switch mode",
+                        subtitle = "The Android home screen, Desktop, or droidtop's modes and settings",
+                        run = launchComponent("dev.droidtop.shell.standard.ModeSwitcherActivity"),
+                    ),
+                )
                 add(
                     ActionItem(
                         id = ID_SYSTEM_NETWORK,

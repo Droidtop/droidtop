@@ -352,6 +352,11 @@ private fun BoxScope.Taskbar(
         Button(onClick = { openContainers(context) }, modifier = Modifier.padding(horizontal = 8.dp)) {
             Text("Containers")
         }
+        // The mode switcher, by name: Desktop's only other route to the
+        // Android home or Gaming was a long-press of Back (SPEC 2c).
+        Button(onClick = { openModes(context) }, modifier = Modifier.padding(horizontal = 8.dp)) {
+            Text("Modes")
+        }
         Button(onClick = { openSettings(context) }, modifier = Modifier.padding(horizontal = 8.dp)) {
             Text("Settings")
         }
@@ -475,6 +480,14 @@ private object DesktopPrefs {
 private fun openContainers(context: Context) {
     val intent = Intent("dev.droidtop.app.action.CONTAINERS").apply {
         setPackage(context.packageName)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    context.startActivity(intent)
+}
+
+private fun openModes(context: Context) {
+    val intent = Intent(Intent.ACTION_MAIN).apply {
+        component = ComponentName(context.packageName, "dev.droidtop.shell.standard.ModeSwitcherActivity")
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
     context.startActivity(intent)

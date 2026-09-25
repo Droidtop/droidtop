@@ -77,6 +77,21 @@ object HomeRolePrefs {
             .getString(KEY_ALTERNATIVE_TARGET, null)
             ?.let { ComponentName.unflattenFromString(it) }
 
+    /**
+     * Puts droidtop's one icon on droidtop's own home screen, through the
+     * launcher's own install queue (the path a newly installed app's icon
+     * takes), so the way into Gaming or Desktop is on the screen the person
+     * lands on rather than only in the drawer (docs/SPEC.md 2c). The queue
+     * places it the next time the home screen is shown and skips an icon
+     * that is already there.
+     */
+    fun placeDroidtopIcon(context: Context) {
+        runCatching {
+            com.android.launcher3.model.ItemInstallQueue.INSTANCE.get(context)
+                .queueItem(context.packageName, android.os.Process.myUserHandle())
+        }.onFailure { android.util.Log.w("droidtop.HomeRole", "Could not queue droidtop's icon", it) }
+    }
+
     fun setAlternativeTarget(context: Context, component: ComponentName) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
             .putString(KEY_ALTERNATIVE_TARGET, component.flattenToString())

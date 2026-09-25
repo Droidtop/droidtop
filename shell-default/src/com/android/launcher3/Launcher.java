@@ -447,6 +447,9 @@ public class Launcher extends StatefulActivity<LauncherState>
     // consumed in onStart -- see onStart's own comment for why the actual
     // redirect can't happen from inside onCreate itself.
     private String mDroidtopPendingModeRedirect;
+    // droidtop patch: set in onCreate, consumed in onStart, like the mode
+    // redirect above -- resumes unfinished onboarding over this home screen.
+    private boolean mDroidtopResumeOnboarding;
     // Double-tap-home window tracking for the hard display reinit (see
     // onNewIntent). Static: home presses span onNewIntent calls.
     private static long sDroidtopLastHomePressMs = 0L;
@@ -468,11 +471,21 @@ public class Launcher extends StatefulActivity<LauncherState>
         // on -- see onStart for why. See dev.droidtop.shell.standard.
         // Modes's own doc comment for the follow-up this closes out
         // (auto-redirect was deliberately deferred, then asked for
-        // explicitly).
-        if (savedInstanceState == null && isTaskRoot()) {
-            String lastMode = dev.droidtop.library.settings.Modes.lastMode(this);
-            if (!dev.droidtop.library.settings.Mode.LAUNCHER.getId().equals(lastMode)) {
-                mDroidtopPendingModeRedirect = lastMode;
+        // explicitly). Where it redirects is Modes.homeTarget: the default
+        // mode the person chose, else the last one used (SPEC 2c). An
+        // explicit "Android" (BackButtonMenu.openHome) never redirects.
+        if (savedInstanceState == null && isTaskRoot()
+                && !dev.droidtop.shell.standard.BackButtonMenu.isExplicitHome(getIntent())) {
+            if (!dev.droidtop.shell.standard.OnboardingGate.isComplete(this)) {
+                // Unfinished setup wins over every mode (SPEC 7b): becoming
+                // the Home app mid-onboarding used to draw this home screen
+                // over it with nothing saying setup was unfinished.
+                mDroidtopResumeOnboarding = true;
+            } else {
+                String target = dev.droidtop.library.settings.Modes.homeTarget(this);
+                if (!dev.droidtop.library.settings.Mode.LAUNCHER.getId().equals(target)) {
+                    mDroidtopPendingModeRedirect = target;
+                }
             }
         }
         mIsReCreated = true;
@@ -1230,6 +1243,12 @@ public class Launcher extends StatefulActivity<LauncherState>
             startActivity(redirect);
             finish();
         }
+        if (mDroidtopResumeOnboarding) {
+            // Not finished: this stays the home screen underneath, and the
+            // next Home press brings setup back again (onNewIntent).
+            mDroidtopResumeOnboarding = false;
+            dev.droidtop.shell.standard.OnboardingGate.resumeIfUnfinished(this, true);
+        }
 
         TraceHelper.INSTANCE.beginSection(ON_START_EVT);
         super.onStart();
@@ -1781,7 +1800,18 @@ public class Launcher extends StatefulActivity<LauncherState>
         // screens" gesture. The reinit deliberately leaves any app the
         // user launched onto a display alone (see MainActivity's parked-
         // display handling).
-        if (Intent.ACTION_MAIN.equals(intent.getAction())) {
+        //
+        // Where it forwards is Modes.homeTarget -- the default mode the
+        // person chose, else the last one used -- not the last one alone:
+        // "Opens into Android" followed by one visit to Gaming used to make
+        // every later Home press land in Gaming (rig, dq-coordinator-24).
+        // An explicit "Android" from the mode switcher shows this screen.
+        // Unfinished onboarding comes before all of it (SPEC 7b).
+        if (Intent.ACTION_MAIN.equals(intent.getAction())
+                && !dev.droidtop.shell.standard.BackButtonMenu.isExplicitHome(intent)) {
+            if (dev.droidtop.shell.standard.OnboardingGate.resumeIfUnfinished(this, true)) {
+                return;
+            }
             // Double-tap detection: two HOME presses within the window is
             // the HARD display reinit (re-assert droidtop on BOTH
             // displays regardless of what runs on them -- per direction);
@@ -1790,11 +1820,11 @@ public class Launcher extends StatefulActivity<LauncherState>
             long nowMs = android.os.SystemClock.elapsedRealtime();
             boolean doubleTap = nowMs - sDroidtopLastHomePressMs < 600;
             sDroidtopLastHomePressMs = nowMs;
-            String droidtopLastMode = dev.droidtop.library.settings.Modes.lastMode(this);
-            if (!dev.droidtop.library.settings.Mode.LAUNCHER.getId().equals(droidtopLastMode)) {
+            String droidtopHomeTarget = dev.droidtop.library.settings.Modes.homeTarget(this);
+            if (!dev.droidtop.library.settings.Mode.LAUNCHER.getId().equals(droidtopHomeTarget)) {
                 Intent redirect = new Intent(Intent.ACTION_MAIN);
                 redirect.setClassName(getPackageName(), "dev.droidtop.app.MainActivity");
-                redirect.putExtra(dev.droidtop.shell.standard.BackButtonMenu.EXTRA_MODE, droidtopLastMode);
+                redirect.putExtra(dev.droidtop.shell.standard.BackButtonMenu.EXTRA_MODE, droidtopHomeTarget);
                 redirect.putExtra(dev.droidtop.shell.standard.BackButtonMenu.EXTRA_DISPLAY_REINIT, true);
                 if (doubleTap) {
                     redirect.putExtra(dev.droidtop.shell.standard.BackButtonMenu.EXTRA_DISPLAY_REINIT_FORCE, true);

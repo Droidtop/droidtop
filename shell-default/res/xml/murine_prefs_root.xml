@@ -19,6 +19,17 @@
     xmlns:launcher="http://schemas.android.com/apk/res-auto"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <!-- droidtop: Global settings as the first row, where the modes are
+         switched on and off. It was only an unlabelled action-bar icon,
+         and the rig found no way back to Modes after turning Gaming off
+         (dq-coordinator-23, F5). The action-bar item stays for the other
+         settings screens. -->
+    <Preference
+        android:icon="@drawable/ic_settings_general"
+        android:title="@string/pref_global_settings_title"
+        android:summary="@string/pref_global_settings_desc"
+        android:fragment="app.murinelauncher.settings.SettingsGlobalFragment"/>
+
     <Preference
         android:icon="@drawable/ic_settings_general"
         android:title="@string/pref_category_general_title"
@@ -49,13 +60,6 @@
         android:title="@string/pref_category_misc_title"
         android:summary="@string/pref_category_misc_desc"
         android:fragment="app.murinelauncher.settings.SettingsMiscFragment"/>
-
-    <!-- Real, deliberate absence: "Global settings" is a real, persistent
-         action-bar item on every SettingsActivity screen now (see
-         SettingsActivity.java's own onCreateOptionsMenu), not a row
-         here: it's genuinely separate from any one screen's own real
-         settings list, General/Icons/Home/Drawer/QSB/Misc above
-         included. -->
 
     <PreferenceCategory android:title="@string/pref_subcategory_other_shells">
         <Preference

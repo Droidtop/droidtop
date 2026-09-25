@@ -44,8 +44,9 @@ public class AppFilter {
     public boolean shouldShowApp(ComponentName app, boolean retainSearchable) {
         if (mFilteredComponents.contains(app)) return false;
         // droidtop patch (not upstream Murine/Launcher3): droidtop's own
-        // package is hidden except for its Games screen, which is how
-        // Launcher mode shows the library (docs/SPEC.md, "Launcher mode").
+        // package is hidden except for its one icon, which opens setup,
+        // Gaming or Desktop, or the library's games when both are off
+        // (docs/SPEC.md 2c, "One droidtop icon").
         if (SettingsHiddenAppsFragment.HIDE_SELF && app.getPackageName().equals(mContext.getPackageName())
                 && !LAUNCHER_GAMES_ACTIVITY.equals(app.getClassName())) return false;
         return !HiddenAppsRepository.isHidden(mContext, app) || (retainSearchable && HiddenAppsRepository.isSearchHiddenAppsEnabled(mContext));

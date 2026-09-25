@@ -8,6 +8,4 @@
          `aapt dump badging`. A distinct name avoids the resource-name
          collision entirely rather than fighting it. -->
     <string name="droidtop_app_name">droidtop</string>
-    <!-- The Launcher mode drawer icon that opens the library's games (LauncherGamesActivity). -->
-    <string name="launcher_games_label">Games</string>
 </resources>

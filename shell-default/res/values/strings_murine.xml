@@ -171,4 +171,7 @@
     <string name="pref_droidtop_home_screen_desc">Choose whether droidtop\'s own launcher, a different installed launcher, or neither owns your home screen</string>
     <string name="pref_restart_title">Restart</string>
     <string name="pref_restart_summary">Restart the launcher</string>
+    <!-- droidtop: the home screen's long-press menu entry that opens the mode switcher (BackButtonMenu). -->
+    <string name="droidtop_modes_option">droidtop modes</string>
+    <string name="pref_global_settings_desc">Modes, your home screen, setup and the tutorial</string>
 </resources>

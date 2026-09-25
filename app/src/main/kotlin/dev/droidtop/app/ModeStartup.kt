@@ -76,11 +76,6 @@ object ModeStartup {
             }.start()
         }
 
-        // The drawer icon into the shells (an activity-alias of
-        // MainActivity). With Gaming and Desktop both off it would open
-        // MainActivity onto nothing, so it is not offered.
-        setComponentEnabled(app, APP_SHELLS_ICON, on(ModePiece.APP_SHELLS_ICON))
-
         // Other apps' "Open with" lists offer droidtop only while Desktop
         // mode, which runs what it opens, is on.
         setComponentEnabled(app, OpenWithActivity::class.java.name, on(ModePiece.DESKTOP_OPEN_WITH))
@@ -94,9 +89,6 @@ object ModeStartup {
 
         if (on(ModePiece.WINDOWS_BACKBONE)) ensureGamenative(app)
     }
-
-    /** Declared in `:app`'s manifest; see [ModePiece.APP_SHELLS_ICON]. */
-    private const val APP_SHELLS_ICON = "dev.droidtop.app.OpenShells"
 
     /**
      * The warm pass is one-way: once the cache is loaded it stays loaded,

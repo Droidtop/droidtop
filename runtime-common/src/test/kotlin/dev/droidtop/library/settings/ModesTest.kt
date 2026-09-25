@@ -84,10 +84,25 @@ class ModesTest {
     }
 
     @Test
-    fun `the shells icon is offered only while a shell it could open is on`() {
-        assertTrue(ModePiece.APP_SHELLS_ICON in ModeGate.piecesToStart(setOf(Mode.GAMING)))
-        assertTrue(ModePiece.APP_SHELLS_ICON in ModeGate.piecesToStart(setOf(Mode.DESKTOP)))
-        assertFalse(ModePiece.APP_SHELLS_ICON in ModeGate.piecesToStart(setOf(Mode.LAUNCHER)))
+    fun `home goes to the chosen default, not to the mode used last`() {
+        val all = setOf(Mode.LAUNCHER, Mode.GAMING, Mode.DESKTOP)
+        // "Opens into Android", then Gaming opened once (rig, dq-coordinator-24).
+        assertEquals(Mode.LAUNCHER, ModeGate.homeTarget("standard", "gaming", all))
+        assertEquals(Mode.GAMING, ModeGate.homeTarget("gaming", "standard", all))
+    }
+
+    @Test
+    fun `home follows the last mode only when no default was chosen`() {
+        val all = setOf(Mode.LAUNCHER, Mode.GAMING, Mode.DESKTOP)
+        assertEquals(Mode.GAMING, ModeGate.homeTarget(null, "gaming", all))
+        assertEquals(Mode.LAUNCHER, ModeGate.homeTarget(null, null, all))
+    }
+
+    @Test
+    fun `home never forwards into a mode that is off`() {
+        val launcherOnly = setOf(Mode.LAUNCHER)
+        assertEquals(Mode.LAUNCHER, ModeGate.homeTarget("gaming", "desktop", launcherOnly))
+        assertEquals(Mode.DESKTOP, ModeGate.homeTarget("gaming", "desktop", setOf(Mode.DESKTOP)))
     }
 
     @Test

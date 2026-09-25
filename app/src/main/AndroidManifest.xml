@@ -120,9 +120,9 @@
           screen, Desktop/Gaming/Settings are reached through its
           back-button menu (see dev.droidtop.shell.standard.BackButtonMenu,
           patched into Launcher.onBackPressed()) launching this Activity by
-          explicit Intent with an EXTRA_MODE extra. A person whose Home is
-          another launcher, or none, has no such menu, so the OpenShells
-          alias below is droidtop's icon in that launcher's drawer.
+          explicit Intent with an EXTRA_MODE extra. droidtop's one drawer
+          icon (LauncherGamesActivity, below) opens it too, in every
+          launcher including droidtop's own.
         -->
         <!--
           configChanges: without this, a real rotation (confirmed live via
@@ -143,31 +143,12 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|navigation" />
 
         <!--
-          droidtop's own drawer icon, for a device whose Home is another
-          launcher or none (docs/SPEC.md 7b, "Home screen"): it opens
-          MainActivity with no mode named, so the default or last-used mode
-          opens. ModeStartup disables it while Gaming and Desktop are both
-          off, when it would open onto nothing. droidtop's own launcher
-          hides it (AppFilter hides droidtop's package except Games), where
-          the back-button menu is the route instead.
-        -->
-        <activity-alias
-            android:name="dev.droidtop.app.OpenShells"
-            android:targetActivity="dev.droidtop.app.MainActivity"
-            android:exported="true"
-            android:label="@string/droidtop_app_name">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <!--
           Started by dev.droidtop.shell.standard.OnboardingGate (:shell-default,
           via explicit component name; see that class's own doc comment for
-          why not a typed Intent) on first launch only. Every caller is
-          inside this APK, so it is not exported: another app has no
-          business walking the user into droidtop's setup screens.
+          why not a typed Intent) from every droidtop entry point while setup
+          is unfinished. Every caller is inside this APK, so it is not
+          exported: another app has no business walking the user into
+          droidtop's setup screens.
         -->
         <activity
             android:name="dev.droidtop.app.OnboardingActivity"
@@ -193,18 +174,20 @@
         </activity>
 
         <!--
-          Launcher mode's view of the library: the Games icon in the app
-          drawer (docs/SPEC.md, "Launcher mode"). The package's one
-          always-enabled MAIN/LAUNCHER activity, which is also what lets a
+          droidtop's ONE drawer icon, in every launcher including droidtop's
+          own (docs/SPEC.md 2c, "One droidtop icon"). It resumes unfinished
+          onboarding, else opens Gaming or Desktop through MainActivity, else
+          (both off) draws the library's games itself. The package's one
+          MAIN/LAUNCHER activity, always enabled, which is also what lets a
           game be pinned to the home screen at all: the platform attributes
-          a pinned shortcut to a launcher activity of its package and
-          refuses one from a package that has none. Not a way into
-          MainActivity; that is the OpenShells alias above.
+          a pinned shortcut to a launcher activity of its package and refuses
+          one from a package that has none. The class keeps its old name
+          because every pinned game names it.
         -->
         <activity
             android:name="dev.droidtop.app.LauncherGamesActivity"
             android:exported="true"
-            android:label="@string/launcher_games_label"
+            android:label="@string/droidtop_app_name"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|navigation">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

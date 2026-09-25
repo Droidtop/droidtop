@@ -35,3 +35,28 @@ fun Modifier.ownPadButtons(onBack: () -> Unit): Modifier = onKeyEvent { event ->
     if (event.type == KeyEventType.KeyUp && GamepadKeyMap.actionFor(event.key) == GamepadAction.B) onBack()
     true
 }
+
+/**
+ * The pad's A on a control that is otherwise only clickable. Compose's
+ * `clickable` answers Enter and DPAD_CENTER, never BUTTON_A, and a window
+ * that owns its pad ([ownPadButtons]) no longer lets Android turn an
+ * unhandled A into DPAD_CENTER -- so without this a button a person can
+ * see and has focus on ignores the one button that means "yes" (rig,
+ * dq-coordinator-24, finding 7: pad A did nothing on onboarding's Welcome).
+ *
+ * Put it AHEAD of the `clickable` in the chain: a key event travels from
+ * the focused node up to the root, and `clickable` is the focus target, so
+ * a handler written after it is never reached. Only pad buttons are read,
+ * so an Enter the `clickable` already handled is not a second click.
+ */
+fun Modifier.padClick(onClick: () -> Unit): Modifier = onKeyEvent { event ->
+    if (event.type == KeyEventType.KeyUp &&
+        KeyEvent.isGamepadButton(event.nativeKeyEvent.keyCode) &&
+        GamepadKeyMap.actionFor(event.key) == GamepadAction.A
+    ) {
+        onClick()
+        true
+    } else {
+        false
+    }
+}

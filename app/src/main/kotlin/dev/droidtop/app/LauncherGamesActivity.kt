@@ -1,6 +1,7 @@
 package dev.droidtop.app
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -20,7 +21,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryKinds
 import dev.droidtop.library.scanFollowingGamesRoots
+import dev.droidtop.library.settings.Mode
+import dev.droidtop.library.settings.Modes
 import dev.droidtop.shell.gamepad.LauncherGamesScreen
+import dev.droidtop.shell.standard.OnboardingGate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,30 +35,52 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Launcher mode's view of the library (docs/SPEC.md, "Launcher mode"): the
- * "Games" icon in the app drawer opens a grid of every game the shared
- * library holds, drawn by the shell's own [LauncherGamesScreen] so it is
- * recognisably droidtop's; A or a tap plays, Y or a long press pins the
- * game to the home screen as an ordinary icon.
+ * droidtop's ONE icon in a launcher's app drawer, droidtop's own launcher
+ * included (docs/SPEC.md 2c, "One droidtop icon").
+ *
+ * What a tap does depends on what is set up, so the icon is never a
+ * second way to reach something else and never a dead end:
+ *
+ * - setup unfinished: onboarding, at the step it was on ([OnboardingGate]);
+ * - Gaming or Desktop on: that shell, through [MainActivity], which opens
+ *   the default or last-used mode like any other entry into it;
+ * - both off: Launcher mode's view of the library, drawn by the shell's
+ *   own [LauncherGamesScreen]; A or a tap plays, Y or a long press pins
+ *   the game to the home screen as an ordinary icon.
+ *
+ * There used to be two icons with droidtop's picture on them: this one,
+ * labelled "Games", which opened only the grid, and an activity-alias of
+ * MainActivity labelled "droidtop" that went away with Gaming and
+ * Desktop. BlueStacks' launcher labels every entry with the application's
+ * name, so a newcomer saw two identical "droidtop" icons and took droidtop
+ * for installed twice (rig, dq-coordinator-24, finding 6); droidtop's own
+ * launcher hid the alias, so from its home screen there was no icon into
+ * Gaming at all (finding 3).
  *
  * Nothing here is a second library or a second launch path. The list is
  * [dev.droidtop.library.Library.backgroundScanState] for the same kinds
- * the Gaming shell's Games section reads, so with both modes on they share
- * one scan; a tap is [GameLaunchActivity.dispatch]; a pinned icon is a
- * launcher shortcut whose intent is [GameLaunchActivity.intentFor]. What
- * Gaming adds on top -- themes, scraped metadata views, the Quick Menu --
- * is deliberately absent.
+ * the Gaming shell's Games section reads; a tap is
+ * [GameLaunchActivity.dispatch]; a pinned icon is a launcher shortcut
+ * whose intent is [GameLaunchActivity.intentFor].
  *
- * It is the package's one ALWAYS-enabled MAIN/LAUNCHER activity, which
- * is also what makes pinning possible at all: the platform refuses a
- * pinned shortcut from a package with no launcher activity to attribute
- * it to, and the other one (the OpenShells icon into the shells) goes
- * away with Gaming and Desktop.
+ * It is the package's one MAIN/LAUNCHER activity and always enabled,
+ * which is also what makes pinning possible at all: the platform refuses
+ * a pinned shortcut from a package with no launcher activity to attribute
+ * it to. Pinned games name this class, which is why it keeps its old name.
  */
 class LauncherGamesActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (OnboardingGate.resumeIfUnfinished(this)) {
+            finish()
+            return
+        }
+        if (Modes.isEnabled(Mode.GAMING) || Modes.isEnabled(Mode.DESKTOP)) {
+            startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            finish()
+            return
+        }
         val library = LibraryCore.library(applicationContext)
         // The same scan the Gaming shell's Games section runs, following
         // the games roots as they change (Library.scanFollowingGamesRoots),
@@ -114,10 +140,8 @@ class LauncherGamesActivity : AppCompatActivity() {
                     .setShortLabel(entry.title)
                     .setIcon(icon)
                     .setIntent(GameLaunchActivity.intentFor(context, entry.id))
-                    // Attributed to this activity by name: left unset, the
-                    // platform picks one of the package's launcher
-                    // activities, and the other one (OpenShells) is
-                    // disabled whenever Gaming and Desktop are both off.
+                    // Attributed to this activity by name: it is the
+                    // package's one launcher activity and never disabled.
                     .setActivity(android.content.ComponentName(context, LauncherGamesActivity::class.java))
                     .build()
                 val asked = runCatching { ShortcutManagerCompat.requestPinShortcut(context, shortcut, null) }
