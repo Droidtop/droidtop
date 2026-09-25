@@ -6,6 +6,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.droidtop.shell.gamepad.input.ControllerPrefs
 
 /**
  * The one place the Gaming shell asks "how much room is there, and is
@@ -22,18 +23,27 @@ import androidx.compose.ui.unit.dp
  * portrait, and both want the same vertical arrangement for different
  * reasons.
  *
- * [touchFirst] is portrait. Not a guess about hardware: droidtop's own
- * pad-shaped devices (the Retroid console, a TV box, a docked handheld)
- * are landscape, and the screens people hold upright are phones without
- * a controller attached. A pad plugged into a portrait phone still works
- * exactly as before -- [touchFirst] only ever ADDS touch affordances
- * (see [TouchHintBar]), it never removes a pad route.
+ * [touchFirst] is portrait, or a small landscape window with no pad
+ * registered. droidtop's own pad-shaped devices (the Retroid console, a
+ * TV box, a docked handheld) are landscape, and the screens people hold
+ * upright are phones without a controller attached. A pad plugged into a
+ * portrait phone still works exactly as before -- [touchFirst] only ever
+ * ADDS touch affordances (see [TouchHintBar]), it never removes a pad
+ * route.
  */
 enum class ShellWidthClass { COMPACT, MEDIUM, EXPANDED }
 
 data class ShellWindow(
     val widthDp: Int,
     val heightDp: Int,
+    /**
+     * Whether a real, non-virtual gamepad or joystick is registered with
+     * Android right now -- [ControllerPrefs.attachedControllers], the one
+     * gamepad-detection rule droidtop has. A Retroid console's own face
+     * buttons and sticks ARE such a device: they show up exactly like an
+     * external pad would, which is what [touchFirst] uses them for.
+     */
+    val padPresent: Boolean = false,
 ) {
     val portrait: Boolean get() = heightDp > widthDp
 
@@ -51,17 +61,28 @@ data class ShellWindow(
      * instead of them.
      *
      * A window is treated as a phone's when it is upright OR when one of
-     * its sides is phone-sized, which is the same device turned
-     * sideways: a 1080x1920 phone at 420dpi is 411 x 731dp, so rotating
+     * its sides is phone-sized AND nothing has already answered the pad
+     * question: a 1080x1920 phone at 420dpi is 411 x 731dp, so rotating
      * it gives a 731dp-WIDE window that is not compact by width and is
      * still a phone in somebody's hands with no pad attached. Keying on
      * `portrait` alone took the touch bar away in that rotation
      * (emulator capture, 2026-09-11: the rotated screen had the theme's
-     * own help legend and no route to B/Y/Select at all). The console
-     * is 1280x720dp, whose smaller side is 720dp, so nothing about it
-     * changes.
+     * own help legend and no route to B/Y/Select at all).
+     *
+     * The short-side check alone is wrong for a handheld console: a
+     * Retroid Pocket 5's 5.5" 1080x1920 panel is a 768x432dp window in
+     * landscape (rig capture, 2026-09-25), so its 432dp short side trips
+     * the same "phone-sized" branch the rotated-phone fix above added,
+     * and the shell's touch-sized pills got substituted in over the
+     * theme's own thin `<helpsystem>` legend -- sized and positioned for
+     * a legend, not for 48dp touch targets, so they visually overlapped
+     * the system carousel it sits above (docs/SPEC.md 7j). [padPresent]
+     * is [ControllerPrefs.attachedControllers], the one existing
+     * gamepad-detection rule; a console's own buttons answer it exactly
+     * like an external pad would, so this reuses that answer instead of
+     * guessing again from geometry.
      */
-    val touchFirst: Boolean get() = portrait || minOf(widthDp, heightDp) < 600
+    val touchFirst: Boolean get() = portrait || (minOf(widthDp, heightDp) < 600 && !padPresent)
 
     /**
      * The shell's own screen-edge gutter. 48dp is right for a TV-distance
@@ -249,5 +270,6 @@ fun currentShellWindow(): ShellWindow {
     return ShellWindow(
         widthDp = configuration.screenWidthDp,
         heightDp = configuration.screenHeightDp,
+        padPresent = ControllerPrefs.attachedControllers().isNotEmpty(),
     )
 }

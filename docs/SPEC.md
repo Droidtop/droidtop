@@ -7339,6 +7339,30 @@ Rigs: the emulator `droidtop-portrait` AVD (1080x1920 at 420dpi = 411 x
 `run.ps1` with `-Portrait`; and a portrait BlueStacks instance.
 Screenshots of both belong in the evidence for any chrome change.
 
+**A handheld console is not "phone-sized" just because its short side is
+compact.** `ShellWindow.touchFirst` treated any window whose short side
+is under 600dp as a phone's, to catch a real phone rotated into
+landscape (above). A Retroid Pocket 5's 5.5" 1080x1920 panel is a
+768x432dp window in landscape, so its 432dp short side tripped that same
+branch even though it is a console with its own D-pad and face buttons,
+never a screen someone holds with no pad. On the owner's console this
+put the shell's touch-sized pills (`ButtonHintFooter`, `minTouchTarget`
+48dp) over the theme's own thin `<helpsystem>` legend instead of leaving
+the legend to draw --- the pills are sized and padded for a fingertip,
+the legend is not, so the substituted bar visually overlapped the system
+carousel and the gamelist above it. The fix reuses the one existing
+gamepad-detection rule (`ControllerPrefs.attachedControllers`, already
+how droidtop asks "is a pad attached" everywhere else) rather than adding
+a second, geometry-based guess: `ShellWindow.padPresent` carries that
+answer, and the short-side branch of `touchFirst` only fires when no pad
+is registered. A console's own buttons register exactly like an external
+pad does, so this is the same rule, asked once. Portrait alone still
+means touch-first regardless of a pad, unchanged from above: a pad
+plugged into a portrait phone still gets the touch bar. No canvas
+reservation was added for the pills --- the decision two paragraphs up
+holds --- because the real bug was never the layout, it was believing a
+dense small landscape panel was a phone.
+
 ## 7k. The design system: one spacing scale, one type scale, one colour source
 
 droidtop draws two kinds of surface. A **themed view** takes every colour, typeface and
