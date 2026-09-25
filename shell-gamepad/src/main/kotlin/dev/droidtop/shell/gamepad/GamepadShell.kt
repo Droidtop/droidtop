@@ -339,12 +339,6 @@ fun GamepadShell(
     // Swallows the key-UP of the hold that opened the menu, so the
     // shell's ordinary short-press Select action doesn't ALSO fire.
     var swallowSelectUp by remember { mutableStateOf(false) }
-    // Counts SELECT KeyDowns between KeyUps: the system's own key-repeat
-    // redelivers KeyDown while held, so a second KeyDown IS the ~500ms
-    // hold threshold -- portable across Compose flavors, no
-    // nativeKeyEvent access (which the JetBrains artifacts droidtop
-    // builds against do not expose; a real CI failure, not a guess).
-    var selectDownCount by remember { mutableStateOf(0) }
     var displayChoice by remember {
         mutableStateOf<DisplayChoiceRequest?>(null)
     }
@@ -576,20 +570,21 @@ fun GamepadShell(
                 // KeyDowns = the system's own key-repeat (~500ms), so
                 // short-press Select keeps its existing meaning.
                 if (GamepadKeyMap.actionFor(event.key) == GamepadAction.SELECT) {
-                    if (event.type == KeyEventType.KeyDown) {
-                        selectDownCount += 1
-                        if (selectDownCount >= 2) {
-                            // Second KeyDown = the system's key-repeat
-                            // fired = a real hold.
-                            if (!quickMenuOpen) {
-                                quickMenuOpen = true
-                                swallowSelectUp = true
-                            }
-                            return@onKeyEvent true
+                    // A hold is the system's own key-repeat: a KeyDown with
+                    // a repeat count. It used to be counted as "a second
+                    // KeyDown since the last KeyUp this handler saw", but
+                    // the KeyUp of a short press is taken by whatever the
+                    // press opened (the gamelist options), so the counter
+                    // never reset and the NEXT short press opened the
+                    // Quick Menu behind that menu (rig, dq-shell2-01).
+                    if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount > 0) {
+                        if (!quickMenuOpen) {
+                            quickMenuOpen = true
+                            swallowSelectUp = true
                         }
+                        return@onKeyEvent true
                     }
                     if (event.type == KeyEventType.KeyUp) {
-                        selectDownCount = 0
                         if (swallowSelectUp) {
                             swallowSelectUp = false
                             return@onKeyEvent true
