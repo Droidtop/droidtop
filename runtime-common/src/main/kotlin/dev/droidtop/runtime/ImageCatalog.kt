@@ -130,6 +130,50 @@ interface ImageCatalogResolver {
 }
 
 /**
+ * Which of a repository's published tags is its current release, the one
+ * a Recommended entry creates from (docs/SPEC.md §3a). The registry's own
+ * `latest` when it publishes one; otherwise the highest plain version
+ * number (`12`, `3.20`, compared part by part as numbers); otherwise none,
+ * and the person picks a reference under Custom. Never the first tag
+ * listed: registries list tags in ascending order, so that was the oldest
+ * one there is (`alpine:2.6` from 2014, whose schema-1 manifest crane
+ * cannot even read, and `debian:10`, rig dq-coordinator-23 F13).
+ */
+object ImageTags {
+    const val LATEST = "latest"
+    private val VERSION = Regex("""\d+(\.\d+)*""")
+
+    fun current(tags: List<String>): String? {
+        if (LATEST in tags) return LATEST
+        return tags.filter { VERSION.matches(it) }.maxWithOrNull { a, b -> compareVersions(a, b) }
+    }
+
+    private fun compareVersions(a: String, b: String): Int {
+        val left = a.split('.').map { it.toBigInteger() }
+        val right = b.split('.').map { it.toBigInteger() }
+        for (i in 0 until maxOf(left.size, right.size)) {
+            val order = (left.getOrNull(i) ?: java.math.BigInteger.ZERO).compareTo(right.getOrNull(i) ?: java.math.BigInteger.ZERO)
+            if (order != 0) return order
+        }
+        return left.size.compareTo(right.size)
+    }
+}
+
+/**
+ * [repository] at its current tag ([ImageTags.current]), resolved to a
+ * digest now, so the pull is pinned to what the registry serves today.
+ */
+suspend fun ImageCatalogResolver.resolveCurrent(repository: KnownImageRepository): ResolvedImage {
+    val tags = listTags(repository)
+    val tag = ImageTags.current(tags)
+        ?: error(
+            "${repository.registry}/${repository.repository} publishes no \"${ImageTags.LATEST}\" tag and no plain " +
+                "version number, so droidtop cannot tell which is current. Enter the reference you want under Custom.",
+        )
+    return resolve(repository, tag)
+}
+
+/**
  * Loads droidtop's bundled seed list of known repositories from APK assets
  * (`runtime-common/src/main/assets/known-image-repositories.json`) — just
  * "which OCI repositories are worth showing," not a version/tag snapshot.

@@ -920,9 +920,17 @@ stops at "which repositories," never "which versions."
   unset or stale choice fails with guidance to make one, never a silent
   pick. (A "first PRIMARY-role seed entry" fallback briefly existed and
   silently selected alpine on the first live pipeline run — removed as
-  a spec violation.) Within a chosen repository the registry's own
-  `latest` tag is the default until Desktop setup grows a real tag
-  picker.
+  a spec violation.) Within a chosen repository droidtop takes the
+  repository's CURRENT tag (`ImageTags.current`, decided 2026-09-25):
+  the registry's own `latest` when it publishes one, otherwise the
+  highest plain version number (`12`, `3.20`, compared part by part),
+  otherwise none, and the person is told to enter a reference under
+  Custom. The same rule serves the PRIMARY (Desktop setup) and a
+  Recommended sibling (`ImageCatalogResolver.resolveCurrent`). Never the
+  first tag listed: registries list tags in ascending order, so the
+  container manager's first-listed pick created `alpine:2.6` (2014, a
+  schema-1 manifest crane cannot read) and `debian:10` (rig
+  dq-coordinator-23 F13). A tag picker in the creation flow remains open.
 
 ## 3b. Optional: other architectures/OSes via QEMU/libvirt — a value-add, not core
 
