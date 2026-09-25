@@ -440,6 +440,11 @@ package from the drawer. It now works like this:
   droidtop screen left in the package's shared task, and B from the grid
   goes home. Game folders opened in the grid carries its own hint row
   (A Select, Y Info, B Back), since the settings navigator draws none.
+  Opened from droidtop's own home screen, B reopens that home screen as the
+  explicit "Android" one: a plain finish let Android recreate it with a
+  fresh Home intent, which forwards to the default mode (dq-shell2-02).
+  PC and engine games are listed as Gaming's PC grid lists them, one card
+  per game under the game's name (`LibraryGrouping`, §7m).
 - A tap or A launches through `GameLaunchActivity.dispatch`, which is
   `Library.launch` (play history and launch-screen memory included).
 - Y or a long press pins the game to the home screen as an ordinary icon: a
@@ -5115,10 +5120,15 @@ collection), interval, and a name overlay as their own rows. A on a
 slideshow or video launches the game shown; any other key wakes the
 shell. Android's own display timeout still powers the panel down, and
 the row says the screensaver shows only when its timer is the shorter.
-Holding Select for the Quick Menu is the key event's own repeat count, never
-a count of KeyDowns since the last KeyUp the root saw: the KeyUp of a short
-press is taken by the menu it opens, and the next short press opened the
-Quick Menu behind the gamelist options (rig, dq-shell2-01). While the
+Holding Select for the Quick Menu is decided at the shell's root in the
+PREVIEW pass, on the way down, before any screen sees the press: a KeyDown
+with a repeat count, or a KeyUp a long-press timeout after its KeyDown for
+a source that sends no repeats. A hold takes every edge of the press, so
+the screen under it never sees a short press; a short press passes through
+untouched. Counting KeyDowns since the last KeyUp the root saw failed
+because a short press's KeyUp is taken by the menu it opens (dq-shell2-01),
+and reading the hold on the way back up lost to the screen that had already
+opened its options (dq-shell2-02). While the
 screensaver shows it has the whole window: the tab bar and the hint row
 stand down.
 The setting has one definition (`ScreensaverPrefs`) that the row writes
@@ -6168,7 +6178,12 @@ whatever the thumbnails found (rig, dq-shell2-01: a wrong key read "found
 `error`), never shown raw. **A list follows its selection only as far as it takes to show it**
 (settings, choice pickers, the Quick Menu): a row already wholly on screen
 does not move, so a tap never scrolls the next row under the finger (rig,
-dq-shell2-01). **A result is shown whole**: the options menu
+dq-shell2-01), and the settings navigator keeps each depth's scroll and
+restores it on return from a sub-screen (dq-shell2-02). A new result in the
+options menu scrolls itself wholly into view. **"Rescan library" is one
+action** (`LibraryRescan`, wired by :app to `Library.rescanNow`) wherever
+it is offered: it says it started, waits for the walk to finish and says
+what it found. **A result is shown whole**: the options menu
 draws an action's result as wrapped text under the actions, in a panel
 that scrolls, never as a row cut to a line, because the fix is the last
 sentence.
