@@ -2,7 +2,15 @@ package dev.droidtop.app.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import dev.droidtop.shell.gamepad.input.padClick
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -52,13 +60,25 @@ internal fun SelectableRow(
     onClick: (() -> Unit)? = null,
 ) {
     val window = currentShellWindow()
+    var focused by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = window.minTouchTarget + Space.Sm)
+            // The pad's A answers the row, and the shell's accent ring
+            // says which row the pad is on; the fill stays the "chosen"
+            // cue. Onboarding showed no focus at all (dq-coordinator-24,
+            // finding 7).
+            .then(if (onClick != null) Modifier.padClick(onClick) else Modifier)
+            .onFocusChanged { focused = it.isFocused }
             .background(
                 if (selected) MenuTokens.SurfaceSelected else MenuTokens.Surface,
                 MenuTokens.RowShape,
+            )
+            .border(
+                width = if (focused) MenuTokens.FocusRingWidth else 1.dp,
+                color = if (focused) MenuTokens.Accent else Color.Transparent,
+                shape = MenuTokens.RowShape,
             )
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = Space.Lg, vertical = Space.Md),
