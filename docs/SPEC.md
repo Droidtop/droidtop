@@ -402,8 +402,14 @@ app screen below 10), as its hand-off work with the skip beside it; the
 Alternative choice asks the same way. Global settings' "Use droidtop as
 home screen" is On only when droidtop's launcher is enabled AND is what
 Home opens, says which app Home opens, and turning it on opens Android's
-Default home app screen. With droidtop's launcher enabled but not Home,
-the mode switcher's "Android" opens whatever Home opens. droidtop registers no
+Default home app screen. The mode switcher always lists "Android", and
+when droidtop's launcher is not Home (or droidtop holds no home at all) it
+opens whatever Home opens; it used to vanish then (dq-onboard-02). Below
+Android 10 there is no role to request: when no Home app has been chosen
+"Always" yet, the step opens Home itself, which is Android's chooser with
+droidtop in it; only when another app is already the default does it open
+Android's settings (on BlueStacks the Default apps list, one level above
+the Home choice). droidtop registers no
 boot receiver; the HOME role is what starts it at boot, and nothing
 else of droidtop's (the desktop session, the VPN) starts before a person
 opens it (§3).
@@ -472,7 +478,8 @@ front, a Gaming shell whose mode had been switched off included
 icon's app shortcut "Games" (a long press) and the home screen's
 long-press menu entry "droidtop games" open it (`ACTION_SHOW_GAMES`).
 Launcher3's pin sheet (`AddItemActivity`) also runs in a task of its own,
-so Cancel returns to the grid rather than into older droidtop screens.
+so Cancel returns to the grid rather than into older droidtop screens, and
+Back from the grid goes to the home screen.
 Finishing onboarding with droidtop's own launcher as Home asks for this
 icon on the home screen (`HomeRolePrefs.placeDroidtopIcon`), and the
 launcher queues it through its own install queue when its home screen
@@ -506,7 +513,10 @@ long-press menu ("droidtop modes"), Gaming's Quick Menu, System tab
 ("Switch mode"), and the Desktop taskbar ("Modes"). A surface with no
 Activity of its own to hand opens it through `ModeSwitcherActivity`.
 "Modes and settings" opens Global settings, where each mode is switched on
-and off, and Global settings is the first row of the launcher's settings
+and off (Settings runs in a task of its own and every opening from a
+switcher, the home screen menu or the Desktop taskbar starts it fresh, so a
+page left open never answers for the page asked for, and clearing it never
+takes a running shell with it), and Global settings is the first row of the launcher's settings
 list and of Desktop's settings as well as Gaming's; turning a mode off is
 always reversible from the UI (it once took a data clear, dq-coordinator-23
 F5).
@@ -613,8 +623,13 @@ the mark used to be written when the walk started, so a walk that died
 with the process left the new folder marked walked and unread
 (dq-onboard-01). So the core follower also walks at process start when the
 last process did not finish, and a second caller joins a walk of the same
-set instead of restarting it. scan.log says when such a walk starts and
-when it ends.
+set instead of restarting it. scan.log says when the folders change, when
+such a walk starts and when it ends. The core follower holds its
+preference listener strongly for the life of the process: SharedPreferences
+keeps listeners in a weak map, and the first version (a flow collected in a
+scope nothing referenced) was garbage-collected with its listener, so a
+folder added in setup went unwalked until the next process start, twice on
+the rig (dq-onboard-01, -02).
 
 **Gaming and Desktop are on once setup has turned them on** (decided
 2026-09-25). Until onboarding finishes, `Modes.reload` counts neither as
