@@ -43,6 +43,22 @@ object ScraperReadiness {
     }
 
     /**
+     * Why the selected PC and engine game source cannot run, with the fix;
+     * null when it can. Named settings, not codes: a person who has never
+     * opened the scraper screen can act on this sentence alone.
+     */
+    fun pcSourceProblem(context: Context): String? = when (PcScraperSourcePrefs.get(context)) {
+        PcScraperSource.LUTRIS -> null
+        PcScraperSource.IGDB -> if (ScraperPrefs.isConfigured(context)) {
+            null
+        } else {
+            "IGDB needs your own free API credentials: create an application at dev.twitch.tv/console, " +
+                "then enter its Client ID and Client Secret under $SCRAPER_SETTINGS > IGDB. " +
+                "Lutris needs no account at all if you would rather not."
+        }
+    }
+
+    /**
      * What to change when [refusal] is a source rejecting the credentials it
      * was sent (HTTP 401 or 403 from a source that takes a key or an
      * account); null for any other refusal, which is not the person's to fix.
