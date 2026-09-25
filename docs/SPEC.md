@@ -851,9 +851,14 @@ primary's one long-lived session, and `start()` returns when the
 compositor's socket accepts a connection (it fails with the script's last
 output if the script exits first, or prints nothing for fifteen minutes).
 The plan booted is the catalog entry's current one (`start` takes it), and
-the marker records which plan last completed, so a package added to a plan
-reaches a container made before it; a reused container provisioned with
-its creation-time command and had no font (dq-desktop-07).
+the marker records every plan whose install completed, so a package added
+to a plan reaches a container made before it (a reused container
+provisioned with its creation-time command and had no font, dq-desktop-07),
+and a plan already installed, such as Printing switched off and on again,
+is not installed again. The script says "first boot" only when no plan has
+completed yet, and "the desktop setup changed" otherwise; it used to keep
+only the last plan and announce a first boot on every such switch
+(dq-desk2-02).
 The proot backend also binds a generated `/etc/resolv.conf` (the active
 Android network's own DNS servers, read at every start; a stock image has
 none and Android has no `/etc/resolv.conf` to inherit) and `/etc/hosts`.
