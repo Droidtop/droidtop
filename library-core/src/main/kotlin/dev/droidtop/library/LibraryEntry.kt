@@ -207,6 +207,18 @@ data class LibraryEntry(
      * One folder cannot know this; the game can.
      */
     val availableUpdate: String? = null,
+    // The rest of a game's scraped flavour (docs/SPEC.md 7h), read back
+    // by withScrapedMetadata like the ES-DE fields above: its series, its
+    // links, and which source each field came from.
+    val series: String? = null,
+    val links: List<GameLink> = emptyList(),
+    val fieldSources: Map<String, String> = emptyMap(),
+    // Scraped hero art (ES-DE `fanart`), logo (ES-DE `marquee`) and icon
+    // for an entry with no ES-DE layout behind it (a store install);
+    // [mediaForImageTypes] answers a theme's fanart and marquee from them.
+    val heroUri: String? = null,
+    val logoUri: String? = null,
+    val iconUri: String? = null,
 ) {
     /**
      * The image file this entry should show for a themed element that
@@ -221,14 +233,53 @@ data class LibraryEntry(
      * existing single-artwork default), which is what
      * [EsDeImageTypes.forImageElement] returning an empty list expresses.
      *
-     * Returns null unconditionally for an entry with no [mediaLocator],
-     * for the same reason: an entry with no ES-DE media layout genuinely
+     * Returns null for an entry with no [mediaLocator] unless it has the
+     * scraped media named below, for the same reason: an entry with no ES-DE media layout genuinely
      * has no marquee, and pretending otherwise by handing back
      * [artworkUri] would put the wrong picture in a marquee slot.
+     *
+     * A store install's scraped hero and logo ([heroUri], [logoUri]) are
+     * its `fanart` and `marquee`: they are exactly those types, filed in
+     * the metadata row because the entry has no layout to find them in.
      */
     fun mediaForImageTypes(imageTypes: List<String>): String? {
-        val locator = mediaLocator ?: return null
+        val locator = mediaLocator
+            ?: return imageTypes.firstNotNullOfOrNull { type ->
+                when (type) {
+                    "fanart" -> heroUri
+                    "marquee" -> logoUri
+                    else -> null
+                }
+            }
         return EsDeArtwork.resolveImageTypes(locator, imageTypes)
+    }
+}
+
+/**
+ * One of a game's links, as its source names it ("Official website",
+ * "Steam", "Wikipedia"). Stored in the metadata row as JSON.
+ */
+@Serializable
+data class GameLink(val label: String, val url: String) {
+    companion object {
+        fun encode(links: List<GameLink>): String? {
+            if (links.isEmpty()) return null
+            val array = org.json.JSONArray()
+            links.forEach { array.put(org.json.JSONObject().put("label", it.label).put("url", it.url)) }
+            return array.toString()
+        }
+
+        fun decode(json: String?): List<GameLink> {
+            if (json.isNullOrBlank()) return emptyList()
+            return runCatching {
+                val array = org.json.JSONArray(json)
+                (0 until array.length()).mapNotNull { i ->
+                    val row = array.optJSONObject(i) ?: return@mapNotNull null
+                    val url = row.optString("url", "").ifBlank { null } ?: return@mapNotNull null
+                    GameLink(row.optString("label", "").ifBlank { url }, url)
+                }
+            }.getOrDefault(emptyList())
+        }
     }
 }
 

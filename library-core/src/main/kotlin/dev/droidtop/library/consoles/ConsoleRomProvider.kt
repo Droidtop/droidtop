@@ -895,9 +895,16 @@ class ConsoleRomProvider(
      * `UPDATE`) since the editor legitimately holds and can change every
      * real field at once, same as real ES-DE's own `GuiMetaDataEd` saving
      * its whole in-memory `MetaDataList` back on exit.
+     *
+     * Every field the person changed is recorded as theirs
+     * ([dev.droidtop.library.scraper.FieldSources.EDITED]), which is what
+     * keeps a later scrape from writing over it (docs/SPEC.md 7h).
      */
     suspend fun saveMetadata(metadata: GameMetadataEntity) {
-        dao.upsertGameMetadata(metadata)
+        val before = dao.getGameMetadataSingle(metadata.id)
+        dao.upsertGameMetadata(
+            metadata.copy(fieldSources = dev.droidtop.library.scraper.FieldSources.afterEdit(before, metadata)),
+        )
     }
 
     /** Real custom collections list, alphabetical -- droidtop's own equivalent of real ES-DE's `getCustomCollectionSystems`. */

@@ -86,6 +86,12 @@ suspend fun List<LibraryEntry>.withScrapedMetadata(
             launchScreen = meta.launchScreen,
             sortName = meta.sortName,
             collectionSortName = meta.collectionSortName,
+            series = meta.series,
+            links = GameLink.decode(meta.links),
+            fieldSources = dev.droidtop.library.scraper.FieldSources.decode(meta.fieldSources),
+            heroUri = entry.heroUri ?: meta.heroPath?.takeIf { File(it).isFile },
+            logoUri = entry.logoUri ?: meta.logoPath?.takeIf { File(it).isFile },
+            iconUri = entry.iconUri ?: meta.iconPath?.takeIf { File(it).isFile },
         )
     }
 }
