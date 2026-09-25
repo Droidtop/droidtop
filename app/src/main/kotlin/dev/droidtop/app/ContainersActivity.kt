@@ -41,6 +41,7 @@ import dev.droidtop.runtime.CraneImageCatalogResolver
 import dev.droidtop.runtime.ImageCatalogRole
 import dev.droidtop.runtime.KnownImageRepository
 import dev.droidtop.runtime.RootfsImage
+import dev.droidtop.runtime.resolveCurrent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -121,10 +122,7 @@ private fun ContainersScreen() {
                 enabled = busyMessage == null,
                 onCreateFromRepository = { repo ->
                     runAction("Creating from ${repo.repository}") { rt ->
-                        val resolver = CraneImageCatalogResolver(context)
-                        val tag = resolver.listTags(repo).firstOrNull()
-                            ?: error("no tags published under ${repo.registry}/${repo.repository}")
-                        rt.createSibling(resolver.resolve(repo, tag).toRootfsImage())
+                        rt.createSibling(CraneImageCatalogResolver(context).resolveCurrent(repo).toRootfsImage())
                     }
                     showCreate = false
                 },

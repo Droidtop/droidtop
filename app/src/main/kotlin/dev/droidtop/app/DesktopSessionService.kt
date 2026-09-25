@@ -16,10 +16,9 @@ import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.CraneImageCatalogResolver
 import dev.droidtop.runtime.DisplayOutput
 import dev.droidtop.runtime.DisplayOutputKind
-import dev.droidtop.runtime.ImageCatalogResolver
 import dev.droidtop.runtime.KnownImageRepository
 import dev.droidtop.runtime.PrimaryProvisioning
-import dev.droidtop.runtime.ResolvedImage
+import dev.droidtop.runtime.resolveCurrent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -181,7 +180,7 @@ class DesktopSessionService : Service() {
             return existing
         }
         _stateHolder.value = DesktopSessionState.Connecting("Downloading ${repository.repository}")
-        val image = selectPrimaryImage(CraneImageCatalogResolver(applicationContext), repository)
+        val image = CraneImageCatalogResolver(applicationContext).resolveCurrent(repository)
         android.util.Log.i(
             TAG,
             "Creating the primary container from ${image.repository.registry}/${image.repository.repository}:${image.tag} " +
@@ -218,21 +217,6 @@ class DesktopSessionService : Service() {
             ?: error("PRIMARY entry ${repository.id} has no desktopEnvironment set")
         return CompositorProvisioning.plan(repository.os, desktopEnvironment, DesktopSetupPrefs.printing(applicationContext))
             ?: error("No known compositor provisioning for ${repository.os}/$desktopEnvironment")
-    }
-
-    /**
-     * Within the chosen repository the registry's own `latest` tag is
-     * preferred (first-listed picked `alpine:2.6`, a 2015 image, because
-     * `crane ls` returns tags in ascending registry order); a real per-tag
-     * picker is Desktop setup UI work, not this method's. Returns the full
-     * [ResolvedImage], digest included, so the pull is pinned.
-     */
-    private suspend fun selectPrimaryImage(resolver: ImageCatalogResolver, repository: KnownImageRepository): ResolvedImage {
-        val tags = resolver.listTags(repository)
-        val tag = tags.firstOrNull { it.equals("latest", ignoreCase = true) }
-            ?: tags.firstOrNull()
-            ?: error("No tags published under ${repository.registry}/${repository.repository}")
-        return resolver.resolve(repository, tag)
     }
 
     /**

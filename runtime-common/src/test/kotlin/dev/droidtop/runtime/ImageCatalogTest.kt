@@ -25,7 +25,7 @@ class ImageCatalogTest {
 
         assertTrue("seed list should have at least one repository", list.repositories.isNotEmpty())
         assertTrue(
-            "seed list should have at least one PRIMARY (or BOTH) entry — DesktopSessionService.selectPrimaryImage() requires it",
+            "seed list should have at least one PRIMARY (or BOTH) entry — DesktopSessionService needs one to create the desktop from",
             list.repositories.any { it.role == ImageCatalogRole.PRIMARY || it.role == ImageCatalogRole.BOTH },
         )
     }
@@ -115,5 +115,37 @@ class ImageCatalogTest {
         val resolved = resolver.resolve(repo, tags.first())
         assertEquals("3.20", resolved.tag)
         assertEquals("docker.io/library/alpine:3.20", resolved.toRootfsImage().reference)
+    }
+
+    @Test
+    fun `the current tag is latest when the registry publishes one`() {
+        assertEquals("latest", ImageTags.current(listOf("2.6", "2.7", "3.20", "edge", "latest")))
+    }
+
+    @Test
+    fun `without latest the current tag is the highest plain version, not the first listed`() {
+        assertEquals("13", ImageTags.current(listOf("10", "10-slim", "11", "12", "13", "bookworm", "trixie")))
+        assertEquals("3.10", ImageTags.current(listOf("3.9", "3.10", "3.2")))
+        assertEquals("20250101", ImageTags.current(listOf("20241231", "20250101", "20250101R1")))
+    }
+
+    @Test
+    fun `no current tag when nothing is latest or a plain version`() {
+        assertEquals(null, ImageTags.current(listOf("edge", "rolling")))
+        assertEquals(null, ImageTags.current(emptyList()))
+    }
+
+    @Test
+    fun `resolveCurrent pins the current tag`() = kotlinx.coroutines.runBlocking {
+        val repo = KnownImageRepository(
+            id = "debian",
+            os = "debian",
+            role = ImageCatalogRole.SIBLING,
+            repository = "library/debian",
+            officialSource = true,
+            arm64Available = true,
+        )
+        val resolved = FakeResolver(mapOf("debian" to listOf("10", "11", "12", "latest"))).resolveCurrent(repo)
+        assertEquals("docker.io/library/debian:latest", resolved.toRootfsImage().reference)
     }
 }
