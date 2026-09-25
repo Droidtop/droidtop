@@ -564,9 +564,9 @@ private fun BoxScope.StartMenu(
                     }
                 }
                 items(linuxApps, key = { "linux:" + it.id }) { app ->
-                    Text(
-                        app.name,
-                        color = MaterialTheme.colorScheme.onSurface,
+                    // The app's own name, and under it what kind of program
+                    // it is when the entry says (foot: "Terminal").
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
@@ -574,7 +574,12 @@ private fun BoxScope.StartMenu(
                                 onDismiss()
                             }
                             .padding(vertical = 4.dp, horizontal = 8.dp),
-                    )
+                    ) {
+                        Text(app.name, color = MaterialTheme.colorScheme.onSurface)
+                        app.genericName?.let {
+                            Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                 }
                 item(key = "library-header") { StartMenuHeader("Library") }
             }
