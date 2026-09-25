@@ -1255,11 +1255,16 @@ object AppSettingsCatalogs {
                                 "update; to pick up new or changed games, use Rescan library",
                             run = { ctx, onStatus ->
                                 onStatus("Rebuilding...")
-                                val count = withContext(Dispatchers.IO) {
+                                val result = withContext(Dispatchers.IO) {
                                     dev.droidtop.app.LibraryCore.library(ctx).rebuildIndexFromRecords()
                                 }
-                                if (count == 0) "Nothing to rebuild from yet: scan the library first"
-                                else "Rebuilt from $count game records"
+                                when {
+                                    result.records == 0 && result.keptWithoutRecord == 0 ->
+                                        "Nothing to rebuild from yet: scan the library first"
+                                    result.keptWithoutRecord == 0 -> "Rebuilt from ${result.records} game records"
+                                    else -> "Rebuilt from ${result.records} game records, and kept " +
+                                        "${result.keptWithoutRecord} listed games that had none"
+                                }
                             },
                         ),
                     ),
