@@ -540,6 +540,48 @@ fun GamepadShell(
             // Outermost, so it sees only what nothing below wanted: the
             // shell owns the pad, and Android's generic fallbacks never
             // act on it (Modifier.ownPadButtons).
+            // Holding Select is the Quick Menu, decided HERE, on the way
+            // down, before any screen sees the press: a hold read on the
+            // way back up lost to whatever the screen underneath does with
+            // Select (the gamelist and library options took the press, and
+            // a held Select opened them instead: rig, dq-shell2-02). A hold
+            // is either the system's own key-repeat (a KeyDown with a
+            // repeat count) or, for a source that sends none, a KeyUp that
+            // came at least a long-press timeout after its KeyDown. Every
+            // edge of a hold is taken here, so the screen never sees a
+            // short press; a short press passes through untouched.
+            .onPreviewKeyEvent { event ->
+                if (GamepadKeyMap.actionFor(event.key) != GamepadAction.SELECT) return@onPreviewKeyEvent false
+                val native = event.nativeKeyEvent
+                when (event.type) {
+                    KeyEventType.KeyDown -> {
+                        if (native.repeatCount == 0) {
+                            // A fresh press: whatever an earlier hold left
+                            // behind is over (its KeyUp may have gone to the
+                            // Quick Menu's own window).
+                            swallowSelectUp = false
+                            false
+                        } else {
+                            if (!quickMenuOpen && !swallowSelectUp) quickMenuOpen = true
+                            swallowSelectUp = true
+                            true
+                        }
+                    }
+                    KeyEventType.KeyUp -> when {
+                        swallowSelectUp -> {
+                            swallowSelectUp = false
+                            true
+                        }
+                        native.eventTime - native.downTime >=
+                            android.view.ViewConfiguration.getLongPressTimeout() -> {
+                            if (!quickMenuOpen) quickMenuOpen = true
+                            true
+                        }
+                        else -> false
+                    }
+                    else -> false
+                }
+            }
             .ownPadButtons { backDispatcher?.onBackPressed() }
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown) {
@@ -569,28 +611,6 @@ fun GamepadShell(
                 // second mechanism for its own sake. repeatCount >= 2
                 // KeyDowns = the system's own key-repeat (~500ms), so
                 // short-press Select keeps its existing meaning.
-                if (GamepadKeyMap.actionFor(event.key) == GamepadAction.SELECT) {
-                    // A hold is the system's own key-repeat: a KeyDown with
-                    // a repeat count. It used to be counted as "a second
-                    // KeyDown since the last KeyUp this handler saw", but
-                    // the KeyUp of a short press is taken by whatever the
-                    // press opened (the gamelist options), so the counter
-                    // never reset and the NEXT short press opened the
-                    // Quick Menu behind that menu (rig, dq-shell2-01).
-                    if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount > 0) {
-                        if (!quickMenuOpen) {
-                            quickMenuOpen = true
-                            swallowSelectUp = true
-                        }
-                        return@onKeyEvent true
-                    }
-                    if (event.type == KeyEventType.KeyUp) {
-                        if (swallowSelectUp) {
-                            swallowSelectUp = false
-                            return@onKeyEvent true
-                        }
-                    }
-                }
                 if (event.type != KeyEventType.KeyUp || detailEntry != null) return@onKeyEvent false
                 val sections = sectionsFor(uiMode)
                 val currentIndex = sections.indexOf(section)
