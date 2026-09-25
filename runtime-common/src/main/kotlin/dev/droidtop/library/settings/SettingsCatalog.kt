@@ -30,10 +30,42 @@ import android.net.Uri
  * so a renderer with no special knowledge gets working behavior for
  * everything.
  */
+/**
+ * A category's identity, drawn once per row that OPENS something (a
+ * [NestedScreenItem]/[SubScreenItem]) rather than on every leaf toggle --
+ * the same density a polished console settings list (Switch, Steam Deck)
+ * uses: enough to scan the list by shape, not an icon competing with
+ * every value column.
+ *
+ * Wired into the Gaming shell's own row (`MenuRow`/`CatalogIconGlyphs.kt`
+ * in `:shell-gamepad`, settings polish pass 2026-09-25), which is where
+ * the owner's "significant improvements to polish and layout" direction
+ * was raised against. The Preference/touch surface (`:shell-default`,
+ * `CatalogPreferenceBuilder`) still renders every row with
+ * `isIconSpaceReserved = false` and no icon -- real vendored Murine/
+ * launcher3 drawables exist for some of these concepts but were not
+ * verified to look right at settings-row size without a working build+
+ * screenshot loop, so that parity is left as a follow-up rather than
+ * shipped unverified.
+ */
+enum class CatalogIcon {
+    GLOBAL, MODES, DATA, HOME_ROLE,
+    GAMING, DESKTOP, STANDARD,
+    LIBRARY, SCRAPER, CONSOLE_SYSTEMS, GAME_FOLDERS, PLATFORMS, ORPHANED_MEDIA,
+    WINDOWS_GAMES, CONTAINERS, ENGINEHOST,
+    APPEARANCE, THEME, SCREENSAVER,
+    INPUT, CONTROLLER, KEYBOARD,
+    DISPLAY, SYSTEM_UPDATES, ANDROID_SETTINGS,
+    INTEGRATIONS, SEARCH,
+}
+
 sealed interface CatalogItem {
     val id: String
     val title: String
     val subtitle: String?
+
+    /** A category glyph for rows that open something. Null draws none -- see [CatalogIcon]. */
+    val icon: CatalogIcon? get() = null
 
     /**
      * What this setting is SET TO, for the value column every surface
@@ -125,6 +157,7 @@ class ActionItem(
     override val subtitle: String? = null,
     override val value: String? = null,
     val confirmTitle: String? = null,
+    override val icon: CatalogIcon? = null,
     val run: (Context) -> Unit,
 ) : CatalogItem
 
@@ -217,6 +250,7 @@ class NestedScreenItem(
     // Optional per-row accent (ARGB) -- e.g. the console-systems folder
     // list keeps its real per-system color cue from SystemThemeColors.
     val accent: Int? = null,
+    override val icon: CatalogIcon? = null,
 ) : CatalogItem {
     init {
         require((inline != null) != (registryId != null)) { "Exactly one of inline/registryId must be set" }
@@ -237,6 +271,7 @@ class SubScreenItem(
     override val title: String,
     override val subtitle: String? = null,
     val fragmentClassName: String,
+    override val icon: CatalogIcon? = null,
 ) : CatalogItem {
     fun launchIntent(context: Context): Intent = Intent(Intent.ACTION_MAIN).apply {
         component = ComponentName(context.packageName, "com.android.launcher3.settings.SettingsActivity")

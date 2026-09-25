@@ -176,6 +176,7 @@ object DroidtopWideSettings {
                             title = "Containers",
                             subtitle = "Manage Linux containers and distros: create, start, stop, delete",
                             registryId = ContainersCatalog.SCREEN_ID,
+                            icon = dev.droidtop.library.settings.CatalogIcon.CONTAINERS,
                         ),
                     ),
                 ),
