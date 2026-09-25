@@ -330,6 +330,7 @@ object ThemeAssets {
             discoveredThemes = null
             systemThemeCache.clear()
             capabilitiesCache.clear()
+            pcGroupFolderCache.clear()
         }
     }
 
@@ -669,10 +670,59 @@ object ThemeAssets {
         // path for EVERY system -- systems the theme has no art for got a
         // dead path here and rendered as a blank carousel item instead of
         // falling through (confirmed live: Art Book Next's black items).
-        return listOfNotNull(
-            listElement.valueOrNull<EsDeThemeValue.Path>("staticImage")?.resolved,
-            listElement.valueOrNull<EsDeThemeValue.Path>("path")?.resolved,
-            listElement.valueOrNull<EsDeThemeValue.Path>("defaultImage")?.resolved,
-        ).firstOrNull { File(it).exists() }
+        return (systemArtPaths(listElement) + listOfNotNull(listElement.valueOrNull<EsDeThemeValue.Path>("defaultImage")?.resolved))
+            .firstOrNull { File(it).exists() }
+    }
+
+    /** The art [listElement] declares for the system it was parsed for, before its `defaultImage`. */
+    private fun systemArtPaths(listElement: EsDeThemeElement): List<String> = listOfNotNull(
+        listElement.valueOrNull<EsDeThemeValue.Path>("staticImage")?.resolved,
+        listElement.valueOrNull<EsDeThemeValue.Path>("path")?.resolved,
+    )
+
+    /**
+     * ES-DE's own system id for Microsoft Windows. The PC group wears a
+     * theme's `windows` art where the theme ships it (docs/SPEC.md 7i):
+     * ES-DE's `pc` system is IBM PC and DOS, and themes draw it that way.
+     */
+    const val WINDOWS_THEME_FOLDER = "windows"
+
+    /**
+     * The `${system.theme}` the PC group takes when the theme ships no
+     * `windows` art: a folder no theme ships, so every per-system element
+     * falls through to the theme's own defaults and the carousel draws the
+     * group's name, as ES-DE does for a system its theme does not know.
+     * Nothing is drawn for PC that the theme did not make, and nothing the
+     * theme made for DOS.
+     */
+    const val NEUTRAL_PC_THEME_FOLDER = "droidtop-pc"
+
+    private val pcGroupFolderCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /** [pcGroupThemeFolder]'s answer for the active theme if it is known, else null; no parse. */
+    fun cachedPcGroupThemeFolder(context: Context): String? =
+        resolveActiveTheme(context)?.let { pcGroupFolderCache[it.name] }
+
+    /**
+     * The theme folder the PC group themes as under the active theme:
+     * [WINDOWS_THEME_FOLDER] when the theme's system view declares art for
+     * `windows` and that file exists, else [NEUTRAL_PC_THEME_FOLDER]. The
+     * check is the parse the group then draws with ([systemFullName] is the
+     * group's own label, so the cache key matches), so it costs no parse
+     * the carousel would not make anyway. Parses: call it off the main
+     * thread.
+     */
+    fun pcGroupThemeFolder(context: Context, systemFullName: String): String {
+        val active = resolveActiveTheme(context) ?: return NEUTRAL_PC_THEME_FOLDER
+        pcGroupFolderCache[active.name]?.let { return it }
+        val listElement = loadActiveTheme(context, WINDOWS_THEME_FOLDER, null, systemFullName)
+            ?.views?.get("system")?.primaryListElement()
+        val folder = if (listElement != null && systemArtPaths(listElement).any { File(it).exists() }) {
+            WINDOWS_THEME_FOLDER
+        } else {
+            NEUTRAL_PC_THEME_FOLDER
+        }
+        pcGroupFolderCache[active.name] = folder
+        return folder
     }
 }
