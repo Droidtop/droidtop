@@ -296,6 +296,7 @@ class MainActivity : AppCompatActivity() {
                         launchFailure = desktopLaunchFailure,
                         onDismissLaunchFailure = { DesktopSessionService.dismissLaunchFailure() },
                         onLaunchFailure = { DesktopSessionService.reportLaunchFailure(it) },
+                        onStartSession = { DesktopSessionService.start(this@MainActivity) },
                     )
                     if (askDesktopNotifications) {
                         DesktopNotificationPermission.Dialog(

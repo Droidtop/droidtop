@@ -815,6 +815,11 @@ init under proot: starting one is a no-op and each `exec` is a session of
 its own, so the interface says so (`ContainerRuntime.siblingsNeedStart`
 is false here) and the container manager offers no Start for one.
 
+**The desktop that is not running offers to start (2026-09-25).** Desktop
+mode's viewport, when the session was stopped, says so and has one button,
+"Start the desktop"; a failed start has "Try again" (rig dq-desk2-02: the
+only route was Containers, and the taskbar's Start is the Start menu).
+
 **Stopping is a stop (decided 2026-09-25, rig dq-coordinator-23 F9).**
 proot ignores SIGTERM (`src/tracee/event.c` sets every terminating signal
 but SIGQUIT and the fault signals to SIG_IGN) and sets no
