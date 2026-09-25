@@ -28,9 +28,18 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import coil3.compose.AsyncImage
+import androidx.compose.runtime.remember
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.consoles.PlatformsDatabase
+import dev.droidtop.library.consoles.resolvePlayer
 import dev.droidtop.library.displayName
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -157,16 +166,32 @@ internal fun CompanionContent(entry: LibraryEntry?) {
             CompanionIdle(entries)
             return@Box
         }
-        // No artwork here by design (per direction): this panel is the
-        // ambient WIDGETS/INFO surface (§4's dual-screen roles -- the
-        // shell itself lives on the other display when both exist), so
-        // it carries focused-game information, not a second copy of the
-        // shell's art.
+        // Companion redesign (docs/SPEC.md 4d, 2026-09-25 owner review:
+        // "a bunch of images and some white text"): the focused panel
+        // used to carry no art at all, just the text column below --
+        // exactly the gap the review's info_d0/info_d5 capture showed
+        // (the addon never changed when a game's info opened on the
+        // main screen). A real thumbnail earns the row's own space
+        // rather than filling the backdrop, which stays this panel's
+        // ambient art (idle rotation) rather than a second copy of
+        // the shell's own hero art.
         Row(
             modifier = Modifier.fillMaxSize().padding(48.dp),
             horizontalArrangement = Arrangement.spacedBy(40.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            val thumbnailUri = entry.artworkUri ?: entry.heroUri
+            if (!thumbnailUri.isNullOrBlank()) {
+                AsyncImage(
+                    model = thumbnailUri,
+                    contentDescription = entry.title,
+                    modifier = Modifier
+                        .width(220.dp)
+                        .height(300.dp)
+                        .clip(RoundedCornerShape(12.dp)),
+                    contentScale = ContentScale.Crop,
+                )
+            }
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -210,6 +235,56 @@ internal fun CompanionContent(entry: LibraryEntry?) {
                 }
                 if (entry.playtimeSeconds > 0) {
                     Text("Played ${entry.playtimeSeconds / 60} min", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
+                }
+                // Real DateUtils relative formatting ("3 days ago"), the
+                // standard Android phrasing -- never a raw epoch or a
+                // hand-rolled "N days" that drifts from what the OS
+                // itself would say for the same instant.
+                entry.lastPlayedEpochMs?.let { lastPlayed ->
+                    val context = LocalContext.current
+                    Text(
+                        "Last played " + android.text.format.DateUtils.getRelativeTimeSpanString(
+                            lastPlayed,
+                            System.currentTimeMillis(),
+                            android.text.format.DateUtils.MINUTE_IN_MILLIS,
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+                // Real, existing update tracking (docs/SPEC.md 7g) --
+                // never a second "is this current" check invented here.
+                entry.availableUpdate?.let { latest ->
+                    Text(
+                        "Update available: $latest",
+                        color = MaterialTheme.colorScheme.tertiary,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+                // Which player will actually run this game, for console
+                // ROMs -- the same resolution Library.launch itself uses
+                // (ConsoleRomProvider.resolvePlayer: the game's own
+                // altEmulator, then the system's override, then the
+                // first installed candidate), read here rather than
+                // duplicated, so this line can never say something
+                // launch would not actually do. PC entries already carry
+                // their own source line below; engine games are named by
+                // the system line above (their engine IS the "system").
+                if (entry.systemId != null) {
+                    val context = LocalContext.current
+                    val system = remember(entry.systemId) {
+                        PlatformsDatabase.builtInsOrEmpty().firstOrNull { it.id == entry.systemId }
+                    }
+                    val player = remember(system, entry.altEmulator) {
+                        system?.let { resolvePlayer(context, it, entry.altEmulator) }
+                    }
+                    if (player != null) {
+                        Text(
+                            "Runs with " + player.name,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
                 }
                 // PC entries carry facts a ROM does not: which store it
                 // came from, how much disk it holds, and what other
