@@ -89,6 +89,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(updatesScreen())
         SettingsScreenRegistry.register(DroidtopWideSettings.globalScreen())
         SettingsScreenRegistry.register(DroidtopWideSettings.desktopScreen())
+        SettingsScreenRegistry.register(ContainersCatalog.screen())
     }
 
     // ------------------------------------------------------------------

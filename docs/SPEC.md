@@ -1279,18 +1279,33 @@ the `ContainerRuntime` interface that already exists (§3):
   desktop for a terminal" instead, since there is nowhere to show one.
 - The desktop session's PRIMARY container is listed like everything else
   but guarded (can't be deleted while it's the active desktop).
-- **What the screen is today (2026-09-25).** `ContainersActivity` is still
-  the flat list below, not the catalog screen designed next: one
-  scrolling list holding the header, the create panel and one card per
-  container (the create panel used to sit above a list of its own and ran
-  off a landscape screen, taking "Custom OCI reference" with it). A card
-  shows the name, primary or sibling, `image:tag` with the digest's first
-  twelve characters, and a state: STARTING (with the boot's latest line)
-  and RUNNING for the primary from the session, RUNNING for a sibling
-  with programs in it, STOPPED for one that must be started, READY for a
-  proot sibling, which needs no start. Actions: Start or Stop the desktop
-  (primary), Start (a sibling that needs it) or Stop (ends its programs),
-  Terminal, Delete; then Name (Rename), the VPN, Devices and Printing rows.
+- **What the screen is (built 2026-09-25).** The container manager is the
+  catalog screen `containers` (`ContainersCatalog`, registered with the
+  other settings screens): Desktop settings opens it in place, whichever
+  surface draws them, and `ContainersActivity` hosts it for the Desktop
+  taskbar with the shell's hint row (A Select, B Back, Y Info), in
+  droidtop's dark look, pad and touch alike. It replaced a hand-built
+  Material list with no focus, no hint row, an error line at the top of
+  the screen and a rename field under the keyboard (dq-desk2-02). The root
+  holds "Create a container" and one row per container: its name, "The
+  desktop's own" for the primary, `image:tag` with the digest's first
+  twelve characters, and its state (Starting and Running for the primary
+  from the session, Running for a sibling with programs in it, Stopped
+  for one that must be started, Ready for a proot sibling, which needs no
+  start). A container's page: the primary action (Start the desktop, which
+  opens Desktop; Stop the desktop, which ends the session; Start or Stop
+  for a sibling), Terminal, Name (a refused rename says why on the Name
+  row itself), Printing (primary), VPN (carry the device's traffic, the
+  apps it carries, Android's always-on settings), USB devices, Delete.
+  "Create a container" lists the Recommended repositories and "Any OCI
+  image"; a repository's page has **Version, a tag picker** over the live
+  tag list (`ImageTags.ordered`: the current tag first, marked
+  "(current)", then version numbers newest first, then the other tags, at
+  most 200, the rest reachable as a Custom reference), Name (defaulting as
+  below) and Create, which reports its progress on its own row. Text is
+  edited in the navigator's dialog, where the keyboard's Done key saves.
+  Not built yet from the design below: Restart, Recreate from the image,
+  storage used, Start with droidtop, Sockets and Mounts.
   **Names (decided 2026-09-25).** A container is called by a name the
   person chooses, never by its id (`droidtop-sibling-8993dfbd` told two
   terminals nothing, dq-desk2-01): `ContainerNames`, one file per backend
@@ -1769,7 +1784,7 @@ not settled designs):
   platform's framework and IPP Everywhere, and a second print path with
   its own driver model is duplication for no case the standing test names.
 - **USB peripherals.** A "Devices" row on each container's entry in the
-  container manager (§3d, `ContainerDevicesRow`) lists the USB devices
+  container manager (§3d, the USB devices group of a container's page) lists the USB devices
   Android enumerates now (`UsbManager.deviceList`, which needs no
   permission; each device's name is its node path) and lets each be bound
   into that container at the same path, from its next start. Under

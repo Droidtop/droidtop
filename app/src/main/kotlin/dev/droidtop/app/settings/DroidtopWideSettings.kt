@@ -168,17 +168,14 @@ object DroidtopWideSettings {
                                 )
                             },
                         ),
-                        ActionItem(
+                        // The container manager is a catalog screen of its own
+                        // (docs/SPEC.md 3d), opened in place by whichever
+                        // surface is showing these settings.
+                        dev.droidtop.library.settings.NestedScreenItem(
                             id = "pref_desktop_containers",
                             title = "Containers",
                             subtitle = "Manage Linux containers and distros: create, start, stop, delete",
-                            run = { ctx ->
-                                ctx.startActivity(
-                                    Intent("dev.droidtop.app.action.CONTAINERS")
-                                        .setPackage(ctx.packageName)
-                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                                )
-                            },
+                            registryId = ContainersCatalog.SCREEN_ID,
                         ),
                     ),
                 ),

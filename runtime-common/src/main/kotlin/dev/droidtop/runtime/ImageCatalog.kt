@@ -148,6 +148,18 @@ object ImageTags {
         return tags.filter { VERSION.matches(it) }.maxWithOrNull { a, b -> compareVersions(a, b) }
     }
 
+    /**
+     * [tags] in the order a version picker offers them: the current tag
+     * ([current]) first, then plain version numbers newest first, then
+     * every other tag, at most [limit].
+     */
+    fun ordered(tags: List<String>, limit: Int): List<String> {
+        val current = current(tags)
+        val versions = tags.filter { it != current && VERSION.matches(it) }.sortedWith { a, b -> compareVersions(b, a) }
+        val others = tags.filter { it != current && !VERSION.matches(it) }.sortedDescending()
+        return (listOfNotNull(current) + versions + others).distinct().take(limit)
+    }
+
     private fun compareVersions(a: String, b: String): Int {
         val left = a.split('.').map { it.toBigInteger() }
         val right = b.split('.').map { it.toBigInteger() }
