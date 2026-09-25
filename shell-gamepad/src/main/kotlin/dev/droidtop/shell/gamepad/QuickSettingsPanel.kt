@@ -95,7 +95,6 @@ import java.util.Date
 internal fun QuickSettingsPanel(
     sheetWidthDp: Int,
     onDismiss: () -> Unit,
-    tabHint: Pair<GamepadAction, String>,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -261,14 +260,15 @@ internal fun QuickSettingsPanel(
             }
         }
         // The same bar the Notifications tab beside this one uses: on a
-        // touch screen these are the controls, not a legend. L1/R1 is
-        // named too: a pad user cannot tap the tabs above.
+        // touch screen these are the controls, not a legend. L1/R1 switches
+        // tabs but is no longer named here -- see the ShoulderGlyph beside
+        // the tab row itself, above (owner, 2026-09-25: "Can remove the
+        // next/previous section pills").
         TouchHintBar(
             hints = listOf(
                 GamepadAction.LEFT to "Lower",
                 GamepadAction.RIGHT to "Raise",
                 GamepadAction.A to "Act",
-                tabHint,
                 GamepadAction.B to "Close",
             ),
             background = Color.Transparent,
