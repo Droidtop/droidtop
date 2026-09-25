@@ -155,6 +155,16 @@
             android:exported="false" />
 
         <!--
+          The first-run tutorial (docs/SPEC.md 7b), shown when onboarding
+          finishes and from Global settings' "Show the tutorial". Started
+          only from inside this APK.
+        -->
+        <activity
+            android:name="dev.droidtop.app.TutorialActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|navigation" />
+
+        <!--
           Launching one library entry with no mode attached: how the
           Launcher (and adb, for checking it) reaches the shared launch
           resolution while Gaming is off. Exported so the launcher's own
