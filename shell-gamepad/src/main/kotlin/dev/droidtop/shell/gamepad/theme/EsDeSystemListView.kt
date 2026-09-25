@@ -391,6 +391,33 @@ fun EsDeSystemListView(
 }
 
 /**
+ * ES-DE's own wraparound "shortest path" logic
+ * (`CarouselComponent::onCursorChanged`'s `posMax` handling): the signed
+ * step from [from] that lands on the entry at [toIndex], choosing
+ * whichever direction crosses fewer entries -- so a step off either end
+ * of a looping list continues one step further in the same direction
+ * ([from] plus or minus 1) instead of reversing across the whole list to
+ * reach the wrapped index directly. The result is not reduced modulo
+ * [entryCount]: [from] (`camOffset`) is meant to grow or shrink without
+ * bound as the cursor keeps moving one way, and it is the RENDERED index
+ * that wraps (`EsDeSystemSlide.wrap`, [layoutEsDeCarousel]), not this
+ * animated position. Zero or one entries never move.
+ *
+ * On an exact tie (halfway around an even-length list) this picks the
+ * forward direction; real ES-DE's own tie-break is not observable
+ * without a device at that exact state, and either choice reduces to the
+ * same on-screen index.
+ */
+internal fun shortestCamOffsetStep(from: Float, toIndex: Int, entryCount: Int): Float {
+    if (entryCount <= 1) return from
+    val raw = toIndex - from
+    var wrapped = raw % entryCount
+    if (wrapped > entryCount / 2f) wrapped -= entryCount
+    if (wrapped <= -entryCount / 2f) wrapped += entryCount
+    return from + wrapped
+}
+
+/**
  * Real ES-DE carousel rendering. All FOUR real carousel types --
  * `horizontal`, `vertical`, `horizontalWheel`, `verticalWheel` -- now
  * render with their own real geometry; before this pass droidtop
@@ -418,10 +445,18 @@ fun EsDeSystemListView(
  * animation restarts mid-flight at a fractional distance rather than a
  * full one-item step. `itemTransitions="instant"` skips the animation
  * entirely, which is exactly what real ES-DE's own
- * `mInstantItemTransitions` does. Not ported: ES-DE's real wraparound
- * "shortest path" logic for a looping carousel (`onCursorChanged`'s
- * `posMax` handling) -- droidtop's list isn't circular in its animation,
- * so a direct `animateTo` is the correct real behavior here.
+ * `mInstantItemTransitions` does. `camOffset` is also real ES-DE's
+ * wraparound "shortest path" logic (`onCursorChanged`'s `posMax`
+ * handling, ported as [shortestCamOffsetStep]): the target is the
+ * SHORTEST signed step from wherever `camOffset` already is, never the
+ * raw `focusedIndex`, so stepping forward off the last item animates one
+ * step further in the same direction (into `entryCount`, which
+ * [layoutEsDeCarousel] already reduces by modulo when it draws) instead
+ * of animating backward through every item to reach `0`. `camOffset`
+ * itself is therefore unbounded -- it is the on-screen INDEX that wraps,
+ * via modulo, not this animated position (owner, on the RP5 console,
+ * 2026-09-25: "it cycles back to the beginning, but by darting back, not
+ * continuing to go forward").
  *
  * `imageType` IS now honored (the library-core data-model change it was
  * blocked on landed as `LibraryEntry.mediaLocator`) -- see
@@ -547,7 +582,7 @@ private fun EsDeCarousel(
 
     LaunchedEffect(focusedIndex, config.instantItemTransitions) {
         val startPos = camOffset.value
-        val target = focusedIndex.toFloat()
+        val target = shortestCamOffsetStep(startPos, focusedIndex, items.size)
         if (config.instantItemTransitions) {
             camOffset.snapTo(target)
             return@LaunchedEffect
