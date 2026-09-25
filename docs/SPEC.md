@@ -392,7 +392,8 @@ Launcher could not show or launch a single library game: droidtop's
 package had no launcher activity, and the fork hid everything in its own
 package from the drawer. It now works like this:
 
-- A **Games** icon in the drawer (`LauncherGamesActivity`, `:app`) opens a
+- With Gaming and Desktop both off, droidtop's one icon in the drawer
+  (`LauncherGamesActivity`, `:app`; see "One droidtop icon" below) opens a
   grid of the library's games — the same `LibraryKinds.GAMES` scan the
   Gaming shell's Games section reads, run by the same loop
   (`Library.scanFollowingGamesRoots`, which follows the games roots as they
@@ -417,27 +418,62 @@ package from the drawer. It now works like this:
   none (a remote cover would mean a network fetch to build an icon).
 - The fork's `AppFilter` still hides droidtop's own package except this
   one component, and `NativeAppProvider` leaves droidtop's own package out
-  of the Apps list, so the Games icon never shows as an "app" in Gaming or
+  of the Apps list, so droidtop's icon never shows as an "app" in Gaming or
   Desktop.
-- A pinned game's shortcut names `LauncherGamesActivity` as its activity,
-  so it never depends on the gated `OpenShells` icon below.
+- A pinned game's shortcut names `LauncherGamesActivity`, the package's one
+  launcher activity, as its activity.
 
-It is not mode-gated, deliberately. It runs nothing until someone opens
-it, and it is the package's one always-enabled MAIN/LAUNCHER activity,
-which Android requires before it will accept a pinned shortcut from
-droidtop at all; disabling it with the fork would take the pinned games
-with it. The package's other launcher entry is `OpenShells`, an alias of
-`MainActivity` that is droidtop's own icon in another launcher's drawer
-(§7b, "Home screen"); it is a mode piece (`APP_SHELLS_ICON`), enabled
-exactly while Gaming or Desktop is on, and the fork's `AppFilter` hides it
-because droidtop's own home screen reaches the shells through its
-back-button menu. With
-"Alternative" set as home, it is the same Games icon in the other
-launcher's drawer — one more entry point onto the shared library, which
-is what "with Gaming off, games still launch" needs. Every game is not
-put in the drawer as its own icon: the drawer is `LauncherApps`, which
-lists installed activities only, and faking entries into it would mean
-rewriting the fork's app model.
+**One droidtop icon (decided 2026-09-25).** The package has exactly one
+MAIN/LAUNCHER activity, `LauncherGamesActivity`, labelled "droidtop", and
+it is the same icon in every launcher, droidtop's own included. What a tap
+does depends on what is set up: unfinished onboarding resumes at its step
+(§7b); else, with Gaming or Desktop on, it opens `MainActivity` with no
+mode named, so the default or last-used shell opens; else it draws the
+games grid above. It used to be two icons with droidtop's picture on them:
+this one labelled "Games", and `OpenShells`, an alias of `MainActivity`
+labelled "droidtop" that was a mode piece and hidden by droidtop's own
+launcher. BlueStacks' launcher labels every entry with the application's
+name, so a newcomer saw two identical "droidtop" icons and took droidtop
+for installed twice, and from droidtop's own home screen there was no icon
+into Gaming at all (rig, dq-coordinator-24). The alias and its mode piece
+are gone. The icon is not mode-gated: it runs nothing until someone opens
+it, and Android requires an enabled launcher activity before it accepts a
+pinned shortcut from droidtop at all. The class keeps its old name because
+every pinned game names it. Finishing onboarding with droidtop's own
+launcher as Home puts this icon on the home screen through the launcher's
+own install queue (`HomeRolePrefs.placeDroidtopIcon`), so the way into
+Gaming or Desktop is on the first screen, not only in the drawer. Every
+game is not put in the drawer as its own icon: the drawer is
+`LauncherApps`, which lists installed activities only, and faking entries
+into it would mean rewriting the fork's app model.
+
+**Home goes to the default mode (decided 2026-09-25).** A Home press goes
+where `ModeGate.homeTarget` says: the default mode the person chose (in
+onboarding, or Global settings > Default mode), when it is on; else the
+mode they last used; else the Android home screen. The Launcher3 fork and
+the Alternative forwarder both ask it, on a cold start and on every Home
+press. It used to follow the last-used mode alone, so a person who
+answered "Opens into Android" and then opened Gaming once had every later
+Home press land back in Gaming (rig, dq-coordinator-24). An explicit
+"Android" from the mode switcher (`BackButtonMenu.openHome`, which names
+the mode in its intent) shows the home screen and is never forwarded.
+Default mode offers Android whenever droidtop holds the home screen, so
+onboarding's answer reads back there instead of "Whichever was used last";
+"Whichever was used last" keeps the old behaviour for whoever picks it.
+
+**Switching modes is named on every surface (decided 2026-09-25).** The
+mode switcher (`BackButtonMenu`: Android, the modes that are on, and
+"Modes and settings") opens from a long-press of Back anywhere, and by
+name from each surface, because the long press alone is invisible to a
+newcomer and BlueStacks never delivers it: the Android home screen's
+long-press menu ("droidtop modes"), Gaming's Quick Menu, System tab
+("Switch mode"), and the Desktop taskbar ("Modes"). A surface with no
+Activity of its own to hand opens it through `ModeSwitcherActivity`.
+"Modes and settings" opens Global settings, where each mode is switched on
+and off, and Global settings is the first row of the launcher's settings
+list and of Desktop's settings as well as Gaming's; turning a mode off is
+always reversible from the UI (it once took a data clear, dq-coordinator-23
+F5).
 
 ### Gaming mode — the gaming-focused shell (renamed from Handheld)
 
@@ -524,6 +560,18 @@ Deliberately not component-gated, with reasons: a device-admin receiver
 (disabling an active admin is not droidtop's call behind the user's
 back), exported Activities the HOME role already gates, and the
 launcher's ContentProviders, whose `onCreate` is a bare `return true`.
+
+**A games folder is walked when it is added.** `GamesRoots.walkIfChanged`
+is the one step from "the folders changed" to "the library has their
+games", and it has two callers: every surface that lists games runs it for
+as long as it is open (`Library.scanFollowingGamesRoots`), and the shared
+core runs it the moment the folder preference changes, for the life of the
+process (`GamesRoots.follow`, installed from `DroidtopApplication`), so a
+folder added in onboarding or Settings is walked whichever mode is on and
+whichever surface is open. That walk is the person's own act, not the slow
+pass, which still runs only while something observes the library. It used
+to wait for the Gaming shell, so after "Open Android" the launcher's games
+said "No games yet" (rig, dq-coordinator-24).
 
 The Gaming and Desktop switches are set in two places and read in one:
 onboarding writes them from "Anything else to set up" when it finishes
@@ -3036,6 +3084,23 @@ rig's new-user passes, which try to break onboarding on purpose.
 **Themes are chosen during setup (directed 2026-09-24).** Onboarding includes the theme
 downloader (the same Browse themes screen Settings opens, one mechanism), so a person can pick and
 download another ES-DE theme before they first see the Gaming shell, not only the bundled default.
+Built 2026-09-25: the Appearance step's "Get more themes" draws `ThemeBrowserScreen` in place of the
+step, and the theme list is read again when it returns.
+
+**Onboarding survives becoming Home (decided 2026-09-25).** droidtop is a Home candidate from the
+moment it is installed, and a person may make it the Home app before or during setup: in Android's
+chooser, in Settings > Default apps, or through the Home screen step itself. So every droidtop entry
+point asks `OnboardingGate.resumeIfUnfinished` first: the Launcher3 fork (cold start and every Home
+press), the Alternative forwarder, droidtop's icon and `MainActivity`. While setup is unfinished each
+of them hands over to the running onboarding (one instance: `CLEAR_TOP` with `SINGLE_TOP`) instead of
+drawing itself; the rig found the home screen drawn over an unfinished setup with nothing saying so,
+and only Recents (labelled "Games") or the icon (which restarted at step 1) as ways back
+(dq-coordinator-24). A first run is written down as it goes (`OnboardingProgress`, the run's answers
+as JSON; folders, grants and the home role are real state already), so a new process resumes at the
+same step with the same answers; one force-stop used to keep only the folder list. "Leave setup" is a
+real answer: for the rest of that process the Home key shows the home screen, and the next process,
+or a tap on droidtop's icon, resumes. The gate no longer runs from `Application.onCreate`, which also
+starts for a broadcast, a bound service or a pinned game. Recents names the task "droidtop setup".
 
 ### What onboarding is for
 
@@ -3053,8 +3118,20 @@ used through, and finally which of the things actually configured droidtop opens
 
 Onboarding is one scaffold, not a set of unrelated screens. The scaffold owns:
 
-- **Progress**, always visible: which step this is out of the steps this run will actually
-  present. A person must be able to tell how much is left.
+- **Progress**, always visible, counting parts that never change (decided 2026-09-25): "Part 3 of
+  6: What to set up", over six segments (Welcome, Home screen, What to set up, Your games, Controls
+  and look, Finish). The steps inside a part come and go with the answers; the parts do not, and a
+  part a run has nothing to ask in is passed over and still counted. Counting steps against the plan
+  was accurate and still read as broken, because the total moved as answers came in ("1 of 7", then
+  "2 of 8", "4 of 10", and "of 7" again after a restart; dq-coordinator-24). The plan is still the
+  pipeline.
+- **Pad-first** (decided 2026-09-25). The pad's selection starts on the step's forward action, or on
+  its first answer when the step asks something (asked again for a moment, since some answers are
+  read off the main thread, then the forward action). Every button and answer takes the pad's A
+  (`padClick`; Compose's `clickable` answers Enter and DPAD_CENTER, never BUTTON_A) and draws the
+  shell's accent ring when it has focus; the window owns the pad (`ownPadButtons`), so B is Back; and
+  a hint row (A Select, B Back) is the touch route to both. On the rig, A did nothing on Welcome, no
+  focus showed anywhere, and D-pad Down went up to Back (dq-coordinator-24).
 - **Back**, always available, stepping back through the path actually taken. System Back
   is the same control. Leaving onboarding is a deliberate act with a confirmation — never
   one Back press, which today drops to the system home.
@@ -3115,9 +3192,8 @@ buttons and a link. The component is the shell's existing menu row anatomy
 - **Home screen.** How the home screen behaves when Home is pressed: droidtop's own Standard
   launcher, Alternative (droidtop holds the HOME role and forwards to a launcher the person
   already has), or neither, in which case droidtop claims no `CATEGORY_HOME` role.
-  Whenever droidtop is not the home screen, its icon in the launcher that is (`OpenShells`)
-  opens the default or last-used mode like any other app, beside the Games icon (§2c). With
-  Gaming and Desktop both off it has nothing to open and is not offered.
+  droidtop's one icon (§2c, "One droidtop icon") is in whichever launcher is the home screen,
+  droidtop's own included, and opens the default or last-used mode like any other app.
   - *Standard* points at the Standard shell's own settings rather than re-inventing them,
     and returns to onboarding afterwards.
   - *Alternative* lists the installed home activities with their icons and their application
@@ -3151,8 +3227,12 @@ buttons and a link. The component is the shell's existing menu row anatomy
 - **Game folders.** The single name for this concept, everywhere in droidtop. Two routes, both
   first-class: the system picker, and a typed path for what the picker cannot reach (an
   emulator's host share, a mount a rooted device adds, a USB drive), validated for real before
-  it is stored. Each added folder is a row showing the path, what the scan found under it, and
-  a way to remove it. The step reports the result of the scan; a folder that yields nothing is
+  it is stored. Readable folders the picker cannot offer are listed under "Found on this device"
+  (directories under `/storage` other than the emulated internal storage, and under
+  `/mnt/windows`, where emulators mount a host share), each with Add; the typed path's example
+  names no folder, since a newcomer had to already know the share's path (dq-coordinator-24).
+  Adding a folder starts the library's walk of it at once (§2c). Each added folder is a row
+  showing the path, what the scan found under it, and a way to remove it. The step reports the result of the scan; a folder that yields nothing is
   a fact the person learns here, not after onboarding.
 - **No games yet.** When nothing is found, droidtop offers concrete repairs rather than an
   empty library, following ES-DE: choose a different folder, generate the conventional
@@ -3200,7 +3280,9 @@ buttons and a link. The component is the shell's existing menu row anatomy
   This step replaces the earlier `PORTRAIT_THEME` step, which appeared only when droidtop had
   already swapped the theme and offered exactly two answers, one of them hardcoded to DEcaffe.
   A person setting droidtop up chooses their theme; they are not handed a swap to ratify.
-- **Keyboard.** Optional. droidtop cannot set the system input method itself, so it states why
+- **Keyboard.** Asked only of a run setting up Desktop (decided 2026-09-25): its reason is
+  terminals and Windows programs, and a Gaming-only run was asked about software it had just said
+  it did not want. Optional. droidtop cannot set the system input method itself, so it states why
   a desktop keyboard is needed, hands over to Android's own screens, and reflects what came
   back. Declining is a real answer, not a nag. A primary action always produces visible
   feedback, including when the platform screen it opens does not exist on this API level.
@@ -3209,11 +3291,34 @@ buttons and a link. The component is the shell's existing menu row anatomy
   check passed. When exactly one mode qualifies this is a confirmation, not a question with
   one answer. When none does, it is a confirmation that droidtop opens into Gaming, which
   explains what to add.
-- **What next.** Onboarding ends with a summary: what was set up, what was skipped, and where
-  in Settings each skipped thing lives, and whether it is now off, then one action into the
-  chosen mode. It does not end by returning to the system home. "Android" opens the home
+- **Default mode is also where Home goes** (§2c, "Home goes to the default mode"), and the step
+  says so.
+- **What next.** Onboarding ends with a summary: what was set up, what was skipped (skipped
+  steps included: Controller, Keyboard), and where in Settings each skipped thing lives, and
+  whether it is now off; then what a newcomer will want a minute later and is asked where it is
+  used (scraping, the Windows games download, notification access), named with where it is; then
+  one action into the chosen mode. Finishing with droidtop's own launcher as Home puts droidtop's
+  icon on its home screen, and the first-run tutorial opens over the first frame of the chosen
+  mode. It does not end by returning to the system home. "Android" opens the home
   screen droidtop holds, through the same `BackButtonMenu.openHome` the mode switcher uses;
   it is not a `MainActivity` shell.
+
+### The first-run tutorial
+
+Built 2026-09-25 (`TutorialActivity`). It covers what onboarding cannot ask about, in the order
+the rig's new-user pass asked for (dq-coordinator-24, "Tutorial should cover"): getting around (the
+controls, and that the hint row is also the touch route to them), finding and launching games, a
+game's page (Play, what runs it, the one Windows download), the Quick Menu, switching modes,
+Settings, and where help is. Rules:
+
+- It tells a setup only what it has: the Gaming pages only while Gaming is on, the ways into a mode
+  that this home screen and these modes actually have, and where the Home button goes
+  (`TutorialPages.build`, pure over the setup, unit-tested). Button names come from
+  `GamepadKeyMap.labelFor`, so a swapped pad reads right.
+- It opens once, over the first frame of the mode onboarding opens into, and again from Global
+  settings > "Show the tutorial". Every page but the last has "Skip the tutorial".
+- It is driven like every droidtop screen: A and the filled button go on, B goes back a page (out,
+  on the first), the hint row is tappable, the selection starts on the way on.
 
 ### Copy
 
