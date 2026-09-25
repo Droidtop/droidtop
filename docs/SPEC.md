@@ -425,7 +425,8 @@ package from the drawer. It now works like this:
   grid offers "Add a games folder" rather than a sentence. It runs in a task
   of its own (`taskAffinity`), so the icon never brings back another
   droidtop screen left in the package's shared task, and B from the grid
-  goes home.
+  goes home. Game folders opened in the grid carries its own hint row
+  (A Select, Y Info, B Back), since the settings navigator draws none.
 - A tap or A launches through `GameLaunchActivity.dispatch`, which is
   `Library.launch` (play history and launch-screen memory included).
 - Y or a long press pins the game to the home screen as an ordinary icon: a
@@ -5080,7 +5081,9 @@ the row says the screensaver shows only when its timer is the shorter.
 Holding Select for the Quick Menu is the key event's own repeat count, never
 a count of KeyDowns since the last KeyUp the root saw: the KeyUp of a short
 press is taken by the menu it opens, and the next short press opened the
-Quick Menu behind the gamelist options (rig, dq-shell2-01).
+Quick Menu behind the gamelist options (rig, dq-shell2-01). While the
+screensaver shows it has the whole window: the tab bar and the hint row
+stand down.
 The setting has one definition (`ScreensaverPrefs`) that the row writes
 and the shell's idle timer OBSERVES: the row lives inside the shell, so a
 value read once at start left a newly chosen timer on Off until the app
@@ -6125,7 +6128,10 @@ keyless thumbnails gave a cover is found AND refused, and a source that
 refused every request leads the summary with that refusal and its fix
 whatever the thumbnails found (rig, dq-shell2-01: a wrong key read "found
 1"). A JSON error body is reduced to its own sentence (`status`, `message`,
-`error`), never shown raw. **A result is shown whole**: the options menu
+`error`), never shown raw. **A list follows its selection only as far as it takes to show it**
+(settings, choice pickers, the Quick Menu): a row already wholly on screen
+does not move, so a tap never scrolls the next row under the finger (rig,
+dq-shell2-01). **A result is shown whole**: the options menu
 draws an action's result as wrapped text under the actions, in a panel
 that scrolls, never as a row cut to a line, because the fix is the last
 sentence.
@@ -7525,7 +7531,13 @@ only when the app is its own installer of record (true from the second
 in-app update onward) -- genuine silent updates where allowed, the
 confirmation dialog everywhere else. No installer permission is assumed, no
 root is used (root stays desktop-only), and nothing is sideloaded around
-the platform's checks.
+the platform's checks. droidtop asks `canRequestPackageInstalls()` before
+it downloads: when "install unknown apps" is not granted it opens that
+setting for droidtop and says what to turn on, rather than letting the
+installer stop at "not allowed to install unknown apps from this source".
+The Check now row then reports the installer's own answer for the session
+-- installed, cancelled, or refused with its reason -- and never "handed to
+the installer" as if that were an outcome (rig, dq-shell2-01).
 
 **Engine-plugin bundles -- where auto-update genuinely lives.** Bundles are
 enginehost's own signed payloads, so replacing one is not an APK install
