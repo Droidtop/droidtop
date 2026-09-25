@@ -8,6 +8,7 @@ import dev.droidtop.library.FileGameRecordStore
 import dev.droidtop.library.LibraryIndexDatabase
 import dev.droidtop.library.RoomLibraryIndexStore
 import dev.droidtop.library.RoomFavoritesStore
+import dev.droidtop.library.RoomGameLinksStore
 import dev.droidtop.library.RoomPlayHistoryStore
 import dev.droidtop.library.consoles.ConsoleRomProvider
 import dev.droidtop.runtime.PrimaryContainerSession
@@ -109,6 +110,10 @@ object LibraryCore {
             slowRoundAllowed = {
                 app.getSystemService(android.os.PowerManager::class.java)?.isPowerSaveMode != true
             },
+            // Merged games' names and F95zone thread links, and the update
+            // source's answers (docs/SPEC.md 7g, 7m): the library's own
+            // facts, in the same database as play history.
+            links = RoomGameLinksStore(app),
         )
     }
 }

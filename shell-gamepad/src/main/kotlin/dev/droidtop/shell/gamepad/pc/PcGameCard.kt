@@ -126,6 +126,8 @@ internal fun PcGameCard(
                         append(entry.sourceLabel())
                         entry.engineLabel()?.let { append(" - ").append(it) }
                         if (pc?.installed == false) append(" - not installed")
+                        // The game's update, in the one wording (docs/SPEC.md 7g).
+                        entry.availableUpdate?.let { append(" - ").append(dev.droidtop.library.GameUpdates.line(it)) }
                     }
                 },
                 color = if (entry.missing) MenuTokens.Danger else MenuTokens.Value,

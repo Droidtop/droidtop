@@ -185,6 +185,7 @@ class LibraryTest {
         assertTrue(playHistory.getAll(listOf(missing.id)).isEmpty())
         assertEquals(setOf(replacement.id), favorites.ids)
         assertEquals(listOf(missing.id to replacement.id), provider.moved)
+        assertEquals(listOf(false), provider.kept)
         assertEquals(listOf(replacement.id), index.slices[provider.indexKey]?.entries()?.map { it.id })
     }
 
@@ -195,6 +196,49 @@ class LibraryTest {
 
         assertFalse(library.replaceMissing(replacement, missing.copy(missing = false)))
         assertTrue(provider.moved.isEmpty())
+    }
+
+    @Test
+    fun `two games made one keep both folders, under one name, with the facts on the one card`() = runBlocking {
+        val older = LibraryEntry(id = "/games/renpy/StarHarbor-0.3-pc", title = "StarHarbor", kind = LibraryEntryKind.RENPY)
+        val newer = LibraryEntry(id = "/games/other/Star_Harbour-0.4-pc", title = "Star_Harbour", kind = LibraryEntryKind.RENPY)
+        val provider = FoldingProvider(LibraryEntryKind.RENPY, listOf(older, newer))
+        val playHistory = FakePlayHistoryStore()
+        val favorites = FakeFavoritesStore()
+        val links = FakeGameLinksStore()
+        val library = Library(listOf(provider), playHistory, favorites, links = links)
+        playHistory.recordPlay(older.id, 1_000L)
+        playHistory.recordPlay(newer.id, 3_000L)
+        favorites.setFavorite(older.id, true)
+        val groups = LibraryGrouping.group(listOf(older, newer))
+        assertEquals(2, groups.size)
+
+        assertTrue(library.mergeGames(groups.first { it.game.name == "StarHarbor" }, groups.first { it.game.name == "Star_Harbour" }))
+
+        // One game, named for the game it was asked from, with both folders
+        // still in it; the newer version is what its card draws, so the
+        // older card's history and favourite are there now.
+        val merged = LibraryGrouping.group(library.scanAll()).single()
+        assertEquals("StarHarbor", merged.game.name)
+        assertEquals(setOf(older.id, newer.id), merged.entriesByPath.keys)
+        assertEquals(newer.id, merged.displayEntry.id)
+        assertEquals(2, playHistory.getAll(listOf(newer.id))[newer.id]?.playCount)
+        assertEquals(3_000L, playHistory.getAll(listOf(newer.id))[newer.id]?.lastPlayedEpochMs)
+        assertEquals(setOf(newer.id), favorites.ids)
+        assertEquals(listOf(older.id to newer.id), provider.moved)
+        // Both folders are still here, so a scrape is copied, not taken.
+        assertEquals(listOf(true), provider.kept)
+    }
+
+    @Test
+    fun `a game is never merged with itself or with a store row`() = runBlocking {
+        val folder = LibraryEntry(id = "/games/renpy/StarHarbor-0.3-pc", title = "StarHarbor", kind = LibraryEntryKind.RENPY)
+        val store = LibraryEntry(id = "steam:1", title = "Star Harbor", kind = LibraryEntryKind.WINE_PROFILE)
+        val library = Library(listOf(FoldingProvider(LibraryEntryKind.RENPY, listOf(folder))), links = FakeGameLinksStore())
+        val groups = LibraryGrouping.group(listOf(folder, store))
+
+        assertFalse(library.mergeGames(groups[0], groups[0]))
+        assertFalse(library.mergeGames(groups.first { it.game.name == "StarHarbor" }, groups.first { it.game.name == "Star Harbor" }))
     }
 
     private val renpyGame = LibraryEntry(id = "/games/renpy/Known", title = "Known", kind = LibraryEntryKind.RENPY)
@@ -316,11 +360,30 @@ private class FoldingProvider(
 ) : LibraryProvider, EntryFactsOwner {
     override val kinds = setOf(kind)
     val moved = mutableListOf<Pair<String, String>>()
+    val kept = mutableListOf<Boolean>()
     override suspend fun scan(): List<LibraryEntry> = entries
     override suspend fun launch(entry: LibraryEntry) {}
-    override suspend fun moveEntryFacts(fromId: String, toId: String) {
+    override suspend fun moveEntryFacts(fromId: String, toId: String, keepSource: Boolean) {
         moved += fromId to toId
+        kept += keepSource
     }
+}
+
+/** The library's own links (merged names, thread links), in memory. */
+private class FakeGameLinksStore : GameLinksStore {
+    val names = mutableMapOf<String, String>()
+    override suspend fun getAll(ids: Collection<String>): Map<String, GameLinks> =
+        ids.mapNotNull { id -> names[id]?.let { id to GameLinks(gameName = it) } }.toMap()
+    override suspend fun setGameName(ids: Collection<String>, name: String) {
+        ids.forEach { names[it] = name }
+    }
+    override suspend fun setF95Thread(ids: Collection<String>, thread: Long?) {}
+    override suspend fun moveTo(fromId: String, toId: String) {
+        names.remove(fromId)?.let { names.putIfAbsent(toId, it) }
+    }
+    override suspend fun linkedThreads(): Map<Long, F95ThreadCheck?> = emptyMap()
+    override suspend fun idsLinkedTo(thread: Long): List<String> = emptyList()
+    override suspend fun saveCheck(check: F95ThreadCheck) {}
 }
 
 private class FakeFoldIndexStore(val slices: MutableMap<String, LibrarySlice>) : LibraryIndexStore {

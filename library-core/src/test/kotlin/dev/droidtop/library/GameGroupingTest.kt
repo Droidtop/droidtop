@@ -215,4 +215,62 @@ class GameGroupingTest {
         assertEquals("ThiefofHeartsPart3-0.0.9-pc", qualifiedFolderTitle(File("/games/renpy/Thief of Hearts/ThiefofHeartsPart3-0.0.9-pc")))
         assertEquals("Part Time Job", qualifiedFolderTitle(File("/games/renpy/Part Time Job")))
     }
+
+    @Test
+    fun `an update is the game's, and a version already here is not offered again`() {
+        val game = GameGrouping.group(
+            listOf(
+                GameGrouping.Found("/games/x/StarHarbor-0.9.5-pc", latestKnown = "v0.9.6"),
+                GameGrouping.Found("/games/x/StarHarbor-0.9.6-pc"),
+            ),
+        ).single()
+
+        assertFalse(game.updateAvailable)
+        assertTrue(game.allVersions.none { it.updateAvailable })
+    }
+
+    @Test
+    fun `an update the game does not have is on every one of its versions`() {
+        val game = GameGrouping.group(
+            listOf(
+                GameGrouping.Found("/games/x/StarHarbor-0.9.4-pc"),
+                GameGrouping.Found("/games/x/StarHarbor-0.9.5-pc", latestKnown = "0.9.6"),
+            ),
+        ).single()
+
+        assertEquals("0.9.6", game.availableUpdate)
+        assertEquals(listOf("0.9.6", "0.9.6"), game.allVersions.map { it.latestKnown })
+    }
+
+    @Test
+    fun `a game whose folders name no version claims no update`() {
+        val game = GameGrouping.group(listOf(GameGrouping.Found("/games/x/Star Harbor", latestKnown = "0.5"))).single()
+
+        assertFalse(game.updateAvailable)
+        // And a source with nothing to say says nothing.
+        assertEquals(null, GameUpdates.available("N/A", listOf("0.4")))
+        assertEquals(null, GameUpdates.available(" ", listOf("0.4")))
+    }
+
+    @Test
+    fun `an update reads the same wherever it is shown`() {
+        assertEquals("v0.9.6 is available", GameUpdates.line("0.9.6"))
+        assertEquals("Final is available", GameUpdates.line("Final"))
+    }
+
+    @Test
+    fun `a folder the user made part of a game is grouped under that game's name`() {
+        val games = GameGrouping.group(
+            listOf(
+                GameGrouping.Found("/games/a/StarHarbor-0.3-pc"),
+                GameGrouping.Found("/games/b/Star_Harbour_Remaster-0.4-pc", name = "StarHarbor"),
+                GameGrouping.Found("/games/b/Moon Garden-1.0"),
+            ),
+        )
+
+        assertEquals(listOf("Moon Garden", "StarHarbor"), games.map { it.name })
+        val merged = games.last()
+        assertEquals(listOf("0.4", "0.3"), merged.versions.map { it.version })
+        assertEquals("/games/b/Star_Harbour_Remaster-0.4-pc", merged.defaultVersion?.playable?.path)
+    }
 }

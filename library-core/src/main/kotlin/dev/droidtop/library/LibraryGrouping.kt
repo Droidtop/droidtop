@@ -22,16 +22,28 @@ data class LibraryGameGroup(
     /** The version and copy Play starts: newest version of the first segment. */
     val defaultCopy: GameCopy? get() = game.defaultVersion?.playable
 
-    /** The entry the list draws, titled with the game's own name. */
+    /**
+     * The entry the list draws, titled with the game's own name and
+     * carrying the game's available update, which no one folder can know
+     * (docs/SPEC.md 7g).
+     */
     val displayEntry: LibraryEntry
         get() {
             val entry = defaultCopy?.let { entriesByPath[it.path] }
                 ?: entriesByPath.values.first()
-            return if (entry.title == game.name) entry else entry.copy(title = game.name)
+            val update = game.availableUpdate
+            return if (entry.title == game.name && entry.availableUpdate == update) {
+                entry
+            } else {
+                entry.copy(title = game.name, availableUpdate = update)
+            }
         }
 
     /** How many folders this one card stands for. */
     val folders: Int get() = entriesByPath.size
+
+    /** The F95zone thread the user linked to this game, from whichever of its folders holds the link. */
+    val f95Thread: Long? get() = entriesByPath.values.firstNotNullOfOrNull { it.f95Thread }
 
     /** The entry one copy of this game is, or null when the scan no longer has it. */
     fun entryFor(copy: GameCopy): LibraryEntry? = entriesByPath[copy.path]
@@ -56,7 +68,16 @@ object LibraryGrouping {
     /** Every game in [entries], in the order their names sort. */
     fun group(entries: List<LibraryEntry>): List<LibraryGameGroup> {
         val byPath = entries.filter { it.id.isFolderPath() }.associateBy { it.id }
-        val grouped = GameGrouping.group(byPath.keys.map { GameGrouping.Found(path = it, installed = byPath[it]?.pcInfo?.installed != false) })
+        val grouped = GameGrouping.group(
+            byPath.values.map { entry ->
+                GameGrouping.Found(
+                    path = entry.id,
+                    installed = entry.pcInfo?.installed != false,
+                    latestKnown = entry.latestKnown,
+                    name = entry.gameName,
+                )
+            },
+        )
             .map { game -> LibraryGameGroup(game, game.allVersions.flatMap { it.copies }.mapNotNull { copy -> byPath[copy.path]?.let { copy.path to it } }.toMap()) }
             .filter { it.entriesByPath.isNotEmpty() }
         val ungrouped = entries.filterNot { it.id.isFolderPath() }.map { entry ->
@@ -67,14 +88,6 @@ object LibraryGrouping {
         }
         return (grouped + ungrouped).sortedBy { it.game.name.lowercase() }
     }
-
-    /**
-     * The group [entry] belongs to, among [among] -- what a detail screen
-     * asks so that it can offer the game's other versions and segments.
-     * Null when [entry] is not in [among] at all.
-     */
-    fun groupOf(entry: LibraryEntry, among: List<LibraryEntry>): LibraryGameGroup? =
-        group(among).firstOrNull { it.entriesByPath.containsKey(entry.id) }
 
     /**
      * A store row's id is `steam:440`; a scanned game's id is where it is.

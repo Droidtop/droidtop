@@ -28,6 +28,12 @@ data class GroupedGame(
     val versions: List<GameVersion> = emptyList(),
     /** The game's parts, in the order their own names give ([GameNaming.Segment]). */
     val segments: List<GameSegment> = emptyList(),
+    /**
+     * What an update source says the game's newest version is, as it said
+     * it (docs/SPEC.md 7g, "Where an update comes from"); null until
+     * something has looked.
+     */
+    val latestKnown: String? = null,
 ) {
     /** What the game's detail opens on: its first segment, or none when it has no parts. */
     val defaultSegment: GameSegment? get() = segments.firstOrNull()
@@ -46,8 +52,45 @@ data class GroupedGame(
     /** Whether any copy of this game is installed on this device. */
     val installed: Boolean get() = allVersions.any { version -> version.copies.any { it.installed } }
 
+    /** The version a source knows of that none of this game's folders is, or null ([GameUpdates.available]). */
+    val availableUpdate: String? get() = GameUpdates.available(latestKnown, allVersions.map { it.version })
+
     /** Whether some source knows of a version newer than the one that is here. */
-    val updateAvailable: Boolean get() = allVersions.any { it.updateAvailable }
+    val updateAvailable: Boolean get() = availableUpdate != null
+}
+
+/**
+ * Whether a version an update source names is one this device does not
+ * have, and the one wording for it (docs/SPEC.md 7g). The card, the
+ * detail's update row and every "Parts and versions" row say it with
+ * [line], so "an update is available" reads the same wherever it shows.
+ */
+object GameUpdates {
+
+    /**
+     * [latest] when it names a version none of [versions] is, else null.
+     *
+     * Pythia's rule (`f95_update_check.run_update_check`): a different
+     * string is an update, compared as the two sources write them, less a
+     * leading `v` (a folder says `0.9.5`, a thread says `v0.9.5`). Two
+     * cases say nothing: a source with no version to give (blank, or
+     * F95Checker's own `N/A`), and a game none of whose folders names a
+     * version, where there is nothing to compare with -- Pythia skips
+     * that case too (`if installed_version and ...`).
+     */
+    fun available(latest: String?, versions: Collection<String>): String? {
+        val newest = latest?.let(::normalize)?.takeIf { it.isNotEmpty() && !it.equals("N/A", ignoreCase = true) }
+            ?: return null
+        val here = versions.map(::normalize).filter { it.isNotEmpty() }
+        if (here.isEmpty()) return null
+        return if (here.any { it.equals(newest, ignoreCase = true) }) null else newest
+    }
+
+    /** "v0.9.6 is available": a version that starts with a digit gets its `v`, a name ("Final") does not. */
+    fun line(available: String): String =
+        (if (available.firstOrNull()?.isDigit() == true) "v$available" else available) + " is available"
+
+    private fun normalize(version: String): String = version.trim().removePrefix("v").removePrefix("V").trim()
 }
 
 /** One part of a game: `Week 1` of Fetish Locator, `Part 3` of Thief of Hearts. */
@@ -60,18 +103,21 @@ data class GameSegment(
 /**
  * One version of a game, and every copy of that version on this device.
  *
- * [latestKnown] is what a source says the newest version is (Pythia keeps
- * the same fact per entry as `available_updates[]`, written by its F95
- * update check); it is null until something has actually looked, which is
- * not the same as "up to date" and is not shown as such.
+ * [latestKnown] is the newer version a source knows of that the game has
+ * in none of its folders ([GroupedGame.availableUpdate]; Pythia keeps the
+ * same fact per entry as `available_updates[]`, written by its F95 update
+ * check). It is the GAME's fact, so every version of the game carries it,
+ * and it is null both until something has looked and when the newest
+ * version is already here: a row for `v0.8` does not offer `v0.9` while
+ * `v0.9` is the row beneath it.
  */
 data class GameVersion(
     val version: String,
     val copies: List<GameCopy> = emptyList(),
     val latestKnown: String? = null,
 ) {
-    /** Whether [latestKnown] names a version other than this one. */
-    val updateAvailable: Boolean get() = latestKnown != null && latestKnown != version
+    /** Whether a source knows of a version of this game that is not here. */
+    val updateAvailable: Boolean get() = latestKnown != null
 
     /**
      * The copy this version plays as: an installed one, else the first
@@ -138,9 +184,14 @@ data class GameCopy(
  * has nobody to ask, so only names that are equal once punctuation and
  * case are dropped merge on their own; a name that is merely SIMILAR is
  * never merged, and is offered to a person only where one is already
- * choosing ([MissingGames.candidates]). The corpus says why in three lines:
- * `love_of_magic_book1`, `book2` and `book3` are 0.94 similar and are
- * three different games.
+ * choosing ([MissingGames.candidates], [SimilarGames.candidates]). The
+ * corpus says why in three lines: `love_of_magic_book1`, `book2` and
+ * `book3` are 0.94 similar and are three different games.
+ *
+ * What a person has said wins over what a name derives: a folder the user
+ * made part of another game ([Found.name], docs/SPEC.md 7m "The same
+ * game") is grouped under that game's name, which is Pythia's
+ * `reconciliation.merge` recorded as the one fact it changes.
  */
 object GameGrouping {
 
@@ -150,8 +201,10 @@ object GameGrouping {
         val source: String? = null,
         val platforms: List<String> = emptyList(),
         val installed: Boolean = true,
-        /** The newest version a source knows of, when something has looked. */
+        /** The newest version an update source knows of for this folder's game, when something has looked. */
         val latestKnown: String? = null,
+        /** The game the user said this folder is (docs/SPEC.md 7m); null is the name the folder derives. */
+        val name: String? = null,
     )
 
     /**
@@ -163,8 +216,9 @@ object GameGrouping {
         val games = LinkedHashMap<String, Builder>()
         for (folder in found.sortedBy { it.path }) {
             val derived = GameNaming.derive(folder.path)
-            val key = GameNaming.nameKey(derived.name).ifEmpty { folder.path.lowercase() }
-            games.getOrPut(key) { Builder(derived.name) }.merge(derived, folder)
+            val name = folder.name?.takeIf { it.isNotBlank() } ?: derived.name
+            val key = GameNaming.nameKey(name).ifEmpty { folder.path.lowercase() }
+            games.getOrPut(key) { Builder(name) }.merge(derived, folder)
         }
         return games.values.map { it.build() }.sortedBy { it.name.lowercase() }
     }
@@ -179,7 +233,12 @@ object GameGrouping {
         private val direct = VersionsBuilder()
         private val segments = LinkedHashMap<String, SegmentBuilder>()
 
+        // The game's, not a folder's: whichever of its folders the update
+        // source was asked about, it answered for the game.
+        private var latestKnown: String? = null
+
         fun merge(derived: GameNaming.Derived, folder: Found) {
+            if (latestKnown == null) latestKnown = folder.latestKnown
             val copy = GameCopy(
                 path = folder.path,
                 mods = derived.mods,
@@ -194,21 +253,26 @@ object GameGrouping {
             } else {
                 segments.getOrPut(GameNaming.nameKey(segment.label)) { SegmentBuilder(segment) }.versions
             }
-            into.merge(derived.version, copy, folder.latestKnown)
+            into.merge(derived.version, copy)
         }
 
-        fun build(): GroupedGame = GroupedGame(
-            name = name,
-            versions = direct.build(),
-            segments = segments.values
-                .map { it.build() }
-                .sortedWith(compareBy({ it.order ?: Int.MAX_VALUE }, { it.label.lowercase() })),
-        )
+        fun build(): GroupedGame {
+            val every = direct.versions() + segments.values.flatMap { it.versions.versions() }
+            val available = GameUpdates.available(latestKnown, every)
+            return GroupedGame(
+                name = name,
+                versions = direct.build(available),
+                segments = segments.values
+                    .map { it.build(available) }
+                    .sortedWith(compareBy({ it.order ?: Int.MAX_VALUE }, { it.label.lowercase() })),
+                latestKnown = latestKnown,
+            )
+        }
 
         private class SegmentBuilder(val segment: GameNaming.Segment) {
             val versions = VersionsBuilder()
 
-            fun build(): GameSegment = GameSegment(segment.label, segment.order, versions.build())
+            fun build(available: String?): GameSegment = GameSegment(segment.label, segment.order, versions.build(available))
         }
     }
 
@@ -221,18 +285,18 @@ object GameGrouping {
      */
     private class VersionsBuilder {
         private val groups = LinkedHashMap<String, MutableList<GameCopy>>()
-        private val latest = HashMap<String, String>()
 
-        fun merge(version: String, copy: GameCopy, latestKnown: String?) {
+        fun merge(version: String, copy: GameCopy) {
             val copies = groups.getOrPut(version) { mutableListOf() }
             val existing = copies.indexOfFirst { it.path == copy.path }
             if (existing >= 0) copies[existing] = copy else copies += copy
-            latestKnown?.let { latest[version] = it }
         }
 
-        /** Newest first, which is the order everything downstream relies on. */
-        fun build(): List<GameVersion> = groups
-            .map { (version, copies) -> GameVersion(version, copies.toList(), latest[version]) }
+        fun versions(): Set<String> = groups.keys
+
+        /** Newest first, which is the order everything downstream relies on; [available] is the game's update, on each. */
+        fun build(available: String?): List<GameVersion> = groups
+            .map { (version, copies) -> GameVersion(version, copies.toList(), available) }
             .sortedWith(GameVersion.NEWEST_FIRST)
     }
 }

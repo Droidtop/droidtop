@@ -302,7 +302,8 @@ object GameNaming {
      * other and are three different games, as do `Lust Academy` and
      * `Lust Theory` at 0.75. Equal names merge ([sameGame]); similar names
      * are only offered, to a person choosing a missing game's replacement
-     * ([MissingGames.candidates]).
+     * ([MissingGames.candidates]) or saying two games are one
+     * ([SimilarGames.candidates]).
      */
     const val NAME_SIMILARITY_THRESHOLD = 0.6
 

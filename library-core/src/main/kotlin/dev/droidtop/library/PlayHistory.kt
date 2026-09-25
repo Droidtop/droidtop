@@ -72,3 +72,60 @@ object NoOpFavoritesStore : FavoritesStore {
     override suspend fun getAll(ids: Collection<String>): Set<String> = emptySet()
     override suspend fun moveTo(fromId: String, toId: String) {}
 }
+
+/**
+ * What the user has said about one entry's game, and what its update
+ * source last answered (docs/SPEC.md 7g and 7m).
+ */
+data class GameLinks(
+    /** The game the user made this folder part of; null is the name the folder derives. */
+    val gameName: String? = null,
+    /** The F95zone thread the user linked. */
+    val f95Thread: Long? = null,
+    /** What the update source last said about [f95Thread]; null until it has been asked. */
+    val check: F95ThreadCheck? = null,
+) {
+    /** The thread's version as the source wrote it, when it has one to give. */
+    val latestKnown: String? get() = check?.takeUnless { it.gone }?.version
+}
+
+/**
+ * The library's own store of [GameLinks], keyed by [LibraryEntry.id]
+ * like play history and favourites, and joined onto every list the
+ * library hands out the same way.
+ */
+interface GameLinksStore {
+    suspend fun getAll(ids: Collection<String>): Map<String, GameLinks>
+
+    /** [ids] are all the game called [name] from now on (docs/SPEC.md 7m, "The same game"). */
+    suspend fun setGameName(ids: Collection<String>, name: String)
+
+    /** Links [thread] to every one of [ids], or unlinks them when it is null. */
+    suspend fun setF95Thread(ids: Collection<String>, thread: Long?)
+
+    /**
+     * Carries [fromId]'s links to [toId] when a missing game is folded
+     * into the game that replaced it ([Library.replaceMissing]). Only into
+     * an empty place: a game that already has its own name or thread keeps
+     * it.
+     */
+    suspend fun moveTo(fromId: String, toId: String)
+
+    /** Every thread any entry links, with what the source last said about it. */
+    suspend fun linkedThreads(): Map<Long, F95ThreadCheck?>
+
+    /** The entries that link [thread]. */
+    suspend fun idsLinkedTo(thread: Long): List<String>
+
+    suspend fun saveCheck(check: F95ThreadCheck)
+}
+
+object NoOpGameLinksStore : GameLinksStore {
+    override suspend fun getAll(ids: Collection<String>): Map<String, GameLinks> = emptyMap()
+    override suspend fun setGameName(ids: Collection<String>, name: String) {}
+    override suspend fun setF95Thread(ids: Collection<String>, thread: Long?) {}
+    override suspend fun moveTo(fromId: String, toId: String) {}
+    override suspend fun linkedThreads(): Map<Long, F95ThreadCheck?> = emptyMap()
+    override suspend fun idsLinkedTo(thread: Long): List<String> = emptyList()
+    override suspend fun saveCheck(check: F95ThreadCheck) {}
+}
