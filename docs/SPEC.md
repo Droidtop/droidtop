@@ -9029,6 +9029,32 @@ root don't each reimplement the pairing handshake. It only answers
 whether the path is available; a plugin still declares `requestsRoot` or
 `boundServiceTargets` for what it actually intends to do with it.
 
+**Two generic per-installed-app checks, added 2026-09-26.**
+`PluginContext.isAppInstalled(packageName)` and `.launchApp(packageName)`
+answer "is this OTHER package installed" and "open its own launcher
+Activity", the same shape `hasShizukuAccess()` already special-cased for
+Shizuku's one package, generalised for any `app_status`-shaped plugin
+that manages a different installed app: `isAppInstalled` tells "not
+installed" apart from "installed but not doing what I need" (Shizuku's
+own installed-but-not-granted state, for one), and `launchApp` hands the
+user to that app's own setup/pairing/config screen without the plugin
+ever holding a `Context` of its own to build the `Intent` — both live in
+the isolated `:pluginhost` process next to `hasShizukuAccess`, same
+"PackageManager presence check, never throws" shape.
+
+**`hasRootApproval()` was dead code until 2026-09-26.**
+`PluginRuntimeService` built a fresh `PluginContext` per load but never
+threaded `PluginRecord.rootApproved` across the `loadPlugin` binder call
+— `hasRootApproval()` always returned `false`, so a plugin that declared
+`requestsRoot` and got both the plugin and its root request approved on
+the settings screen could still never see it granted. `IPluginRuntime.
+loadPlugin` now carries `rootApproved` (`NativePluginRunner.load` already
+had the whole `PluginRecord`, just never passed the one field on); the
+process also checks the device itself (`su -c id`) before granting it,
+cached for that process's lifetime, so `hasRootApproval()` finally means
+"device has root AND user approved" the way its own doc comment always
+said it did.
+
 **Root is an opt-in, per-plugin enhancement — never a requirement, never
 standard.** droidtop's own launcher and handheld code still never needs
 root (§3d, §7); that standing rule is unchanged. The one exception is
