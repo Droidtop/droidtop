@@ -675,8 +675,72 @@ sources rather than assumed from Nova/Apex's feature lists:
 | A home-screen widget of droidtop's own (a "full computer" feature neither Nova nor Apex can offer, since they have no game library) | **built this change** | `ContinuePlayingWidgetProvider.kt` (see below) |
 | Global settings, Desktop settings rendered in the shell's own row component, pad-navigable | HAVE (fixed 2026-09-24/25, UI pass H4) | `DroidtopWideSettings.kt`, `SettingsGlobalFragment.kt`'s `CatalogPreferenceNavigator` |
 | Icon-pack/drawer/hidden-apps settings pages left as stock Android preference UI | HAVE, and correct: H4's own fix text scopes the shell's row component to Global/Desktop only, and explicitly keeps these stock | `docs/audit-2026-09-24/ui-assessment.md` H4 |
-| Plugin contributions in the launcher (status tiles, search providers, app actions, launcher widgets from third-party engines/tools) | **not yet buildable** — plugin API is being rebuilt (agent `plugins`, §12/12a) | seam only, see below |
+| Plugin contributions in the launcher: status tiles (**built this change**), search providers and app actions (still not buildable -- see below) | PARTIAL | `PluginStatusWidgetProvider.kt`; see below |
 | Recent/frequently-used apps row in the app drawer | **built this change** | `RecentAppsStore`, `AlphabeticalAppsList.addRecentAppItems`; see below |
+
+**A real plugin-fed launcher surface: the status-tile home-screen widget
+(built this change).** §12a's `PluginCapability.STATUS_TILE` and
+`PluginStore.runnableFor` already documented themselves as "what an
+actual call site (a status tile row, a metadata pass) should iterate",
+but the only existing call site was a manual test button in the Plugins
+settings screen (`AppSettingsCatalogs.pluginsScreen`, "Call ...'s status
+tile"), not a real launcher surface. `PluginStatusWidgetProvider` is that
+call site: a droidtop-drawn home-screen widget (not a row inside Murine's
+own workspace grid, per §7k), same shape as the already-shipped
+`ContinuePlayingWidgetProvider` -- placeable from the Standard launcher's
+stock widget picker, refreshed on its own schedule (the system's periodic
+tick, or immediately after a plugin's approval/enabled state changes in
+Settings) rather than a background loop a plugin owns itself, matching
+`STATUS_TILE`'s own contract. Each refresh opens one short-lived
+`PluginCrashPolicy` connection per candidate plugin and tears it down
+right after; a plugin that times out or fails is dropped for that refresh
+rather than shown as broken.
+
+Two real, load-bearing bugs surfaced and were fixed while wiring this up,
+neither of them specific to the new widget:
+
+1. **droidtop's own home-screen widgets never appeared in its own widget
+   picker at all.** `WidgetsModel.WidgetValidityCheckForPicker` runs every
+   non-custom widget item through `AppFilter.shouldShowApp`, and
+   `AppFilter` hides every component in droidtop's own package except
+   `LauncherGamesActivity` (the "One droidtop icon" rule, aimed at the app
+   drawer/all-apps list) -- a rule that was never meant to cover a
+   home-screen widget (an explicit, opt-in placement surface) but applied
+   there too since the exemption was one hardcoded class name.
+   `ContinuePlayingWidgetProvider`'s own acceptance check ("place the
+   widget from the stock widget picker") could not have actually passed
+   before this fix; confirmed live on emulator-5560 that neither widget
+   appeared (droidtop's own `#custom-widget-scheme` smartspace clock still
+   did, since that path skips `AppFilter` entirely) until
+   `AppFilter.HIDE_SELF_EXEMPT_CLASSES` was extended to include both
+   widget providers.
+2. **A `native_bundle` plugin self-disables on its very first real call on
+   Android 10+.** Android refuses `DexClassLoader` on a file that is still
+   writable by the app ("Writable dex file ... is not allowed"); this
+   plugin worked fine through approval (a load, not an `invoke()`) and
+   then disabled itself the moment the new widget's first refresh actually
+   called it. `PluginBundleInstaller` wrote each payload file and never
+   marked it read-only afterwards, so this was never going to work on any
+   Android 10+ device -- it only looked like it worked because the
+   existing `dq-plugins-01` rig check ran entirely on BlueStacks (Android
+   9), which does not enforce this restriction. Fixed with one line
+   (`target.setReadOnly()` right after each payload file is written) --
+   `PluginContext`'s own doc comment already called the payload
+   "read-only" as if this were already true, and now it actually is.
+
+Rig-verified on emulator-5560 end to end, the user way: installed and
+approved the real `plugin-sample-statustile` bundle through Settings'
+own file picker, placed "Plugin status" from the stock widget picker,
+and it showed "Sample tile: loaded 1 time(s), called OK" -- a real
+`invoke()` round trip through the isolated `:pluginhost` process,
+rendered on the home screen.
+
+Scoped to status tiles only this pass, not search providers or app
+actions: `PluginCapability` has no search-provider capability defined at
+all (adding one here would be inventing API surface, not building
+against the real one -- a decision for whoever owns §12a next), and app
+actions (`PluginCapability.APP_STATUS`) has no real sample plugin yet to
+verify against. Both left open.
 
 **A real "Recent" row in the app drawer (built this change).**
 Confirmed genuinely absent first (grepped shell-default for predicted/
