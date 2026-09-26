@@ -5,8 +5,17 @@ import org.eclipse.jgit.api.MergeCommand
 import org.eclipse.jgit.api.ResetCommand
 import org.eclipse.jgit.api.errors.GitAPIException
 import org.eclipse.jgit.api.MergeResult
+import org.eclipse.jgit.lib.ProgressMonitor
 import org.json.JSONObject
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Real ES-DE theme-downloader parity -- mirrors `GuiThemeDownloader`'s own
@@ -34,6 +43,21 @@ import java.io.File
  * ES-DE's own handling for a repository somehow left in that state) --
  * not mirrored, since JGit's own clone/pull never leaves a repo that way
  * under droidtop's own usage.
+ *
+ * No shallow clone: the vendored JGit release droidtop ships
+ * (org.eclipse.jgit:org.eclipse.jgit 5.13.3, gradle/libs.versions.toml)
+ * predates `CloneCommand.setDepth` (added upstream in JGit 6.4; confirmed
+ * absent by decompiling this exact jar's `CloneCommand.class` -- it has
+ * no such method). A full, real git history of `themes-list.git`
+ * (160+ community themes, each with its own checked-in screenshot,
+ * accumulated over every edit anyone has ever made to that repo) is
+ * genuinely large to transfer on a plain connection -- the multi-minute
+ * first fetch (rig, p2-rig-theme-browser-fetch-hang) is real transfer
+ * time, not a bug in what droidtop asks for (`setCloneAllBranches(false)`
+ * already limits it to the one branch, not a recursive per-theme walk).
+ * [ThemeSyncProgress] and cooperative cancellation below make that wait
+ * visible and boundable instead of trying to make the transfer itself
+ * artificially fast.
  */
 object ThemeDownloader {
     private const val THEMES_LIST_URL = "https://gitlab.com/es-de/themes/themes-list.git"
@@ -46,8 +70,21 @@ object ThemeDownloader {
     // README for the real overlay format/mechanism.
     private const val THEME_PATCHES_URL = "https://github.com/droidtop/droidtop-theme-patches.git"
 
-    enum class ThemeSyncStatus { CLONED, UPDATED, UP_TO_DATE, DIVERGED, FAILED }
+    enum class ThemeSyncStatus { CLONED, UPDATED, UP_TO_DATE, DIVERGED, FAILED, CANCELLED }
     data class ThemeSyncResult(val status: ThemeSyncStatus, val error: Throwable? = null)
+
+    /**
+     * Real progress off JGit's own [ProgressMonitor] (rig,
+     * p2-rig-theme-browser-fetch-hang: the "Fetching the theme list..."
+     * screen never moved, and a newcomer had no way to tell "still
+     * working" from "stuck forever"). JGit reports whole transport
+     * phases as tasks ("remote: Counting objects", "Receiving objects",
+     * "Resolving deltas"), each with its own completed/total -- exactly
+     * what a real spinner needs, already computed, no polling of our own.
+     */
+    fun interface ThemeSyncProgress {
+        fun onUpdate(task: String, completed: Int, total: Int)
+    }
 
     data class ThemeScreenshot(val image: String, val caption: String)
 
@@ -67,8 +104,58 @@ object ThemeDownloader {
 
     fun themesListDir(userThemesDir: File): File = File(userThemesDir, THEMES_LIST_DIR_NAME)
 
-    fun syncThemesList(userThemesDir: File): ThemeSyncResult =
-        syncRepository(themesListDir(userThemesDir), THEMES_LIST_URL, allowReset = true)
+    /**
+     * Runs one blocking [sync] call (one of this object's own methods,
+     * given as a trailing lambda so every caller shares the SAME
+     * cancellation/progress wiring rather than reimplementing it -- the
+     * ONE mechanism droidtop's own Browse-themes screen and its
+     * onboarding background download both go through) off the main
+     * thread, with a stall watchdog: [ThemeSyncProgress] resets a clock
+     * on every real update JGit reports, and if [STALL_TIMEOUT_MS] passes
+     * with NO progress at all, `isCancelled` flips true -- JGit polls
+     * that cooperatively and stops cleanly rather than this needing to
+     * interrupt a blocking thread. A slow-but-progressing real transfer
+     * (this doc's own note on `themes-list.git`'s real history size) is
+     * left alone; only a genuine stall (dead connection, server gone
+     * quiet) is cut off. Fixes rig p2-rig-theme-browser-fetch-hang (no
+     * indication of a stall at all) and the download-never-completing
+     * half of p1-rig-onboarding-artbooknext-never-downloads (previously
+     * this could hang forever with no eventual FAILED status either).
+     */
+    suspend fun withStallWatchdog(
+        onProgress: (task: String, completed: Int, total: Int) -> Unit = { _, _, _ -> },
+        sync: (ThemeSyncProgress, () -> Boolean) -> ThemeSyncResult,
+    ): ThemeSyncResult = coroutineScope {
+        val cancelled = AtomicBoolean(false)
+        val lastProgressAt = AtomicLong(android.os.SystemClock.elapsedRealtime())
+        val progress = ThemeSyncProgress { task, completed, total ->
+            lastProgressAt.set(android.os.SystemClock.elapsedRealtime())
+            onProgress(task, completed, total)
+        }
+        val watchdog = launch(Dispatchers.Default) {
+            while (isActive) {
+                delay(STALL_CHECK_INTERVAL_MS)
+                if (android.os.SystemClock.elapsedRealtime() - lastProgressAt.get() > STALL_TIMEOUT_MS) {
+                    cancelled.set(true)
+                    break
+                }
+            }
+        }
+        val result = withContext(Dispatchers.IO) { sync(progress) { cancelled.get() } }
+        watchdog.cancel()
+        result
+    }
+
+    /** No progress at all for this long reads as stalled, not "still working" -- see [withStallWatchdog]. */
+    private const val STALL_TIMEOUT_MS = 30_000L
+    private const val STALL_CHECK_INTERVAL_MS = 3_000L
+
+    fun syncThemesList(
+        userThemesDir: File,
+        progress: ThemeSyncProgress? = null,
+        isCancelled: () -> Boolean = { false },
+    ): ThemeSyncResult =
+        syncRepository(themesListDir(userThemesDir), THEMES_LIST_URL, allowReset = true, progress, isCancelled)
 
     /**
      * Same "always hard reset, it's read-only to the app" treatment as
@@ -83,20 +170,68 @@ object ThemeDownloader {
         userThemesDir: File,
         entry: ThemeDownloadEntry,
         allowReset: Boolean = false,
+        progress: ThemeSyncProgress? = null,
+        isCancelled: () -> Boolean = { false },
     ): ThemeSyncResult {
         val dirName = entry.reponame.ifBlank { entry.name }
-        return syncRepository(File(userThemesDir, dirName), entry.url, allowReset)
+        return syncRepository(File(userThemesDir, dirName), entry.url, allowReset, progress, isCancelled)
     }
 
-    private fun syncRepository(dir: File, url: String, allowReset: Boolean): ThemeSyncResult {
+    private fun syncRepository(
+        dir: File,
+        url: String,
+        allowReset: Boolean,
+        progress: ThemeSyncProgress? = null,
+        isCancelled: () -> Boolean = { false },
+    ): ThemeSyncResult {
+        // A caller's own timeout (ThemeBrowserScreen, OnboardingThemeDownload)
+        // flips this rather than interrupting the thread: JGit polls
+        // isCancelled() between transport phases and throws its own
+        // CancelledException, which the catches below turn into a real,
+        // reportable CANCELLED result instead of a half-written repo
+        // nobody knows the state of.
+        val monitor = object : ProgressMonitor {
+            private var task = ""
+            private var total = 0
+            private var done = 0
+            override fun start(totalTasks: Int) {}
+            override fun beginTask(title: String, totalWork: Int) {
+                task = title
+                total = totalWork
+                done = 0
+                progress?.onUpdate(task, done, total)
+            }
+            override fun update(completed: Int) {
+                done += completed
+                progress?.onUpdate(task, done, total)
+            }
+            override fun endTask() {}
+            override fun isCancelled(): Boolean = isCancelled()
+        }
+        // A clone that never finishes (network died, or the caller's own
+        // timeout cancelled it) leaves a `.git` directory that looks like
+        // a real repo to the `isDirectory` check below but is actually
+        // incomplete -- without cleaning it up, every future attempt
+        // would open THIS half-written repo instead of cloning fresh, and
+        // fail forever. Only the fresh-clone path can leave this behind;
+        // an existing repo being pulled/reset is never deleted.
+        val freshClone = !File(dir, ".git").isDirectory
         return try {
-            if (!File(dir, ".git").isDirectory) {
+            if (freshClone) {
                 dir.parentFile?.mkdirs()
-                Git.cloneRepository().setURI(url).setDirectory(dir).call().close()
+                Git.cloneRepository()
+                    .setURI(url)
+                    .setDirectory(dir)
+                    .setCloneAllBranches(false)
+                    .setProgressMonitor(monitor)
+                    .call().close()
                 ThemeSyncResult(ThemeSyncStatus.CLONED)
             } else {
                 Git.open(dir).use { git ->
-                    val pullResult = git.pull().setFastForward(MergeCommand.FastForwardMode.FF_ONLY).call()
+                    val pullResult = git.pull()
+                        .setFastForward(MergeCommand.FastForwardMode.FF_ONLY)
+                        .setProgressMonitor(monitor)
+                        .call()
                     if (pullResult.isSuccessful) {
                         if (pullResult.mergeResult?.mergeStatus == MergeResult.MergeStatus.ALREADY_UP_TO_DATE) {
                             ThemeSyncResult(ThemeSyncStatus.UP_TO_DATE)
@@ -104,7 +239,7 @@ object ThemeDownloader {
                             ThemeSyncResult(ThemeSyncStatus.UPDATED)
                         }
                     } else if (allowReset) {
-                        git.fetch().call()
+                        git.fetch().setProgressMonitor(monitor).call()
                         val branch = git.repository.branch
                         git.reset().setMode(ResetCommand.ResetType.HARD).setRef("origin/$branch").call()
                         ThemeSyncResult(ThemeSyncStatus.UPDATED)
@@ -114,12 +249,15 @@ object ThemeDownloader {
                 }
             }
         } catch (t: GitAPIException) {
-            ThemeSyncResult(ThemeSyncStatus.FAILED, t)
+            if (freshClone) dir.deleteRecursively()
+            ThemeSyncResult(if (isCancelled()) ThemeSyncStatus.CANCELLED else ThemeSyncStatus.FAILED, t)
         } catch (t: Exception) {
-            ThemeSyncResult(ThemeSyncStatus.FAILED, t)
+            if (freshClone) dir.deleteRecursively()
+            ThemeSyncResult(if (isCancelled()) ThemeSyncStatus.CANCELLED else ThemeSyncStatus.FAILED, t)
         } catch (t: LinkageError) {
             // A library method this Android version does not have is a
             // failed download, not a crashed app (rig, dq-onboard-01).
+            if (freshClone) dir.deleteRecursively()
             ThemeSyncResult(ThemeSyncStatus.FAILED, t)
         }
     }
