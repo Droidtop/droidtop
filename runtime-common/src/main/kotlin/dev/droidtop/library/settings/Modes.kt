@@ -142,6 +142,20 @@ object ModeGate {
     fun piecesToStart(enabled: Set<Mode>): Set<ModePiece> =
         ModePiece.entries.filterTo(mutableSetOf()) { piece -> piece.owners.any { it in enabled } }
 
+    /**
+     * The rows [dev.droidtop.shell.standard.BackButtonMenu]'s mode switcher
+     * offers, in order: "Android" always (it is the home screen the Home
+     * button opens whether or not droidtop holds it), then Desktop and
+     * Gaming only while they are enabled. Settings and Reinitialize
+     * displays are the switcher's own fixed rows, not modes, so they are
+     * appended by the caller rather than named here.
+     */
+    fun switcherModes(enabled: Set<Mode>): List<Mode> = buildList {
+        add(Mode.LAUNCHER)
+        if (Mode.DESKTOP in enabled) add(Mode.DESKTOP)
+        if (Mode.GAMING in enabled) add(Mode.GAMING)
+    }
+
     fun resolveAppMode(
         explicitId: String?,
         defaultId: String?,

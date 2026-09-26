@@ -55,6 +55,26 @@ class ModesTest {
     }
 
     @Test
+    fun `the switcher always offers Android, and Desktop or Gaming only while enabled`() {
+        assertEquals(listOf(Mode.LAUNCHER), ModeGate.switcherModes(emptySet()))
+        assertEquals(listOf(Mode.LAUNCHER), ModeGate.switcherModes(setOf(Mode.LAUNCHER)))
+        assertEquals(
+            listOf(Mode.LAUNCHER, Mode.DESKTOP),
+            ModeGate.switcherModes(setOf(Mode.LAUNCHER, Mode.DESKTOP)),
+        )
+        assertEquals(
+            listOf(Mode.LAUNCHER, Mode.GAMING),
+            ModeGate.switcherModes(setOf(Mode.GAMING)),
+        )
+        // Desktop before Gaming regardless of set iteration order -- the
+        // switcher's row order must not depend on Set's own ordering.
+        assertEquals(
+            listOf(Mode.LAUNCHER, Mode.DESKTOP, Mode.GAMING),
+            ModeGate.switcherModes(setOf(Mode.GAMING, Mode.DESKTOP, Mode.LAUNCHER)),
+        )
+    }
+
+    @Test
     fun `a disabled mode contributes no piece`() {
         val launcherOnly = ModeGate.piecesToStart(setOf(Mode.LAUNCHER))
         assertEquals(
