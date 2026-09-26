@@ -79,7 +79,19 @@ class NativePluginRunner(
     }
 
     override suspend fun load(record: PluginRecord, installDir: String): Boolean {
-        val entryClass = record.manifest.entryClass ?: return false
+        // entryClass is genuinely null for anything but NATIVE_BUNDLE --
+        // PluginManifest.structuralProblems() only requires it for that
+        // kind, and PluginRuntimeService.loadPlugin's own doc comment
+        // says the python path never reads it (its entry point is always
+        // installDir's own plugin.py). The AIDL parameter itself is a
+        // non-null String, so this used to bail out here with `?: return
+        // false` before ever binding the service -- a python plugin's
+        // "Call ... status tile" failed with "plugin failed to load" and
+        // no process, no exception and nothing in logcat (rig,
+        // dq-pyplugin-01 follow-up), because load() never got far enough
+        // to try. An empty string is the same "unused" placeholder
+        // PluginRuntimeService already documents.
+        val entryClass = record.manifest.entryClass ?: ""
         val runtime = ensureConnected() ?: return false
         return try {
             withTimeout(PluginRunner.CALL_TIMEOUT_MS) {
