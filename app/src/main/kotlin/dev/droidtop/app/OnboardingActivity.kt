@@ -99,7 +99,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -655,12 +654,11 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
             }
         }
         GamesRootPrefs.markOnboardingComplete(context)
-        // Any Art Book Next download still running at this point is
-        // cancelled rather than left to finish and swap the theme in
-        // later (OnboardingThemeDownload's own doc comment) -- a
-        // succeeded download has already written LibraryThemePrefs
-        // itself, so there is nothing left to activate here.
-        OnboardingThemeDownload.cancelIfIncomplete(context)
+        // An Art Book Next download still running at this point keeps
+        // running (OnboardingThemeDownload's own doc comment) -- only its
+        // late auto-activation is disowned here, since the person has
+        // already moved on to whatever theme resolved for Gaming mode.
+        OnboardingThemeDownload.disownIfIncomplete()
         // The modes are on from here (Modes.reload reads the finished
         // setup), so ModeStartup starts what they own now, not at the
         // next process start.
@@ -1849,17 +1847,28 @@ private fun ControllerStep(
  * github.com/anthonycaccese/art-book-next-es-de), downloaded the moment
  * the Appearance step is shown, through the same real [ThemeDownloader]
  * "Browse themes" uses -- not a second download mechanism. Runs on its
- * own process-lifetime scope so leaving the step (Next, Back) never
- * cancels it mid-clone; only [cancelIfIncomplete] does, once onboarding
- * itself is finishing without it.
+ * own process-lifetime scope so leaving the step (Next, Back), and
+ * finishing onboarding itself, never cancels it mid-clone (rig,
+ * p1-rig-onboarding-artbooknext-never-downloads: the step's own copy
+ * promises "press Next and it finishes in the background," and this used
+ * to finish onboarding by killing the job and deleting the partial clone
+ * a moment later -- on any run where the clone legitimately took a
+ * while, which the theme-list index fetch alone can (see
+ * ThemeDownloader's own doc comment on themes-list.git's real size), the promise was
+ * never kept and nothing told the person). [disownIfIncomplete] now only
+ * stops the LATE activation described below, once called; the download
+ * itself always runs to completion or a real, visible FAILED status.
  *
  * A successful download writes [LibraryThemePrefs] directly -- the exact
  * call a row's own tap makes -- but ONLY when nothing has been chosen yet
- * (`get() == null`), so an explicit pick before or after the download
- * finishes always wins; this is a pre-selected default, not a forced one.
- * That write happens here, not in the Appearance step's own composition,
- * because the download can finish after the person has already moved
- * past that step -- a Compose LaunchedEffect tied to it would miss that.
+ * (`get() == null`) AND [disownIfIncomplete] was not called, so an
+ * explicit pick before or after the download finishes always wins, and a
+ * download that finishes after the person has already moved on to Gaming
+ * mode (onboarding itself finished before it did) never swaps the active
+ * theme out from under them -- [ThemeAssets.defaultThemeFor]'s own doc
+ * comment states this same rule for the portrait default. The clone
+ * itself still finishes and shows up as installed in Browse themes
+ * either way; only the auto-activation is suppressed.
  */
 private object OnboardingThemeDownload {
     const val RECOMMENDED_THEME_DIR = "art-book-next-es-de"
@@ -1878,10 +1887,20 @@ private object OnboardingThemeDownload {
         job = scope.launch {
             mutableStatus.value = Status.DOWNLOADING
             val userThemesDir = ThemeAssets.userThemesDir(appContext)
-            ThemeDownloader.syncThemesList(userThemesDir)
+            // Same stall watchdog Browse themes uses (ThemeDownloader.
+            // withStallWatchdog's own doc comment): without it, a truly
+            // dead connection left this stuck on DOWNLOADING forever,
+            // with no eventual FAILED status for the person to see either.
+            ThemeDownloader.withStallWatchdog { progress, isCancelled ->
+                ThemeDownloader.syncThemesList(userThemesDir, progress, isCancelled)
+            }
             val entry = ThemeDownloader.parseThemesList(userThemesDir)
                 .firstOrNull { it.reponame == RECOMMENDED_THEME_DIR }
-            val result = entry?.let { ThemeDownloader.downloadOrUpdateTheme(userThemesDir, it) }
+            val result = entry?.let {
+                ThemeDownloader.withStallWatchdog { progress, isCancelled ->
+                    ThemeDownloader.downloadOrUpdateTheme(userThemesDir, it, progress = progress, isCancelled = isCancelled)
+                }
+            }
             val ok = result != null && result.status in setOf(
                 ThemeDownloader.ThemeSyncStatus.CLONED,
                 ThemeDownloader.ThemeSyncStatus.UPDATED,
@@ -1893,7 +1912,7 @@ private object OnboardingThemeDownload {
                 // the newly cloned theme is otherwise invisible to
                 // discoverThemes until something does this.
                 LibraryThemePrefs.notifyThemesChanged()
-                if (LibraryThemePrefs.get(appContext) == null) {
+                if (activateOnSuccess && LibraryThemePrefs.get(appContext) == null) {
                     LibraryThemePrefs.set(appContext, RECOMMENDED_THEME_DIR)
                 }
                 mutableStatus.value = Status.SUCCEEDED
@@ -1903,30 +1922,28 @@ private object OnboardingThemeDownload {
         }
     }
 
+    // Guards ONLY the auto-activation above, not the download itself --
+    // see [disownIfIncomplete].
+    @Volatile
+    private var activateOnSuccess = true
+
     /**
-     * Called once, from `finishOnboarding`: a download still running when
-     * setup finishes must not be left to complete and swap the theme in
-     * later, behind someone already looking at Gaming mode --
-     * [ThemeAssets.defaultThemeFor]'s own doc comment states this same
-     * rule for the portrait default ("the theme moving under the user is
-     * the one thing this rule must not do"). Cancelling here, and
-     * removing the partial clone, leaves [LibraryThemePrefs] unset, so
-     * the existing DEcaffe-or-Slate fallback in
-     * `ThemeAssets.resolveActiveTheme` applies exactly as it did before
-     * this object existed -- no second fallback mechanism.
+     * Called once, from `finishOnboarding`, when a download is still
+     * running as setup finishes: the person has already moved on to
+     * whatever theme resolved for Gaming mode (DEcaffe or Slate, per
+     * `ThemeAssets.resolveActiveTheme`'s existing fallback), so this
+     * download finishing later must not silently swap the active theme
+     * out from under them. It no longer cancels the job or deletes the
+     * partial clone (rig, p1-rig-onboarding-artbooknext-never-downloads:
+     * that broke the step's own promise that the download "finishes in
+     * the background," with nothing telling the person it had actually
+     * been killed) -- the clone keeps running and will show up as
+     * installed in Browse themes, or as a real FAILED status there, same
+     * as any other Browse-themes download.
      */
-    fun cancelIfIncomplete(context: Context) {
+    fun disownIfIncomplete() {
         if (mutableStatus.value != Status.DOWNLOADING) return
-        val appContext = context.applicationContext
-        val running = job
-        scope.launch {
-            // Wait for the cancelled clone to actually stop writing
-            // before deleting its directory out from under it.
-            running?.cancelAndJoin()
-            runCatching {
-                File(ThemeAssets.userThemesDir(appContext), RECOMMENDED_THEME_DIR).deleteRecursively()
-            }
-        }
+        activateOnSuccess = false
     }
 }
 

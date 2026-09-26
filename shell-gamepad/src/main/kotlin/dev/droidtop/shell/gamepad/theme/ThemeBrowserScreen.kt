@@ -11,10 +11,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -62,6 +64,17 @@ import kotlinx.coroutines.withContext
  * `ThemeAssets.discoverThemes` already scans -- a newly downloaded theme
  * becomes selectable from Settings' own "Theme" cycle-link immediately,
  * no separate registration step.
+ *
+ * `ThemeDownloader.withStallWatchdog` (rig, p2-rig-theme-browser-fetch-
+ * hang) is what every sync below actually runs through: real progress
+ * from JGit's own transport ("Receiving objects", counts, not a fake
+ * spinner) drives the visible status line, and a stall watchdog (shared
+ * with the onboarding background download -- see that object's own doc
+ * comment) tells a genuinely stuck transfer apart from a slow-but-
+ * working one, since `themes-list.git`'s full real history is
+ * legitimately large and a multi-minute first fetch on an ordinary
+ * connection is expected, not itself a bug (`ThemeDownloader`'s own doc
+ * comment).
  */
 @Composable
 fun ThemeBrowserScreen(onDismiss: () -> Unit) {
@@ -75,6 +88,9 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
     // a list to show.
     var fetchStatus by remember { mutableStateOf<String?>(null) }
     var fetchFailed by remember { mutableStateOf(false) }
+    // Whether a fetch (index or a per-theme download) is actively running
+    // -- drives the spinner, separate from [loading] (first paint only).
+    var fetchRunning by remember { mutableStateOf(false) }
     val firstFocus = remember { FocusRequester() }
     val emptyFocus = remember { FocusRequester() }
 
@@ -86,13 +102,20 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
     }
     suspend fun fetchIndex() {
         fetchFailed = false
-        fetchStatus = "Fetching the theme list\u2026"
-        val result = withContext(Dispatchers.IO) {
-            ThemeDownloader.syncThemesList(ThemeAssets.userThemesDir(context))
+        fetchRunning = true
+        fetchStatus = "Fetching the theme list…"
+        val result = ThemeDownloader.withStallWatchdog(onProgress = { task, completed, total ->
+            fetchStatus = if (total > 0) "$task… $completed/$total" else "$task…"
+        }) { progress, isCancelled ->
+            ThemeDownloader.syncThemesList(ThemeAssets.userThemesDir(context), progress, isCancelled)
         }
+        fetchRunning = false
         refresh()
-        fetchFailed = result.status == ThemeDownloader.ThemeSyncStatus.FAILED && entries.isEmpty()
+        fetchFailed = (result.status == ThemeDownloader.ThemeSyncStatus.FAILED ||
+            result.status == ThemeDownloader.ThemeSyncStatus.CANCELLED) && entries.isEmpty()
         fetchStatus = when {
+            result.status == ThemeDownloader.ThemeSyncStatus.CANCELLED && entries.isEmpty() ->
+                "Timed out waiting for a response. Check the connection, then press A to try again."
             fetchFailed -> "Could not fetch the theme list. Check the connection, then press A to try again."
             entries.isEmpty() -> "The theme list is empty."
             else -> null
@@ -160,17 +183,23 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
                 modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
             )
             // A refresh of a stale list runs under the list it already has,
-            // and says so above it.
+            // and says so above it, with a real spinner while it runs --
+            // static text alone read as "stuck" (rig,
+            // p2-rig-theme-browser-fetch-hang).
             if (entries.isNotEmpty()) {
-                fetchStatus?.let { Text(it, color = MenuTokens.OnSurfaceMuted, modifier = Modifier.padding(bottom = 8.dp)) }
+                fetchStatus?.let { status ->
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
+                        if (fetchRunning) {
+                            CircularProgressIndicator(color = MenuTokens.OnSurfaceMuted, modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                            androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
+                        }
+                        Text(status, color = MenuTokens.OnSurfaceMuted)
+                    }
+                }
             }
             when {
-                loading -> Text("Loading\u2026", color = MenuTokens.OnSurfaceMuted)
-                entries.isEmpty() -> Text(
-                    fetchStatus ?: "Fetching the theme list\u2026",
-                    color = MenuTokens.OnSurfaceMuted,
-                    // The one thing on screen when the fetch failed, so A
-                    // on it is the retry.
+                loading -> Text("Loading…", color = MenuTokens.OnSurfaceMuted)
+                entries.isEmpty() -> Column(
                     modifier = Modifier
                         .focusRequester(emptyFocus)
                         .onKeyEvent { event ->
@@ -185,7 +214,17 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
                         }
                         .focusable()
                         .clickable(enabled = fetchFailed) { coroutineScope.launch { fetchIndex() } },
-                )
+                ) {
+                    if (fetchRunning) {
+                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            CircularProgressIndicator(color = MenuTokens.OnSurfaceMuted, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
+                            Text(fetchStatus ?: "Fetching the theme list…", color = MenuTokens.OnSurfaceMuted)
+                        }
+                    } else {
+                        Text(fetchStatus ?: "Fetching the theme list…", color = MenuTokens.OnSurfaceMuted)
+                    }
+                }
                 else -> LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     // The hint bar's own room (MenuTokens.HintBarRoom).
@@ -215,10 +254,13 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
                             screenshotPath = screenshotPath,
                             modifier = if (index == 0) Modifier.focusRequester(firstFocus) else Modifier,
                             onDownload = {
-                                statusByDirName = statusByDirName + (dirName to "Downloading...")
+                                statusByDirName = statusByDirName + (dirName to "Downloading…")
                                 coroutineScope.launch {
-                                    val result = withContext(Dispatchers.IO) {
-                                        ThemeDownloader.downloadOrUpdateTheme(ThemeAssets.userThemesDir(context), entry)
+                                    val result = ThemeDownloader.withStallWatchdog(onProgress = { task, completed, total ->
+                                        val text = if (total > 0) "$task… $completed/$total" else "$task…"
+                                        statusByDirName = statusByDirName + (dirName to text)
+                                    }) { progress, isCancelled ->
+                                        ThemeDownloader.downloadOrUpdateTheme(ThemeAssets.userThemesDir(context), entry, progress = progress, isCancelled = isCancelled)
                                     }
                                     statusByDirName = statusByDirName + (dirName to when (result.status) {
                                         ThemeDownloader.ThemeSyncStatus.CLONED -> "Downloaded"
@@ -226,6 +268,7 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
                                         ThemeDownloader.ThemeSyncStatus.UP_TO_DATE -> "Already up to date"
                                         ThemeDownloader.ThemeSyncStatus.DIVERGED -> "Not updated: your copy has local changes"
                                         ThemeDownloader.ThemeSyncStatus.FAILED -> "Download failed. Check the connection and select it again."
+                                        ThemeDownloader.ThemeSyncStatus.CANCELLED -> "Timed out. Check the connection and select it again."
                                     })
                                     // A theme UPDATED in place keeps its name -- the
                                     // name-keyed parse cache would silently keep
