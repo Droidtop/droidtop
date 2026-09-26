@@ -74,9 +74,21 @@ open class RadioGroupBottomSheet : BottomSheetDialogFragment() {
         view.findViewById<TextView>(R.id.sheet_title)?.text = sheetTitle ?: ""
         dialog?.setOnShowListener { applyAdjustedBackgroundTint(dialog) }
         if (savedInstanceState == null && textProvider != null) {
+            // droidtop patch: commitNow, not commit. commit() defers the
+            // child fragment (and so its RecyclerView) to the next main-
+            // thread loop iteration, which runs AFTER this sheet's own
+            // first layout pass -- prefs_container (wrap_content) had no
+            // children yet at that point and correctly measured to zero,
+            // and nothing forced the sheet to re-measure once the
+            // RecyclerView actually arrived (confirmed live: dumpsys
+            // accessibility showed prefs_container's own bounds as
+            // Rect(0,0-1280,0), "visible: false", not just the RecyclerView
+            // inside it). commitNow runs the child fragment's onCreateView
+            // synchronously, so its RecyclerView exists before this sheet's
+            // first layout pass ever measures prefs_container.
             childFragmentManager.beginTransaction()
                 .replace(R.id.prefs_container, RadioPreferenceFragment())
-                .commit()
+                .commitNow()
         }
     }
 
