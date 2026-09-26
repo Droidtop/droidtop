@@ -205,6 +205,25 @@
         </receiver>
 
         <!--
+          droidtop's own plugin-fed home-screen widget (docs/SPEC.md,
+          Launcher mode, "Plugin contributions reach the launcher"):
+          approved, enabled status_tile plugins' own state, placeable
+          from the Standard launcher's stock widget picker like any other
+          app's widget. Not exported beyond the widget-host contract,
+          same shape as ContinuePlayingWidgetProvider above.
+        -->
+        <receiver
+            android:name="dev.droidtop.app.PluginStatusWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_plugin_status_info" />
+        </receiver>
+
+        <!--
           droidtop's ONE drawer icon, in every launcher including droidtop's
           own (docs/SPEC.md 2c, "One droidtop icon"). It resumes unfinished
           onboarding, else opens Gaming or Desktop through MainActivity, else
