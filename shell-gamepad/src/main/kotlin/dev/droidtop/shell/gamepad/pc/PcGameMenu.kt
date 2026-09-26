@@ -26,17 +26,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
+import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.EngineHost
 import dev.droidtop.library.EngineOverridePrefs
 import dev.droidtop.library.EnginesDatabase
@@ -68,8 +65,8 @@ import dev.droidtop.library.scraper.line
 import dev.droidtop.shell.gamepad.CollectionMembershipEditor
 import dev.droidtop.shell.gamepad.ManualMatchPicker
 import dev.droidtop.shell.gamepad.MenuTokens
+import dev.droidtop.shell.gamepad.MenuPanel
 import dev.droidtop.shell.gamepad.TextEditDialog
-import dev.droidtop.shell.gamepad.selectionFrame
 import dev.droidtop.shell.gamepad.MediaViewer
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
@@ -78,18 +75,27 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * One PC or engine game, and everything droidtop can do with it —
- * docs/SPEC.md §7i's "Game detail".
+ * The PC-only actions on one PC or engine game -- docs/SPEC.md §7i's
+ * "Game options", an ES-DE-style in-context menu over the themed
+ * gamelist (redecided 2026-09-26), not a screen of its own.
  *
- * The two rules that shape it:
+ * What used to live here as a full-screen "detail" -- a hero-art header,
+ * the scraped description/developer/rating/genre "About this game" --
+ * is gone: the active theme's own gamelist already shows all of that for
+ * the focused game (md_image/md_description/md_developer/md_rating and
+ * the rest, bound from the exact same [LibraryEntry] fields), exactly as
+ * it does for a console ROM. This menu is only what the theme cannot
+ * show: the resolved runner and its picker, Wine/container settings,
+ * ProtonDB, the Lutris import, the F95 link and update state, merge and
+ * versions/segments, favourite/collections/scrape.
  *
- * - **The runner is stated, never hidden.** A "Runs with" row names the
- *   resolved runner and why it won ("default for Ren'Py", "your choice"),
- *   and opens the picker over the full availability model.
- * - **The primary button never lies.** It is Play when the resolved
- *   runner is ready, and it *is the setup action* when it is not
- *   ("Set up Windows games", "Install the Ren'Py plugin"). A button known
- *   in advance to produce nothing is worse than an honest one.
+ * A itself no longer opens this menu (docs/SPEC.md 7i): on the gamelist,
+ * A launches when the resolved runner is ready and runs the one setup
+ * action when it is not ([dev.droidtop.library.PcRunnerOptions.resolveAndPlay]),
+ * exactly like a console ROM's A. This menu opens on Y ("Game options"),
+ * the same in-context-menu convention [dev.droidtop.shell.gamepad
+ * .GamelistOptionsMenu] already uses for the whole gamelist's own
+ * actions (sort/scrape/"Stores and folders").
  *
  * Store management and prefix configuration are not droidtop's own
  * screens: :runtime-windows compiles the whole vendored gamenative tree,
@@ -101,21 +107,17 @@ import kotlinx.coroutines.withContext
  * build has no prefix.
  */
 @Composable
-internal fun PcGameDetail(
+internal fun PcGameMenu(
     entry: LibraryEntry,
     library: Library,
     onLaunch: () -> Unit,
     onClose: () -> Unit,
-    // Every game entry the shell has, so this screen can offer the OTHER
+    // Every game entry the shell has, so this menu can offer the OTHER
     // folders of the same game -- its versions and its segments (docs/
     // SPEC.md 7m). Empty means "nothing to group with", which is what a
     // caller that has no list passes.
     siblings: List<LibraryEntry> = emptyList(),
     onOpenOther: (LibraryEntry) -> Unit = {},
-    // What A does on the focused element, for the shell's hint row: the
-    // primary button's own verb while it is focused, null (the row's
-    // generic "Select") everywhere else (UI pass 2026-09-24, M7).
-    onPrimaryFocus: (String?) -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -233,39 +235,51 @@ internal fun PcGameDetail(
         }
     }
 
+    // RunnerPicker/EnginePicker/MediaViewer/CollectionMembershipEditor are
+    // plain fillMaxSize() screens, written for the days when this menu was
+    // itself a full-screen nav-stack detail: FullScreenOverlay hosts them
+    // in a full-bleed Dialog instead, now that this menu is an in-context
+    // overlay over the gamelist (docs/SPEC.md 7i, redecided 2026-09-26),
+    // without touching those shared composables themselves --
+    // CollectionMembershipEditor is also a console ROM's own full-screen
+    // detail content and stays exactly that there.
     if (picking) {
-        RunnerPicker(
-            options = runners.options,
-            engine = runners.engine,
-            current = resolved?.option?.strategy,
-            overridden = LaunchStrategyOverridePrefs.get(context, entry.id) != null,
-            onPick = { strategy ->
-                LaunchStrategyOverridePrefs.set(context, entry.id, strategy)
-                picking = false
-                reloadToken++
-            },
-            onDismiss = { picking = false },
-        )
+        FullScreenOverlay(onDismiss = { picking = false }) {
+            RunnerPicker(
+                options = runners.options,
+                engine = runners.engine,
+                current = resolved?.option?.strategy,
+                overridden = LaunchStrategyOverridePrefs.get(context, entry.id) != null,
+                onPick = { strategy ->
+                    LaunchStrategyOverridePrefs.set(context, entry.id, strategy)
+                    picking = false
+                    reloadToken++
+                },
+                onDismiss = { picking = false },
+            )
+        }
         return
     }
     val engineFolder = engineChoice.folder
     if (pickingEngine && engineFolder != null) {
-        EnginePicker(
-            engines = engineChoice.engines,
-            current = runners.engine,
-            pinned = engineChoice.pinned,
-            onPick = { id ->
-                EngineOverridePrefs.set(context, engineFolder, id)
-                pickingEngine = false
-                status = if (id == null) {
-                    "Detecting this folder again. The library's label follows on its next scan."
-                } else {
-                    "Pinned. The library's label follows on its next scan."
-                }
-                reloadToken++
-            },
-            onDismiss = { pickingEngine = false },
-        )
+        FullScreenOverlay(onDismiss = { pickingEngine = false }) {
+            EnginePicker(
+                engines = engineChoice.engines,
+                current = runners.engine,
+                pinned = engineChoice.pinned,
+                onPick = { id ->
+                    EngineOverridePrefs.set(context, engineFolder, id)
+                    pickingEngine = false
+                    status = if (id == null) {
+                        "Detecting this folder again. The library's label follows on its next scan."
+                    } else {
+                        "Pinned. The library's label follows on its next scan."
+                    }
+                    reloadToken++
+                },
+                onDismiss = { pickingEngine = false },
+            )
+        }
         return
     }
     if (importingLutris) {
@@ -282,11 +296,15 @@ internal fun PcGameDetail(
         return
     }
     if (viewingMedia) {
-        MediaViewer(title = entry.title, media = media, onClose = { viewingMedia = false })
+        FullScreenOverlay(onDismiss = { viewingMedia = false }) {
+            MediaViewer(title = entry.title, media = media, onClose = { viewingMedia = false })
+        }
         return
     }
     if (editingCollections) {
-        CollectionMembershipEditor(entry = entry, library = library, onDismiss = { editingCollections = false })
+        FullScreenOverlay(onDismiss = { editingCollections = false }) {
+            CollectionMembershipEditor(entry = entry, library = library, onDismiss = { editingCollections = false })
+        }
         return
     }
     if (pickingMatch) {
@@ -488,207 +506,238 @@ internal fun PcGameDetail(
         },
     )
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .onKeyEvent { event ->
-                val action = GamepadKeyMap.actionFor(event.key)
-                if (event.type == KeyEventType.KeyUp && (action == GamepadAction.BACK || action == GamepadAction.B)) {
-                    onClose()
-                    true
-                } else {
-                    false
-                }
-            },
-    ) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .weight(1f)
-                .padding(horizontal = dev.droidtop.shell.gamepad.LocalShellWindow.current.edgePadding),
-            // The hint bar's own room at the end of the list, so the last
-            // card clears it instead of ending under it (MenuTokens.HintBarRoom).
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                bottom = dev.droidtop.shell.gamepad.MenuTokens.HintBarRoom,
-            ),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            // ONE header, artwork or not: a game's own screen opens with
-            // the game, never straight into a column of rows. A game with
-            // no scraped art gets the same plate with the same title and
-            // identity line over it, so the screen has the same shape
-            // either way (research/ui-polish item 18).
-            item { PcDetailHeader(entry, grouping, available) }
+    val runner = resolved
+    val isReady = runner?.option?.state == RunnerState.READY
+    val setupAction = runner?.option?.action
 
-            // A game the walk no longer finds has no runner question to
-            // answer and nothing to play: the folder it was is not there.
-            // Every row below the button still applies -- its history, its
-            // metadata, its collections and the replacement action are
-            // exactly what it is being kept FOR (docs/SPEC.md 7g).
-            if (entry.missing) {
-                item {
-                    PrimaryActionButton(
-                        label = "The folder is not there",
-                        detail = missingFolderLine(entry),
-                        enabled = false,
-                        onSelect = {},
-                    )
-                }
-            }
-
-            // 1. Runs with -- WHICH runner, and how to change it. Whether
-            // this game can be played is the button's sentence and only
-            // the button's: the rig read "Nothing on this device can run
-            // this game yet" here and "Can't play yet / No runner on this
-            // device offers this game" immediately below it, three
-            // wordings of one fact. A game with no runner option at all
-            // has nothing to choose, so the row is not drawn.
-            if (!entry.missing && (!loaded || runners.options.isNotEmpty())) {
-                item {
-                    DetailRow(
+    // Flattened once per recomposition into what this Dialog actually
+    // draws and what Up/Down/A navigate: a header entry (never
+    // selectable), a group title (never selectable), an info line (never
+    // selectable, e.g. a status message or the compatibility summary),
+    // or a row (selectable, the same PcActionRow every group already
+    // produces). One list, one focus index, the same shape
+    // GamelistOptionsMenu's own Select-button menu already uses.
+    val entries = buildList {
+        // 1. Runs with -- WHICH runner, and how to change it.
+        if (!entry.missing && (!loaded || runners.options.isNotEmpty())) {
+            add(
+                PcMenuEntry.Row(
+                    PcActionRow(
                         title = "Runs with",
                         detail = when {
                             !loaded -> "Working out what can run this…"
                             runner == null -> "Not chosen — ${runners.options.size} to choose from"
                             else -> "${runner.label} - ${runner.reason}"
                         },
-                        enabled = loaded && runners.options.isNotEmpty(),
-                        onSelect = { picking = true },
-                    )
-                }
-            }
+                        onSelect = if (loaded && runners.options.isNotEmpty()) ({ picking = true }) else null,
+                    ),
+                ),
+            )
+        }
+        // 2. Play, or the one action that makes Play possible -- the
+        // gamelist's own A now makes this exact decision on its own
+        // (docs/SPEC.md 7i, redecided 2026-09-26,
+        // PcRunnerOptions.resolveAndPlay), so this row is a second way to
+        // reach the very same thing from the menu, not a different one.
+        if (entry.missing) {
+            add(PcMenuEntry.Row(PcActionRow("The folder is not there", missingFolderLine(entry), null)))
+        } else {
+            add(
+                PcMenuEntry.Row(
+                    PcActionRow(
+                        title = when {
+                            !loaded -> "…"
+                            isReady -> "Play"
+                            setupAction != null -> runner?.option?.reason ?: "Set up"
+                            else -> "Can't play yet"
+                        },
+                        detail = when {
+                            !loaded -> ""
+                            isReady -> runner?.option?.caveat ?: "Starts now on ${runner?.label}"
+                            setupAction != null -> "One step, then this becomes Play"
+                            else -> runner?.option?.reason ?: "No runner on this device offers this game"
+                        },
+                        onSelect = if (loaded && (isReady || setupAction != null)) {
+                            {
+                                if (isReady) {
+                                    onClose()
+                                    onLaunch()
+                                } else if (setupAction != null) {
+                                    scope.launch {
+                                        status = "Working…"
+                                        val failure = PcRunnerOptions.runAction(context, entry, setupAction) { status = it }
+                                        status = failure
+                                        reloadToken++
+                                    }
+                                }
+                            }
+                        } else {
+                            null
+                        },
+                    ),
+                ),
+            )
+        }
+        status?.let { add(PcMenuEntry.Info(it)) }
 
-            // 2. The primary button: Play, or the one action that makes Play possible.
-            if (!entry.missing) item {
-                val setupAction = runner?.option?.action
-                val isReady = runner?.option?.state == RunnerState.READY
-                PrimaryActionButton(
-                    label = when {
-                        !loaded -> "…"
-                        isReady -> "Play"
-                        setupAction != null -> runner.option.reason ?: "Set up"
-                        else -> "Can't play yet"
-                    },
-                    detail = when {
-                        !loaded -> ""
-                        isReady -> runner.option.caveat ?: "Starts now on ${runner.label}"
-                        setupAction != null -> "One step, then this becomes Play"
-                        else -> runner?.option?.reason ?: "No runner on this device offers this game"
-                    },
-                    enabled = loaded && (isReady || setupAction != null),
-                    onFocus = { focused ->
-                        onPrimaryFocus(
-                            when {
-                                !focused -> null
-                                isReady -> "Play"
-                                setupAction != null -> "Set up"
-                                else -> null
+        actions.forEach { group ->
+            add(PcMenuEntry.Header(group.title))
+            group.rows.forEach { add(PcMenuEntry.Row(it)) }
+        }
+
+        // Links the scrape brought back (an official site, a store page):
+        // PC-only actionable rows, unlike description/developer/rating/
+        // genre, which the theme's own md_* elements already show while
+        // browsing (docs/SPEC.md 7i, redecided 2026-09-26) and are not
+        // repeated here.
+        if (entry.links.isNotEmpty()) {
+            add(PcMenuEntry.Header("Links"))
+            entry.links.forEach { link ->
+                add(
+                    PcMenuEntry.Row(
+                        PcActionRow(link.label, link.url) {
+                            status = runCatching {
+                                context.startActivity(
+                                    android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(link.url))
+                                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                                null
+                            }.getOrElse { "Nothing on this device opens ${link.url}" }
+                        },
+                    ),
+                )
+            }
+        }
+
+        // Compatibility: evidence, never a verdict and never a gate
+        // (docs/SPEC.md 7i). gamenative's own reports when the entry
+        // carries them, and ProtonDB for a game with a Windows route,
+        // looked up only when asked.
+        val compat = entry.pcInfo?.compatibility
+        val offersProtonDb = !entry.missing && (hasWindowsRoute || entry.pcInfo?.storeId != null)
+        if (compat != null || offersProtonDb) {
+            add(PcMenuEntry.Header("Compatibility"))
+            compat?.let {
+                add(PcMenuEntry.Info(it.summary() + "\nOther people's results on other hardware."))
+            }
+        }
+        if (offersProtonDb) {
+            val state = protonDb
+            add(
+                PcMenuEntry.Row(
+                    PcActionRow(
+                        title = if (state is ProtonDbState.Found) state.summary.line() else "ProtonDB",
+                        detail = state.detail(),
+                        onSelect = if (state !is ProtonDbState.Looking) {
+                            {
+                                when (state) {
+                                    is ProtonDbState.Found -> status = runCatching {
+                                        context.startActivity(
+                                            android.content.Intent(
+                                                android.content.Intent.ACTION_VIEW,
+                                                android.net.Uri.parse(ProtonDbClient.pageUrl(state.appId)),
+                                            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                                        )
+                                        null
+                                    }.getOrElse { "There is no browser on this device to open ProtonDB in." }
+                                    else -> {
+                                        protonDb = ProtonDbState.Looking
+                                        scope.launch { protonDb = lookUpProtonDb(entry, gameName) }
+                                    }
+                                }
+                            }
+                        } else {
+                            null
+                        },
+                    ),
+                ),
+            )
+        }
+        add(PcMenuEntry.Row(PcActionRow("Close", "", onClose)))
+    }
+
+    val rowEntries = entries.filterIsInstance<PcMenuEntry.Row>()
+    var focusIndex by remember(entry) { mutableStateOf(0) }
+    Dialog(onDismissRequest = onClose) {
+        MenuPanel(
+            modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp)),
+            focusLabel = "Game options",
+            onKey = { event ->
+                if (event.type != KeyEventType.KeyUp) {
+                    false
+                } else {
+                    when (GamepadKeyMap.actionFor(event.key)) {
+                        GamepadAction.UP -> {
+                            if (rowEntries.isNotEmpty()) focusIndex = (focusIndex - 1 + rowEntries.size) % rowEntries.size
+                            dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds.play("scroll")
+                            true
+                        }
+                        GamepadAction.DOWN -> {
+                            if (rowEntries.isNotEmpty()) focusIndex = (focusIndex + 1) % rowEntries.size
+                            dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds.play("scroll")
+                            true
+                        }
+                        GamepadAction.A -> {
+                            rowEntries.getOrNull(focusIndex)?.row?.onSelect?.invoke()
+                            true
+                        }
+                        GamepadAction.B, GamepadAction.BACK, GamepadAction.SELECT -> {
+                            onClose()
+                            true
+                        }
+                        else -> false
+                    }
+                }
+            },
+        ) {
+            Text(
+                gameName,
+                style = MaterialTheme.typography.titleLarge,
+                color = MenuTokens.OnSurface,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            )
+            Text(entry.identityLine(available), color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall)
+            var rowCounter = 0
+            entries.forEach { menuEntry ->
+                when (menuEntry) {
+                    is PcMenuEntry.Header -> dev.droidtop.shell.gamepad.MenuSectionLabel(menuEntry.title)
+                    is PcMenuEntry.Info -> Text(menuEntry.text, color = MenuTokens.Value, style = MaterialTheme.typography.bodySmall)
+                    is PcMenuEntry.Row -> {
+                        val index = rowCounter++
+                        dev.droidtop.shell.gamepad.MenuRow(
+                            title = menuEntry.row.title,
+                            subtitle = menuEntry.row.detail.ifBlank { null },
+                            selected = index == focusIndex,
+                            onClick = {
+                                focusIndex = index
+                                menuEntry.row.onSelect?.invoke()
                             },
                         )
-                    },
-                    onSelect = {
-                        if (isReady) {
-                            onLaunch()
-                        } else if (setupAction != null) {
-                            scope.launch {
-                                status = "Working…"
-                                val failure = PcRunnerOptions.runAction(context, entry, setupAction) { status = it }
-                                status = failure
-                                reloadToken++
-                            }
-                        }
-                    },
-                )
-            }
-
-            status?.let { message -> item { Text(message, color = MenuTokens.Value, style = MaterialTheme.typography.bodySmall) } }
-
-            // What the game IS, as scraped: shown to players, so it sits
-            // under Play rather than at the bottom of the management rows
-            // (docs/SPEC.md 7h). ES-DE's own hide-metadata flag hides it.
-            if (!entry.hideMetadata) {
-                pcAboutItems(
-                    entry = entry,
-                    onHint = onPrimaryFocus,
-                    onOpenLink = { link ->
-                        status = runCatching {
-                            context.startActivity(
-                                android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(link.url))
-                                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                            )
-                            null
-                        }.getOrElse { "Nothing on this device opens ${link.url}" }
-                    },
-                )
-            }
-
-            actions.forEach { group ->
-                item(key = "group:" + group.title) {
-                    Text(
-                        group.title,
-                        color = MenuTokens.OnSurfaceMuted,
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier.padding(top = 16.dp),
-                    )
-                }
-                items(group.rows, key = { "row:" + group.title + it.title }) { row ->
-                    DetailRow(title = row.title, detail = row.detail, enabled = row.onSelect != null, onSelect = { row.onSelect?.invoke() })
-                }
-            }
-
-            // Compatibility: evidence, never a verdict and never a gate
-            // (docs/SPEC.md 7i). gamenative's own reports when the entry
-            // carries them, and ProtonDB for a game with a Windows route,
-            // looked up only when asked.
-            val compat = entry.pcInfo?.compatibility
-            val offersProtonDb = !entry.missing && (hasWindowsRoute || entry.pcInfo?.storeId != null)
-            if (compat != null || offersProtonDb) {
-                item(key = "group:Compatibility") {
-                    Column(modifier = Modifier.padding(top = 16.dp)) {
-                        Text("Compatibility", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.labelLarge)
-                        if (compat != null) {
-                            Text(compat.summary(), color = MenuTokens.Value, style = MaterialTheme.typography.bodyMedium)
-                            Text(
-                                "Other people's results on other hardware.",
-                                color = MenuTokens.OnSurfaceDisabled,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
                     }
                 }
             }
-            if (offersProtonDb) {
-                item(key = "row:ProtonDB") {
-                    val state = protonDb
-                    DetailRow(
-                        title = if (state is ProtonDbState.Found) state.summary.line() else "ProtonDB",
-                        detail = state.detail(),
-                        enabled = state !is ProtonDbState.Looking,
-                        onSelect = {
-                            when (state) {
-                                is ProtonDbState.Found -> status = runCatching {
-                                    context.startActivity(
-                                        android.content.Intent(
-                                            android.content.Intent.ACTION_VIEW,
-                                            android.net.Uri.parse(ProtonDbClient.pageUrl(state.appId)),
-                                        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                                    )
-                                    null
-                                }.getOrElse { "There is no browser on this device to open ProtonDB in." }
-                                else -> {
-                                    protonDb = ProtonDbState.Looking
-                                    scope.launch { protonDb = lookUpProtonDb(entry, gameName) }
-                                }
-                            }
-                        },
-                    )
-                }
-            }
-            item(key = "end") { androidx.compose.foundation.layout.Spacer(Modifier.height(32.dp)) }
+            dev.droidtop.shell.gamepad.MenuHint("Up/Down moves, A activates, B closes")
         }
     }
 }
 
+/** A minimal full-bleed [Dialog] host for a screen written as a plain fillMaxSize() composable (see the call sites above). */
+@Composable
+private fun FullScreenOverlay(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        content()
+    }
+}
+
+/** One entry in [PcGameMenu]'s flattened list: a group header, an info line, or a selectable row. */
+private sealed interface PcMenuEntry {
+    data class Header(val title: String) : PcMenuEntry
+    data class Info(val text: String) : PcMenuEntry
+    data class Row(val row: PcActionRow) : PcMenuEntry
+}
 /**
  * One line under the title: where it came from, what engine it is, how
  * big it is -- or, for a game the walk no longer finds, the one fact
@@ -1038,7 +1087,7 @@ private fun missingFolderLine(entry: LibraryEntry): String =
         "Nothing droidtop scanned still has this game. Its history, favourite and collections are kept."
     }
 
-/** What the detail knows of [PcGameDetail]'s entry from names alone, worked out off the main thread. */
+/** What the detail knows of [PcGameMenu]'s entry from names alone, worked out off the main thread. */
 private data class DetailNames(
     val forId: String?,
     val grouping: dev.droidtop.library.LibraryGameGroup?,
@@ -1093,214 +1142,6 @@ private const val PC_CONTAINER_CONFIG_ACTIVITY = "dev.droidtop.app.PcContainerCo
 private const val EXTRA_PC_ENTRY_ID = "dev.droidtop.app.extra.PC_ENTRY_ID"
 private const val EXTRA_PC_TITLE = "dev.droidtop.app.extra.PC_TITLE"
 
-/**
- * A game's own screen opens with the game: its artwork when something has
- * scraped some, and the same plate with the same two lines when nothing
- * has. One anatomy either way -- the rig's detail screen started straight
- * into rows, with nothing of the game on its own screen at all.
- *
- * Nothing is invented here: the plate is the title and the identity line
- * this entry already carries, on the shell's own surface colour. There is
- * no stand-in cover art, because a made-up cover is a lie about a game.
- */
-@Composable
-private fun PcDetailHeader(entry: LibraryEntry, grouping: dev.droidtop.library.LibraryGameGroup?, update: String?) {
-    // The header names the GAME and then says which folder of it is open,
-    // in the words the "Parts and versions" rows use. The card in the grid
-    // already said "BeingADIK"; this screen said "BeingADik - Chap3+", the
-    // folder's own qualified title, and the two disagreed on the same
-    // screen pair (rig, build 550).
-    // Until the grouping is worked out (off the main thread), the name
-    // this one folder derives is the game's name as the grouping will say
-    // it, bar casing; a store row keeps the title its store gave.
-    val ownName = remember(entry) { ownNameOf(entry) }
-    val title = dev.droidtop.library.GameNaming.displayName(grouping?.game?.name ?: ownName)
-    val copyLine = grouping?.let { copyLabel(it, entry) }
-    // Art narrower than this, cropped across a 220dp hero, is a blur of
-    // a small icon rather than artwork (UI pass 2026-09-24, M7); the plate
-    // is drawn without it, as for a game with no art at all.
-    // Wide hero art (ES-DE's fanart: a SteamGridDB hero, or what ES-DE
-    // scraped) is what this wide plate is shaped for; the cover is the
-    // fallback. A logo, when there is one, names the game in its own
-    // lettering in place of the title text. Both are layout lookups, so
-    // they are read off the main thread.
-    val scraped by produceState(entry.heroUri to entry.logoUri, entry) {
-        value = withContext(Dispatchers.IO) {
-            entry.mediaForImageTypes(listOf("fanart")) to entry.mediaForImageTypes(listOf("marquee"))
-        }
-    }
-    val headerArt = scraped.first ?: entry.artworkUri
-    val logo = scraped.second
-    var logoFailed by remember(logo) { mutableStateOf(false) }
-    var artTooSmall by remember(headerArt) { mutableStateOf(false) }
-    Box(modifier = Modifier.fillMaxWidth().height(220.dp).padding(top = 24.dp)) {
-        Box(modifier = Modifier.fillMaxSize().background(MenuTokens.Card, RoundedCornerShape(16.dp)))
-        if (headerArt != null && !artTooSmall) {
-            AsyncImage(
-                model = headerArt,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                onSuccess = { state ->
-                    val width = state.painter.intrinsicSize.width
-                    if (width.isFinite() && width < HERO_MIN_ART_WIDTH_PX) artTooSmall = true
-                },
-                modifier = Modifier.fillMaxSize().background(MenuTokens.Card, RoundedCornerShape(16.dp)),
-            )
-        }
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomStart)
-                .background(Brush.verticalGradient(listOf(Color.Transparent, MenuTokens.Scrim)))
-                .padding(16.dp),
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                if (logo != null && !logoFailed) {
-                    AsyncImage(
-                        model = logo,
-                        contentDescription = title,
-                        contentScale = ContentScale.Fit,
-                        alignment = Alignment.BottomStart,
-                        onError = { logoFailed = true },
-                        modifier = Modifier.height(64.dp).fillMaxWidth(0.6f),
-                    )
-                } else {
-                    Text(
-                        title,
-                        color = MenuTokens.OnSurface,
-                        style = MaterialTheme.typography.headlineSmall,
-                        maxLines = 2,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    )
-                }
-                if (copyLine != null) {
-                    Text(
-                        copyLine,
-                        color = MenuTokens.OnLaunchMuted,
-                        style = MaterialTheme.typography.labelLarge,
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    )
-                }
-                Text(
-                    entry.identityLine(update),
-                    color = MenuTokens.Value,
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
-}
-
-/**
- * The one thing this screen is FOR, as a button rather than as another
- * row in the list of rows. It says what pressing it does and what will
- * happen; when nothing can be done it is a disabled button that says why,
- * which is the only honest shape for "this game has no runner here"
- * (research/ui-polish item 18).
- */
-@Composable
-private fun PrimaryActionButton(
-    label: String,
-    detail: String,
-    enabled: Boolean,
-    onSelect: () -> Unit,
-    onFocus: (Boolean) -> Unit = {},
-) {
-    var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(12.dp)
-    val background = when {
-        !enabled -> MenuTokens.LaunchDisabled
-        focused -> MenuTokens.LaunchFocused
-        else -> MenuTokens.Launch
-    }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 6.dp)
-            // Ahead of the focus targets, not after them: see [GameCard].
-            .onKeyEvent { event ->
-                if (enabled && event.type == KeyEventType.KeyUp &&
-                    GamepadKeyMap.actionFor(event.key) == GamepadAction.A
-                ) {
-                    onSelect()
-                    true
-                } else {
-                    false
-                }
-            }
-            .onFocusChanged {
-                focused = it.isFocused
-                onFocus(it.isFocused)
-            }
-            .focusable(enabled = enabled)
-            .then(if (enabled) Modifier.clickable(onClick = onSelect) else Modifier)
-            .background(background, shape)
-            .border(
-                width = if (focused) MenuTokens.FocusRingWidth else 1.dp,
-                color = if (focused) MenuTokens.Accent else MenuTokens.CardOutline,
-                shape = shape,
-            )
-            .padding(horizontal = 20.dp, vertical = 18.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(
-            label,
-            color = if (enabled) MenuTokens.OnSurface else MenuTokens.OnSurfaceDisabled,
-            style = MaterialTheme.typography.headlineSmall,
-        )
-        if (detail.isNotBlank()) {
-            Text(
-                detail,
-                color = if (enabled) MenuTokens.OnLaunchMuted else MenuTokens.OnSurfaceDisabled,
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
-    }
-}
-
-@Composable
-internal fun DetailRow(
-    title: String,
-    detail: String,
-    enabled: Boolean,
-    onSelect: () -> Unit,
-) {
-    var focused by remember { mutableStateOf(false) }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            // Ahead of the focus targets, not after them: see [GameCard].
-            .onKeyEvent { event ->
-                if (enabled && event.type == KeyEventType.KeyUp &&
-                    GamepadKeyMap.actionFor(event.key) == GamepadAction.A
-                ) {
-                    onSelect()
-                    true
-                } else {
-                    false
-                }
-            }
-            .onFocusChanged { focused = it.isFocused }
-            .focusable(enabled = enabled)
-            .then(if (enabled) Modifier.clickable(onClick = onSelect) else Modifier)
-            .selectionFrame(focused, RoundedCornerShape(10.dp), rest = MenuTokens.CardInset)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        Text(
-            title,
-            color = if (enabled) MenuTokens.OnSurface else MenuTokens.OnSurfaceDisabled,
-            style = MaterialTheme.typography.titleMedium,
-        )
-        if (detail.isNotBlank()) {
-            Text(detail, color = if (enabled) MenuTokens.Value else MenuTokens.OnSurfaceDisabled, style = MaterialTheme.typography.bodySmall)
-        }
-    }
-}
 
 /** The ProtonDB row's states: nothing is fetched until the person asks. */
 private sealed interface ProtonDbState {
@@ -1334,5 +1175,3 @@ private suspend fun lookUpProtonDb(entry: LibraryEntry, name: String): ProtonDbS
 private fun ownNameOf(entry: LibraryEntry): String =
     if (entry.id.startsWith("/")) dev.droidtop.library.GameNaming.derive(entry.id).name.ifEmpty { entry.title } else entry.title
 
-/** The narrowest artwork the detail's hero draws; below it the plate goes without. */
-private const val HERO_MIN_ART_WIDTH_PX = 320f

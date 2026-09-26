@@ -110,6 +110,40 @@ object PcRunnerOptions {
         }
     }
 
+    /**
+     * A's real decision on a PC or engine game, made once at the moment
+     * it is pressed rather than a button's whole own screen (docs/SPEC.md
+     * 7i, redecided 2026-09-26): launch, exactly like a console ROM, when
+     * the resolved runner is [RunnerState.READY]; otherwise run the one
+     * action that would make it ready ([runAction]) instead of dispatching
+     * a launch known in advance to produce nothing. This is the exact
+     * decision `PcGameMenu` (formerly `PcGameDetail`)'s own primary button always made -- reused
+     * here rather than duplicated, now that A on the gamelist needs it
+     * too and the fixed detail screen it used to live on alone is gone.
+     *
+     * Touches the filesystem/PM ([forEntry]), so callers already call
+     * this off the main thread or from a coroutine that does.
+     */
+    suspend fun resolveAndPlay(
+        context: Context,
+        entry: LibraryEntry,
+        onLaunch: () -> Unit,
+        onStatus: (String) -> Unit = {},
+    ) {
+        val runner = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            resolvedFor(context, entry, forEntry(context, entry))
+        }
+        val setupAction = runner?.option?.action
+        when {
+            runner?.option?.state == RunnerState.READY -> onLaunch()
+            setupAction != null -> {
+                val failure = runAction(context, entry, setupAction, onStatus)
+                if (failure != null) onStatus(failure)
+            }
+            else -> onStatus(runner?.option?.reason ?: "No runner on this device offers this game")
+        }
+    }
+
     private fun openStorePage(context: Context, packageName: String): String? = try {
         context.startActivity(
             android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=$packageName"))

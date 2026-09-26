@@ -7155,42 +7155,93 @@ focused game exactly as a console ROM's are. `PcSurface`'s grid,
 kept as a fallback: one mechanism draws every gamelist now.
 
 What does NOT change: the runner model, availability states, overrides,
-the game detail screen and its sections, ProtonDB, the Lutris import, and
-same-game merge (all below, unchanged from 2026-09-10) — none of that is
-an ES-DE concept, so none of it moves into the theme. It moves onto the
-game's own detail screen (`PcGameDetail`, opened with A, matching this
-section's original "one place to look" design, not the console
-convention of A-launches) and into the gamelist's own Select menu
-(`GamelistOptionsMenu`, the same ES-DE `GuiGamelistOptions` PATTERN every
-system's gamelist already uses for sort/scrape/import), as a "Stores and
-folders" row, rather than in a screen only the PC card knew how to open.
-Y/Info, X/favorite and the L/R and Left/Right sibling-system jumps now
-work on a PC gamelist exactly as they do on a console one, because there
-is no more `!is GameGroup.Pc` exclusion anywhere in `GamepadShell.kt` to
-keep them from it.
+the game's own actions, ProtonDB, the Lutris import, and same-game merge
+(all below, unchanged from 2026-09-10) — none of that is an ES-DE
+concept, so none of it moves into the theme.
+
+**Revised again the same day: an expanded themed view, not a plain one
+(owner direction 2026-09-26).** The redecision above still had this
+section's own actions reachable only through A opening a fixed detail
+screen, which read as "the gamelist, then a second, different screen" —
+not the single coherent surface a theme's own PC card should open into.
+The owner's correction: "We don't want it to be the same as the others,
+it's an expanded view, because PC is so much bigger... [Extended] with PC
+regions that follow the theme's styling where the theme has no slot...
+We can also add an L2 menu for extra PC actions and stuff." Three changes
+from this:
+
+- **A launches, exactly like a console ROM's, when the runner is ready,
+  and runs the one setup action when it is not** — never opens a menu.
+  This is the same decision the old fixed detail screen's primary button
+  always made ("Play" when ready, *is the setup action* otherwise), made
+  once now in the ONE launch handler
+  (`PcRunnerOptions.resolveAndPlay`, called from `GamepadShell`'s
+  `onLaunch`) rather than inside a screen of its own, so the gamelist's A
+  and `PcGameMenu`'s own "Play"/"Set up" row can never disagree.
+- **The PC gamelist is an EXPANDED themed view, not a plain one.** It is
+  still the active theme's own gamelist -- its element positions, sizes,
+  variants, aspect ratios, fonts and colours, exactly as any console
+  system's -- extended with two droidtop-drawn regions the ES-DE element
+  schema has no slot for at all, layered OVER the theme's canvas rather
+  than shrinking it (the same rule the shell's help row already follows,
+  §7j): a filter/organisation strip (source/store, engine, install state
+  -- `PcExpandedOverlay`, replacing `PcSurface`'s own retired chip row)
+  and a compact per-focused-game info strip (resolved runner, source,
+  play time), both in droidtop's own palette
+  (`MenuTokens`) so they read as droidtop's addition to the theme rather
+  than a second competing look.
+- **L2 opens `PcGameMenu`,** an ES-DE-style in-context menu (the same
+  `GuiGamelistOptions` PATTERN `GamelistOptionsMenu` already uses for the
+  whole gamelist's Select-button actions, scoped here to ONE game) for
+  everything ES-DE genuinely has no concept of: the resolved runner and
+  its picker, Wine/container settings, ProtonDB, the Lutris import, the
+  F95 link and update state, same-game merge, and versions/segments.
+  Checked against every other binding in `GamepadShell.kt`/`QuickMenu.kt`
+  before choosing it: L2 was unclaimed (L/R are the sibling-system jump,
+  R2 opens the Quick Menu on hold, L3/R3 are unused) -- the one gamepad
+  region with nothing else on it. Y still opens the same menu for a
+  PC/engine game (a player who has not learned the L2 convention still
+  finds it, the same row Y already opens for a console ROM's own "Info"
+  would have been if PC still needed one), and the menu is reached by
+  touch through the gamelist's own hint row exactly like every other
+  bound action (design language: "the hint row is the touch route to pad
+  buttons") -- no on-screen row is L2-only.
+  `PcGameMenu` replaced the old fixed-layout `PcGameDetail` screen
+  outright (renamed, not kept as a second implementation): its hero-art
+  header and scraped "About this game" text are gone, because the
+  theme's own gamelist already shows a focused PC game's art and
+  description/developer/rating/genre while browsing, the same as a
+  console ROM's; what remains is a Dialog-hosted menu over rows this
+  section's action groups already produced (`rememberPcActions`),
+  unchanged in substance.
+
+**PC is always visible (owner direction 2026-09-26: "PC should always be
+visible").** Unlike a console system, whose card only ever appears once
+it holds a game, `GameGroup.Pc` is forced into the carousel's group list
+regardless of how many PC/engine entries the library currently has. An
+empty PC group opens straight into first-run setup (`pc_stores`, the same
+settings-catalog screen the "Stores and folders" row and this section's
+own "First run" paragraph below already describe) instead of an empty
+gamelist -- this is also what fixes the gap the previous revision above
+left open: the group could not previously be OPENED at all with zero
+entries, so its own documented first-run screen had no way in.
 
 **What still costs a themed screen its point of difference.** ES-DE's
 element schema has no element type for a runner, a prefix, install state
-or a store login, so a card grid alone was never going to carry a PC
-game's own concerns — the game's own detail screen still exists for
-exactly that reason, same as it always has. The theme owns the list; it
-was never going to own the runner picker.
+or a store login, so the theme's own canvas alone was never going to
+carry a PC game's own concerns -- `PcGameMenu` and the two expanded-view
+strips exist for exactly that reason. The theme owns the list's layout;
+it was never going to own the runner picker.
 
-**Known gaps, left open rather than shipped half-built:** the source/
-engine/install-state filter chips and the size sort `PcSurface`'s own
-header row offered have no themed equivalent yet (`GamelistOptionsMenu`'s
-sort is the fixed ES-DE `GamelistSort` enum: name/rating/release date/
-last played, and its filter is ES-DE's own all/favorites/completed/
-unplayed) — a PC-specific extension of that menu is real follow-up work,
-not implemented in this pass. An empty PC library also still cannot be
-reached at all: `GameGroup.Pc` only appears in the carousel when at least
-one PC/engine entry already exists (the same "present-and-non-empty
-groups" rule every console system group uses), so the "first run"
-concrete-repairs screen this section describes below has no way in from
-an actually-empty library; this predates this redecision and is unfixed.
+**Known gap, left open rather than shipped half-built:** `GamelistSort`
+(name/rating/release date/last played) has no "size" option, unlike
+`PcSurface`'s own retired sort -- the expanded view's own filter strip
+covers source/engine/install state, which was the larger of the two
+gaps the previous revision above named, but a size sort still has no
+home. Real follow-up work, not implemented in this pass.
 
-The original decision text follows, still current except where the
-redecision above says otherwise.
+The original decision text follows, still current except where a
+revision above says otherwise.
 
 The user's framing (2026-09-10): "we explicitly want THAT category to
 break from the ESDE theme, because of how much infrastructure we have to
@@ -7329,27 +7380,35 @@ the group in text only. The `pc` id itself stays the group's: its system
 id, its `downloaded_media` folder and its scrape. B returns to the carousel with focus
 on that card. Nothing else in the system view changes.
 
-**Library (REDECIDED 2026-09-26, see the top of this section).** The
-PC group's list is the active theme's own gamelist view — the same
-`EsDeThemedView`/`EsDeSystemListView` call every console system's
-gamelist renders through, on `GameGroup.Pc`'s own folded, one-card-
-per-game list (`LibraryGrouping`, §7m). It is laid out, positioned and
-sized by the theme, shows the theme's own `md_image`/`md_video`/
-`md_description` and the rest for whichever game is focused, and moves
-by the theme's own `<carousel>`/`<grid>`/`<textlist>` or, absent one,
-droidtop's headless per-game Up/Down (the same fallback a themeless
-console gamelist already used). The one-time filter chip row and the
-grid's own header/help row this paragraph used to describe are gone with
-`PcSurface`; see "Known gaps" at the top of this section for what that
-cost and has not yet been rebuilt as a themed-menu equivalent.
+**Library (REDECIDED 2026-09-26, revised again the same day -- see the
+top of this section for both).** The PC group's list is the active
+theme's own gamelist view, EXPANDED — the same `EsDeThemedView`/
+`EsDeSystemListView` call every console system's gamelist renders
+through, on `GameGroup.Pc`'s own folded, one-card-per-game list
+(`LibraryGrouping`, §7m), laid out, positioned and sized by the theme,
+showing the theme's own `md_image`/`md_video`/`md_description` and the
+rest for whichever game is focused, moving by the theme's own
+`<carousel>`/`<grid>`/`<textlist>` or, absent one, droidtop's headless
+per-game Up/Down (the same fallback a themeless console gamelist already
+used) — PLUS `PcExpandedOverlay`'s two droidtop-drawn regions layered
+over that same canvas without shrinking it: a source/engine/install-state
+filter strip (`PcSurface`'s own retired chips, filtering this gamelist
+instead of a grid of its own) and a compact resolved-runner/source/
+play-time strip for the focused game. The group is always in the
+carousel, even with zero games, opening straight into first-run setup
+when it is empty (see the top of this section).
 
-A game's actions live on the game's own screen, opened with A (unlike a
-console ROM, where A launches — see the redecision above): there is
-exactly one place to look for what can be done with a game. B returns to
-the carousel, the shell's own back route in both its forms, matching
-every other themed gamelist; Y opens the same detail screen as Info,
-X toggles favourite in place, and Select opens `GamelistOptionsMenu` for
-sort/scrape/"Stores and folders", the same as any system's gamelist.
+A game's actions: A launches when the resolved runner is ready and runs
+the one setup action when it is not, exactly like a console ROM's A (see
+the redecision above — this no longer opens a screen). B returns to the
+carousel, the shell's own back route in both its forms, matching every
+other themed gamelist. X toggles favourite in place. Y and L2 both open
+`PcGameMenu`, an in-context menu over everything ES-DE has no slot for:
+the resolved runner and its picker, Wine/container settings, ProtonDB,
+the Lutris import, the F95 link and update state, merge, and
+versions/segments — there is exactly one place to look for what can be
+done with a game beyond playing it. Select opens `GamelistOptionsMenu`
+for sort/scrape/"Stores and folders", the same as any system's gamelist.
 
 **Game detail.** In order: identity; a **Runs with** row carrying the
 resolved runner, its reason, and the picker; a primary button that is
