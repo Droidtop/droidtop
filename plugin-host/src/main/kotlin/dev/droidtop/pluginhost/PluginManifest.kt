@@ -63,6 +63,23 @@ data class PluginManifest(
     companion object {
         private val REQUIRED_ABIS = setOf("arm64-v8a", "x86_64")
 
+        /**
+         * A field a manifest may write as JSON `null` (description,
+         * entryClass) needs [JSONObject.isNull], not
+         * `optString(key).takeIf { it.isNotBlank() }` -- confirmed on the
+         * rig (dq-plugins-01) via [PluginRecord]'s own copy of this same
+         * pattern: Android's bundled org.json returns the literal string
+         * "null" for a key holding [JSONObject.NULL], not an empty
+         * string, so the old check kept "null" as if it were real text.
+         * PluginManifestTest's JVM unit test never caught it because its
+         * testImplementation org.json:json jar (a different
+         * implementation than the one Android ships) returns "" there
+         * instead -- a real behavioural gap between the test jar and the
+         * device, not something a unit test alone could have shown.
+         */
+        private fun optNullableString(json: JSONObject, key: String): String? =
+            if (json.isNull(key)) null else json.optString(key).takeIf { it.isNotBlank() }
+
         fun fromJson(json: JSONObject): PluginManifest? {
             val id = json.optString("id").takeIf { it.isNotBlank() } ?: return null
             val origin = json.optString("origin").takeIf { it.isNotBlank() } ?: return null
@@ -98,14 +115,14 @@ data class PluginManifest(
                 id = id,
                 origin = origin,
                 label = json.optString("label").ifBlank { id },
-                description = json.optString("description").takeIf { it.isNotBlank() },
+                description = optNullableString(json, "description"),
                 version = json.optString("version").ifBlank { "0" },
                 kind = kind,
                 capabilities = capabilities,
                 contractVersion = contractVersion,
                 requestsRoot = json.optBoolean("requestsRoot", false),
                 abis = abis,
-                entryClass = json.optString("entryClass").takeIf { it.isNotBlank() },
+                entryClass = optNullableString(json, "entryClass"),
                 payload = payload,
                 boundServiceTargets = boundServiceTargets,
             )
