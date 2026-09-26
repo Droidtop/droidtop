@@ -29,6 +29,7 @@ import dev.droidtop.pluginhost.PluginKind
 import dev.droidtop.pluginhost.PluginTrustState
 import dev.droidtop.pluginhost.PluginCapability
 import dev.droidtop.pluginhost.PluginCrashPolicy
+import dev.droidtop.pluginhost.PythonRuntimeManager
 import dev.droidtop.library.consoles.resolvePlayer
 import dev.droidtop.library.scraper.ScraperPrefs
 import dev.droidtop.library.scraper.ScraperSource
@@ -1262,7 +1263,9 @@ object AppSettingsCatalogs {
                                 if (m.requestsRoot) {
                                     append(if (record.rootApproved) " - uses root (approved)" else " - can use root (not granted)")
                                 }
-                                if (m.kind == PluginKind.PYTHON) append(" - no Python runner yet, cannot run")
+                                if (m.kind == PluginKind.PYTHON && !PythonRuntimeManager.isInstalled(context)) {
+                                    append(" - needs the Python runtime, not downloaded yet (see below)")
+                                }
                             }
                             add(ActionItem(id = "plugin_${m.id}_info", title = m.label, subtitle = statusLine, run = {}))
                             when (record.trust) {
@@ -1376,6 +1379,64 @@ object AppSettingsCatalogs {
                                     title = "Uninstall \"${m.label}\"",
                                     confirmTitle = "Remove ${m.label} and its data?",
                                     run = { ctx -> PluginStore.uninstall(ctx, m.id) },
+                                ),
+                            )
+                        }
+                        // The python kind's runtime is a separate, explicit
+                        // download (docs/SPEC.md 12a) -- never triggered
+                        // implicitly by loading a plugin -- so it gets its
+                        // own row here rather than happening silently
+                        // behind a plugin's first invoke().
+                        val pythonInstalled = PythonRuntimeManager.isInstalled(context)
+                        val pythonVersion = PythonRuntimeManager.installedVersion(context)
+                            ?: PythonRuntimeManager.pinnedVersion(context)
+                        add(
+                            ActionItem(
+                                id = "plugins_python_runtime_status",
+                                title = "Python runtime",
+                                subtitle = if (pythonInstalled) {
+                                    "Installed: CPython $pythonVersion (${PythonRuntimeManager.currentAbi()}), official python.org Android build"
+                                } else {
+                                    "Not installed -- needed by any python-kind plugin. CPython $pythonVersion (${PythonRuntimeManager.currentAbi()}), ~22 MB, downloaded from python.org and SHA-256 verified"
+                                },
+                                run = {},
+                            ),
+                        )
+                        if (pythonInstalled) {
+                            add(
+                                ActionItem(
+                                    id = "plugins_python_runtime_remove",
+                                    title = "Remove Python runtime",
+                                    subtitle = "Any installed python-kind plugin stops working until it's downloaded again",
+                                    confirmTitle = "Remove the downloaded Python runtime?",
+                                    run = { ctx -> PythonRuntimeManager.remove(ctx) },
+                                ),
+                            )
+                        } else {
+                            add(
+                                AsyncActionItem(
+                                    id = "plugins_python_runtime_download",
+                                    title = "Download Python runtime",
+                                    subtitle = "Fetches the official CPython Android build for this device's ABI and verifies it before use",
+                                    run = { ctx, onStatus ->
+                                        val error = PythonRuntimeManager.ensureInstalled(ctx) { progress ->
+                                            val text = when (progress) {
+                                                is PythonRuntimeManager.Progress.Downloading -> {
+                                                    if (progress.totalBytes > 0) {
+                                                        val pct = (progress.bytesRead * 100 / progress.totalBytes).toInt()
+                                                        "Downloading... $pct% (${progress.bytesRead / 1024 / 1024} MB / ${progress.totalBytes / 1024 / 1024} MB)"
+                                                    } else {
+                                                        "Downloading... ${progress.bytesRead / 1024 / 1024} MB"
+                                                    }
+                                                }
+                                                PythonRuntimeManager.Progress.Verifying -> "Verifying SHA-256..."
+                                                PythonRuntimeManager.Progress.Extracting -> "Extracting..."
+                                                PythonRuntimeManager.Progress.Done -> "Done"
+                                            }
+                                            onStatus(text)
+                                        }
+                                        error ?: "Python runtime installed"
+                                    },
                                 ),
                             )
                         }
