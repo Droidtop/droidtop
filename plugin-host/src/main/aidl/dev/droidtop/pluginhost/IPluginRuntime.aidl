@@ -29,8 +29,13 @@ interface IPluginRuntime {
      * can't be loaded or doesn't implement the plugin API; a plugin that
      * fails to load is disabled, exactly like one that crashes after
      * loading.
+     *
+     * rootApproved is PluginRecord.rootApproved at the moment :app
+     * issued this load -- droidtop's own approval state never lives in
+     * this process, so it is handed down on every load (see
+     * PluginContext.hasRootApproval).
      */
-    boolean loadPlugin(String pluginId, String installDir, String entryClass);
+    boolean loadPlugin(String pluginId, String installDir, String entryClass, boolean rootApproved);
 
     void unloadPlugin(String pluginId);
 
