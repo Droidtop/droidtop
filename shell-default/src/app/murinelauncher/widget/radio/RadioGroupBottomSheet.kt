@@ -133,6 +133,34 @@ open class RadioGroupBottomSheet : BottomSheetDialogFragment() {
             return recyclerView
         }
 
+        /**
+         * droidtop patch: the wrap_content fix above was necessary but not
+         * sufficient. PreferenceFragmentCompat's own root view (androidx's
+         * `preference_list_fragment.xml`, a FrameLayout wrapping the
+         * RecyclerView) is ALSO match_parent height, and that root view is
+         * what actually gets added into prefs_container by the fragment
+         * transaction -- fixing only the RecyclerView inside it left the
+         * outer wrapper still collapsing to zero (confirmed live: dumpsys
+         * accessibility kept reporting prefs_container at
+         * Rect(0,0-1280,0) even with the RecyclerView fix and a
+         * synchronous commitNow in place). Forcing this root wrap_content
+         * too is what actually lets prefs_container measure real content.
+         */
+        override fun onCreateView(
+            inflater: android.view.LayoutInflater,
+            container: android.view.ViewGroup?,
+            savedInstanceState: Bundle?,
+        ): View {
+            val root = super.onCreateView(inflater, container, savedInstanceState)
+            root.layoutParams = (root.layoutParams ?: android.view.ViewGroup.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+            )).apply {
+                height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+            }
+            return root
+        }
+
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             val sheet = parentSheet ?: return
             val ctx = requireContext()
