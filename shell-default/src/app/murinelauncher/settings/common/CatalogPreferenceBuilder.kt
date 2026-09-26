@@ -203,7 +203,15 @@ class CatalogPreferenceNavigator(
      * fragment transaction of its own.
      */
     private fun openSearch() {
-        val context = fragment.requireContext()
+        val appContext = fragment.requireContext()
+        // The dialog's OWN themed context, not the fragment's: a manually
+        // built child view constructed from the fragment's context (which
+        // ThemeOverride may have pushed dark) rendered near-white text on
+        // the platform AlertDialog's light background -- illegible, unlike
+        // every setMessage()-based dialog elsewhere in this file, which
+        // pulls its TextView from the dialog's own theme instead.
+        val builder = AlertDialog.Builder(appContext)
+        val context = builder.context
         val density = context.resources.displayMetrics.density
         val pad = (16 * density).toInt()
 
@@ -228,7 +236,7 @@ class CatalogPreferenceNavigator(
         }
         recycler.adapter = adapter
 
-        dialog = AlertDialog.Builder(context)
+        dialog = builder
             .setTitle("Search settings")
             .setView(container)
             .setNegativeButton(android.R.string.cancel, null)
@@ -247,7 +255,7 @@ class CatalogPreferenceNavigator(
 
         fragment.lifecycleScope.launch {
             index = withContext(Dispatchers.IO) {
-                SettingsSearchIndex.build(context, CatalogScreen(id = rootScreenId, title = rootTitle, groups = rootGroups))
+                SettingsSearchIndex.build(appContext, CatalogScreen(id = rootScreenId, title = rootTitle, groups = rootGroups))
             }
             adapter.submit(SettingsSearchIndex.search(index, input.text?.toString().orEmpty()))
         }
@@ -304,6 +312,13 @@ class CatalogPreferenceNavigator(
         list.addOnChildAttachStateChangeListener(object : RecyclerView.OnChildAttachStateChangeListener {
             override fun onChildViewAttachedToWindow(view: View) {
                 view.isFocusable = true
+                // Also focusable IN touch mode: a plain requestFocus() (the
+                // search-result focus above, and any future caller) is
+                // silently dropped by the framework in touch mode
+                // otherwise -- the same "requestFocus() in onCreate is not
+                // enough" trap DESIGN-LANGUAGE.md already names, here on a
+                // row reached by a tap rather than at screen-open time.
+                view.isFocusableInTouchMode = true
                 view.foreground = ContextCompat.getDrawable(view.context, R.drawable.catalog_row_focus_ring)
             }
             override fun onChildViewDetachedFromWindow(view: View) {}
