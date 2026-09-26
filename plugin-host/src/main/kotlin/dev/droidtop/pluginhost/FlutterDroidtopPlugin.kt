@@ -120,10 +120,21 @@ class FlutterDroidtopPlugin(
             // FlutterEngine's constructor sets everything up but does NOT run
             // the plugin's Dart `main()` on its own -- every real embedding
             // (FlutterActivity/FlutterFragment included) calls
-            // executeDartEntrypoint itself. createDefault() runs `main` from
-            // the asset bundle's own kernel/AOT data, which after
-            // loadAssetsIntoEngine above is this plugin's own flutter_assets.
-            newEngine.dartExecutor.executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault())
+            // executeDartEntrypoint itself. NOT DartEntrypoint.createDefault():
+            // found on the rig -- that factory reads
+            // FlutterInjector.instance().flutterLoader(), the PROCESS-WIDE
+            // singleton, and throws ("DartEntrypoints can only be created
+            // once a FlutterEngine is created") if IT was never initialized --
+            // which it never is here, deliberately (this class's own header
+            // comment: "never touching the process-wide FlutterInjector
+            // singleton at all"). [flutterLoader] above, OUR OWN instance,
+            // was already initialized by the FlutterEngine constructor
+            // that just ran; its own findAppBundlePath() is what
+            // createDefault() would have used, so calling it directly and
+            // building the DartEntrypoint by hand skips the singleton
+            // entirely.
+            val entrypoint = DartExecutor.DartEntrypoint(flutterLoader.findAppBundlePath(), "main")
+            newEngine.dartExecutor.executeDartEntrypoint(entrypoint)
         }
     }
 
