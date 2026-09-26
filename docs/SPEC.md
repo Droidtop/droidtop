@@ -508,6 +508,19 @@ Default mode offers Android whenever droidtop holds the home screen, so
 onboarding's answer reads back there instead of "Whichever was used last";
 "Whichever was used last" keeps the old behaviour for whoever picks it.
 
+Checked again 2026-09-26 after a UX review reported Home landing on the
+Standard shell with Default mode = Gaming: on a genuinely cold process start
+(`am force-stop` then Home, or a reboot) `Launcher.onCreate`'s redirect is
+recorded immediately but only acted on in `onStart` (see that method's own
+comment), which does not run until Launcher3's own model load finishes --
+observed taking several seconds on a cold, not-yet-JIT-warmed process
+(emulator-5560, Android 14). Checking the resumed activity right after the
+Home key, rather than waiting those few seconds out, reads as "stuck on
+Standard" when it is actually still loading; waiting confirms it does land in
+Gaming. No code change from this: recorded here so the same false read isn't
+repeated. The switch-mode dialog's own, separately confirmed break is
+recorded below.
+
 **Switching modes is named on every surface (decided 2026-09-25).** The
 mode switcher (`BackButtonMenu`: Android, the modes that are on, and
 "Modes and settings") opens from a long-press of Back anywhere, and by
@@ -524,6 +537,30 @@ takes a running shell with it), and Global settings is the first row of the laun
 list and of Desktop's settings as well as Gaming's; turning a mode off is
 always reversible from the UI (it once took a data clear, dq-coordinator-23
 F5).
+
+**The switcher's rows are real Views, not a stock dialog list (fixed
+2026-09-26).** A UX pass on BlueStacks (Android 9, droidtop 0.1.0-dev-903)
+found the switcher unusable both ways: D-pad Down moved focus onto
+"Android" and no further Down press ever reached "Gaming" or past it, and
+tapping "Gaming" directly restarted `MainActivity` (confirmed in logcat)
+but the screen stayed on whatever was showing before -- the stock
+`AlertDialog.setItems` list's own internal selection tracking, not
+droidtop's own focus/click handling. `BackButtonMenu.show` now builds the
+dialog's rows itself: one real, individually focusable `TextView` per row
+in a plain vertical `LinearLayout`, each with its own click closure
+capturing its mode directly rather than looking an index back up in a
+parallel array. A `LinearLayout`'s own focus search is the same mechanism
+every other droidtop screen already relies on for pad navigation, and is
+far more reliably tested across Android versions than a `ListView`'s
+internal one; the first row receives focus explicitly on open rather than
+waiting for the first Down press to "acquire" it. The row order is
+`ModeGate.switcherModes` (`runtime-common`, unit-tested in `ModesTest`):
+Android always, Desktop and Gaming only while enabled -- exactly what
+`BackButtonMenu` computed inline before, now a pure function the dialog
+and its test share. The dialog also draws its own hint row ("Up/Down
+Navigate · A Select · B Cancel") instead of leaving the Quick Menu's
+underneath it visible through the dialog, which named controls
+("Lower/Raise/Act/Close") that don't apply here.
 
 ### "Full computer", and where Launcher mode stands against Nova/Apex (survey + decided 2026-09-25)
 
