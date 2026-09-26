@@ -3425,6 +3425,16 @@ app-drawer icon or a floating switcher button:
   list of rows. Each mode's settings show that mode's own settings first,
   with shortcuts to the other modes' settings at the bottom.
 
+  **H4 is not satisfied by the catalog migration alone (decided 2026-09-26,
+  owner delegated).** "H4 fixed" means BOTH renderers use the same row
+  language: the same icons, the same grouping, a visible focus ring, the hint
+  row, and search -- not merely reading from the shared `DroidtopWideSettings`
+  catalog. A screen that pulls its rows from the catalog but still renders
+  them as a stock Material `Preference` list, with no focus ring and no hint
+  row, is still broken under H4 even though the data model is already unified.
+  `p1-dt-h4-rig-verify` checks this with fresh rig screenshots of Global
+  settings, Desktop mode's settings and the Standard settings surface.
+
   **Global settings and Desktop mode's settings are catalogs**
   (`DroidtopWideSettings` in `:app`, registered as `global_settings` and
   `desktop_settings`), like every other droidtop setting. The Gaming shell
@@ -8668,15 +8678,25 @@ one runner per kind:
   all — the standing bundle rule (§7d) — enforced by
   `PluginBundleInstaller.structuralProblems()`. **This is the only kind
   with a working runner today.**
-- **`python`** — documented, not built. droidtop vendors no Python
-  runtime; bundling one (Chaquopy, python-for-android) is real, scoped
-  follow-up work, not a stub worth shipping now. A manifest declaring it
-  validates like any other and is refused ACTIVATION with a clear reason
-  — never silently ignored.
+- **`python`** — documented, not built. **Runtime decided 2026-09-26 (owner
+  delegated): Chaquopy** (MIT, embeds CPython per ABI), delivered as a
+  downloadable runtime component fetched on first use of a Python plugin,
+  never bundled into the base APK -- not `python-for-android` (its only
+  mention in this repo is a stale 2016/2021 fork recommended for archival),
+  and not droidtop's container/OCI stack (root/Desktop-only, too heavy to
+  require for a plugin). A manifest declaring `python` validates like any
+  other and is refused ACTIVATION with a clear reason until the Chaquopy
+  runner exists — never silently ignored.
 - **`flutter_embed`** — documented, not built, added 2026-09-25 for a
   real forthcoming case: an existing Flutter/Dart app the owner wants to
-  turn into a plugin rather than rewrite natively. Same treatment as
-  `python`: validates, refused at activation.
+  turn into a plugin rather than rewrite natively (romgi). Same treatment as
+  `python`: validates, refused at activation. **Build order decided 2026-09-26
+  (owner delegated): after both the core plugin host's own rig check
+  (`dq-plugins-01`) is green and the `python` kind lands** -- one shared
+  Flutter engine instance is meant to serve every `flutter_embed` plugin, and
+  sequencing it behind a verified host and a second working runner (not just
+  the first, `native_bundle`) is cheaper than discovering a host-level bug
+  while also bringing up a brand-new embedding.
 
 **The API surface** (`PluginCapability`, a closed set — the trust shape
 differs per capability, same reasoning §12's `IntegrationCapability`
