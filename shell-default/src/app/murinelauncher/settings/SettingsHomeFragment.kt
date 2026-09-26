@@ -13,12 +13,12 @@ import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.preference.Preference
-import androidx.preference.SwitchPreferenceCompat
 import app.murinelauncher.receiver.ScreenOffAdminReceiver
 import app.murinelauncher.widget.radio.RadioGroupPreference
 import app.murinelauncher.widget.smartspace.SmartspaceMode
 import app.murinelauncher.service.MurineAccessibilityService
 import app.murinelauncher.settings.common.AbstractSettingsFragment
+import com.android.launcher3.touch.GestureAction
 import com.android.launcher3.Flags
 import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.LauncherPrefs
@@ -33,8 +33,13 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
         const val FIXED_LANDSCAPE_MODE: String = "pref_fixed_landscape_mode"
         const val GRID_SIZE_WIDTH: String = "pref_grid_size_width"
         const val GRID_SIZE_HEIGHT: String = "pref_grid_size_height"
+        // droidtop patch: superseded by DOUBLE_TAP_ACTION/SWIPE_DOWN_ACTION
+        // below -- kept only as the migration source key
+        // (GestureActionMigration), never bound to a preference row itself.
         const val DOUBLE_TAP_TO_SLEEP: String = "pref_double_tap_to_sleep"
         const val SWIPE_DOWN_NOTIFICATIONS: String = "pref_swipe_down_notifications"
+        const val DOUBLE_TAP_ACTION: String = "pref_gesture_double_tap_action"
+        const val SWIPE_DOWN_ACTION: String = "pref_gesture_swipe_down_action"
         const val SMARTSPACE_MODE: String = "pref_smartspace_mode"
         private const val REQUEST_DEVICE_ADMIN = 1001
 
@@ -108,24 +113,16 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
                 preference.setDefaultValue(LauncherPrefs.defaultGridHeight(isTablet))
                 return true
             }
-            DOUBLE_TAP_TO_SLEEP -> {
-                preference.setOnPreferenceChangeListener { _, newValue ->
-                    if (newValue as Boolean && !Utilities.ATLEAST_P) {
-                        val dpm = requireContext().getSystemService(DevicePolicyManager::class.java)
-                        val admin = ComponentName(requireContext(), ScreenOffAdminReceiver::class.java)
-                        if (dpm != null && !dpm.isAdminActive(admin)) {
-                            val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
-                                putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin)
-                            }
-                            startActivityForResult(intent, REQUEST_DEVICE_ADMIN)
-                            return@setOnPreferenceChangeListener false
-                        }
-                    }
-                    true
-                }
+            DOUBLE_TAP_ACTION -> {
+                preference as RadioGroupPreference
+                bindGestureAction(preference, LauncherPrefs.GESTURE_DOUBLE_TAP_ACTION.defaultValue)
                 return true
             }
-            SWIPE_DOWN_NOTIFICATIONS -> return true
+            SWIPE_DOWN_ACTION -> {
+                preference as RadioGroupPreference
+                bindGestureAction(preference, LauncherPrefs.GESTURE_SWIPE_DOWN_ACTION.defaultValue)
+                return true
+            }
             SMARTSPACE_MODE -> {
                 preference as RadioGroupPreference
                 preference.asEnum(SmartspaceMode::class.java).apply {
@@ -151,15 +148,47 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
         }
     }
 
+    /**
+     * Wires a gesture-action `RadioGroupPreference` exactly like
+     * SMARTSPACE_MODE's own `RadioGroupPreference` above -- one shared
+     * function since both gesture slots (double-tap, swipe-down) offer
+     * the same GestureAction choices.
+     */
+    private fun bindGestureAction(preference: RadioGroupPreference, defaultAction: GestureAction) {
+        preference.asEnum(GestureAction::class.java).apply {
+            setDefaultValue(defaultAction)
+            setTextProvider { c, action -> action.getDisplayName(c) }
+            setSummaryProvider { c, action -> action.getSummary(c) }
+            // Pre-P devices lock the screen through a device admin
+            // (GestureAction.LOCK_SCREEN's own legacy path), which needs
+            // requesting once, same as the old DOUBLE_TAP_TO_SLEEP switch
+            // used to do on change; P+ (every real target device) uses the
+            // accessibility service instead and needs nothing here.
+            setOnPreferenceChangeListener { newValue ->
+                if (newValue == GestureAction.LOCK_SCREEN && !Utilities.ATLEAST_P) {
+                    val dpm = requireContext().getSystemService(DevicePolicyManager::class.java)
+                    val admin = ComponentName(requireContext(), ScreenOffAdminReceiver::class.java)
+                    if (dpm != null && !dpm.isAdminActive(admin)) {
+                        val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                            putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin)
+                        }
+                        startActivityForResult(intent, REQUEST_DEVICE_ADMIN)
+                        // Still accept the selection: the gesture simply
+                        // no-ops until admin is granted, matching what
+                        // lockScreenLegacy() already did unconditionally.
+                    }
+                }
+                true
+            }
+        }
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_DEVICE_ADMIN) {
-            val dpm = requireContext().getSystemService(DevicePolicyManager::class.java)
-            val admin = ComponentName(requireContext(), ScreenOffAdminReceiver::class.java)
-            val granted = dpm?.isAdminActive(admin) == true
-            findPreference<SwitchPreferenceCompat>(DOUBLE_TAP_TO_SLEEP)?.isChecked = granted
-        }
+        // No preference to flip back off any more (see bindGestureAction's
+        // own comment): a denied request just leaves LOCK_SCREEN selected
+        // but a no-op, same as it always was with no admin active.
     }
 
     private object Private {
