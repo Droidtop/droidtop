@@ -115,6 +115,18 @@ object PluginBundleInstaller {
             val target = File(existingRoot, file.path)
             target.parentFile?.mkdirs()
             target.writeBytes(entries.getValue(file.path))
+            // Android 10+ refuses to DexClassLoader a writable file
+            // ("Writable dex file ... is not allowed") -- confirmed live
+            // on emulator-5560 (Android 14): a native_bundle plugin
+            // approved and running fine moments earlier came back
+            // disabledReason="load failed: Writable dex file ... is not
+            // allowed" on its very next real invoke(), since nothing
+            // here had ever marked the extracted payload read-only. The
+            // BlueStacks rig (Android 9) never enforces this, which is
+            // why dq-plugins-01 read as a full pass there. PluginContext's
+            // own doc comment already called this payload "read-only" --
+            // this is what actually makes that true.
+            target.setReadOnly()
         }
 
         val digest = BundleSignature.sha256(manifestBytes)
