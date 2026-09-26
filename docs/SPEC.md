@@ -9049,3 +9049,24 @@ does. Open: the `flutter_embed` runner; a catalog-repo install source for
 plugins; `startJob` support for python-kind plugins; and the rig check
 for the python leg specifically (queued, `device/QUEUE.md`) — the
 `native_bundle` leg's own rig check (`dq-plugins-01`) already passed.
+
+**A python-kind plugin could never actually run (found and fixed
+2026-09-26).** The Plugins settings row and the "Download Python runtime"
+action both worked and were reachable on BlueStacks (Android 9) all
+along, on both settings surfaces and via search — that could not be
+reproduced despite retesting dq-pyplugin-01's own repro on the exact
+reported build/commit. What was real and did reproduce every time: once
+approved, a python-kind plugin's "Call ... status tile" always failed
+with "plugin failed to load", no process, no exception, nothing in
+logcat. `NativePluginRunner.load()` (`plugin-host`) required
+`record.manifest.entryClass` to be non-null for every plugin and returned
+`false` before even binding `PluginRuntimeService` when it was not — but
+`PluginManifest.structuralProblems()` only requires `entryClass` for
+`native_bundle`; a python-kind manifest legitimately has none
+(`PluginRuntimeService.loadPlugin`'s own comment: "entryClass is simply
+unused on the python path"). Fixed by defaulting to `""` for that case
+instead of bailing out, the same "unused" placeholder the service side
+already assumed the caller would send. Verified end to end on BlueStacks
+with the signed `plugin-sample-py-statustile` bundle: download the
+Python runtime, install, approve, invoke (now succeeds), force-crash
+(droidtop survives, the plugin is disabled).
