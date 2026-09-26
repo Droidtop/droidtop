@@ -308,6 +308,57 @@ jobs:
             samples/plugin-sample-py-statustile/build/manifest.json
           if-no-files-found: error
 
+  sample-plugin-flutter:
+    # Builds samples/plugin-sample-flutter-statustile's payload
+    # (docs/SPEC.md 12a, flutter_embed kind): a real `flutter build apk`
+    # against a Flutter SDK pinned to the EXACT engine version
+    # plugin-host/src/main/assets/flutter-runtimes.json and
+    # plugin-host/build.gradle.kts both pin (Flutter 3.47.5, engine
+    # af7e796e161ae0bb1ff0758c71a7105418bd9ded, confirmed 2026-09-26 --
+    # see build.sh's own header). Uploads build/manifest.json and
+    # build/payload/{lib,flutter_assets} UNSIGNED, same reasoning as the
+    # other two sample-plugin jobs: this job never sees the plugin
+    # origin's private key (droidtop-dev only), so sign.sh runs outside
+    # CI.
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up the Android build
+        # flutter build apk needs a real Android SDK/NDK/JDK, the same
+        # ones the sample-plugin job's own :plugin-host build already
+        # needs -- no separate setup path for this one.
+        uses: ./.github/actions/android-setup
+
+      - name: Install the pinned Flutter SDK
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/flutter.tar.xz"             https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.47.5-stable.tar.xz
+          echo "2132e990f236f8d22e7c6314b29a191a95b10d7cbcfec9b4e2e303d996652cbb  $RUNNER_TEMP/flutter.tar.xz" | sha256sum -c -
+          tar -C "$RUNNER_TEMP" -xf "$RUNNER_TEMP/flutter.tar.xz"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Build the sample flutter plugin payload (unsigned)
+        run: |
+          export PATH="$RUNNER_TEMP/flutter/bin:$PATH"
+          flutter config --no-analytics >/dev/null
+          cd samples/plugin-sample-flutter-statustile
+          ./build.sh
+
+      - name: Upload unsigned plugin payload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plugin-sample-flutter-statustile-unsigned
+          path: |
+            samples/plugin-sample-flutter-statustile/build/manifest.json
+            samples/plugin-sample-flutter-statustile/build/payload
+          if-no-files-found: error
+
   publish:
     # A GitHub Release is the "give this to someone to install"
     # mechanism: permanent, one clean download URL, and what the in-app

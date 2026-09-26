@@ -1,0 +1,16 @@
+name: flutter_statustile
+description: >
+  droidtop flutter_embed sample plugin (docs/SPEC.md 12a) -- a status_tile
+  handler over one MethodChannel, no UI. Built by samples/plugin-sample-flutter-statustile/build.sh.
+publish_to: 'none'
+version: 1.0.0
+
+environment:
+  sdk: '>=3.10.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  uses-material-design: false

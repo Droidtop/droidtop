@@ -1,0 +1,12 @@
+{
+  "id": "droidtop.sample-flutter-statustile",
+  "origin": "droidtop",
+  "label": "Sample status tile (Flutter)",
+  "description": "Harmless flutter_embed-kind sample exercising the plugin API end to end (SPEC 12a); see build.sh in this folder.",
+  "version": "1.0.0",
+  "kind": "flutter_embed",
+  "capabilities": ["status_tile"],
+  "contractVersion": 1,
+  "requestsRoot": false,
+  "abis": ["arm64-v8a", "x86_64"]
+}
