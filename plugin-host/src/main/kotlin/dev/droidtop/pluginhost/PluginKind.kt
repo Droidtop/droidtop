@@ -17,19 +17,22 @@ enum class PluginKind(val id: String) {
     NATIVE_BUNDLE("native_bundle"),
 
     /**
-     * A Python script or module. Documented here as the extension point
-     * it is, not built. Blocked on a real conflict, not just missing
-     * effort (docs/SPEC.md 12a, "python -- blocked on a real packaging
-     * conflict"): Chaquopy, the runtime named for this kind, is a Gradle
-     * plugin that compiles CPython into whichever app applies it at that
-     * app's own build time -- there is no supported way to produce a
-     * separate, later-downloadable Chaquopy runtime artifact, which is
-     * what droidtop's own "never bundled in the base APK" requirement
-     * needs. python-for-android has the same "build it in" shape and is
-     * additionally stale. A manifest that declares this kind is accepted
-     * and validated like any other -- schema, hashes, signature, ABI
-     * where it applies -- but [PluginStore] refuses to activate it and
-     * says why, rather than pretending a runner exists.
+     * A single-file Python plugin (`plugin.py`), run by [PythonDroidtopPlugin]
+     * inside a process-wide CPython interpreter that
+     * [PythonBridge]/`plugin-host/native` embeds via `dlopen` +
+     * the stable C API (docs/SPEC.md 12a, redecided 2026-09-26 after
+     * Chaquopy was found to only compile CPython INTO whichever app
+     * applies its Gradle plugin at that app's own build time -- see git
+     * history on this file for that earlier, now-superseded text). The
+     * interpreter itself comes from [PythonRuntimeManager], which
+     * downloads the OFFICIAL per-ABI CPython Android build
+     * (python.org/downloads/android/, PEP 738) on first use of a
+     * python-kind plugin, verifies its SHA-256 against a pinned list
+     * (`plugin-host/src/main/assets/python-runtimes.json`), and stores it
+     * under `filesDir` -- never bundled in the base APK, exactly as the
+     * decision requires, because this time the artifact genuinely is a
+     * separate, independently-downloadable thing rather than a
+     * build-time compilation step.
      */
     PYTHON("python"),
 

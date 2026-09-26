@@ -47,7 +47,7 @@ class PluginCrashPolicy(
      */
     suspend fun invoke(record: PluginRecord, capability: PluginCapability, args: Map<String, String>): PluginResult {
         if (!record.runnable()) return PluginResult.failure("plugin is not approved/enabled")
-        if (record.manifest.kind != PluginKind.NATIVE_BUNDLE) {
+        if (record.manifest.kind != PluginKind.NATIVE_BUNDLE && record.manifest.kind != PluginKind.PYTHON) {
             return PluginResult.failure("no runner for kind ${record.manifest.kind.id} yet")
         }
         val dir = PluginStore.payloadDirFor(context, record.manifest.id)
@@ -73,7 +73,8 @@ class PluginCrashPolicy(
 
     /** Starts a long-running job for [record] (see [PluginJob]); same runnable/re-verify gates as [invoke], null on any refusal. */
     suspend fun startJob(record: PluginRecord, capability: PluginCapability, args: Map<String, String>): String? {
-        if (!record.runnable() || record.manifest.kind != PluginKind.NATIVE_BUNDLE) return null
+        if (!record.runnable()) return null
+        if (record.manifest.kind != PluginKind.NATIVE_BUNDLE && record.manifest.kind != PluginKind.PYTHON) return null
         if (PluginBundleInstaller.verifyInstalled(PluginStore.root(context), record) != null) {
             PluginStore.disableWithReason(context, record.manifest.id, "files changed on disk since approval")
             return null

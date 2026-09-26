@@ -97,4 +97,31 @@ class PluginManifestTest {
         val manifest = PluginManifest.fromJson(manifestJson(id = "somethingelse.sample"))!!
         assertTrue(manifest.structuralProblems().any { it.contains("namespaced") })
     }
+
+    @Test
+    fun `flags a python plugin with no plugin py in its payload`() {
+        val json = manifestJson(
+            id = "droidtop.sample-py",
+            kind = "python",
+            abis = emptyList(),
+            payload = listOf("not-the-right-file.py" to "a".repeat(64)),
+            entryClass = null,
+        )
+        val manifest = PluginManifest.fromJson(json)!!
+        assertTrue(manifest.structuralProblems().any { it.contains("plugin.py") })
+    }
+
+    @Test
+    fun `accepts a python plugin that ships plugin py`() {
+        val json = manifestJson(
+            id = "droidtop.sample-py",
+            kind = "python",
+            abis = emptyList(),
+            payload = listOf("plugin.py" to "a".repeat(64)),
+            entryClass = null,
+        )
+        val manifest = PluginManifest.fromJson(json)!!
+        assertEquals(PluginKind.PYTHON, manifest.kind)
+        assertTrue(manifest.structuralProblems().isEmpty())
+    }
 }

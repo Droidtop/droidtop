@@ -248,6 +248,39 @@ jobs:
             samples/plugin-sample-statustile/build/manifest.json
           if-no-files-found: error
 
+  sample-plugin-python:
+    # Builds samples/plugin-sample-py-statustile's payload (docs/SPEC.md
+    # 12a, python kind): unlike sample-plugin above, a python-kind
+    # plugin's payload IS its source (plugin.py) -- no compiler, no
+    # :plugin-host classpath, no Android SDK/NDK needed at all, so this
+    # job doesn't even check out the Android toolchain. Uploads
+    # build/manifest.json + build/plugin.py UNSIGNED, same reasoning as
+    # sample-plugin: this job never sees the plugin origin's private key
+    # (droidtop-dev only), so sign.sh runs outside CI.
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Build the sample python plugin payload (unsigned)
+        run: |
+          cd samples/plugin-sample-py-statustile
+          ./build.sh
+
+      - name: Upload unsigned plugin payload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plugin-sample-py-statustile-unsigned
+          path: |
+            samples/plugin-sample-py-statustile/build/plugin.py
+            samples/plugin-sample-py-statustile/build/manifest.json
+          if-no-files-found: error
+
   publish:
     # A GitHub Release is the "give this to someone to install"
     # mechanism: permanent, one clean download URL, and what the in-app

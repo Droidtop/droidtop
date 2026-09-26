@@ -55,3 +55,4 @@ Thumbs.db
 
 # Editor backup files
 *~
+samples/plugin-sample-py-statustile/src/__pycache__/

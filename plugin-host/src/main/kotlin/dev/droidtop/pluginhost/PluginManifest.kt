@@ -41,7 +41,16 @@ data class PluginManifest(
     val requestsRoot: Boolean,
     /** The manifest's own claim, corroborated by PluginBundleInstaller reading the real payload paths before this is trusted. */
     val abis: Set<String>,
-    /** Fully-qualified class implementing [DroidtopPlugin], loaded by [PluginKind.NATIVE_BUNDLE]'s runner. Unused/absent for kinds without one yet. */
+    /**
+     * [PluginKind.NATIVE_BUNDLE]: the fully-qualified class implementing
+     * [DroidtopPlugin], loaded by [PluginRuntimeService]'s
+     * `DexClassLoader` path. [PluginKind.PYTHON] has no dex class to
+     * name, so this field is unused for it -- a python-kind plugin's
+     * entry point is always its payload's single `plugin.py`
+     * ([PluginManifest.structuralProblems] requires it be present),
+     * loaded by [PythonDroidtopPlugin] instead. Absent for
+     * [PluginKind.FLUTTER_EMBED], which has no runner yet.
+     */
     val entryClass: String?,
     val payload: List<PluginPayloadFile>,
     /**
@@ -143,6 +152,9 @@ data class PluginManifest(
         }
         if (kind == PluginKind.NATIVE_BUNDLE && entryClass == null) {
             add("a native_bundle plugin must declare entryClass")
+        }
+        if (kind == PluginKind.PYTHON && payload.none { it.path == "plugin.py" }) {
+            add("a python plugin must ship plugin.py at its payload root")
         }
         val hasNativeLibs = payload.any { it.path.startsWith("lib/") && it.path.endsWith(".so") }
         if (hasNativeLibs && !abis.containsAll(REQUIRED_ABIS)) {

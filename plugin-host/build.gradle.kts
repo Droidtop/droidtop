@@ -6,9 +6,25 @@ plugins {
 android {
     namespace = "dev.droidtop.pluginhost"
     compileSdk = 36
+    // Only for :plugin-host's own bridge (native/ -- libdroidtoppy.so,
+    // docs/SPEC.md 12a's "python" kind): dlopen/dlsym glue that never
+    // links or bundles CPython itself. Matches input-keyboard's/
+    // host-bridge's own ndkVersion pin so CI's single NDK install serves
+    // all of them.
+    ndkVersion = "27.0.12077973"
 
     defaultConfig {
         minSdk = 26
+        ndk {
+            abiFilters += "arm64-v8a"
+            abiFilters += "x86_64"
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("native/CMakeLists.txt")
+        }
     }
 
     // The IPluginRuntime binder contract (docs/SPEC.md 12a): :app talks to

@@ -39,8 +39,26 @@ class PluginRuntimeService : Service() {
         }
 
         override fun loadPlugin(pluginId: String, installDir: String, entryClass: String): Boolean {
+            val dir = File(installDir)
+            // The manifest on disk (written by PluginBundleInstaller,
+            // re-verified before every activation by PluginCrashPolicy)
+            // is the one place this process can tell a native_bundle load
+            // from a python one apart -- IPluginRuntime.loadPlugin's own
+            // signature is unchanged; entryClass is simply unused on the
+            // python path (that kind's entry point is always its own
+            // payload's plugin.py, found straight off installDir).
+            val manifestFile = File(dir, "manifest.json")
+            val kind = runCatching {
+                PluginManifest.fromJson(JSONObject(manifestFile.readText()))?.kind
+            }.getOrNull()
+            return when (kind) {
+                PluginKind.PYTHON -> loadPythonPlugin(pluginId, dir)
+                else -> loadNativeBundlePlugin(pluginId, dir, entryClass)
+            }
+        }
+
+        private fun loadNativeBundlePlugin(pluginId: String, dir: File, entryClass: String): Boolean {
             return try {
-                val dir = File(installDir)
                 val jar = File(dir, "classes.jar")
                 if (!jar.isFile) return false
                 val nativeDir = nativeLibraryDirFor(dir)
@@ -48,6 +66,34 @@ class PluginRuntimeService : Service() {
                 val loader = DexClassLoader(jar.absolutePath, optimizedDir.absolutePath, nativeDir, javaClass.classLoader)
                 val instance = loader.loadClass(entryClass).getDeclaredConstructor().newInstance()
                 val plugin = instance as? DroidtopPlugin ?: return false
+                plugin.onLoad(pluginContextFor(pluginId, dir))
+                loaded[pluginId] = plugin
+                true
+            } catch (t: Throwable) {
+                reportCrash(pluginId, "", "load failed: ${t.message ?: t::class.java.simpleName}")
+                false
+            }
+        }
+
+        /**
+         * [PluginKind.PYTHON]'s load path (docs/SPEC.md 12a): runs
+         * `plugin.py` inside [PythonBridge]'s process-wide interpreter
+         * rather than a DexClassLoader. A missing/not-yet-downloaded
+         * [PythonRuntimeManager] runtime is reported as an ordinary load
+         * failure (return false, no [reportCrash]) -- that is an
+         * expected, non-crash state (the runtime download is its own
+         * explicit settings action, never triggered implicitly from
+         * here), exactly like [NativePluginRunner.load] returning false
+         * for "the process never connected" does not disable the plugin.
+         */
+        private fun loadPythonPlugin(pluginId: String, dir: File): Boolean {
+            val built = PythonDroidtopPlugin.forInstall(applicationContext, pluginId, dir)
+            val plugin = built.getOrElse { e ->
+                if (e.message?.contains("runtime not installed", ignoreCase = true) == true) return false
+                reportCrash(pluginId, "", "load failed: ${e.message ?: e::class.java.simpleName}")
+                return false
+            }
+            return try {
                 plugin.onLoad(pluginContextFor(pluginId, dir))
                 loaded[pluginId] = plugin
                 true
