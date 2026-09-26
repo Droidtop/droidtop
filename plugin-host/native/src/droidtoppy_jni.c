@@ -61,6 +61,15 @@ typedef void (*PyErr_NormalizeException_t)(PyObject **, PyObject **, PyObject **
 typedef PyObject *(*PyObject_Str_t)(PyObject *);
 typedef void (*PyErr_Clear_t)(void);
 
+/* PyGILState_STATE is a plain enum (PyGILState_LOCKED=0, PyGILState_UNLOCKED=1)
+ * in every CPython version that has shipped it -- stable ABI since 3.2,
+ * safe to redeclare as int here the same way every other stable-ABI type
+ * in this file is redeclared rather than pulled from a header. */
+typedef int PyGILState_STATE;
+typedef PyGILState_STATE (*PyGILState_Ensure_t)(void);
+typedef void (*PyGILState_Release_t)(PyGILState_STATE);
+typedef void *(*PyEval_SaveThread_t)(void);
+
 typedef struct {
     void *libpython;
     Py_InitializeEx_t Py_InitializeEx;
@@ -79,6 +88,9 @@ typedef struct {
     PyErr_NormalizeException_t PyErr_NormalizeException;
     PyObject_Str_t PyObject_Str;
     PyErr_Clear_t PyErr_Clear;
+    PyGILState_Ensure_t PyGILState_Ensure;
+    PyGILState_Release_t PyGILState_Release;
+    PyEval_SaveThread_t PyEval_SaveThread;
 
     /* The bootstrap module's three helpers, resolved once after init. */
     PyObject *fn_load;
@@ -199,6 +211,9 @@ Java_dev_droidtop_pluginhost_PythonBridge_nativeInit(JNIEnv *env, jobject thiz,
     RESOLVE(PyErr_NormalizeException, "PyErr_NormalizeException");
     RESOLVE(PyObject_Str, "PyObject_Str");
     RESOLVE(PyErr_Clear, "PyErr_Clear");
+    RESOLVE(PyGILState_Ensure, "PyGILState_Ensure");
+    RESOLVE(PyGILState_Release, "PyGILState_Release");
+    RESOLVE(PyEval_SaveThread, "PyEval_SaveThread");
 #undef RESOLVE
 
     g_py.libpython = handle;
@@ -224,6 +239,7 @@ Java_dev_droidtop_pluginhost_PythonBridge_nativeInit(JNIEnv *env, jobject thiz,
         return JNI_FALSE;
     }
     LOGI("python runtime initialized (home=%s)", getenv("PYTHONHOME"));
+    g_py.PyEval_SaveThread();
     return JNI_TRUE;
 }
 
@@ -234,17 +250,23 @@ Java_dev_droidtop_pluginhost_PythonBridge_nativeLoadModule(JNIEnv *env, jobject 
     const char *path = (*env)->GetStringUTFChars(env, jPath, NULL);
     const char *dataDir = (*env)->GetStringUTFChars(env, jDataDir, NULL);
 
+    /* This call arrives on whichever binder thread the AIDL dispatcher
+     * picked, not necessarily nativeInit's own thread -- see that
+     * function's own comment on why every Python call here must be
+     * bracketed in the GIL rather than assuming it's already held. */
+    PyGILState_STATE gstate = g_py.PyGILState_Ensure();
     PyObject *result = g_py.PyObject_CallFunction(g_py.fn_load, "sss", uniqueName, path, dataDir);
+    const char *msg = (result == NULL) ? fetch_python_error() : NULL;
+    if (result != NULL) g_py.Py_DecRef(result);
+    g_py.PyGILState_Release(gstate);
+
     (*env)->ReleaseStringUTFChars(env, jUniqueName, uniqueName);
     (*env)->ReleaseStringUTFChars(env, jPath, path);
     (*env)->ReleaseStringUTFChars(env, jDataDir, dataDir);
 
     if (result == NULL) {
-        const char *msg = fetch_python_error();
         throw_java(env, msg != NULL ? msg : "on_load failed");
-        return;
     }
-    g_py.Py_DecRef(result);
 }
 
 JNIEXPORT jstring JNICALL
@@ -254,35 +276,59 @@ Java_dev_droidtop_pluginhost_PythonBridge_nativeCallFunction(JNIEnv *env, jobjec
     const char *funcName = (*env)->GetStringUTFChars(env, jFuncName, NULL);
     const char *argJson = (*env)->GetStringUTFChars(env, jArgJson, NULL);
 
+    /* See nativeLoadModule's own comment: this is a fresh binder thread,
+     * not nativeInit's, and must hold the GIL for every Python call --
+     * held for NewStringUTF too, since utf8 below is a borrowed pointer
+     * into result's own buffer and Py_DecRef must run before releasing
+     * the GIL, same ordering the original (single-threaded-assuming)
+     * version already had, just now inside the locked section. */
+    PyGILState_STATE gstate = g_py.PyGILState_Ensure();
     PyObject *result = g_py.PyObject_CallFunction(g_py.fn_call, "sss", uniqueName, funcName, argJson);
+    const char *msg = NULL;
+    jstring jresult = NULL;
+    jboolean badReturn = JNI_FALSE;
+    if (result == NULL) {
+        msg = fetch_python_error();
+    } else {
+        const char *utf8 = g_py.PyUnicode_AsUTF8(result);
+        if (utf8 == NULL) {
+            badReturn = JNI_TRUE;
+        } else {
+            jresult = (*env)->NewStringUTF(env, utf8);
+        }
+        g_py.Py_DecRef(result);
+    }
+    g_py.PyGILState_Release(gstate);
+
     (*env)->ReleaseStringUTFChars(env, jUniqueName, uniqueName);
     (*env)->ReleaseStringUTFChars(env, jFuncName, funcName);
     (*env)->ReleaseStringUTFChars(env, jArgJson, argJson);
 
     if (result == NULL) {
-        const char *msg = fetch_python_error();
         throw_java(env, msg != NULL ? msg : "plugin call failed");
         return NULL;
     }
-    const char *utf8 = g_py.PyUnicode_AsUTF8(result);
-    if (utf8 == NULL) {
-        g_py.Py_DecRef(result);
+    if (badReturn) {
         throw_java(env, "plugin function did not return a str");
         return NULL;
     }
-    jstring jresult = (*env)->NewStringUTF(env, utf8);
-    g_py.Py_DecRef(result);
     return jresult;
 }
 
 JNIEXPORT void JNICALL
 Java_dev_droidtop_pluginhost_PythonBridge_nativeUnloadModule(JNIEnv *env, jobject thiz, jstring jUniqueName) {
     const char *uniqueName = (*env)->GetStringUTFChars(env, jUniqueName, NULL);
+
+    /* Same reasoning as nativeLoadModule/nativeCallFunction: a fresh
+     * binder thread, must hold the GIL for every Python call here. */
+    PyGILState_STATE gstate = g_py.PyGILState_Ensure();
     PyObject *result = g_py.PyObject_CallFunction(g_py.fn_unload, "s", uniqueName);
-    (*env)->ReleaseStringUTFChars(env, jUniqueName, uniqueName);
     if (result == NULL) {
         g_py.PyErr_Clear();
-        return;
+    } else {
+        g_py.Py_DecRef(result);
     }
-    g_py.Py_DecRef(result);
+    g_py.PyGILState_Release(gstate);
+
+    (*env)->ReleaseStringUTFChars(env, jUniqueName, uniqueName);
 }
