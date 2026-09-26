@@ -7783,6 +7783,36 @@ running on the console and asked for the visual pass on top of it. Decided and b
   View focus on it once the target screen's `PreferenceScreen` is set, the same "immediately, or
   after the screen finishes building" split.
 
+  **Verified on the BlueStacks rig (agent settingsh4, 2026-09-26), the user way, by touch and by
+  pad (`adb shell input tap`/`input text`, and `input keyevent KEYCODE_DPAD_*`/`KEYCODE_BACK` for
+  the pad half — a real controller was not attached to this rig session).** Global settings
+  (`SettingsGlobalFragment`) and Desktop mode's settings (`SettingsDesktopFragment`), reached
+  directly via `am start -n dev.droidtop.app/com.android.launcher3.settings.SettingsActivity --es
+  ":settings:fragment" <class>` (the same exported entry point `APPLICATION_PREFERENCES` uses):
+  the "Search settings" row and `Containers` (a `NestedScreenItem`) both draw their real icon; no
+  leaf row does; `Modes`/`Data` (Global) and the untitled/`Containers` grouping (Desktop) draw as
+  section labels on both surfaces. Search for "tutorial" from Global settings' own row found
+  "Show the tutorial" and landed on it scrolled into view WITH the accent focus ring, not back on
+  the search row; D-pad down from there moved the ring to "Rerun onboarding", confirming the ring
+  is a real focus target and not a one-off highlight. Search for "container" from Desktop found a
+  depth-1 result ("Create a container", inside `Containers`) and pushed that real nested screen
+  scrolled to and focused on that exact row; `KEYCODE_BACK` returned cleanly to Desktop mode's own
+  list. Two real defects surfaced by this same rig pass and fixed before it re-ran clean (see the
+  commit "Fix two rig-found bugs in the touch surface's new settings search"): the search
+  dialog's `EditText`/result text rendered near-illegible pale-grey-on-white because it was built
+  from the fragment's own (`ThemeOverride`-darkened) context instead of the `AlertDialog`'s own
+  themed one; and the very first tap into a result drew no ring at all because `requestFocus()`
+  right after a touch event is silently dropped unless the row is also `isFocusableInTouchMode`,
+  not only `isFocusable` — the same trap DESIGN-LANGUAGE.md already names for a screen's initial
+  selection, here on a row reached by a tap rather than at screen-open time. **Known minor
+  cosmetic gap, not reopened as a defect:** the focus ring's rounded corners are clipped flush by
+  the row's own bounds (no inset), so a row against another row's edge reads as a straight accent
+  line rather than a rounded box — visible, correctly coloured and correctly positioned, just not
+  as polished a shape as `selectionFrame`'s. Gaming shell parity for the same search+focus fix was
+  re-checked on the same rig pass: "hint" from the Gaming settings home found "Show button hints"
+  and landed on it with `selectionFrame`, not back on "Search settings" (the exact repro in
+  `p1-rig-settings-search-no-focus.md`); D-pad down from there moved to "Screensaver" correctly.
+
 **Copy is part of the system.** Sentence case, one dash convention (a spaced em dash, never
 `--`), one name per concept, verb labels on buttons, no developer notation and no backend error
 strings in a user-facing string. Ids, package names, URLs and paths sit behind a Details page,
