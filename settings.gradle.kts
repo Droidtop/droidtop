@@ -20,6 +20,21 @@ dependencyResolutionManagement {
         // (io.github.joshuatam:javasteam), published only here — the
         // same repository gamenative's own settings.gradle declares.
         maven { url = uri("https://central.sonatype.com/repository/maven-snapshots/") }
+        // Needed by :plugin-host (docs/SPEC.md 12a, flutter_embed kind):
+        // Flutter's own Maven repo for the `io.flutter:flutter_embedding_release`
+        // artifact -- the Java-only embedding classes (FlutterEngine,
+        // FlutterJNI, MethodChannel, ...) compiled straight into
+        // :plugin-host's own APK, the same "small glue code ships in the
+        // base APK" call made for PythonBridge's native glue. Confirmed
+        // real and live (2026-09-26): storage.googleapis.com/download.flutter.io
+        // is the exact repo Flutter's own Gradle plugin
+        // (FlutterPlugin.kt) adds for this artifact. The much larger
+        // Dart/Skia/Impeller engine binary (libflutter.so) is NEVER a
+        // build-time dependency -- that is downloaded at runtime by
+        // FlutterRuntimeManager from a different, official Flutter CDN
+        // bucket (flutter_infra_release), verified against
+        // plugin-host/src/main/assets/flutter-runtimes.json.
+        maven { url = uri("https://storage.googleapis.com/download.flutter.io") }
     }
     // gradle/libs.versions.toml is picked up by convention — do not also
     // declare it via versionCatalogs { create("libs") { from(...) } },

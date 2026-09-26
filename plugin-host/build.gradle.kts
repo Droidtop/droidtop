@@ -52,6 +52,14 @@ dependencies {
     // classpath itself to read the xz codec, so it is declared here too.
     implementation(libs.commons.compress)
     implementation("org.tukaani:xz:1.9")
+    // docs/SPEC.md 12a, flutter_embed kind: the Flutter embedding's own
+    // Java classes (FlutterEngine/FlutterJNI/FlutterLoader/MethodChannel),
+    // pinned to the EXACT engine version
+    // plugin-host/src/main/assets/flutter-runtimes.json downloads
+    // libflutter.so for -- FlutterDroidtopPlugin's DownloadedFlutterJNI
+    // subclass only works with the FlutterJNI from this same build. Bump
+    // both together, never independently.
+    implementation("io.flutter:flutter_embedding_release:1.0.0-af7e796e161ae0bb1ff0758c71a7105418bd9ded")
     testImplementation(libs.junit)
     // android.jar's org.json is a set of stubs that throw at runtime; the
     // main sourceset relies on the real implementation bundled in the

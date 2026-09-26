@@ -53,6 +53,7 @@ class PluginRuntimeService : Service() {
             }.getOrNull()
             return when (kind) {
                 PluginKind.PYTHON -> loadPythonPlugin(pluginId, dir)
+                PluginKind.FLUTTER_EMBED -> loadFlutterPlugin(pluginId, dir)
                 else -> loadNativeBundlePlugin(pluginId, dir, entryClass)
             }
         }
@@ -90,6 +91,54 @@ class PluginRuntimeService : Service() {
             val built = PythonDroidtopPlugin.forInstall(applicationContext, pluginId, dir)
             val plugin = built.getOrElse { e ->
                 if (e.message?.contains("runtime not installed", ignoreCase = true) == true) return false
+                reportCrash(pluginId, "", "load failed: ${e.message ?: e::class.java.simpleName}")
+                return false
+            }
+            return try {
+                plugin.onLoad(pluginContextFor(pluginId, dir))
+                loaded[pluginId] = plugin
+                true
+            } catch (t: Throwable) {
+                reportCrash(pluginId, "", "load failed: ${t.message ?: t::class.java.simpleName}")
+                false
+            }
+        }
+
+        /**
+         * [PluginKind.FLUTTER_EMBED]'s load path (docs/SPEC.md 12a):
+         * hosts a real FlutterEngine via [FlutterDroidtopPlugin] rather
+         * than a DexClassLoader or the python interpreter. Two
+         * preconditions are checked BEFORE any engine construction is
+         * attempted, both reported as an ordinary "not ready" load
+         * failure (return false, no [reportCrash]) rather than a crash --
+         * same shape [loadPythonPlugin] already uses for "runtime not
+         * installed":
+         *
+         *   1. the shared Flutter runtime (libflutter.so,
+         *      [FlutterRuntimeManager]) is actually downloaded, and
+         *   2. this plugin's own [PluginManifest.runtimeVersion] matches
+         *      that runtime EXACTLY -- a Dart AOT snapshot only runs
+         *      against the exact engine build it was compiled for
+         *      (docs/SPEC.md 12a's flutter_embed section has the
+         *      citation), so a version drift here is refused up front
+         *      rather than left to fail confusingly deep inside
+         *      FlutterEngine's own native init.
+         */
+        private fun loadFlutterPlugin(pluginId: String, dir: File): Boolean {
+            val manifestFile = File(dir, "manifest.json")
+            val runtimeVersion = runCatching {
+                PluginManifest.fromJson(JSONObject(manifestFile.readText()))?.runtimeVersion
+            }.getOrNull()
+            val pinnedVersion = FlutterRuntimeManager.pinnedVersion(applicationContext)
+            if (pinnedVersion == null || FlutterRuntimeManager.libflutterSoPath(applicationContext) == null) {
+                return false
+            }
+            if (runtimeVersion != pinnedVersion) {
+                reportCrash(pluginId, "", "plugin's runtimeVersion ($runtimeVersion) does not match the installed Flutter runtime ($pinnedVersion)")
+                return false
+            }
+            val built = FlutterDroidtopPlugin.forInstall(applicationContext, pluginId, dir)
+            val plugin = built.getOrElse { e ->
                 reportCrash(pluginId, "", "load failed: ${e.message ?: e::class.java.simpleName}")
                 return false
             }
