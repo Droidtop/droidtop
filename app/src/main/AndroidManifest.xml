@@ -252,10 +252,30 @@
           Gaming shell is NOT on (docs/SPEC.md section 4, Gaming-mode
           dual-screen roles). Started by MainActivity's role
           orchestration, never launched directly by the user.
+
+          android:launchMode="singleTask" (rig, p1-rig-companion-display0-
+          ghosting): with the default "standard" launch mode, every
+          re-assertion of this Activity from orchestration's health-check
+          timer or its own re-relocation retry (both routine, not error
+          paths; MainActivity.observeSecondScreen fires this
+          startActivity call repeatedly over a session) pushed a BRAND NEW
+          instance onto display 0's task, on top of whatever instance was
+          already there. The old instance never finished, so its own
+          composed content (and, before it, the Gaming shell's own last
+          frame if this was mid-relocation) kept a live surface underneath
+          the new one; SurfaceFlinger compositing both during the
+          transition matches the reported ghosting exactly, and
+          dumpsys window's transient surface=[0,0][0,0] on both windows
+          matches a teardown/recreate race rather than a sizing bug.
+          singleTask (same fix MainActivity itself needed, and the same
+          reasoning: see that Activity's own doc comment) makes a repeat
+          launch resolve through onNewIntent against the ONE existing
+          instance instead of stacking another.
         -->
         <activity
             android:name="dev.droidtop.app.CompanionActivity"
             android:exported="false"
+            android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|navigation" />
 
         <!--

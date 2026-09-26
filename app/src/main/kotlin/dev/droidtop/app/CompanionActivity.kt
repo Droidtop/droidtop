@@ -132,6 +132,21 @@ class CompanionActivity : AppCompatActivity() {
         CompanionWidgetPrefs.setWidgetIds(this, widgetIds)
     }
 
+    // singleTask (AndroidManifest.xml) resolves a repeat launch from
+    // MainActivity's role orchestration against this ONE instance rather
+    // than stacking a new one on top -- the fix for the display-0
+    // ghosting rig bug (dumpsys window's transient surface=[0,0][0,0] on
+    // both windows during relocation). This carries no per-launch extras
+    // today, but every other singleTask Activity in droidtop
+    // (MainActivity) overrides onNewIntent for the same reason: Android's
+    // documented behavior for re-launching an already-top Activity is to
+    // bring it forward with its ORIGINAL Intent still in effect, silently
+    // dropping whatever the new Intent carried.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
+
     override fun onStart() {
         super.onStart()
         widgetHost.startListening()
