@@ -8678,15 +8678,38 @@ one runner per kind:
   all — the standing bundle rule (§7d) — enforced by
   `PluginBundleInstaller.structuralProblems()`. **This is the only kind
   with a working runner today.**
-- **`python`** — documented, not built. **Runtime decided 2026-09-26 (owner
-  delegated): Chaquopy** (MIT, embeds CPython per ABI), delivered as a
-  downloadable runtime component fetched on first use of a Python plugin,
-  never bundled into the base APK -- not `python-for-android` (its only
-  mention in this repo is a stale 2016/2021 fork recommended for archival),
-  and not droidtop's container/OCI stack (root/Desktop-only, too heavy to
-  require for a plugin). A manifest declaring `python` validates like any
-  other and is refused ACTIVATION with a clear reason until the Chaquopy
-  runner exists — never silently ignored.
+- **`python`** — documented, not built, and **blocked on a real
+  packaging conflict found 2026-09-26** in the runtime the same day's
+  decision named. Chaquopy (MIT since 12.0.1, chaquo.com/chaquopy/license)
+  is a Gradle plugin, not a library a plugin bundle can carry on its own:
+  it compiles the CPython interpreter as a native component INTO the app
+  that applies it, one native library set per ABI declared in that app's
+  own `abiFilters`/`ndk.abiFilters` (chaquo.com/chaquopy/doc/current/android.html),
+  and the standard library loads straight out of the APK's own assets at
+  run time (`extractPackages` only copies files already inside the APK to
+  app-private storage on first import for startup speed — it does not
+  fetch anything). There is no supported path to produce "a Chaquopy
+  runtime" as a standalone artifact a plugin host downloads later: the
+  interpreter and stdlib are baked in wherever the Gradle plugin runs, at
+  that module's own build time, not attachable post-build. Android's own
+  answer to "ship this only when it's used" — Play Feature Delivery /
+  dynamic feature modules — is Play Store-specific and droidtop is not
+  Play-distributed (`build-scripts/release_channel.py`, GitHub Releases
+  only), so that route is also closed. **This directly conflicts with the
+  2026-09-26 decision's "downloadable component, fetched on first use,
+  never bundled in the base APK"** — that requirement cannot be met by
+  Chaquopy as it actually ships, so it is not implemented pending the
+  owner choosing one of: (a) accept Chaquopy compiled into the base APK
+  (its native libraries add several MB per ABI, chaquo.com/chaquopy/doc/current/android.html's
+  own sizing note) and drop "downloadable"; (b) accept it as a genuinely
+  separate installable unit — a standalone APK/AAR droidtop's own updater
+  fetches and loads via context creation into a Chaquopy-built module,
+  unverified whether that is supported outside Chaquopy's own single-app
+  model and not investigated further without a decision to spend the
+  time; (c) a different Python runtime with an actual split-delivery
+  story (not researched). `PluginKind.PYTHON` still validates like any
+  other kind and is refused ACTIVATION with a clear reason — never
+  silently ignored — until one of these is chosen and built.
 - **`flutter_embed`** — documented, not built, added 2026-09-25 for a
   real forthcoming case: an existing Flutter/Dart app the owner wants to
   turn into a plugin rather than rewrite natively (romgi). Same treatment as

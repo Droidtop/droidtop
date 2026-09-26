@@ -18,13 +18,18 @@ enum class PluginKind(val id: String) {
 
     /**
      * A Python script or module. Documented here as the extension point
-     * it is, not built: droidtop vendors no Python runtime today (grep
-     * confirms it, see PluginRunner.kt's doc comment), and bundling one
-     * (e.g. Chaquopy or python-for-android) is real, scoped follow-up
-     * work, not a stub worth shipping now. A manifest that declares this
-     * kind is accepted and validated like any other -- schema, hashes,
-     * signature, ABI where it applies -- but [PluginStore] refuses to
-     * activate it and says why, rather than pretending a runner exists.
+     * it is, not built. Blocked on a real conflict, not just missing
+     * effort (docs/SPEC.md 12a, "python -- blocked on a real packaging
+     * conflict"): Chaquopy, the runtime named for this kind, is a Gradle
+     * plugin that compiles CPython into whichever app applies it at that
+     * app's own build time -- there is no supported way to produce a
+     * separate, later-downloadable Chaquopy runtime artifact, which is
+     * what droidtop's own "never bundled in the base APK" requirement
+     * needs. python-for-android has the same "build it in" shape and is
+     * additionally stale. A manifest that declares this kind is accepted
+     * and validated like any other -- schema, hashes, signature, ABI
+     * where it applies -- but [PluginStore] refuses to activate it and
+     * says why, rather than pretending a runner exists.
      */
     PYTHON("python"),
 
