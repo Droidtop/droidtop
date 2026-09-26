@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  droidtop patch (shell-default is not upstream Launcher3's own module --
+  droidtop patch (shell-default is not upstream Launcher3's own module,
   the fork's own additions live here already, e.g. RadioGroupPreference).
   One row of a droidtop library search result: artwork + title, the same
   shape as an app row but reading from the game library's own index
