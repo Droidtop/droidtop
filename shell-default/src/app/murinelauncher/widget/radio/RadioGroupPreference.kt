@@ -1,16 +1,12 @@
 package app.murinelauncher.widget.radio
 
 import android.content.Context
-import android.content.ContextWrapper
 import android.content.res.TypedArray
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
 import android.graphics.drawable.Drawable
 import android.util.AttributeSet
 import androidx.core.content.ContextCompat
-import androidx.fragment.app.DialogFragment
-import androidx.fragment.app.FragmentActivity
-import androidx.fragment.app.FragmentManager
 import androidx.preference.Preference
 import androidx.preference.PreferenceManager
 import com.android.launcher3.R
@@ -45,7 +41,6 @@ class RadioGroupPreference @JvmOverloads constructor(
     internal var isEnabledProviderIdx: ((Context, Int) -> Boolean)? = null
 
     private var keyEntries: Array<String>? = null
-    private var fragmentManager: FragmentManager? = null
     private var defaultValueRaw: String? = null
     private var needsViewUpdate = false
 
@@ -73,7 +68,6 @@ class RadioGroupPreference @JvmOverloads constructor(
 
     // Common setters
 
-    fun setFragmentManager(fm: FragmentManager) { fragmentManager = fm }
     fun getSheetTitle(): CharSequence = sheetTitle ?: title ?: ""
     fun setSheetTitle(title: CharSequence?) { sheetTitle = title }
     fun setIconPosition(position: RadioGroupBottomSheet.IconPosition) { iconPosition = position }
@@ -214,16 +208,6 @@ class RadioGroupPreference @JvmOverloads constructor(
         return if (idx >= 0) idx else 0
     }
 
-    private fun resolveFragmentManager(): FragmentManager? {
-        fragmentManager?.let { return it }
-        var ctx = context
-        while (ctx is ContextWrapper) {
-            if (ctx is FragmentActivity) return ctx.supportFragmentManager
-            ctx = ctx.baseContext
-        }
-        return null
-    }
-
     private fun resolveIconTint(): Int = iconTintColor ?: defaultIconTint
 
     private fun applyTint(drawable: Drawable) {
@@ -259,45 +243,43 @@ class RadioGroupPreference @JvmOverloads constructor(
     }
 
     /**
-     * Shows the selection bottom sheet programmatically.
-     * Requires the context chain to contain a [FragmentActivity].
+     * Shows the selection dialog programmatically.
      */
     fun showSheet() {
         onClick()
     }
 
     override fun onClick() {
-        val fm = resolveFragmentManager() ?: return
         val ctx = context
         val tp = textProviderIdx ?: { _: Context, i: Int -> i.toString() }
         val currentIdx = resolveCurrentIndex()
 
-        // Remove any stale/restored fragment with the same tag before showing a new one
-        fm.findFragmentByTag(RadioGroupBottomSheet.TAG)?.let {
-            fm.beginTransaction().remove(it).commitAllowingStateLoss()
-            fm.executePendingTransactions()
-        }
-
-        val sheet = RadioGroupBottomSheet()
-        sheet.setStyle(DialogFragment.STYLE_NORMAL, com.android.settingslib.widget.theme.R.style.Theme_SettingsLib_BottomSheetDialog)
-        sheet.configure(
+        // droidtop patch: a real, individually focusable-row dialog
+        // (RadioListDialog), not RadioGroupBottomSheet's bottom sheet --
+        // that sheet's options list measured to zero height on a 1080p
+        // landscape handheld profile (the Retroid Pocket 5's own shape)
+        // across four separate, individually-correct layout fixes
+        // (docs/SPEC.md). Same approach commit e978478e used for the mode
+        // switcher after a stock widget proved unreliable for D-pad focus.
+        RadioListDialog.show(
+            context = ctx,
             title = getSheetTitle(),
             entryCount = entryCount,
             iconPosition = iconPosition,
             currentIndex = currentIdx,
             textProvider = { i -> tp(ctx, i) },
-            iconProvider = iconProviderIdx?.let { p -> { i -> p(ctx, i) } },
+            iconProvider = iconProviderIdx?.let { p -> { i: Int -> p(ctx, i) } },
             iconTint = if (tintSheetIcons) resolveIconTint() else null,
-            isVisibleProvider = isVisibleProviderIdx?.let { p -> { i -> p(ctx, i) } },
-            isEnabledProvider = isEnabledProviderIdx?.let { p -> { i -> p(ctx, i) } },
-            listener = RadioGroupBottomSheet.OnItemSelectedListener { index ->
-                if (!callChangeListener(index)) return@OnItemSelectedListener
-                persistValue(index)
-                onSelectedIdx?.invoke(index)
-                updatePreferenceView()
-            }
+            isVisibleProvider = isVisibleProviderIdx?.let { p -> { i: Int -> p(ctx, i) } },
+            isEnabledProvider = isEnabledProviderIdx?.let { p -> { i: Int -> p(ctx, i) } },
+            onSelected = { index ->
+                if (callChangeListener(index)) {
+                    persistValue(index)
+                    onSelectedIdx?.invoke(index)
+                    updatePreferenceView()
+                }
+            },
         )
-        sheet.show(fm, RadioGroupBottomSheet.TAG)
     }
 
     class Typed<T> internal constructor(

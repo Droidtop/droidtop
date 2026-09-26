@@ -712,6 +712,24 @@ distinguish. The four fixes stay landed (each is independently correct
 regardless of the remaining symptom); the open remainder is filed as its
 own follow-up rather than guessed at further.
 
+**Replaced with a real dialog instead of debugging further (fixed
+2026-09-26).** Rather than keep chasing the zero-height symptom above with
+no way to attach a debugger from a cloud session, `RadioGroupPreference`
+now shows its own `RadioListDialog` (real, individually focusable rows in
+a plain `LinearLayout`, a hint row, current selection shown via the same
+`droidtop_list_selector` accent-ring state the mode switcher uses) instead
+of `RadioGroupBottomSheet` -- the same fix commit e978478e already applied
+to the mode switcher when a stock widget proved unreliable for D-pad
+focus. This covers every caller that goes through `RadioGroupPreference`:
+gesture actions, smartspace/"At a glance" mode, icon packs, per-app icon
+pack override list, and the QSB search-provider picker.
+`RadioGroupBottomSheet` itself is not deleted -- `FilterableIconPackSheet`
+and `IconPickerBottomSheet` (`AppInfoPreferenceFragment`'s per-app icon
+picker, a filterable icon grid with a live "show all" toggle, a genuinely
+different job) still build on it directly and were left alone; if the
+same zero-height bug turns out to affect that sheet too it is a separate,
+not-yet-confirmed follow-up.
+
 **The target feature set, decided:** Launcher mode keeps inheriting Nova/Apex-class
 functionality from Murine wholesale rather than droidtop reimplementing any
 of the rows marked HAVE above — the vendored-tree rule (hook or extend, never
