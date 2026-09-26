@@ -178,6 +178,76 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 build-scripts/abi_sets.py app/build/outputs/apk/release/app-universal-release.apk
 
+  sample-plugin:
+    # Builds samples/plugin-sample-statustile's payload (docs/SPEC.md 12a)
+    # so dq-plugins-01 (device/QUEUE.md) is no longer blocked on "nobody
+    # has run build.sh". This is a real Gradle build against :plugin-host's
+    # own compiled API, dexed the same way build.sh documents (kotlinc +
+    # d8), producing build/manifest.json + build/classes.jar and uploading
+    # them UNSIGNED: this job never sees the plugin origin's private key
+    # (droidtop-dev only, /root/coordination/keys/droidtop-plugins/), so
+    # signing (sample-plugin's sign.sh) happens outside CI, same as a real
+    # third-party plugin author's own release process would.
+    #
+    # No native code in this sample (manifest's "abis": [] -- see
+    # PluginManifest.kt), so there is only one dex output; a future
+    # native_bundle sample with real .so payloads would need this job to
+    # build/verify a lib/<abi> pair per PluginBundleInstaller's ABI rule
+    # rather than skip it.
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up the Android build
+        uses: ./.github/actions/android-setup
+
+      - name: Build :plugin-host
+        run: ./gradlew :plugin-host:assembleDebug --stacktrace
+
+      - name: Extract the :plugin-host classpath
+        run: |
+          mkdir -p "$RUNNER_TEMP/plugin-host-classes"
+          unzip -q -o plugin-host/build/outputs/aar/plugin-host-debug.aar classes.jar -d "$RUNNER_TEMP/plugin-host-classes"
+          echo "PLUGIN_HOST_CLASSPATH=$RUNNER_TEMP/plugin-host-classes/classes.jar" >> "$GITHUB_ENV"
+
+      - name: Install kotlinc
+        # The Kotlin compiler CLI is not on this runner image; a real
+        # plugin author building outside droidtop's Gradle graph (the
+        # whole point of samples/ being unlisted in settings.gradle.kts)
+        # would install one too. Pinned to gradle/libs.versions.toml's
+        # "kotlin" entry so this sample compiles against the same
+        # language version :plugin-host itself does.
+        run: |
+          KOTLIN_VERSION=$(grep '^kotlin = ' gradle/libs.versions.toml | cut -d '"' -f2)
+          echo "Using kotlinc $KOTLIN_VERSION"
+          curl -sL "https://github.com/JetBrains/kotlin/releases/download/v${KOTLIN_VERSION}/kotlin-compiler-${KOTLIN_VERSION}.zip" -o "$RUNNER_TEMP/kotlinc.zip"
+          unzip -q "$RUNNER_TEMP/kotlinc.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/kotlinc/bin" >> "$GITHUB_PATH"
+
+      - name: Build the sample plugin payload (unsigned)
+        env:
+          ANDROID_JAR: ${{ env.ANDROID_SDK_ROOT }}/platforms/android-36/android.jar
+        run: |
+          export PATH="$ANDROID_SDK_ROOT/build-tools/36.0.0:$PATH"
+          cd samples/plugin-sample-statustile
+          ./build.sh
+
+      - name: Upload unsigned plugin payload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plugin-sample-statustile-unsigned
+          path: |
+            samples/plugin-sample-statustile/build/classes.jar
+            samples/plugin-sample-statustile/build/manifest.json
+          if-no-files-found: error
+
   publish:
     # A GitHub Release is the "give this to someone to install"
     # mechanism: permanent, one clean download URL, and what the in-app
