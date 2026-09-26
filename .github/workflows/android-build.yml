@@ -324,9 +324,16 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Checkout
+      - name: Checkout (with submodules)
+        # android-setup's own vendor-deps step (libffi, ...) unconditionally
+        # builds from vendor/ regardless of what this job actually needs --
+        # confirmed the hard way (this job's first run: "sed: can't read
+        # Makefile.am: No such file or directory", a shallow non-submodule
+        # checkout leaving vendor/ empty). Same submodules: recursive the
+        # sample-plugin job above already carries for the same reason.
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          submodules: recursive
           fetch-depth: 1
           persist-credentials: false
 
