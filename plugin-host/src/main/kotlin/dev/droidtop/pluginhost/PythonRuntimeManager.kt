@@ -175,7 +175,7 @@ object PythonRuntimeManager {
     }
 
     /**
-     * Extracts only `prefix/lib/**` (libpython*.so, libssl/libcrypto/
+     * Extracts only everything under `prefix/lib/` (libpython*.so, libssl/libcrypto/
      * libsqlite3 and their `ossl-modules`, and the stdlib tree including
      * `lib-dynload`) into [installDir], dropping `prefix/include` (C
      * headers, unused at runtime) and `prefix/lib/pkgconfig` -- the
