@@ -29,6 +29,7 @@ import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 
 import android.app.AlertDialog;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -83,6 +84,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+
+import com.android.launcher3.allapps.RecentAppsStore;
 
 import app.murinelauncher.util.Constants;
 
@@ -463,6 +466,14 @@ public class ItemClickHandler {
             FloatingIconView.fetchIcon(launcher, v, item, true /* isOpening */);
         }
         launcher.startActivitySafely(v, intent, item);
+        // droidtop patch (not upstream Launcher3): feeds the app drawer's
+        // own "Recent" row (RecentAppsStore, AlphabeticalAppsList) --
+        // both workspace and drawer icon taps funnel through this one
+        // method, so this is the one place a launch needs recording.
+        ComponentName launchedComponent = item.getTargetComponent();
+        if (launchedComponent != null) {
+            RecentAppsStore.recordLaunch(launcher, launchedComponent);
+        }
     }
 
     /**

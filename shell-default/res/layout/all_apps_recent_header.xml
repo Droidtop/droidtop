@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  droidtop patch (not upstream Launcher3): the label above the app
+  drawer's own "Recent" row (AlphabeticalAppsList.addRecentAppItems,
+  BaseAllAppsAdapter.VIEW_TYPE_RECENT_APPS_HEADER). Static text, so no
+  view holder binding is needed beyond inflating this layout.
+-->
+<TextView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/recent_apps_header"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="@string/all_apps_recent_header"
+    android:gravity="start"
+    android:paddingTop="16dp"
+    android:paddingBottom="8dp"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:fontFamily="sans-serif-medium"
+    android:textSize="14sp"
+    android:textColor="?android:attr/textColorTertiary"
+    android:focusable="false" />

@@ -81,7 +81,12 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
     // isIconViewType(...) and mAdapterProvider.isViewSupported(...) are
     // both false for it.
     public static final int VIEW_TYPE_LIBRARY_GAME = 1 << 9;
-    public static final int NEXT_ID = 10;
+    // droidtop patch (not upstream Launcher3): the app drawer's own
+    // "Recent" section label, above a handful of AppInfo rows the
+    // ordinary VIEW_TYPE_ICON path already renders -- see
+    // AlphabeticalAppsList.addRecentAppItems and RecentAppsStore.
+    public static final int VIEW_TYPE_RECENT_APPS_HEADER = 1 << 10;
+    public static final int NEXT_ID = 11;
 
     // Common view type masks
     public static final int VIEW_TYPE_MASK_DIVIDER = VIEW_TYPE_ALL_APPS_DIVIDER;
@@ -272,6 +277,9 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
             case VIEW_TYPE_LIBRARY_GAME:
                 return new ViewHolder(mLayoutInflater.inflate(R.layout.all_apps_game_result,
                         parent, false));
+            case VIEW_TYPE_RECENT_APPS_HEADER:
+                return new ViewHolder(mLayoutInflater.inflate(R.layout.all_apps_recent_header,
+                        parent, false));
             case VIEW_TYPE_ALL_APPS_DIVIDER, VIEW_TYPE_PRIVATE_SPACE_SYS_APPS_DIVIDER:
                 return new ViewHolder(mLayoutInflater.inflate(
                         R.layout.private_space_divider, parent, false));
@@ -399,7 +407,8 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
             case VIEW_TYPE_BOTTOM_VIEW_TO_SCROLL_TO:
             case VIEW_TYPE_ALL_APPS_DIVIDER:
             case VIEW_TYPE_WORK_DISABLED_CARD:
-                // nothing to do
+            case VIEW_TYPE_RECENT_APPS_HEADER:
+                // nothing to do -- static text/dividers, nothing to bind
                 break;
             case VIEW_TYPE_WORK_EDU_CARD:
                 ((WorkEduCard) holder.itemView).setPosition(position);
