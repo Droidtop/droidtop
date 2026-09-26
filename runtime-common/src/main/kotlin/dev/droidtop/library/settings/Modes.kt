@@ -208,11 +208,17 @@ object Modes {
     private const val KEY_ONBOARDING_COMPLETE = "droidtop_onboarding_complete"
 
     /**
-     * The Launcher3 fork's HOME activity. Defined here rather than in
-     * `:shell-default` so mode gating and
+     * droidtop's real `CATEGORY_HOME` component for Standard -- since
+     * 2026-09-26 a small trampoline ahead of the Launcher3 fork itself
+     * (`dev.droidtop.shell.standard.HomeTrampolineActivity`), not
+     * `com.android.launcher3.Launcher` directly: the trampoline decides
+     * the Home target from [homeTarget] before Launcher3's own `onCreate`
+     * ever runs, so a Home press whose target is Gaming or Desktop never
+     * inflates Standard's view tree at all (docs/SPEC.md 2c). Defined here
+     * rather than in `:shell-default` so mode gating and
      * [dev.droidtop.shell.standard.HomeRolePrefs] name it once.
      */
-    const val LAUNCHER_ACTIVITY = "com.android.launcher3.Launcher"
+    const val LAUNCHER_ACTIVITY = "dev.droidtop.shell.standard.HomeTrampolineActivity"
 
     private val state = kotlinx.coroutines.flow.MutableStateFlow<Set<Mode>>(Mode.entries.toSet())
 

@@ -97,6 +97,15 @@
         <!--
         Main launcher activity. When extending only change the name, and keep all the
         attributes and intent filters the same
+
+        droidtop patch: no longer declares CATEGORY_HOME (moved to
+        HomeTrampolineActivity below, so a Home press whose target is
+        Gaming or Desktop never inflates this Activity's view tree at all,
+        docs/SPEC.md 2c). DEFAULT stays so ALL_APPS/SHOW_WORK_APPS still
+        resolve implicitly; every droidtop-internal launch of this
+        Activity already names the component explicitly (BackButtonMenu,
+        HomeTrampolineActivity, pinned-game shortcuts), which needs no
+        filter match at all.
         -->
         <activity
             android:name="com.android.launcher3.Launcher"
@@ -115,7 +124,6 @@
                 <action android:name="android.intent.action.MAIN" />
                 <action android:name="android.intent.action.SHOW_WORK_APPS" />
                 <action android:name="android.intent.action.ALL_APPS" />
-                <category android:name="android.intent.category.HOME" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.MONKEY"/>
                 <category android:name="android.intent.category.LAUNCHER_APP" />
@@ -126,12 +134,40 @@
         </activity>
 
         <!--
+          droidtop's own HOME-role trampoline (built 2026-09-26,
+          docs/SPEC.md 2c): holds CATEGORY_HOME for "Standard" instead of
+          com.android.launcher3.Launcher itself, so a real Home press is
+          decided (Modes.homeTarget: a SharedPreferences read, no model,
+          no view inflation) before Launcher3's own heavy onCreate and
+          LauncherModel bind ever run. When the target is Standard it
+          forwards straight into com.android.launcher3.Launcher, explicit
+          component to explicit component, matching what BackButtonMenu's
+          own "Android" already does. Enabled by default (Standard is
+          droidtop's default Home implementation); HomeRolePrefs.
+          setActiveHomeImplementation toggles this and
+          AlternativeLauncherActivity below oppositely, so exactly one (or
+          neither) is ever an actual HOME candidate.
+        -->
+        <activity
+            android:name="dev.droidtop.shell.standard.HomeTrampolineActivity"
+            android:exported="true"
+            android:enabled="true"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!--
           "Alternative" mode (docs/SPEC.md Onboarding section): droidtop
           holds the HOME role but forwards to a different installed
           launcher instead of rendering its own UI: verified against
           farmerbb/Taskbar's real, shipping HSLActivity. Disabled by
           default; HomeRolePrefs.setActiveHomeImplementation toggles this
-          and com.android.launcher3.Launcher above oppositely, so exactly
+          and HomeTrampolineActivity above oppositely, so exactly
           one (or neither) is ever an actual HOME candidate. Package
           enumeration (PackageManager.queryIntentActivities on
           ACTION_MAIN+CATEGORY_HOME) needs no separate queries block here:
