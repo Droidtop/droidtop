@@ -677,15 +677,40 @@ sources rather than assumed from Nova/Apex's feature lists:
 | Icon-pack/drawer/hidden-apps settings pages left as stock Android preference UI | HAVE, and correct: H4's own fix text scopes the shell's row component to Global/Desktop only, and explicitly keeps these stock | `docs/audit-2026-09-24/ui-assessment.md` H4 |
 | Plugin contributions in the launcher (status tiles, search providers, app actions, launcher widgets from third-party engines/tools) | **not yet buildable** — plugin API is being rebuilt (agent `plugins`, §12/12a) | seam only, see below |
 
-**Rig finding, not fixed here (2026-09-26).** Verifying the gesture-action
-picker on emulator-5560 (Android 14, 1920x1080 landscape) found
-`RadioGroupBottomSheet`'s sheet showing only its title row -- no radio
-options visible or reachable by swipe, confirmed via `uiautomator dump`
-(only the title text node exists in the sheet). This reproduces identically
-on the pre-existing, unmodified smartspace-mode picker, so it is not a
-gesture-actions regression; every `RadioGroupPreference` row in Settings is
-affected on this profile. Filed as its own follow-up rather than guessed at
-here.
+**RadioGroupBottomSheet renders no options on this rig -- four real fixes
+landed, root cause still open (2026-09-26).** Verifying the gesture-action
+picker on emulator-5560 (Android 14, 1920x1080 landscape -- the Retroid
+Pocket 5's own resolution and orientation) found `RadioGroupBottomSheet`
+showing only its title row, no radio options visible or reachable by
+touch. Confirmed not a gesture-actions regression: it reproduces
+identically on the pre-existing, unmodified smartspace-mode picker
+(`SmartspaceMode`, same `RadioGroupPreference` mechanism), so every
+`RadioGroupPreference` row in Settings is affected. Four distinct, real
+layout bugs were found and fixed by inspecting `dumpsys accessibility`
+output live against each hypothesis in turn: the preference list's
+RecyclerView inherited `match_parent` height from its stock AndroidX
+layout inside a `wrap_content` container; the child fragment holding it
+was added with a deferred `commit()` rather than `commitNow()`, so the
+container's first layout pass ran before that fragment's view existed;
+the sheet's own collapsed/peek state clipped content even once the above
+two were fixed; and `PreferenceFragmentCompat`'s own root view (not just
+its RecyclerView) was also `match_parent`. Each fix was verified to have
+actually compiled into the tested APK (decompiled and grepped for the
+added method names -- catching a false negative earlier in this pass
+where a stale reused download directory served an old build and looked
+identical to genuine failures) and rig-tested fresh after each one; the
+sheet confirmed reaching `STATE_EXPANDED` (`drag_handle`'s own
+content-desc read "Expanded. Drag handle") but `prefs_container` still
+measured `Rect(0,0-1280,0)` -- zero height -- with all four fixes in
+place simultaneously. The remaining cause is narrower than layout at this
+point: most likely `RadioPreferenceFragment.onCreatePreferences` (or
+`SelectorWithWidgetPreference`'s own view binding) isn't producing rows
+at runtime despite looking correct in source, which needs Android
+Studio's Layout Inspector or a debugger attached to a live session to
+isolate -- past what adb screenshots, `uiautomator dump` and logcat can
+distinguish. The four fixes stay landed (each is independently correct
+regardless of the remaining symptom); the open remainder is filed as its
+own follow-up rather than guessed at further.
 
 **The target feature set, decided:** Launcher mode keeps inheriting Nova/Apex-class
 functionality from Murine wholesale rather than droidtop reimplementing any
