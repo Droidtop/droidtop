@@ -9069,17 +9069,34 @@ instead of bailing out, the same "unused" placeholder the service side
 already assumed the caller would send.
 
 Re-verified on BlueStacks with the signed `plugin-sample-py-statustile`
-bundle after this fix: the plugin now genuinely loads (no more "plugin
-failed to load", `:pluginhost` starts and logs "python runtime
-initialized") and its status tile call reaches real native code instead
-of bailing out before ever trying — but that call itself then crashes the
-`:pluginhost` process with SIGSEGV (fault addr 0x10, null pointer
-dereference, tombstone reports the crashing frame's own ABI as x86_64
-even though `:pluginhost` otherwise runs arm64-v8a under BlueStacks'
-translation — `/data/tombstones/tombstone_14`). Crash containment itself
-worked exactly as designed: `dev.droidtop.app`'s main process was
-unaffected and stayed on screen, and the plugin was disabled with "call
-failed across the binder" the same as any other crash. This is a second,
-separate bug in the python-kind native bridge itself
-(`plugin-host/native`), not in the entryClass path this change fixes;
-left open, not fixed here — see the follow-up filed for it.
+bundle after this fix: the plugin now genuinely loaded, but its first
+real invoke() crashed `:pluginhost` outright with SIGSEGV (fault addr
+0x10, null pointer dereference, tombstone_14) — a second, separate bug in
+the python-kind native bridge (`plugin-host/native`), not in the
+entryClass path above. Root cause: `nativeInit`
+(`native/src/droidtoppy_jni.c`) ran `Py_InitializeEx` on whichever binder
+thread happened to handle that plugin's `loadPlugin()` AIDL call, which
+implicitly gives THAT thread the GIL and never released it, and nothing
+in this file ever called `PyGILState_Ensure`/`Release`. Every later call
+(`nativeLoadModule`/`nativeCallFunction`/`nativeUnloadModule`) arrives on
+whichever thread the binder pool happens to pick for that AIDL call —
+almost never the same OS thread `Py_InitializeEx` ran on (the crashing
+thread's own name, `Binder:1644_2`, was not the loading call's thread) —
+and calling into libpython with no `PyThreadState` on the calling thread
+is undefined behavior. Fixed the standard way CPython's own embedding
+docs describe for a multi-threaded host ("Non-Python-created Threads"):
+`nativeInit` now releases the GIL with `PyEval_SaveThread()` once setup
+finishes, and every other entry point brackets its Python calls in
+`PyGILState_Ensure()`/`PyGILState_Release()` (both stable ABI since 3.2,
+resolved by `dlsym` like every other symbol in this file). CI now also
+keeps plugin-host's unstripped `libdroidtoppy.so` as its own artifact
+(`droidtoppy-native-symbols`) so a future native crash's tombstone can be
+symbolised against the exact commit that built it.
+
+Re-verified end to end on BlueStacks after the GIL fix, fresh CI build:
+download the Python runtime, install and approve the signed sample
+bundle, "Call ... status tile" now genuinely succeeds ("called OK",
+repeated calls stayed stable, no crash), and "Debug: force ... to crash"
+still disables the plugin the same as before — droidtop's main process
+was unaffected throughout, confirming crash containment was never the
+problem, the bridge's own thread-safety was.
