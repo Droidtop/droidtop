@@ -2,9 +2,6 @@ package dev.droidtop.app
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.addCallback
@@ -27,6 +24,7 @@ import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.library.scanFollowingGamesRoots
 import dev.droidtop.library.settings.Mode
 import dev.droidtop.library.settings.Modes
+import dev.droidtop.library.search.LibraryArtwork
 import dev.droidtop.shell.gamepad.LauncherGamesScreen
 import dev.droidtop.shell.standard.OnboardingGate
 import kotlinx.coroutines.CoroutineScope
@@ -36,7 +34,6 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /**
  * droidtop's ONE icon in a launcher's app drawer, droidtop's own launcher
@@ -206,26 +203,11 @@ class LauncherGamesActivity : AppCompatActivity() {
          */
         private fun artworkIcon(context: Context, entry: LibraryEntry): IconCompat? {
             val art = (entry.iconUri ?: entry.artworkUri)?.takeIf { it.isNotBlank() } ?: return null
-            val uri = Uri.parse(art)
-            val open: () -> java.io.InputStream? = when (uri.scheme) {
-                null, "file" -> { -> File(uri.path ?: art).inputStream() }
-                "content", "android.resource" -> { -> context.contentResolver.openInputStream(uri) }
-                else -> return null
-            }
-            return runCatching {
-                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                open()?.use { BitmapFactory.decodeStream(it, null, bounds) }
-                var sample = 1
-                while (minOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= ICON_PX) sample *= 2
-                val decoded = open()?.use {
-                    BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
-                } ?: return null
-                val edge = minOf(decoded.width, decoded.height)
-                val square = Bitmap.createBitmap(
-                    decoded, (decoded.width - edge) / 2, (decoded.height - edge) / 2, edge, edge,
-                )
-                IconCompat.createWithBitmap(Bitmap.createScaledBitmap(square, ICON_PX, ICON_PX, true))
-            }.getOrNull()
+            // Shared with the app-drawer/QSB search row's own artwork
+            // (BaseAllAppsAdapter.VIEW_TYPE_LIBRARY_GAME) -- one decode
+            // mechanism, not two (docs/SPEC.md, "one mechanism per job").
+            val bitmap = LibraryArtwork.decodeSquareBitmap(context, art, ICON_PX) ?: return null
+            return IconCompat.createWithBitmap(bitmap)
         }
     }
 }

@@ -31,6 +31,8 @@ import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.search.SearchAlgorithm;
 import com.android.launcher3.search.SearchCallback;
 import com.android.launcher3.search.StringMatcherUtility;
+import dev.droidtop.library.search.LibrarySearch;
+import dev.droidtop.library.search.LibrarySearchEntry;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -64,6 +66,19 @@ public class DefaultAppSearchAlgorithm implements SearchAlgorithm<AdapterItem> {
     public void doSearch(String query, SearchCallback<AdapterItem> callback) {
         mAppState.getModel().enqueueModelUpdateTask((taskController, dataModel, apps) ->  {
             ArrayList<AdapterItem> result = getTitleMatchResult(mAppState.getContext(), apps.data, query);
+            // droidtop patch (not upstream Launcher3): droidtop's own
+            // library (games) alongside app results -- docs/SPEC.md,
+            // Launcher mode, "App-drawer/QSB search over droidtop's own
+            // library". LibrarySearch.source, when registered
+            // (DroidtopApplication.onCreate), only ever filters the
+            // library's already-scanned, in-RAM index (docs/SPEC.md 7g):
+            // no folder walk or disk read happens on this search path.
+            LibrarySearch.Source librarySource = LibrarySearch.INSTANCE.getSource();
+            if (librarySource != null) {
+                for (LibrarySearchEntry entry : librarySource.search(query)) {
+                    result.add(AdapterItem.asGame(entry));
+                }
+            }
             if (mAddNoResultsMessage && result.isEmpty()) {
                 result.add(getEmptyMessageAdapterItem(query));
             }
