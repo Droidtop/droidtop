@@ -85,6 +85,39 @@ open class RadioGroupBottomSheet : BottomSheetDialogFragment() {
 
         private val parentSheet get() = parentFragment as? RadioGroupBottomSheet
 
+        /**
+         * droidtop patch: PreferenceFragmentCompat's own RecyclerView is
+         * created with layout_height="match_parent" (its stock
+         * preference_recyclerview.xml). That is fine inside a normal
+         * Activity/Fragment host, but radio_group_bottom_sheet.xml hosts
+         * this fragment's container (R.id.prefs_container) at
+         * wrap_content -- match_parent inside wrap_content resolves to
+         * zero height, so the whole options list silently measured to
+         * nothing and the sheet showed only its title row (found live on
+         * emulator-5560, 1920x1080 landscape -- the Retroid Pocket 5's own
+         * resolution/orientation -- confirmed reproducing on every
+         * RadioGroupPreference sheet, not just the new gesture-action
+         * ones). RecyclerView's own onMeasure already handles wrap_content
+         * correctly for LinearLayoutManager (the default here, via
+         * androidx.preference's isAutoMeasureEnabled path); it only needed
+         * to be asked for wrap_content instead of inheriting match_parent.
+         */
+        override fun onCreateRecyclerView(
+            inflater: android.view.LayoutInflater,
+            parent: android.view.ViewGroup,
+            savedInstanceState: Bundle?,
+        ): androidx.recyclerview.widget.RecyclerView {
+            val recyclerView = super.onCreateRecyclerView(inflater, parent, savedInstanceState)
+            recyclerView.layoutParams = recyclerView.layoutParams.apply {
+                height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+            }
+            // No independent scrolling of its own: the bottom sheet as a
+            // whole is what scrolls/drags, and a handful of radio rows
+            // never needs internal scrolling.
+            recyclerView.isNestedScrollingEnabled = false
+            return recyclerView
+        }
+
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             val sheet = parentSheet ?: return
             val ctx = requireContext()
