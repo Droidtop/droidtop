@@ -27,6 +27,8 @@ import dev.droidtop.library.integrations.IntegrationStore
 import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.PluginKind
 import dev.droidtop.pluginhost.PluginTrustState
+import dev.droidtop.pluginhost.PluginCapability
+import dev.droidtop.pluginhost.PluginCrashPolicy
 import dev.droidtop.library.consoles.resolvePlayer
 import dev.droidtop.library.scraper.ScraperPrefs
 import dev.droidtop.library.scraper.ScraperSource
@@ -1218,6 +1220,10 @@ object AppSettingsCatalogs {
      * one -- same "no separate save step" shape [integrationsScreen]
      * uses.
      */
+    /** True on a debuggable build -- avoids needing android.buildFeatures.buildConfig just for this one debug-only plugin test action. */
+    private fun ctxIsDebuggable(context: Context): Boolean =
+        (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+
     private fun pluginsScreen() = CatalogScreen(
         id = SCREEN_PLUGINS,
         title = "Plugins",
@@ -1302,6 +1308,65 @@ object AppSettingsCatalogs {
                                             onToggle = { ctx, on -> PluginStore.setEnabled(ctx, m.id, on) },
                                         ),
                                     )
+                                    // A live call, not just the status line above: the
+                                    // real way to "see" a status_tile plugin's own
+                                    // output (dq-plugins-01), through the same
+                                    // PluginCrashPolicy.invoke every other capability
+                                    // call site is meant to use -- a short-lived
+                                    // policy per tap, torn down right after, since this
+                                    // screen has no ongoing binder connection to keep
+                                    // warm between taps.
+                                    if (record.runnable() && PluginCapability.STATUS_TILE in m.capabilities) {
+                                        add(
+                                            AsyncActionItem(
+                                                id = "plugin_${m.id}_call_status_tile",
+                                                title = "Call \"${m.label}\"'s status tile",
+                                                subtitle = "Runs a real invoke() through the isolated plugin process and shows what it returns",
+                                                run = { ctx, _ ->
+                                                    val policy = PluginCrashPolicy(ctx.applicationContext)
+                                                    try {
+                                                        val result = policy.invoke(record, PluginCapability.STATUS_TILE, emptyMap())
+                                                        if (result.ok) {
+                                                            result.values.entries.joinToString(", ") { (k, v) -> "$k=$v" }
+                                                                .ifEmpty { "OK, no values" }
+                                                        } else {
+                                                            "Failed: ${result.error}"
+                                                        }
+                                                    } finally {
+                                                        policy.shutdown()
+                                                    }
+                                                },
+                                            ),
+                                        )
+                                        // Debug builds only -- this is a test-only hook
+                                        // (the "query" arg exists in this sample plugin
+                                        // for dq-plugins-01, never in a droidtop call
+                                        // site), not a real user feature, so it never
+                                        // ships in a release build.
+                                        if (ctxIsDebuggable(context)) {
+                                            add(
+                                                AsyncActionItem(
+                                                    id = "plugin_${m.id}_force_crash",
+                                                    title = "Debug: force \"${m.label}\" to crash",
+                                                    subtitle = "Confirms crash containment -- droidtop should survive and disable this plugin",
+                                                    confirmTitle = "Force ${m.label} to crash now?",
+                                                    run = { ctx, _ ->
+                                                        val policy = PluginCrashPolicy(ctx.applicationContext)
+                                                        try {
+                                                            val result = policy.invoke(record, PluginCapability.STATUS_TILE, mapOf("query" to "force-crash"))
+                                                            if (result.ok) {
+                                                                "Unexpected success: ${result.values}"
+                                                            } else {
+                                                                "Crashed as expected: ${result.error}"
+                                                            }
+                                                        } finally {
+                                                            policy.shutdown()
+                                                        }
+                                                    },
+                                                ),
+                                            )
+                                        }
+                                    }
                                 }
                                 PluginTrustState.DENIED -> Unit
                             }
