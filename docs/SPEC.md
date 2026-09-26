@@ -574,9 +574,12 @@ the Gaming shell can see) populates from installed plugins, and each surface
 (the QSB's search results, a home-screen widget slot, a long-press app
 action) reads that registry rather than knowing about plugins directly. This
 keeps Launcher mode buildable now and the plugin surface pluggable in later
-without a second registration mechanism. Left undone deliberately: no
-plugin-facing API, no plugin search results, no plugin widgets. Agent
-`plugins` owns when §12a is ready for this to be wired up for real.
+without a second registration mechanism. Scope recorded in `docs/plugin-catalog.md`
+(2026-09-25, agent `plugins`): the registry/catalog pattern is the only
+interface; no plugin surface code is built until §12a manifest/API lands.
+Left undone deliberately: no plugin-facing API, no plugin search results,
+no plugin widgets. Agent `plugins` owns when §12a is ready for this to be
+wired up for real.
 
 **Handheld constraint, restated for this work specifically:** every row above
 must work by controller AND touch, pointer and focus as one selection (§7j),
