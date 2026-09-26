@@ -26,6 +26,7 @@ import static com.android.launcher3.icons.BitmapInfo.FLAG_NO_BADGE;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_PRIVATE_SPACE_PREINSTALLED_APPS_COUNT;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_PRIVATE_SPACE_USER_INSTALLED_APPS_COUNT;
 
+import android.content.ComponentName;
 import android.content.Context;
 import android.text.Spannable;
 import android.text.SpannableString;
@@ -50,6 +51,7 @@ import com.android.launcher3.views.ActivityContext;
 import java.io.PrintWriter;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -67,6 +69,10 @@ import java.util.stream.Stream;
  */
 public class AlphabeticalAppsList<T extends Context & ActivityContext> implements
         AllAppsStore.OnUpdateListener {
+
+    // droidtop patch: cap on the "Recent" row's own icon count (see
+    // addRecentAppItems).
+    private static final int RECENT_ROW_LIMIT = 5;
 
     public static final String TAG = "AlphabeticalAppsList";
     public static final String PRIVATE_SPACE_PACKAGE = "com.android.privatespace";
@@ -326,6 +332,10 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
                                     R.string.work_profile_edu_section), 0));
                     Log.d(TAG, "Adding FastScrollSection for work edu card.");
                 }
+                // droidtop patch (not upstream Launcher3): the "Recent"
+                // row goes before the alphabetical list, same shape as
+                // the work-profile items above it.
+                position += addRecentAppItems();
                 position = addAppsWithSections(mApps, position);
             }
             if (Flags.enablePrivateSpace()) {
@@ -486,6 +496,44 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
             }
         }
         return position;
+    }
+
+    /**
+     * droidtop patch (not upstream Launcher3): the app drawer's own
+     * "Recent" row (docs/SPEC.md, Launcher mode survey, "Recent/
+     * frequently-used apps row" -- confirmed genuinely absent from this
+     * Murine fork). Backed by {@link RecentAppsStore} (a launch actually
+     * made through droidtop's own UI, not UsageStatsManager -- see that
+     * class's own doc comment), matched against apps already in
+     * {@link #mApps} so a hidden, filtered, or since-uninstalled
+     * component is silently excluded, never a second lookup. Skipped
+     * entirely with zero matches (a fresh install has no history yet) --
+     * no row beats an empty one.
+     *
+     * @return the number of adapter items added.
+     */
+    private int addRecentAppItems() {
+        List<ComponentName> recent = RecentAppsStore.current(mActivityContext);
+        if (recent.isEmpty()) return 0;
+        Map<ComponentName, AppInfo> byComponent = new HashMap<>();
+        for (AppInfo info : mApps) {
+            byComponent.put(info.componentName, info);
+        }
+        List<AppInfo> matched = new ArrayList<>();
+        for (ComponentName component : recent) {
+            AppInfo info = byComponent.get(component);
+            if (info != null && !matched.contains(info)) {
+                matched.add(info);
+            }
+            if (matched.size() >= RECENT_ROW_LIMIT) break;
+        }
+        if (matched.isEmpty()) return 0;
+        mAdapterItems.add(new AdapterItem(BaseAllAppsAdapter.VIEW_TYPE_RECENT_APPS_HEADER));
+        for (AppInfo info : matched) {
+            mAdapterItems.add(AdapterItem.asApp(info));
+        }
+        mAdapterItems.add(new AdapterItem(BaseAllAppsAdapter.VIEW_TYPE_ALL_APPS_DIVIDER));
+        return matched.size() + 2;
     }
 
     private int addAppsWithSections(List<AppInfo> appList, int startPosition) {
