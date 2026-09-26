@@ -19,8 +19,25 @@ import javax.inject.Inject;
  */
 public class AppFilter {
 
-    /** Named by string: :shell-default cannot depend on :app, which declares it. */
-    private static final String LAUNCHER_GAMES_ACTIVITY = "dev.droidtop.app.LauncherGamesActivity";
+    /**
+     * Named by string: :shell-default cannot depend on :app, which
+     * declares all of these. droidtop's own package is hidden from app
+     * lists except its one drawer icon (docs/SPEC.md 2c, "One droidtop
+     * icon") -- but a home-screen WIDGET is a different, explicit-
+     * placement surface the same rule was never meant to cover, and the
+     * widget picker's own validity check (WidgetsModel.
+     * WidgetValidityCheckForPicker) runs every real (non-custom) widget
+     * item through this same shouldShowApp -- confirmed live on
+     * emulator-5560: ContinuePlayingWidgetProvider and
+     * PluginStatusWidgetProvider both silently vanished from droidtop's
+     * own stock widget picker (Murine's own #custom-widget-scheme
+     * smartspace clock entry still showed, since that path skips this
+     * check entirely) until each was added here.
+     */
+    private static final Set<String> HIDE_SELF_EXEMPT_CLASSES = Set.of(
+            "dev.droidtop.app.LauncherGamesActivity",
+            "dev.droidtop.app.ContinuePlayingWidgetProvider",
+            "dev.droidtop.app.PluginStatusWidgetProvider");
 
     private final Context mContext;
     private final Set<ComponentName> mFilteredComponents;
@@ -48,7 +65,7 @@ public class AppFilter {
         // Gaming or Desktop, or the library's games when both are off
         // (docs/SPEC.md 2c, "One droidtop icon").
         if (SettingsHiddenAppsFragment.HIDE_SELF && app.getPackageName().equals(mContext.getPackageName())
-                && !LAUNCHER_GAMES_ACTIVITY.equals(app.getClassName())) return false;
+                && !HIDE_SELF_EXEMPT_CLASSES.contains(app.getClassName())) return false;
         return !HiddenAppsRepository.isHidden(mContext, app) || (retainSearchable && HiddenAppsRepository.isSearchHiddenAppsEnabled(mContext));
     }
 }
