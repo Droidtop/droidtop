@@ -8,6 +8,7 @@ import io.flutter.embedding.engine.loader.FlutterLoader
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import org.json.JSONObject
@@ -71,6 +72,14 @@ class FlutterDroidtopPlugin(
     private var engine: FlutterEngine? = null
     private var channel: MethodChannel? = null
 
+    // Job callbacks the host is waiting on, keyed by the SAME jobId
+    // PluginRuntimeService.startJob generated and handed to startJob()
+    // below. Dart reports progress/completion by calling back INTO this
+    // channel (methods "jobProgress"/"jobComplete", handled in onLoad's
+    // setMethodCallHandler) rather than over a return value, since a real
+    // job outlives the single invokeMethod call that started it.
+    private val activeJobs = ConcurrentHashMap<String, PluginJobProgress>()
+
     override fun onLoad(context: PluginContext) {
         val libapp = File(installDir, "lib/${FlutterRuntimeManager.currentAbi()}/libapp.so")
         if (!libapp.isFile) {
@@ -93,6 +102,7 @@ class FlutterDroidtopPlugin(
 
         val messenger: BinaryMessenger = newEngine.dartExecutor.binaryMessenger
         val newChannel = MethodChannel(messenger, "dev.droidtop.pluginhost/$pluginId")
+        newChannel.setMethodCallHandler { call, result -> handleIncomingCall(call, result) }
         engine = newEngine
         channel = newChannel
 
@@ -144,9 +154,44 @@ class FlutterDroidtopPlugin(
     }
 
     override fun onUnload() {
+        channel?.setMethodCallHandler(null)
         channel = null
         engine?.destroy()
         engine = null
+        activeJobs.clear()
+    }
+
+    /**
+     * Handles calls Dart makes INTO the host over the same channel
+     * [invoke] and [startJob] use to call OUT to Dart -- Flutter's
+     * [MethodChannel] is bidirectional on one [BinaryMessenger], the
+     * same object underlies both directions. Only "jobProgress" and
+     * "jobComplete" are expected here; anything else (including a
+     * mistaken "invoke", which only ever flows host-to-plugin) is
+     * [MethodChannel.Result.notImplemented].
+     */
+    private fun handleIncomingCall(call: MethodChannel.MethodCall, result: MethodChannel.Result) {
+        when (call.method) {
+            "jobProgress" -> {
+                val obj = JSONObject(call.arguments as String)
+                val jobId = obj.optString("jobId")
+                val progress = activeJobs[jobId]
+                if (progress != null) {
+                    progress.report(obj.optInt("percent"), obj.optString("statusLine"))
+                }
+                result.success(null)
+            }
+            "jobComplete" -> {
+                val obj = JSONObject(call.arguments as String)
+                val jobId = obj.optString("jobId")
+                val progress = activeJobs.remove(jobId)
+                if (progress != null) {
+                    progress.complete(decode(obj.optString("result")))
+                }
+                result.success(null)
+            }
+            else -> result.notImplemented()
+        }
     }
 
     override fun invoke(capability: PluginCapability, args: PluginArgs): PluginResult {
@@ -207,11 +252,73 @@ class FlutterDroidtopPlugin(
         }
     }
 
-    // startJob is not implemented for v1 of flutter_embed -- the
-    // DroidtopPlugin default (throws UnsupportedOperationException,
-    // turned into a clean "doesn't support jobs" by PluginRuntimeService)
-    // is exactly right until a real flutter_embed plugin needs one; the
-    // owner's plan for romgi's own patch-style jobs will need this.
+    /**
+     * Bridges [DroidtopPlugin.startJob] to Dart over the same
+     * per-plugin [MethodChannel] [invoke] uses, mirroring the
+     * request/response shape but fire-and-forget on the way out: unlike
+     * [invoke] there is no [PluginRunner.CALL_TIMEOUT_MS] watchdog here
+     * (the job itself is explicitly not bounded by it, same as every
+     * other kind's [DroidtopPlugin.startJob] contract), so this posts
+     * "startJob" to the engine's platform thread and returns immediately
+     * -- [progress] is registered under [jobId] BEFORE that post so a
+     * Dart callback racing ahead of this method's own return still finds
+     * it. Dart's own `main.dart` is expected to call back "jobProgress"/
+     * "jobComplete" (handled by [handleIncomingCall]) rather than reply
+     * to the "startJob" invocation itself, since the job's real answer
+     * arrives later, not synchronously.
+     */
+    override fun startJob(jobId: String, capability: PluginCapability, args: PluginArgs, progress: PluginJobProgress) {
+        val ch = channel ?: run {
+            progress.complete(PluginResult.failure("flutter engine not loaded"))
+            return
+        }
+        activeJobs[jobId] = progress
+        val argsJson = JSONObject().apply { args.keys().forEach { put(it, args.string(it)) } }
+        val payload = JSONObject()
+            .put("jobId", jobId)
+            .put("capability", capability.id)
+            .put("args", argsJson)
+            .toString()
+
+        val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+        mainHandler.post {
+            ch.invokeMethod(
+                "startJob",
+                payload,
+                object : MethodChannel.Result {
+                    override fun success(result: Any?) {
+                        // Dart accepted the job; the real answer comes
+                        // later via "jobComplete", not here.
+                    }
+
+                    override fun error(errorCode: String, errorMessage: String?, errorDetails: Any?) {
+                        activeJobs.remove(jobId)?.complete(PluginResult.failure(errorMessage ?: errorCode))
+                    }
+
+                    override fun notImplemented() {
+                        activeJobs.remove(jobId)?.complete(
+                            PluginResult.failure("plugin's Dart code has no MethodChannel handler for 'startJob'"),
+                        )
+                    }
+                },
+            )
+        }
+    }
+
+    /**
+     * Best-effort, same contract as [DroidtopPlugin.cancelJob] generally:
+     * forwards [jobId] to Dart so it can stop whatever it's doing, but
+     * does not itself wait for or force completion -- Dart's own
+     * "jobComplete" callback (or never calling it, if the process is
+     * torn down first) is still what resolves [activeJobs].
+     */
+    override fun cancelJob(jobId: String) {
+        val ch = channel ?: return
+        val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+        mainHandler.post {
+            ch.invokeMethod("cancelJob", JSONObject().put("jobId", jobId).toString())
+        }
+    }
 
     /**
      * Overrides the one method [FlutterJNI] uses to load `libflutter.so`

@@ -8952,7 +8952,7 @@ one runner per kind:
     how plugin bundles themselves are installed today).
 - **`flutter_embed`** — **built 2026-09-26**, added 2026-09-25 for a
   real forthcoming case: an existing Flutter/Dart app the owner wants to
-  turn into a plugin rather than rewrite natively (romgi). Its own
+  turn into a plugin rather than rewrite natively. Its own
   paragraphs below ("The `flutter_embed` kind") have the full design and
   feasibility citation trail; **not rig-verified yet** (queued,
   `dq-flutterembed-01`).
@@ -9289,15 +9289,38 @@ the runtime-download cost twice, which this satisfies; a literally shared
 *instance* running two plugins' Dart code in one isolate group is a
 different, larger feature this build didn't attempt).
 
-**For the private romgi plugin plan:** the recommended route A (embed a
-Flutter engine, reuse romgi's real Dart code) is now backed by a real,
-buildable runner rather than a hypothesis — the fallback route B (Kotlin
-port) in that repo's `PLUGIN-PLAN.md` is no longer the only sequencing
-option. What romgi's own plan still needs to work out, unaffected by this
-build: how its own `acquire_content`-shaped calls map onto the plugin's
-Dart `main()` and its MethodChannel handler for `"invoke"` (this build's
-sample only exercises `status_tile`, the simplest capability), and
-whether romgi's own Dart dependencies (image/network libraries with their
-OWN native code) fit inside a single `FlutterEngine`'s asset/native-lib
-model the same way this sample's trivial UI-less Dart does — untested
-here.
+**`startJob` for flutter_embed, built 2026-09-26.** A real forthcoming
+flutter_embed plugin needs long-running jobs with progress (a download),
+so this landed ahead of the "not supported until a real plugin needs it"
+default every other kind still uses. `FlutterDroidtopPlugin.startJob`
+posts one `"startJob"` call to Dart's own `MethodChannel` (the same
+channel `invoke` already uses) carrying `{jobId, capability, args}`, then
+returns immediately -- Dart is expected to answer later by calling BACK
+into the host on that same channel (`MethodChannel` is bidirectional on
+one `BinaryMessenger`; `FlutterDroidtopPlugin` now also calls
+`setMethodCallHandler` on it, which `invoke`'s host-to-plugin-only
+direction never needed) with `"jobProgress"`/`{jobId, percent,
+statusLine}` zero or more times and exactly one `"jobComplete"`/`{jobId,
+result}`, dispatched to the matching `PluginJobProgress` via an in-memory
+`jobId -> PluginJobProgress` map. `cancelJob` forwards `{jobId}` to Dart
+the same fire-and-forget way (best-effort, as the interface already
+documents).
+
+This also fixed a real, pre-existing gap in `DroidtopPlugin.startJob`
+itself, not something flutter-specific: `PluginRuntimeService.startJob`
+already generates a `jobId` (returned to droidtop's own caller) but never
+handed it to the plugin's own `startJob()`, so nothing implementing
+multiple concurrent jobs could ever correlate a later `cancelJob(jobId)`
+back to a specific one. Fixed by adding `jobId` as `DroidtopPlugin.
+startJob`'s first parameter (no existing override to migrate --
+flutter_embed above is the first kind to implement it at all).
+
+**Open question for a real Flutter/Dart app being embedded this way:**
+this build's own sample only exercises `status_tile`, the simplest
+capability, over one MethodChannel handler for `"invoke"`. A real app
+being adapted this way still needs to work out how its own capability
+calls map onto that Dart `main()`/`"invoke"` handler, and whether its own
+Dart dependencies (image/network libraries with their OWN native code)
+fit inside a single `FlutterEngine`'s asset/native-lib model the same way
+this sample's trivial UI-less Dart does — untested here, and specific to
+whatever plugin is being built, not this runner itself.

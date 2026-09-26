@@ -40,9 +40,14 @@ interface DroidtopPlugin {
      * plugins only ever implement [invoke]. A plugin that overrides this
      * MUST call [progress] on its own background thread/coroutine and
      * return quickly itself: this method's own return is just "the job
-     * started", not "the job finished".
+     * started", not "the job finished". [jobId] is the SAME id
+     * [PluginRuntimeService.startJob] already generated and returned to
+     * droidtop's caller -- handed to the plugin so a later [cancelJob]
+     * can be correlated to a specific job when a plugin runs more than
+     * one at a time, instead of every plugin having to invent its own
+     * id and hope it lines up.
      */
-    fun startJob(capability: PluginCapability, args: PluginArgs, progress: PluginJobProgress) {
+    fun startJob(jobId: String, capability: PluginCapability, args: PluginArgs, progress: PluginJobProgress) {
         throw UnsupportedOperationException("${this::class.simpleName} does not support long-running jobs")
     }
 
