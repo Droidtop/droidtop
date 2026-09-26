@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Fixed-row layout for PluginStatusWidgetProvider: a title, up to four
+  rows (one per approved, enabled plugin declaring status_tile, refreshed
+  on the widget's own schedule, never a background loop the plugin
+  owns), and an empty state when none are installed or none returned a
+  usable result. Same shape and the same shared system-widget background
+  as widget_continue_playing.xml (docs/SPEC.md 7k: a launcher's
+  home-screen widgets are stock Android surfaces on a wallpaper, not
+  droidtop's own chrome).
+-->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_continue_playing_background"
+    android:padding="12dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/widget_plugin_status_title"
+        android:textStyle="bold"
+        android:textSize="14sp"
+        android:textColor="@android:color/white"
+        android:layout_marginBottom="6dp" />
+
+    <TextView
+        android:id="@+id/widget_plugin_status_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/widget_plugin_status_empty"
+        android:textSize="13sp"
+        android:textColor="#CCFFFFFF"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_plugin_status_row1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="36dp"
+        android:gravity="center_vertical"
+        android:textSize="13sp"
+        android:textColor="@android:color/white"
+        android:ellipsize="end"
+        android:maxLines="1" />
+
+    <TextView
+        android:id="@+id/widget_plugin_status_row2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="36dp"
+        android:gravity="center_vertical"
+        android:textSize="13sp"
+        android:textColor="@android:color/white"
+        android:ellipsize="end"
+        android:maxLines="1" />
+
+    <TextView
+        android:id="@+id/widget_plugin_status_row3"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="36dp"
+        android:gravity="center_vertical"
+        android:textSize="13sp"
+        android:textColor="@android:color/white"
+        android:ellipsize="end"
+        android:maxLines="1" />
+
+    <TextView
+        android:id="@+id/widget_plugin_status_row4"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="36dp"
+        android:gravity="center_vertical"
+        android:textSize="13sp"
+        android:textColor="@android:color/white"
+        android:ellipsize="end"
+        android:maxLines="1" />
+
+</LinearLayout>

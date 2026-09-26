@@ -3,6 +3,7 @@ package dev.droidtop.app.settings
 import android.content.Context
 import android.net.Uri
 import dev.droidtop.app.GamesRootPrefs
+import dev.droidtop.app.PluginStatusWidgetProvider
 import dev.droidtop.library.scraper.importGamelistXml
 import dev.droidtop.library.scraper.scrapeSystemArtwork
 import dev.droidtop.library.consoles.ConsoleSystemDef
@@ -1246,7 +1247,7 @@ object AppSettingsCatalogs {
                                             } else {
                                                 "Runs in its own process from now on"
                                             },
-                                            run = { ctx -> PluginStore.setApproval(ctx, m.id, approved = true, grantRoot = false) },
+                                            run = { ctx -> PluginStore.setApproval(ctx, m.id, approved = true, grantRoot = false); PluginStatusWidgetProvider.requestUpdate(ctx) },
                                         ),
                                     )
                                     if (m.requestsRoot) {
@@ -1256,7 +1257,7 @@ object AppSettingsCatalogs {
                                                 title = "Approve and allow root",
                                                 subtitle = "Only takes effect if this device actually has root; root stays an enhancement, never a requirement",
                                                 confirmTitle = "Let \"${m.label}\" use root on this device?",
-                                                run = { ctx -> PluginStore.setApproval(ctx, m.id, approved = true, grantRoot = true) },
+                                                run = { ctx -> PluginStore.setApproval(ctx, m.id, approved = true, grantRoot = true); PluginStatusWidgetProvider.requestUpdate(ctx) },
                                             ),
                                         )
                                     }
@@ -1265,7 +1266,7 @@ object AppSettingsCatalogs {
                                             id = "plugin_${m.id}_deny",
                                             title = "Deny \"${m.label}\"",
                                             subtitle = "Stays installed but never runs. A future update (a new signed archive) can be approved again.",
-                                            run = { ctx -> PluginStore.setApproval(ctx, m.id, approved = false, grantRoot = false) },
+                                            run = { ctx -> PluginStore.setApproval(ctx, m.id, approved = false, grantRoot = false); PluginStatusWidgetProvider.requestUpdate(ctx) },
                                         ),
                                     )
                                 }
@@ -1275,7 +1276,7 @@ object AppSettingsCatalogs {
                                             id = "plugin_${m.id}_enabled",
                                             title = "Enabled",
                                             current = record.enabled,
-                                            onToggle = { ctx, on -> PluginStore.setEnabled(ctx, m.id, on) },
+                                            onToggle = { ctx, on -> PluginStore.setEnabled(ctx, m.id, on); PluginStatusWidgetProvider.requestUpdate(ctx) },
                                         ),
                                     )
                                     // A live call, not just the status line above: the
@@ -1345,7 +1346,7 @@ object AppSettingsCatalogs {
                                     id = "plugin_${m.id}_uninstall",
                                     title = "Uninstall \"${m.label}\"",
                                     confirmTitle = "Remove ${m.label} and its data?",
-                                    run = { ctx -> PluginStore.uninstall(ctx, m.id) },
+                                    run = { ctx -> PluginStore.uninstall(ctx, m.id); PluginStatusWidgetProvider.requestUpdate(ctx) },
                                 ),
                             )
                         }
