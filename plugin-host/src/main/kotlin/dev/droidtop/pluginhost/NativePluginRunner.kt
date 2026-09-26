@@ -95,7 +95,7 @@ class NativePluginRunner(
         val runtime = ensureConnected() ?: return false
         return try {
             withTimeout(PluginRunner.CALL_TIMEOUT_MS) {
-                runtime.loadPlugin(record.manifest.id, installDir, entryClass)
+                runtime.loadPlugin(record.manifest.id, installDir, entryClass, record.rootApproved)
             }
         } catch (e: TimeoutCancellationException) {
             onCrash(record.manifest.id, "", "load timed out")

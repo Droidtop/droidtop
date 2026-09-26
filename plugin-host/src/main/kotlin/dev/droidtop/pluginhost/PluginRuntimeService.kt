@@ -38,7 +38,7 @@ class PluginRuntimeService : Service() {
             callback = cb
         }
 
-        override fun loadPlugin(pluginId: String, installDir: String, entryClass: String): Boolean {
+        override fun loadPlugin(pluginId: String, installDir: String, entryClass: String, rootApproved: Boolean): Boolean {
             val dir = File(installDir)
             // The manifest on disk (written by PluginBundleInstaller,
             // re-verified before every activation by PluginCrashPolicy)
@@ -52,13 +52,13 @@ class PluginRuntimeService : Service() {
                 PluginManifest.fromJson(JSONObject(manifestFile.readText()))?.kind
             }.getOrNull()
             return when (kind) {
-                PluginKind.PYTHON -> loadPythonPlugin(pluginId, dir)
-                PluginKind.FLUTTER_EMBED -> loadFlutterPlugin(pluginId, dir)
-                else -> loadNativeBundlePlugin(pluginId, dir, entryClass)
+                PluginKind.PYTHON -> loadPythonPlugin(pluginId, dir, rootApproved)
+                PluginKind.FLUTTER_EMBED -> loadFlutterPlugin(pluginId, dir, rootApproved)
+                else -> loadNativeBundlePlugin(pluginId, dir, entryClass, rootApproved)
             }
         }
 
-        private fun loadNativeBundlePlugin(pluginId: String, dir: File, entryClass: String): Boolean {
+        private fun loadNativeBundlePlugin(pluginId: String, dir: File, entryClass: String, rootApproved: Boolean): Boolean {
             return try {
                 val jar = File(dir, "classes.jar")
                 if (!jar.isFile) return false
@@ -67,7 +67,7 @@ class PluginRuntimeService : Service() {
                 val loader = DexClassLoader(jar.absolutePath, optimizedDir.absolutePath, nativeDir, javaClass.classLoader)
                 val instance = loader.loadClass(entryClass).getDeclaredConstructor().newInstance()
                 val plugin = instance as? DroidtopPlugin ?: return false
-                plugin.onLoad(pluginContextFor(pluginId, dir))
+                plugin.onLoad(pluginContextFor(pluginId, dir, rootApproved))
                 loaded[pluginId] = plugin
                 true
             } catch (t: Throwable) {
@@ -87,7 +87,7 @@ class PluginRuntimeService : Service() {
          * here), exactly like [NativePluginRunner.load] returning false
          * for "the process never connected" does not disable the plugin.
          */
-        private fun loadPythonPlugin(pluginId: String, dir: File): Boolean {
+        private fun loadPythonPlugin(pluginId: String, dir: File, rootApproved: Boolean): Boolean {
             val built = PythonDroidtopPlugin.forInstall(applicationContext, pluginId, dir)
             val plugin = built.getOrElse { e ->
                 if (e.message?.contains("runtime not installed", ignoreCase = true) == true) return false
@@ -95,7 +95,7 @@ class PluginRuntimeService : Service() {
                 return false
             }
             return try {
-                plugin.onLoad(pluginContextFor(pluginId, dir))
+                plugin.onLoad(pluginContextFor(pluginId, dir, rootApproved))
                 loaded[pluginId] = plugin
                 true
             } catch (t: Throwable) {
@@ -124,7 +124,7 @@ class PluginRuntimeService : Service() {
          *      rather than left to fail confusingly deep inside
          *      FlutterEngine's own native init.
          */
-        private fun loadFlutterPlugin(pluginId: String, dir: File): Boolean {
+        private fun loadFlutterPlugin(pluginId: String, dir: File, rootApproved: Boolean): Boolean {
             val manifestFile = File(dir, "manifest.json")
             val runtimeVersion = runCatching {
                 PluginManifest.fromJson(JSONObject(manifestFile.readText()))?.runtimeVersion
@@ -143,7 +143,7 @@ class PluginRuntimeService : Service() {
                 return false
             }
             return try {
-                plugin.onLoad(pluginContextFor(pluginId, dir))
+                plugin.onLoad(pluginContextFor(pluginId, dir, rootApproved))
                 loaded[pluginId] = plugin
                 true
             } catch (t: Throwable) {
@@ -250,30 +250,66 @@ class PluginRuntimeService : Service() {
         return if (dir.isDirectory) dir.absolutePath else null
     }
 
-    private fun pluginContextFor(pluginId: String, installDir: File): PluginContext = object : PluginContext {
+    private fun pluginContextFor(pluginId: String, installDir: File, rootApproved: Boolean): PluginContext = object : PluginContext {
         override fun privateDataDir(): String = File(installDir, "data").apply { mkdirs() }.absolutePath
-        // The library-folder and root-approval questions need :app's own
-        // configured state (the systems database, the approval record);
-        // this process never reads either directly -- both are resolved
-        // by :app BEFORE the call reaches here and passed down through
-        // argsJson/PluginArgs by NativePluginRunner instead. This
-        // per-plugin PluginContext therefore only ever answers the parts
-        // that are genuinely local to this process (its own storage).
+        // The library-folder question needs :app's own configured state
+        // (the systems database); this process never reads it directly
+        // -- it is resolved by :app BEFORE the call reaches here and
+        // passed down through argsJson/PluginArgs by NativePluginRunner
+        // instead. Root approval, by contrast, IS threaded down to this
+        // process now: [rootApproved] is [PluginRecord.rootApproved] as
+        // it stood at the moment :app issued this load (NativePluginRunner.load
+        // passes the whole record's own flag across loadPlugin's AIDL
+        // call), re-sent on every load rather than cached here, since a
+        // load happens again on every [PluginCrashPolicy] call and picks
+        // up any approval change made on the settings screen since the
+        // last one.
         override fun libraryFolderPath(systemId: String): String? = null
-        override fun hasRootApproval(): Boolean = false
+        override fun hasRootApproval(): Boolean = rootApproved && deviceHasRoot()
         override fun hasShizukuAccess(): Boolean = checkShizukuAccess(applicationContext)
-    }
-
-    private fun checkShizukuAccess(context: Context): Boolean {
-        val installed = runCatching {
-            context.packageManager.getPackageInfo(SHIZUKU_MANAGER_PACKAGE, 0)
+        override fun isAppInstalled(packageName: String): Boolean = checkPackageInstalled(applicationContext, packageName)
+        override fun launchApp(packageName: String): Boolean = runCatching {
+            val intent = applicationContext.packageManager.getLaunchIntentForPackage(packageName) ?: return@runCatching false
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            applicationContext.startActivity(intent)
             true
         }.getOrDefault(false)
+    }
+
+    private fun checkPackageInstalled(context: Context, packageName: String): Boolean = runCatching {
+        context.packageManager.getPackageInfo(packageName, 0)
+        true
+    }.getOrDefault(false)
+
+    private fun checkShizukuAccess(context: Context): Boolean {
+        val installed = checkPackageInstalled(context, SHIZUKU_MANAGER_PACKAGE)
         if (!installed) return false
         return runCatching {
             context.checkSelfPermission(SHIZUKU_PERMISSION) == android.content.pm.PackageManager.PERMISSION_GRANTED
         }.getOrDefault(false)
     }
+
+    /**
+     * Whether THIS DEVICE has a root solution present at all, independent
+     * of any plugin's own approval -- [PluginContext.hasRootApproval]
+     * folds this together with [PluginRecord.rootApproved] so a plugin
+     * never has to make two divergent checks itself (12a point 2 of the
+     * root section). The same lightweight probe a root-aware app
+     * commonly uses ("su -c id", exit code 0 means a su binary answered
+     * and granted the call): cheap enough to run per load, cached for
+     * this process's lifetime since a device does not gain or lose root
+     * between one plugin call and the next.
+     */
+    private val deviceHasRootCached: Boolean by lazy {
+        runCatching {
+            val process = ProcessBuilder("sh", "-c", "su -c id").start()
+            process.inputStream.bufferedReader().readText()
+            process.errorStream.bufferedReader().readText()
+            process.waitFor() == 0
+        }.getOrDefault(false)
+    }
+
+    private fun deviceHasRoot(): Boolean = deviceHasRootCached
 
     companion object {
         fun bindIntent(context: Context): Intent = Intent(context, PluginRuntimeService::class.java)

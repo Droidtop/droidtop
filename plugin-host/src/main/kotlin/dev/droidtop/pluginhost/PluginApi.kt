@@ -122,6 +122,31 @@ interface PluginContext {
      * the Shizuku path is available at all.
      */
     fun hasShizukuAccess(): Boolean
+
+    /**
+     * True when [packageName] is currently installed on this device --
+     * the same lightweight `PackageManager` presence check
+     * [hasShizukuAccess] already makes for Shizuku's own package,
+     * generalised so an `app_status` plugin managing some OTHER
+     * installed app can tell "not installed" apart from "installed but
+     * not doing what I need" without ever being handed a raw
+     * `PackageManager`/`Context` (cross-cutting need surfaced by more
+     * than one real `app_status` plugin design). Never throws; returns
+     * false for an unknown package.
+     */
+    fun isAppInstalled(packageName: String): Boolean
+
+    /**
+     * Launches [packageName]'s own default launcher activity, exactly as
+     * tapping its icon would -- the one generic way an `app_status`
+     * plugin hands the user off to another app's own UI (its setup
+     * screen, a pairing flow, its own settings) without droidtop or the
+     * plugin needing to know that app's activity names, and without the
+     * plugin holding a `Context` of its own to build the `Intent`
+     * itself. Returns false, never throws, when [packageName] isn't
+     * installed or declares no launcher activity.
+     */
+    fun launchApp(packageName: String): Boolean
 }
 
 /**
