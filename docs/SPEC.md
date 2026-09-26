@@ -8187,6 +8187,12 @@ in `.git/config`; a separate `publish` job with `contents: write` downloads the
 `release-promote.yml` does. Every action is pinned to a commit SHA; moving one
 is a reviewed commit.
 
+**Branch protection on main (2026-09-25).** `main` is protected via the
+GitHub API: force-pushes and deletion are blocked, linear history is required,
+and the "Android build" workflow must pass (strict status checks). This
+prevents a mistaken or compromised push from publishing a signed APK to the
+`latest` channel without a successful build.
+
 Every build publishes BOTH variants: `droidtop-latest.apk` (release) and
 `droidtop-latest-debug.apk` (the same code, debuggable). The debug APK exists
 because making the published build a release build took `adb shell run-as`
