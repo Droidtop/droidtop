@@ -730,6 +730,33 @@ different job) still build on it directly and were left alone; if the
 same zero-height bug turns out to affect that sheet too it is a separate,
 not-yet-confirmed follow-up.
 
+**Rig-verified (emulator-5560, 1920x1080 landscape).** `RadioListDialog`
+renders correctly for every caller: `SmartspaceMode`'s "First screen
+widget" picker (3 rows, icons, current-selection ring), the icon-shape
+picker (`iconPosition="end"`, 6+ entries, scrolls), and both gesture
+pickers -- by D-pad (focus moves row to row, A selects, dismisses) and by
+touch. Selecting a value updates the outer preference row's summary and
+persists immediately.
+
+**A second, unrelated bug surfaced during that same verification and is
+fixed alongside it:** `murine_prefs_home.xml`'s two gesture rows had
+`android:key="pref_double_tap_action"`/`"pref_swipe_down_action"`, but
+`SettingsHomeFragment.initPreference`'s own `DOUBLE_TAP_ACTION`/
+`SWIPE_DOWN_ACTION` constants (and the `LauncherPrefs` items the runtime
+gesture handlers actually read) are
+`"pref_gesture_double_tap_action"`/`"pref_gesture_swipe_down_action"`.
+The `when (preference.key)` branch never matched, so `bindGestureAction`
+never ran: both rows opened with zero entries and zero configured
+text/summary providers, independent of the dialog/layout work above. This
+predates this pass (introduced when gesture actions were first built,
+2026-09-26 morning) and was mistaken at the time for another instance of
+the sheet's layout bug since the visible symptom (title only, no rows)
+looked identical. Fixed by renaming the XML keys to match; confirmed live
+that both gesture rows now show all four `GestureAction` entries, that a
+selection's summary updates ("Opens the full list of apps"), and that it
+persists to the exact `SharedPreferences` key
+(`pref_gesture_double_tap_action`) the gesture handlers read.
+
 **The target feature set, decided:** Launcher mode keeps inheriting Nova/Apex-class
 functionality from Murine wholesale rather than droidtop reimplementing any
 of the rows marked HAVE above — the vendored-tree rule (hook or extend, never
