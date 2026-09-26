@@ -43,7 +43,7 @@ its group, is placed in numeric order, and gets a line in the contents below.
 - [7f. Gaming mode: real, generic ES-DE theme engine](#7f-gaming-mode-real-generic-es-de-theme-engine)
 - [7g. One library across every source (audit + plan, directed 2026-09-01)](#7g-one-library-across-every-source-audit--plan-directed-2026-09-01)
 - [7h. Scraper honesty, and what counts as a game (directed 2026-09-02)](#7h-scraper-honesty-and-what-counts-as-a-game-directed-2026-09-02)
-- [7i. The PC surface — "a PC in a box", not an ES-DE system (directed 2026-09-10)](#7i-the-pc-surface--a-pc-in-a-box-not-an-es-de-system-directed-2026-09-10)
+- [7i. The PC surface — droidtop's own actions, on the theme's own layout (REDECIDED 2026-09-26)](#7i-the-pc-surface--droidtops-own-actions-on-the-themes-own-layout-redecided-2026-09-26)
 - [7j. Portrait and touch-first chrome (directed 2026-09-10)](#7j-portrait-and-touch-first-chrome-directed-2026-09-10)
 - [7k. The design system: one spacing scale, one type scale, one colour source](#7k-the-design-system-one-spacing-scale-one-type-scale-one-colour-source)
 - [7m. One game, its versions and its segments (directed 2026-09-16)](#7m-one-game-its-versions-and-its-segments-directed-2026-09-16)
@@ -7129,19 +7129,74 @@ the first scan after an install read the EMPTY set. That is why build 537
 (upgraded, with a previous run's value in the preference) listed 171 games
 and a freshly installed 539 listed 151 with every folder game missing.
 
-## 7i. The PC surface — "a PC in a box", not an ES-DE system (directed 2026-09-10)
+## 7i. The PC surface — droidtop's own actions, on the theme's own layout (REDECIDED 2026-09-26)
 
-The user's framing: "we explicitly want THAT category to break from the
-ESDE theme, because of how much infrastructure we have to build. It needs
-to be a PC in a box, like droidtop, controlling detection, runners, and
-etc based on availability."
+**Superseded.** The 2026-09-10 decision below ("a PC in a box, not an
+ES-DE system") had the PC/engine list break from the theme entirely: its
+own fixed `PcSurface` grid (`PcGameCard`, a `LazyVerticalGrid`, its own
+header, its own chip row, its own help row), rendered the same regardless
+of which theme was active. Live use showed what that actually was: "we're
+essentially using the gamenative menu with our theme, but its layout and
+stuff need to be reactive to the theme" (the owner, 2026-09-26). A PC or
+engine game is a game in Gaming mode's one library, and the reason every
+console system's gamelist is themed is the same reason a PC game's should
+be: so the games a person is looking at read as the theme they picked,
+not as a screen the theme happens to be adjacent to.
 
-In Gaming mode every console system is rendered by the ES-DE theme
-engine (§7f) and one category is not: **PC**. The `pc` card stays in the
-theme's own carousel, drawn from the theme's own `pc` art, and opening it
-enters droidtop's own full-screen surface instead of a themed gamelist.
-Design pass and build plan:
-`/root/coordination/research/pc-in-a-box/README.md`.
+**The redecision.** PC and engine games are now a `GameGroup.Pc` gamelist
+like any console system's (§7f): the SAME `EsDeThemedView`/
+`EsDeSystemListView` machinery, the active theme's own gamelist view
+(its `<carousel>`/`<grid>`/`<textlist>`, whichever it declares, or none),
+its element positions, sizes, variants and aspect ratios, and its
+metadata elements (`md_image`, `md_video`, `md_description`,
+`md_developer`, `md_rating`, `md_lastplayed` and the rest) bound to the
+focused game exactly as a console ROM's are. `PcSurface`'s grid,
+`PcGameCard` and its own chip row and help row are deleted outright, not
+kept as a fallback: one mechanism draws every gamelist now.
+
+What does NOT change: the runner model, availability states, overrides,
+the game detail screen and its sections, ProtonDB, the Lutris import, and
+same-game merge (all below, unchanged from 2026-09-10) — none of that is
+an ES-DE concept, so none of it moves into the theme. It moves onto the
+game's own detail screen (`PcGameDetail`, opened with A, matching this
+section's original "one place to look" design, not the console
+convention of A-launches) and into the gamelist's own Select menu
+(`GamelistOptionsMenu`, the same ES-DE `GuiGamelistOptions` PATTERN every
+system's gamelist already uses for sort/scrape/import), as a "Stores and
+folders" row, rather than in a screen only the PC card knew how to open.
+Y/Info, X/favorite and the L/R and Left/Right sibling-system jumps now
+work on a PC gamelist exactly as they do on a console one, because there
+is no more `!is GameGroup.Pc` exclusion anywhere in `GamepadShell.kt` to
+keep them from it.
+
+**What still costs a themed screen its point of difference.** ES-DE's
+element schema has no element type for a runner, a prefix, install state
+or a store login, so a card grid alone was never going to carry a PC
+game's own concerns — the game's own detail screen still exists for
+exactly that reason, same as it always has. The theme owns the list; it
+was never going to own the runner picker.
+
+**Known gaps, left open rather than shipped half-built:** the source/
+engine/install-state filter chips and the size sort `PcSurface`'s own
+header row offered have no themed equivalent yet (`GamelistOptionsMenu`'s
+sort is the fixed ES-DE `GamelistSort` enum: name/rating/release date/
+last played, and its filter is ES-DE's own all/favorites/completed/
+unplayed) — a PC-specific extension of that menu is real follow-up work,
+not implemented in this pass. An empty PC library also still cannot be
+reached at all: `GameGroup.Pc` only appears in the carousel when at least
+one PC/engine entry already exists (the same "present-and-non-empty
+groups" rule every console system group uses), so the "first run"
+concrete-repairs screen this section describes below has no way in from
+an actually-empty library; this predates this redecision and is unfixed.
+
+The original decision text follows, still current except where the
+redecision above says otherwise.
+
+The user's framing (2026-09-10): "we explicitly want THAT category to
+break from the ESDE theme, because of how much infrastructure we have to
+build. It needs to be a PC in a box, like droidtop, controlling
+detection, runners, and etc based on availability." Design pass and
+build plan: `/root/coordination/research/pc-in-a-box/README.md`.
 
 ### Scope
 
@@ -7274,33 +7329,27 @@ the group in text only. The `pc` id itself stays the group's: its system
 id, its `downloaded_media` folder and its scrape. B returns to the carousel with focus
 on that card. Nothing else in the system view changes.
 
-**Library.** One grid over one list, with a header line of plain facts,
-full-bleed rather than a centred column. Filters are one multi-select
-chip row — source, install state and engine — plus a sort that cycles in
-place, never separate screens. Those three are free: every value is
-already on the entry. **Runner state is deliberately not a chip.**
-Working it out means a filesystem walk and a provider query per game,
-which is right for one open game and wrong for a whole grid, so it is
-stated where it is needed rather than filtered on where it is not.
-The chip row is reached and left by the pad like the grid: Up from the
-grid's top row lands on Sort, the first chip; Left and Right move along
-the chips and never leave the surface (at the grid's own edges they are
-ES-DE's switch-system); one key handler above the chips and the grid owns
-every direction (rig, build 814: Sort was touch-only, and Left from a chip
-opened All games). **Every card grid moves by index** (`GridPad`): the
-Games section's unthemed grid, this grid and the Launcher's Games grid take
-both edges of a direction and move on the UP edge one card along the row or
-straight down the column, scrolling the next row in first; at an edge they
-answer "not handled" and the screen decides what the edge means. Compose's
-own focus search moved on the DOWN edge as well (two cards per press) and,
-searching geometrically among composed cards, took Down from the second
-column to the first column of a partly visible next row (rig, dq-shell2-01).
+**Library (REDECIDED 2026-09-26, see the top of this section).** The
+PC group's list is the active theme's own gamelist view — the same
+`EsDeThemedView`/`EsDeSystemListView` call every console system's
+gamelist renders through, on `GameGroup.Pc`'s own folded, one-card-
+per-game list (`LibraryGrouping`, §7m). It is laid out, positioned and
+sized by the theme, shows the theme's own `md_image`/`md_video`/
+`md_description` and the rest for whichever game is focused, and moves
+by the theme's own `<carousel>`/`<grid>`/`<textlist>` or, absent one,
+droidtop's headless per-game Up/Down (the same fallback a themeless
+console gamelist already used). The one-time filter chip row and the
+grid's own header/help row this paragraph used to describe are gone with
+`PcSurface`; see "Known gaps" at the top of this section for what that
+cost and has not yet been rebuilt as a themed-menu equivalent.
 
-A game's actions live on the game's own screen, opened with A, rather
-than in a separate in-context menu over the grid: there is exactly one
-place to look for what can be done with a game. B returns to the
-carousel, the shell's own back route in both its forms, and the surface
-draws its own hint row because the theme is not drawing one here.
+A game's actions live on the game's own screen, opened with A (unlike a
+console ROM, where A launches — see the redecision above): there is
+exactly one place to look for what can be done with a game. B returns to
+the carousel, the shell's own back route in both its forms, matching
+every other themed gamelist; Y opens the same detail screen as Info,
+X toggles favourite in place, and Select opens `GamelistOptionsMenu` for
+sort/scrape/"Stores and folders", the same as any system's gamelist.
 
 **Game detail.** In order: identity; a **Runs with** row carrying the
 resolved runner, its reason, and the picker; a primary button that is
@@ -7348,16 +7397,24 @@ how many game folders exist.
 
 ### Relationship to the theme engine
 
-The theme owns the system view, the `pc` card, its art, its layout and its
-transition out. It owns nothing past that card, for three structural
-reasons: ES-DE's element schema has no element type for runner state,
-install state, prefix configuration or store authentication; its gamelist
-models "a game and its metadata" rather than "a game, four runners and an
-override"; and the screens droidtop reuses here are Compose, so theming
-them would mean rewriting them.
+**Redecided 2026-09-26** (see the top of this section): the theme now
+owns the system view, the `pc`/`windows` card and its art, AND the
+gamelist — its element positions, sizes, variants, aspect ratios and
+metadata bindings for a PC or engine game, exactly as for a console ROM.
+It needs no theme patch to do this: a theme's `windows` art where it has
+some, its own defaults where it does not, the same fallback the entry
+point already used before this redecision.
 
-It needs no theme patch: a theme's `windows` art where it has some, its
-own defaults where it does not.
+What the theme still does not, and structurally cannot, own: a runner, a
+prefix, install state or a store login. ES-DE's element schema has no
+element type for any of those, and its gamelist models "a game and its
+metadata" rather than "a game, four runners and an override" — so that
+half of this section (the game's own detail screen, its sections, the
+Lutris import, ProtonDB) is unchanged droidtop UI, reached from the
+themed gamelist via A on a game (opens detail, not launch) and via
+Select's `GamelistOptionsMenu` ("Stores and folders"), never a fixed
+screen drawn on top of the theme's canvas.
+
 Engine games fold into this one PC entry, with engine as a filter inside
 it, rather than appearing as invented per-engine systems in the carousel:
 the shell has ONE group for the PC category, and it owns the `pc` system
@@ -7367,10 +7424,10 @@ all), a store or Wine title, a Linux-container game, and whatever a user
 put in a games-root folder named `pc`, which can no longer become a
 second card of its own that this surface would then render empty.
 
-Breaking from the theme carries an obligation: droidtop's own chrome —
-this surface, the Quick Menu, the settings catalog and the adopted
-gamenative dialogs — takes its colour and type from one droidtop palette,
-not four separate looks.
+Droidtop's own chrome that the theme genuinely does not reach — the
+game's detail screen, the Quick Menu, the settings catalog and the
+adopted gamenative dialogs — still takes its colour and type from one
+droidtop palette, not a separate look per screen.
 
 ### Relationship to the Quick Menu
 
@@ -7441,7 +7498,7 @@ by a second path.
 ## 7j. Portrait and touch-first chrome (directed 2026-09-10)
 
 "Most people will be on phones without controllers." droidtop's own
-chrome --- the tab bar, Quick Menu, PC surface, game detail, gamelist
+chrome --- the tab bar, Quick Menu, PC game detail, gamelist
 options, settings, onboarding and the launch chooser --- treats a screen
 held upright with no pad attached as a primary target, not a degraded
 one. Two rules carry the whole design.
@@ -7567,7 +7624,8 @@ Consequences:
   nothing else, and never guesses that some `<image>` a theme declares
   was "really" a help-bar background;
 - actions that had no on-screen name at all are now named and reachable:
-  Select for gamelist options, Y for the PC surface's stores and folders;
+  Select for gamelist options (PC's own "Stores and folders" among them,
+  see §7i's 2026-09-26 redecision), Y for a themed gamelist's Info;
 - **a card says what IT is, never the heading it sits under.** The line
   under a tile's or card's name is what the thing itself declares -- an
   installed app's own Android application category, a scraped game's
@@ -7694,8 +7752,10 @@ dense small landscape panel was a phone.
 
 droidtop draws two kinds of surface. A **themed view** takes every colour, typeface and
 measurement from the active ES-DE theme (section 7f) and is out of scope here. Everything
-else — onboarding, the shell's chrome and menus, the settings catalog, the Quick Menu, the
-PC surface, the desktop panels — is **droidtop's own chrome**, and all of it obeys one system.
+else — onboarding, the shell's chrome and menus, the settings catalog, the Quick Menu, a
+PC game's detail screen, the desktop panels — is **droidtop's own chrome**, and all of it obeys
+one system. A PC/engine gamelist is a themed view like any console system's (§7i, redecided
+2026-09-26) and is out of scope here too.
 
 **Spacing.** One responsive source, `ShellWindow`: the screen-edge gutter, the gap between
 top-level tabs, the minimum grid item, the minimum touch target and the maximum modal width
@@ -7717,8 +7777,8 @@ with an ellipsis and is reachable in full somewhere.
 the wrong one. The shell's palette (`MenuTokens`) is absolute against its own grounds, so any
 panel that hosts it is painted from that same palette — a platform scheme underneath a
 hand-picked one is what produced white-on-white. It has two grounds and one set of text roles:
-the menus' overlay surface, and the black `Ground` under the shell's own pages (the game grid
-and a game's detail, the PC surface, the editors and pickers the shell opens full-screen), with
+the menus' overlay surface, and the black `Ground` under the shell's own pages (a game's
+detail, the editors and pickers the shell opens full-screen), with
 the cards laid on it (`Card`, the brightened `CardFocused`, `CardInset`), the solid chosen chip
 (`Selected`/`OnSelected`), the one primary action (`Launch`) and one faded label for anything
 unavailable (`OnSurfaceDisabled`, faded by `ChromeColors.DisabledAlpha`). droidtop's chrome

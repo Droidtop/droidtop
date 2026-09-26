@@ -26,6 +26,7 @@ import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.scraper.importGamelistXml
 import dev.droidtop.library.scraper.isPcOrEngineGame
+import dev.droidtop.shell.gamepad.pc.PC_SYSTEM_ID
 import dev.droidtop.library.scraper.scrapeSystemArtwork
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
@@ -113,6 +114,7 @@ object GamelistSortPrefs {
 
 /** The one label for the PC/engine scrape action, shared by the list that offers it and the handler that runs it. */
 private const val SCRAPE_PC_GAMES = "Scrape PC & engine games"
+private const val STORES_AND_FOLDERS = "Stores and folders"
 private const val ORPHANS_FIND = "Find orphaned media"
 private const val ORPHANS_DELETE = "Delete orphaned media: press A again"
 
@@ -139,6 +141,11 @@ internal fun GamelistOptionsMenu(
     // exactly what the user is looking at rather than a second copy.
     games: List<LibraryEntry> = emptyList(),
     onJumpTo: (Int) -> Unit = {},
+    // "Stores and folders" (docs/SPEC.md 7i): sign in to a store, add a
+    // games folder, set up Windows games, see what is downloading. Opens
+    // the group's own options screen (ShellBackStack.optionsOpen), the
+    // same level above the gamelist every group's options screen uses.
+    onOpenStores: () -> Unit = {},
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
@@ -195,6 +202,11 @@ internal fun GamelistOptionsMenu(
             // have no console systemId, so the action above never
             // covered them and there was no way to scrape them at all.
             if (games.any { it.isPcOrEngineGame }) add(SCRAPE_PC_GAMES)
+            // Only inside the PC group itself, whose games occupy this
+            // whole gamelist -- not "All games" or another collection
+            // that merely happens to contain a PC entry, which is not
+            // where a store login belongs.
+            if (systemId == PC_SYSTEM_ID) add(STORES_AND_FOLDERS)
         }
         add("Close")
     }
@@ -405,6 +417,10 @@ internal fun GamelistOptionsMenu(
                     busy = false
                     onScraped()
                 }
+            }
+            STORES_AND_FOLDERS -> {
+                onDismiss()
+                onOpenStores()
             }
             "Close" -> onDismiss()
         }
