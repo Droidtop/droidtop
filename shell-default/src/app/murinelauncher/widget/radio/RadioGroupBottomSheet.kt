@@ -72,7 +72,10 @@ open class RadioGroupBottomSheet : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         view.findViewById<TextView>(R.id.sheet_title)?.text = sheetTitle ?: ""
-        dialog?.setOnShowListener { applyAdjustedBackgroundTint(dialog) }
+        dialog?.setOnShowListener {
+            applyAdjustedBackgroundTint(dialog)
+            expandFully(dialog)
+        }
         if (savedInstanceState == null && textProvider != null) {
             // droidtop patch: commitNow, not commit. commit() defers the
             // child fragment (and so its RecyclerView) to the next main-
@@ -259,6 +262,31 @@ open class RadioGroupBottomSheet : BottomSheetDialogFragment() {
                     Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
             val tintColor = adjustDialogColor(background.resolvedTintColor, isDarkTheme)
             background.tintList = ColorStateList(arrayOf(intArrayOf()), intArrayOf(tintColor))
+        }
+
+        /**
+         * droidtop patch: force STATE_EXPANDED and skip the collapsed
+         * (peek) state entirely. Even with the options list correctly
+         * wrap_content-measuring and its child fragment committed
+         * synchronously (see onViewCreated's own comment), the sheet's
+         * default collapsed/peek height still clipped the options list
+         * out of view on emulator-5560's 1920x1080 landscape profile --
+         * the Retroid Pocket 5's own resolution and orientation -- with
+         * no drag gesture able to reach the expanded state from there
+         * (confirmed live: dumpsys accessibility kept reporting
+         * prefs_container at zero height regardless). A handful of radio
+         * rows has no real "peek" use case anyway -- there is nothing
+         * useful to show partially collapsed -- so always expanding is
+         * correct, not just a workaround.
+         */
+        @JvmStatic
+        fun expandFully(dialog: android.app.Dialog?) {
+            val bottomSheet = dialog?.findViewById<View>(
+                com.google.android.material.R.id.design_bottom_sheet
+            ) ?: return
+            val behavior = com.google.android.material.bottomsheet.BottomSheetBehavior.from(bottomSheet)
+            behavior.skipCollapsed = true
+            behavior.state = com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
         }
 
         private fun adjustDialogColor(color: Int, isDarkTheme: Boolean): Int {
