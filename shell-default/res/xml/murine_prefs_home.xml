@@ -76,12 +76,12 @@
 
     <PreferenceCategory android:title="@string/pref_subcategory_gestures">
         <app.murinelauncher.widget.radio.RadioGroupPreference
-            android:key="pref_double_tap_action"
+            android:key="pref_gesture_double_tap_action"
             android:title="@string/pref_double_tap_action_title"
             android:persistent="true"
             app:showPreviewIcon="false"/>
         <app.murinelauncher.widget.radio.RadioGroupPreference
-            android:key="pref_swipe_down_action"
+            android:key="pref_gesture_swipe_down_action"
             android:title="@string/pref_swipe_down_action_title"
             android:persistent="true"
             app:showPreviewIcon="false"/>
