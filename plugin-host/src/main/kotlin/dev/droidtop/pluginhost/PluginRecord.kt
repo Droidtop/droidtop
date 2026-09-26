@@ -48,6 +48,24 @@ data class PluginRecord(
     }
 
     companion object {
+        /**
+         * A field written as `value ?: JSONObject.NULL` (description,
+         * entryClass, disabledReason) comes back from org.json's own
+         * [JSONObject.optString] as the literal four-character string
+         * "null", not a real null -- [JSONObject.NULL]'s own `toString()`
+         * -- so `.takeIf { it.isNotBlank() }` alone kept that text
+         * forever. Confirmed on the rig (dq-plugins-01): approving a
+         * freshly-installed plugin wrote disabledReason as
+         * [JSONObject.NULL], and the very next read back showed
+         * "Disabled after a crash: null" with no crash having happened
+         * at all, because [PluginRecord.runnable] never saw a real null.
+         * [JSONObject.isNull] is org.json's own correct check for this
+         * (true for a missing key OR one explicitly holding
+         * [JSONObject.NULL]).
+         */
+        private fun optNullableString(json: JSONObject, key: String): String? =
+            if (json.isNull(key)) null else json.optString(key).takeIf { it.isNotBlank() }
+
         fun fromJson(json: JSONObject): PluginRecord? {
             val payloadJson = json.optJSONArray("payload") ?: JSONArray()
             val payload = buildList {
@@ -68,14 +86,14 @@ data class PluginRecord(
                 id = json.optString("id"),
                 origin = json.optString("origin"),
                 label = json.optString("label"),
-                description = json.optString("description").takeIf { it.isNotBlank() },
+                description = optNullableString(json, "description"),
                 version = json.optString("version"),
                 kind = kind,
                 capabilities = capabilities,
                 contractVersion = json.optInt("contractVersion"),
                 requestsRoot = json.optBoolean("requestsRoot"),
                 abis = buildSet { for (i in 0 until abisJson.length()) add(abisJson.optString(i)) },
-                entryClass = json.optString("entryClass").takeIf { it.isNotBlank() },
+                entryClass = optNullableString(json, "entryClass"),
                 payload = payload,
                 boundServiceTargets = boundServiceTargets,
             )
@@ -86,7 +104,7 @@ data class PluginRecord(
                 trust = trust,
                 enabled = json.optBoolean("enabled", trust == PluginTrustState.APPROVED),
                 rootApproved = json.optBoolean("rootApproved", false),
-                disabledReason = json.optString("disabledReason").takeIf { it.isNotBlank() },
+                disabledReason = optNullableString(json, "disabledReason"),
             )
         }
     }
