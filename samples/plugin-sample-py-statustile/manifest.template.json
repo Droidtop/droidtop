@@ -1,0 +1,12 @@
+{
+  "id": "droidtop.sample-py-statustile",
+  "origin": "droidtop",
+  "label": "Sample status tile (Python)",
+  "description": "Harmless python-kind sample exercising the plugin API end to end (SPEC 12a); see build.sh in this folder.",
+  "version": "1.0.0",
+  "kind": "python",
+  "capabilities": ["status_tile"],
+  "contractVersion": 1,
+  "requestsRoot": false,
+  "abis": []
+}

@@ -1,0 +1,16 @@
+{
+  "_comment": "Pinned, hash-verified official CPython Android builds (PEP 738, python.org/downloads/android/). Downloaded by PythonRuntimeManager on first use of a python-kind plugin; never bundled in the base APK. Each entry's sha256 was computed from the actual file fetched from the URL below (see docs/SPEC.md 12a for the verification note) -- update both together, never edit one without re-downloading and re-hashing.",
+  "version": "3.14.7",
+  "artifacts": {
+    "arm64-v8a": {
+      "url": "https://www.python.org/ftp/python/3.14.7/python-3.14.7-aarch64-linux-android.tar.gz",
+      "sha256": "6d50cc3aa66e414a439594089bcdfb5f1264358155c70c1f00471c24cfb477fb"
+    },
+    "x86_64": {
+      "url": "https://www.python.org/ftp/python/3.14.7/python-3.14.7-x86_64-linux-android.tar.gz",
+      "sha256": "2c16ce2359565cd8c24f86cfb75630768ba6607e732946b294b969797f583b60"
+    }
+  },
+  "libpythonSoName": "libpython3.14.so",
+  "stdlibDirName": "python3.14"
+}

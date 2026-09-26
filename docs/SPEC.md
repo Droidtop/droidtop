@@ -8795,38 +8795,76 @@ one runner per kind:
   all — the standing bundle rule (§7d) — enforced by
   `PluginBundleInstaller.structuralProblems()`. **This is the only kind
   with a working runner today.**
-- **`python`** — documented, not built, and **blocked on a real
-  packaging conflict found 2026-09-26** in the runtime the same day's
-  decision named. Chaquopy (MIT since 12.0.1, chaquo.com/chaquopy/license)
-  is a Gradle plugin, not a library a plugin bundle can carry on its own:
-  it compiles the CPython interpreter as a native component INTO the app
-  that applies it, one native library set per ABI declared in that app's
-  own `abiFilters`/`ndk.abiFilters` (chaquo.com/chaquopy/doc/current/android.html),
-  and the standard library loads straight out of the APK's own assets at
-  run time (`extractPackages` only copies files already inside the APK to
-  app-private storage on first import for startup speed — it does not
-  fetch anything). There is no supported path to produce "a Chaquopy
-  runtime" as a standalone artifact a plugin host downloads later: the
-  interpreter and stdlib are baked in wherever the Gradle plugin runs, at
-  that module's own build time, not attachable post-build. Android's own
-  answer to "ship this only when it's used" — Play Feature Delivery /
-  dynamic feature modules — is Play Store-specific and droidtop is not
-  Play-distributed (`build-scripts/release_channel.py`, GitHub Releases
-  only), so that route is also closed. **This directly conflicts with the
-  2026-09-26 decision's "downloadable component, fetched on first use,
-  never bundled in the base APK"** — that requirement cannot be met by
-  Chaquopy as it actually ships, so it is not implemented pending the
-  owner choosing one of: (a) accept Chaquopy compiled into the base APK
-  (its native libraries add several MB per ABI, chaquo.com/chaquopy/doc/current/android.html's
-  own sizing note) and drop "downloadable"; (b) accept it as a genuinely
-  separate installable unit — a standalone APK/AAR droidtop's own updater
-  fetches and loads via context creation into a Chaquopy-built module,
-  unverified whether that is supported outside Chaquopy's own single-app
-  model and not investigated further without a decision to spend the
-  time; (c) a different Python runtime with an actual split-delivery
-  story (not researched). `PluginKind.PYTHON` still validates like any
-  other kind and is refused ACTIVATION with a clear reason — never
-  silently ignored — until one of these is chosen and built.
+- **`python`** — **built 2026-09-26**, replacing the Chaquopy line
+  above (kept in git history, not here, per "state from code"): Chaquopy
+  turned out to only compile CPython INTO whichever app applies its
+  Gradle plugin at that app's own build time, with no supported path to a
+  separate, later-downloadable artifact — see `PluginKind.kt`'s own git
+  history for the full finding. The runtime this kind actually uses is
+  CPython's **official Android build**: Android has been a
+  python.org-supported platform since 3.13 (PEP 738), and
+  python.org/downloads/android/ publishes real, versioned, per-ABI
+  archives at `python.org/ftp/python/<version>/python-<version>-<abi>-linux-android.tar.gz`
+  (confirmed against the 3.14.7 release: `aarch64-linux-android` and
+  `x86_64-linux-android`, ~22 MB each, licensed under the PSF License —
+  the same terms as CPython itself). Each archive's `prefix/lib/` holds
+  `libpython3.14.so`, the stdlib (`prefix/lib/python3.14/`, including
+  `lib-dynload`'s compiled extension modules and OpenSSL/sqlite3's own
+  `.so`s), matching the shape the CPython Android testbed
+  (`github.com/python/cpython/tree/3.14/Android/testbed`) extracts into
+  an app's own files dir and points `PYTHONHOME` at.
+  - **`PythonRuntimeManager`** (`plugin-host`) downloads the artifact for
+    the device's own ABI on first use — never bundled in the base APK —
+    verifies its SHA-256 against a pinned list
+    (`plugin-host/src/main/assets/python-runtimes.json`), and extracts
+    only `prefix/lib/**` (dropping the unused C headers under
+    `prefix/include`) into `filesDir/python-runtime/<version>/<abi>/`,
+    laid out exactly like the archive's own `prefix/` so it can be handed
+    straight to the bridge as `PYTHONHOME`. The download is a separate,
+    explicit, progress-shown Settings action (an `AsyncActionItem` in the
+    Plugins screen, the same "long action with live status text" shape
+    droidtop's settings catalog already uses elsewhere) — never triggered
+    implicitly by loading a plugin, so a 22 MB fetch never happens
+    silently inside a capability call's 15-second watchdog.
+  - **The embedding bridge** (`plugin-host/native`, `libdroidtoppy.so`,
+    itself bundled in the base APK — only CPython is downloaded) `dlopen`s
+    the downloaded `libpython3.14.so` and resolves only the small,
+    genuinely ABI-stable subset of the C API by hand
+    (`Py_InitializeEx`, `PyRun_SimpleString`, `PyImport_ImportModule`,
+    `PyObject_CallFunction`, `PyUnicode_From/AsUTF8`, `PyErr_Fetch`) —
+    deliberately not the `PyConfig`-based init the testbed's own
+    `main_activity.c` uses, since `PyConfig`'s field layout is tied to
+    the exact CPython build it was compiled against, which the testbed
+    controls (one pinned checkout) but this bridge does not (a runtime
+    chosen and downloaded independently of `libdroidtoppy.so`'s own
+    build). `PYTHONHOME` is set as a plain environment variable before
+    `Py_InitializeEx`, not through a config struct, for the same reason.
+    One interpreter per `:pluginhost` process (CPython has no
+    stable-ABI-safe way to run fully independent interpreters), with
+    every python-kind plugin loaded as its own uniquely-named module via
+    a small bootstrap script so two plugins' globals never collide.
+  - **`PythonDroidtopPlugin`** adapts a `plugin.py` file to the same
+    `DroidtopPlugin` interface a `native_bundle` plugin implements, so
+    `PluginRuntimeService`'s `loaded` map, `invoke`/`startJob`/`unload`
+    call sites, and `PluginCrashPolicy`'s crash-containment story need no
+    per-kind special casing beyond `loadPlugin` picking the right
+    adapter. A python-kind manifest ships one payload file, `plugin.py`,
+    exporting `on_load(data_dir)` / `invoke(payload_json) -> json_str` /
+    `on_unload()` — JSON in, JSON out, same shape as the binder boundary
+    a native_bundle plugin crosses. A plugin whose runtime isn't
+    downloaded yet fails to load with that reason, same non-crashing
+    "not ready" signal a native_bundle plugin's own connection failure
+    already produces — it does not disable the plugin.
+  - **Sample**: `samples/plugin-sample-py-statustile`, the python
+    analogue of `plugin-sample-statustile`; its `build.sh` needs no
+    compiler at all (a python-kind plugin's payload is its own source),
+    so the `sample-plugin-python` CI job runs it with no Android
+    SDK/NDK setup.
+  - **Not built**: `startJob` for python-kind plugins (defaults to "not
+    supported", same as any `DroidtopPlugin` that doesn't override it);
+    a catalog-repo install source for the runtime itself (today's pinned
+    single version in `python-runtimes.json` is hand-updated, matching
+    how plugin bundles themselves are installed today).
 - **`flutter_embed`** — documented, not built, added 2026-09-25 for a
   real forthcoming case: an existing Flutter/Dart app the owner wants to
   turn into a plugin rather than rewrite natively (romgi). Same treatment as
@@ -8973,12 +9011,18 @@ path, not a redesign.
 **What is built vs. open.** Built: the manifest format and validation,
 signing/hashing, install/uninstall/enable/approve, the approval screen,
 the `native_bundle` runner (isolated process, binder API, crash
-containment via `PluginCrashPolicy`), the job shape, and a sample plugin
-(`samples/plugin-sample-statustile`) exercising `status_tile` end to end,
-including a deliberate forced crash for testing the disable path. Open:
-the `python` and `flutter_embed` runners; a catalog-repo install source;
-and producing/signing the sample's actual bundle, which needs a compiled
-`:plugin-host` classpath and a dex compiler this change's session did not
-have without a local Gradle build (against this project's own "CI
-builds, never local" rule) — `samples/plugin-sample-statustile/build.sh`
-is the real, unexecuted recipe.
+containment via `PluginCrashPolicy`), the job shape, the `python` runner
+(`PythonRuntimeManager`, the `plugin-host/native` dlopen bridge,
+`PythonDroidtopPlugin`, above), and two sample plugins
+(`samples/plugin-sample-statustile` for `native_bundle`,
+`samples/plugin-sample-py-statustile` for `python`) each exercising
+`status_tile` end to end, including a deliberate forced crash for testing
+the disable path. Both samples' unsigned payloads are built by CI
+(`sample-plugin`, `sample-plugin-python` in
+`.github/workflows/android-build.yml`); signing either into an
+installable `.droidplugin.tar.xz` still needs droidtop-dev's private key
+(`sign.sh` in each sample's own folder) and is not something CI ever
+does. Open: the `flutter_embed` runner; a catalog-repo install source for
+plugins; `startJob` support for python-kind plugins; and the rig check
+for the python leg specifically (queued, `device/QUEUE.md`) — the
+`native_bundle` leg's own rig check (`dq-plugins-01`) already passed.
