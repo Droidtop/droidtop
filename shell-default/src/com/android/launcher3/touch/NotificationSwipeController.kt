@@ -38,7 +38,7 @@ class NotificationSwipeController(private val mLauncher: Launcher) : TouchContro
             val dx = ev.getX() - mDownPoint.x
 
             if (dy > mTouchSlop && dy > abs(dx)) {
-                expandNotifications()
+                LauncherPrefs.GESTURE_SWIPE_DOWN_ACTION.get(mLauncher).perform(mLauncher)
                 return true
             }
             // Horizontal movement won; cancel gesture
@@ -54,17 +54,9 @@ class NotificationSwipeController(private val mLauncher: Launcher) : TouchContro
     }
 
     private fun canInterceptTouch(ev: MotionEvent) = !MotionEventsUtils.isTrackpadScroll(ev) &&
-            LauncherPrefs.GESTURE_SWIPE_DOWN_NOTIFICATIONS.get(mLauncher) &&
+            LauncherPrefs.GESTURE_SWIPE_DOWN_ACTION.get(mLauncher) != GestureAction.NONE &&
             mLauncher.isInState(LauncherState.NORMAL) &&
             AbstractFloatingView.getTopOpenView(mLauncher) == null &&
             // Ignore touches in the navbar region.
             ev.getY() <= (mLauncher.getDragLayer().getHeight() - mLauncher.deviceProfile.getInsets().bottom);
-
-    private fun expandNotifications() {
-        try {
-            val sbService = mLauncher.getSystemService("statusbar")
-            if (sbService != null) sbService.javaClass.getMethod("expandNotificationsPanel")
-                .invoke(sbService)
-        } catch (_: Exception) {}
-    }
 }

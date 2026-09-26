@@ -336,12 +336,22 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
         @JvmField
         val TASKBAR_PINNING_IN_DESKTOP_MODE =
             backedUpItem(TASKBAR_PINNING_DESKTOP_MODE_KEY, true, EncryptionType.DEVICE_PROTECTED)
+        // droidtop patch: one action per gesture slot instead of one
+        // hardcoded action toggled on/off (docs/SPEC.md, Launcher mode
+        // survey, "Assignable gesture actions"). Defaults match the old
+        // booleans' own defaults exactly (double-tap off, swipe-down onto
+        // notifications), so a fresh install behaves identically; an
+        // existing install's old boolean value is carried over once by
+        // GestureActionMigration, run from LauncherApplication.onCreate.
         @JvmField
-        val GESTURE_DOUBLE_TAP_SLEEP =
-            backedUpItem(SettingsHomeFragment.DOUBLE_TAP_TO_SLEEP, false)
+        val GESTURE_DOUBLE_TAP_ACTION =
+            backedUpItem(SettingsHomeFragment.DOUBLE_TAP_ACTION, com.android.launcher3.touch.GestureAction.NONE)
         @JvmField
-        val GESTURE_SWIPE_DOWN_NOTIFICATIONS =
-            backedUpItem(SettingsHomeFragment.SWIPE_DOWN_NOTIFICATIONS, true)
+        val GESTURE_SWIPE_DOWN_ACTION =
+            backedUpItem(
+                SettingsHomeFragment.SWIPE_DOWN_ACTION,
+                com.android.launcher3.touch.GestureAction.OPEN_NOTIFICATIONS,
+            )
         @JvmField
         val ACCESSIBILITY_DISCLOSURE_ACCEPTED =
             backedUpItem("pref_accessibility_disclosure_accepted", false)

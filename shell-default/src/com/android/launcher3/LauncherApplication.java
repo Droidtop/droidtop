@@ -43,6 +43,13 @@ public class LauncherApplication extends Application {
 
         app.murinelauncher.theme.ThemeOverride.syncNightMode(this);
         MainProcessInitializer.initialize(this);
+        // droidtop patch: one-time carry-over from the old two-boolean
+        // gesture prefs to the new per-slot GestureAction (see
+        // GestureActionMigration's own doc comment). Cheap (one
+        // SharedPreferences read, no-ops after the first run), so it runs
+        // unconditionally rather than only from a mode or a settings
+        // screen.
+        com.android.launcher3.touch.GestureActionMigration.applyOnce(this);
         // Onboarding is resumed by droidtop's entry activities, not here
         // (OnboardingGate): a process also starts for a broadcast, a bound
         // service or a pinned game, none of which is a person opening
