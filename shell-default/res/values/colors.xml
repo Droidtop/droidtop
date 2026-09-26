@@ -325,4 +325,10 @@
     <color name="murine_search_bar_color">@color/settingslib_materialColorSurfaceBright</color>
     <color name="murine_search_icon_tint">@color/settingslib_materialColorPrimary</color>
     <color name="murine_search_hint_color">@color/settingslib_materialColorOnSurfaceVariant</color>
+    <!-- docs/SPEC.md 7k shared row language: the touch/Preference
+         surface's focus ring, kept at the same hex as DesignTokens.kt's
+         ChromeColors.LightPrimary/DarkPrimary (the Gaming shell's chrome
+         colour outside the themed renderer) so a row focused on either
+         surface reads as the same accent. -->
+    <color name="catalog_focus_ring">#FF2F5DC8</color>
 </resources>

@@ -3,8 +3,17 @@ package app.murinelauncher.settings.common
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.text.Editable
+import android.text.TextWatcher
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
@@ -13,16 +22,22 @@ import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceGroup
 import androidx.preference.SwitchPreferenceCompat
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import app.murinelauncher.widget.CustomSeekBarPreference
+import com.android.launcher3.R
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
+import dev.droidtop.library.settings.CatalogIcon
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.FolderPickItem
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.SettingsSearchIndex
+import dev.droidtop.library.settings.SettingsSearchResult
 import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.library.settings.SubScreenItem
 import dev.droidtop.library.settings.TextInputItem
@@ -45,13 +60,41 @@ import kotlinx.coroutines.withContext
  * Every preference is non-persistent by design: the catalog's own
  * onSelect/onToggle/onChange callbacks are the ONE write path for a
  * setting, shared with every other renderer.
+ *
+ * Shared row language with the Gaming shell's [CatalogNavigator]
+ * (docs/SPEC.md 7k, settings polish pass): a category icon on rows that
+ * open something ([CatalogIconDrawables], the same Material Symbols
+ * Outlined choice per [CatalogIcon] as the shell's own
+ * `CatalogIconGlyphs.kt`), a pad/keyboard focus ring on every row
+ * (`catalog_row_focus_ring`, the same accent and 3dp width as the shell's
+ * `selectionFrame`), and search over the same [SettingsSearchIndex] the
+ * shell's own "Search settings" row uses. Section grouping was already
+ * shared: both renderers walk the same [CatalogGroup] list from the same
+ * catalog, so a titled/untitled group here is a titled/untitled group
+ * there. The touch surface's own always-visible Up arrow
+ * (`SettingsActivity`, wired to the same [backCallback] this class adds)
+ * is its "what B does" tell -- the Gaming shell's hint row exists because
+ * its dark chrome draws no toolbar at all; this surface already has one.
  */
 class CatalogPreferenceNavigator(
     private val fragment: PreferenceFragmentCompat,
     private val rootGroups: suspend (Context) -> List<CatalogGroup>,
     private val skipGroupIds: Set<String> = emptySet(),
+    /**
+     * Search (docs/SPEC.md 7k) is built from a synthetic root [CatalogScreen]
+     * wrapping [rootGroups] -- these two only name it for that index's own
+     * "In <screen>" result labels and depth-0 identity; they don't have to
+     * match a real [dev.droidtop.library.settings.SettingsScreenRegistry] id.
+     * Search is off by default so a nested management screen (Console
+     * systems, Containers -- hosted by their own navigator instance) never
+     * offers a second entry point, matching the shell's own `showSearch`.
+     */
+    private val enableSearch: Boolean = false,
+    private val rootScreenId: String = "root",
+    private val rootTitle: String = "",
 ) {
     private val stack = ArrayDeque<CatalogScreen>()
+    private var focusRingAttached = false
 
     // Last outcome per async item id, so the rebuild that follows an
     // AsyncActionItem keeps its result on the row (the gamepad renderer's
@@ -98,12 +141,24 @@ class CatalogPreferenceNavigator(
         fragment.requireActivity().onBackPressedDispatcher.addCallback(fragment, backCallback)
     }
 
-    fun rebuild() {
+    fun rebuild(focusKey: String? = null) {
         val context = fragment.preferenceManager.context
         fragment.lifecycleScope.launch {
             val screen = stack.lastOrNull()
             val groups = screen?.groups?.invoke(context) ?: rootGroups(context)
             val prefScreen = fragment.preferenceManager.createPreferenceScreen(context)
+            if (screen == null && enableSearch) {
+                prefScreen.addPreference(
+                    Preference(context).apply {
+                        key = SEARCH_PREFERENCE_KEY
+                        title = "Search settings"
+                        summary = "Find any setting by name"
+                        icon = ContextCompat.getDrawable(context, CatalogIcon.SEARCH.drawableRes())
+                        isIconSpaceReserved = true
+                        setOnPreferenceClickListener { openSearch(); true }
+                    },
+                )
+            }
             for (group in groups) {
                 if (screen == null && group.id in skipGroupIds) continue
                 val container: PreferenceGroup = if (group.title != null) {
@@ -122,17 +177,137 @@ class CatalogPreferenceNavigator(
             fragment.preferenceScreen = prefScreen
             screen?.title?.let { fragment.activity?.title = it }
             backCallback.isEnabled = stack.isNotEmpty()
+            ensureFocusRing()
+            if (focusKey != null) focusOn(focusKey)
         }
     }
 
-    private fun push(screen: CatalogScreen) {
+    private fun push(screen: CatalogScreen, focusKey: String? = null) {
         stack.addLast(screen)
-        rebuild()
+        rebuild(focusKey)
     }
 
     private fun pop() {
         stack.removeLastOrNull()
         rebuild()
+    }
+
+    /**
+     * Search across settings (docs/SPEC.md 7k), on the Preference surface:
+     * the same [SettingsSearchIndex] the Gaming shell's "Search settings"
+     * row builds, over a synthetic root wrapping [rootGroups] so this
+     * fragment's own catalog is indexed the same shallow way (its own
+     * groups, one level into whatever [NestedScreenItem] it opens).  A
+     * plain [AlertDialog] rather than a second screen: the whole feature
+     * is "type, see matches, pick one", which a dialog does without a
+     * fragment transaction of its own.
+     */
+    private fun openSearch() {
+        val context = fragment.requireContext()
+        val density = context.resources.displayMetrics.density
+        val pad = (16 * density).toInt()
+
+        val input = EditText(context).apply {
+            hint = "Search settings"
+            setSingleLine(true)
+        }
+        val recycler = RecyclerView(context).apply {
+            layoutManager = LinearLayoutManager(context)
+        }
+        val container = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad, pad / 2, pad, 0)
+            addView(input, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            addView(recycler, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (360 * density).toInt()))
+        }
+
+        lateinit var dialog: AlertDialog
+        val adapter = SearchResultAdapter { result ->
+            dialog.dismiss()
+            navigateToResult(result)
+        }
+        recycler.adapter = adapter
+
+        dialog = AlertDialog.Builder(context)
+            .setTitle("Search settings")
+            .setView(container)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialog.show()
+        input.requestFocus()
+
+        var index: List<SettingsSearchResult> = emptyList()
+        input.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                adapter.submit(SettingsSearchIndex.search(index, s?.toString().orEmpty()))
+            }
+        })
+
+        fragment.lifecycleScope.launch {
+            index = withContext(Dispatchers.IO) {
+                SettingsSearchIndex.build(context, CatalogScreen(id = rootScreenId, title = rootTitle, groups = rootGroups))
+            }
+            adapter.submit(SettingsSearchIndex.search(index, input.text?.toString().orEmpty()))
+        }
+    }
+
+    /**
+     * Picking a search result (docs/SPEC.md 7k, "picking a search result
+     * scrolls its screen ... and gives it initial focus"): the result's
+     * own screen is shown -- the root if it IS the synthetic search root,
+     * or the one real nested [CatalogScreen] the index found it in,
+     * matching the index's own "root, or one level in" depth -- and the
+     * matching row is scrolled into view and focused once that screen's
+     * preferences are built, rather than defaulting to wherever the list
+     * already was (the rig bug this pass fixes for both renderers).
+     */
+    private fun navigateToResult(result: SettingsSearchResult) {
+        if (result.target.id == rootScreenId) {
+            stack.clear()
+            rebuild(focusKey = result.itemId)
+        } else {
+            stack.clear()
+            push(result.target, focusKey = result.itemId)
+        }
+    }
+
+    /** Scrolls the preference list to [key] and gives that row real focus. */
+    private fun focusOn(key: String) {
+        val list = try { fragment.listView } catch (_: RuntimeException) { null } ?: return
+        val adapter = list.adapter as? PreferenceGroup.PreferencePositionCallback ?: return
+        val position = adapter.getPreferenceAdapterPosition(key)
+        if (position < 0) return
+        list.scrollToPosition(position)
+        // A second post: scrollToPosition only schedules the layout pass
+        // that creates the view holder for a row not already on screen,
+        // so requesting focus in the SAME frame finds nothing there yet.
+        list.post {
+            list.findViewHolderForAdapterPosition(position)?.itemView?.requestFocus()
+        }
+    }
+
+    /**
+     * A pad/keyboard focus ring on every row (docs/SPEC.md 7k), the touch
+     * surface's half of the Gaming shell's `selectionFrame`: every row
+     * the RecyclerView attaches becomes a real focus target with the
+     * shared ring as its `foreground`, drawn over the row's own icon/
+     * switch/ripple rather than replacing them. Attached once per
+     * fragment -- the listener outlives every `rebuild()`'s
+     * `setPreferenceScreen` call, so later screens need no re-attachment.
+     */
+    private fun ensureFocusRing() {
+        if (focusRingAttached) return
+        val list = try { fragment.listView } catch (_: RuntimeException) { null } ?: return
+        focusRingAttached = true
+        list.addOnChildAttachStateChangeListener(object : RecyclerView.OnChildAttachStateChangeListener {
+            override fun onChildViewAttachedToWindow(view: View) {
+                view.isFocusable = true
+                view.foreground = ContextCompat.getDrawable(view.context, R.drawable.catalog_row_focus_ring)
+            }
+            override fun onChildViewDetachedFromWindow(view: View) {}
+        })
     }
 
     /** Runs [action] at once, or after an OK when [confirmTitle] asks for one. */
@@ -146,6 +321,23 @@ class CatalogPreferenceNavigator(
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(android.R.string.ok) { _, _ -> action() }
             .show()
+    }
+
+    /**
+     * A category icon on rows that open something (docs/SPEC.md 7k) --
+     * never on a leaf toggle/choice/slider, the same rule
+     * `CatalogRowView` (`:shell-gamepad`) applies, so the two surfaces
+     * agree on what "carries an icon" means. No icon means no reserved
+     * space, matching the Compose renderer drawing nothing at all (not
+     * even a blank slot) for a leaf row.
+     */
+    private fun Preference.applyCatalogIcon(catalogIcon: CatalogIcon?) {
+        if (catalogIcon != null) {
+            icon = ContextCompat.getDrawable(context, catalogIcon.drawableRes())
+            isIconSpaceReserved = true
+        } else {
+            isIconSpaceReserved = false
+        }
     }
 
     private fun toPreference(context: Context, item: CatalogItem): Preference = when (item) {
@@ -288,7 +480,7 @@ class CatalogPreferenceNavigator(
             summary = listOfNotNull(item.subtitle, item.valueLabel?.invoke(context)?.takeIf { it.isNotBlank() })
                 .joinToString("  ·  ")
                 .ifBlank { null }
-            isIconSpaceReserved = false
+            applyCatalogIcon(item.icon)
             setOnPreferenceClickListener {
                 val child = item.resolve()
                 if (child != null) push(child)
@@ -299,7 +491,7 @@ class CatalogPreferenceNavigator(
             key = item.id
             title = item.title
             summary = item.subtitle
-            isIconSpaceReserved = false
+            applyCatalogIcon(item.icon)
             // Native androidx preference-fragment navigation -- the same
             // mechanism the previous XML android:fragment attribute used,
             // via SettingsActivity's own onPreferenceStartFragment.
@@ -307,3 +499,37 @@ class CatalogPreferenceNavigator(
         }
     }
 }
+
+/** One line per [SettingsSearchResult]: its name, and which screen it lives on. */
+private class SearchResultAdapter(
+    private val onPick: (SettingsSearchResult) -> Unit,
+) : RecyclerView.Adapter<SearchResultAdapter.Holder>() {
+    private var results: List<SettingsSearchResult> = emptyList()
+
+    fun submit(results: List<SettingsSearchResult>) {
+        this.results = results
+        notifyDataSetChanged()
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
+        val view = LayoutInflater.from(parent.context).inflate(android.R.layout.simple_list_item_2, parent, false)
+        return Holder(view)
+    }
+
+    override fun getItemCount() = results.size
+
+    override fun onBindViewHolder(holder: Holder, position: Int) {
+        val result = results[position]
+        holder.title.text = result.itemTitle
+        holder.subtitle.text = "In ${result.screenTitle}" + (result.itemSubtitle?.let { " · $it" } ?: "")
+        holder.itemView.setOnClickListener { onPick(result) }
+    }
+
+    class Holder(view: View) : RecyclerView.ViewHolder(view) {
+        val title: TextView = view.findViewById(android.R.id.text1)
+        val subtitle: TextView = view.findViewById(android.R.id.text2)
+    }
+}
+
+/** The synthetic settings-home row that opens search -- never a real catalog id. */
+private const val SEARCH_PREFERENCE_KEY = "__settings_search__"
