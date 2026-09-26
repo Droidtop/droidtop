@@ -241,7 +241,9 @@ class PluginRuntimeService : Service() {
     }
 
     private fun nativeLibraryDirFor(installDir: File): String? {
-        val abi = if (Build.SUPPORTED_64_BIT_ABIS.contains("x86_64") && !Build.SUPPORTED_64_BIT_ABIS.contains("arm64-v8a")) {
+        // x86_64 wins whenever it is present -- see FlutterRuntimeManager.currentAbi's
+        // own doc comment for the real device this was confirmed broken on.
+        val abi = if (Build.SUPPORTED_64_BIT_ABIS.contains("x86_64")) {
             "x86_64"
         } else {
             "arm64-v8a"

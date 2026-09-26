@@ -9408,6 +9408,20 @@ download, progress/completion over the normal job callback. Deliberately
 generic (no plugin-specific field names): any `acquire_content` plugin
 speaks this same shape.
 
+**A shared ABI-choice bug picked the wrong runtime on a real x86_64
+device (found and fixed 2026-09-26).** `FlutterRuntimeManager.currentAbi`,
+`PythonRuntimeManager.currentAbi` and `PluginRuntimeService.
+nativeLibraryDirFor` all picked x86_64 only when the device's
+`Build.SUPPORTED_64_BIT_ABIS` did NOT also list arm64-v8a. BlueStacks
+lists both (arm64-v8a for its own ARM-translation layer, x86_64 as the
+real native ABI), so all three fell through to arm64-v8a on a real
+x86_64 process. Found running the "Get games" UI's first-ever real
+search against a real flutter_embed plugin: `:pluginhost` tried to
+`dlopen` the downloaded arm64-v8a `libflutter.so` and failed with
+"has unexpected e_machine: 183 (EM_AARCH64)". Fixed identically in all
+three: x86_64 wins whenever it is present, full stop, since it is always
+the real native ABI when listed at all.
+
 **A python-kind plugin could never actually run (found and fixed
 2026-09-26).** The Plugins settings row and the "Download Python runtime"
 action both worked and were reachable on BlueStacks (Android 9) all
