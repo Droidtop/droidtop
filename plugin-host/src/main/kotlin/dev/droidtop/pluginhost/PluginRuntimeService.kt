@@ -196,7 +196,7 @@ class PluginRuntimeService : Service() {
             }
             jobExecutor.execute {
                 try {
-                    plugin.startJob(cap, PluginArgs(argsMap), progress)
+                    plugin.startJob(jobId, cap, PluginArgs(argsMap), progress)
                 } catch (e: UnsupportedOperationException) {
                     // A plugin that never overrode startJob() -- an
                     // ordinary, expected shape, not a crash: report it as

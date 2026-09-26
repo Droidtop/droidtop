@@ -670,13 +670,22 @@ sources rather than assumed from Nova/Apex's feature lists:
 | Backup/restore | HAVE, wired to Settings | `backup/BackupHelper.kt`, `SettingsMiscFragment.BACKUP_EXPORT`/`BACKUP_IMPORT` |
 | Smartspace/clock widget | HAVE | `widget/smartspace/{MurineClockView,SmartspaceMode}.kt` |
 | Configurable QSB with web search providers | HAVE | `widget/search/{SearchProvider,MurineSearchBarView}.kt` (8 providers + custom) |
-| Gestures: double-tap to sleep, swipe-down to notifications | HAVE, exposed in Settings | `LauncherPrefs.GESTURE_DOUBLE_TAP_SLEEP`/`GESTURE_SWIPE_DOWN_NOTIFICATIONS`, toggled from `SettingsHomeFragment` (`DOUBLE_TAP_TO_SLEEP`, `SWIPE_DOWN_NOTIFICATIONS`), applied in `WorkspaceTouchListener.java`/`NotificationSwipeController.kt` |
-| Assignable gesture *actions* (Nova's "map any gesture to any action", not just the two fixed ones above) | **LACK** | no such mapping layer exists; backlog |
+| Gestures: double-tap and swipe-down, each assignable to any of nothing/lock screen/open notifications/open app drawer (**built 2026-09-26**, was two fixed on/off gestures) | HAVE, exposed in Settings | `GestureAction` enum + `perform(Launcher)` (`com.android.launcher3.touch`), `LauncherPrefs.GESTURE_DOUBLE_TAP_ACTION`/`GESTURE_SWIPE_DOWN_ACTION`, picked from `SettingsHomeFragment`'s `RadioGroupPreference` rows (`DOUBLE_TAP_ACTION`, `SWIPE_DOWN_ACTION`), applied in `WorkspaceTouchListener.java`/`NotificationSwipeController.kt`; an existing install's old two-boolean prefs are carried over once by `GestureActionMigration` |
 | App-drawer/QSB search over droidtop's own library (games, not just installed apps) | **LACK** | `DefaultAppSearchAlgorithm.java` only ever produces `AdapterItem.asApp`; backlog |
 | A home-screen widget of droidtop's own (a "full computer" feature neither Nova nor Apex can offer, since they have no game library) | **built this change** | `ContinuePlayingWidgetProvider.kt` (see below) |
 | Global settings, Desktop settings rendered in the shell's own row component, pad-navigable | HAVE (fixed 2026-09-24/25, UI pass H4) | `DroidtopWideSettings.kt`, `SettingsGlobalFragment.kt`'s `CatalogPreferenceNavigator` |
 | Icon-pack/drawer/hidden-apps settings pages left as stock Android preference UI | HAVE, and correct: H4's own fix text scopes the shell's row component to Global/Desktop only, and explicitly keeps these stock | `docs/audit-2026-09-24/ui-assessment.md` H4 |
 | Plugin contributions in the launcher (status tiles, search providers, app actions, launcher widgets from third-party engines/tools) | **not yet buildable** — plugin API is being rebuilt (agent `plugins`, §12/12a) | seam only, see below |
+
+**Rig finding, not fixed here (2026-09-26).** Verifying the gesture-action
+picker on emulator-5560 (Android 14, 1920x1080 landscape) found
+`RadioGroupBottomSheet`'s sheet showing only its title row -- no radio
+options visible or reachable by swipe, confirmed via `uiautomator dump`
+(only the title text node exists in the sheet). This reproduces identically
+on the pre-existing, unmodified smartspace-mode picker, so it is not a
+gesture-actions regression; every `RadioGroupPreference` row in Settings is
+affected on this profile. Filed as its own follow-up rather than guessed at
+here.
 
 **The target feature set, decided:** Launcher mode keeps inheriting Nova/Apex-class
 functionality from Murine wholesale rather than droidtop reimplementing any
@@ -9289,15 +9298,38 @@ the runtime-download cost twice, which this satisfies; a literally shared
 *instance* running two plugins' Dart code in one isolate group is a
 different, larger feature this build didn't attempt).
 
-**For the private Flutter-app plugin plan:** the recommended route A (embed a
-Flutter engine, reuse the app's real Dart code) is now backed by a real,
-buildable runner rather than a hypothesis — the fallback route B (Kotlin
-port) in that repo's `PLUGIN-PLAN.md` is no longer the only sequencing
-option. What the app's own plan still needs to work out, unaffected by this
-build: how its own `acquire_content`-shaped calls map onto the plugin's
-Dart `main()` and its MethodChannel handler for `"invoke"` (this build's
-sample only exercises `status_tile`, the simplest capability), and
-whether the app's own Dart dependencies (image/network libraries with their
-OWN native code) fit inside a single `FlutterEngine`'s asset/native-lib
-model the same way this sample's trivial UI-less Dart does — untested
-here.
+**`startJob` for flutter_embed, built 2026-09-26.** A real forthcoming
+flutter_embed plugin needs long-running jobs with progress (a download),
+so this landed ahead of the "not supported until a real plugin needs it"
+default every other kind still uses. `FlutterDroidtopPlugin.startJob`
+posts one `"startJob"` call to Dart's own `MethodChannel` (the same
+channel `invoke` already uses) carrying `{jobId, capability, args}`, then
+returns immediately -- Dart is expected to answer later by calling BACK
+into the host on that same channel (`MethodChannel` is bidirectional on
+one `BinaryMessenger`; `FlutterDroidtopPlugin` now also calls
+`setMethodCallHandler` on it, which `invoke`'s host-to-plugin-only
+direction never needed) with `"jobProgress"`/`{jobId, percent,
+statusLine}` zero or more times and exactly one `"jobComplete"`/`{jobId,
+result}`, dispatched to the matching `PluginJobProgress` via an in-memory
+`jobId -> PluginJobProgress` map. `cancelJob` forwards `{jobId}` to Dart
+the same fire-and-forget way (best-effort, as the interface already
+documents).
+
+This also fixed a real, pre-existing gap in `DroidtopPlugin.startJob`
+itself, not something flutter-specific: `PluginRuntimeService.startJob`
+already generates a `jobId` (returned to droidtop's own caller) but never
+handed it to the plugin's own `startJob()`, so nothing implementing
+multiple concurrent jobs could ever correlate a later `cancelJob(jobId)`
+back to a specific one. Fixed by adding `jobId` as `DroidtopPlugin.
+startJob`'s first parameter (no existing override to migrate --
+flutter_embed above is the first kind to implement it at all).
+
+**Open question for a real Flutter/Dart app being embedded this way:**
+this build's own sample only exercises `status_tile`, the simplest
+capability, over one MethodChannel handler for `"invoke"`. A real app
+being adapted this way still needs to work out how its own capability
+calls map onto that Dart `main()`/`"invoke"` handler, and whether its own
+Dart dependencies (image/network libraries with their OWN native code)
+fit inside a single `FlutterEngine`'s asset/native-lib model the same way
+this sample's trivial UI-less Dart does — untested here, and specific to
+whatever plugin is being built, not this runner itself.
