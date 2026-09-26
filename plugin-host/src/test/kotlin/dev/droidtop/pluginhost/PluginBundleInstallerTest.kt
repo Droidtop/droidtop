@@ -164,7 +164,16 @@ class PluginBundleInstallerTest {
             val record = (installed as PluginInstallResult.Installed).record
             assertTrue(PluginBundleInstaller.verifyInstalled(pluginsRoot, record) == null)
 
-            File(pluginsRoot, "testorigin.sample-statustile/classes.jar").writeBytes("edited on disk".toByteArray())
+            // PluginBundleInstaller now marks every payload file read-only right
+            // after writing it (Android 10+ refuses DexClassLoader on a writable
+            // dex file otherwise) -- simulating a real tamperer here needs the
+            // same setWritable(true) step an actual attacker with filesystem
+            // access could always do, or this write fails with
+            // FileNotFoundException (permission denied) before ever reaching
+            // the check this test is actually exercising.
+            val edited = File(pluginsRoot, "testorigin.sample-statustile/classes.jar")
+            edited.setWritable(true)
+            edited.writeBytes("edited on disk".toByteArray())
             val problem = PluginBundleInstaller.verifyInstalled(pluginsRoot, record)
             assertTrue(problem != null && problem.reason.contains("classes.jar"))
         }
