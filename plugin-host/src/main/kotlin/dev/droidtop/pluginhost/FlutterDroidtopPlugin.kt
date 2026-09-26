@@ -89,31 +89,70 @@ class FlutterDroidtopPlugin(
         val libflutter = FlutterRuntimeManager.libflutterSoPath(appContext)
             ?: throw IllegalStateException("Flutter runtime is not installed -- download it in Settings > Plugins first")
 
-        val flutterJNI = DownloadedFlutterJNI(libflutter)
-        val flutterLoader = FlutterLoader(flutterJNI)
-        val dartVmArgs = arrayOf("--aot-shared-library-name=${libapp.absolutePath}")
+        // Found on the rig (dq-flutterembed-01): FlutterEngine's constructor,
+        // FlutterLoader's init and DartExecutor.executeDartEntrypoint are all
+        // @UiThread -- Flutter enforces this itself ("Methods marked with
+        // @UiThread must be executed on the main thread"). onLoad() runs on
+        // whatever thread NativePluginRunner's AIDL call arrives on inside
+        // :pluginhost (a binder thread), never the main thread, so every one
+        // of these calls has to be pushed onto the main Looper and waited on
+        // -- the same blocking-post-and-latch shape invoke() below already
+        // uses for MethodChannel calls, for the same underlying reason.
+        runOnMainThreadBlocking {
+            val flutterJNI = DownloadedFlutterJNI(libflutter)
+            val flutterLoader = FlutterLoader(flutterJNI)
+            val dartVmArgs = arrayOf("--aot-shared-library-name=${libapp.absolutePath}")
 
-        // FlutterEngine's constructor itself calls flutterLoader.startInitialization()/
-        // ensureInitializationComplete() synchronously the first time -- this is real,
-        // possibly slow (asset extraction, JNI init) work, which is why onLoad (like every
-        // DroidtopPlugin.onLoad) is still covered by PluginRunner.CALL_TIMEOUT_MS, same
-        // constraint PythonDroidtopPlugin.forInstall's Py_InitializeEx call already has.
-        val newEngine = FlutterEngine(appContext, flutterLoader, flutterJNI, dartVmArgs, true)
-        loadAssetsIntoEngine(newEngine, installDir)
+            // FlutterEngine's constructor itself calls flutterLoader.startInitialization()/
+            // ensureInitializationComplete() synchronously the first time -- this is real,
+            // possibly slow (asset extraction, JNI init) work, which is why onLoad (like every
+            // DroidtopPlugin.onLoad) is still covered by PluginRunner.CALL_TIMEOUT_MS, same
+            // constraint PythonDroidtopPlugin.forInstall's Py_InitializeEx call already has.
+            val newEngine = FlutterEngine(appContext, flutterLoader, flutterJNI, dartVmArgs, true)
+            loadAssetsIntoEngine(newEngine, installDir)
 
-        val messenger: BinaryMessenger = newEngine.dartExecutor.binaryMessenger
-        val newChannel = MethodChannel(messenger, "dev.droidtop.pluginhost/$pluginId")
-        newChannel.setMethodCallHandler { call, result -> handleIncomingCall(call, result) }
-        engine = newEngine
-        channel = newChannel
+            val messenger: BinaryMessenger = newEngine.dartExecutor.binaryMessenger
+            val newChannel = MethodChannel(messenger, "dev.droidtop.pluginhost/$pluginId")
+            newChannel.setMethodCallHandler { call, result -> handleIncomingCall(call, result) }
+            engine = newEngine
+            channel = newChannel
 
-        // FlutterEngine's constructor sets everything up but does NOT run
-        // the plugin's Dart `main()` on its own -- every real embedding
-        // (FlutterActivity/FlutterFragment included) calls
-        // executeDartEntrypoint itself. createDefault() runs `main` from
-        // the asset bundle's own kernel/AOT data, which after
-        // loadAssetsIntoEngine above is this plugin's own flutter_assets.
-        newEngine.dartExecutor.executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault())
+            // FlutterEngine's constructor sets everything up but does NOT run
+            // the plugin's Dart `main()` on its own -- every real embedding
+            // (FlutterActivity/FlutterFragment included) calls
+            // executeDartEntrypoint itself. createDefault() runs `main` from
+            // the asset bundle's own kernel/AOT data, which after
+            // loadAssetsIntoEngine above is this plugin's own flutter_assets.
+            newEngine.dartExecutor.executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault())
+        }
+    }
+
+    /**
+     * Runs [block] on the main thread and blocks the CALLING thread until
+     * it finishes, rethrowing whatever [block] threw on the caller's own
+     * thread so [onLoad]'s normal "throwing is how you report failure"
+     * contract (PluginRuntimeService.loadPlugin's catch(Throwable)) still
+     * works unchanged -- the exception just now genuinely happened on the
+     * main thread, not the calling one.
+     */
+    private fun runOnMainThreadBlocking(block: () -> Unit) {
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            block()
+            return
+        }
+        val latch = CountDownLatch(1)
+        var error: Throwable? = null
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            try {
+                block()
+            } catch (t: Throwable) {
+                error = t
+            } finally {
+                latch.countDown()
+            }
+        }
+        latch.await(PluginRunner.CALL_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        error?.let { throw it }
     }
 
     /**
@@ -157,8 +196,15 @@ class FlutterDroidtopPlugin(
     override fun onUnload() {
         channel?.setMethodCallHandler(null)
         channel = null
-        engine?.destroy()
+        // FlutterEngine.destroy() is @UiThread too -- post it, but
+        // onUnload itself is documented best-effort ("the process may
+        // already be dying"), so this does not block waiting for it the
+        // way onLoad's runOnMainThreadBlocking does.
+        val toDestroy = engine
         engine = null
+        if (toDestroy != null) {
+            android.os.Handler(android.os.Looper.getMainLooper()).post { toDestroy.destroy() }
+        }
         activeJobs.clear()
     }
 
