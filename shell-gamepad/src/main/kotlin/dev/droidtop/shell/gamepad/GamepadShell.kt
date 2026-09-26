@@ -335,6 +335,16 @@ fun GamepadShell(
     // below. Installed only while this composition is live.
     // Quick Menu (hold SELECT) -- see QuickMenu.kt for the paradigm.
     var quickMenuOpen by remember { mutableStateOf(false) }
+    // A quick menu left open when this shell lost the foreground (the
+    // Switch-mode dialog's own "Android"/"Desktop" rows, or Home) must not
+    // still be showing when a fresh, real deep-link brings this same
+    // singleTask composition back -- rig, dq-modefix-01 steps 3-4:
+    // MainActivity/GamepadShell is never destroyed by a mode round trip,
+    // so quickMenuOpen stayed true from before, and picking "Gaming" from
+    // the Switch-mode dialog resumed the SAME composition with the old
+    // Quick Menu still stacked on top, which read as "Gaming never
+    // appears" even though mode had actually already resolved correctly.
+    LaunchedEffect(deepLinkToken) { quickMenuOpen = false }
     // Swallows the key-UP of the hold that opened the menu, so the
     // shell's ordinary short-press Select action doesn't ALSO fire.
     var swallowSelectUp by remember { mutableStateOf(false) }
