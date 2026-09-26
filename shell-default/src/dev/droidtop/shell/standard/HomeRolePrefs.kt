@@ -7,15 +7,17 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
  * Owns which of droidtop's own two `CATEGORY_HOME` activities is actually
- * enabled — `com.android.launcher3.Launcher` (Standard) or
- * [AlternativeLauncherActivity] (Alternative, which forwards to a
- * different installed launcher). Exactly one is ever enabled at a time,
- * mirroring `farmerbb/Taskbar`'s own real, shipping `HomeActivity`/
- * `HSLActivity` toggle (verified against its actual source this session) —
- * `PackageManager.setComponentEnabledSetting` overrides the manifest's
- * default `android:enabled` value at runtime, so both real activities stay
- * declared normally in the manifest and this is the only thing that
- * decides which one Android actually offers as a HOME candidate.
+ * enabled — [HomeTrampolineActivity] (Standard; forwards into
+ * `com.android.launcher3.Launcher` once it decides Standard is the
+ * target, docs/SPEC.md 2c) or [AlternativeLauncherActivity] (Alternative,
+ * which forwards to a different installed launcher). Exactly one is ever
+ * enabled at a time, mirroring `farmerbb/Taskbar`'s own real, shipping
+ * `HomeActivity`/`HSLActivity` toggle (verified against its actual source
+ * this session) — `PackageManager.setComponentEnabledSetting` overrides
+ * the manifest's default `android:enabled` value at runtime, so both real
+ * activities stay declared normally in the manifest and this is the only
+ * thing that decides which one Android actually offers as a HOME
+ * candidate.
  *
  * [HomeImplementation.NONE] means droidtop claims no HOME role at all —
  * both disabled — matching onboarding's "decide later" option (see

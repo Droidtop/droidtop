@@ -524,36 +524,42 @@ recorded below.
 Revisited 2026-09-26 (launcher2, p1-dt-home-redirect-before-model-load).
 The held task's original ask was to decide the target with `ModeGate`/prefs
 alone, as early as possible, so Standard never draws when the target is
-another mode. That decision already happens as early as `Launcher.onCreate`
-can make it -- before `super.onCreate()`, from `Modes.homeTarget` (a
-SharedPreferences read, no model, no disk work) -- and both `onCreate`
-(cold start) and `onNewIntent` (warm Home press) already read the same
-`homeTarget` function `AlternativeLauncherActivity` uses, guarded by
-`BackButtonMenu.isExplicitHome` so a deliberate "Android" pick is never
-bounced back to the default mode. There is one decision function, asked at
-one point in each path; nothing here still uses the old last-mode-only
-check the switch-mode bug (above) was about. What the held task cannot get
-without rewriting vendored `Launcher.java` beyond a hook -- forbidden by
-this repo's own vendoring rule -- is skipping Standard's own view inflation
-and `LauncherModel` bind entirely when the target isn't Standard: `onStart`
-is where the redirect fires (not `onCreate`) specifically because
-`Launcher.onDestroy` unconditionally dereferences fields (`mModel`,
-`mRotationHelper`, `mAppWidgetHolder`, `mWidgetPickerDataProvider`,
-`mWorkspace`, `mOverlayManager`) that only exist once `onCreate`'s full
-upstream body has run; finishing any earlier crashes with
-`LauncherModel.removeCallbacks on a null object reference` (the same crash
-the existing comment on `onStart` already documents). Making `onDestroy`
-null-safe across every one of those fields is a real rewrite of upstream
-Launcher3 lifecycle code, not a hook, so it stays out of scope here. Net
-effect unchanged from the note above: the decision is correct and as early
-as it can be without that rewrite, and the multi-second Standard frame on a
-cold, JIT-cold process is `setupViews()` and the initial `LauncherModel`
-bind running to completion, not a wrong decision. A scoped follow-up for
-whoever wants to remove the frame is filed as
-`p2-launcher-home-trampoline-activity.md`: a dedicated HOME-role trampoline
-activity ahead of Launcher3's own, cheap enough to decide and redirect
-before Launcher3's Activity is even created, so Standard's own `onCreate`
-never runs for a non-Standard target.
+another mode. That decision already happened as early as `Launcher.onCreate`
+could make it -- before `super.onCreate()`, from `Modes.homeTarget` (a
+SharedPreferences read, no model, no disk work) -- but `Launcher.onCreate`
+could not act on a non-Standard decision without first running the rest of
+its own upstream body: `onStart` is where the old redirect fired (not
+`onCreate`) specifically because `Launcher.onDestroy` unconditionally
+dereferences fields (`mModel`, `mRotationHelper`, `mAppWidgetHolder`,
+`mWidgetPickerDataProvider`, `mWorkspace`, `mOverlayManager`) that only
+exist once `onCreate`'s full upstream body has run; finishing any earlier
+crashed with `LauncherModel.removeCallbacks on a null object reference`.
+Making `onDestroy` null-safe across every one of those fields would be a
+real rewrite of upstream Launcher3 lifecycle code, not a hook, so that path
+stayed closed.
+
+**Built 2026-09-26: `HomeTrampolineActivity`.** `com.android.launcher3.Launcher`
+no longer declares `CATEGORY_HOME` at all -- `dev.droidtop.shell.standard.
+HomeTrampolineActivity` (`:shell-default`) does, ahead of it, and is now what
+`Modes.LAUNCHER_ACTIVITY` names (the component `HomeRolePrefs` and mode
+gating's `launcherIsDroidtopHome` check the enabled-state of). A real Home
+press now goes: system -> `HomeTrampolineActivity.onCreate` -> one
+`Modes.homeTarget` read -> an explicit-component `Intent` to whichever of
+`MainActivity` (Gaming/Desktop) or `com.android.launcher3.Launcher`
+(Standard) is the target, then `finish()`. When the target isn't Standard,
+Launcher3 is never constructed at all -- no `setupViews()`, no
+`LauncherModel` bind -- so the multi-second Standard frame is gone for that
+case. When the target IS Standard, the trampoline forwards to
+`com.android.launcher3.Launcher` explicit-to-explicit, the same pattern
+`BackButtonMenu.openHome`'s "Android" already used, so Standard draws
+exactly as before. The double-tap "hard display reinit" detection that used
+to live in `Launcher.onNewIntent`'s own redirect branch moved to the
+trampoline too (a process-lifetime timestamp, since every Home press
+recreates the trampoline fresh); `Launcher.java`'s own three copies of this
+decision (`onCreate`, `onStart`, `onNewIntent`) are unreachable now that it
+no longer holds `CATEGORY_HOME`, and are left in place as a harmless no-op
+safety net rather than removed, since ripping working vendored lifecycle
+code out is its own risk for no behavioural gain.
 
 **The cold-start splash shows droidtop's own icon, not the platform's
 (decided 2026-09-26).** The UX review found droidtop's Android 12+
