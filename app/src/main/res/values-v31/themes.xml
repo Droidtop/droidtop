@@ -1,0 +1,20 @@
+<resources>
+    <!-- Android 12+ draws this app's own SplashScreen window from theme
+         attributes rather than the platform's generic fallback icon (UX
+         review 2026-09-26, "droidtop's own cold-start splash ... shows the
+         same generic green Android-robot placeholder instead of a droidtop
+         mark", p2-ux-droidtop-app-icons.md). Leaving these unset lets each
+         OS/OEM splash implementation decide how to derive an icon from the
+         adaptive icon, and that derivation was observed producing the
+         platform's default mascot instead of droidtop's own laptop-and-
+         robot mark (mipmap/ic_launcher) on at least one test rig. Setting
+         them explicitly removes that guesswork: the real launcher icon and
+         its own background colour (ic_launcher_background, #1B2430) render
+         every cold start, on every API 31+ device, regardless of how a
+         given OS build's automatic derivation behaves.
+    -->
+    <style name="Theme.DroidTop" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="android:windowSplashScreenBackground">#1B2430</item>
+    </style>
+</resources>

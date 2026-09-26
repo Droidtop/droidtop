@@ -521,6 +521,62 @@ Gaming. No code change from this: recorded here so the same false read isn't
 repeated. The switch-mode dialog's own, separately confirmed break is
 recorded below.
 
+Revisited 2026-09-26 (launcher2, p1-dt-home-redirect-before-model-load).
+The held task's original ask was to decide the target with `ModeGate`/prefs
+alone, as early as possible, so Standard never draws when the target is
+another mode. That decision already happens as early as `Launcher.onCreate`
+can make it -- before `super.onCreate()`, from `Modes.homeTarget` (a
+SharedPreferences read, no model, no disk work) -- and both `onCreate`
+(cold start) and `onNewIntent` (warm Home press) already read the same
+`homeTarget` function `AlternativeLauncherActivity` uses, guarded by
+`BackButtonMenu.isExplicitHome` so a deliberate "Android" pick is never
+bounced back to the default mode. There is one decision function, asked at
+one point in each path; nothing here still uses the old last-mode-only
+check the switch-mode bug (above) was about. What the held task cannot get
+without rewriting vendored `Launcher.java` beyond a hook -- forbidden by
+this repo's own vendoring rule -- is skipping Standard's own view inflation
+and `LauncherModel` bind entirely when the target isn't Standard: `onStart`
+is where the redirect fires (not `onCreate`) specifically because
+`Launcher.onDestroy` unconditionally dereferences fields (`mModel`,
+`mRotationHelper`, `mAppWidgetHolder`, `mWidgetPickerDataProvider`,
+`mWorkspace`, `mOverlayManager`) that only exist once `onCreate`'s full
+upstream body has run; finishing any earlier crashes with
+`LauncherModel.removeCallbacks on a null object reference` (the same crash
+the existing comment on `onStart` already documents). Making `onDestroy`
+null-safe across every one of those fields is a real rewrite of upstream
+Launcher3 lifecycle code, not a hook, so it stays out of scope here. Net
+effect unchanged from the note above: the decision is correct and as early
+as it can be without that rewrite, and the multi-second Standard frame on a
+cold, JIT-cold process is `setupViews()` and the initial `LauncherModel`
+bind running to completion, not a wrong decision. A scoped follow-up for
+whoever wants to remove the frame is filed as
+`p2-launcher-home-trampoline-activity.md`: a dedicated HOME-role trampoline
+activity ahead of Launcher3's own, cheap enough to decide and redirect
+before Launcher3's Activity is even created, so Standard's own `onCreate`
+never runs for a non-Standard target.
+
+**The cold-start splash shows droidtop's own icon, not the platform's
+(decided 2026-09-26).** The UX review found droidtop's Android 12+
+SplashScreen showing the platform's generic mascot instead of droidtop's
+own adaptive icon (laptop + robot, `mipmap/ic_launcher`) on a genuinely
+cold `am start` (`p2-ux-droidtop-app-icons.md`). droidtop had never set
+`windowSplashScreenAnimatedIcon`/`windowSplashScreenBackground` of its own,
+leaving every OS build's automatic derivation from the adaptive icon free
+to fall back however it likes; `app/src/main/res/values-v31/themes.xml`
+now sets both explicitly on `Theme.DroidTop` so the real icon and its own
+background (`#1B2430`, the same slate `ic_launcher_background` uses) render
+on every API 31+ device regardless of that derivation. The review's other
+fallback-icon findings (Enginehost and several BlueStacks-bundled utility
+apps showing the platform mascot in the Standard shell's Apps grid) are not
+a droidtop bug: that grid resolves each entry's icon through
+`PackageManager`/`LauncherActivityInfo`, which falls back only when the
+target app's own manifest has no resolvable icon resource. Enginehost's
+manifest (`enginehost/app/src/main/AndroidManifest.xml`) sets no
+`android:icon` at all, so this is Enginehost's own fix to make, not
+droidtop's; the BlueStacks-bundled apps (Bsxlauncher, Filemanager, Nowgg,
+Piggy) are host-emulator utilities with no equivalent on the Retroid
+hardware droidtop actually ships on.
+
 **Switching modes is named on every surface (decided 2026-09-25).** The
 mode switcher (`BackButtonMenu`: Android, the modes that are on, and
 "Modes and settings") opens from a long-press of Back anywhere, and by
