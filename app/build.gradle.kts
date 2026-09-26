@@ -128,7 +128,7 @@ android {
 
     packaging {
         jniLibs {
-            // Dependencies (zstd-jni, libarchive, sentry, ...) carry 32-bit
+            // Dependencies (zstd-jni, libarchive, ...) carry 32-bit
             // and other ABIs droidtop does not ship; the universal APK keeps
             // exactly arm64-v8a + x86_64, as the old ndk abiFilters did.
             excludes += listOf("lib/armeabi/**", "lib/armeabi-v7a/**", "lib/x86/**", "lib/mips/**", "lib/mips64/**", "lib/riscv64/**")

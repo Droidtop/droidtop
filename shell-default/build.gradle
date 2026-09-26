@@ -218,14 +218,6 @@ dependencies {
 
     implementation 'com.github.alesimula:murine-aircompressor:2.0.9'
 
-    // Crash reporting to droidtop's own self-hosted Bugsink instance (a
-    // Sentry-API-compatible server, see docs/SPEC.md): the Sentry SDK's
-    // own uncaught-exception handler reports a crash. Murine's Recovery
-    // library (its "Recover / Restart" crash screen) is gone: it rebuilt
-    // the activity stack into a blank white home screen Home could not
-    // leave and locked the screen to portrait (rig, dq-onboard-01).
-    implementation 'io.sentry:sentry-android:7.20.1'
-
     api libs.lottie
     implementation libs.dagger
     kapt libs.dagger.compiler
