@@ -47,7 +47,7 @@ class PluginCrashPolicy(
      */
     suspend fun invoke(record: PluginRecord, capability: PluginCapability, args: Map<String, String>): PluginResult {
         if (!record.runnable()) return PluginResult.failure("plugin is not approved/enabled")
-        if (record.manifest.kind != PluginKind.NATIVE_BUNDLE && record.manifest.kind != PluginKind.PYTHON) {
+        if (record.manifest.kind !in RUNNABLE_KINDS) {
             return PluginResult.failure("no runner for kind ${record.manifest.kind.id} yet")
         }
         val dir = PluginStore.payloadDirFor(context, record.manifest.id)
@@ -74,7 +74,7 @@ class PluginCrashPolicy(
     /** Starts a long-running job for [record] (see [PluginJob]); same runnable/re-verify gates as [invoke], null on any refusal. */
     suspend fun startJob(record: PluginRecord, capability: PluginCapability, args: Map<String, String>): String? {
         if (!record.runnable()) return null
-        if (record.manifest.kind != PluginKind.NATIVE_BUNDLE && record.manifest.kind != PluginKind.PYTHON) return null
+        if (record.manifest.kind !in RUNNABLE_KINDS) return null
         if (PluginBundleInstaller.verifyInstalled(PluginStore.root(context), record) != null) {
             PluginStore.disableWithReason(context, record.manifest.id, "files changed on disk since approval")
             return null
@@ -90,5 +90,19 @@ class PluginCrashPolicy(
 
     fun shutdown() {
         runner.unbind()
+    }
+
+    companion object {
+        // Kinds with a real runner behind NativePluginRunner. Found stale
+        // 2026-09-26: this list still named only NATIVE_BUNDLE/PYTHON after
+        // flutter_embed's runner landed (63627015) -- PluginRuntimeService's
+        // own dispatch handled FLUTTER_EMBED fine, but every call from the
+        // Settings UI goes through THIS class first (AppSettingsCatalogs.kt),
+        // so a flutter_embed plugin could install, approve and show
+        // "Running", but never actually be called: every invoke/startJob
+        // failed here with "no runner for kind flutter_embed yet" before
+        // ever reaching the runner that would have worked. One list instead
+        // of two separate != chains so a future kind only needs one edit.
+        private val RUNNABLE_KINDS = setOf(PluginKind.NATIVE_BUNDLE, PluginKind.PYTHON, PluginKind.FLUTTER_EMBED)
     }
 }
