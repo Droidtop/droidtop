@@ -30,14 +30,13 @@ object RecentAppsStore {
     /** Records [component] as just launched: most-recent-first, deduplicated. */
     @JvmStatic
     fun recordLaunch(context: Context, component: ComponentName) {
-        val key = component.flattenToString()
         val existing = current(context).toMutableList()
-        existing.remove(key)
-        existing.add(0, key)
+        existing.remove(component)
+        existing.add(0, component)
         while (existing.size > MAX_TRACKED) existing.removeAt(existing.size - 1)
         context.getSharedPreferences(LauncherFiles.SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
             .edit()
-            .putString(KEY_RECENT_COMPONENTS, existing.joinToString(SEPARATOR))
+            .putString(KEY_RECENT_COMPONENTS, existing.joinToString(SEPARATOR) { it.flattenToString() })
             .apply()
     }
 
