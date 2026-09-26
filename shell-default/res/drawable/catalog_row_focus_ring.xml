@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- docs/SPEC.md 7k shared row language: the pad/keyboard focus ring for
+     a Preference row (the touch surface's half of the Gaming shell's
+     `selectionFrame` in GamingMenu.kt: the same 3dp width, the same 10dp
+     corner radius, the same accent colour). Set as the row's `foreground`,
+     never its background, so it draws on top of the existing icon/switch/
+     ripple content instead of replacing it. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <corners android:radius="10dp" />
+            <stroke
+                android:width="3dp"
+                android:color="@color/catalog_focus_ring" />
+            <solid android:color="@android:color/transparent" />
+        </shape>
+    </item>
+    <item android:drawable="@android:color/transparent" />
+</selector>

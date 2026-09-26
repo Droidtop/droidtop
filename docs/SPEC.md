@@ -3346,7 +3346,9 @@ app-drawer icon or a floating switcher button:
     row titles/subtitles), not a small addition, and was not attempted here rather than shipped
     partial. A `CatalogScreen`/row family is exactly the seam agent `scrape`'s SteamGridDB
     credential row and agent `plugins`' plugin-contributed integration rows both already use —
-    no new mechanism needed for either.
+    no new mechanism needed for either. (Built two days later, on the settings home only, by
+    `SettingsSearchIndex` — see 7k's "Search across settings" above; the touch surface's own
+    entry point followed in the H4 shared-row-language pass, 2026-09-26.)
   - **Known real gap, confirmed on-device**: the Standard shell as it
     ships from Murine Launcher upstream is functional but plain — first
     real-device testing surfaced this directly, not a guess. Backlog item,
@@ -7673,12 +7675,38 @@ running on the console and asked for the visual pass on top of it. Decided and b
   `round_rect_folder`, `ic_palette`, `ic_allapps_search`, `cloud_download_24px`…) but picking the
   right one per `CatalogIcon` needs a working build-and-screenshot loop to confirm they read
   right at row size, which this pass did not have; left open rather than shipped unverified.
+  **Built (H4 shared-row-language pass, agent settingsh4, 2026-09-26):** `CatalogIconDrawables.kt`
+  (`:shell-default`) maps the same `CatalogIcon` enum to the same Material Symbols Outlined
+  choice `CatalogIconGlyphs.kt` uses, as real Android `<vector>` resources
+  (`res/drawable/ic_catalog_*.xml`) fetched from `google/material-design-icons`
+  (Apache-2.0) — the `_24px` "regular weight, no fill" variant, matching the Compose
+  `Icons.Outlined.*` family exactly — rather than a second Compose dependency added to this
+  forked launcher3 tree just to rasterize one glyph per row. `CatalogPreferenceBuilder.
+  applyCatalogIcon` sets it (and `isIconSpaceReserved`) only for `NestedScreenItem`/
+  `SubScreenItem`, the same "never on a leaf" rule. The vendored Murine/launcher3 drawables named
+  above were never used: none of them is this same icon family, and the point of sharing a row
+  language is that a setting reads as the same shape on both surfaces, not merely "has some
+  icon".
 - **Real section grouping wherever a screen had gone flat.** Console systems (`AppSettingsCatalogs.
   consoleSystemsGroups`) was the one management screen with no section label at all — six rows in
   one undifferentiated run, the same shape the Gaming settings home itself had before the
   2026-09-24 UI pass split it into `SHELL`/`LIBRARY`/`System`/`Input`/`Appearance` (`GROUP_GAMING`
   etc., `GamingSettingsCatalog`). Split into `Management`/`Integrations`/`Platform database`, the
   same section-label component every other screen already draws.
+- **A pad/keyboard focus ring on the touch surface too (H4 shared-row-language pass, agent
+  settingsh4, 2026-09-26).** The Gaming shell's rows always drew `selectionFrame` (`GamingMenu.kt`,
+  a 3dp accent ring); `CatalogPreferenceBuilder`'s rows had no focus state at all — a real gap for
+  a pad or a keyboard plugged into a phone/tablet running the Standard shell, since a stock
+  Preference row has no visible focus of its own. `CatalogPreferenceNavigator.ensureFocusRing`
+  attaches one `RecyclerView.OnChildAttachStateChangeListener` per fragment (survives every
+  `rebuild()`'s `setPreferenceScreen`, so nested screens need no re-attachment) that makes every
+  row a real focus target and gives it `catalog_row_focus_ring` — the same 3dp width and 10dp
+  corner radius as `selectionFrame`, at the same accent hex as `DesignTokens.kt`'s
+  `ChromeColors.LightPrimary`/`DarkPrimary` — as its `foreground`, so it draws over the row's own
+  icon/switch/ripple rather than replacing them. This surface's existing always-on toolbar Up
+  arrow (`SettingsActivity`, wired to the same `pop()` every renderer's B/Back already calls) is
+  its equivalent of the shell's hint row: the shell draws one because its dark chrome has no
+  toolbar at all, and this surface already has a real, always-correct one.
 - **Search across settings, on the settings home, by pad and by touch.** `SettingsSearchIndex`
   (`:runtime-common`) builds a flat index ONCE per search session (`build`, suspend, IO-bound —
   the same real cost as opening every top-level settings screen once) by walking the root's own
@@ -7693,8 +7721,30 @@ running on the console and asked for the visual pass on top of it. Decided and b
   mechanism beside them — and opens a full-screen `SettingsSearchOverlay` (a text field plus
   matching rows, each showing which screen it lives on); picking a result pushes that screen
   onto the settings home's own navigation stack, so B from it returns to Settings same as
-  opening the row by hand would have. Not yet built on the touch/Preference surface, which has
-  no search entry point of its own yet — left open with the icon work above.
+  opening the row by hand would have. **Built on the touch/Preference surface (H4
+  shared-row-language pass, agent settingsh4, 2026-09-26):** `CatalogPreferenceNavigator.
+  openSearch` builds the same `SettingsSearchIndex` over a synthetic root wrapping whatever
+  `rootGroups` that fragment already renders, in a plain `AlertDialog` (an `EditText` plus a
+  `RecyclerView`, filtered per keystroke the same way the Gaming overlay is) opened from a
+  "Search settings" preference prepended to the settings home the same way the shell prepends
+  its own search row; picking a result pushes the same one-level target the Gaming shell would.
+  Wired into Global, Desktop and Gaming's Preference fragments (`SettingsGlobalFragment`/
+  `SettingsDesktopFragment`/`SettingsGamingFragment`, `enableSearch = true`).
+
+  **Fixed alongside it, in both renderers (rig, `p1-rig-settings-search-no-focus.md`): a picked
+  result did not scroll to or focus the row it found.** The Gaming shell's `onPick` pushed the
+  target screen (or did nothing at all when the result was already on the CURRENT screen) but
+  never touched `selectionByDepth`, so the list landed wherever it already was — back on "Search
+  settings" itself for a same-screen result, or row 0 of a freshly pushed screen. `CatalogNavigator`
+  now carries a `pendingFocusId` set on pick and consumed by a `LaunchedEffect(rows, pendingFocusId)`
+  once the rows that should contain it are the ones actually built — immediately for a same-screen
+  result, or once a just-pushed screen's `groups()` finishes loading — calling the navigator's own
+  `setSelected`, which the existing `keepInView` scroll-follow effect already picks up. The
+  Preference surface never had ANY result-focus behaviour to fix (search did not exist there
+  yet); its new `navigateToResult`/`focusOn` scroll to the matching preference by key
+  (`PreferenceGroup.PreferencePositionCallback.getPreferenceAdapterPosition`) and request real
+  View focus on it once the target screen's `PreferenceScreen` is set, the same "immediately, or
+  after the screen finishes building" split.
 
 **Copy is part of the system.** Sentence case, one dash convention (a spaced em dash, never
 `--`), one name per concept, verb labels on buttons, no developer notation and no backend error

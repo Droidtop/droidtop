@@ -32,6 +32,9 @@ public final class SettingsGlobalFragment : AbstractSettingsFragment() {
         val nav = CatalogPreferenceNavigator(
             fragment = this,
             rootGroups = { ctx -> SettingsScreenRegistry.get("global_settings")?.groups?.invoke(ctx).orEmpty() },
+            enableSearch = true,
+            rootScreenId = "global_settings",
+            rootTitle = getString(R.string.pref_global_settings_title),
         )
         navigator = nav
         nav.rebuild()

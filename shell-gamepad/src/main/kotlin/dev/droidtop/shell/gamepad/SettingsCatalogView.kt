@@ -148,6 +148,14 @@ fun CatalogNavigator(
     var searchOpen by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var searchIndex by remember { mutableStateOf<List<SettingsSearchResult>>(emptyList()) }
+    // A search result's row id (docs/SPEC.md 7k, "picking a search result
+    // scrolls its screen ... and gives it initial focus"): set on pick,
+    // and consumed once the CURRENT screen's rows actually contain it --
+    // immediately for a result on the screen already showing, and once a
+    // freshly pushed screen's groups() finish loading for one that isn't
+    // (rig, dq-settingsui-02: a picked result landed on the right screen
+    // with focus back at "Search settings" instead of on the row found).
+    var pendingFocusId by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     val screen = stack.last()
@@ -316,12 +324,16 @@ fun CatalogNavigator(
             onPick = { result ->
                 searchOpen = false
                 searchQuery = ""
+                pendingFocusId = result.itemId
                 if (result.target != screen) {
                     scrollByDepth[stack.lastIndex] = listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
                     stack.add(result.target)
                     selectionByDepth[stack.lastIndex] = 0
                     refresh()
                 }
+                // else: same screen, already showing -- the effect below
+                // moves the selection there once this recomposes past the
+                // search overlay's early return.
             },
             onClose = { searchOpen = false; searchQuery = "" },
         )
@@ -364,6 +376,20 @@ fun CatalogNavigator(
 
     infoRow?.let { item ->
         CatalogInfoSheet(item = item, status = statusById[item.id], onDismiss = { infoRow = null })
+    }
+
+    // Resolves pendingFocusId (search-result focus, above) once the rows
+    // that should contain it are the ones actually built: for the screen
+    // search was opened FROM, that is immediately (rows already reflect
+    // it); for a screen search just pushed, only once its own groups()
+    // finish loading replace the placeholder empty list.
+    LaunchedEffect(rows, pendingFocusId) {
+        val id = pendingFocusId ?: return@LaunchedEffect
+        val index = rows.indexOfFirst { it.item.id == id }
+        if (index >= 0) {
+            setSelected(index)
+            pendingFocusId = null
+        }
     }
 
     val listFocus = remember { FocusRequester() }

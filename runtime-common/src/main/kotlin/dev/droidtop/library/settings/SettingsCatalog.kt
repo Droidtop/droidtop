@@ -38,15 +38,13 @@ import android.net.Uri
  * every value column.
  *
  * Wired into the Gaming shell's own row (`MenuRow`/`CatalogIconGlyphs.kt`
- * in `:shell-gamepad`, settings polish pass 2026-09-25), which is where
- * the owner's "significant improvements to polish and layout" direction
- * was raised against. The Preference/touch surface (`:shell-default`,
- * `CatalogPreferenceBuilder`) still renders every row with
- * `isIconSpaceReserved = false` and no icon -- real vendored Murine/
- * launcher3 drawables exist for some of these concepts but were not
- * verified to look right at settings-row size without a working build+
- * screenshot loop, so that parity is left as a follow-up rather than
- * shipped unverified.
+ * in `:shell-gamepad`, settings polish pass 2026-09-25) and, since the H4
+ * shared-row-language pass, into the Preference/touch surface too
+ * (`:shell-default`, `CatalogPreferenceBuilder.applyCatalogIcon`,
+ * `CatalogIconDrawables.kt`): the same Material Symbols Outlined choice
+ * per icon on both surfaces, fetched as real Android `<vector>` resources
+ * (`google/material-design-icons`, Apache-2.0) rather than a second
+ * Compose dependency added to this forked launcher3 tree.
  */
 enum class CatalogIcon {
     GLOBAL, MODES, DATA, HOME_ROLE,

@@ -73,4 +73,6 @@
     <color name="all_apps_search_bg_color">#14FFFFFF</color>
     <color name="all_apps_search_border_color">#22FFFFFF</color>
     <color name="all_apps_tabs_bg_color">#19FFFFFF</color>
+    <!-- See values/colors.xml: mirrors ChromeColors.DarkPrimary. -->
+    <color name="catalog_focus_ring">#FF8AB4FF</color>
 </resources>
