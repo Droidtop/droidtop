@@ -33,6 +33,7 @@ data class PluginRecord(
         put("requestsRoot", manifest.requestsRoot)
         put("abis", JSONArray(manifest.abis.toList()))
         put("entryClass", manifest.entryClass ?: JSONObject.NULL)
+        put("runtimeVersion", manifest.runtimeVersion ?: JSONObject.NULL)
         put("boundServiceTargets", JSONArray(manifest.boundServiceTargets.toList()))
         put(
             "payload",
@@ -94,6 +95,7 @@ data class PluginRecord(
                 requestsRoot = json.optBoolean("requestsRoot"),
                 abis = buildSet { for (i in 0 until abisJson.length()) add(abisJson.optString(i)) },
                 entryClass = optNullableString(json, "entryClass"),
+                runtimeVersion = optNullableString(json, "runtimeVersion"),
                 payload = payload,
                 boundServiceTargets = boundServiceTargets,
             )

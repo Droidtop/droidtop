@@ -8888,16 +8888,12 @@ one runner per kind:
     a catalog-repo install source for the runtime itself (today's pinned
     single version in `python-runtimes.json` is hand-updated, matching
     how plugin bundles themselves are installed today).
-- **`flutter_embed`** — documented, not built, added 2026-09-25 for a
+- **`flutter_embed`** — **built 2026-09-26**, added 2026-09-25 for a
   real forthcoming case: an existing Flutter/Dart app the owner wants to
-  turn into a plugin rather than rewrite natively (romgi). Same treatment as
-  `python`: validates, refused at activation. **Build order decided 2026-09-26
-  (owner delegated): after both the core plugin host's own rig check
-  (`dq-plugins-01`) is green and the `python` kind lands** -- one shared
-  Flutter engine instance is meant to serve every `flutter_embed` plugin, and
-  sequencing it behind a verified host and a second working runner (not just
-  the first, `native_bundle`) is cheaper than discovering a host-level bug
-  while also bringing up a brand-new embedding.
+  turn into a plugin rather than rewrite natively (romgi). Its own
+  paragraphs below ("The `flutter_embed` kind") have the full design and
+  feasibility citation trail; **not rig-verified yet** (queued,
+  `dq-flutterembed-01`).
 
 **The API surface** (`PluginCapability`, a closed set — the trust shape
 differs per capability, same reasoning §12's `IntegrationCapability`
@@ -9045,10 +9041,15 @@ the disable path. Both samples' unsigned payloads are built by CI
 `.github/workflows/android-build.yml`); signing either into an
 installable `.droidplugin.tar.xz` still needs droidtop-dev's private key
 (`sign.sh` in each sample's own folder) and is not something CI ever
-does. Open: the `flutter_embed` runner; a catalog-repo install source for
-plugins; `startJob` support for python-kind plugins; and the rig check
-for the python leg specifically (queued, `device/QUEUE.md`) — the
-`native_bundle` leg's own rig check (`dq-plugins-01`) already passed.
+does. The `flutter_embed` runner (`FlutterRuntimeManager`,
+`FlutterDroidtopPlugin`, above) and its own sample
+(`samples/plugin-sample-flutter-statustile`) are built the same way but
+not yet rig-verified (queued, `dq-flutterembed-01` — see "The
+`flutter_embed` kind" below). Open: a catalog-repo install source for
+plugins; `startJob` support for python-kind and flutter_embed-kind
+plugins; and the rig check for the python leg specifically (queued,
+`device/QUEUE.md`) — the `native_bundle` leg's own rig check
+(`dq-plugins-01`) already passed.
 
 **A python-kind plugin could never actually run (found and fixed
 2026-09-26).** The Plugins settings row and the "Download Python runtime"
@@ -9100,3 +9101,141 @@ repeated calls stayed stable, no crash), and "Debug: force ... to crash"
 still disables the plugin the same as before — droidtop's main process
 was unaffected throughout, confirming crash containment was never the
 problem, the bridge's own thread-safety was.
+
+**The `flutter_embed` kind (built 2026-09-26).** Built by agent
+`flutterkind` on top of the `python` kind and the already-passed
+`native_bundle` rig check, per the build-order decision above. Feasibility
+was checked against real Flutter engine source and real, live artifact
+URLs before any code was written — not assumed:
+
+1. **`libflutter.so` from outside the APK.** `FlutterJNI.loadLibrary(Context)`
+   is the ONLY place the engine loads its own native library, and it is a
+   plain, non-final, public method (`ReLinker.loadLibrary(context,
+   "flutter")`, i.e. `System.loadLibrary("flutter")` under the hood — which
+   only ever searches this process's own installed native library
+   directory, confirmed against `flutter/engine`'s own `FlutterJNI.java`
+   and `ReLinker`'s `SystemLibraryLoader.java`). `FlutterJNI` is
+   subclassable and `FlutterLoader` has a public
+   `FlutterLoader(FlutterJNI)` constructor that takes an injected
+   instance — both confirmed via `javap` against the real, pinned
+   `flutter_embedding_release` jar (below), not guessed from docs.
+   `FlutterDroidtopPlugin.DownloadedFlutterJNI` overrides just that one
+   method to `System.load()` the absolute path `FlutterRuntimeManager`
+   downloaded, and `FlutterEngine`'s
+   `(Context, FlutterLoader, FlutterJNI, String[], boolean)` constructor
+   takes that custom loader directly — no `FlutterInjector` singleton, no
+   reflection, no hidden API.
+2. **`libapp.so` (the plugin's own AOT snapshot) from outside the APK.**
+   `FlutterLoader`'s own source adds `--aot-shared-library-name` TWICE —
+   once as a bare name, once as `nativeLibraryDir + File.separator +
+   aotSharedLibraryName`, with the comment "provide a fully qualified path
+   ... as a workaround for devices where [the bare name] fails" — and
+   caller-supplied `dartVmArgs` (from `FlutterEngine`'s constructor) are
+   appended LAST, after both of those, so "last occurrence wins" for a
+   repeated flag lets `FlutterDroidtopPlugin` pass its own
+   `--aot-shared-library-name=<plugin's own installDir>/lib/<abi>/libapp.so`
+   and have it win. Both of these are confirmed straight from
+   `FlutterLoader.java`'s real source, not inferred.
+3. **The engine binary itself is real and downloadable.** Two Google-owned
+   CDN buckets are involved, confirmed live on 2026-09-26 by actually
+   downloading from both at the exact pinned version
+   (`af7e796e161ae0bb1ff0758c71a7105418bd9ded`, the current stable-channel
+   engine as of that date):
+   - `storage.googleapis.com/flutter_infra_release/flutter/<version>/android-<arch>-release/artifacts.zip`
+     — the same bucket `flutter precache` itself downloads from — contains
+     one file, `flutter.jar` (an Android native-library jar, not a
+     dex/class jar), holding `lib/<abi>/libflutter.so`. This is what
+     `FlutterRuntimeManager` downloads at runtime, verified against
+     `plugin-host/src/main/assets/flutter-runtimes.json`'s pinned sha256
+     for each ABI.
+   - `storage.googleapis.com/download.flutter.io` — the Maven repo
+     Flutter's own Gradle plugin (`FlutterPlugin.kt`) adds for
+     `io.flutter:flutter_embedding_release:1.0.0-<version>`, the Java-only
+     embedding classes (`FlutterEngine`/`FlutterJNI`/`FlutterLoader`/
+     `MethodChannel`/...). This is a normal COMPILE-TIME
+     `plugin-host/build.gradle.kts` dependency — a few hundred KB of plain
+     JVM bytecode with no Dart/native engine code in it, the same
+     "small glue code ships in the base APK" call already made for
+     `PythonBridge`'s native glue. What must never be bundled, and isn't,
+     is the actual Dart/Skia/Impeller engine binary (`libflutter.so`,
+     tens of MB per ABI) — that stays a `FlutterRuntimeManager` download,
+     same as CPython's `libpython3.14.so` is for the `python` kind.
+   Unlike python.org's own release archives (kept indefinitely, per
+   `PythonRuntimeManager`'s header), this is one upstream's storage
+   retention behaviour, not a published guarantee — a GCS bucket listing
+   query against a handful of engine hashes going back to 2022 all still
+   returned real files on 2026-09-26, but if a future pinned version's
+   artifact ever disappears, the fix is re-hosting that exact version's
+   bytes under a droidtop-controlled URL with the SAME pinned hash, never
+   silently drifting to a newer, unverified one.
+4. **Licence.** The Flutter engine and its Android embedding are
+   BSD-3-Clause (`flutter/flutter`'s own `LICENSE`); redistributing the
+   downloaded binary and depending on the Java classes at build time both
+   carry only the standard BSD attribution requirement, satisfied via
+   `NOTICE.md`.
+
+**One thing this build could NOT confirm the same way: `flutter_assets`
+loaded from outside the APK.** Everything above resolves entirely through
+public, non-final Flutter classes. Assets are different: the engine reads
+`flutter_assets/` (the kernel blob, the AOT's own data, fonts, images)
+through Android's real `AssetManager`, which only ever reads zip-shaped
+sources — APK assets, or another zip/apk added via
+`AssetManager.addAssetPath(String)`. That method is public through API 28
+and reflective-only since (a long-standing technique real Android
+plugin-hosting frameworks still use, not invented here).
+`FlutterDroidtopPlugin.loadAssetsIntoEngine` repacks the plugin's own
+extracted `flutter_assets/` tree into a small zip and calls
+`addAssetPath` on it reflectively — written, but NOT rig-verified, and is
+exactly what `dq-flutterembed-01` needs to check first. If a real device's
+hidden-API enforcement refuses that reflective call, the documented
+fallback (not built) is repackaging `flutter_assets` as a tiny per-plugin
+Android split/APK Android's real asset-loading path recognizes on its
+own, at the cost of a second signed artifact per plugin instead of a bare
+directory.
+
+**What's built.** `FlutterRuntimeManager` (download/verify/extract
+`libflutter.so`, mirroring `PythonRuntimeManager`'s shape exactly —
+`plugin-host/src/main/assets/flutter-runtimes.json` pins the exact engine
+version and per-ABI sha256), `FlutterDroidtopPlugin` (the `DroidtopPlugin`
+adapter: constructs the engine, bridges `invoke` over one `MethodChannel`
+per plugin at `dev.droidtop.pluginhost/<pluginId>`, same JSON-in/JSON-out
+shape `PythonDroidtopPlugin` already uses), and `PluginRuntimeService`'s
+dispatch for `PluginKind.FLUTTER_EMBED`. `PluginManifest.runtimeVersion`
+is new: a flutter_embed manifest must declare the EXACT engine version its
+`libapp.so` was built against (a Dart AOT snapshot's format is tied to the
+exact engine build, not a version range — confirmed against real Flutter
+tooling's own "Snapshot not compatible with the current VM configuration"
+failure mode), checked byte-for-byte against
+`FlutterRuntimeManager.pinnedVersion()` before activation; a mismatch
+disables the plugin with that reason rather than failing deep inside
+native engine init. Settings → Plugins gets the same "separate, explicit
+download" row shape the Python runtime already has
+(`AppSettingsCatalogs.kt`). Sample:
+`samples/plugin-sample-flutter-statustile`, a minimal Dart app (one
+`status_tile` handler) built by a pinned Flutter SDK in CI
+(`sample-plugin-flutter` job) and signed the same way every other sample
+is (`sign.sh`, droidtop-dev's key only).
+
+**Not built:** `startJob` for flutter_embed (same "not supported until a
+real plugin needs it" default every other kind starts with); the
+`flutter_assets`-outside-the-APK technique's rig verification (above); a
+shared single `FlutterEngine`/runtime-download UX across multiple
+flutter_embed plugins beyond the one shared `libflutter.so` download
+already in place (each plugin still gets its own `FlutterEngine`
+instance — the owner's "one shared engine" framing was about not paying
+the runtime-download cost twice, which this satisfies; a literally shared
+*instance* running two plugins' Dart code in one isolate group is a
+different, larger feature this build didn't attempt).
+
+**For the private romgi plugin plan:** the recommended route A (embed a
+Flutter engine, reuse romgi's real Dart code) is now backed by a real,
+buildable runner rather than a hypothesis — the fallback route B (Kotlin
+port) in that repo's `PLUGIN-PLAN.md` is no longer the only sequencing
+option. What romgi's own plan still needs to work out, unaffected by this
+build: how its own `acquire_content`-shaped calls map onto the plugin's
+Dart `main()` and its MethodChannel handler for `"invoke"` (this build's
+sample only exercises `status_tile`, the simplest capability), and
+whether romgi's own Dart dependencies (image/network libraries with their
+OWN native code) fit inside a single `FlutterEngine`'s asset/native-lib
+model the same way this sample's trivial UI-less Dart does — untested
+here.

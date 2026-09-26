@@ -38,15 +38,24 @@ enum class PluginKind(val id: String) {
 
     /**
      * An embedded Flutter/Dart engine, hosted the same crash-contained
-     * way a native bundle is (its own :pluginhost-process runner, once
-     * built) rather than as a separate app. Documented as an open
-     * extension point, not built: one real plugin candidate is an
+     * way a native bundle is: its own :pluginhost-process runner
+     * ([FlutterDroidtopPlugin]), driving a real `FlutterEngine` bridged
+     * to droidtop over one `MethodChannel` per plugin. **Built
+     * 2026-09-26** (docs/SPEC.md 12a has the full feasibility citation
+     * trail) for the real candidate that motivated it: romgi, an
      * existing Flutter app the owner wants to turn into a plugin rather
-     * than rewrite (2026-09-25), and the [PluginKind]/[PluginRunner]
-     * split exists precisely so that becomes "add a case and a runner"
-     * later, not a redesign. A manifest declaring this kind validates
-     * like any other and is refused activation with a clear reason,
-     * same as [PYTHON].
+     * than rewrite (2026-09-25).
+     *
+     * [FlutterRuntimeManager] downloads the shared Flutter engine binary
+     * (`libflutter.so`, per ABI) the same "official upstream artifact,
+     * hash-verified, never bundled" way [PythonRuntimeManager] downloads
+     * CPython -- one shared runtime download serves every flutter_embed
+     * plugin on the device, matching the owner's "one shared engine
+     * instance" plan. Each plugin still gets its OWN `FlutterEngine`
+     * instance and its own AOT snapshot (`libapp.so`) in its own signed
+     * payload, pinned to the exact engine version it was built against
+     * ([PluginManifest.runtimeVersion]) -- a Dart AOT snapshot's format
+     * is tied to the exact engine build, not a version range.
      */
     FLUTTER_EMBED("flutter_embed"),
     ;

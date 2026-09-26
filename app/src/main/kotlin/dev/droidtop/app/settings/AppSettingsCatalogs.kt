@@ -30,6 +30,7 @@ import dev.droidtop.pluginhost.PluginTrustState
 import dev.droidtop.pluginhost.PluginCapability
 import dev.droidtop.pluginhost.PluginCrashPolicy
 import dev.droidtop.pluginhost.PythonRuntimeManager
+import dev.droidtop.pluginhost.FlutterRuntimeManager
 import dev.droidtop.library.consoles.resolvePlayer
 import dev.droidtop.library.scraper.ScraperPrefs
 import dev.droidtop.library.scraper.ScraperSource
@@ -1266,6 +1267,9 @@ object AppSettingsCatalogs {
                                 if (m.kind == PluginKind.PYTHON && !PythonRuntimeManager.isInstalled(context)) {
                                     append(" - needs the Python runtime, not downloaded yet (see below)")
                                 }
+                                if (m.kind == PluginKind.FLUTTER_EMBED && !FlutterRuntimeManager.isInstalled(context)) {
+                                    append(" - needs the Flutter runtime, not downloaded yet (see below)")
+                                }
                             }
                             add(ActionItem(id = "plugin_${m.id}_info", title = m.label, subtitle = statusLine, run = {}))
                             when (record.trust) {
@@ -1436,6 +1440,62 @@ object AppSettingsCatalogs {
                                             onStatus(text)
                                         }
                                         error ?: "Python runtime installed"
+                                    },
+                                ),
+                            )
+                        }
+                        // Same "separate, explicit download" treatment as the
+                        // python runtime above, for flutter_embed
+                        // (docs/SPEC.md 12a): never triggered implicitly
+                        // by loading a plugin.
+                        val flutterInstalled = FlutterRuntimeManager.isInstalled(context)
+                        val flutterVersion = FlutterRuntimeManager.pinnedVersion(context)
+                        add(
+                            ActionItem(
+                                id = "plugins_flutter_runtime_status",
+                                title = "Flutter runtime",
+                                subtitle = if (flutterInstalled) {
+                                    "Installed: Flutter engine $flutterVersion (${FlutterRuntimeManager.currentAbi()}), official Flutter engine build"
+                                } else {
+                                    "Not installed -- needed by any flutter_embed-kind plugin. Flutter engine $flutterVersion (${FlutterRuntimeManager.currentAbi()}), ~40 MB, downloaded from Flutter's own release CDN and SHA-256 verified"
+                                },
+                                run = {},
+                            ),
+                        )
+                        if (flutterInstalled) {
+                            add(
+                                ActionItem(
+                                    id = "plugins_flutter_runtime_remove",
+                                    title = "Remove Flutter runtime",
+                                    subtitle = "Any installed flutter_embed-kind plugin stops working until it's downloaded again",
+                                    confirmTitle = "Remove the downloaded Flutter runtime?",
+                                    run = { ctx -> FlutterRuntimeManager.remove(ctx) },
+                                ),
+                            )
+                        } else {
+                            add(
+                                AsyncActionItem(
+                                    id = "plugins_flutter_runtime_download",
+                                    title = "Download Flutter runtime",
+                                    subtitle = "Fetches the official Flutter engine build for this device's ABI and verifies it before use",
+                                    run = { ctx, onStatus ->
+                                        val error = FlutterRuntimeManager.ensureInstalled(ctx) { progress ->
+                                            val text = when (progress) {
+                                                is FlutterRuntimeManager.Progress.Downloading -> {
+                                                    if (progress.totalBytes > 0) {
+                                                        val pct = (progress.bytesRead * 100 / progress.totalBytes).toInt()
+                                                        "Downloading... $pct% (${progress.bytesRead / 1024 / 1024} MB / ${progress.totalBytes / 1024 / 1024} MB)"
+                                                    } else {
+                                                        "Downloading... ${progress.bytesRead / 1024 / 1024} MB"
+                                                    }
+                                                }
+                                                FlutterRuntimeManager.Progress.Verifying -> "Verifying SHA-256..."
+                                                FlutterRuntimeManager.Progress.Extracting -> "Extracting..."
+                                                FlutterRuntimeManager.Progress.Done -> "Done"
+                                            }
+                                            onStatus(text)
+                                        }
+                                        error ?: "Flutter runtime installed"
                                     },
                                 ),
                             )

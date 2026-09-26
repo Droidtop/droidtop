@@ -18,6 +18,7 @@ class PluginManifestTest {
         abis: List<String> = listOf("arm64-v8a", "x86_64"),
         payload: List<Pair<String, String>> = listOf("classes.jar" to "a".repeat(64)),
         entryClass: String? = "dev.droidtop.samples.statustile.StatusTilePlugin",
+        runtimeVersion: String? = null,
     ): JSONObject = JSONObject().apply {
         put("id", id)
         put("origin", origin)
@@ -35,6 +36,7 @@ class PluginManifestTest {
         put("contractVersion", contractVersion)
         put("abis", JSONArray(abis))
         put("entryClass", entryClass ?: JSONObject.NULL)
+        put("runtimeVersion", runtimeVersion ?: JSONObject.NULL)
         put(
             "payload",
             JSONArray(payload.map { (path, sha) -> JSONObject().put("path", path).put("sha256", sha) }),
@@ -122,6 +124,60 @@ class PluginManifestTest {
         )
         val manifest = PluginManifest.fromJson(json)!!
         assertEquals(PluginKind.PYTHON, manifest.kind)
+        assertTrue(manifest.structuralProblems().isEmpty())
+    }
+
+    @Test
+    fun `flags a flutter_embed plugin with no runtimeVersion`() {
+        val json = manifestJson(
+            id = "droidtop.sample-flutter",
+            kind = "flutter_embed",
+            abis = listOf("arm64-v8a", "x86_64"),
+            payload = listOf(
+                "lib/arm64-v8a/libapp.so" to "a".repeat(64),
+                "lib/x86_64/libapp.so" to "b".repeat(64),
+                "flutter_assets/kernel_blob.bin" to "c".repeat(64),
+            ),
+            entryClass = null,
+            runtimeVersion = null,
+        )
+        val manifest = PluginManifest.fromJson(json)!!
+        assertTrue(manifest.structuralProblems().any { it.contains("runtimeVersion") })
+    }
+
+    @Test
+    fun `flags a flutter_embed plugin with no flutter_assets`() {
+        val json = manifestJson(
+            id = "droidtop.sample-flutter",
+            kind = "flutter_embed",
+            abis = listOf("arm64-v8a", "x86_64"),
+            payload = listOf(
+                "lib/arm64-v8a/libapp.so" to "a".repeat(64),
+                "lib/x86_64/libapp.so" to "b".repeat(64),
+            ),
+            entryClass = null,
+            runtimeVersion = "af7e796e161ae0bb1ff0758c71a7105418bd9ded",
+        )
+        val manifest = PluginManifest.fromJson(json)!!
+        assertTrue(manifest.structuralProblems().any { it.contains("flutter_assets") })
+    }
+
+    @Test
+    fun `accepts a complete flutter_embed plugin`() {
+        val json = manifestJson(
+            id = "droidtop.sample-flutter",
+            kind = "flutter_embed",
+            abis = listOf("arm64-v8a", "x86_64"),
+            payload = listOf(
+                "lib/arm64-v8a/libapp.so" to "a".repeat(64),
+                "lib/x86_64/libapp.so" to "b".repeat(64),
+                "flutter_assets/kernel_blob.bin" to "c".repeat(64),
+            ),
+            entryClass = null,
+            runtimeVersion = "af7e796e161ae0bb1ff0758c71a7105418bd9ded",
+        )
+        val manifest = PluginManifest.fromJson(json)!!
+        assertEquals(PluginKind.FLUTTER_EMBED, manifest.kind)
         assertTrue(manifest.structuralProblems().isEmpty())
     }
 }

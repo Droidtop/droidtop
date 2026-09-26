@@ -52,6 +52,21 @@ data class PluginManifest(
      * [PluginKind.FLUTTER_EMBED], which has no runner yet.
      */
     val entryClass: String?,
+    /**
+     * [PluginKind.FLUTTER_EMBED] only: the exact pinned Flutter engine
+     * version (the git hash [FlutterRuntimeManager] downloads
+     * `libflutter.so` for, e.g. "af7e796e161ae0bb1ff0758c71a7105418bd9ded")
+     * this plugin's `libapp.so` AOT snapshot was built against. A Dart
+     * AOT snapshot's format is tied to the exact engine build that
+     * produced it, not a semantic-version range (confirmed against real
+     * Flutter tooling errors -- "Snapshot not compatible with the
+     * current VM configuration" -- docs/SPEC.md 12a's flutter_embed
+     * section), so this is checked byte-for-byte against
+     * [FlutterRuntimeManager.pinnedVersion] before activation, the same
+     * "runtime version pinned per plugin" requirement the owner's plan
+     * called for. Unused (null) for every other kind.
+     */
+    val runtimeVersion: String? = null,
     val payload: List<PluginPayloadFile>,
     /**
      * Package names this plugin may hold a LIVE bound-service/binder
@@ -132,6 +147,7 @@ data class PluginManifest(
                 requestsRoot = json.optBoolean("requestsRoot", false),
                 abis = abis,
                 entryClass = optNullableString(json, "entryClass"),
+                runtimeVersion = optNullableString(json, "runtimeVersion"),
                 payload = payload,
                 boundServiceTargets = boundServiceTargets,
             )
@@ -155,6 +171,17 @@ data class PluginManifest(
         }
         if (kind == PluginKind.PYTHON && payload.none { it.path == "plugin.py" }) {
             add("a python plugin must ship plugin.py at its payload root")
+        }
+        if (kind == PluginKind.FLUTTER_EMBED) {
+            if (runtimeVersion.isNullOrBlank()) {
+                add("a flutter_embed plugin must declare runtimeVersion (the exact pinned Flutter engine version its libapp.so was built against)")
+            }
+            if (payload.none { it.path.startsWith("lib/") && it.path.endsWith("/libapp.so") }) {
+                add("a flutter_embed plugin must ship lib/<abi>/libapp.so")
+            }
+            if (payload.none { it.path.startsWith("flutter_assets/") }) {
+                add("a flutter_embed plugin must ship its flutter_assets/ tree")
+            }
         }
         val hasNativeLibs = payload.any { it.path.startsWith("lib/") && it.path.endsWith(".so") }
         if (hasNativeLibs && !abis.containsAll(REQUIRED_ABIS)) {
