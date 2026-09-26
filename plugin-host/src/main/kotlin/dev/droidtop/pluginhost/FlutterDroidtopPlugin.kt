@@ -6,6 +6,7 @@ import io.flutter.embedding.engine.FlutterJNI
 import io.flutter.embedding.engine.dart.DartExecutor
 import io.flutter.embedding.engine.loader.FlutterLoader
 import io.flutter.plugin.common.BinaryMessenger
+import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -170,7 +171,7 @@ class FlutterDroidtopPlugin(
      * mistaken "invoke", which only ever flows host-to-plugin) is
      * [MethodChannel.Result.notImplemented].
      */
-    private fun handleIncomingCall(call: MethodChannel.MethodCall, result: MethodChannel.Result) {
+    private fun handleIncomingCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "jobProgress" -> {
                 val obj = JSONObject(call.arguments as String)
