@@ -23,6 +23,14 @@ void main() {
   // capability calls.
   WidgetsFlutterBinding.ensureInitialized();
   _channel.setMethodCallHandler(_handleCall);
+  // The flutter_embed readiness handshake (docs/SPEC.md 12a, required of
+  // every flutter_embed plugin, not just this sample): FlutterDroidtopPlugin's
+  // onLoad() blocks waiting for exactly this call before returning, because
+  // executeDartEntrypoint() starting this isolate is not the same moment as
+  // this line actually running -- a call posted right after onLoad used to
+  // race this isolate's own startup and fail with a channel-not-yet-registered
+  // PlatformException. No sleep, no polling: this is the signal.
+  _channel.invokeMethod('ready');
 }
 
 Future<String> _handleCall(MethodCall call) async {

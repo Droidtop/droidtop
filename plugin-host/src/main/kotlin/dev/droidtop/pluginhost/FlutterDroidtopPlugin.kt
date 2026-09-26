@@ -81,6 +81,27 @@ class FlutterDroidtopPlugin(
     // job outlives the single invokeMethod call that started it.
     private val activeJobs = ConcurrentHashMap<String, PluginJobProgress>()
 
+    // The readiness handshake (found needed on the rig, 2026-09-26): a
+    // Dart plugin's own `main()` calling `setMethodCallHandler` is not
+    // synchronous with `executeDartEntrypoint` returning below --
+    // `executeDartEntrypoint` only starts the isolate, it does not wait
+    // for that isolate's own main() body to run. The very first real
+    // `invoke()` call posted right after onLoad returned used to race
+    // Dart's own startup and fail with a channel-not-yet-registered
+    // PlatformException ("channel-error, Unable to establish
+    // connection") -- confirmed on BlueStacks against a real
+    // flutter_embed plugin, the acquire_content UI's own first real
+    // caller. Every flutter_embed plugin's own Dart entrypoint MUST call
+    // `_channel.invokeMethod("ready")` as the very first thing it does
+    // after `setMethodCallHandler` (see samples/plugin-sample-flutter-
+    // statustile's own main.dart) -- this is now part of the
+    // flutter_embed contract, documented in docs/SPEC.md 12a. No sleep,
+    // no polling: [onLoad] blocks the CALLING thread (never the main
+    // thread, which must stay free to deliver that very "ready" call)
+    // on this latch until it counts down or [PluginRunner.CALL_TIMEOUT_MS]
+    // elapses.
+    private var readyLatch: CountDownLatch? = null
+
     override fun onLoad(context: PluginContext) {
         val libapp = File(installDir, "lib/${FlutterRuntimeManager.currentAbi()}/libapp.so")
         if (!libapp.isFile) {
@@ -133,8 +154,27 @@ class FlutterDroidtopPlugin(
             // createDefault() would have used, so calling it directly and
             // building the DartEntrypoint by hand skips the singleton
             // entirely.
+            val latch = CountDownLatch(1)
+            readyLatch = latch
             val entrypoint = DartExecutor.DartEntrypoint(flutterLoader.findAppBundlePath(), "main")
             newEngine.dartExecutor.executeDartEntrypoint(entrypoint)
+        }
+
+        // Deliberately OUTSIDE runOnMainThreadBlocking's own post: that
+        // block already returned (executeDartEntrypoint only starts the
+        // isolate), and the "ready" call Dart sends back arrives as an
+        // ordinary MethodChannel message on the main Looper -- waiting
+        // for it FROM the main thread would deadlock the very thread
+        // that has to deliver it. This await happens on onLoad's own
+        // calling thread (a binder thread inside :pluginhost), which is
+        // exactly what leaves the main thread free.
+        val latch = readyLatch
+        if (latch != null && !latch.await(PluginRunner.CALL_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+            throw IllegalStateException(
+                "plugin's Dart entrypoint never signaled ready -- " +
+                    "every flutter_embed plugin must call _channel.invokeMethod('ready') " +
+                    "right after setMethodCallHandler (docs/SPEC.md 12a)",
+            )
         }
     }
 
@@ -230,6 +270,13 @@ class FlutterDroidtopPlugin(
      */
     private fun handleIncomingCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
+            "ready" -> {
+                // The readiness handshake's other half -- see [readyLatch]'s
+                // own doc comment. Counting down more than once (a plugin
+                // that calls this twice) is harmless; CountDownLatch ignores it.
+                readyLatch?.countDown()
+                result.success(null)
+            }
             "jobProgress" -> {
                 val obj = JSONObject(call.arguments as String)
                 val jobId = obj.optString("jobId")

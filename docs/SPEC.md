@@ -676,6 +676,40 @@ sources rather than assumed from Nova/Apex's feature lists:
 | Global settings, Desktop settings rendered in the shell's own row component, pad-navigable | HAVE (fixed 2026-09-24/25, UI pass H4) | `DroidtopWideSettings.kt`, `SettingsGlobalFragment.kt`'s `CatalogPreferenceNavigator` |
 | Icon-pack/drawer/hidden-apps settings pages left as stock Android preference UI | HAVE, and correct: H4's own fix text scopes the shell's row component to Global/Desktop only, and explicitly keeps these stock | `docs/audit-2026-09-24/ui-assessment.md` H4 |
 | Plugin contributions in the launcher (status tiles, search providers, app actions, launcher widgets from third-party engines/tools) | **not yet buildable** — plugin API is being rebuilt (agent `plugins`, §12/12a) | seam only, see below |
+| Recent/frequently-used apps row in the app drawer | **built this change** | `RecentAppsStore`, `AlphabeticalAppsList.addRecentAppItems`; see below |
+
+**A real "Recent" row in the app drawer (built this change).**
+Confirmed genuinely absent first (grepped shell-default for predicted/
+frequent -- no `PredictedAppIcon`, no `UsageStatsManager`, nothing; Nova/
+Apex both have this, stock Launcher3 does not by default). Built on
+droidtop's own launch history rather than `UsageStatsManager`: that needs
+the special "Usage access" grant (a Settings toggle, not a runtime
+permission dialog) a fresh install would not have, and this pass has no UI
+to request it. `RecentAppsStore` records a launch directly at the one
+place both workspace and drawer icon taps already funnel through
+(`ItemClickHandler.startAppShortcutOrInfoActivity`) -- the same
+"droidtop tracks its own history" shape `RoomPlayHistoryStore` already
+uses for games, just SharedPreferences-simple since this is component
+names. `AlphabeticalAppsList.addRecentAppItems` prepends a "Recent"
+header + up to 5 matched `AppInfo` rows + a divider before the
+alphabetical list (same shape as the work-profile items already prepended
+there), matched against apps already in `mApps` so a hidden, filtered, or
+since-uninstalled component is silently excluded.
+
+A first version only recorded launches but never re-derived the row on
+reopen -- `AlphabeticalAppsList`'s cached adapter items only rebuild from
+a real `LauncherModel` change (install/uninstall), which closing and
+reopening the drawer does not trigger, so a launch recorded after the
+drawer's last real data refresh never appeared. Rig-caught on
+emulator-5560: launched Chrome and Clock from a fresh drawer, reopened it,
+saw no row at all. Fixed by having `Launcher.onStateSetStart` call
+`ActivityAllAppsContainerView.refreshRecentApps()` (which just calls the
+already-public `updateAdapterItems()`, which already dispatches its own
+`DiffUtil` update) every time the drawer opens (`ALL_APPS` state).
+Rig-confirmed after the fix: a fresh (onboarded) install shows no row at
+all; launching Chrome then Clock and reopening the drawer shows
+"Clock, Chrome" (most-recent-leftmost); launching Calendar next moves it
+to the front ("Calendar, Clock, Chrome").
 
 **Library-aware app-drawer/QSB search (built this change).**
 `DefaultAppSearchAlgorithm.getTitleMatchResult` only ever walked installed
@@ -9586,6 +9620,43 @@ download" row shape the Python runtime already has
 `status_tile` handler) built by a pinned Flutter SDK in CI
 (`sample-plugin-flutter` job) and signed the same way every other sample
 is (`sign.sh`, droidtop-dev's key only).
+
+**The readiness handshake (found needed 2026-09-26, part of the
+flutter_embed contract).** The acquire_content UI's own first real
+`invoke()` call against a flutter_embed plugin
+reliably failed with a MethodChannel `PlatformException(channel-error,
+Unable to establish connection on channel ...)` -- `FlutterEngine.
+dartExecutor.executeDartEntrypoint()` only STARTS the plugin's Dart
+isolate; it returns before that isolate's own `main()` body has actually
+run far enough to call `setMethodCallHandler`. `FlutterDroidtopPlugin.
+onLoad()` used to return as soon as `executeDartEntrypoint` did, so the
+very next `invoke()`/`startJob()` call could be posted to the engine's
+platform thread before Dart's own handler existed at all -- a real race,
+not a timing coincidence specific to one plugin (the trivial sample's own
+rig check, `dq-flutterembed-01`, happened not to call `invoke()`
+immediately enough after load to hit it).
+
+Fixed with a no-sleep, no-polling handshake: every flutter_embed plugin's
+Dart entrypoint MUST call `_channel.invokeMethod('ready')` as the very
+first thing it does right after `setMethodCallHandler` (`samples/
+plugin-sample-flutter-statustile/lib/main.dart` does this now).
+`FlutterDroidtopPlugin.onLoad()` creates a `CountDownLatch` right before
+`executeDartEntrypoint`, registers a `"ready"` handler in its own
+`handleIncomingCall` dispatch that counts it down, and -- after
+`executeDartEntrypoint` returns -- awaits that latch (bounded by
+`PluginRunner.CALL_TIMEOUT_MS`, the same watchdog `loadPlugin`'s AIDL
+call is already covered by end to end) ON ITS OWN CALLING THREAD, never
+the main thread: the "ready" call itself arrives as an ordinary
+MethodChannel message delivered on the main Looper, so waiting for it
+FROM the main thread would deadlock the very thread that has to deliver
+it. A plugin that never signals ready fails `onLoad` with a clear
+message naming the missing call, the same "throwing is how onLoad
+reports failure" contract every other load failure already uses -- not a
+silent hang.
+
+Re-verified on BlueStacks after this fix: the acquire_content UI's search
+call against the flutter_embed plugin reached real Dart code and
+returned a real answer, with no channel-error.
 
 **Not built:** `startJob` for flutter_embed (same "not supported until a
 real plugin needs it" default every other kind starts with); the
