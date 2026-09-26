@@ -148,6 +148,10 @@ jobs:
           path: |
             app/build/outputs/apk/release/app-universal-release.apk
             app/build/outputs/apk/debug/app-universal-debug.apk
+            app/build/outputs/apk/release/app-x86_64-release.apk
+            app/build/outputs/apk/debug/app-x86_64-debug.apk
+            app/build/outputs/release-info.json
+          if-no-files-found: error
 
       - name: Upload droidtoppy native symbols
         # :plugin-host/native's own libdroidtoppy.so (docs/SPEC.md 12a's
@@ -163,10 +167,6 @@ jobs:
           name: droidtoppy-native-symbols
           path: plugin-host/.cxx/**/obj/**/libdroidtoppy.so
           if-no-files-found: warn
-            app/build/outputs/apk/release/app-x86_64-release.apk
-            app/build/outputs/apk/debug/app-x86_64-debug.apk
-            app/build/outputs/release-info.json
-          if-no-files-found: error
 
       - name: Class-load API gate (minSdk)
         # The bug lint cannot see: a framework type newer than minSdk in a
