@@ -9066,7 +9066,20 @@ logcat. `NativePluginRunner.load()` (`plugin-host`) required
 (`PluginRuntimeService.loadPlugin`'s own comment: "entryClass is simply
 unused on the python path"). Fixed by defaulting to `""` for that case
 instead of bailing out, the same "unused" placeholder the service side
-already assumed the caller would send. Verified end to end on BlueStacks
-with the signed `plugin-sample-py-statustile` bundle: download the
-Python runtime, install, approve, invoke (now succeeds), force-crash
-(droidtop survives, the plugin is disabled).
+already assumed the caller would send.
+
+Re-verified on BlueStacks with the signed `plugin-sample-py-statustile`
+bundle after this fix: the plugin now genuinely loads (no more "plugin
+failed to load", `:pluginhost` starts and logs "python runtime
+initialized") and its status tile call reaches real native code instead
+of bailing out before ever trying — but that call itself then crashes the
+`:pluginhost` process with SIGSEGV (fault addr 0x10, null pointer
+dereference, tombstone reports the crashing frame's own ABI as x86_64
+even though `:pluginhost` otherwise runs arm64-v8a under BlueStacks'
+translation — `/data/tombstones/tombstone_14`). Crash containment itself
+worked exactly as designed: `dev.droidtop.app`'s main process was
+unaffected and stayed on screen, and the plugin was disabled with "call
+failed across the binder" the same as any other crash. This is a second,
+separate bug in the python-kind native bridge itself
+(`plugin-host/native`), not in the entryClass path this change fixes;
+left open, not fixed here — see the follow-up filed for it.
