@@ -72,8 +72,10 @@ import dev.droidtop.library.LibraryKinds
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.shell.gamepad.pc.PC_SYSTEM_ID
-import dev.droidtop.shell.gamepad.pc.PcGameDetail
 import dev.droidtop.shell.gamepad.pc.PC_STORES_SCREEN_ID
+import dev.droidtop.shell.gamepad.pc.sourceLabel
+import dev.droidtop.shell.gamepad.pc.engineLabel
+import dev.droidtop.shell.gamepad.pc.PcExpandedOverlay
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.consoles.PlatformsDatabase
 import dev.droidtop.library.displayName
@@ -373,7 +375,10 @@ fun GamepadShell(
         QuickMenu(onDismiss = { quickMenuOpen = false })
     }
 
-    val onLaunch: (LibraryEntry) -> Unit = { entry ->
+    // The actual dispatch: unchanged for every entry, PC and engine games
+    // included -- once something has decided this game IS ready, it
+    // launches exactly the same way a console ROM does.
+    val dispatchLaunch: (LibraryEntry) -> Unit = { entry ->
         // Real ES-DE launch sound -- played unconditionally on any game
         // launch (ViewController.cpp:1064-1066 plays LAUNCHSOUND whether
         // or not a launch transition is configured), so it lives here in
@@ -398,6 +403,28 @@ fun GamepadShell(
             // arrives sooner.
             kotlinx.coroutines.delay(2500)
             launching = null
+        }
+    }
+    // What A actually decides (docs/SPEC.md 7i, redecided 2026-09-26): a
+    // PC or engine game resolves its runner first and either launches,
+    // exactly like a console ROM, or runs the one setup action that would
+    // make it ready -- the same decision PcGameMenu's own "Play"/"Set up"
+    // row makes, now made once here so the gamelist's A and that row
+    // never disagree. A console ROM or app has no runner to resolve, so
+    // it dispatches straight through, unchanged.
+    val onLaunch: (LibraryEntry) -> Unit = { entry ->
+        if (entry.isPcOrEngineGame) {
+            scope.launch {
+                launchError = null
+                dev.droidtop.library.PcRunnerOptions.resolveAndPlay(
+                    context = context,
+                    entry = entry,
+                    onLaunch = { dispatchLaunch(entry) },
+                    onStatus = { message -> launchError = message },
+                )
+            }
+        } else {
+            dispatchLaunch(entry)
         }
     }
     val tabBarFocus = remember { FocusRequester() }
@@ -785,27 +812,13 @@ fun GamepadShell(
                         // "empty" even though it's a plain static list with nothing
                         // to wait for. detailEntry is also section-independent, so
                         // it stays checked before the loading gate too.
-                        // A PC or engine game gets the PC surface's own detail
-                        // screen (docs/SPEC.md 7i): runner availability, the
-                        // per-game override and the actions that go with them are
-                        // not a console ROM's concerns, and putting both on one
-                        // screen is what made the old one grow two personalities.
-                        entry != null && entry.isPcOrEngineGame -> PcGameDetail(
-                            entry = entry,
-                            library = library,
-                            onLaunch = { onLaunch(entry); nav.back() },
-                            onClose = { nav.back() },
-                            onPrimaryFocus = { detailPrimaryLabel = it },
-                            // The game's other folders -- its versions and its
-                            // segments (docs/SPEC.md 7m) -- are reachable from
-                            // here, and picking one opens that folder's own
-                            // detail, so Play starts what the user chose.
-                            siblings = gameEntries.orEmpty(),
-                            // Sideways, not deeper: another folder of the same
-                            // game replaces this detail, so B from it still means
-                            // "back to the grid I came from".
-                            onOpenOther = { nav.openDetail(it.id) },
-                        )
+                        // A PC or engine game no longer opens a detail screen of
+                        // its own (docs/SPEC.md 7i, redecided 2026-09-26): its
+                        // metadata is the theme's own gamelist elements and its
+                        // actions are PcGameMenu, an in-context overlay opened
+                        // from the gamelist itself (L2/Y), so this branch is
+                        // console ROMs and native apps only, as EntryDetailScreen
+                        // has always been.
                         entry != null -> EntryDetailScreen(
                             entry = entry,
                             library = library,
@@ -975,7 +988,7 @@ private fun EntryDetailScreen(
     var scrapeStatus by remember(entry) { mutableStateOf<String?>(null) }
     var scrapeResult by remember(entry) { mutableStateOf<String?>(null) }
     // Everything scraped for this game, for the media viewer: listed on
-    // IO once per entry, never while drawing (the same as PcGameDetail).
+    // IO once per entry, never while drawing (the same as PcGameMenu).
     val media by produceState(emptyList<Pair<String, String>>(), entry) {
         value = withContext(Dispatchers.IO) {
             val romFile = java.io.File(entry.id)
@@ -1016,7 +1029,7 @@ private fun EntryDetailScreen(
     // reaches this screen any more (see the PC branch at the call site),
     // so the launch-strategy picker, the PC scrape action and the PC
     // "choose match" branch that used to live here moved wholesale to
-    // PcGameDetail rather than being duplicated across two screens.
+    // PcGameMenu rather than being duplicated across two screens.
     val isRomEntry = entry.kind == LibraryEntryKind.CONSOLE_ROM
 
     if (editingMetadata) {
@@ -1475,7 +1488,7 @@ private sealed interface GameGroup {
      * laid out by the active theme's gamelist view exactly like a console
      * system's (docs/SPEC.md 7i, revised 2026-09-26) -- droidtop's own
      * runner/store/prefix actions live on the game's own detail screen
-     * ([dev.droidtop.shell.gamepad.pc.PcGameDetail]) and in the gamelist's
+     * ([dev.droidtop.shell.gamepad.pc.PcGameMenu]) and in the gamelist's
      * own Select menu ("Stores and folders"), never in a fixed grid of
      * droidtop's own.
      *
@@ -1745,6 +1758,19 @@ private fun GamesSection(
     var sortVersion by remember { mutableIntStateOf(0) }
     val firstFocus = remember { FocusRequester() }
     val context = LocalContext.current
+    // The PC/engine game whose in-context "Game options" menu is open
+    // (L2/Y, docs/SPEC.md 7i, owner direction 2026-09-26) -- a Dialog
+    // overlay on top of this SAME themed gamelist, never a nav-stack
+    // detail screen: the PC surface's separate full-screen detail is
+    // gone, along with its own back-stack level.
+    var pcMenuEntry by remember { mutableStateOf<LibraryEntry?>(null) }
+    // The PC group's own organisation (owner direction 2026-09-26: "the
+    // store/source and engine filters, and install state") -- droidtop's
+    // own chrome, drawn as PcExpandedOverlay's own chip row over the
+    // themed canvas, never a theme concept.
+    var pcSources by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var pcEngines by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var pcInstalledOnly by remember { mutableStateOf(false) }
     // Which theme folder the PC card wears under this theme (see
     // GameGroup.Pc.systemThemeFolder): known at once when this theme has
     // been checked before, otherwise worked out off the main thread.
@@ -1811,8 +1837,16 @@ private fun GamesSection(
     // The PC card sorts among the console systems by its own label, the
     // same as every other card: it is a category of the library, not a
     // section of chrome.
+    // PC is always visible (owner direction 2026-09-26: "PC should
+    // always be visible"), unlike a console system group, which only
+    // ever appears once it has a game: an empty PC library still has a
+    // card, and opening it leads straight into first-run setup (below)
+    // instead of there being no way in at all -- the gap the PC surface's
+    // own now-removed "auto-open on empty" never actually reached, since
+    // this group could not be opened before it held at least one game.
     val orderedSystemGroups = remember(byGroup, platformsLoadVersion) {
-        byGroup.keys
+        (byGroup.keys + GameGroup.Pc)
+            .distinct()
             .filterNot { it is GameGroup.Collection }
             .sortedBy { it.label.lowercase() }
     }
@@ -1867,7 +1901,7 @@ private fun GamesSection(
     // Alphabetical -- real ES-DE's own default gamelist sort order, and a
     // real, stable Up/Down order for the headless (no list widget) case
     // below, unlike allGames' own natural Library order.
-    val systemGamesForGroup = remember(selectedGroup, entries, collectionGroupMembers, sortVersion, pcGrouped) {
+    val systemGamesForGroup = remember(selectedGroup, entries, collectionGroupMembers, sortVersion, pcGrouped, pcSources, pcEngines, pcInstalledOnly) {
         val group = selectedGroup
         when (group) {
             null -> emptyList()
@@ -1888,7 +1922,14 @@ private fun GamesSection(
             // entries, same as PcSurface always did.
             else -> {
                 val filter = GamelistFilterPrefs.get(context, group.label)
-                val base = if (group is GameGroup.Pc) pcGrouped.orEmpty() else entries.filter { it.gameGroup() == group }
+                val base = if (group is GameGroup.Pc) {
+                    pcGrouped.orEmpty()
+                        .filter { pcSources.isEmpty() || it.sourceLabel() in pcSources }
+                        .filter { pcEngines.isEmpty() || it.engineLabel() in pcEngines }
+                        .filter { !pcInstalledOnly || it.pcInfo?.installed != false }
+                } else {
+                    entries.filter { it.gameGroup() == group }
+                }
                 base.filter { filter.matches(it) }
                     .sortedWith(GamelistSortPrefs.comparator(GamelistSortPrefs.get(context, group.label)))
             }
@@ -1936,6 +1977,26 @@ private fun GamesSection(
         }
     }
 
+    // The in-context "Game options" menu for one PC/engine game (L2/Y,
+    // docs/SPEC.md 7i) -- an overlay on this same gamelist, not a second
+    // screen. Its own runner picker/Wine settings/media viewer/collection
+    // editor sub-dialogs replace it exactly the way they used to replace
+    // the old full-screen detail (PcGameMenu's own doc comment).
+    pcMenuEntry?.let { menuEntry ->
+        dev.droidtop.shell.gamepad.pc.PcGameMenu(
+            entry = menuEntry,
+            library = library,
+            onLaunch = { onLaunch(menuEntry) },
+            onClose = { pcMenuEntry = null },
+            // Every PC/engine game the shell has, so this menu can offer
+            // the other folders of the same game (docs/SPEC.md 7m).
+            siblings = entries.filter { it.isPcOrEngineGame },
+            // Sideways, not deeper: another folder of the same game
+            // replaces which entry this SAME menu is showing.
+            onOpenOther = { pcMenuEntry = it },
+        )
+    }
+
     // Real, unified themed-gamelist condition -- ONE real render path
     // below handles ANY theme with a real "gamelist" view, whether or not
     // it declares its own <carousel>/<grid>/<textlist>
@@ -1968,7 +2029,7 @@ private fun GamesSection(
                 key = entry.id,
                 label = entry.title,
                 logoPath = entry.artworkUri,
-                onSelect = { if (entry.isPcOrEngineGame) onShowDetail(entry) else onLaunch(entry) },
+                onSelect = { onLaunch(entry) },
                 // Lets a themed carousel/grid honour its own real
                 // <imageType> for this game instead of always drawing the
                 // one pre-resolved artwork. Coordinates only, no I/O here.
@@ -2180,18 +2241,34 @@ private fun GamesSection(
                         true
                     }
                     action == GamepadAction.A && group != null && themed && !gamelistHasListWidget -> {
-                        systemGamesForGroup.getOrNull(focusedGameIndex)?.let { if (it.isPcOrEngineGame) onShowDetail(it) else onLaunch(it) } != null
+                        systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onLaunch(it) } != null
                     }
                     // Y/Info applies regardless of widget presence -- a
                     // real, useful action either way, not specific to the
-                    // headless case.
+                    // headless case. For a PC/engine game there is no
+                    // separate "Info" any more (the theme's own metadata
+                    // elements show it while browsing): Y opens the same
+                    // in-context "Game options" menu L2 does, so a player
+                    // who does not know the L2 convention still finds it.
                     action == GamepadAction.Y && group != null && themed -> {
-                        systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onShowDetail(it) } != null
+                        systemGamesForGroup.getOrNull(focusedGameIndex)?.let {
+                            if (it.isPcOrEngineGame) pcMenuEntry = it else onShowDetail(it)
+                        } != null
                     }
                     // X/favorite-toggle applies regardless of widget
                     // presence, same reasoning as Y/Info above.
                     action == GamepadAction.X && group != null && themed -> {
                         systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onToggleFavorite(it) } != null
+                    }
+                    // L2: PC's own "Game options" menu (docs/SPEC.md 7i,
+                    // owner direction 2026-09-26) -- runner/Wine settings,
+                    // ProtonDB, the Lutris import, the F95 link, merge and
+                    // versions/segments, none of which the ES-DE element
+                    // schema has a slot for. Unclaimed everywhere else in
+                    // the shell (R2 is the Quick Menu's own hold-to-open),
+                    // so this is the one place it means anything.
+                    action == GamepadAction.L2 && group is GameGroup.Pc && systemGamesForGroup.isNotEmpty() -> {
+                        systemGamesForGroup.getOrNull(focusedGameIndex)?.let { pcMenuEntry = it } != null
                     }
                     else -> false
                 }
@@ -2617,7 +2694,16 @@ private fun GamesSection(
                 // with the exclusions it needed everywhere else in this file (see
                 // `themed`, the focus-tracking effect and the help-row claim
                 // above -- all of them used to read `... !is GameGroup.Pc`).
-                if (group is GameGroup.Pc && nav.optionsOpen) {
+                // Empty (owner direction 2026-09-26: "PC should always be
+                // visible... its empty state leads straight into first-run
+                // setup"), known empty rather than merely not-yet-grouped:
+                // pcGrouped is null while the async fold above is still
+                // running on a library that may well have PC games, and
+                // showing first-run for that split second would be a false
+                // "you have nothing" (same reasoning as pcGrouped's own
+                // doc comment).
+                val pcKnownEmpty = group is GameGroup.Pc && pcGrouped?.isEmpty() == true
+                if (group is GameGroup.Pc && (nav.optionsOpen || pcKnownEmpty)) {
                     // "Stores and folders": sign in to a store, add a games
                     // folder, set up Windows games, see what is downloading --
                     // a level of its own ABOVE the gamelist, on the same
@@ -2625,8 +2711,9 @@ private fun GamesSection(
                     // screen already uses (see the help-row claim and the
                     // key-routing guards above, both already agnostic of which
                     // group opened it). Reached from the Select menu's "Stores
-                    // and folders" row (GamelistOptionsMenu) instead of a
-                    // PC-only key the theme's help row knows nothing about.
+                    // and folders" row (GamelistOptionsMenu), or automatically
+                    // when the group is genuinely empty, instead of a PC-only
+                    // key the theme's help row knows nothing about.
                     // Registered at process start by :app, which this module
                     // cannot depend on, hence the id lookup.
                     val storesScreen = remember { dev.droidtop.library.settings.SettingsScreenRegistry.get(PC_STORES_SCREEN_ID) }
@@ -2650,6 +2737,11 @@ private fun GamesSection(
                             requestFocusWhenAttached(firstFocus, "Gamelist")
                         }
                     }
+                    // A Box, not a Column: PcExpandedOverlay's own two strips
+                    // are droidtop's own chrome layered OVER this canvas, at
+                    // its own size, never a sibling that would shrink it
+                    // (docs/SPEC.md 7j's help-row lesson applies here too).
+                    Box(modifier = Modifier.fillMaxSize()) {
                     EsDeThemedView(
                         view = gamelistView,
                         items = gamelistWidgetItems,
@@ -2665,12 +2757,29 @@ private fun GamesSection(
                         },
                         focusedSystemEntries = systemGamesForGroup,
                         focusedGameIndex = focusedGameIndex,
-                        hints = listOf(
-                            GamepadAction.A to (if (group is GameGroup.Pc) "Open" else "Launch"),
-                            GamepadAction.Y to "Info",
-                            GamepadAction.X to "Favorite",
-                            GamepadAction.B to "Back",
-                        ),
+                        // A always launches (or runs the one setup step) exactly
+                        // like a console ROM's, PC and engine games included
+                        // (docs/SPEC.md 7i, redecided 2026-09-26): the resolved-
+                        // runner decision lives in the one onLaunch handler now,
+                        // not in what this hint row says. PC swaps Y's "Info" --
+                        // the theme's own gamelist already shows that while
+                        // browsing -- for L2's "Game options", the one thing the
+                        // theme cannot show.
+                        hints = if (group is GameGroup.Pc) {
+                            listOf(
+                                GamepadAction.A to "Launch",
+                                GamepadAction.L2 to "Game options",
+                                GamepadAction.X to "Favorite",
+                                GamepadAction.B to "Back",
+                            )
+                        } else {
+                            listOf(
+                                GamepadAction.A to "Launch",
+                                GamepadAction.Y to "Info",
+                                GamepadAction.X to "Favorite",
+                                GamepadAction.B to "Back",
+                            )
+                        },
                         systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
                             name = selectedGroupLabel,
                             gameCount = systemGamesForGroup.size,
@@ -2683,6 +2792,23 @@ private fun GamesSection(
                         collectionGamelist = inCollectionGamelist,
                         transition = esDeTransition,
                     )
+                    // The PC group's own "expanded view" (owner direction
+                    // 2026-09-26): filters and per-game runner/source/
+                    // playtime facts, none of them an ES-DE concept, layered
+                    // over the same canvas the theme just drew.
+                    if (group is GameGroup.Pc) {
+                        PcExpandedOverlay(
+                            entries = systemGamesForGroup,
+                            focused = systemGamesForGroup.getOrNull(focusedGameIndex),
+                            sources = pcSources,
+                            engines = pcEngines,
+                            installedOnly = pcInstalledOnly,
+                            onSourcesChanged = { pcSources = it },
+                            onEnginesChanged = { pcEngines = it },
+                            onInstalledOnlyChanged = { pcInstalledOnly = it },
+                        )
+                    }
+                    }
                 }
             } else {
                 val allGames = entries.filter { it.gameGroup() == group }
