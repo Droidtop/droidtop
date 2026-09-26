@@ -30,9 +30,15 @@ test -d "$BUNDLE_DIR/payload/flutter_assets" || { echo "missing $BUNDLE_DIR/payl
 
 openssl dgst -sha256 -sign "$PLUGIN_SIGNING_KEY" "$BUNDLE_DIR/manifest.json" | base64 -w0 > "$BUNDLE_DIR/manifest.sig"
 
+# GNU tar's repeated -C is CUMULATIVE (each one is relative to wherever
+# the previous -C left it, not to this script's own cwd) -- confirmed the
+# hard way: a second relative "-C $BUNDLE_DIR/payload" resolved as
+# "$BUNDLE_DIR/$BUNDLE_DIR/payload" and failed to open. Absolute paths for
+# both -C arguments sidestep that entirely.
+BUNDLE_ABS="$(cd "$BUNDLE_DIR" && pwd)"
 tar --sort=name -cf - \
-  -C "$BUNDLE_DIR" manifest.json manifest.sig \
-  -C "$BUNDLE_DIR/payload" lib flutter_assets \
+  -C "$BUNDLE_ABS" manifest.json manifest.sig \
+  -C "$BUNDLE_ABS/payload" lib flutter_assets \
   | xz -9e > droidtop.sample-flutter-statustile.droidplugin.tar.xz
 
 echo "Signed droidtop.sample-flutter-statustile.droidplugin.tar.xz"
