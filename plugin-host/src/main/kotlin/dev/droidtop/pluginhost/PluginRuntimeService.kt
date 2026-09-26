@@ -39,6 +39,25 @@ class PluginRuntimeService : Service() {
         }
 
         override fun loadPlugin(pluginId: String, installDir: String, entryClass: String, rootApproved: Boolean): Boolean {
+            // Found while fixing the flutter_embed channel-error race
+            // (2026-09-26): PluginCrashPolicy.invoke()/startJob() call
+            // load() before EVERY capability call, unconditionally --
+            // and this method used to rebuild the plugin from scratch
+            // every single time, directly violating DroidtopPlugin.onLoad's
+            // own documented contract ("Called once after loading, before
+            // any invoke"). Harmless for native_bundle/python's cheap,
+            // idempotent setup, but for flutter_embed this reconstructed a
+            // brand new FlutterEngine (a full Dart isolate boot) on every
+            // call -- confirmed on the rig: the SECOND such construction in
+            // one :pluginhost process logged "FlutterJNI.init called more
+            // than once" and left the freshly-built engine's own
+            // MethodChannel unable to reach its already-registered Dart
+            // handler (PlatformException(channel-error, ...)), even though
+            // the readiness handshake had just succeeded on THAT SAME
+            // engine moments earlier. A plugin already in [loaded] is
+            // already loaded; returning true here without touching it is
+            // what onLoad's own contract always said this should do.
+            loaded[pluginId]?.let { return true }
             val dir = File(installDir)
             // The manifest on disk (written by PluginBundleInstaller,
             // re-verified before every activation by PluginCrashPolicy)
