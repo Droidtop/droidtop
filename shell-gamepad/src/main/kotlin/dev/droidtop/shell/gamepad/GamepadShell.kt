@@ -73,7 +73,7 @@ import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.shell.gamepad.pc.PC_SYSTEM_ID
 import dev.droidtop.shell.gamepad.pc.PcGameDetail
-import dev.droidtop.shell.gamepad.pc.PcSurface
+import dev.droidtop.shell.gamepad.pc.PC_STORES_SCREEN_ID
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.consoles.PlatformsDatabase
 import dev.droidtop.library.displayName
@@ -1471,9 +1471,13 @@ private sealed interface GameGroup {
     val systemThemeFolder: String?
 
     /**
-     * The PC category: ONE card for every PC and engine game, and the
-     * only group the ES-DE theme does not draw past its own card (see
-     * [dev.droidtop.shell.gamepad.pc.PcSurface], docs/SPEC.md 7i).
+     * The PC category: ONE card for every PC and engine game, themed and
+     * laid out by the active theme's gamelist view exactly like a console
+     * system's (docs/SPEC.md 7i, revised 2026-09-26) -- droidtop's own
+     * runner/store/prefix actions live on the game's own detail screen
+     * ([dev.droidtop.shell.gamepad.pc.PcGameDetail]) and in the gamelist's
+     * own Select menu ("Stores and folders"), never in a fixed grid of
+     * droidtop's own.
      *
      * There used to be a card per engine here (a "Ren'Py" card, an "RPG
      * Maker" card, ...), invented by droidtop and retired by the user
@@ -1847,10 +1851,23 @@ private fun GamesSection(
     LaunchedEffect(gamelistTheme) { EsDeNavigationSounds.load(gamelistTheme) }
     val gamelistView = gamelistTheme?.views?.get("gamelist")
     val gamelistHasListWidget = remember(gamelistView) { gamelistView?.primaryListElement() != null }
+    // ONE card per PC/engine GAME, not per folder (docs/SPEC.md 7m) --
+    // PcSurface always folded its grid this way off the composition
+    // thread, so the same regex-based folding still costs nothing on a
+    // large library now that the PC group flows through this gamelist
+    // like any other (docs/SPEC.md 7i, revised 2026-09-26). Null while the
+    // first pass is still running draws nothing rather than a false empty
+    // gamelist; a republish keeps the previous cards until the new ones
+    // are ready.
+    val pcGrouped by produceState<List<LibraryEntry>?>(initialValue = null, entries) {
+        value = withContext(Dispatchers.Default) {
+            dev.droidtop.library.LibraryGrouping.group(entries.filter { it.gameGroup() == GameGroup.Pc }).map { it.displayEntry }
+        }
+    }
     // Alphabetical -- real ES-DE's own default gamelist sort order, and a
     // real, stable Up/Down order for the headless (no list widget) case
     // below, unlike allGames' own natural Library order.
-    val systemGamesForGroup = remember(selectedGroup, entries, collectionGroupMembers, sortVersion) {
+    val systemGamesForGroup = remember(selectedGroup, entries, collectionGroupMembers, sortVersion, pcGrouped) {
         val group = selectedGroup
         when (group) {
             null -> emptyList()
@@ -1866,10 +1883,13 @@ private fun GamesSection(
             }
             // The stored per-group sort (GamelistSortPrefs), NAME by
             // default which is real ES-DE's own gamelist default, and
-            // the stored per-group filter (ALL by default).
+            // the stored per-group filter (ALL by default). PC draws from
+            // the folded one-card-per-game list above instead of the raw
+            // entries, same as PcSurface always did.
             else -> {
                 val filter = GamelistFilterPrefs.get(context, group.label)
-                entries.filter { it.gameGroup() == group && filter.matches(it) }
+                val base = if (group is GameGroup.Pc) pcGrouped.orEmpty() else entries.filter { it.gameGroup() == group }
+                base.filter { filter.matches(it) }
                     .sortedWith(GamelistSortPrefs.comparator(GamelistSortPrefs.get(context, group.label)))
             }
         }
@@ -1908,6 +1928,10 @@ private fun GamesSection(
                 onJumpTo = { index ->
                     focusedGameIndex = index.coerceIn(0, (systemGamesForGroup.lastIndex).coerceAtLeast(0))
                 },
+                onOpenStores = {
+                    gamelistOptionsOpen = false
+                    nav.openOptions()
+                },
             )
         }
     }
@@ -1944,7 +1968,7 @@ private fun GamesSection(
                 key = entry.id,
                 label = entry.title,
                 logoPath = entry.artworkUri,
-                onSelect = { onLaunch(entry) },
+                onSelect = { if (entry.isPcOrEngineGame) onShowDetail(entry) else onLaunch(entry) },
                 // Lets a themed carousel/grid honour its own real
                 // <imageType> for this game instead of always drawing the
                 // one pre-resolved artwork. Coordinates only, no I/O here.
@@ -1968,11 +1992,10 @@ private fun GamesSection(
         // list widget -- a widget's onFocusedIndexChanged (wired at the
         // render call site below) updates the exact same focusedGameIndex
         // state the headless case's own Up/Down handling uses.
-        // The PC surface draws its own grid and reports its own focus
-        // (see the PcSurface call below); this index addresses the themed
-        // gamelist only, so it must not answer for a screen it does not
-        // drive.
-        if (hasThemedGamelist && selectedGroup !is GameGroup.Pc) {
+        // PC and engine games now go through this same themed gamelist
+        // (docs/SPEC.md 7i, revised 2026-09-26) -- no more carve-out for a
+        // screen that drew its own grid and reported its own focus.
+        if (hasThemedGamelist) {
             onFocusedEntryChanged(systemGamesForGroup.getOrNull(focusedGameIndex))
             // What to come back to. Recorded as the user moves, not only
             // when they open something, so B out of a detail and B out of
@@ -1995,18 +2018,13 @@ private fun GamesSection(
             // keeps the shell's bar in the column.
             onHelpRowClaim(
                 when {
-                    // The PC surface's row is droidtop's OWN, with this
-                    // screen's own actions in it (A opens, it does not
-                    // launch) and every hint tappable. Claiming it as a
-                    // THEME row is what let a touch-first window add the
-                    // shell's bar underneath it -- two rows on the PC grid
-                    // in portrait, one in landscape (rig, build 547).
-                    // The group's own options screen is a plain
-                    // droidtop screen drawn over the group: it has no row
-                    // of its own, so the shell's bar draws there -- and
-                    // its B hint is the only touch route out.
+                    // A group's own options screen ("Stores and folders"
+                    // for PC, same mechanism every group's Select menu can
+                    // open) is a plain droidtop screen drawn over the
+                    // group: it has no row of its own, so the shell's bar
+                    // draws there -- and its B hint is the only touch
+                    // route out.
                     nav.optionsOpen -> HelpRowClaim.NONE
-                    selectedGroup is GameGroup.Pc -> HelpRowClaim.SCREEN
                     hasThemedGamelist -> HelpRowClaim.THEME
                     else -> HelpRowClaim.NONE
                 },
@@ -2066,12 +2084,11 @@ private fun GamesSection(
                     return@onKeyEvent false
                 }
                 val group = selectedGroup
-                // The PC surface is droidtop's own screen with its own
-                // focus: the themed-gamelist fallbacks below drive an
-                // index into a list it does not show, so they stop at
-                // its edge. Back and the shoulders still mean what they
-                // mean everywhere else.
-                val themed = hasThemedGamelist && group !is GameGroup.Pc
+                // PC and engine games are a themed gamelist like any
+                // other now (docs/SPEC.md 7i, revised 2026-09-26); the
+                // carve-out this used to need for PcSurface's own
+                // headless focus tracking is gone.
+                val themed = hasThemedGamelist
                 val action = GamepadKeyMap.actionFor(event.key)
                 when {
                     (action == GamepadAction.BACK || action == GamepadAction.B) && group != null -> {
@@ -2163,7 +2180,7 @@ private fun GamesSection(
                         true
                     }
                     action == GamepadAction.A && group != null && themed && !gamelistHasListWidget -> {
-                        systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onLaunch(it) } != null
+                        systemGamesForGroup.getOrNull(focusedGameIndex)?.let { if (it.isPcOrEngineGame) onShowDetail(it) else onLaunch(it) } != null
                     }
                     // Y/Info applies regardless of widget presence -- a
                     // real, useful action either way, not specific to the
@@ -2588,91 +2605,85 @@ private fun GamesSection(
                         }
                     }
                 }
-            } else if (group is GameGroup.Pc) {
-                // The one category the theme does not draw past its own card
-                // (docs/SPEC.md 7i). The system view, the pc art and the
-                // transition into here all stay the theme's; everything
-                // inside is droidtop's, because ES-DE's element schema has no
-                // element type for a runner, a prefix or a store login.
-                PcSurface(
-                    // The group's own members, not a second predicate over the
-                    // whole library: the card's game count and this grid were
-                    // computed two different ways, which is how the card could
-                    // say "1 game" over a surface that said "No PC games yet".
-                    entries = systemGamesForGroup,
-                    onOpen = onShowDetail,
-                    // Same two facts as the themed gamelist above: which
-                    // card to come back to, and which card the user is on.
-                    focusEntryId = nav.focusHere,
-                    onFocusedEntryChanged = { entry ->
-                        nav.rememberFocus(entry?.id)
-                        onFocusedEntryChanged(entry)
-                    },
-                    // A level of its own in the back stack, not state this
-                    // screen owns: see PcSurface's own parameter comment.
-                    optionsOpen = nav.optionsOpen,
-                    onOpenOptions = { nav.openOptions() },
-                    onCloseOptions = { nav.back() },
-                )
             } else if (hasThemedGamelist && gamelistView != null) {
                 // Real, unified theme-driven gamelist render -- ONE call into
-                // the same generic EsDeThemedView/EsDeSystemListView
-                // machinery the system-list screen already uses. Whether
-                // THIS theme's gamelist declares a real <carousel>/<grid>/
-                // <textlist> or none at all (DEcaffe: none; Art Book Next: a
-                // real <textlist>/<grid>) is decided internally
-                // (EsDeThemeView.primaryListElement) -- not a droidtop-level
-                // "which theme is this" branch, so an arbitrary third-party
-                // theme gets the same real treatment as either of these two.
-                // A widget owns its own D-pad focus movement (real Compose
-                // focus + EsDeListItem.onSelect, firstItemFocus attaches to
-                // its first item); with no widget, this composable's own
-                // headless Up/Down handling above drives focusedGameIndex
-                // instead -- either way, onFocusedIndexChanged and
-                // focusedGameIndex both point at the exact same state, so
-                // every other element (metadata/rating/datetime/video) always
-                // binds to whichever game is actually current.
-                LaunchedEffect(group, gamelistHasListWidget, gamelistWidgetItems) {
-                    // Same never-crash boundary AND same frame-retry as the
-                    // system-list screen's own focus request above (see
-                    // requestFocusWhenAttached).
-                    if (gamelistHasListWidget && gamelistWidgetItems.isNotEmpty()) {
-                        requestFocusWhenAttached(firstFocus, "Gamelist")
+                // the same generic EsDeThemedView/EsDeSystemListView machinery
+                // the system-list screen already uses, now covering PC and
+                // engine games too (docs/SPEC.md 7i, revised 2026-09-26): a PC
+                // entry is laid out by the SAME theme element positions, sizes,
+                // variants and md_* metadata bindings as any console system's
+                // gamelist. The fixed GameNative-derived grid this branch used to
+                // hand off to (PcSurface's own LazyVerticalGrid) is gone, along
+                // with the exclusions it needed everywhere else in this file (see
+                // `themed`, the focus-tracking effect and the help-row claim
+                // above -- all of them used to read `... !is GameGroup.Pc`).
+                if (group is GameGroup.Pc && nav.optionsOpen) {
+                    // "Stores and folders": sign in to a store, add a games
+                    // folder, set up Windows games, see what is downloading --
+                    // a level of its own ABOVE the gamelist, on the same
+                    // ShellBackStack.optionsOpen every group's own options
+                    // screen already uses (see the help-row claim and the
+                    // key-routing guards above, both already agnostic of which
+                    // group opened it). Reached from the Select menu's "Stores
+                    // and folders" row (GamelistOptionsMenu) instead of a
+                    // PC-only key the theme's help row knows nothing about.
+                    // Registered at process start by :app, which this module
+                    // cannot depend on, hence the id lookup.
+                    val storesScreen = remember { dev.droidtop.library.settings.SettingsScreenRegistry.get(PC_STORES_SCREEN_ID) }
+                    if (storesScreen != null) {
+                        CatalogNavigator(root = storesScreen, onExit = { nav.back() })
                     }
+                } else {
+                    // A widget owns its own D-pad focus movement (real Compose
+                    // focus + EsDeListItem.onSelect, firstItemFocus attaches to
+                    // its first item); with no widget, this composable's own
+                    // headless Up/Down handling above drives focusedGameIndex
+                    // instead -- either way, onFocusedIndexChanged and
+                    // focusedGameIndex both point at the exact same state, so
+                    // every other element (metadata/rating/datetime/video) always
+                    // binds to whichever game is actually current.
+                    LaunchedEffect(group, gamelistHasListWidget, gamelistWidgetItems) {
+                        // Same never-crash boundary AND same frame-retry as the
+                        // system-list screen's own focus request above (see
+                        // requestFocusWhenAttached).
+                        if (gamelistHasListWidget && gamelistWidgetItems.isNotEmpty()) {
+                            requestFocusWhenAttached(firstFocus, "Gamelist")
+                        }
+                    }
+                    EsDeThemedView(
+                        view = gamelistView,
+                        items = gamelistWidgetItems,
+                        firstItemFocus = if (gamelistHasListWidget) firstFocus else null,
+                        modifier = Modifier.fillMaxSize(),
+                        // Same real SCROLLSOUND as the headless Up/Down branch
+                        // above (a widget hosted in a gamelist scrolls with the
+                        // scroll sound, CarouselComponent.h:105-108) -- guarded on
+                        // a real index change, same reason as the system carousel.
+                        onFocusedIndexChanged = {
+                            if (it != focusedGameIndex) EsDeNavigationSounds.play("scroll")
+                            focusedGameIndex = it
+                        },
+                        focusedSystemEntries = systemGamesForGroup,
+                        focusedGameIndex = focusedGameIndex,
+                        hints = listOf(
+                            GamepadAction.A to (if (group is GameGroup.Pc) "Open" else "Launch"),
+                            GamepadAction.Y to "Info",
+                            GamepadAction.X to "Favorite",
+                            GamepadAction.B to "Back",
+                        ),
+                        systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
+                            name = selectedGroupLabel,
+                            gameCount = systemGamesForGroup.size,
+                            favoriteCount = systemGamesForGroup.count { it.favorite },
+                            countsOnly = (group as? GameGroup.Collection)?.id
+                                ?.let { it == AutoCollections.FAVORITES_ID || it == AutoCollections.LAST_PLAYED_ID } == true,
+                        ),
+                        backgroundDimmed = gamelistOptionsOpen,
+                        gamelist = true,
+                        collectionGamelist = inCollectionGamelist,
+                        transition = esDeTransition,
+                    )
                 }
-                EsDeThemedView(
-                    view = gamelistView,
-                    items = gamelistWidgetItems,
-                    firstItemFocus = if (gamelistHasListWidget) firstFocus else null,
-                    modifier = Modifier.fillMaxSize(),
-                    // Same real SCROLLSOUND as the headless Up/Down branch
-                    // above (a widget hosted in a gamelist scrolls with the
-                    // scroll sound, CarouselComponent.h:105-108) -- guarded on
-                    // a real index change, same reason as the system carousel.
-                    onFocusedIndexChanged = {
-                        if (it != focusedGameIndex) EsDeNavigationSounds.play("scroll")
-                        focusedGameIndex = it
-                    },
-                    focusedSystemEntries = systemGamesForGroup,
-                    focusedGameIndex = focusedGameIndex,
-                    hints = listOf(
-                        GamepadAction.A to "Launch",
-                        GamepadAction.Y to "Info",
-                        GamepadAction.X to "Favorite",
-                        GamepadAction.B to "Back",
-                    ),
-                    systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
-                        name = selectedGroupLabel,
-                        gameCount = systemGamesForGroup.size,
-                        favoriteCount = systemGamesForGroup.count { it.favorite },
-                        countsOnly = (group as? GameGroup.Collection)?.id
-                            ?.let { it == AutoCollections.FAVORITES_ID || it == AutoCollections.LAST_PLAYED_ID } == true,
-                    ),
-                    backgroundDimmed = gamelistOptionsOpen,
-                    gamelist = true,
-                    collectionGamelist = inCollectionGamelist,
-                    transition = esDeTransition,
-                )
             } else {
                 val allGames = entries.filter { it.gameGroup() == group }
                 val recentCount = allGames.count { it.lastPlayedEpochMs != null }
