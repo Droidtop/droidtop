@@ -670,13 +670,22 @@ sources rather than assumed from Nova/Apex's feature lists:
 | Backup/restore | HAVE, wired to Settings | `backup/BackupHelper.kt`, `SettingsMiscFragment.BACKUP_EXPORT`/`BACKUP_IMPORT` |
 | Smartspace/clock widget | HAVE | `widget/smartspace/{MurineClockView,SmartspaceMode}.kt` |
 | Configurable QSB with web search providers | HAVE | `widget/search/{SearchProvider,MurineSearchBarView}.kt` (8 providers + custom) |
-| Gestures: double-tap to sleep, swipe-down to notifications | HAVE, exposed in Settings | `LauncherPrefs.GESTURE_DOUBLE_TAP_SLEEP`/`GESTURE_SWIPE_DOWN_NOTIFICATIONS`, toggled from `SettingsHomeFragment` (`DOUBLE_TAP_TO_SLEEP`, `SWIPE_DOWN_NOTIFICATIONS`), applied in `WorkspaceTouchListener.java`/`NotificationSwipeController.kt` |
-| Assignable gesture *actions* (Nova's "map any gesture to any action", not just the two fixed ones above) | **LACK** | no such mapping layer exists; backlog |
+| Gestures: double-tap and swipe-down, each assignable to any of nothing/lock screen/open notifications/open app drawer (**built 2026-09-26**, was two fixed on/off gestures) | HAVE, exposed in Settings | `GestureAction` enum + `perform(Launcher)` (`com.android.launcher3.touch`), `LauncherPrefs.GESTURE_DOUBLE_TAP_ACTION`/`GESTURE_SWIPE_DOWN_ACTION`, picked from `SettingsHomeFragment`'s `RadioGroupPreference` rows (`DOUBLE_TAP_ACTION`, `SWIPE_DOWN_ACTION`), applied in `WorkspaceTouchListener.java`/`NotificationSwipeController.kt`; an existing install's old two-boolean prefs are carried over once by `GestureActionMigration` |
 | App-drawer/QSB search over droidtop's own library (games, not just installed apps) | **LACK** | `DefaultAppSearchAlgorithm.java` only ever produces `AdapterItem.asApp`; backlog |
 | A home-screen widget of droidtop's own (a "full computer" feature neither Nova nor Apex can offer, since they have no game library) | **built this change** | `ContinuePlayingWidgetProvider.kt` (see below) |
 | Global settings, Desktop settings rendered in the shell's own row component, pad-navigable | HAVE (fixed 2026-09-24/25, UI pass H4) | `DroidtopWideSettings.kt`, `SettingsGlobalFragment.kt`'s `CatalogPreferenceNavigator` |
 | Icon-pack/drawer/hidden-apps settings pages left as stock Android preference UI | HAVE, and correct: H4's own fix text scopes the shell's row component to Global/Desktop only, and explicitly keeps these stock | `docs/audit-2026-09-24/ui-assessment.md` H4 |
 | Plugin contributions in the launcher (status tiles, search providers, app actions, launcher widgets from third-party engines/tools) | **not yet buildable** — plugin API is being rebuilt (agent `plugins`, §12/12a) | seam only, see below |
+
+**Rig finding, not fixed here (2026-09-26).** Verifying the gesture-action
+picker on emulator-5560 (Android 14, 1920x1080 landscape) found
+`RadioGroupBottomSheet`'s sheet showing only its title row -- no radio
+options visible or reachable by swipe, confirmed via `uiautomator dump`
+(only the title text node exists in the sheet). This reproduces identically
+on the pre-existing, unmodified smartspace-mode picker, so it is not a
+gesture-actions regression; every `RadioGroupPreference` row in Settings is
+affected on this profile. Filed as its own follow-up rather than guessed at
+here.
 
 **The target feature set, decided:** Launcher mode keeps inheriting Nova/Apex-class
 functionality from Murine wholesale rather than droidtop reimplementing any
