@@ -126,7 +126,19 @@ runs:
         rm /tmp/cmdline-tools.zip
 
         SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-        yes | "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" --licenses > /dev/null
+        # sdkmanager --licenses stops reading stdin as soon as it has
+        # seen every license it needs and exits -- on a COLD cache (no
+        # SDK installed yet, so every license prompt fires) that can
+        # still happen before `yes` is done writing, and the closed
+        # pipe kills `yes` with SIGPIPE. With `pipefail` (this action's
+        # own shell, `bash -e -o pipefail`) that failed exit status was
+        # the whole line's, not sdkmanager's own -- confirmed from a
+        # real cold-cache run ("yes: standard output: Broken pipe",
+        # "Process completed with exit code 1", nothing else wrong).
+        # `|| true` on `yes` alone (not the whole pipeline) keeps that
+        # one expected-on-a-cold-cache signal from failing the step
+        # while still failing on a real sdkmanager error.
+        (yes || true) | "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" --licenses > /dev/null
         "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" \
           "platform-tools" "platforms;android-34" "build-tools;34.0.0" \
           "platforms;android-36" "build-tools;36.0.0" "ndk;${NDK_VERSION}"
