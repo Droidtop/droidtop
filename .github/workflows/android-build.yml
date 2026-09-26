@@ -153,19 +153,31 @@ jobs:
             app/build/outputs/release-info.json
           if-no-files-found: error
 
+      - name: Find droidtoppy native build outputs
+        # AGP's exact intermediates layout for externalNativeBuild/cmake
+        # output has moved between AGP versions and isn't worth guessing
+        # at from the source tree alone -- list every libdroidtoppy.so
+        # CMake produced so the next step's glob can be corrected against
+        # this run's own log if it ever comes up empty again.
+        run: find plugin-host -iname 'libdroidtoppy.so' -o -iname 'libdroidtoppy.so.debug' 2>/dev/null || true
+
       - name: Upload droidtoppy native symbols
         # :plugin-host/native's own libdroidtoppy.so (docs/SPEC.md 12a's
         # python bridge) -- CMake's own build tree keeps an unstripped
-        # copy before AGP strips the one packaged into the APK. A rig
-        # SIGSEGV in this bridge (tombstone_14, fault addr 0x10) could
-        # only be read as a bare, unsymbolised pc offset; kept as its own
-        # artifact per run so a future tombstone's pc can be resolved with
-        # ndk-stack/addr2line against the exact commit that built it,
-        # instead of guessing from the source alone.
+        # copy before AGP strips the one packaged into the APK, under
+        # either intermediates layout AGP has used. A rig SIGSEGV in this
+        # bridge (tombstone_14, fault addr 0x10) could only be read as a
+        # bare, unsymbolised pc offset; kept as its own artifact per run
+        # so a future tombstone's pc can be resolved with ndk-stack/
+        # addr2line against the exact commit that built it, instead of
+        # guessing from the source alone.
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: droidtoppy-native-symbols
-          path: plugin-host/.cxx/**/obj/**/libdroidtoppy.so
+          path: |
+            plugin-host/.cxx/**/obj/**/libdroidtoppy.so
+            plugin-host/build/intermediates/cxx/**/obj/**/libdroidtoppy.so
+            plugin-host/build/intermediates/merged_native_libs/**/libdroidtoppy.so
           if-no-files-found: warn
 
       - name: Class-load API gate (minSdk)
