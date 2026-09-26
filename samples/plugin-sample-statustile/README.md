@@ -8,15 +8,22 @@ person cares about.
 - `src/` — `StatusTilePlugin.kt`, implementing `dev.droidtop.pluginhost.DroidtopPlugin`.
 - `manifest.template.json` — everything about the manifest except `payload`
   (filled in by `build.sh` once `classes.jar`'s real hash is known).
-- `build.sh` — compiles, dexes, hashes, signs (with the real droidtop
-  plugin origin key generated for this change; see
-  `plugin-host/src/main/kotlin/dev/droidtop/pluginhost/BundleSignature.kt`)
-  and packages `droidtop.sample-statustile.droidplugin.tar.xz`.
+- `build.sh` — compiles, dexes and hashes: produces `build/classes.jar` and
+  `build/manifest.json`. Touches no private key, so it runs in CI (the
+  "sample-plugin" job in `.github/workflows/android-build.yml`, which
+  builds `:plugin-host` first for the classpath and uploads these two
+  files as an unsigned artifact) as well as locally.
+- `sign.sh` — the only script here that touches the real droidtop plugin
+  origin key (see `plugin-host/src/main/kotlin/dev/droidtop/pluginhost/BundleSignature.kt`);
+  signs `build/manifest.json` and packages
+  `droidtop.sample-statustile.droidplugin.tar.xz`. Run on droidtop-dev
+  only, where the private half lives
+  (`/root/coordination/keys/droidtop-plugins/droidtop-origin-private.pem`);
+  never in CI, never committed to this repo.
 
-**Not run yet.** `build.sh` needs kotlinc, d8 and a compiled
-`:plugin-host` classpath, none of which this change's session had without
-running a local Gradle build (against this project's own "no local
-build" rule). Building it is real, scoped follow-up work — either a small
-CI job, or run by hand on droidtop-dev once `:plugin-host` has built at
-least once. The rig item (`dq-plugins-01`,
-`/root/coordination/device/QUEUE.md`) depends on that bundle existing.
+To produce an installable bundle: download the `sample-plugin` CI
+artifact's `build/manifest.json` + `build/classes.jar` (or run `build.sh`
+locally against a `:plugin-host:assembleDebug` classpath), then run
+`PLUGIN_SIGNING_KEY=/root/coordination/keys/droidtop-plugins/droidtop-origin-private.pem ./sign.sh`.
+The rig item (`dq-plugins-01`, `/root/coordination/device/QUEUE.md`) uses
+the resulting `.tar.xz`.
