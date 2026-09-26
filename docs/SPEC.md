@@ -562,6 +562,29 @@ Navigate · A Select · B Cancel") instead of leaving the Quick Menu's
 underneath it visible through the dialog, which named controls
 ("Lower/Raise/Act/Close") that don't apply here.
 
+**That fix was the dialog; a second, separate bug looked like "Gaming
+never appears" (found and fixed 2026-09-26).** The rig re-tested the
+above fix on BlueStacks (Android 9) and found selecting "Gaming" still
+never showed the Gaming carousel, from both the Quick Menu's System tab
+and the Android home screen's "droidtop modes" (dq-modefix-01, steps 3-4)
+-- reproduced again here. `ModeGate.resolveAppMode` was not the cause: it
+already resolves GAMING correctly in this exact scenario (new unit test,
+`ModesTest`, "switching to Gaming after Android was last..."), and
+`MainActivity`'s `singleTask` + `onNewIntent` handling brings the right
+mode back every time. The real cause is `GamepadShell`'s own Quick Menu
+(`quickMenuOpen`, a plain Compose `remember`): switching to Android or
+Desktop leaves `MainActivity`'s task backgrounded, not destroyed, so a
+Quick Menu left open survives the round trip in memory. Picking "Gaming"
+from the switcher brings that same instance back to the front with
+`quickMenuOpen` still `true`, stacking the old Quick Menu over the
+correctly-resolved (but now hidden) Gaming shell -- which is exactly what
+a rig walkthrough and the original report both read as "Gaming never
+appears" and "Quick Menu still open on top". Fixed by dismissing the
+Quick Menu on every real deep-link re-entry
+(`LaunchedEffect(deepLinkToken) { quickMenuOpen = false }`, the same
+per-entry reset token `GamepadShell` already uses for a rescan/section
+deep link), not by touching mode resolution.
+
 ### "Full computer", and where Launcher mode stands against Nova/Apex (survey + decided 2026-09-25)
 
 The owner's direction: droidtop on the console "needs to make the android

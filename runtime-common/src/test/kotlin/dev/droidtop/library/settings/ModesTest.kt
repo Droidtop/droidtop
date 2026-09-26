@@ -35,6 +35,24 @@ class ModesTest {
         )
     }
 
+    /**
+     * Locks in what dq-modefix-01/dq-uxreview's "Gaming never appears"
+     * finding turned out NOT to be: [ModeGate.resolveAppMode] already
+     * picks GAMING correctly here, on BlueStacks (Android 9) exactly as
+     * on Android 14 -- the real defect was GamepadShell's own Quick Menu
+     * Compose state surviving the mode round trip and re-rendering on top
+     * of the (correctly resolved) Gaming shell (see GamepadShell.kt's
+     * quickMenuOpen reset). This test exists so a future regression in
+     * THIS function, rather than that one, is what breaks it.
+     */
+    @Test
+    fun `switching to Gaming after Android was last resolves to Gaming, not Android`() {
+        assertEquals(
+            Mode.GAMING,
+            ModeGate.resolveAppMode(explicitId = "gaming", defaultId = null, lastId = "standard", enabled = setOf(Mode.GAMING)),
+        )
+    }
+
     @Test
     fun `a disabled default or last mode never resolves`() {
         assertEquals(
