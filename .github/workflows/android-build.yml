@@ -148,6 +148,21 @@ jobs:
           path: |
             app/build/outputs/apk/release/app-universal-release.apk
             app/build/outputs/apk/debug/app-universal-debug.apk
+
+      - name: Upload droidtoppy native symbols
+        # :plugin-host/native's own libdroidtoppy.so (docs/SPEC.md 12a's
+        # python bridge) -- CMake's own build tree keeps an unstripped
+        # copy before AGP strips the one packaged into the APK. A rig
+        # SIGSEGV in this bridge (tombstone_14, fault addr 0x10) could
+        # only be read as a bare, unsymbolised pc offset; kept as its own
+        # artifact per run so a future tombstone's pc can be resolved with
+        # ndk-stack/addr2line against the exact commit that built it,
+        # instead of guessing from the source alone.
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: droidtoppy-native-symbols
+          path: plugin-host/.cxx/**/obj/**/libdroidtoppy.so
+          if-no-files-found: warn
             app/build/outputs/apk/release/app-x86_64-release.apk
             app/build/outputs/apk/debug/app-x86_64-debug.apk
             app/build/outputs/release-info.json
