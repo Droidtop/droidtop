@@ -9103,12 +9103,12 @@ one runner per kind:
     a catalog-repo install source for the runtime itself (today's pinned
     single version in `python-runtimes.json` is hand-updated, matching
     how plugin bundles themselves are installed today).
-- **`flutter_embed`** — **built 2026-09-26**, added 2026-09-25 for a
-  real forthcoming case: an existing Flutter/Dart app the owner wants to
-  turn into a plugin rather than rewrite natively. Its own
-  paragraphs below ("The `flutter_embed` kind") have the full design and
-  feasibility citation trail; **not rig-verified yet** (queued,
-  `dq-flutterembed-01`).
+- **`flutter_embed`** — **built and rig-verified 2026-09-26**, added
+  2026-09-25 for a real forthcoming case: an existing Flutter/Dart app the
+  owner wants to turn into a plugin rather than rewrite natively. Its own
+  paragraphs below ("The `flutter_embed` kind") have the full design,
+  feasibility citation trail, and the three real bugs `dq-flutterembed-01`
+  found and fixed before a plugin could actually run.
 
 **The API surface** (`PluginCapability`, a closed set — the trust shape
 differs per capability, same reasoning §12's `IntegrationCapability`
@@ -9284,12 +9284,12 @@ installable `.droidplugin.tar.xz` still needs droidtop-dev's private key
 (`sign.sh` in each sample's own folder) and is not something CI ever
 does. The `flutter_embed` runner (`FlutterRuntimeManager`,
 `FlutterDroidtopPlugin`, above) and its own sample
-(`samples/plugin-sample-flutter-statustile`) are built the same way but
-not yet rig-verified (queued, `dq-flutterembed-01` — see "The
-`flutter_embed` kind" below). Open: a catalog-repo install source for
-plugins; `startJob` support for python-kind and flutter_embed-kind
-plugins; and the rig check for the python leg specifically (queued,
-`device/QUEUE.md`) — the `native_bundle` leg's own rig check
+(`samples/plugin-sample-flutter-statustile`) are built and rig-verified
+the same way (`dq-flutterembed-01` — see "The `flutter_embed` kind"
+below), including `startJob` (built 2026-09-26, above). Open: a
+catalog-repo install source for plugins; `startJob` support for
+python-kind plugins; and the rig check for the python leg specifically
+(queued, `device/QUEUE.md`) — the `native_bundle` leg's own rig check
 (`dq-plugins-01`) already passed.
 
 **A python-kind plugin could never actually run (found and fixed
@@ -9415,8 +9415,8 @@ URLs before any code was written — not assumed:
    carry only the standard BSD attribution requirement, satisfied via
    `NOTICE.md`.
 
-**One thing this build could NOT confirm the same way: `flutter_assets`
-loaded from outside the APK.** Everything above resolves entirely through
+**`flutter_assets` loaded from outside the APK — confirmed working,
+rig-verified 2026-09-26.** Everything above resolves entirely through
 public, non-final Flutter classes. Assets are different: the engine reads
 `flutter_assets/` (the kernel blob, the AOT's own data, fonts, images)
 through Android's real `AssetManager`, which only ever reads zip-shaped
@@ -9426,13 +9426,13 @@ and reflective-only since (a long-standing technique real Android
 plugin-hosting frameworks still use, not invented here).
 `FlutterDroidtopPlugin.loadAssetsIntoEngine` repacks the plugin's own
 extracted `flutter_assets/` tree into a small zip and calls
-`addAssetPath` on it reflectively — written, but NOT rig-verified, and is
-exactly what `dq-flutterembed-01` needs to check first. If a real device's
-hidden-API enforcement refuses that reflective call, the documented
-fallback (not built) is repackaging `flutter_assets` as a tiny per-plugin
-Android split/APK Android's real asset-loading path recognizes on its
-own, at the cost of a second signed artifact per plugin instead of a bare
-directory.
+`addAssetPath` on it reflectively. `dq-flutterembed-01` confirmed on
+BlueStacks (Android 9) that this reflective call is NOT refused: the
+documented fallback (repackaging `flutter_assets` as a tiny per-plugin
+Android split/APK) was never needed. This was the risk this section
+originally flagged as the one open feasibility question — it was not,
+in the end, where a real device actually broke; see "Rig-verified
+2026-09-26" below for what did.
 
 **What's built.** `FlutterRuntimeManager` (download/verify/extract
 `libflutter.so`, mirroring `PythonRuntimeManager`'s shape exactly —
@@ -9493,6 +9493,54 @@ multiple concurrent jobs could ever correlate a later `cancelJob(jobId)`
 back to a specific one. Fixed by adding `jobId` as `DroidtopPlugin.
 startJob`'s first parameter (no existing override to migrate --
 flutter_embed above is the first kind to implement it at all).
+**Rig-verified 2026-09-26 (`dq-flutterembed-01`), three real bugs found
+and fixed before a flutter_embed plugin could actually run at all:**
+
+1. **`PluginCrashPolicy` never let a flutter_embed plugin run.** The
+   Settings UI's "Call ... status tile" action goes through
+   `PluginCrashPolicy.invoke()`/`startJob()` (called from
+   `AppSettingsCatalogs.kt`), NOT directly through
+   `PluginRuntimeService`'s own dispatch. That class's own kind gate was
+   still `!= PluginKind.NATIVE_BUNDLE && != PluginKind.PYTHON` -- never
+   updated when the flutter_embed runner landed earlier the same day. A
+   flutter_embed plugin could install, get approved, and show "Running",
+   but the one path the UI actually calls always answered "no runner for
+   kind flutter_embed yet" before ever reaching `FlutterDroidtopPlugin`.
+   Fixed with one `RUNNABLE_KINDS` set covering all three kinds.
+2. **`FlutterEngine` construction must happen on the main thread.**
+   `onLoad()` runs on whatever thread `NativePluginRunner`'s AIDL call
+   lands on inside `:pluginhost` (a binder thread) -- but `FlutterEngine`'s
+   constructor, `FlutterLoader`'s init and
+   `DartExecutor.executeDartEntrypoint` are all `@UiThread`, enforced by
+   Flutter itself ("Methods marked with @UiThread must be executed on
+   the main thread"). `runOnMainThreadBlocking` now posts `onLoad`'s
+   whole body to the main `Looper` and blocks the calling thread on a
+   `CountDownLatch` (the same shape `invoke()` already used for
+   `MethodChannel` calls), rethrowing on the caller so `onLoad`'s normal
+   throw-to-report-failure contract is unchanged.
+3. **`DartEntrypoint.createDefault()` depends on a singleton this class
+   deliberately never touches.** That factory reads
+   `FlutterInjector.instance().flutterLoader()` -- the process-wide
+   singleton -- and throws ("DartEntrypoints can only be created once a
+   FlutterEngine is created") if IT was never initialized, which it
+   never is here on purpose (this class's own header comment: "never
+   touching the process-wide `FlutterInjector` singleton at all"). Fixed
+   by building the `DartEntrypoint` by hand from OUR OWN `flutterLoader`
+   instance's `findAppBundlePath()` -- already initialized by the
+   `FlutterEngine` constructor that just ran -- instead of calling
+   `createDefault()`.
+
+After all three fixes: the signed sample plugin's real Dart code ran
+inside `:pluginhost` and returned its real value ("Hello from Dart,
+running inside :pluginhost (flutter_embed)"), confirming `flutter_assets`
+loading from outside the APK works (point 1 above, "Rig-verified" in
+that section) was never actually the blocker. The forced-crash check
+also passed: `:pluginhost` died (confirmed via `ps` and logcat's
+"Process dev.droidtop.app:pluginhost ... has died"), droidtop's own
+process and UI stayed fully responsive throughout, and the plugin was
+disabled with "call failed across the binder" -- the same crash
+containment shape the `native_bundle` and `python` kinds' own rig checks
+already confirmed.
 
 **Open question for a real Flutter/Dart app being embedded this way:**
 this build's own sample only exercises `status_tile`, the simplest
