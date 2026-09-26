@@ -1382,6 +1382,15 @@ public class Launcher extends StatefulActivity<LauncherState>
         // When multiple pages are visible, show persistent page indicator
         mWorkspace.getPageIndicator().setShouldAutoHide(!state.hasFlag(FLAG_MULTI_PAGE));
 
+        if (ALL_APPS.equals(state)) {
+            // droidtop patch (not upstream Launcher3): the app drawer's
+            // own "Recent" row (RecentAppsStore) needs re-deriving on
+            // every open, not just when the app list itself changes --
+            // see ActivityAllAppsContainerView.refreshRecentApps's own
+            // doc comment.
+            getAppsView().refreshRecentApps();
+        }
+
         mPrevLauncherState = mStateManager.getCurrentStableState();
         if (mPrevLauncherState != state && ALL_APPS.equals(state)
                 // Making sure mAllAppsSessionLogId is null to avoid double logging.

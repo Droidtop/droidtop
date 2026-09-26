@@ -50,8 +50,12 @@ object PythonRuntimeManager {
     private data class RuntimeSpec(val version: String, val url: String, val sha256: String, val libpythonSoName: String, val stdlibDirName: String)
 
     /** The ABI this device actually needs -- same 64-bit-first choice [PluginRuntimeService.nativeLibraryDirFor] already makes for native_bundle plugins, so both runners agree on which of a plugin's two shipped ABIs is "this device's". */
+    // x86_64 wins whenever it is present -- see FlutterRuntimeManager.currentAbi's
+    // own doc comment for the real device (BlueStacks) this was confirmed broken on:
+    // an x86_64 process that also lists arm64-v8a (ARM translation) must not be
+    // handed an AArch64 .so.
     fun currentAbi(): String =
-        if (Build.SUPPORTED_64_BIT_ABIS.contains("x86_64") && !Build.SUPPORTED_64_BIT_ABIS.contains("arm64-v8a")) "x86_64" else "arm64-v8a"
+        if (Build.SUPPORTED_64_BIT_ABIS.contains("x86_64")) "x86_64" else "arm64-v8a"
 
     private fun readSpec(context: Context): RuntimeSpec? {
         val json = runCatching {

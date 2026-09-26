@@ -67,9 +67,23 @@ object FlutterRuntimeManager {
     private data class ArtifactSpec(val url: String, val sha256: String, val jarEntry: String, val soEntryInJar: String)
     private data class RuntimeSpec(val version: String, val libflutterSoName: String, val artifact: ArtifactSpec)
 
-    /** Same 64-bit-first ABI choice [PythonRuntimeManager.currentAbi] and [PluginRuntimeService.nativeLibraryDirFor] already make -- all three need to agree on which of a plugin's two shipped ABIs is "this device's". */
+    /**
+     * Same ABI choice [PythonRuntimeManager.currentAbi] and
+     * [PluginRuntimeService.nativeLibraryDirFor] already make -- all three
+     * need to agree on which of a plugin's two shipped ABIs is "this
+     * device's". x86_64 wins whenever it is present: an x86_64 device
+     * that ALSO lists arm64-v8a in [Build.SUPPORTED_64_BIT_ABIS] (BlueStacks
+     * does, for its ARM-translation layer) used to fall through to the old
+     * `&& !contains("arm64-v8a")` guard and pick arm64-v8a, downloading and
+     * loading an AArch64 libflutter.so on a real x86_64 process -- confirmed
+     * on the rig: `dlopen failed: ... has unexpected e_machine: 183
+     * (EM_AARCH64)`, acquire_content's first real search call ever run
+     * against a real flutter_embed plugin (2026-09-26). x86_64 is always
+     * this process's real native ABI when it is listed at all, so it must
+     * win outright, not only when arm64-v8a is absent.
+     */
     fun currentAbi(): String =
-        if (Build.SUPPORTED_64_BIT_ABIS.contains("x86_64") && !Build.SUPPORTED_64_BIT_ABIS.contains("arm64-v8a")) "x86_64" else "arm64-v8a"
+        if (Build.SUPPORTED_64_BIT_ABIS.contains("x86_64")) "x86_64" else "arm64-v8a"
 
     private fun readSpec(context: Context): RuntimeSpec? {
         val json = runCatching {

@@ -1117,6 +1117,20 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         // so its header protection is derived from this scrim instead.
     }
 
+    /**
+     * droidtop patch (not upstream Launcher3): re-derives the "Recent"
+     * row (RecentAppsStore, AlphabeticalAppsList.addRecentAppItems) each
+     * time the drawer opens. Closing and reopening the drawer does not
+     * otherwise rebuild AlphabeticalAppsList's cached adapter items --
+     * only a real app-list change (install/uninstall) does, via
+     * onAppsUpdated below -- so without this, a launch recorded since the
+     * last real data refresh would never show up until one happened to
+     * occur for an unrelated reason.
+     */
+    public void refreshRecentApps() {
+        mAH.get(AdapterHolder.MAIN).mAppsList.updateAdapterItems();
+    }
+
     @VisibleForTesting
     public void onAppsUpdated() {
         Log.d(TAG, "onAppsUpdated; number of apps: " + mAllAppsStore.getApps().length);
