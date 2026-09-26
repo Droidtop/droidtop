@@ -135,16 +135,4 @@ object ThemePrefs {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString("droidtop_theme_transitions", null)
 
-    fun setTransitionsSetting(context: Context, setting: String?) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
-            .apply { if (setting == null) remove("droidtop_theme_transitions") else putString("droidtop_theme_transitions", setting) }
-            .apply()
-        changeListeners.forEach { it() }
-    }
-
-    fun setControllerFamily(context: Context, family: EsDeControllerFamily) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().putString("droidtop_controller_family", family.id).apply()
-        changeListeners.forEach { it() }
-    }
 }
