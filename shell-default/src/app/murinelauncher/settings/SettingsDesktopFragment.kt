@@ -31,6 +31,9 @@ public final class SettingsDesktopFragment : AbstractSettingsFragment() {
         val nav = CatalogPreferenceNavigator(
             fragment = this,
             rootGroups = { ctx -> SettingsScreenRegistry.get("desktop_settings")?.groups?.invoke(ctx).orEmpty() },
+            enableSearch = true,
+            rootScreenId = "desktop_settings",
+            rootTitle = getString(R.string.pref_category_desktop_title),
         )
         navigator = nav
         nav.rebuild()

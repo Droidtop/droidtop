@@ -43,6 +43,9 @@ public final class SettingsGamingFragment : AbstractSettingsFragment() {
             fragment = this,
             rootGroups = { ctx -> GamingSettingsCatalog.settingsGroups(ctx) },
             skipGroupIds = setOf(GamingSettingsCatalog.GROUP_GLOBAL),
+            enableSearch = true,
+            rootScreenId = "gaming_settings",
+            rootTitle = getString(R.string.pref_category_gaming_title),
         )
         navigator = nav
         nav.rebuild()
