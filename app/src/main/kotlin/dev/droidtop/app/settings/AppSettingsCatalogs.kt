@@ -24,6 +24,7 @@ import dev.droidtop.library.consoles.availablePlayers
 import dev.droidtop.library.integrations.IntegrationCapability
 import dev.droidtop.library.integrations.IntegrationPlaceholders
 import dev.droidtop.library.integrations.IntegrationStore
+import dev.droidtop.library.integrations.AcquireContentSources
 import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.PluginKind
 import dev.droidtop.pluginhost.PluginTrustState
@@ -328,59 +329,21 @@ object AppSettingsCatalogs {
                                     )
                                     // Third-party "get games for this system"
                                     // hooks the user declared (docs/SPEC.md
-                                    // section 12). The system and its real
-                                    // destination folder are both known
-                                    // here, which is exactly what an
-                                    // acquire-content integration needs.
-                                    IntegrationStore.available(context, IntegrationCapability.ACQUIRE_CONTENT)
-                                        .forEach { integration ->
-                                            // A template that uses {query} needs a search
-                                            // string before it can run: it is offered as a
-                                            // text field, and committing the text runs it.
-                                            if (IntegrationPlaceholders.QUERY in
-                                                IntegrationPlaceholders.usedIn(integration.argumentsTemplate)
-                                            ) {
-                                                add(
-                                                    TextInputItem(
-                                                        id = "folder_integration_${integration.id}_${resolved.id}",
-                                                        title = integration.label,
-                                                        subtitle = integration.description
-                                                            ?: "Type what to search for; ${integration.packageName} opens with it for ${resolved.displayName}",
-                                                        value = "",
-                                                        onChange = { ctx, query ->
-                                                            if (query.isNotBlank()) {
-                                                                IntegrationStore.run(
-                                                                    context = ctx,
-                                                                    integration = integration,
-                                                                    systemId = resolved.id,
-                                                                    systemName = resolved.displayName,
-                                                                    systemFolder = folder,
-                                                                    query = query.trim(),
-                                                                )
-                                                            }
-                                                        },
-                                                    ),
-                                                )
-                                                return@forEach
-                                            }
-                                            add(
-                                                ActionItem(
-                                                    id = "folder_integration_${integration.id}_${resolved.id}",
-                                                    title = integration.label,
-                                                    subtitle = integration.description
-                                                        ?: "Opens ${integration.packageName} for ${resolved.displayName}",
-                                                    run = { ctx ->
-                                                        IntegrationStore.run(
-                                                            context = ctx,
-                                                            integration = integration,
-                                                            systemId = resolved.id,
-                                                            systemName = resolved.displayName,
-                                                            systemFolder = folder,
-                                                        )
-                                                    },
-                                                ),
-                                            )
-                                        }
+                                    // section 12/12a): the JSON and plugin
+                                    // mechanisms unified into ONE "Get
+                                    // games" screen (AcquireContentSources,
+                                    // library-core) -- the system and its
+                                    // real destination folder are both
+                                    // known here, exactly what that screen
+                                    // needs.
+                                    add(
+                                        NestedScreenItem(
+                                            id = "folder_acquire_${resolved.id}",
+                                            title = "Get games",
+                                            subtitle = "Search an installed acquire_content plugin or integration for ${resolved.displayName}",
+                                            inline = AcquireContentSources.systemScreen(resolved.id, resolved.displayName, folder),
+                                        ),
+                                    )
                                     // EmuDeck-style setup helper: firmware
                                     // check against the real Batocera BIOS
                                     // registry, when this system needs any.

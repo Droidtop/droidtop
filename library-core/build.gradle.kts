@@ -93,6 +93,15 @@ tasks.withType<Test>().configureEach { dependsOn(platformDatabaseSeed) }
 
 dependencies {
     implementation(project(":runtime-common"))
+    // §12a's plugin half needs the same JSON-integration store this
+    // module already owns (Integration/IntegrationStore, §12) unified into
+    // one AcquireContentSources mechanism -- both :app's per-system
+    // settings screen and :shell-gamepad's gamelist options menu depend on
+    // this module already and need real PluginRecord/PluginResult types
+    // resolvable at THEIR OWN compile classpath, not just this module's
+    // internal one (the exact RoomDatabase lesson two comments up) -- api,
+    // not implementation.
+    api(project(":plugin-host"))
     // Real integration, not a duplicate: NativeAppProvider sources its app
     // list and icons from shell-default's own real IconCache/LauncherApps
     // machinery (the same one Standard's app drawer uses) instead of a

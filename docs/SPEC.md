@@ -671,11 +671,42 @@ sources rather than assumed from Nova/Apex's feature lists:
 | Smartspace/clock widget | HAVE | `widget/smartspace/{MurineClockView,SmartspaceMode}.kt` |
 | Configurable QSB with web search providers | HAVE | `widget/search/{SearchProvider,MurineSearchBarView}.kt` (8 providers + custom) |
 | Gestures: double-tap and swipe-down, each assignable to any of nothing/lock screen/open notifications/open app drawer (**built 2026-09-26**, was two fixed on/off gestures) | HAVE, exposed in Settings | `GestureAction` enum + `perform(Launcher)` (`com.android.launcher3.touch`), `LauncherPrefs.GESTURE_DOUBLE_TAP_ACTION`/`GESTURE_SWIPE_DOWN_ACTION`, picked from `SettingsHomeFragment`'s `RadioGroupPreference` rows (`DOUBLE_TAP_ACTION`, `SWIPE_DOWN_ACTION`), applied in `WorkspaceTouchListener.java`/`NotificationSwipeController.kt`; an existing install's old two-boolean prefs are carried over once by `GestureActionMigration` |
-| App-drawer/QSB search over droidtop's own library (games, not just installed apps) | **LACK** | `DefaultAppSearchAlgorithm.java` only ever produces `AdapterItem.asApp`; backlog |
+| App-drawer/QSB search over droidtop's own library (games, not just installed apps) | **built this change** | `DefaultAppSearchAlgorithm.doSearch` also queries `LibrarySearch.source`; see below |
 | A home-screen widget of droidtop's own (a "full computer" feature neither Nova nor Apex can offer, since they have no game library) | **built this change** | `ContinuePlayingWidgetProvider.kt` (see below) |
 | Global settings, Desktop settings rendered in the shell's own row component, pad-navigable | HAVE (fixed 2026-09-24/25, UI pass H4) | `DroidtopWideSettings.kt`, `SettingsGlobalFragment.kt`'s `CatalogPreferenceNavigator` |
 | Icon-pack/drawer/hidden-apps settings pages left as stock Android preference UI | HAVE, and correct: H4's own fix text scopes the shell's row component to Global/Desktop only, and explicitly keeps these stock | `docs/audit-2026-09-24/ui-assessment.md` H4 |
 | Plugin contributions in the launcher (status tiles, search providers, app actions, launcher widgets from third-party engines/tools) | **not yet buildable** — plugin API is being rebuilt (agent `plugins`, §12/12a) | seam only, see below |
+
+**Library-aware app-drawer/QSB search (built this change).**
+`DefaultAppSearchAlgorithm.getTitleMatchResult` only ever walked installed
+apps; a played game's own title never showed up searching the drawer even
+though one library across sources is droidtop's whole pitch. `:shell-
+default` cannot depend on `:library-core` directly (`:library-core`
+already depends on `:shell-default` for icon-cache reuse,
+`NativeAppProvider` -- the reverse would be circular), so the seam is
+`dev.droidtop.library.search.LibrarySearch` in `:runtime-common` (which
+depends on nothing else in the repo): a plain query-to-results callback,
+registered once from `DroidtopApplication.onCreate`
+(`LibrarySearchBridge`), backed by the same `Library`/`LibraryCore`
+instance and in-RAM index every other surface reads -- never a second
+index or folder walk, and the callback only ever filters an
+already-scanned snapshot (`StateFlow.value`), so a keystroke costs no
+disk read. `BaseAllAppsAdapter` gained `VIEW_TYPE_LIBRARY_GAME`/
+`AdapterItem.asGame`: a game result renders as its own full-width row
+(artwork + title, `all_apps_game_result.xml`), launching through the same
+`GameLaunchActivity.intentFor` Intent a pinned game icon or the "Continue
+playing" widget uses. The artwork decode itself
+(`LibraryArtwork.decodeSquareBitmap`) moved into `:runtime-common` from
+being a private function on `LauncherGamesActivity`, so both call sites
+share one mechanism. Rig-verified on BlueStacks against the real shared
+library: searching "beingadik" in the app drawer surfaced "BeingADIK
+0.8.3 scrappy" as its own row with its real cover art, alongside (none,
+in this case, since no installed app matched) ordinary app results;
+tapping it dispatched through the real launch path (confirmed by the
+real, correct refusal toast when Desktop mode's container wasn't running
+for that native-Linux build -- not a search bug, the expected behaviour
+of that same launch path from anywhere else); searching "chrome"
+continued to show the ordinary app icon unaffected.
 
 **RadioGroupBottomSheet renders no options on this rig -- four real fixes
 landed, root cause still open (2026-09-26).** Verifying the gesture-action
@@ -9336,6 +9367,46 @@ catalog-repo install source for plugins; `startJob` support for
 python-kind plugins; and the rig check for the python leg specifically
 (queued, `device/QUEUE.md`) — the `native_bundle` leg's own rig check
 (`dq-plugins-01`) already passed.
+
+**The "Get games" UI, unifying both acquire_content mechanisms (built
+2026-09-26).** Until now `acquire_content` had a real JSON half (§12) and
+a real plugin half (above) that could install, approve and show
+"Running", but nothing in droidtop's own UI ever actually called a
+plugin's `invoke`/`startJob` for this capability -- the settings screen's
+only generic plugin trigger was the `status_tile` "Call ..." debug row.
+`AcquireContentSources` (`library-core`) is the one mechanism now: it
+lists every installed source (plugins declaring `PluginCapability.
+ACQUIRE_CONTENT` via `PluginStore.runnableFor`, and JSON integrations of
+the matching `IntegrationCapability` via `IntegrationStore.available`,
+plugins first) and builds the ONE "Get games" `CatalogScreen` both real
+surfaces push: a system's own settings screen (`AppSettingsCatalogs.
+folderScreen`, :app) and Gaming's gamelist Select-button options menu
+(`GamelistOptionsMenu`, :shell-gamepad, pushed through the same
+`CatalogNavigator` its own Settings section already uses, so the query
+field gets real controller/touch text entry for free). A JSON source
+keeps its original one-way shape (a text field or button that fires an
+`am start` and never hears back); a plugin source opens its own search
+screen -- a live query field and a focusable results list, each result a
+real `AsyncActionItem` that starts the download job and shows its
+progress inline, then rescans the library (`LibraryRescan`) on success so
+the file appears without a separate manual step. No installed source at
+all shows a plain row saying so, rather than hiding the whole "Get games"
+entry.
+
+**The wire contract this UI defines** (none existed before it -- this is
+the first real caller of a plugin's `acquire_content` `invoke`/`startJob`
+anywhere in droidtop): `invoke(ACQUIRE_CONTENT, {"action": "search",
+"query", "systemId", "systemName"})` answers
+`PluginResult.success(values = {"entries": <a JSON array string>})`,
+where droidtop reads only `title` (or `name`), `platform`, and a size
+label (`size_str`, `sizeLabel`, or a `links` array's first entry's own
+`size_str`) from each element -- everything else is opaque and
+round-tripped back unread. `startJob(ACQUIRE_CONTENT, {"action":
+"download", "entry": <that exact JSON object>, "destinationPath": <the
+system's real, already-resolved folder>, "linkIndex": "0"})` is the
+download, progress/completion over the normal job callback. Deliberately
+generic (no plugin-specific field names): any `acquire_content` plugin
+speaks this same shape.
 
 **A python-kind plugin could never actually run (found and fixed
 2026-09-26).** The Plugins settings row and the "Download Python runtime"

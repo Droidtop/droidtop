@@ -28,6 +28,8 @@ import dev.droidtop.library.scraper.importGamelistXml
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.shell.gamepad.pc.PC_SYSTEM_ID
 import dev.droidtop.library.scraper.scrapeSystemArtwork
+import dev.droidtop.library.integrations.AcquireContentSources
+import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
@@ -153,6 +155,12 @@ internal fun GamelistOptionsMenu(
     var sort by remember { mutableStateOf(GamelistSortPrefs.get(context, groupKey)) }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
+    // Non-null while the "Get games" screen (AcquireContentSources,
+    // docs/SPEC.md 12/12a) is up -- rendered by the SAME generic
+    // CatalogNavigator Gaming's own Settings section uses, so real
+    // controller/touch text entry and a focusable results list come
+    // for free rather than a second hand-built input widget here.
+    var acquireScreen by remember { mutableStateOf<CatalogScreen?>(null) }
     var filter by remember { mutableStateOf(GamelistFilterPrefs.get(context, groupKey)) }
     // Per-system launch-screen default (docs/SPEC.md section 4c: "Select
     // which display to open ROMs from this tab" / "Tune individual
@@ -195,6 +203,7 @@ internal fun GamelistOptionsMenu(
                 add("Launch screen: " + (systemLaunchScreen?.label ?: "Ask"))
                 add("Scrape this system")
                 add("Import gamelist.xml")
+                add("Get games")
             }
             // Offered wherever PC or engine games are actually on
             // screen, which is the same "act on what you are looking
@@ -418,12 +427,43 @@ internal fun GamelistOptionsMenu(
                     onScraped()
                 }
             }
+            "Get games" -> {
+                if (busy) return
+                val id = systemId ?: return
+                busy = true
+                scope.launch {
+                    val folder = withContext(Dispatchers.IO) { consoleFoldersFor(id).firstOrNull() }
+                    busy = false
+                    if (folder == null) {
+                        status = "No folder for $groupLabel in any games root."
+                    } else {
+                        acquireScreen = AcquireContentSources.systemScreen(id, groupLabel, folder)
+                    }
+                }
+            }
             STORES_AND_FOLDERS -> {
                 onDismiss()
                 onOpenStores()
             }
             "Close" -> onDismiss()
         }
+    }
+
+    val openAcquireScreen = acquireScreen
+    if (openAcquireScreen != null) {
+        Dialog(onDismissRequest = { acquireScreen = null }) {
+            CatalogNavigator(
+                root = openAcquireScreen,
+                onExit = {
+                    acquireScreen = null
+                    // A download may have just landed a real file in
+                    // this system's folder -- rescan so it shows up,
+                    // same as every other library-changing action here.
+                    onScraped()
+                },
+            )
+        }
+        return
     }
 
     Dialog(onDismissRequest = onDismiss) {
