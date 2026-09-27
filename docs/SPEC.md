@@ -2764,6 +2764,74 @@ notifications, quick launch, widgets -- not a stale Gaming/Desktop companion and
 system fallback), confirm the mode switcher's "Android" entry opens that same chosen
 launcher, then switch back to Standard afterwards and confirm the second screen follows.
 
+### The Alternative forwarder needed a nudge to keep the second screen (rig, 2026-09-27)
+
+Verifying "The Alternative forwarder keeps the second screen" above on the console (droidtop
+holding Home via `AlternativeLauncherActivity`, forwarding to the console's own stock
+launcher) found the theory incomplete: after droidtop self-updated (a fresh process, no
+droidtop Activity resumed anywhere at all) the secondary display stayed on Android's own
+mirror-of-the-default-display fallback rather than picking up droidtop's newly-registered
+Standard content, even though droidtop still held Home. The platform's automatic
+SECONDARY_HOME placement does not proactively re-evaluate an already-established mirror on
+its own -- it needs a nudge, the exact same platform behaviour
+`LaunchDisplay.coverVacatedDisplays` was already built to work around for game launches (that
+function's own doc comment: "The platform's own SECONDARY_HOME placement can't be relied on
+for this ... so droidtop places its own"). Nothing was left running anywhere to catch this a
+few seconds later either: the periodic self-heal (section 4c, "Self-detection, built") only
+runs while `MainActivity` itself is started, and nothing app-hosted is running at all while
+the person is on Standard or an Alternative-forwarded launcher.
+
+Fixed by reusing the SAME pattern at the one remaining place it was missing:
+`reassertSecondaryDisplays` (`:shell-default`) explicitly starts
+`dev.droidtop.display.SecondaryDisplayActivity` on every attached secondary display
+(`DisplayManager.displays`, filtered to non-default `FLAG_PRESENTATION` displays), called
+from both `HomeTrampolineActivity.forwardToStandard` and `AlternativeLauncherActivity`'s
+forward path, right alongside the `Modes.setLastMode(LAUNCHER)` call each already makes. A
+string component name (`Intent().setClassName(...)`), not a class reference: `:shell-default`
+does not depend on `:display`, the same reason `HomeTrampolineActivity` already names
+`dev.droidtop.app.MainActivity` as a string rather than importing it.
+
+**Verified live**: droidtop self-updated (969 -> the fixed build) with "Install debug
+builds" Off while itself running a debug-signed install -- confirmed the updater fix in the
+same pass (section 10b) -- then, with Alternative set to the console's own stock launcher
+(`com.retroidpocket.gamelauncher`), a Home press forwarded cleanly with no flash and no loop,
+and the mode switcher's "Android" row opened that same launcher.
+
+### The task model, and one droidtop in Recents (owner correction, 2026-09-27)
+
+The same verification pass also found droidtop's own Recents entries reading as multiple app
+instances -- one process (confirmed via `dumpsys`), but several visible tasks:
+`dev.droidtop.app/.MainActivity` relocated onto the secondary display (an unrelated,
+pre-existing "Main screen: Second display when present" placement, not caused by this pass),
+`dev.droidtop.app/com.android.launcher3.Launcher` left over from earlier Standard navigation,
+and (while it was open) the Settings task. Checked each against its manifest declaration:
+
+- `HomeTrampolineActivity` and `AlternativeLauncherActivity` (the two real `CATEGORY_HOME`
+  holders) already declare `excludeFromRecents="true"` -- correct, and unchanged.
+- `com.android.launcher3.Launcher` (Standard's actual home screen UI, reached only by
+  forwarding from the activity above, never directly) did NOT -- its own real Home screen
+  showing up as a separately-switchable Recents card is not how a real Home screen behaves on
+  stock Android either. Now declares `excludeFromRecents="true"` too, alongside its existing
+  `taskAffinity=""` (kept -- a launcher's own task must not merge with an ordinary app task;
+  unrelated to the Recents-card question).
+- `com.android.launcher3.settings.SettingsActivity` (Settings' own task, `taskAffinity=
+  "dev.droidtop.app.settings"`, deliberate since dq-onboard-02 -- a shared task let "Home
+  settings" clear a running Gaming/Desktop shell out from under it with `CLEAR_TASK`) already
+  declares `autoRemoveFromRecents="true"`: it drops out of Recents the moment it is left, so
+  it only ever appears as its own card while genuinely still open, the same as most Settings
+  apps' own Recents behaviour. Left as-is; the owner's own caveat ("if deliberate, it still
+  shouldn't read as a second instance") is already satisfied by the auto-remove, not by full
+  exclusion, since full exclusion would make a person unable to switch back into Settings via
+  Recents while it is legitimately still open.
+- `MainActivity` itself carries no special Recents handling and needs none: it is the ONE
+  real app-hosted task (Gaming/Desktop), exactly what a person expects to find droidtop under
+  in Recents.
+
+**Needs a rig check**: with a second launcher installed and Alternative active, open Recents
+(the user way -- the Recents gesture/button, not `dumpsys`) after a self-update and after
+using Standard normally, and confirm exactly one droidtop card appears (or none, when nothing
+app-hosted is running), never `com.android.launcher3.Launcher` as a separate switchable entry.
+
 ## 4d. The companion screen, designed (research 2026-09-01)
 
 droidtop's companion currently renders a status bar, notifications and

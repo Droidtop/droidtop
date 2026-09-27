@@ -75,6 +75,10 @@ class AlternativeLauncherActivity : Activity() {
         // it reads the right mode, which needs this recorded the same
         // way HomeTrampolineActivity.forwardToStandard records it.
         dev.droidtop.library.settings.Modes.setLastMode(this, dev.droidtop.library.settings.Mode.LAUNCHER)
+        // Nudges the platform's own SECONDARY_HOME placement rather than
+        // waiting for it to notice on its own -- see that function's own
+        // doc comment for the confirmed-live gap this closes.
+        reassertSecondaryDisplays(this)
         val forwardIntent = intent.apply {
             component = forwardTo
             removeExtra(BackButtonMenu.EXTRA_MODE)
