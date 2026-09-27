@@ -792,10 +792,27 @@ object AppSettingsCatalogs {
                         ToggleItem(
                             id = "updates_debug_builds",
                             title = "Install debug builds",
-                            subtitle = if (update.debugBuilds(context)) {
-                                "Debug builds run several times slower. Turn this off and check again to go back"
-                            } else {
-                                "Much slower builds for debugging droidtop itself. Leave this off to play"
+                            // Real question this answers (rig,
+                            // p1-dt-updater-debug-build-mismatch): a
+                            // device can be ON a debug build (a fresh
+                            // sideload, or CI's own artifact) while this
+                            // stays Off, which is the normal starting
+                            // state, not a stuck one. Both variants are
+                            // built from the same commit and signed with
+                            // the same persistent CI key (app/build.gradle.kts),
+                            // so Check now here correctly detects a newer
+                            // build either way and installs cleanly over
+                            // a debug build even with this Off -- turning
+                            // it off and checking again is exactly how a
+                            // debug install gets back to the faster
+                            // release one.
+                            subtitle = when {
+                                update.debugBuilds(context) ->
+                                    "Debug builds run several times slower. Turn this off and check again to go back"
+                                ctxIsDebuggable(context) ->
+                                    "Currently running a debug build. Check now still finds and installs the faster " +
+                                        "release build with this off"
+                                else -> "Much slower builds for debugging droidtop itself. Leave this off to play"
                             },
                             current = update.debugBuilds(context),
                             onToggle = { ctx, value -> update.setDebugBuilds(ctx, value) },

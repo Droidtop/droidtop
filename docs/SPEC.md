@@ -8957,6 +8957,29 @@ in `.git/config`; a separate `publish` job with `contents: write` downloads the
 `release-promote.yml` does. Every action is pinned to a commit SHA; moving one
 is a reviewed commit.
 
+**Debug-build-installed, "Install debug builds" Off -- investigated, not a
+bug (rig, p1-dt-updater-debug-build-mismatch, 2026-09-27).** The console was
+found on a debug-signed install with this toggle Off and Build channel
+Unstable; the concern was that Check now would either misreport "already
+current" (comparing against the wrong track) or hand a release-signed APK to
+the installer over a debug-signed app and fail with a raw signature
+mismatch. Neither happens: `AppSelfUpdate.fetch`'s `wantDebug` only changes
+which of the channel's two APK names/digests it reads out of the SAME
+`release-info.json` entry (one `versionCode` for both, written by one build
+job -- see "What is published is a release build" above), so "is this newer"
+is unaffected by the toggle either way, and both APKs are signed with the
+SAME persistent CI key (`app/build.gradle.kts`, both `debug{}` and
+`release{}` set `signingConfig = signingConfigs.getByName("droidtop")`) --
+exactly the "installed debug builds update to it by themselves" design
+already recorded above, confirmed by re-reading the actual signing config
+rather than assuming debug and release diverge the way a locally-built,
+unsigned debug APK would. The one real gap was the Settings copy: the
+toggle's subtitle said nothing about this case, reading as if turning it off
+might strand a debug install. `AppSettingsCatalogs.updatesScreen` now shows
+a third subtitle when the running build is itself debuggable
+(`ApplicationInfo.FLAG_DEBUGGABLE`) and the toggle is Off, naming what
+actually happens: Check now still finds and installs the release build.
+
 **Branch protection on main (2026-09-25).** `main` is protected via the
 GitHub API: force-pushes and deletion are blocked, linear history is required,
 and the "Android build" workflow must pass (strict status checks). This
