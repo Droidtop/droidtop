@@ -92,6 +92,10 @@ class HomeTrampolineActivity : Activity() {
         // 4c, "The Alternative forwarder keeps the second screen"; this
         // trampoline's own forward path had the identical gap).
         Modes.setLastMode(this, Mode.LAUNCHER)
+        // Nudges the platform's own SECONDARY_HOME placement rather than
+        // waiting for it to notice on its own -- see that function's own
+        // doc comment for the confirmed-live gap this closes.
+        reassertSecondaryDisplays(this)
         val redirect = Intent(Intent.ACTION_MAIN).apply {
             setClassName(packageName, STANDARD_ACTIVITY)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

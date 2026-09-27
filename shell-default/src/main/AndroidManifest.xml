@@ -106,6 +106,13 @@
         Activity already names the component explicitly (BackButtonMenu,
         HomeTrampolineActivity, pinned-game shortcuts), which needs no
         filter match at all.
+
+        droidtop patch: excludeFromRecents, matching HomeTrampolineActivity/
+        AlternativeLauncherActivity below -- confirmed live (owner,
+        2026-09-27) that this task showed up as its own card in Recents,
+        reading as a second droidtop instance next to MainActivity's task
+        (docs/SPEC.md 2c, "The task model"). A real Home screen is reached
+        through Home, never switched to from Recents, on stock Android too.
         -->
         <activity
             android:name="com.android.launcher3.Launcher"
@@ -118,6 +125,7 @@
             android:resizeableActivity="true"
             android:resumeWhilePausing="true"
             android:taskAffinity=""
+            android:excludeFromRecents="true"
             android:exported="true"
             android:enabled="true">
             <intent-filter>
