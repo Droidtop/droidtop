@@ -84,6 +84,28 @@ class PluginCrashPolicy(
         return runner.startJob(record.manifest.id, capability, args)
     }
 
+    /**
+     * Fires [event] at [record] and returns its answer, or null when
+     * [record] never subscribed ([PluginManifest.subscribedEvents]) --
+     * the check happens here, BEFORE any load/bind, so a plugin that
+     * ignores every event costs nothing (no process spin-up, no binder
+     * call) on droidtop's own state changes. Same runnable/re-verify
+     * gates as [invoke]: a disabled, denied or tampered-with plugin
+     * never receives an event either.
+     */
+    suspend fun notifyEvent(record: PluginRecord, event: dev.droidtop.pluginhost.PluginEvent, args: Map<String, String>): PluginResult? {
+        if (event.id !in record.manifest.subscribedEvents) return null
+        if (!record.runnable()) return null
+        if (record.manifest.kind !in RUNNABLE_KINDS) return null
+        if (PluginBundleInstaller.verifyInstalled(PluginStore.root(context), record) != null) {
+            PluginStore.disableWithReason(context, record.manifest.id, "files changed on disk since approval")
+            return null
+        }
+        val dir = PluginStore.payloadDirFor(context, record.manifest.id)
+        if (!runner.load(record, dir.absolutePath)) return null
+        return runner.notifyEvent(record.manifest.id, event, args)
+    }
+
     fun cancelJob(pluginId: String, jobId: String) {
         runner.cancelJob(pluginId, jobId)
     }

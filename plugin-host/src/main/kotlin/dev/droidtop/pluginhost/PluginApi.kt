@@ -53,6 +53,27 @@ interface DroidtopPlugin {
 
     /** Best-effort: asks a running job to stop. A plugin that ignores this still gets unloaded on disable/uninstall. */
     fun cancelJob(jobId: String) {}
+
+    /**
+     * The event-hook half of the API (docs/SPEC.md 12a "Event hooks"):
+     * called when droidtop fires a [dev.droidtop.pluginhost.PluginEvent]
+     * this plugin declared in [PluginManifest.subscribedEvents] --
+     * [dev.droidtop.pluginhost.PluginRuntimeService] never delivers an
+     * event this plugin didn't subscribe to, the same "never routes an
+     * undeclared one here" guarantee [invoke] already has for
+     * capabilities. Default is a no-op success, so a plugin that
+     * subscribes to nothing (the default) is never affected by any event
+     * regardless of what droidtop fires.
+     *
+     * Bounded by the same call watchdog as [invoke]
+     * ([dev.droidtop.pluginhost.PluginRunner.CALL_TIMEOUT_MS]) -- this is
+     * a quick "do you want to react" check, not itself a place to do
+     * slow work. A plugin that wants to react with a real long-running
+     * action (a core download, a patch) says so in its answer instead of
+     * doing it here: see [dev.droidtop.pluginhost.PluginEvent]'s own doc
+     * comment for the `startJob`-signaling shape.
+     */
+    fun onEvent(event: PluginEvent, args: PluginArgs): PluginResult = PluginResult.success()
 }
 
 /** What a plugin calls from inside [DroidtopPlugin.startJob] to report progress and, exactly once, completion. */

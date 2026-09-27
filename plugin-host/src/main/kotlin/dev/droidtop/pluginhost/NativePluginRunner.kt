@@ -127,6 +127,30 @@ class NativePluginRunner(
         }
     }
 
+    /**
+     * [PluginEvent]'s own analogue of [invoke] -- same watchdog, same
+     * crash-containment path, sent over the same [IPluginRuntime.invoke]
+     * call with the event's id in the capability slot (see
+     * [PluginRuntimeService.invoke]'s own doc comment for why this
+     * shares the one AIDL method rather than adding a second).
+     */
+    suspend fun notifyEvent(pluginId: String, event: PluginEvent, args: Map<String, String>): PluginResult {
+        val runtime = connection ?: ensureConnected() ?: return PluginResult.failure("plugin process is not running")
+        val argsJson = JSONObject().apply { args.forEach { (k, v) -> put(k, v) } }.toString()
+        return try {
+            val resultJson = withTimeout(PluginRunner.CALL_TIMEOUT_MS) {
+                runtime.invoke(pluginId, event.id, argsJson)
+            } ?: return PluginResult.failure("plugin returned no result")
+            decode(resultJson)
+        } catch (e: TimeoutCancellationException) {
+            onCrash(pluginId, event.id, "event call timed out after ${PluginRunner.CALL_TIMEOUT_MS}ms")
+            PluginResult.failure("timed out")
+        } catch (e: Exception) {
+            onCrash(pluginId, event.id, e.message ?: "event call failed across the binder")
+            PluginResult.failure(e.message ?: "call failed")
+        }
+    }
+
     private fun decode(resultJson: String): PluginResult {
         return try {
             val obj = JSONObject(resultJson)

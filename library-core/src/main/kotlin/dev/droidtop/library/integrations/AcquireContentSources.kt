@@ -10,6 +10,7 @@ import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.pluginhost.PluginCapability
 import dev.droidtop.pluginhost.PluginCrashPolicy
+import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginStore
 import java.io.File
@@ -90,20 +91,18 @@ data class AcquireContentResult(
 data class AcquireDownloadOutcome(val ok: Boolean, val message: String, val filePath: String?)
 
 /**
- * A live download job: holds the binder connection its progress/
- * completion arrive over. [close] MUST be called once the job is done
- * (completed, cancelled, or the hosting screen leaving) so :pluginhost's
- * connection doesn't linger -- same "short-lived policy, torn down right
- * after" rule the one other real call site (the Settings "Call ... status
- * tile" row) already follows for the plain `invoke()` case.
+ * A live download job -- now a thin handle onto [PluginJobsCenter]'s own
+ * tracking ([trackingId]) rather than a private binder connection this
+ * class owned itself (docs/SPEC.md 12a "Jobs": "reused by acquire_content
+ * downloads so there's one mechanism"). [close] is a no-op kept only so
+ * existing call sites ([runDownloadAndAwait]) don't need to change shape
+ * -- [PluginJobsCenter] owns tearing its own policy down on completion.
  */
 class AcquireContentJob internal constructor(
-    private val policy: PluginCrashPolicy,
-    private val pluginId: String,
-    val jobId: String,
+    val trackingId: String,
 ) {
-    fun cancel() = policy.cancelJob(pluginId, jobId)
-    fun close() = policy.shutdown()
+    fun cancel() = PluginJobsCenter.cancel(trackingId)
+    fun close() {}
 }
 
 object AcquireContentSources {
@@ -365,10 +364,19 @@ object AcquireContentSources {
         onProgress: (percent: Int, statusLine: String) -> Unit,
         onComplete: (AcquireDownloadOutcome) -> Unit,
     ): AcquireContentJob? {
-        val policy = PluginCrashPolicy(
-            context.applicationContext,
-            onJobProgress = { _, _, percent, statusLine -> onProgress(percent, statusLine) },
-            onJobComplete = { _, _, jobResult ->
+        val trackingId = PluginJobsCenter.start(
+            context = context,
+            record = source.record,
+            capability = PluginCapability.ACQUIRE_CONTENT,
+            args = mapOf(
+                "action" to "download",
+                "entry" to result.raw,
+                "destinationPath" to systemFolder.absolutePath,
+                "linkIndex" to linkIndex.toString(),
+            ),
+            title = "Downloading ${result.title}",
+            onProgress = onProgress,
+            onComplete = { jobResult ->
                 onComplete(
                     AcquireDownloadOutcome(
                         ok = jobResult.ok,
@@ -377,22 +385,8 @@ object AcquireContentSources {
                     ),
                 )
             },
-        )
-        val jobId = policy.startJob(
-            source.record,
-            PluginCapability.ACQUIRE_CONTENT,
-            mapOf(
-                "action" to "download",
-                "entry" to result.raw,
-                "destinationPath" to systemFolder.absolutePath,
-                "linkIndex" to linkIndex.toString(),
-            ),
-        )
-        if (jobId == null) {
-            policy.shutdown()
-            return null
-        }
-        return AcquireContentJob(policy, source.record.manifest.id, jobId)
+        ) ?: return null
+        return AcquireContentJob(trackingId)
     }
 
     /**

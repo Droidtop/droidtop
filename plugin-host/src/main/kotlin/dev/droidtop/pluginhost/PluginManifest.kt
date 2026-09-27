@@ -83,6 +83,20 @@ data class PluginManifest(
      * calls through [PluginContext].
      */
     val boundServiceTargets: Set<String> = emptySet(),
+    /**
+     * [dev.droidtop.pluginhost.PluginEvent] ids this plugin wants
+     * delivered to [DroidtopPlugin.onEvent] (docs/SPEC.md 12a "Event
+     * hooks"). Declared, not implied -- same shape as [boundServiceTargets]
+     * and [requestsRoot]: an id droidtop doesn't recognise (an older
+     * plugin build subscribing to an event a newer droidtop retired, or
+     * a typo) is silently never matched rather than a validation
+     * failure, so a manifest stays forward- and backward-compatible
+     * across [PLUGIN_EVENT_CONTRACT_VERSION] bumps the same way an
+     * unrecognised [PluginCapability] id already is in [PluginManifest.fromJson].
+     * Empty for a plugin that never reacts to droidtop's own state
+     * changes, which is most plugins.
+     */
+    val subscribedEvents: Set<String> = emptySet(),
 ) {
     companion object {
         private val REQUIRED_ABIS = setOf("arm64-v8a", "x86_64")
@@ -135,6 +149,8 @@ data class PluginManifest(
             val abis = buildSet { for (i in 0 until abisJson.length()) add(abisJson.optString(i)) }
             val boundTargetsJson = json.optJSONArray("boundServiceTargets") ?: JSONArray()
             val boundServiceTargets = buildSet { for (i in 0 until boundTargetsJson.length()) add(boundTargetsJson.optString(i)) }
+            val subscribedEventsJson = json.optJSONArray("subscribedEvents") ?: JSONArray()
+            val subscribedEvents = buildSet { for (i in 0 until subscribedEventsJson.length()) add(subscribedEventsJson.optString(i)) }
             return PluginManifest(
                 id = id,
                 origin = origin,
@@ -150,6 +166,7 @@ data class PluginManifest(
                 runtimeVersion = optNullableString(json, "runtimeVersion"),
                 payload = payload,
                 boundServiceTargets = boundServiceTargets,
+                subscribedEvents = subscribedEvents,
             )
         }
     }

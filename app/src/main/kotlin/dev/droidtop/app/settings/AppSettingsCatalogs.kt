@@ -26,6 +26,10 @@ import dev.droidtop.library.integrations.IntegrationCapability
 import dev.droidtop.library.integrations.IntegrationPlaceholders
 import dev.droidtop.library.integrations.IntegrationStore
 import dev.droidtop.library.integrations.AcquireContentSources
+import dev.droidtop.library.integrations.PluginEventBus
+import dev.droidtop.library.integrations.PluginAppStatus
+import dev.droidtop.library.integrations.PluginSettingsRows
+import dev.droidtop.library.integrations.PluginJobsScreen
 import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.PluginKind
 import dev.droidtop.pluginhost.PluginTrustState
@@ -77,6 +81,7 @@ object AppSettingsCatalogs {
     const val SCREEN_PLATFORMS = "manage_platforms"
     const val SCREEN_INTEGRATIONS = "integrations"
     const val SCREEN_PLUGINS = "plugins"
+    const val SCREEN_JOBS = "plugin_jobs"
     const val SCREEN_WINDOWS_GAMES = "windows_games"
     const val SCREEN_PC_STORES = "pc_stores"
     const val SCREEN_ANDROID_SETTINGS = "android_settings"
@@ -94,6 +99,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(platformsScreen())
         SettingsScreenRegistry.register(integrationsScreen())
         SettingsScreenRegistry.register(pluginsScreen())
+        SettingsScreenRegistry.register(PluginJobsScreen.screen())
         SettingsScreenRegistry.register(windowsGamesScreen())
         SettingsScreenRegistry.register(pcStoresScreen())
         SettingsScreenRegistry.register(androidSettingsScreen())
@@ -181,6 +187,18 @@ object AppSettingsCatalogs {
                         subtitle = "Installed plugin code -- searched, approved and run in its own process, never droidtop's databases",
                         registryId = SCREEN_PLUGINS,
                         valueLabel = { pluginsValueLabel },
+                    ),
+                    // The shared jobs surface (docs/SPEC.md 12a
+                    // "Jobs"): every plugin download or long-running
+                    // action, wherever it was started -- a Get-games
+                    // download, an app_status action, an event-hook
+                    // reaction -- shows up here with live progress and
+                    // cancel.
+                    NestedScreenItem(
+                        id = "console_systems_plugin_jobs",
+                        title = "Jobs",
+                        subtitle = "Plugin downloads and long-running actions, with progress and cancel",
+                        registryId = SCREEN_JOBS,
                     ),
                     NestedScreenItem(
                         id = "console_systems_enginehost",
@@ -299,6 +317,28 @@ object AppSettingsCatalogs {
                                 add(systemChoiceItem(context, folder, systems))
                                 if (resolved != null) {
                                     add(playerChoiceItem(context, resolved))
+                                    // docs/SPEC.md 12a "app_status": where droidtop
+                                    // shows an installed app -- here, the emulator
+                                    // this system's player choice actually resolved
+                                    // to -- an approved app_status plugin managing
+                                    // that same package gets a real entry, not just
+                                    // its own separate Plugins-screen row. On-demand
+                                    // only (this screen's own single open), never
+                                    // list rendering.
+                                    val chosenPlayer = resolvePlayer(context, resolved)
+                                    if (chosenPlayer != null) {
+                                        val appStatusPlugins = PluginAppStatus.sourcesFor(context, chosenPlayer.packageName)
+                                        appStatusPlugins.forEach { record ->
+                                            add(
+                                                NestedScreenItem(
+                                                    id = "folder_player_app_status_${resolved.id}_${record.manifest.id}",
+                                                    title = "${chosenPlayer.name}: ${record.manifest.label}",
+                                                    subtitle = "Status and actions this plugin offers for ${chosenPlayer.name}",
+                                                    inline = PluginAppStatus.screenFor(record),
+                                                ),
+                                            )
+                                        }
+                                    }
                                     add(
                                         NestedScreenItem(
                                             id = "folder_add_player_${resolved.id}",
@@ -500,6 +540,24 @@ object AppSettingsCatalogs {
             current = PlayerOverridePrefs.get(context, system.id) ?: "",
             onSelect = { ctx, value ->
                 PlayerOverridePrefs.set(ctx, system.id, value.ifEmpty { null })
+                // docs/SPEC.md 12a "Event hooks": this is THE write path
+                // that changes a system's default player, so it is the
+                // one place that fires PluginEvent.DEFAULT_PLAYER_CHANGED
+                // -- a resolved player (the one actually chosen, "first
+                // installed" included, not just an explicit override) so
+                // a subscribed plugin sees the real effective choice.
+                val chosenPlayer = players.firstOrNull { it.id == value } ?: players.firstOrNull()
+                if (chosenPlayer != null) {
+                    PluginEventBus.notifyDefaultPlayerChangedAsync(
+                        context = ctx,
+                        systemId = system.id,
+                        systemName = system.displayName,
+                        playerId = chosenPlayer.id,
+                        playerName = chosenPlayer.name,
+                        playerPackage = (chosenPlayer as? dev.droidtop.library.consoles.Player.AmStart)?.packageName,
+                        core = system.retroArchCore,
+                    )
+                }
             },
         )
     }
@@ -1354,6 +1412,35 @@ object AppSettingsCatalogs {
                                                 ),
                                             )
                                         }
+                                    }
+                                    // The plugin half's other two real user-facing
+                                    // surfaces (docs/SPEC.md 12a): settings_rows
+                                    // renders in droidtop's own settings style, and
+                                    // app_status is this plugin's status/actions for
+                                    // whatever OTHER installed app it manages -- both
+                                    // real nested screens, not just the debug-only
+                                    // status_tile call above. Siblings of the
+                                    // STATUS_TILE block above, not nested in it: a
+                                    // plugin can declare any subset of the three.
+                                    if (record.runnable() && PluginCapability.SETTINGS_ROWS in m.capabilities) {
+                                        add(
+                                            NestedScreenItem(
+                                                id = "plugin_${m.id}_settings_rows",
+                                                title = "${m.label} settings",
+                                                subtitle = "Settings this plugin contributes",
+                                                inline = PluginSettingsRows.screenFor(record),
+                                            ),
+                                        )
+                                    }
+                                    if (record.runnable() && PluginCapability.APP_STATUS in m.capabilities) {
+                                        add(
+                                            NestedScreenItem(
+                                                id = "plugin_${m.id}_app_status",
+                                                title = "${m.label}: app status",
+                                                subtitle = "Status and actions for the app this plugin manages",
+                                                inline = PluginAppStatus.screenFor(record),
+                                            ),
+                                        )
                                     }
                                 }
                                 PluginTrustState.DENIED -> Unit

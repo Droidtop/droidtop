@@ -9715,6 +9715,119 @@ python-kind plugins; and the rig check for the python leg specifically
 (queued, `device/QUEUE.md`) — the `native_bundle` leg's own rig check
 (`dq-plugins-01`) already passed.
 
+**The rest of the plugin API finally has real UI callers (built
+2026-09-27).** Until this change, `settings_rows`, `app_status` and
+`startJob` were real, working capabilities with NO reachable caller
+anywhere in droidtop's own UI -- the ONLY generic trigger on the Plugins
+screen was `status_tile`'s own debug-shaped "Call ... status tile" row,
+and `droidtop-plugin-retroarch`'s own rig check (agent `retroarch`,
+2026-09-27) confirmed this concretely: its `app_status` actions and its
+`download_core` job existed and worked underneath, but nothing in
+droidtop's UI could reach them. This closes that gap, ES-DE style
+(actions on the surface that already shows the thing, settings only for
+configuration) and entirely in terms of the existing shared catalog
+model (`CatalogScreen`/`CatalogItem`, `runtime-common`'s
+`settings` package) -- neither renderer (the Preference surface,
+`:shell-default`'s SettingsActivity; the in-shell themed section,
+`:shell-gamepad`'s `GamingSettingsCatalog`) needed a single line of new
+UI code, since both already render whatever this catalog model
+describes.
+
+- **`settings_rows`** (`PluginSettingsRows`, `library-core`): first real
+  caller. `invoke(SETTINGS_ROWS, {"target": target})` ->
+  `PluginResult.success(values = <a flat map>)`, each value shown as its
+  own read-only row (a plugin's key never shown, only its value, written
+  as a complete sentence -- the shape `RetroArchPlugin.handleSettingsRows`
+  already shipped before there was anywhere to show it). `target` is
+  `"global"` for the plugin's own entry under Settings > App integrations
+  > Plugins (`AppSettingsCatalogs.pluginsScreen`, `:app`), or
+  `"system:<id>"` when a future plugin targets one system's own settings
+  screen -- a plugin that ignores the arg (every plugin today) returns
+  the same rows regardless.
+- **`app_status`** (`PluginAppStatus`, `library-core`): first real
+  caller of both `invoke(APP_STATUS, {"action": "status"/"launch"})`.
+  `PluginAppStatus.sourcesFor(context, packageName)` answers "which
+  installed app_status plugins currently report managing this package"
+  by calling each one's own `status` action and matching its returned
+  `package` value -- on-demand only (one settings-screen open), never
+  from list rendering, per the standing performance rule. Wired into two
+  real surfaces: the plugin's own entry in the Plugins screen (global,
+  no known target package), and -- "where droidtop shows an installed
+  app" -- a system's own Player choice screen
+  (`AppSettingsCatalogs.folderScreen`), which now looks up
+  `sourcesFor` against the CURRENTLY RESOLVED player's real package and
+  adds that plugin's status/actions right there. A plugin may also offer
+  ONE generic text-entry job from its status answer (`job`, `jobArgKey`,
+  `jobLabel` values -- see `PluginAppStatus`'s own doc comment for the
+  exact convention); `RetroArchPlugin.statusResult` uses this to offer
+  "download a core by name" without droidtop knowing anything
+  RetroArch-specific. **Not built**: a droidtop-owned surface for the
+  Standard shell's drawer long-press menu (AOSP `launcher3`'s own popup
+  menu, `:shell-default`) -- real scope, deliberately left open rather
+  than a shallow, unverified change to that vendored tree; the Player
+  choice surface above is the one this pass actually shipped and rig-
+  checked.
+- **Jobs, one shared mechanism (`PluginJobsCenter`, `plugin-host`;
+  `PluginJobsScreen`, `library-core`).** Before this, `AcquireContentSources`
+  held its own private `PluginCrashPolicy`/callback pair per download,
+  invisible to anything but the screen that started it.
+  `PluginJobsCenter.start` is now the ONE place a plugin job is started
+  from anywhere in droidtop -- a Get-games download, an `app_status`
+  text-entry job, an event-hook reaction (below) -- tracked in one
+  process-lifetime registry (`entries(): StateFlow<List<Entry>>`) a Jobs
+  screen renders live, with cancel (best-effort, per `DroidtopPlugin.
+  cancelJob`'s own contract) alongside progress. `AcquireContentSources.
+  startDownload` now calls through it instead of building its own
+  policy -- same public behavior, one mechanism underneath. Reached from
+  Settings > App integrations > Jobs (`SCREEN_JOBS`, registered next to
+  Plugins), on both renderers via the same shared-registry mechanism
+  every other cross-module screen already uses.
+- **Event hooks (`PluginEvent`, `plugin-host`; `PluginEventBus`,
+  `library-core`).** The OUTGOING half of the plugin API, mirroring
+  `PluginCapability` (the incoming half): droidtop fires a closed,
+  versioned (`PLUGIN_EVENT_CONTRACT_VERSION`) set of events at approved
+  plugins that declared them in a new manifest field,
+  `PluginManifest.subscribedEvents` (an id droidtop doesn't recognise is
+  silently never matched, not a validation failure -- forward/backward
+  compatible the same way an unrecognised capability id already is).
+  Carried over the SAME `IPluginRuntime.invoke` binder call
+  `PluginCapability` calls use (`PluginRuntimeService.invoke` checks
+  `PluginEvent.fromId` first, since the two id namespaces are disjoint by
+  construction) -- no new AIDL method, since an event is already "JSON
+  in, JSON out, one watchdog-bound call" like any capability invoke, just
+  answered by `DroidtopPlugin.onEvent` (default no-op success) instead of
+  `invoke`. `PluginCrashPolicy.notifyEvent` checks the subscription
+  BEFORE any load/bind, so a plugin that ignores every event costs
+  nothing on droidtop's own state changes.
+  - **The one event that exists**: `PluginEvent.DEFAULT_PLAYER_CHANGED`,
+    fired from the one real write path that changes a system's default
+    player (`AppSettingsCatalogs.playerChoiceItem`'s `onSelect`, via
+    `PluginEventBus.notifyDefaultPlayerChangedAsync`) with the resolved
+    player's id/name/package and the system's own configured core
+    (`ConsoleSystemDef.retroArchCore`). A plugin's answer MAY ask
+    droidtop to start a job in reaction: `values["startJob"]` names a
+    `PluginCapability.id`, `values["job"]` names the job, every OTHER
+    returned value becomes that job's own args --
+    `PluginEventBus.notifyDefaultPlayerChanged` reads exactly that shape
+    and hands it straight to `PluginJobsCenter.start`, so the reaction
+    job is tracked and shown exactly like a job the user started by
+    hand. `droidtop-plugin-retroarch`'s `RetroArchPlugin.onEvent` is the
+    first (and so far only) real subscriber: when the event names an
+    installed RetroArch package as the new player and the system's core
+    isn't downloaded yet, it asks for `JOB_DOWNLOAD_CORE` -- the actual,
+    cited reason this mechanism was built (`RetroArchPlugin` also gained
+    a real `cancelJob` in the same change: it checks a cancellation flag
+    every 64 KiB inside its own download loop, since
+    `HttpURLConnection`'s blocking read has no other cooperative
+    cancellation point -- `DroidtopPlugin.cancelJob`'s default is a
+    no-op, so this had to be real plugin-side work, not just a droidtop
+    UI wiring change).
+
+**Rig-checked on BlueStacks (2026-09-27, agent `pluginui`)**: see the
+commit description for exact results against
+`droidtop-plugin-retroarch`'s manifest+code update (subscribedEvents,
+`onEvent`, job hints, real `cancelJob`) pushed alongside this change.
+
 **The "Get games" UI, unifying both acquire_content mechanisms (built
 2026-09-26).** Until now `acquire_content` had a real JSON half (§12) and
 a real plugin half (above) that could install, approve and show
