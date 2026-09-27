@@ -22,6 +22,21 @@ import kotlinx.coroutines.flow.update
  * "show status right here" behavior without a second tracking mechanism
  * underneath it.
  *
+ * **Routing (rewritten 2026-09-27, dq-pluginui-01).** [start] creates a
+ * dedicated [PluginJobRunner] (the real [PluginCrashPolicy] in
+ * production) per job, but [PluginRuntimeService] now broadcasts every
+ * job's progress/completion to EVERY currently registered connection --
+ * fixing a callback-theft bug meant no connection can assume an incoming
+ * event is its own anymore. [jobId] IS the id [start] hands to the
+ * runner AND the [Entry.jobId] key this object tracks under -- one id,
+ * chosen by THIS object before the runner is ever called (never by
+ * :pluginhost, which used to generate and return one, the other half of
+ * the original bug: a fast job's own completion could arrive before that
+ * return trip finished, so the id being compared against did not exist
+ * yet). Every `onJobProgress`/`onJobComplete` closure [start] builds
+ * filters on `eventJobId == jobId` -- a plain `val` comparison, no race,
+ * since [jobId] is fixed before any call that could produce a callback.
+ *
  * Process-lifetime only, deliberately -- a job is already bounded by
  * :pluginhost's own process lifetime (docs/SPEC.md 12a: a job's plugin
  * process dying takes the job with it), so nothing here claims to
@@ -49,9 +64,32 @@ object PluginJobsCenter {
         val result: PluginResult? = null,
     )
 
+    /**
+     * How a job's own [PluginJobRunner] is built. Production code never
+     * touches this -- the default builds a real [PluginCrashPolicy].
+     * `PluginJobsCenterTest.kt` swaps it for a fake that lets a test
+     * control exactly when progress/completion callbacks fire (including
+     * "before [start] itself has returned", the precise ordering
+     * dq-pluginui-01 found broken) without any real Android Service,
+     * RemoteCallbackList, or binder connection. [context] is nullable
+     * only so a test can omit one entirely; every real call site already
+     * passes a real [Context].
+     */
+    internal var runnerFactory: (
+        context: Context?,
+        onJobProgress: (pluginId: String, jobId: String, percent: Int, statusLine: String) -> Unit,
+        onJobComplete: (pluginId: String, jobId: String, result: PluginResult) -> Unit,
+    ) -> PluginJobRunner = { context, onProgress, onComplete ->
+        PluginCrashPolicy(
+            requireNotNull(context) { "a real Context is required outside tests" }.applicationContext,
+            onJobProgress = onProgress,
+            onJobComplete = onComplete,
+        )
+    }
+
     private val state = MutableStateFlow<List<Entry>>(emptyList())
     private val deferreds = ConcurrentHashMap<String, CompletableDeferred<PluginResult>>()
-    private val policies = ConcurrentHashMap<String, PluginCrashPolicy>()
+    private val runners = ConcurrentHashMap<String, PluginJobRunner>()
 
     /** Live, ordered (newest first) view of every tracked job, running or recently finished -- what the Jobs screen and any inline progress row both read. */
     fun entries(): StateFlow<List<Entry>> = state
@@ -59,11 +97,10 @@ object PluginJobsCenter {
     fun find(jobId: String): Entry? = state.value.firstOrNull { it.jobId == jobId }
 
     /**
-     * Starts [capability]'s job for [record] and tracks it here under a
-     * tracking id this function returns (deliberately NOT the same
-     * string [PluginRuntimeService.startJob] generated -- that id is an
-     * implementation detail of one plugin connection; this one is what
-     * every other function on this object, including [cancel], takes).
+     * Starts [capability]'s job for [record] and tracks it under the id
+     * this function returns (also the id it hands to the runner --
+     * [Entry.jobId] IS the real job id now, see this object's own doc
+     * comment for why unifying the two removed the original race).
      * Returns null when the plugin refused outright (not loaded, or no
      * [DroidtopPlugin.startJob] override) -- same "null means refused"
      * shape [PluginCrashPolicy.startJob] already has. [onProgress]/
@@ -73,7 +110,7 @@ object PluginJobsCenter {
      * it.
      */
     suspend fun start(
-        context: Context,
+        context: Context?,
         record: PluginRecord,
         capability: PluginCapability,
         args: Map<String, String>,
@@ -81,52 +118,46 @@ object PluginJobsCenter {
         onProgress: (percent: Int, statusLine: String) -> Unit = { _, _ -> },
         onComplete: (PluginResult) -> Unit = {},
     ): String? {
-        val trackingKey = UUID.randomUUID().toString()
+        val jobId = UUID.randomUUID().toString()
         val deferred = CompletableDeferred<PluginResult>()
-        // The [PluginCrashPolicy] created below is dedicated to exactly
-        // ONE job -- this whole function creates a fresh one per call,
-        // never shares one across jobs -- so any progress/complete
-        // callback THIS policy instance receives belongs to this job by
-        // construction. Comparing against the real (non-tracking) jobId
-        // used to gate every update, but that id is only known AFTER
-        // policy.startJob() returns, while :pluginhost dispatches the
-        // job to its own executor (and can call back) the moment the
-        // AIDL startJob() call arrives on the OTHER side -- before this
-        // suspend call even returns here. A fast job (a small buildbot
-        // zip, confirmed on the rig: dq-pluginui-01, a real snes9x
-        // download completing before this function's own `jobId =
-        // policy.startJob(...)` assignment) could fire onJobComplete
-        // before the id it was being compared against was ever set,
-        // silently dropping the update and leaving the Entry frozen at
-        // "Starting..." forever. Dropping the id comparison entirely
-        // removes the race.
-        val policy = PluginCrashPolicy(
-            context.applicationContext,
-            onJobProgress = { _, _, percent, statusLine ->
-                update(trackingKey) { it.copy(percent = percent, statusLine = statusLine) }
-                onProgress(percent, statusLine)
+        // Every registered connection now hears every job's events
+        // (PluginRuntimeService.kt's own doc comment on registerCallback
+        // has the full story) -- these closures are what turns that
+        // broadcast back into "only MY job", by a plain equality check
+        // against [jobId], fixed above before any call that could
+        // produce an event.
+        val runner = runnerFactory(
+            context,
+            { _, eventJobId, percent, statusLine ->
+                if (eventJobId == jobId) {
+                    update(jobId) { it.copy(percent = percent, statusLine = statusLine) }
+                    onProgress(percent, statusLine)
+                }
             },
-            onJobComplete = { _, _, result ->
-                update(trackingKey) { it.copy(done = true, result = result, statusLine = if (result.ok) "Done" else (result.error ?: "Failed"), percent = 100) }
-                if (!deferred.isCompleted) deferred.complete(result)
-                onComplete(result)
-                policies.remove(trackingKey)?.shutdown()
-                prune()
+            { _, eventJobId, result ->
+                if (eventJobId == jobId) {
+                    update(jobId) { it.copy(done = true, result = result, statusLine = if (result.ok) "Done" else (result.error ?: "Failed"), percent = 100) }
+                    if (!deferred.isCompleted) deferred.complete(result)
+                    onComplete(result)
+                    runners.remove(jobId)?.shutdown()
+                    prune()
+                }
             },
         )
-        policies[trackingKey] = policy
-        deferreds[trackingKey] = deferred
-        // Added to [state] BEFORE policy.startJob() is even called, for
-        // the same reason the jobId comparison above was dropped: a fast
-        // job's callback can arrive while startJob() is still
-        // technically "returning" on this thread, and [update] below is
-        // a no-op against an Entry that doesn't exist in [state] yet. An
-        // Entry that turns out to have no real job behind it (startJob
-        // refused) is removed again in the null branch just below.
+        runners[jobId] = runner
+        deferreds[jobId] = deferred
+        // Added to [state] BEFORE runner.startJob() is even called: a
+        // fast job's own completion callback can arrive while that call
+        // is still technically "returning" on this thread (:pluginhost
+        // dispatches to its own job executor the instant the AIDL call
+        // arrives on its side, not after it returns) -- an Entry that
+        // doesn't exist in [state] yet would make [update] below a
+        // silent no-op. An Entry that turns out to have no real job
+        // behind it (startJob refused) is removed again just below.
         state.update { current ->
             listOf(
                 Entry(
-                    jobId = trackingKey,
+                    jobId = jobId,
                     pluginId = record.manifest.id,
                     pluginLabel = record.manifest.label,
                     capability = capability,
@@ -135,32 +166,28 @@ object PluginJobsCenter {
                 ),
             ) + current
         }
-        val jobId = policy.startJob(record, capability, args)
-        if (jobId == null) {
-            policy.shutdown()
-            policies.remove(trackingKey)
-            deferreds.remove(trackingKey)
-            state.update { current -> current.filter { it.jobId != trackingKey } }
+        val accepted = runner.startJob(record, capability, args, jobId)
+        if (!accepted) {
+            runner.shutdown()
+            runners.remove(jobId)
+            deferreds.remove(jobId)
+            state.update { current -> current.filter { it.jobId != jobId } }
             return null
         }
-        realJobIds[trackingKey] = ReferenceKey(record.manifest.id, jobId)
-        return trackingKey
+        return jobId
     }
 
-    /** Awaits [trackingKey]'s completion -- for a caller (a Jobs-screen row re-attaching to a job it didn't itself start) that needs the final result, not just the live [entries] view. Returns null when [trackingKey] is unknown. */
-    suspend fun await(trackingKey: String): PluginResult? = deferreds[trackingKey]?.await()
+    /** Awaits [jobId]'s completion -- for a caller (a Jobs-screen row re-attaching to a job it didn't itself start) that needs the final result, not just the live [entries] view. Returns null when [jobId] is unknown. */
+    suspend fun await(jobId: String): PluginResult? = deferreds[jobId]?.await()
 
-    /** Best-effort cancel (docs/SPEC.md 12a: [DroidtopPlugin.cancelJob] itself is best-effort -- a plugin that ignores it keeps running until it finishes on its own). No-op for an unknown or already-finished [trackingKey]. */
-    fun cancel(trackingKey: String) {
-        val ref = realJobIds[trackingKey] ?: return
-        policies[trackingKey]?.cancelJob(ref.pluginId, ref.jobId)
+    /** Best-effort cancel (docs/SPEC.md 12a: [DroidtopPlugin.cancelJob] itself is best-effort -- a plugin that ignores it keeps running until it finishes on its own). No-op for an unknown or already-finished [jobId]. */
+    fun cancel(jobId: String) {
+        val entry = find(jobId) ?: return
+        runners[jobId]?.cancelJob(entry.pluginId, jobId)
     }
 
-    private data class ReferenceKey(val pluginId: String, val jobId: String)
-    private val realJobIds = ConcurrentHashMap<String, ReferenceKey>()
-
-    private fun update(trackingKey: String, transform: (Entry) -> Entry) {
-        state.update { current -> current.map { if (it.jobId == trackingKey) transform(it) else it } }
+    private fun update(jobId: String, transform: (Entry) -> Entry) {
+        state.update { current -> current.map { if (it.jobId == jobId) transform(it) else it } }
     }
 
     private fun prune() {

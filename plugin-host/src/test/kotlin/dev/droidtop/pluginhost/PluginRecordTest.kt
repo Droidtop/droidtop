@@ -60,6 +60,21 @@ class PluginRecordTest {
     }
 
     @Test
+    fun `manifest subscribedEvents round-trips, not silently dropped to empty`() {
+        // Found and fixed 2026-09-27 (dq-pluginui-01): toJson()/fromJson()
+        // never carried this field at all, so PluginStore.installed()'s
+        // every read (via this exact round trip) reset a plugin's real,
+        // signed subscribedEvents back to empty -- no plugin's
+        // PluginEvent hook could ever fire, regardless of what its
+        // manifest declared. This is the actual repro: build a manifest
+        // that DOES subscribe, round-trip it the same way PluginStore
+        // does, and confirm the subscription survives.
+        val withEvent = manifest().copy(subscribedEvents = setOf("default_player_changed"))
+        val roundTripped = PluginRecord.fromJson(record().copy(manifest = withEvent).toJson())!!
+        assertEquals(setOf("default_player_changed"), roundTripped.manifest.subscribedEvents)
+    }
+
+    @Test
     fun `a null manifest description and entryClass round-trip as null`() {
         val withNullDescription = manifest(entryClass = null)
         val roundTripped = PluginRecord.fromJson(record().copy(manifest = withNullDescription).toJson())!!

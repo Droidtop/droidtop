@@ -19,7 +19,7 @@ class PluginCrashPolicy(
     private val context: Context,
     private val onJobProgress: (pluginId: String, jobId: String, percent: Int, statusLine: String) -> Unit = { _, _, _, _ -> },
     private val onJobComplete: (pluginId: String, jobId: String, result: PluginResult) -> Unit = { _, _, _ -> },
-) {
+) : PluginJobRunner {
     private val runner: NativePluginRunner = NativePluginRunner(context, ::onCrash, onJobProgress, onJobComplete)
 
     private fun onCrash(pluginId: String, capability: String, reason: String) {
@@ -71,17 +71,17 @@ class PluginCrashPolicy(
         return runner.invoke(record.manifest.id, capability, args)
     }
 
-    /** Starts a long-running job for [record] (see [PluginJob]); same runnable/re-verify gates as [invoke], null on any refusal. */
-    suspend fun startJob(record: PluginRecord, capability: PluginCapability, args: Map<String, String>): String? {
-        if (!record.runnable()) return null
-        if (record.manifest.kind !in RUNNABLE_KINDS) return null
+    /** Starts a long-running job for [record] under the given [jobId] (see [PluginJob], and [IPluginRuntime.startJob]'s own doc comment for why the caller -- [PluginJobsCenter] -- chooses this id); same runnable/re-verify gates as [invoke], false on any refusal. */
+    override suspend fun startJob(record: PluginRecord, capability: PluginCapability, args: Map<String, String>, jobId: String): Boolean {
+        if (!record.runnable()) return false
+        if (record.manifest.kind !in RUNNABLE_KINDS) return false
         if (PluginBundleInstaller.verifyInstalled(PluginStore.root(context), record) != null) {
             PluginStore.disableWithReason(context, record.manifest.id, "files changed on disk since approval")
-            return null
+            return false
         }
         val dir = PluginStore.payloadDirFor(context, record.manifest.id)
-        if (!runner.load(record, dir.absolutePath)) return null
-        return runner.startJob(record.manifest.id, capability, args)
+        if (!runner.load(record, dir.absolutePath)) return false
+        return runner.startJob(record.manifest.id, capability, args, jobId)
     }
 
     /**
@@ -106,11 +106,11 @@ class PluginCrashPolicy(
         return runner.notifyEvent(record.manifest.id, event, args)
     }
 
-    fun cancelJob(pluginId: String, jobId: String) {
+    override fun cancelJob(pluginId: String, jobId: String) {
         runner.cancelJob(pluginId, jobId)
     }
 
-    fun shutdown() {
+    override fun shutdown() {
         runner.unbind()
     }
 

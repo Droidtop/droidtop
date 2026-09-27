@@ -35,6 +35,19 @@ data class PluginRecord(
         put("entryClass", manifest.entryClass ?: JSONObject.NULL)
         put("runtimeVersion", manifest.runtimeVersion ?: JSONObject.NULL)
         put("boundServiceTargets", JSONArray(manifest.boundServiceTargets.toList()))
+        // Found and fixed 2026-09-27 (dq-pluginui-01): this field was
+        // missing from both toJson() and fromJson() below, so
+        // PluginManifest.subscribedEvents -- read correctly off the
+        // real, signed manifest at install time -- was silently dropped
+        // the moment droidtop persisted its OWN copy of this record
+        // (record.json, written right after install and read back by
+        // every later PluginStore.installed() call). A plugin's
+        // subscribedEvents was never actually zero; PluginEventBus's own
+        // "in it.manifest.subscribedEvents" filter was checking a set
+        // that had already been reset to empty by this round trip, so
+        // NO plugin's event hook could ever fire, regardless of what its
+        // manifest declared.
+        put("subscribedEvents", JSONArray(manifest.subscribedEvents.toList()))
         put(
             "payload",
             JSONArray(
@@ -83,6 +96,8 @@ data class PluginRecord(
             val abisJson = json.optJSONArray("abis") ?: JSONArray()
             val boundTargetsJson = json.optJSONArray("boundServiceTargets") ?: JSONArray()
             val boundServiceTargets = buildSet { for (i in 0 until boundTargetsJson.length()) add(boundTargetsJson.optString(i)) }
+            val subscribedEventsJson = json.optJSONArray("subscribedEvents") ?: JSONArray()
+            val subscribedEvents = buildSet { for (i in 0 until subscribedEventsJson.length()) add(subscribedEventsJson.optString(i)) }
             val manifest = PluginManifest(
                 id = json.optString("id"),
                 origin = json.optString("origin"),
@@ -98,6 +113,7 @@ data class PluginRecord(
                 runtimeVersion = optNullableString(json, "runtimeVersion"),
                 payload = payload,
                 boundServiceTargets = boundServiceTargets,
+                subscribedEvents = subscribedEvents,
             )
             val trust = runCatching { PluginTrustState.valueOf(json.optString("trust")) }.getOrNull() ?: PluginTrustState.PENDING
             return PluginRecord(

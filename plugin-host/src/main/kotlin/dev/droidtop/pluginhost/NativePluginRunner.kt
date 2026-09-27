@@ -30,6 +30,17 @@ class NativePluginRunner(
     private var serviceConnection: ServiceConnection? = null
     private var connectDeferred: CompletableDeferred<IPluginRuntime?>? = null
 
+    // Kept so [unbind] can call [IPluginRuntime.unregisterCallback] with
+    // the EXACT same stub instance [registerCallback] was given --
+    // PluginRuntimeService.kt now fans every event out to every
+    // registered caller (docs/SPEC.md 12a "Jobs": found and fixed
+    // 2026-09-27, a single shared callback field meant a second
+    // concurrent connection silently stole delivery from the first), so
+    // a connection that never unregisters keeps costing every future
+    // broadcast a wasted (though harmless, `runCatching`-guarded)
+    // delivery attempt for as long as :pluginhost stays alive.
+    private var callbackStub: IPluginRuntimeCallback.Stub? = null
+
     private suspend fun ensureConnected(): IPluginRuntime? {
         connection?.let { return it }
         val deferred = CompletableDeferred<IPluginRuntime?>()
@@ -49,7 +60,7 @@ class NativePluginRunner(
                     },
                     0,
                 )
-                runtime.setCallback(object : IPluginRuntimeCallback.Stub() {
+                val stub = object : IPluginRuntimeCallback.Stub() {
                     override fun onPluginCrashed(pluginId: String, capability: String, reason: String) {
                         onCrash(pluginId, capability, reason)
                     }
@@ -61,7 +72,9 @@ class NativePluginRunner(
                     override fun onJobComplete(pluginId: String, jobId: String, resultJson: String) {
                         this@NativePluginRunner.onJobComplete(pluginId, jobId, decode(resultJson))
                     }
-                })
+                }
+                callbackStub = stub
+                runtime.registerCallback(stub)
                 connection = runtime
                 deferred.complete(runtime)
             }
@@ -164,11 +177,19 @@ class NativePluginRunner(
         }
     }
 
-    /** Starts a long-running job (see [PluginJob]); null means the plugin process rejected it (not loaded, or doesn't implement [DroidtopPlugin.startJob]). Not watchdog-bound, unlike [invoke]. */
-    suspend fun startJob(pluginId: String, capability: PluginCapability, args: Map<String, String>): String? {
-        val runtime = connection ?: ensureConnected() ?: return null
+    /**
+     * Starts a long-running job (see [PluginJob]) under the CALLER-chosen
+     * [jobId] -- see [IPluginRuntime.startJob]'s own doc comment for why
+     * this process no longer generates and returns one. Returns false
+     * when the plugin process rejected it outright (not loaded); does
+     * NOT mean the plugin doesn't support jobs, which is reported later
+     * as an ordinary job failure over the callback. Not watchdog-bound,
+     * unlike [invoke].
+     */
+    suspend fun startJob(pluginId: String, capability: PluginCapability, args: Map<String, String>, jobId: String): Boolean {
+        val runtime = connection ?: ensureConnected() ?: return false
         val argsJson = JSONObject().apply { args.forEach { (k, v) -> put(k, v) } }.toString()
-        return runCatching { runtime.startJob(pluginId, capability.id, argsJson) }.getOrNull()
+        return runCatching { runtime.startJob(pluginId, capability.id, argsJson, jobId) }.getOrDefault(false)
     }
 
     fun cancelJob(pluginId: String, jobId: String) {
@@ -176,8 +197,10 @@ class NativePluginRunner(
     }
 
     fun unbind() {
+        runCatching { callbackStub?.let { stub -> connection?.unregisterCallback(stub) } }
         serviceConnection?.let { runCatching { context.unbindService(it) } }
         serviceConnection = null
         connection = null
+        callbackStub = null
     }
 }
