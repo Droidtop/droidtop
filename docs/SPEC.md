@@ -8505,6 +8505,8 @@ patching `PcGameMenu` alone -- every menu built on this row gets the same
 fix for the same reason it shares the row in the first place (one
 mechanism per job).
 
+**Left/Right switch the system, L1/R1 switch the tab -- never the other way, anywhere (owner, 2026-09-27).** "Left and right arrows in game menus should switch consoles just like they do on the main screen. L1 and R1 are for menu switching." Before this, a system's own gamelist (`GamesSection`'s themed-gamelist `onKeyEvent`, covering PC and console groups alike -- one `orderedGroups` list, one handler) answered the shoulders TWICE: at the system carousel they already meant "switch section" (`GamepadShell`'s own top-level onKeyEvent), and inside a gamelist they ALSO quick-system-selected, consuming the press before it could bubble up -- a browsing user's L1/R1 press flipped systems instead of tabs depending on how deep they'd drilled, which is the inconsistency the owner is naming. Left/Right already did the real ES-DE `quicksysselect` jump at a gamelist's own edges (`ViewController.cpp:718/728`'s sound, carried over faithfully) and continue to, wrapping continuously through `orderedGroups`; the shoulder branch that duplicated it is deleted outright rather than reconciled, so L/R now falls through to the one place that has ever meant "switch section" -- consistent whether a gamelist is open or not, on the carousel, the PC list and every console list alike, since they all share this one handler. Up/Down never leave the list they're already in (previous rule, above) and Page Up/Page Down remain the keyboard's L1/R1.
+
 ## 7k. The design system: one spacing scale, one type scale, one colour source
 
 droidtop draws two kinds of surface. A **themed view** takes every colour, typeface and
