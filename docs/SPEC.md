@@ -8363,6 +8363,66 @@ reservation was added for the pills --- the decision two paragraphs up
 holds --- because the real bug was never the layout, it was believing a
 dense small landscape panel was a phone.
 
+**The top bar is reached by touch, L1/R1, or Page Up/Page Down -- never
+by the D-pad itself (owner, 2026-09-27).** "Pressing up IMMEDIATELY jumps
+up to the top bar, scrolling up in a list is impossible" -- reproduced on
+the rig from the Games carousel's very first row and from the top of the
+Settings list: Compose's own default 2D focus search (the same mechanism
+section 7j already leans on for card-to-card navigation, see
+`GamepadShell`'s own doc comment) has no notion of a screen boundary, so
+an Up press with nothing focusable above the current row happily picked
+the nearest tab bar `Text` by screen position instead of stopping. The
+fix is in the one shared component every Gaming-mode screen sits under,
+not per screen: `SectionTabBar`'s tab labels are no longer `.focusable()`
+at all -- they take `onClick` for touch and nothing else, and carry no
+`FocusRequester` -- so they simply do not exist as directional-search
+candidates from anywhere, on any screen. The current tab still shows by
+its raised fill; a focus RING there is no longer possible because a pad
+can never park on it. L1/R1 (`SectionTabBar`'s own `ShoulderGlyph`,
+`GamepadShell`'s onKeyEvent) remain the one dedicated route to switch
+sections, and a keyboard's equivalent is Page Up/Page Down
+(`GamepadKeyMap.DEFAULT`) -- the same key a browser or an IDE already
+uses to move between tabs/panes, rather than inventing a droidtop-only
+binding. A screen's own onKeyEvent handlers see focus arrive from
+somewhere real, and Up at the very first row of a list now does nothing
+(`FocusManager.moveFocus` returns false, same as it already did at a
+grid's left/right edge, section 7f's "System → Game" drill-down) rather
+than escaping the screen -- the list simply does not scroll further, it
+does not jump anywhere. Because the shell still needs *something*
+focused before any real content loads (an empty library, or the very
+first frame -- see `GamepadShell`'s own comment on `tabBarFocus`), the
+initial-focus anchor moved off the tab bar entirely, onto an invisible,
+zero-size `Spacer` living in the content area itself; it is requested
+once and abandoned the moment a screen's own first row steals focus, the
+same as before.
+
+**A virtual-cursor menu must scroll its own selection into view (owner,
+2026-09-27).** `MenuPanel`/`MenuRow` (Quick Menu, every Settings screen,
+`GamelistOptionsMenu`, the same-game and manual-match pickers, the Lutris
+importer, and the L2 PC game menu, `PcGameMenu`) do not use real Compose
+focus for Up/Down at all -- each draws its own `selected`/`focusIndex`
+state, moved by hand in a `MenuPanel.onKey` callback (`PcGameMenu`'s own
+`focusIndex`, `EsDeNavigationSounds.play("scroll")`), because a Compose
+`Dialog` silently drops key events unless something inside actually
+holds focus (`MenuPanel`'s own doc comment) and it is that single
+`Column` -- not each row -- which holds it. Nothing connected the moving
+`selected` index back to `MenuPanel`'s `verticalScroll` container, so a
+menu longer than one screenful (`PcGameMenu`'s full list: Runs with,
+Play, Engine, F95zone thread, Manage install, Saves, Controls, Engine
+settings, ProtonDB, Lutris import, same-game merge, versions/segments,
+Stores and folders, Favourites) walked its selection off the bottom edge
+in total silence -- Down kept moving `focusIndex`, the row it now pointed
+at was still there in the data, but the screen never scrolled to show it,
+which is what "all the new stuff added to the PC menu is inaccessible"
+actually was: reachable in state, invisible on screen, functionally dead
+for both a D-pad and the touch a person would otherwise use to scroll
+past it. Fixed once in `MenuRow` itself with a `BringIntoViewRequester`
+that asks whatever scrollable ancestor it has (`MenuPanel`'s own Column)
+to scroll it into view exactly when it becomes `selected`, rather than
+patching `PcGameMenu` alone -- every menu built on this row gets the same
+fix for the same reason it shares the row in the first place (one
+mechanism per job).
+
 ## 7k. The design system: one spacing scale, one type scale, one colour source
 
 droidtop draws two kinds of surface. A **themed view** takes every colour, typeface and

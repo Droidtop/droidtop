@@ -58,6 +58,15 @@ object GamepadKeyMap {
         Key.ButtonR2 to GamepadAction.R2,
         Key.ButtonThumbLeft to GamepadAction.L3,
         Key.ButtonThumbRight to GamepadAction.R3,
+        // A keyboard's own tab-switch equivalent (owner, 2026-09-27): the
+        // top bar itself can never be a D-pad focus target (see
+        // GamepadShell's SectionTabBar), so a keyboard-only user needs a
+        // route to L/R -- the shoulder buttons that cycle Games/Apps/
+        // Settings -- that isn't "click the tab". Page Up/Down is the one
+        // other input already reserved for exactly this job everywhere
+        // else on the platform (browser tabs, IDE panes).
+        Key.PageUp to GamepadAction.L,
+        Key.PageDown to GamepadAction.R,
     )
 
     /**
