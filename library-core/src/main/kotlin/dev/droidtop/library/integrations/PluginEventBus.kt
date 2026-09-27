@@ -89,7 +89,9 @@ object PluginEventBus {
                 val jobCapabilityId = result.values["startJob"] ?: continue
                 val jobCapability = PluginCapability.fromId(jobCapabilityId) ?: continue
                 val jobArgs = result.values - "startJob"
-                val jobTitle = result.values["job"]?.let { "${record.manifest.label}: $it" } ?: record.manifest.label
+                // No plugin-label prefix here either -- see PluginAppStatus's
+                // own note on the same fix (PluginJobsScreen adds it).
+                val jobTitle = result.values["job"] ?: "event reaction"
                 PluginJobsCenter.start(
                     context = context,
                     record = record,

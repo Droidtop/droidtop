@@ -83,35 +83,46 @@ object PluginJobsCenter {
     ): String? {
         val trackingKey = UUID.randomUUID().toString()
         val deferred = CompletableDeferred<PluginResult>()
-        var realJobId: String? = null
+        // The [PluginCrashPolicy] created below is dedicated to exactly
+        // ONE job -- this whole function creates a fresh one per call,
+        // never shares one across jobs -- so any progress/complete
+        // callback THIS policy instance receives belongs to this job by
+        // construction. Comparing against the real (non-tracking) jobId
+        // used to gate every update, but that id is only known AFTER
+        // policy.startJob() returns, while :pluginhost dispatches the
+        // job to its own executor (and can call back) the moment the
+        // AIDL startJob() call arrives on the OTHER side -- before this
+        // suspend call even returns here. A fast job (a small buildbot
+        // zip, confirmed on the rig: dq-pluginui-01, a real snes9x
+        // download completing before this function's own `jobId =
+        // policy.startJob(...)` assignment) could fire onJobComplete
+        // before the id it was being compared against was ever set,
+        // silently dropping the update and leaving the Entry frozen at
+        // "Starting..." forever. Dropping the id comparison entirely
+        // removes the race.
         val policy = PluginCrashPolicy(
             context.applicationContext,
-            onJobProgress = { _, jobId, percent, statusLine ->
-                if (jobId == realJobId) {
-                    update(trackingKey) { it.copy(percent = percent, statusLine = statusLine) }
-                    onProgress(percent, statusLine)
-                }
+            onJobProgress = { _, _, percent, statusLine ->
+                update(trackingKey) { it.copy(percent = percent, statusLine = statusLine) }
+                onProgress(percent, statusLine)
             },
-            onJobComplete = { _, jobId, result ->
-                if (jobId == realJobId) {
-                    update(trackingKey) { it.copy(done = true, result = result, statusLine = if (result.ok) "Done" else (result.error ?: "Failed"), percent = 100) }
-                    if (!deferred.isCompleted) deferred.complete(result)
-                    onComplete(result)
-                    policies.remove(trackingKey)?.shutdown()
-                    prune()
-                }
+            onJobComplete = { _, _, result ->
+                update(trackingKey) { it.copy(done = true, result = result, statusLine = if (result.ok) "Done" else (result.error ?: "Failed"), percent = 100) }
+                if (!deferred.isCompleted) deferred.complete(result)
+                onComplete(result)
+                policies.remove(trackingKey)?.shutdown()
+                prune()
             },
         )
         policies[trackingKey] = policy
-        val jobId = policy.startJob(record, capability, args)
-        if (jobId == null) {
-            policy.shutdown()
-            policies.remove(trackingKey)
-            return null
-        }
-        realJobId = jobId
-        realJobIds[trackingKey] = ReferenceKey(record.manifest.id, jobId)
         deferreds[trackingKey] = deferred
+        // Added to [state] BEFORE policy.startJob() is even called, for
+        // the same reason the jobId comparison above was dropped: a fast
+        // job's callback can arrive while startJob() is still
+        // technically "returning" on this thread, and [update] below is
+        // a no-op against an Entry that doesn't exist in [state] yet. An
+        // Entry that turns out to have no real job behind it (startJob
+        // refused) is removed again in the null branch just below.
         state.update { current ->
             listOf(
                 Entry(
@@ -124,6 +135,15 @@ object PluginJobsCenter {
                 ),
             ) + current
         }
+        val jobId = policy.startJob(record, capability, args)
+        if (jobId == null) {
+            policy.shutdown()
+            policies.remove(trackingKey)
+            deferreds.remove(trackingKey)
+            state.update { current -> current.filter { it.jobId != trackingKey } }
+            return null
+        }
+        realJobIds[trackingKey] = ReferenceKey(record.manifest.id, jobId)
         return trackingKey
     }
 

@@ -161,7 +161,13 @@ object PluginAppStatus {
                                                     record = record,
                                                     capability = PluginCapability.APP_STATUS,
                                                     args = mapOf("job" to job, jobArgKey to text.trim()),
-                                                    title = "${m.label}: $job ($text)",
+                                                    // No plugin-label prefix here: PluginJobsScreen
+                                                    // already prepends "<pluginLabel>: " to every
+                                                    // entry's title -- doing it here too produced a
+                                                    // doubled "RetroArch manager: RetroArch manager:
+                                                    // download_core (snes9x)" row on the rig
+                                                    // (dq-pluginui-01).
+                                                    title = "$job (${text.trim()})",
                                                 )
                                             }
                                         },
