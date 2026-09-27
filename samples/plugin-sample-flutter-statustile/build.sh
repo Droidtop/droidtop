@@ -62,6 +62,16 @@ mkdir -p build/payload/lib/arm64-v8a build/payload/lib/x86_64
 unzip -p "$APK" lib/arm64-v8a/libapp.so > build/payload/lib/arm64-v8a/libapp.so
 unzip -p "$APK" lib/x86_64/libapp.so > build/payload/lib/x86_64/libapp.so
 
+# This plugin's own real Flutter plugin dependencies (sqflite,
+# path_provider, ...), if any -- see FlutterDroidtopPlugin.
+# registerGeneratedPlugins's own doc comment for why this is needed at
+# all. The trivial sample uses none, so classes*.dex here carries no
+# GeneratedPluginRegistrant worth calling and onLoad's own lookup is a
+# silent no-op -- kept here anyway so every flutter_embed plugin's
+# build.sh follows the same shape.
+mkdir -p build/payload/dex
+unzip -qo "$APK" 'classes*.dex' -d build/payload/dex
+
 # flutter_assets lives at "assets/flutter_assets/**" inside the APK; the
 # plugin payload wants it at its own top-level "flutter_assets/**" (what
 # FlutterDroidtopPlugin.loadAssetsIntoEngine reads from installDir).
