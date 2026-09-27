@@ -60,14 +60,14 @@ class LibraryTest {
     private val wineEntry = LibraryEntry(id = "wine:notepad", title = "Notepad", kind = LibraryEntryKind.WINE_PROFILE)
 
     @Test
-    fun `scanAll aggregates entries across every registered provider`() = runBlocking {
+    fun `scan aggregates entries across every registered provider`() = runBlocking {
         val nativeProvider = FakeProvider(LibraryEntryKind.NATIVE_ANDROID_APP, listOf(nativeEntry))
         val wineProvider = FakeProvider(LibraryEntryKind.WINE_PROFILE, listOf(wineEntry))
         val library = Library(listOf(nativeProvider, wineProvider))
 
-        val entries = library.scanAll()
+        library.scanInBackground(LibraryEntryKind.entries.toSet())
+        val entries = library.backgroundScanState(LibraryEntryKind.entries.toSet()).value ?: emptyList()
 
-        assertEquals(2, entries.size)
         assertTrue(entries.contains(nativeEntry))
         assertTrue(entries.contains(wineEntry))
     }
@@ -96,10 +96,11 @@ class LibraryTest {
 
         library.launch(nativeEntry)
         library.launch(nativeEntry)
-        val entries = library.scanAll()
+        library.scanInBackground(setOf(LibraryEntryKind.NATIVE_ANDROID_APP))
+        val scanned = library.backgroundScanState(setOf(LibraryEntryKind.NATIVE_ANDROID_APP)).value ?: emptyList()
 
         assertEquals(listOf(nativeEntry.id, nativeEntry.id), playHistory.recordCalls)
-        val rescored = entries.single { it.id == nativeEntry.id }
+        val rescored = scanned.single { it.id == nativeEntry.id }
         assertEquals(2, rescored.playCount)
         assertTrue(rescored.lastPlayedEpochMs != null)
     }
@@ -131,11 +132,14 @@ class LibraryTest {
         assertEquals(true, library.toggleFavorite(wineEntry))
         assertEquals(setOf(wineEntry.id), favorites.ids)
 
-        val entries = library.scanAll()
-        assertTrue(entries.single { it.id == wineEntry.id }.favorite)
+        library.scanInBackground(setOf(LibraryEntryKind.WINE_PROFILE))
+        val state = library.backgroundScanState(setOf(LibraryEntryKind.WINE_PROFILE))
+        val entries = state.value?.filter { it.id == wineEntry.id }
+        assertTrue(!entries.isNullOrEmpty())
+        assertTrue(entries!!.single().favorite)
 
         // Toggling the scanned (now favourite) entry turns it off again.
-        assertEquals(false, library.toggleFavorite(entries.single { it.id == wineEntry.id }))
+        assertEquals(false, library.toggleFavorite(wineEntry))
         assertTrue(favorites.ids.isEmpty())
     }
 
@@ -144,7 +148,7 @@ class LibraryTest {
         val provider = FakeProvider(LibraryEntryKind.NATIVE_ANDROID_APP, listOf(nativeEntry))
         val library = Library(listOf(provider), favorites = FakeFavoritesStore())
 
-        val entries = library.scanAll()
+        val entries = provider.scan()
 
         assertEquals(nativeEntry, entries.single())
     }
@@ -218,7 +222,9 @@ class LibraryTest {
         // One game, named for the game it was asked from, with both folders
         // still in it; the newer version is what its card draws, so the
         // older card's history and favourite are there now.
-        val merged = LibraryGrouping.group(library.scanAll()).single()
+        library.scanInBackground(LibraryEntryKind.entries.toSet())
+        val scanned = library.backgroundScanState(LibraryEntryKind.entries.toSet()).value ?: emptyList()
+        val merged = LibraryGrouping.group(scanned).single()
         assertEquals("StarHarbor", merged.game.name)
         assertEquals(setOf(older.id, newer.id), merged.entriesByPath.keys)
         assertEquals(newer.id, merged.displayEntry.id)

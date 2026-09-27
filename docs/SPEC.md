@@ -8968,6 +8968,10 @@ reference/             → screenshots used as visual references
 
 **Dead-code removal (P3, 2026-09-25):** `MediaAppBrowserClient` (library-core presence client, no callers) deleted; `shell-default/upstream-unused-reference/` (18 MB, 1,086 uncompiled files) and `fix_segmented.py` removed; `GameGrouping.suggestions`, `GamingPrefs` setters (`setDefaultSection`/`setShowHints`/`setAppsGridColumns`), `ThemePrefs.setControllerFamily`/`setTransitionsSetting`, and `ConsoleRomProvider.rescan()` deleted; empty-DSN Sentry SDK (`io.sentry:sentry-android:7.20.1`) removed from `shell-default/build.gradle`, its manifest auto-init meta-data and `CrashReporting.kt` already gone; no AI attribution.
 
+### Three ROM-entry stores collapsed to one; `rom_entries`/`scan_metadata` retired (D1, 2026-09-26)
+
+`RomDatabase.rom_entries` and `scan_metadata` (the persistent ROM-scan cache) are deleted; the index (`RoomLibraryIndexStore`, backed by `library-index.db`) and the per-game JSON records (`files/library/games/`) replace them as the single sources. `Library.scanAll()` and `Library.scanKinds()` are deleted (the index-backed `LibraryProgressive` and `Library.find()` already cover what they did); `ConsoleRomProvider.scan()` now walks fresh folders without the cache filter. The `game_metadata`, `collections` and `collection_members` user-data tables stay in `RomDatabase` and survive a non-destructive migration (`MIGRATION_10_11` drops the two pure-cache tables). No AI attribution.
+
 ### `:runtime-windows` consumes ALL of gamenative (decided 2026-08-31)
 
 Previously the module compiled only the vendored `com.winlator.*` subtree
