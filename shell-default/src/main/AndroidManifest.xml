@@ -108,7 +108,7 @@
         filter match at all.
 
         droidtop patch: excludeFromRecents, matching HomeTrampolineActivity/
-        AlternativeLauncherActivity below -- confirmed live (owner,
+        AlternativeLauncherActivity below: confirmed live (owner,
         2026-09-27) that this task showed up as its own card in Recents,
         reading as a second droidtop instance next to MainActivity's task
         (docs/SPEC.md 2c, "The task model"). A real Home screen is reached
