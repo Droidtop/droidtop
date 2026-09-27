@@ -96,7 +96,7 @@ class ModesTest {
     fun `a disabled mode contributes no piece`() {
         val launcherOnly = ModeGate.piecesToStart(setOf(Mode.LAUNCHER))
         assertEquals(
-            setOf(ModePiece.LAUNCHER_SYSTEM_COMPONENTS, ModePiece.LAUNCHER_SECOND_SCREEN),
+            setOf(ModePiece.LAUNCHER_SYSTEM_COMPONENTS),
             launcherOnly,
         )
         assertTrue(ModeGate.piecesToStart(emptySet()).isEmpty())

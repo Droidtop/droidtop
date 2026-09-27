@@ -77,15 +77,6 @@ class SecondaryDisplayActivity : ComponentActivity() {
 
     private fun render() {
         val mode = SecondaryDisplayContent.currentMode(this)
-
-        // A mode that answers with its own Activity gets first refusal:
-        // Standard hands off to Launcher3's secondary-display UI, which
-        // is an Activity and cannot be composed into this one.
-        if (SecondaryDisplayContent.handoffFor(mode)?.invoke(this) == true) {
-            finish()
-            return
-        }
-
         val content = SecondaryDisplayContent.contentFor(mode)
         setContent {
             if (content != null) {

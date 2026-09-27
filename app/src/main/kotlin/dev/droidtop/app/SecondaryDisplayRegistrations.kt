@@ -6,15 +6,28 @@ import dev.droidtop.display.SecondaryDisplayContent
 /**
  * What each mode draws on a secondary screen, registered per mode rather
  * than all at once: a mode that is off registers nothing, so the platform
- * placing :display's SecondaryDisplayActivity can never compose a disabled
+ * placing :display's SecondaryDisplayActivity (or, when droidtop does not
+ * hold Home, SecondScreenAttachService's own Presentation -- docs/SPEC.md
+ * section 4c, "Attaching without Home") can never compose a disabled
  * mode's surface (docs/SPEC.md section 4c and "Modes and what each
  * contributes").
  *
  * Gaming and Desktop each draw either the companion surface or the input
- * surface, per the user's role choice for that mode; Launcher hands off to
- * Launcher3's own secondary-display Activity. The role is read at
- * composition rather than captured once, so a role changed in settings
- * takes effect the next time that screen comes up.
+ * surface, per the user's role choice for that mode; Standard draws its
+ * own launcher-style surface (StandardSecondScreenSurface). The role is
+ * read at composition rather than captured once, so a role changed in
+ * settings takes effect the next time that screen comes up.
+ *
+ * Real bug this replaced (owner, 2026-09-27, "it seems we use the same
+ * dual screen mode for standard and gaming"): Standard used to hand off
+ * to Launcher3's own bare `SecondaryDisplayLauncher` -- a near-empty
+ * system stub, not a droidtop surface at all -- while [SecondScreenPresentation]
+ * (the LIVE surface, shown whenever MainActivity itself drives the second
+ * screen) never branched on mode to begin with and always drew the game
+ * companion regardless. Standard now registers real content the same way
+ * Gaming and Desktop do, and [SecondScreenPresentation] now reads this
+ * SAME registry instead of hardcoding the companion, so the idle and live
+ * surfaces can never disagree about what a mode's second screen is.
  */
 object SecondaryDisplayRegistrations {
 
@@ -22,19 +35,12 @@ object SecondaryDisplayRegistrations {
 
     fun setDesktop(enabled: Boolean) = set(SecondaryDisplayContent.Mode.DESKTOP, enabled)
 
-    fun unregisterLauncherHandoff() =
-        SecondaryDisplayContent.unregister(SecondaryDisplayContent.Mode.STANDARD)
-
-    fun registerLauncherHandoff() {
-        SecondaryDisplayContent.registerHandoff(SecondaryDisplayContent.Mode.STANDARD) { context ->
-            runCatching {
-                context.startActivity(
-                    android.content.Intent().setClassName(
-                        context.packageName,
-                        "com.android.launcher3.secondarydisplay.SecondaryDisplayLauncher",
-                    ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                )
-            }.isSuccess
+    /** Standard is the always-on default (docs/SPEC.md 2c): it is never gated behind a ModePiece the way Gaming/Desktop's second screens are. */
+    fun registerStandard() {
+        SecondaryDisplayContent.register(SecondaryDisplayContent.Mode.STANDARD) {
+            dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
+                StandardSecondScreenSurface()
+            }
         }
     }
 

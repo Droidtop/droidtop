@@ -405,6 +405,22 @@
         </service>
 
         <!--
+          Keeps droidtop's own second-screen surface attached to a
+          secondary display even when droidtop is not the Home app (see
+          docs/SPEC.md 4c, "Attaching without Home"): a plain foreground
+          service holding a Presentation, no root, no activity-launch
+          restriction involved.
+        -->
+        <service
+            android:name="dev.droidtop.app.SecondScreenAttachService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Shows droidtop's own second-screen surface on an attached display" />
+        </service>
+
+        <!--
           Real bug this fixes: AmStartCommandToIntentConverter used to hand
           emulator apps a plain file:// URI (Uri.fromFile), which crashes
           with android.os.FileUriExposedException the moment the Intent

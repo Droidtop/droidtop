@@ -54,9 +54,6 @@ enum class ModePiece(vararg owners: Mode) {
      */
     LAUNCHER_SYSTEM_COMPONENTS(Mode.LAUNCHER),
 
-    /** Handing the secondary screen to Launcher3's own second-screen UI. */
-    LAUNCHER_SECOND_SCREEN(Mode.LAUNCHER),
-
     /** droidtop's own notification listener, read only by the Quick Menu. */
     GAMING_NOTIFICATION_LISTENER(Mode.GAMING),
 

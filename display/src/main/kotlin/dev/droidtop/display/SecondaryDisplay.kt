@@ -33,24 +33,8 @@ object SecondaryDisplayContent {
      */
     private val contents = mutableMapOf<Mode, @Composable () -> Unit>()
 
-    /**
-     * What to do when a mode draws nothing of its own — Standard hands
-     * off to Launcher3's own secondary-display UI, which is an Activity,
-     * not a composable.
-     */
-    private val handoffs = mutableMapOf<Mode, (Context) -> Boolean>()
-
     fun register(mode: Mode, content: @Composable () -> Unit) {
         contents[mode] = content
-    }
-
-    /**
-     * Registers a mode that answers by starting its own Activity instead
-     * of composing. Returning false means it declined, and the composable
-     * content (if any) is used instead.
-     */
-    fun registerHandoff(mode: Mode, handoff: (Context) -> Boolean) {
-        handoffs[mode] = handoff
     }
 
     /**
@@ -59,15 +43,14 @@ object SecondaryDisplayContent {
      * the platform could still compose a disabled mode's surface until the
      * process next started; [dev.droidtop.app.ModeStartup] now calls this
      * from the same pass that stops everything else the mode contributes.
+     * Standard is never unregistered — see
+     * [dev.droidtop.app.SecondaryDisplayRegistrations.registerStandard].
      */
     fun unregister(mode: Mode) {
         contents -= mode
-        handoffs -= mode
     }
 
     internal fun contentFor(mode: Mode): (@Composable () -> Unit)? = contents[mode]
-
-    internal fun handoffFor(mode: Mode): ((Context) -> Boolean)? = handoffs[mode]
 
     /**
      * The active mode, from the one place that owns mode state
