@@ -1439,9 +1439,78 @@ Foot Client and Foot Server, and Foot opened a terminal window on the
 desktop; text typed into it ran (`echo droidtop-typed` printed its output).
 Getting there took three fixes found only on stock Android: fork/vfork
 refused by the x86_64 app seccomp policy (proot patch), the compositor's
-socket name, and the keymap memfd (§6b). Not verified yet: an arm64
-device (the Retroid console), the Debian plan, labwc, sibling containers
-through this backend, clipboard, rotation, and the second screen.
+socket name, and the keymap memfd (§6b).
+
+**dq-desktop-08's four milestones (for regression tracking).** The above
+run is summarised as four concrete checks that any device must pass for
+Desktop mode to be considered working:
+
+1. **Proot system check passes** — `ContainerRuntime.checkSystemRequirements()`
+   runs a trivial `proot --kill-on-exit --rootfs=/ /system/bin/sh -c 'echo $CHECK_TOKEN'`
+   and it exits 0 with the token in stdout. This proves ptrace is allowed and
+   the packaged proot/loaders can start a program.
+
+2. **Primary container boots and `exec` answers** — the session pulls the
+   chosen image (Alpine in the emulator run), unpacks it, provisions the
+   compositor (sway) and base packages (xwayland, a font, foot), starts the
+   primary container, and a probe `exec` (`uname -m; . /etc/os-release && echo "$PRETTY_NAME"; id -u`)
+   returns 0 with the expected architecture, distro name, and uid 0.
+
+3. **Host-bridge connects and input works** — `HostBridge` connects to the
+   compositor's Wayland socket (found dynamically, not hardcoded to
+   `wayland-0`), the output is resized to the Android view, the viewport
+   renders sway's desktop with its bar and clock, and taps on the Android
+   surface move the compositor's cursor to the correct coordinates.
+
+4. **Start menu launches a Linux app with typed input** — the Start menu's
+   "Linux apps" section lists the container's desktop entries (Foot, Foot
+   Client, Foot Server on Alpine), tapping Foot opens a terminal window on
+   the compositor's desktop, and text typed into it executes (verified by
+   `echo droidtop-typed` printing its output).
+
+**Retroid Pocket 5 (Android 13, arm64-v8a) — verification needed.** The
+emulator run was x86_64 on API 34; the Retroid is the project's target
+hardware and has never run Desktop mode. The following differences may
+surface blockers:
+
+- **ptrace permission** — BlueStacks (Android 9 x86_64) refuses
+  `ptrace(PTRACE_TRACEME)` to app processes (dq-desktop-04). The Retroid's
+  vendor kernel may or may not allow it. `ProotRuntime.checkSystemRequirements`
+  will report the exact error if blocked (e.g. "proot error: ptrace(TRACEME):
+  Operation not permitted").
+
+- **seccomp policy on arm64** — the fork/vfork→clone patch (build-scripts/proot-patches/0001)
+  addresses x86_64 only (Android's arm64 app seccomp policy does not trap
+  fork/vfork syscalls). No arm64-specific seccomp issue is known, but the
+  Retroid's vendor policy may differ from the stock emulator.
+
+- **ABI match** — droidtop ships fat APKs with arm64-v8a proot binaries.
+  `ProotRuntime.installedAbiMismatch()` checks that the installed ABI equals
+  `Build.SUPPORTED_64_BIT_ABIS[0]`; a mismatch (e.g. if Android installs the
+  x86_64 slice on an arm64 device) is reported explicitly.
+
+- **memfd_create** — Android 13 (API 33) has memfd_create; proot's
+  `--ashmem-memfd` option is a no-op where memfd works. The emulator run
+  needed the keymap memfd fix (§6b); the same fix applies on arm64.
+
+- **Wayland compositor on arm64** — sway and wlroots are architecture-
+  agnostic; the Alpine arm64 packages exist. No code change is expected.
+
+**Needs a rig check** (to be run by the coordinator on the Retroid Pocket 5):
+1. Open droidtop, complete onboarding, enable Desktop mode in Global settings.
+2. Open Desktop mode — the viewport should show "Start the desktop"; press it.
+3. Watch logcat (`droidtop.proot` and `droidtop.DesktopSession`) for the four
+   milestones above. Record which pass and which fail, with exact error text.
+4. If milestone 1 fails, capture the full `checkSystemRequirements` stderr —
+   that is the "exact cause" to document (as was done for BlueStacks' ptrace
+   refusal at SPEC §3 line 1060-1064).
+5. If milestones 1-2 pass but 3 fails, capture host-bridge connection logs
+   (socket path, connection result, output resize).
+6. If milestones 1-3 pass but 4 fails, capture Start menu UI and Foot launch
+   logs (desktop entry parsing, exec result, input injection).
+
+Not verified yet (tracked separately): the Debian plan, labwc, sibling
+containers through this backend, clipboard, rotation, and the second screen.
 
 **What the pipeline did off-device (2026-09-24).** Termux's proot built for
 x86_64 Linux, a stock Alpine rootfs owned by an unprivileged user, the exact
