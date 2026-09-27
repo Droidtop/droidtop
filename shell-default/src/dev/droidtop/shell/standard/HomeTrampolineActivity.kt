@@ -85,6 +85,13 @@ class HomeTrampolineActivity : Activity() {
     }
 
     private fun forwardToStandard() {
+        // Standard is now the active surface -- read by
+        // dev.droidtop.display.SecondaryDisplayContent.currentMode so the
+        // second screen shows Standard's own content rather than
+        // whatever Gaming/Desktop mode was last app-hosted (docs/SPEC.md
+        // 4c, "The Alternative forwarder keeps the second screen"; this
+        // trampoline's own forward path had the identical gap).
+        Modes.setLastMode(this, Mode.LAUNCHER)
         val redirect = Intent(Intent.ACTION_MAIN).apply {
             setClassName(packageName, STANDARD_ACTIVITY)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

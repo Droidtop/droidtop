@@ -52,6 +52,21 @@ class SecondaryDisplayActivity : ComponentActivity() {
         render()
     }
 
+    /**
+     * `singleTop` means an already-resumed instance (this Activity can
+     * stay resumed while a Presentation is layered on top of it on the
+     * same Display -- Android does not pause the covered Activity just
+     * because another window overlaps it) gets `onNewIntent`, not a fresh
+     * `onCreate`/`onResume`. Without this, re-asserting this Activity to
+     * pick up a mode change (MainActivity dismissing its own Presentation
+     * on Home-to-Standard, docs/SPEC.md 4c) was a no-op whenever this
+     * Activity had never actually left the resumed state underneath.
+     */
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        render()
+    }
+
     override fun onResume() {
         super.onResume()
         // The mode can change while this sits on the other screen (the

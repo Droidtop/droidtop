@@ -66,6 +66,15 @@ class AlternativeLauncherActivity : Activity() {
             return
         }
 
+        // Standard is the active surface here too, even though the
+        // chosen launcher is what actually renders on the primary
+        // display: droidtop still holds Home (this Activity IS the
+        // enabled HOME one), and the secondary display still gets
+        // droidtop's own SECONDARY_HOME placement (docs/SPEC.md 4c, "The
+        // Alternative forwarder keeps the second screen") -- but only if
+        // it reads the right mode, which needs this recorded the same
+        // way HomeTrampolineActivity.forwardToStandard records it.
+        dev.droidtop.library.settings.Modes.setLastMode(this, dev.droidtop.library.settings.Mode.LAUNCHER)
         val forwardIntent = intent.apply {
             component = forwardTo
             removeExtra(BackButtonMenu.EXTRA_MODE)
