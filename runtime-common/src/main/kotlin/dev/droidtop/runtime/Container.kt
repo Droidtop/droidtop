@@ -1,6 +1,8 @@
 package dev.droidtop.runtime
 
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * A running Linux container, regardless of which backend created it
@@ -65,6 +67,26 @@ data class ContainerInfo(
 /** [container]'s name ([ContainerInfo.displayName]), or its id when the backend no longer lists it. */
 suspend fun ContainerRuntime.nameOf(container: Container): String =
     listContainers().firstOrNull { it.container.id == container.id }?.displayName ?: container.id
+
+/**
+ * One extra host-folder bind the person added on a container's Mounts row
+ * (docs/SPEC.md 3d) -- beyond the standard shared-storage/app-storage
+ * binds every container already gets. [name] is what the folder is called
+ * inside the container, under [ContainerLayout.EXTRA_MOUNTS_DIR]; picked
+ * from the host folder's own name and de-duplicated by the caller (the
+ * catalog screen), never typed by hand.
+ */
+data class ExtraMount(val hostPath: String, val name: String) {
+    val containerPath: String get() = "${ContainerLayout.EXTRA_MOUNTS_DIR}/$name"
+}
+
+/**
+ * Which shared sockets a container's processes can reach (docs/SPEC.md 3d
+ * Sockets row). Both on by default -- droidtop shares the desktop's
+ * Wayland display and, where the backend can, the host's audio, unless a
+ * container is deliberately isolated from one.
+ */
+data class ContainerSockets(val waylandShared: Boolean = true, val audioShared: Boolean = true)
 
 /** Common lifecycle surface both container backends implement. */
 interface ContainerRuntime {
@@ -135,6 +157,65 @@ interface ContainerRuntime {
      * person could see (the container manager offers no Start for it).
      */
     val siblingsNeedStart: Boolean get() = true
+
+    /**
+     * Stops then starts [container] (docs/SPEC.md 3d "Restart"). The
+     * default is every backend's own [stop]/[start] in sequence -- neither
+     * backend needs anything smarter than that, and [start] with no
+     * explicit [PrimaryProvisioning] re-applies the recorded plan. For a
+     * SIBLING backend that needs no start ([siblingsNeedStart] false),
+     * this still ends every process running in it; there is nothing after
+     * that for a no-init sibling to boot back into.
+     */
+    suspend fun restart(container: Container) {
+        stop(container)
+        start(container)
+    }
+
+    /**
+     * Destroys [container] and creates a fresh one from the SAME image
+     * reference, name and role (docs/SPEC.md 3d "Recreate from the
+     * image") -- a re-pull of a tag gets whatever the registry serves for
+     * it now, the same as `docker pull && recreate` on real Linux. The
+     * PRIMARY's provisioning plan carries over; nothing else about the
+     * old container (its running state, anything installed by hand
+     * inside it) does. Fails when the container has no recorded image
+     * reference to recreate from (a container made before this existed).
+     */
+    suspend fun recreateFromImage(container: Container): Container
+
+    /**
+     * Real size on disk, in bytes -- the container manager's "Storage
+     * used" row (docs/SPEC.md 3d). The rootfs tree is the overwhelming
+     * majority of it for every backend, so this is the one implementation
+     * every backend shares; a backend whose bookkeeping lives partly
+     * outside the rootfs (droidspaces' side files) is close enough that a
+     * second, backend-specific walk isn't worth the duplication.
+     */
+    suspend fun diskUsageBytes(container: Container): Long = withContext(Dispatchers.IO) {
+        ContainerDiskUsage.bytesUnder(File(container.rootfsPath))
+    }
+
+    /** The sockets [container]'s processes currently see shared (docs/SPEC.md 3d Sockets row). */
+    suspend fun sockets(container: Container): ContainerSockets
+
+    /** Records which sockets to share with [container] from its next start/exec. */
+    suspend fun setSockets(container: Container, sockets: ContainerSockets)
+
+    /**
+     * Why this backend cannot bridge host audio into a container; null
+     * when it can (docs/SPEC.md 3d Sockets row). Parallels
+     * [deviceSharingUnavailableReason] -- proot has no audio bridge at
+     * all, so [ContainerSockets.audioShared] is never actually
+     * controllable there.
+     */
+    val audioSharingUnavailableReason: String?
+
+    /** Extra host folders bound into [container] beyond the standard shared-storage set (docs/SPEC.md 3d Mounts row). */
+    suspend fun extraMounts(container: Container): List<ExtraMount>
+
+    /** Replaces [container]'s extra mounts; bound from its next start/exec. */
+    suspend fun setExtraMounts(container: Container, mounts: List<ExtraMount>)
 
     /**
      * Whether this device can run this backend at all, answered by running

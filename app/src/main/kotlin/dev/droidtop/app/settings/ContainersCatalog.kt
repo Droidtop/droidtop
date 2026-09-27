@@ -11,6 +11,7 @@ import dev.droidtop.app.ContainerRuntimeFactory
 import dev.droidtop.app.DesktopSessionService
 import dev.droidtop.app.DesktopSessionState
 import dev.droidtop.app.DesktopSetupPrefs
+import dev.droidtop.app.GamesRootPrefs
 import dev.droidtop.app.MainActivity
 import dev.droidtop.app.vpn.DroidtopVpnService
 import dev.droidtop.app.vpn.VpnPrefs
@@ -22,6 +23,7 @@ import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
+import dev.droidtop.library.settings.FolderPickItem
 import dev.droidtop.library.settings.Mode
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.TextInputItem
@@ -32,9 +34,11 @@ import dev.droidtop.runtime.ContainerInfo
 import dev.droidtop.runtime.ContainerLayout
 import dev.droidtop.runtime.ContainerNames
 import dev.droidtop.runtime.ContainerRole
+import dev.droidtop.runtime.ContainerSockets
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.ContainerTerminal
 import dev.droidtop.runtime.CraneImageCatalogResolver
+import dev.droidtop.runtime.ExtraMount
 import dev.droidtop.runtime.ImageCatalogRole
 import dev.droidtop.runtime.ImageTags
 import dev.droidtop.runtime.KnownImageRepository
@@ -180,6 +184,9 @@ object ContainersCatalog {
         val running = isRunning(info)
         val desktopUp = session is DesktopSessionState.Connected
 
+        // buildList's block below isn't suspend, so anything that needs a
+        // suspend call (the real disk-usage walk) is computed up front.
+        val diskUsageBytes = runCatching { runtime.diskUsageBytes(container) }.getOrNull()
         val main = buildList<CatalogItem> {
             // The state, and the one action that changes it.
             when {
@@ -229,6 +236,9 @@ object ContainersCatalog {
                     ),
                 )
             }
+            if (running) add(restartItem(info, runtime))
+            add(recreateItem(info, runtime))
+            add(storageItem(diskUsageBytes))
             add(terminalItem(info, runtime, desktopUp))
             add(
                 TextInputItem(
@@ -249,8 +259,153 @@ object ContainersCatalog {
         if (primary) groups += CatalogGroup(id = "printing", title = "Printing", items = printingItems(context, runtime, desktopUp))
         groups += CatalogGroup(id = "vpn", title = "VPN", items = vpnItems(context, runtime, info))
         groups += CatalogGroup(id = "devices", title = "USB devices", items = deviceItems(context, runtime, info))
+        groups += CatalogGroup(id = "sockets", title = "Sockets", items = socketItems(runtime, info))
+        groups += CatalogGroup(id = "mounts", title = "Mounts", items = mountItems(runtime, info))
         groups += CatalogGroup(id = "delete", title = null, items = listOf(deleteItem(info, runtime, running)))
         return groups
+    }
+
+    /** Ends everything running in the container and boots it again (docs/SPEC.md 3d "Restart"). */
+    private fun restartItem(info: ContainerInfo, runtime: ContainerRuntime): CatalogItem {
+        val container = info.container
+        return AsyncActionItem(
+            id = "container_restart",
+            title = "Restart",
+            subtitle = if (info.container.role == ContainerRole.PRIMARY) "Ends the desktop and every program on it, then starts it again" else "Ends everything running in it, then starts it again",
+            confirmTitle = "Restart ${info.displayName}?",
+            run = { _, _ ->
+                runtime.restart(container)
+                "Restarted."
+            },
+        )
+    }
+
+    /** A fresh pull of the same image, kept name and role (docs/SPEC.md 3d "Recreate from the image"). */
+    private fun recreateItem(info: ContainerInfo, runtime: ContainerRuntime): CatalogItem {
+        if (info.image == null) {
+            return ActionItem(
+                id = "container_recreate",
+                title = "Recreate from the image",
+                subtitle = "This container has no recorded image reference to recreate from (made before this existed)",
+                run = {},
+            )
+        }
+        return AsyncActionItem(
+            id = "container_recreate",
+            title = "Recreate from the image",
+            subtitle = "Deletes it and pulls ${info.image} fresh, keeping the name and everything else about it",
+            confirmTitle = "Recreate ${info.displayName} from ${info.image}? Everything installed by hand in it is lost",
+            run = { _, onStatus ->
+                onStatus("Pulling ${info.image}...")
+                runtime.recreateFromImage(info.container)
+                "Recreated \"${info.displayName}\" from ${info.image}."
+            },
+        )
+    }
+
+    /** Real size on disk (docs/SPEC.md 3d "Storage used"), computed fresh every time the page opens. */
+    private fun storageItem(bytes: Long?): CatalogItem = ActionItem(
+        id = "container_storage",
+        title = "Storage used",
+        value = bytes?.let { formatBytes(it) } ?: "Unknown",
+        run = {},
+    )
+
+    /** Human-readable size; GB once it passes a gigabyte, MB above a megabyte, KB below. */
+    private fun formatBytes(bytes: Long): String = when {
+        bytes >= 1_000_000_000L -> String.format("%.1f GB", bytes / 1_000_000_000.0)
+        bytes >= 1_000_000L -> String.format("%.0f MB", bytes / 1_000_000.0)
+        else -> "${bytes / 1_000} KB"
+    }
+
+    // ---- sockets (docs/SPEC.md 3d) ----
+
+    private suspend fun socketItems(runtime: ContainerRuntime, info: ContainerInfo): List<CatalogItem> {
+        val container = info.container
+        val sockets = runCatching { runtime.sockets(container) }.getOrDefault(ContainerSockets())
+        return buildList {
+            add(
+                ToggleItem(
+                    id = "container_socket_wayland",
+                    title = "Wayland",
+                    subtitle = "Share the desktop's display with this container's own programs",
+                    current = sockets.waylandShared,
+                    onToggle = { _, on ->
+                        kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                            runCatching { runtime.setSockets(container, sockets.copy(waylandShared = on)) }
+                        }
+                    },
+                ),
+            )
+            val audioReason = runtime.audioSharingUnavailableReason
+            if (audioReason != null) {
+                add(ActionItem(id = "container_socket_audio", title = "Audio: not available here", subtitle = audioReason, run = {}))
+            } else {
+                add(
+                    ToggleItem(
+                        id = "container_socket_audio",
+                        title = "Audio",
+                        subtitle = "Bridge the device's audio into this container",
+                        current = sockets.audioShared,
+                        onToggle = { _, on ->
+                            kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                                runCatching { runtime.setSockets(container, sockets.copy(audioShared = on)) }
+                            }
+                        },
+                    ),
+                )
+            }
+        }
+    }
+
+    // ---- mounts (docs/SPEC.md 3d) ----
+
+    private suspend fun mountItems(runtime: ContainerRuntime, info: ContainerInfo): List<CatalogItem> {
+        val container = info.container
+        val mounts = runCatching { runtime.extraMounts(container) }.getOrDefault(emptyList())
+        return buildList {
+            add(
+                FolderPickItem(
+                    id = "container_mount_add",
+                    title = "Add a folder",
+                    subtitle = "Shares a host folder into this container, from its next start",
+                    onPicked = { _, uri ->
+                        val resolved = GamesRootPrefs.resolveStoragePath(uri)
+                            ?: return@FolderPickItem "Couldn't resolve that folder to a real path on this device"
+                        val name = uniqueMountName(resolved.name.ifBlank { "folder" }, mounts.map { it.name })
+                        val outcome = kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                            runCatching { runtime.setExtraMounts(container, mounts + ExtraMount(resolved.absolutePath, name)) }
+                        }
+                        outcome.exceptionOrNull()?.message
+                    },
+                ),
+            )
+            if (mounts.isEmpty()) {
+                add(ActionItem(id = "container_mounts_none", title = "No extra folders shared", subtitle = "Add one above", run = {}))
+            }
+            mounts.forEach { mount ->
+                add(
+                    AsyncActionItem(
+                        id = "container_mount:${mount.name}",
+                        title = mount.name,
+                        subtitle = "${mount.hostPath} \u2192 ${mount.containerPath}",
+                        confirmTitle = "Stop sharing ${mount.name}?",
+                        run = { _, _ ->
+                            runtime.setExtraMounts(container, mounts - mount)
+                            "Removed."
+                        },
+                    ),
+                )
+            }
+        }
+    }
+
+    /** [base], or [base] followed by the first free " 2", " 3", ... suffix not already in [existing]. */
+    private fun uniqueMountName(base: String, existing: List<String>): String {
+        if (base !in existing) return base
+        var n = 2
+        while ("$base $n" in existing) n++
+        return "$base $n"
     }
 
     private fun terminalItem(info: ContainerInfo, runtime: ContainerRuntime, desktopUp: Boolean): CatalogItem {

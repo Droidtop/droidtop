@@ -7,7 +7,10 @@ import android.net.LocalSocketAddress
 import android.util.Log
 import dev.droidtop.runtime.Container
 import dev.droidtop.runtime.ContainerBackend
+import dev.droidtop.runtime.ContainerDiskUsage
 import dev.droidtop.runtime.ContainerExecResult
+import dev.droidtop.runtime.ContainerSockets
+import dev.droidtop.runtime.ExtraMount
 import dev.droidtop.runtime.ContainerInfo
 import dev.droidtop.runtime.ContainerLayout
 import dev.droidtop.runtime.ContainerNames
@@ -122,6 +125,26 @@ class ProotRuntime(
     override suspend fun rename(container: Container, name: String) {
         val existing = listContainers()
         withContext(Dispatchers.IO) { names.rename(container.id, name, existing) }
+    }
+
+    /**
+     * A fresh pull of the same image reference, kept name and role, the
+     * PRIMARY's provisioning plan carried over (docs/SPEC.md 3d "Recreate
+     * from the image"). Fails when [container] has no recorded image
+     * reference -- there is nothing to re-pull.
+     */
+    override suspend fun recreateFromImage(container: Container): Container {
+        val info = listContainers().firstOrNull { it.container.id == container.id }
+            ?: error("${container.id} no longer exists")
+        val imageRef = info.image ?: error("${container.id} has no recorded image reference to recreate from")
+        val provisioning = if (container.role == ContainerRole.PRIMARY) readProvisioning(container.id) else null
+        val displayName = info.displayName
+        destroy(container)
+        val created = createContainer(container.id, container.role, RootfsImage(reference = imageRef), provisioning)
+        if (container.role == ContainerRole.SIBLING) {
+            withContext(Dispatchers.IO) { names.set(created.id, displayName) }
+        }
+        return created
     }
 
     private suspend fun createContainer(
@@ -249,6 +272,33 @@ class ProotRuntime(
                 )
             }
         names.named(found)
+    }
+
+    /** Read from [configOf]'s own KEY_SOCKET_WAYLAND -- audio has no proot bridge at all, see [audioSharingUnavailableReason]. */
+    override suspend fun sockets(container: Container): ContainerSockets = withContext(Dispatchers.IO) {
+        val config = runCatching { readConfig(container.id) }.getOrNull()
+        ContainerSockets(
+            waylandShared = config?.getProperty(KEY_SOCKET_WAYLAND)?.toBooleanStrictOrNull() ?: true,
+            audioShared = false,
+        )
+    }
+
+    override suspend fun setSockets(container: Container, sockets: ContainerSockets) = withContext(Dispatchers.IO) {
+        val config = readConfig(container.id)
+        config[KEY_SOCKET_WAYLAND] = sockets.waylandShared.toString()
+        configOf(container.id).outputStream().use { config.store(it, "droidtop proot container") }
+        Unit
+    }
+
+    override val audioSharingUnavailableReason: String =
+        "Audio sharing needs the root container backend; proot has no audio bridge."
+
+    override suspend fun extraMounts(container: Container): List<ExtraMount> = withContext(Dispatchers.IO) {
+        readExtraMounts(container.id)
+    }
+
+    override suspend fun setExtraMounts(container: Container, mounts: List<ExtraMount>) = withContext(Dispatchers.IO) {
+        writeExtraMounts(container.id, mounts)
     }
 
     /**
@@ -409,9 +459,14 @@ class ProotRuntime(
     ): Process {
         val rootfs = rootfsOf(containerId)
         val marker = ProotProcesses.sessionEnvironment(containerId, sessionId)
+        val waylandSocketName = if (readSocketsSync(containerId).waylandShared) {
+            ContainerLayout.findWaylandSocket(socketsDir)?.name
+        } else {
+            null
+        }
         val guestEnvironment = LinkedHashMap<String, String>().apply {
             putAll(baseGuestEnvironment)
-            putAll(ContainerLayout.clientEnvironment(ContainerLayout.findWaylandSocket(socketsDir)?.name))
+            putAll(ContainerLayout.clientEnvironment(waylandSocketName))
             putAll(env)
             putAll(marker)
         }
@@ -432,6 +487,13 @@ class ProotRuntime(
             // Volumes mounted now, looked up per session: a card or USB
             // drive mounted since the last one is there the next time.
             ContainerLayout.sharedStorageBinds(SharedVolume.mounted(context)).forEach { (host, guest) -> add("--bind=$host:$guest") }
+            // The person's own extra Mounts (docs/SPEC.md 3d), each at its
+            // own path under EXTRA_MOUNTS_DIR -- a host folder removed
+            // since it was added is skipped, the same "don't fail a start
+            // over one missing bind" policy sharedStorageBinds already
+            // gets from the platform for a card that's been unmounted.
+            readExtraMounts(containerId).filter { File(it.hostPath).isDirectory }
+                .forEach { add("--bind=${it.hostPath}:${it.containerPath}") }
             add("--bind=${File(etcDir, "resolv.conf").absolutePath}:/etc/resolv.conf")
             add("--bind=${File(etcDir, "hosts").absolutePath}:/etc/hosts")
             add("--cwd=/root")
@@ -492,6 +554,26 @@ class ProotRuntime(
     private fun containerDir(name: String) = File(containersDir, name)
     private fun rootfsOf(name: String) = File(containerDir(name), "rootfs")
     private fun configOf(name: String) = File(containerDir(name), "container.properties")
+    private fun extraMountsFile(name: String) = File(containerDir(name), "mounts.list")
+
+    /** Synchronous read for [startSession], which already runs on Dispatchers.IO via its callers. */
+    private fun readSocketsSync(name: String): ContainerSockets {
+        val config = runCatching { readConfig(name) }.getOrNull()
+        return ContainerSockets(waylandShared = config?.getProperty(KEY_SOCKET_WAYLAND)?.toBooleanStrictOrNull() ?: true)
+    }
+
+    /** One "hostPath\tname" line per extra mount ([ExtraMount], docs/SPEC.md 3d). */
+    private fun readExtraMounts(name: String): List<ExtraMount> =
+        extraMountsFile(name).takeIf { it.isFile }?.readLines().orEmpty()
+            .mapNotNull { line ->
+                val parts = line.split("\t", limit = 2)
+                if (parts.size == 2 && parts[0].isNotBlank() && parts[1].isNotBlank()) ExtraMount(parts[0], parts[1]) else null
+            }
+
+    private fun writeExtraMounts(name: String, mounts: List<ExtraMount>) {
+        extraMountsFile(name).apply { parentFile?.mkdirs() }
+            .writeText(mounts.joinToString("") { "${it.hostPath}\t${it.name}\n" })
+    }
 
     private fun readConfig(name: String): Properties =
         Properties().apply { configOf(name).inputStream().use { load(it) } }
@@ -597,6 +679,7 @@ class ProotRuntime(
         private const val KEY_INSTALL = "provision.install"
         private const val KEY_COMPOSITOR = "provision.compositor"
         private const val KEY_DAEMONS = "provision.daemons"
+        private const val KEY_SOCKET_WAYLAND = "socket.wayland"
 
         private const val CHECK_TOKEN = "droidtop-proot-ok"
         private const val CHECK_TIMEOUT_S = 30L

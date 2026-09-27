@@ -47,6 +47,12 @@ class ContainerTerminalTest {
         override suspend fun sharedDevices(container: Container): List<String> = error("not used")
         override suspend fun setSharedDevices(container: Container, devicePaths: List<String>) = error("not used")
         override fun hostStorageToContainerPath(hostPath: File): String = error("not used")
+        override suspend fun recreateFromImage(container: Container): Container = error("not used")
+        override suspend fun sockets(container: Container): ContainerSockets = error("not used")
+        override suspend fun setSockets(container: Container, sockets: ContainerSockets) = error("not used")
+        override val audioSharingUnavailableReason: String? = null
+        override suspend fun extraMounts(container: Container): List<ExtraMount> = error("not used")
+        override suspend fun setExtraMounts(container: Container, mounts: List<ExtraMount>) = error("not used")
     }
 
     private val primary = Container(

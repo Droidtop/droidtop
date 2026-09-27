@@ -6,10 +6,13 @@ import android.content.Context
 import dev.droidtop.runtime.Container
 import dev.droidtop.runtime.ContainerBackend
 import dev.droidtop.runtime.ContainerExecResult
+import dev.droidtop.runtime.ContainerDiskUsage
 import dev.droidtop.runtime.ContainerLayout
 import dev.droidtop.runtime.ContainerNames
 import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.ContainerRuntime
+import dev.droidtop.runtime.ContainerSockets
+import dev.droidtop.runtime.ExtraMount
 import dev.droidtop.runtime.ImageCachePolicy
 import dev.droidtop.runtime.PrimaryProvisioning
 import dev.droidtop.runtime.RootfsImage
@@ -141,10 +144,33 @@ class DroidSpacesRuntime(
         val rootfsPath = File(rootfsDir, name).absolutePath
         rootfsPuller.pullAndUnpack(image, rootfsPath, cachePolicy)
         writeInit(rootfsPath, provisioning)
+        withContext(Dispatchers.IO) { writeImageRecord(name, image) }
+        if (provisioning != null) withContext(Dispatchers.IO) { writeProvisioning(name, provisioning) }
 
         writeConfig(name, rootfsPath)
 
         return Container(id = name, role = role, backend = backend, rootfsPath = rootfsPath)
+    }
+
+    /**
+     * A fresh pull of the same image reference, kept name and role, the
+     * PRIMARY's provisioning plan carried over (docs/SPEC.md 3d "Recreate
+     * from the image"). UNVERIFIED against a live droidspaces container --
+     * no rooted device available in this environment; same caveat as the
+     * rest of this class.
+     */
+    override suspend fun recreateFromImage(container: Container): Container {
+        val info = listContainers().firstOrNull { it.container.id == container.id }
+            ?: error("${container.id} no longer exists")
+        val imageRef = info.image ?: error("${container.id} has no recorded image reference to recreate from")
+        val provisioning = if (container.role == ContainerRole.PRIMARY) readProvisioning(container.id) else null
+        val displayName = info.displayName
+        destroy(container)
+        val created = createContainer(container.id, container.role, RootfsImage(reference = imageRef), provisioning)
+        if (container.role == ContainerRole.SIBLING) {
+            withContext(Dispatchers.IO) { names.set(created.id, displayName) }
+        }
+        return created
     }
 
     /**
@@ -162,6 +188,7 @@ class DroidSpacesRuntime(
         // so WAYLAND_DISPLAY is added per exec (see [exec]), not here.
         envFile.writeText(ContainerLayout.clientEnvironment(null).entries.joinToString("") { (key, value) -> "$key=$value\n" })
 
+        val sockets = readSockets(name)
         val config = DroidSpacesContainerConfig(
             name = name,
             rootfsPath = rootfsPath,
@@ -175,8 +202,17 @@ class DroidSpacesRuntime(
                 // to bind mount ... (skipping)"), not a failed start.
                 devicesFile(name).takeIf { it.isFile }?.readLines().orEmpty()
                     .filter { it.isNotBlank() }
-                    .map { it to it },
+                    .map { it to it } +
+                // The person's own extra Mounts (docs/SPEC.md 3d), each at
+                // its own path -- droidspaces skips a bind whose host side
+                // is gone the same way it skips an unplugged device.
+                readExtraMounts(name).filter { File(it.hostPath).isDirectory }.map { it.hostPath to it.containerPath },
             envFilePath = envFile.absolutePath,
+            // The one place this backend already bridges host audio in --
+            // droidspaces' own PulseAudio bridge, used as-is (see this
+            // class's doc comment). Off skips the bridge entirely, unlike
+            // Wayland (below) which only withholds the client env var.
+            enablePulseAudio = sockets.audioShared,
         )
         config.writeTo(File(configsDir, "$name.config"))
     }
@@ -218,7 +254,10 @@ class DroidSpacesRuntime(
 
     override suspend fun start(container: Container, provisioning: PrimaryProvisioning?, onProgress: (String) -> Unit) {
         // The current plan replaces the /sbin/init written at creation.
-        if (provisioning != null && container.role == ContainerRole.PRIMARY) writeInit(container.rootfsPath, provisioning)
+        if (provisioning != null && container.role == ContainerRole.PRIMARY) {
+            writeInit(container.rootfsPath, provisioning)
+            withContext(Dispatchers.IO) { writeProvisioning(container.id, provisioning) }
+        }
         // Best-effort stop of a stale same-name instance first. Real,
         // confirmed on-device leak this recovers from: droidspaces child
         // processes survive an app force-stop (force-stop skips every
@@ -256,6 +295,7 @@ class DroidSpacesRuntime(
                 .firstOrNull { it.startsWith("rootfs_path=") }
                 ?.substringAfter("rootfs_path=")
                 ?: File(rootfsDir, name).absolutePath
+            val (imageRef, digest) = readImageRecord(name)
             dev.droidtop.runtime.ContainerInfo(
                 container = Container(
                     id = name,
@@ -264,6 +304,8 @@ class DroidSpacesRuntime(
                     rootfsPath = rootfsPath,
                 ),
                 running = showOutput.lineSequence().any { it.contains(name) },
+                image = imageRef,
+                digest = digest,
             )
         })
     }
@@ -279,7 +321,12 @@ class DroidSpacesRuntime(
      * CLI docs use (`run sh -c "id && env"`).
      */
     override suspend fun exec(container: Container, command: List<String>, env: Map<String, String>): ContainerExecResult {
-        val fullEnv = ContainerLayout.clientEnvironment(ContainerLayout.findWaylandSocket(socketsDir)?.name) + env
+        val waylandSocketName = if (readSockets(container.id).waylandShared) {
+            ContainerLayout.findWaylandSocket(socketsDir)?.name
+        } else {
+            null
+        }
+        val fullEnv = ContainerLayout.clientEnvironment(waylandSocketName) + env
         val envPrefix = fullEnv.entries.joinToString(" ") { (k, v) -> "$k=${shellQuote(v)}" }
         val commandLine = command.joinToString(" ") { shellQuote(it) }
         val shellScript = if (envPrefix.isEmpty()) commandLine else "$envPrefix $commandLine"
@@ -297,6 +344,10 @@ class DroidSpacesRuntime(
 
         File(configsDir, "${container.id}.config").delete()
         File(configsDir, "${container.id}.env").delete()
+        imageRecordFile(container.id).delete()
+        provisioningFile(container.id).delete()
+        socketsFile(container.id).delete()
+        mountsFile(container.id).delete()
         names.remove(container.id)
         // Root-owned tree, symlinks inside, possible live bind mounts
         // over it: exactly the job RootfsDelete exists for. A refusal
@@ -340,6 +391,87 @@ class DroidSpacesRuntime(
             "not a device node path: $devicePaths"
         }
         devicesFile(container.id).apply { parentFile?.mkdirs() }.writeText(devicePaths.joinToString("") { "$it\n" })
+    }
+
+    // ---- sockets (docs/SPEC.md 3d) ----
+
+    private fun socketsFile(name: String) = File(configsDir, "$name.sockets")
+
+    private fun readSockets(name: String): ContainerSockets {
+        val lines = socketsFile(name).takeIf { it.isFile }?.readLines().orEmpty().associate { line ->
+            val (key, value) = line.split("=", limit = 2).let { it.getOrElse(0) { "" } to it.getOrElse(1) { "" } }
+            key to value
+        }
+        return ContainerSockets(
+            waylandShared = lines["wayland"]?.toBooleanStrictOrNull() ?: true,
+            audioShared = lines["audio"]?.toBooleanStrictOrNull() ?: true,
+        )
+    }
+
+    override suspend fun sockets(container: Container): ContainerSockets = withContext(Dispatchers.IO) { readSockets(container.id) }
+
+    override suspend fun setSockets(container: Container, sockets: ContainerSockets) = withContext(Dispatchers.IO) {
+        socketsFile(container.id).apply { parentFile?.mkdirs() }
+            .writeText("wayland=${sockets.waylandShared}\naudio=${sockets.audioShared}\n")
+        Unit
+    }
+
+    // Real: droidspaces bridges Android's audio HAL to a host PulseAudio
+    // daemon and binds it into any container with enable_pulseaudio=1 --
+    // see this class's own doc comment and [writeConfig].
+    override val audioSharingUnavailableReason: String? = null
+
+    // ---- extra mounts (docs/SPEC.md 3d) ----
+
+    private fun mountsFile(name: String) = File(configsDir, "$name.mounts")
+
+    private fun readExtraMounts(name: String): List<ExtraMount> =
+        mountsFile(name).takeIf { it.isFile }?.readLines().orEmpty()
+            .mapNotNull { line ->
+                val parts = line.split("\t", limit = 2)
+                if (parts.size == 2 && parts[0].isNotBlank() && parts[1].isNotBlank()) ExtraMount(parts[0], parts[1]) else null
+            }
+
+    override suspend fun extraMounts(container: Container): List<ExtraMount> = withContext(Dispatchers.IO) { readExtraMounts(container.id) }
+
+    override suspend fun setExtraMounts(container: Container, mounts: List<ExtraMount>) = withContext(Dispatchers.IO) {
+        mountsFile(container.id).apply { parentFile?.mkdirs() }
+            .writeText(mounts.joinToString("") { "${it.hostPath}\t${it.name}\n" })
+        Unit
+    }
+
+    // ---- image reference + provisioning plan, for recreateFromImage ----
+
+    private fun imageRecordFile(name: String) = File(configsDir, "$name.image")
+
+    private fun writeImageRecord(name: String, image: RootfsImage) {
+        imageRecordFile(name).apply { parentFile?.mkdirs() }
+            .writeText(image.reference + "\n" + (image.digest ?: ""))
+    }
+
+    private fun readImageRecord(name: String): Pair<String?, String?> {
+        val lines = imageRecordFile(name).takeIf { it.isFile }?.readLines() ?: return null to null
+        return lines.getOrNull(0) to lines.getOrNull(1)?.ifBlank { null }
+    }
+
+    private fun provisioningFile(name: String) = File(configsDir, "$name.provisioning")
+
+    /** Same three fields as ProotRuntime's Properties-backed equivalent, one per line. */
+    private fun writeProvisioning(name: String, provisioning: PrimaryProvisioning) {
+        provisioningFile(name).apply { parentFile?.mkdirs() }
+            .writeText(
+                provisioning.installCommand + "\u0000" +
+                    provisioning.compositorCommand + "\u0000" +
+                    provisioning.daemons.joinToString(";"),
+            )
+    }
+
+    private fun readProvisioning(name: String): PrimaryProvisioning? {
+        val text = provisioningFile(name).takeIf { it.isFile }?.readText() ?: return null
+        val parts = text.split("\u0000")
+        if (parts.size < 2) return null
+        val daemons = parts.getOrElse(2) { "" }.split(";").filter { it.isNotBlank() }
+        return PrimaryProvisioning(parts[0], parts[1], daemons)
     }
 
     override fun hostStorageToContainerPath(hostPath: File): String =
