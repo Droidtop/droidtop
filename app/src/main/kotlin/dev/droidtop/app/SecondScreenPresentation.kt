@@ -3,6 +3,11 @@ package dev.droidtop.app
 import android.content.Context
 import android.os.Bundle
 import android.view.Display
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -42,16 +47,25 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
  * companion at all; and being a real Activity it can take input focus,
  * which this window never does.
  */
-class SecondScreenPresentation(outerContext: Context, display: Display) : android.app.Presentation(outerContext, display) {
+class SecondScreenPresentation(
+    outerContext: Context,
+    display: Display,
+    /**
+     * Overrides [dev.droidtop.display.SecondaryDisplayContent.currentMode]
+     * (which reads the last-USED mode) -- for
+     * [SecondScreenAttachService], whose whole reason to exist is that no
+     * droidtop Activity is currently running at all, so "last used" can
+     * be stale (e.g. Gaming from an earlier session) and would otherwise
+     * show the game companion on a display nothing of Gaming's own is
+     * driving. Null for the normal case: MainActivity's own Presentation,
+     * where the last-used mode IS the mode actually in front.
+     */
+    private val forcedMode: dev.droidtop.display.SecondaryDisplayContent.Mode? = null,
+) : android.app.Presentation(outerContext, display) {
     private val lifecycleOwner = object : LifecycleOwner {
         val registry = LifecycleRegistry(this)
         override val lifecycle: Lifecycle get() = registry
     }
-    // Its own host, so widgets the user already added render on this
-    // display too. Listening starts/stops with the presentation.
-    private val widgetManager = android.appwidget.AppWidgetManager.getInstance(outerContext)
-    private val widgetHost = CompanionWidgets.host(outerContext)
-    private val widgetIds = CompanionWidgetPrefs.widgetIds(outerContext)
 
     private val savedStateOwner = object : SavedStateRegistryOwner {
         val controller = SavedStateRegistryController.create(this)
@@ -67,42 +81,26 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
         // Which mode's second-screen role applies, read from the same
         // place :display reads it, so this live surface and the idle
         // SECONDARY_HOME surface underneath always agree about what this
-        // screen is for.
-        val mode = dev.droidtop.display.SecondaryDisplayContent.currentMode(context)
-        if (SecondScreenInputPrefs.role(context, mode) == SecondScreenInputPrefs.Role.INPUT) {
-            // Keyboard and trackpad instead of the companion. A plain View
-            // tree, not Compose: both halves are already Views (the forked
-            // keyboard's own key grid, :input-seat's trackpad), and
-            // wrapping them in Compose here would add a layer that does
-            // nothing. `context` is the Presentation's own display
-            // context, which is what the keyboard needs in order to lay
-            // itself out for THIS panel rather than the primary one.
-            setContentView(SecondScreenInputView(context, mode))
-            return
-        }
-
+        // screen is for -- and drawn through the SAME registered content
+        // [dev.droidtop.display.SecondaryDisplayActivity] uses
+        // ([dev.droidtop.app.SecondaryDisplayRegistrations]), rather than
+        // this class hardcoding the game companion regardless of mode the
+        // way it used to (owner, 2026-09-27: "it seems we use the same
+        // dual screen mode for standard and gaming" -- true of this
+        // class, which never branched on mode at all). Widget
+        // hosting/listening is the registered content's own concern now
+        // (CompanionSurfaceHost's DisposableEffect, StandardSecondScreenSurface's
+        // own), not duplicated here.
+        val mode = forcedMode ?: dev.droidtop.display.SecondaryDisplayContent.currentMode(context)
+        val content = dev.droidtop.display.SecondaryDisplayContent.contentFor(mode)
         val composeView = ComposeView(context).apply {
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(savedStateOwner)
             setContent {
-                val entry = settledFocusedEntry()
-                // darkTheme = true: an ambient always-dark companion
-                // surface (black ground is the design, like an idle
-                // screen) -- see DroidtopTheme's own doc comment.
-                dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
-                    // The SAME surface CompanionActivity hosts, not a
-                    // reduced copy -- see CompanionSurface's doc comment
-                    // for the bug that divergence caused.
-                    CompanionSurface(
-                        entry = entry,
-                        widgetIds = widgetIds,
-                        widgetManager = widgetManager,
-                        widgetHost = widgetHost,
-                        // No add/remove controls: binding a widget needs an
-                        // Activity result and a Presentation cannot receive
-                        // one. Already-added widgets still render here.
-                        controls = null,
-                    )
+                if (content != null) {
+                    content()
+                } else {
+                    Box(modifier = Modifier.fillMaxSize().background(Color.Black))
                 }
             }
         }
@@ -111,15 +109,15 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
 
     override fun onStart() {
         super.onStart()
-        // Without this a hosted widget renders once and then never
-        // updates -- no clock tick, no now-playing change.
-        CompanionWidgets.startListening(context)
         lifecycleOwner.registry.currentState = Lifecycle.State.RESUMED
+        dev.droidtop.display.SecondScreenOwnership.activityOwnedDisplayId = display?.displayId
     }
 
     override fun onStop() {
-        CompanionWidgets.stopListening()
         lifecycleOwner.registry.currentState = Lifecycle.State.DESTROYED
+        if (dev.droidtop.display.SecondScreenOwnership.activityOwnedDisplayId == display?.displayId) {
+            dev.droidtop.display.SecondScreenOwnership.activityOwnedDisplayId = null
+        }
         super.onStop()
     }
 }

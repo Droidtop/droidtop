@@ -41,13 +41,21 @@ object ModeStartup {
         LAUNCHER_SYSTEM_COMPONENTS.forEach {
             setComponentEnabled(app, it, on(ModePiece.LAUNCHER_SYSTEM_COMPONENTS))
         }
-        // Standard hands its secondary display to Launcher3's own UI; with
-        // the fork off there is nothing to hand it to.
-        if (on(ModePiece.LAUNCHER_SECOND_SCREEN)) {
-            SecondaryDisplayRegistrations.registerLauncherHandoff()
-        } else {
-            SecondaryDisplayRegistrations.unregisterLauncherHandoff()
-        }
+        // Standard's own second screen (docs/SPEC.md 4c) is registered
+        // once, unconditionally, and never unregistered: unlike Gaming's
+        // and Desktop's, it is not gated on a ModePiece, because it is
+        // droidtop's default/ambient second-screen surface -- the one
+        // SecondScreenAttachService shows precisely when droidtop is NOT
+        // the effective Home app (Standard's own Activity therefore not
+        // running), so tying the registration to `launcherIsDroidtopHome`
+        // would remove it exactly when it is needed most.
+        SecondaryDisplayRegistrations.registerStandard()
+        // Re-evaluated every time this pass runs (process start, and
+        // every mode/Home-role toggle from Settings): a no-op that stops
+        // itself immediately whenever droidtop already holds Home, since
+        // the platform's own SECONDARY_HOME placement already owns that
+        // case (docs/SPEC.md 4c, "Attaching without Home").
+        SecondScreenAttachService.ensureRunning(app)
 
         // The Quick Menu's Notifications tab is the only reader of the
         // listener, and a NotificationListenerService is bound by the
