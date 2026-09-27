@@ -50,7 +50,10 @@ object SecondaryDisplayContent {
         contents -= mode
     }
 
-    internal fun contentFor(mode: Mode): (@Composable () -> Unit)? = contents[mode]
+    // Public, not internal: SecondScreenPresentation (:app) reads the
+    // same registry SecondaryDisplayActivity (this module) does, so the
+    // idle and live surfaces can never disagree about a mode's content.
+    fun contentFor(mode: Mode): (@Composable () -> Unit)? = contents[mode]
 
     /**
      * The active mode, from the one place that owns mode state
