@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- DroidTop's own icon (not Murine/Launcher3's default): a laptop with the
-     Android robot on its screen - "turns an Android device into a laptop-
-     class desktop." Kept inside the ~66dp adaptive-icon safe zone (centered
-     in the 108x108 viewport) so it survives circle/squircle/rounded-square
-     masking alike. Android green (#3DDC84, the real brand color) for the
-     robot and screen glow; light grey for the laptop body so it reads
-     clearly against the dark background layer. -->
+<!-- PLACEHOLDER icon, replace with real art: droidtop's own icon (not
+     Murine/Launcher3's default), a laptop with the Android robot on its
+     screen - "turns an Android device into a laptop-class desktop." Kept
+     inside the ~66dp adaptive-icon safe zone (centered in the 108x108
+     viewport) so it survives circle/squircle/rounded-square masking alike.
+     Android green (#3DDC84, the real brand color) for the robot and screen
+     glow; light grey for the laptop body so it reads clearly against the
+     dark background layer. Approved as the placeholder 2026-09-27; see
+     docs/SPEC.md "Launcher icon" for what a real replacement needs, and
+     keep drawable/ic_launcher_monochrome.xml's shape in sync with this
+     one. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"

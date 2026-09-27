@@ -303,7 +303,10 @@ class DesktopSessionService : Service() {
         return Notification.Builder(this, channelId)
             .setContentTitle("droidtop desktop")
             .setContentText("Running the shared desktop session")
-            .setSmallIcon(android.R.drawable.ic_menu_manage)
+            // droidtop's own mark, not a generic system glyph: the adaptive
+            // icon's monochrome layer doubles as the notification silhouette
+            // (one icon shape, see mipmap-anydpi-v26/ic_launcher.xml).
+            .setSmallIcon(R.drawable.ic_launcher_monochrome)
             .addAction(Notification.Action.Builder(null, "Stop", stop).build())
             .build()
     }

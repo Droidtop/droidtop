@@ -583,6 +583,32 @@ droidtop's; the BlueStacks-bundled apps (Bsxlauncher, Filemanager, Nowgg,
 Piggy) are host-emulator utilities with no equivalent on the Retroid
 hardware droidtop actually ships on.
 
+**The launcher icon is one replaceable field, not several copies
+(restructured 2026-09-27).** Every surface that shows droidtop's own icon -
+the manifest's `android:icon`/`android:roundIcon`, the splash theme above,
+`shortcuts.xml`, the two home-screen widgets' preview images, and
+`LauncherGamesActivity`'s pinned-shortcut fallback - already pointed at the
+one alias, `mipmap/ic_launcher`
+(`app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml`). The desktop-session
+notification did not: `DesktopSessionService.buildNotification()` used the
+platform's generic `android.R.drawable.ic_menu_manage`. The adaptive icon
+now has a third layer, `drawable/ic_launcher_monochrome.xml` (Android 13+
+themed icons), and the notification's `setSmallIcon` reuses that same
+drawable as its silhouette instead of carrying a second icon asset - one
+mechanism, not two. All three layers
+(`ic_launcher_background.xml`/`ic_launcher_foreground.xml`/
+`ic_launcher_monochrome.xml`) are marked `PLACEHOLDER icon, replace with
+real art` in their own file comments (approved as the placeholder by the
+owner, 2026-09-27; real art comes later). To replace it: swap the three
+drawables for the real design (adaptive-icon safe zone is the centre ~66dp
+of a 108x108dp viewport per Android's spec; the monochrome layer must stay
+a single flat colour, since both the OS and the notification tint it) and
+leave every reference as `mipmap/ic_launcher` - nothing else needs to
+change. droidtop's minSdk is 26, so only the `mipmap-anydpi-v26` adaptive
+icon exists; there is no legacy per-density mipmap set to keep in sync.
+Enginehost's own icon (it currently sets none, per the fallback-icon
+finding above) is that app's own fix, not droidtop's.
+
 **Switching modes is named on every surface (decided 2026-09-25).** The
 mode switcher (`BackButtonMenu`: Android, the modes that are on, and
 "Modes and settings") opens from a long-press of Back anywhere, and by

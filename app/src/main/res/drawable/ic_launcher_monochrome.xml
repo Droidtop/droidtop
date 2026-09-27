@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive icon monochrome layer (Android 13+ themed icons), and the
+     source for droidtop's notification small icon: buildNotification() in
+     DesktopSessionService references this same drawable rather than a
+     second silhouette, so there is one icon shape, not two. A single flat
+     colour on transparent: the system supplies its own tint in both
+     contexts, so the fillColor/strokeColor values below are never actually
+     shown as white.
+
+     PLACEHOLDER icon, replace with real art: the same laptop-and-robot
+     mark as ic_launcher_foreground.xml, simplified to one colour - the
+     screen bezel is an outline rather than solid fill so the robot reads
+     as a silhouette inside it instead of disappearing into a same-colour
+     fill. Keep this file's shapes in sync with the foreground if that
+     design changes. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Laptop base / keyboard deck -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,76 L84,76 L90,84 L18,84 Z" />
+
+    <!-- Laptop screen bezel, outline only so the interior stays transparent -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:pathData="M30,26 h48 a4,4 0 0 1 4,4 v42 a4,4 0 0 1 -4,4 h-48 a4,4 0 0 1 -4,-4 v-42 a4,4 0 0 1 4,-4 z" />
+
+    <!-- Android robot: dome head -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M46,52 a8,8 0 0 1 16,0 z" />
+
+    <!-- Robot antennae -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:pathData="M47.3,42.5 l-3,-5.2 M60.7,42.5 l3,-5.2" />
+
+    <!-- Robot body -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M45,52 h18 v9 a2,2 0 0 1 -2,2 h-14 a2,2 0 0 1 -2,-2 z" />
+
+    <!-- Robot arms -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M41.5,53 h3 v8 h-3 a1.5,1.5 0 0 1 -1.5,-1.5 v-5 a1.5,1.5 0 0 1 1.5,-1.5 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M63.5,53 h3 a1.5,1.5 0 0 1 1.5,1.5 v5 a1.5,1.5 0 0 1 -1.5,1.5 h-3 z" />
+
+    <!-- Robot legs -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M49,63 h3 v5 a1.5,1.5 0 0 1 -3,0 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M56,63 h3 v5 a1.5,1.5 0 0 1 -3,0 z" />
+</vector>
