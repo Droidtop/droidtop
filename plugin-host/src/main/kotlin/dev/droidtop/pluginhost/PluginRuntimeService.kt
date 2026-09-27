@@ -40,6 +40,10 @@ class PluginRuntimeService : Service() {
      * paying for.
      */
     private val callbacks = RemoteCallbackList<IPluginRuntimeCallback>()
+    // RemoteCallbackList.beginBroadcast cannot be outstanding on two threads at once (throws if it is);
+    // the three broadcast senders below share this lock so one job's progress callback never lands
+    // mid-broadcast of another one's -- confirmed live on the rig, two concurrent core downloads.
+    private val broadcastLock = Any()
 
     // One shared pool for every plugin's jobs in this process. A job is
     // expected to run minutes (docs/SPEC.md 12a's job shape), so it must
@@ -311,7 +315,7 @@ class PluginRuntimeService : Service() {
      * dead or misbehaving callback (`runCatching` per item) never stops
      * the rest from being delivered.
      */
-    private fun broadcastJobProgress(pluginId: String, jobId: String, percent: Int, statusLine: String) {
+    private fun broadcastJobProgress(pluginId: String, jobId: String, percent: Int, statusLine: String) = synchronized(broadcastLock) {
         val n = callbacks.beginBroadcast()
         try {
             for (i in 0 until n) {
@@ -322,7 +326,7 @@ class PluginRuntimeService : Service() {
         }
     }
 
-    private fun broadcastJobComplete(pluginId: String, jobId: String, result: PluginResult) {
+    private fun broadcastJobComplete(pluginId: String, jobId: String, result: PluginResult) = synchronized(broadcastLock) {
         val json = encode(result)
         val n = callbacks.beginBroadcast()
         try {
@@ -334,7 +338,7 @@ class PluginRuntimeService : Service() {
         }
     }
 
-    private fun broadcastPluginCrashed(pluginId: String, capability: String, reason: String) {
+    private fun broadcastPluginCrashed(pluginId: String, capability: String, reason: String) = synchronized(broadcastLock) {
         val n = callbacks.beginBroadcast()
         try {
             for (i in 0 until n) {
