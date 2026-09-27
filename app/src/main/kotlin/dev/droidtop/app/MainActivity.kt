@@ -912,33 +912,56 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
-        // The shell is no longer foreground -- a game may have started, or
-        // the user switched apps. The live companion window has to come
-        // down (leaving it up would layer it over whatever now runs on
-        // that display), but the display it covered must not be left
-        // EMPTY: an empty secondary display mirrors the default one. So
-        // the idle surface is asserted there first, best-effort -- this
-        // Activity is still visible during onStop, and a refusal is
-        // logged, never fatal. Launches droidtop itself dispatched
-        // already covered their displays via coverVacatedDisplays.
-        secondScreenPresentation?.let { presentation ->
-            val displayId = presentation.display?.displayId
-            if (displayId != null && displayId != dev.droidtop.library.LaunchDisplay.parkedDisplayId) {
-                runCatching {
-                    startActivity(
-                        Intent(this, dev.droidtop.display.SecondaryDisplayActivity::class.java)
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                        android.app.ActivityOptions.makeBasic()
-                            .setLaunchDisplayId(displayId)
-                            .toBundle(),
-                    )
-                }.onFailure {
-                    android.util.Log.w("droidtop.MainActivity", "Idle cover on display $displayId refused at onStop", it)
-                }
+        // The live companion Presentation lives on its OWN Display and
+        // keeps rendering regardless of this Activity's own foreground
+        // state (it is a WindowManager window, not something tied to
+        // this Activity's visibility) -- it only needs tearing down when
+        // whatever just took over foreground IS that same display, which
+        // would otherwise sit underneath the Presentation's window.
+        //
+        // This used to dismiss the Presentation on EVERY onStop
+        // unconditionally, then reassert droidtop's idle cover Activity
+        // there unless a launch had parked onto that same display --
+        // meaning a game launched onto a DIFFERENT display (e.g. "Games
+        // launch on: Same display as the shell", the common case) still
+        // tore the companion down and re-launched SecondaryDisplayActivity
+        // in its place, racing that unrelated cross-display
+        // dismiss+startActivity pair against the just-launched game's own
+        // surface/EGL setup at the exact moment it matters most.
+        // Root-caused live (rig, p1-dt-n64-black-screen-hang): launching
+        // an N64 ROM (RetroArch, built-in display, matching the shell's
+        // own) both fell the companion back to the bare system
+        // SecondaryDisplayLauncher (this reassertion racing and losing)
+        // and hung the game's own surface for 45s+ into an ANR -- not a
+        // RetroArch/mupen64plus_next defect, since the same core launched
+        // directly from RetroArch's own UI (bypassing this path entirely)
+        // does not reproduce it.
+        val presentation = secondScreenPresentation
+        val presentationDisplayId = presentation?.display?.displayId
+        if (presentation != null && presentationDisplayId != null &&
+            presentationDisplayId == dev.droidtop.library.LaunchDisplay.parkedDisplayId
+        ) {
+            // The just-launched app parked onto the SAME display as the
+            // companion: it really would sit underneath the
+            // Presentation's window, so it has to come down, and the
+            // display must not be left EMPTY (an empty secondary display
+            // mirrors the default one) -- the idle surface is asserted
+            // there first, best-effort; this Activity is still visible
+            // during onStop, and a refusal is logged, never fatal.
+            runCatching {
+                startActivity(
+                    Intent(this, dev.droidtop.display.SecondaryDisplayActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    android.app.ActivityOptions.makeBasic()
+                        .setLaunchDisplayId(presentationDisplayId)
+                        .toBundle(),
+                )
+            }.onFailure {
+                android.util.Log.w("droidtop.MainActivity", "Idle cover on display $presentationDisplayId refused at onStop", it)
             }
+            presentation.dismiss()
+            secondScreenPresentation = null
         }
-        secondScreenPresentation?.dismiss()
-        secondScreenPresentation = null
         secondScreenHealthCheckJob?.cancel()
         secondScreenHealthCheckJob = null
         CompanionState.dualScreenBroken.value = false
