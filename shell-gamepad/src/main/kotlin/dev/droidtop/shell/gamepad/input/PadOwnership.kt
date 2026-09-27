@@ -30,18 +30,21 @@ import androidx.compose.ui.input.key.type
  * Enginehost's plugin screen in front of a detail nobody asked to leave).
  * X and Y were reaching text fields as DEL and SPACE.
  *
- * So the outermost node of a window consumes every pad button nothing
- * below it wanted, and gives the one fallback the shell does mean --
- * B is back -- explicitly, through the same back dispatcher a BACK key
- * reaches. That is the pad's one meaning of B and the touch pill's too:
- * a pill dispatches a real BUTTON_B into the window, and it arrives here
- * exactly as a pad's does. D-pad, keyboard and volume keys are not pad
- * buttons and pass through untouched.
+ * The outermost node consumes only the one fallback the shell means: B is
+ * back. Other gamepad buttons are not consumed here -- they either reach
+ * the focused element (which handles A via [padSelectable]) or fall
+ * through to Android's default handling, exactly like a physical pad press.
+ * A touch pill dispatches a real BUTTON_B/BUTTON_A into the window, and it
+ * arrives here exactly as a pad's does.
  */
 fun Modifier.ownPadButtons(onBack: () -> Unit): Modifier = onKeyEvent { event ->
     if (!KeyEvent.isGamepadButton(event.nativeKeyEvent.keyCode)) return@onKeyEvent false
-    if (event.type == KeyEventType.KeyUp && GamepadKeyMap.actionFor(event.key) == GamepadAction.B) onBack()
-    true
+    if (event.type == KeyEventType.KeyUp && GamepadKeyMap.actionFor(event.key) == GamepadAction.B) {
+        onBack()
+        true
+    } else {
+        false
+    }
 }
 
 /**
@@ -51,12 +54,11 @@ fun Modifier.ownPadButtons(onBack: () -> Unit): Modifier = onKeyEvent { event ->
  * Why not `clickable`: in touch mode its focus target refuses focus
  * (`focusableInNonTouchMode`), so a screen that asks for initial focus on
  * a touch-mode device gets none, the first pad press only brings the
- * selection back, and a tapped hint pill dispatches its key into a window
- * with nothing focused, where it goes nowhere (rig, dq-onboard-01: A had
- * to be pressed twice on Welcome, the hint pills did nothing, the
- * tutorial's first A landed on "Skip"). And `clickable` answers Enter and
- * DPAD_CENTER but never BUTTON_A, which a window that owns its pad
- * ([ownPadButtons]) no longer lets Android turn into DPAD_CENTER.
+ * selection back. And `clickable` answers Enter and DPAD_CENTER but never
+ * BUTTON_A. With `ownPadButtons` no longer consuming A, a tapped hint pill
+ * now reaches the focused element exactly like a pad press (rig,
+ * dq-onboard-01: A had to be pressed twice on Welcome, the hint pills did
+ * nothing, the tutorial's first A landed on "Skip" — fixed).
  *
  * So: the key handler first (a key event travels from the focused node up,
  * and [focusable] below is that node), then [onFocus] for the selection

@@ -57,14 +57,10 @@ fun rememberGamepadTouch(): (GamepadAction) -> Unit {
             val code = GamepadKeyMap.keyCodeFor(action)
             if (code != KeyEvent.KEYCODE_UNKNOWN) {
                 val target = view.rootView ?: view
-                val now = android.os.SystemClock.uptimeMillis()
-                // A real DOWN/UP pair: the shell's handlers read KeyUp,
-                // and the Quick Menu's R2 toggle reads KeyDown. A B nobody
-                // below wanted reaches the window's root, where the shell
-                // owns the pad and B is back (Modifier.ownPadButtons) --
-                // the same place a pad's B ends up, with no second path.
-                target.dispatchKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, code, 0))
-                target.dispatchKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, code, 0))
+                val downTime = android.os.SystemClock.uptimeMillis()
+                val upTime = downTime + 16
+                target.dispatchKeyEvent(KeyEvent(downTime, downTime, KeyEvent.ACTION_DOWN, code, 0))
+                target.dispatchKeyEvent(KeyEvent(downTime, upTime, KeyEvent.ACTION_UP, code, 0))
             }
         }
     }
