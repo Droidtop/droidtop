@@ -51,6 +51,16 @@ object ContainerLayout {
     const val SHARED_STORAGE_DIR = "/run/droidtop-shared-storage"
 
     /**
+     * Where a container's own extra Mounts (docs/SPEC.md 3d) appear
+     * inside it, one directory per bind (ExtraMount.name) -- the same
+     * "one directory per thing shared" shape as SHARED_STORAGE_DIR,
+     * kept separate from it because these are per-CONTAINER binds a
+     * person adds one at a time, not the one device-wide set every
+     * container gets automatically.
+     */
+    const val EXTRA_MOUNTS_DIR = "/run/droidtop-mounts"
+
+    /**
      * Every plan ([planId]) whose install has completed in this container,
      * one per line. Provisioning runs when the current plan is not among
      * them, so a package added to a plan reaches containers made before

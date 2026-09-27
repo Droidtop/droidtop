@@ -1739,8 +1739,39 @@ the `ContainerRuntime` interface that already exists (§3):
   most 200, the rest reachable as a Custom reference), Name (defaulting as
   below) and Create, which reports its progress on its own row. Text is
   edited in the navigator's dialog, where the keyboard's Done key saves.
-  Not built yet from the design below: Restart, Recreate from the image,
-  storage used, Start with droidtop, Sockets and Mounts.
+  **Restart, Recreate from the image, storage used, Sockets and Mounts
+  (built 2026-09-27).** `ContainerRuntime` gained `restart` (stop then
+  start; a default every backend shares), `recreateFromImage` (destroy
+  and re-create from the SAME recorded image reference, name and role,
+  the PRIMARY's provisioning plan carried over -- each backend implements
+  it itself, since where the plan lives differs), `diskUsageBytes` (a
+  real recursive walk of the rootfs tree, `ContainerDiskUsage`, shared by
+  both backends as a default method), `sockets`/`setSockets`
+  (`ContainerSockets(waylandShared, audioShared)`) and
+  `extraMounts`/`setExtraMounts` (`ExtraMount`, a host folder bound at its
+  own path under `ContainerLayout.EXTRA_MOUNTS_DIR`, picked with the
+  system folder picker like §4b's shared-storage flow). Sockets and
+  Mounts follow the same "one row unlocks a real backend feature" shape
+  as Devices: proot has no audio bridge at all
+  (`audioSharingUnavailableReason`, mirroring `deviceSharingUnavailableReason`),
+  so its Audio row is a message, never a fake toggle; droidspaces wires
+  the toggle straight to droidspaces' own `enable_pulseaudio` config
+  field, already used as-is (`DroidSpacesContainerConfig`). Wayland is
+  real on both backends: off withholds `WAYLAND_DISPLAY` from that
+  container's processes (the shared socket directory itself stays bound,
+  since CUPS and the VPN socket also live there and are a different
+  question). Extra Mounts bind through each backend's own existing
+  primitive (proot's `--bind`, droidspaces' `bind_mounts`) exactly like
+  the shared-storage/USB-device binds already there. The droidspaces
+  backend previously recorded no image reference at all
+  (`ContainerInfo.image`/`digest` were always null for it) --
+  fixed alongside this work, since `recreateFromImage` needed one and the
+  container page's own image line was silently blank for every
+  droidspaces container. Rig-checked on emulator-5560 (proot backend);
+  the droidspaces backend is unverified against a live container, same
+  standing caveat as the rest of that class -- no rooted device available
+  here. Still not built: Start with droidtop (autostart with the
+  session).
   **Names (decided 2026-09-25).** A container is called by a name the
   person chooses, never by its id (`droidtop-sibling-8993dfbd` told two
   terminals nothing, dq-desk2-01): `ContainerNames`, one file per backend
