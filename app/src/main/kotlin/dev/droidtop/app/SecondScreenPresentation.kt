@@ -47,21 +47,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
  * companion at all; and being a real Activity it can take input focus,
  * which this window never does.
  */
-class SecondScreenPresentation(
-    outerContext: Context,
-    display: Display,
-    /**
-     * Overrides [dev.droidtop.display.SecondaryDisplayContent.currentMode]
-     * (which reads the last-USED mode) -- for
-     * [SecondScreenAttachService], whose whole reason to exist is that no
-     * droidtop Activity is currently running at all, so "last used" can
-     * be stale (e.g. Gaming from an earlier session) and would otherwise
-     * show the game companion on a display nothing of Gaming's own is
-     * driving. Null for the normal case: MainActivity's own Presentation,
-     * where the last-used mode IS the mode actually in front.
-     */
-    private val forcedMode: dev.droidtop.display.SecondaryDisplayContent.Mode? = null,
-) : android.app.Presentation(outerContext, display) {
+class SecondScreenPresentation(outerContext: Context, display: Display) : android.app.Presentation(outerContext, display) {
     private val lifecycleOwner = object : LifecycleOwner {
         val registry = LifecycleRegistry(this)
         override val lifecycle: Lifecycle get() = registry
@@ -91,7 +77,7 @@ class SecondScreenPresentation(
         // hosting/listening is the registered content's own concern now
         // (CompanionSurfaceHost's DisposableEffect, StandardSecondScreenSurface's
         // own), not duplicated here.
-        val mode = forcedMode ?: dev.droidtop.display.SecondaryDisplayContent.currentMode(context)
+        val mode = dev.droidtop.display.SecondaryDisplayContent.currentMode(context)
         val content = dev.droidtop.display.SecondaryDisplayContent.contentFor(mode)
         val composeView = ComposeView(context).apply {
             setViewTreeLifecycleOwner(lifecycleOwner)
@@ -110,14 +96,10 @@ class SecondScreenPresentation(
     override fun onStart() {
         super.onStart()
         lifecycleOwner.registry.currentState = Lifecycle.State.RESUMED
-        dev.droidtop.display.SecondScreenOwnership.activityOwnedDisplayId = display?.displayId
     }
 
     override fun onStop() {
         lifecycleOwner.registry.currentState = Lifecycle.State.DESTROYED
-        if (dev.droidtop.display.SecondScreenOwnership.activityOwnedDisplayId == display?.displayId) {
-            dev.droidtop.display.SecondScreenOwnership.activityOwnedDisplayId = null
-        }
         super.onStop()
     }
 }

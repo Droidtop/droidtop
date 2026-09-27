@@ -2706,81 +2706,63 @@ handoff-to-an-Activity mechanism (SecondaryDisplayContent.registerHandoff, added
 Standard's old bare-launcher-3 hand-off) is removed with it: Standard registers real
 composable content the same way Gaming and Desktop do, and ModePiece.LAUNCHER_SECOND_SCREEN
 (the mode-piece that used to gate that hand-off) is gone -- Standard's second screen is not
-gated on a mode piece at all (see "Attaching without Home" below for why).
+gated on a mode piece at all -- the platform only ever places SecondaryDisplayActivity
+(which reads this registry) while droidtop holds Home, so an unregistered Standard content
+would only matter in a state nothing can show it in anyway.
 
-### Attaching without Home (directed 2026-09-27)
+### The Alternative forwarder keeps the second screen (directed 2026-09-27, corrected)
 
-Second owner requirement, same pass: "Our standard mode's second screen should still attach
-when we're running other launcher intents (when a user chose a different launcher)." The
-mechanism above only reaches the second screen two ways, and both depend on droidtop holding
-Home:
+Second owner requirement, same pass, relayed wrong the first time and corrected: droidtop
+does not need its second screen to work while some OTHER app holds Home outright -- the real
+ask was the existing **Alternative** home implementation (`HomeRolePrefs.HomeImplementation.
+ALTERNATIVE`, `AlternativeLauncherActivity`, farmerbb/Taskbar's real `HSLActivity` pattern):
+droidtop still holds the HOME role, one of its own two HOME activities (this one, not
+`HomeTrampolineActivity`) is what is enabled, and it immediately forwards Home presses to a
+different, person-chosen launcher instead of rendering anything itself. Since droidtop is
+still the platform's current Home app in this configuration, the platform's own
+`SECONDARY_HOME` placement already puts `SecondaryDisplayActivity` on the secondary display
+exactly as it does for plain Standard -- nothing here needed a new attachment mechanism,
+and the `SecondScreenAttachService`/`SecondScreenOwnership` foreground-service machinery this
+section briefly carried (checked against AOSP's background-activity-launch policy, still a
+real thing to know if droidtop ever needs a TRUE not-Home case) was removed again per one
+mechanism per job: it solved a problem that, once the requirement was corrected, droidtop
+does not actually have.
 
-- SecondaryDisplayActivity is SECONDARY_HOME -- the platform places it on a secondary
-  display only while droidtop IS the current default Home app. Pick Nova, Pixel Launcher, or
-  the stock AOSP one instead, and THAT app's own SECONDARY_HOME activity (or the platform's
-  bare fallback) gets placed there instead; droidtop's content never appears.
-- SecondScreenPresentation is owned by MainActivity, which only runs while Gaming or
-  Desktop is the foreground mode -- nothing shows it while droidtop is sitting unopened
-  behind another launcher.
+**The real gap**: `SecondaryDisplayContent.currentMode` (what both `SecondaryDisplayActivity`
+and `SecondScreenPresentation` read) resolves from `Modes.lastMode`, and nothing wrote
+`Mode.LAUNCHER` there when Home actually landed on Standard or forwarded through Alternative
+-- only `BackButtonMenu`'s explicit "Android" switcher row did. Pressing the real Home key
+(`HomeTrampolineActivity.forwardToStandard`) or letting Alternative forward
+(`AlternativeLauncherActivity`) left `Modes.lastMode` however it last was from Gaming or
+Desktop, so the second screen kept showing that stale mode's content instead of Standard's
+own -- the same root shape as "The second screen is per-mode" above, reaching one step
+further back into how the mode is even recorded. Both activities now call
+`Modes.setLastMode(this, Mode.LAUNCHER)` before forwarding, matching what every other real
+entry into a mode already does (`MainActivity.resolveMode`, `BackButtonMenu.launchAppMode`).
 
-**What the platform actually allows a normal, non-privileged app to do here** (checked
-against AOSP's own multi-display activity-launch policy,
-source.android.com/docs/core/display/multi_display/activity-launch, since this needed
-answering rather than assuming): starting an ACTIVITY on any display, including a secondary
-one, from a background component (a Service with no foreground Activity of its own) is
-restricted since Android 10's background-activity-launch policy, and the documented
-exemptions (INTERNAL_SYSTEM_WINDOW, ACTIVITY_EMBEDDING, being the display's own creator)
-are all privileged or don't apply here -- no blanket "secondary display" exemption exists for
-an ordinary background service. SYSTEM_ALERT_WINDOW is the wrong tool for a different
-reason: it gates TYPE_APPLICATION_OVERLAY, a window drawn on top of OTHER apps on the SAME
-(default) display, not a window on a display of its own. A Presentation, though, is neither
-of those: it is a Dialog-style window added directly through WindowManager, scoped to a
-Display-bound Context the app already legitimately holds via the
-android.software.presentation feature (already declared, already how SecondScreenPresentation
-itself works) -- not an activity launch, and not subject to the BAL restriction at all. This
-is the same standard pattern wireless-display and media-route-provider apps use to keep
-content on an external display independent of whichever app is foreground, and needs no root.
+**Two more pieces, needed for that fix to actually show up on screen**: `SecondaryDisplayActivity`
+is `singleTop`, so re-asserting it (MainActivity's `onStop` starting it again to reclaim the
+display) delivered `onNewIntent`, not a fresh `onCreate`/`onResume` -- and nothing overrode
+`onNewIntent`, so `render()` never re-ran when the Activity was already resumed underneath a
+live `Presentation` (which is the common case: covering another window on the same `Display`
+does not pause the Activity beneath it). It now does. And `MainActivity.onStop` (this
+session's earlier N64-hang fix, "An N64 launch, root-caused" above) only tore its own
+companion `Presentation` down when a launch had parked onto that SAME display -- correct for
+"a game launched elsewhere," but it left a stale Gaming/Desktop companion Presentation
+sitting on top of Standard's freshly-registered content when the real reason for leaving was
+a Home press. `onStop` now also tears it down when `Modes.lastMode` no longer matches the
+mode this MainActivity instance was showing (`modeDeparted`) -- set by the trampoline/
+forwarder/switcher BEFORE this Activity's own `onStop` runs, in Android's normal activity-
+transition order, so comparing the two numbers apart needs no extra signalling. A plain game
+launch never touches `Modes.lastMode`, so the N64 fix is unaffected by this addition.
 
-**Built**: SecondScreenAttachService (:app), a foreground service
-(foregroundServiceType="specialUse", the same declared use as DesktopSessionService) that
-watches DisplayManager for a secondary display and, whenever droidtop does NOT currently
-hold Home (HomeRolePrefs.isDroidtopHome), shows a SecondScreenPresentation there with
-Standard's content forced (never the possibly-stale currentMode()/last-used mode, since by
-definition no droidtop Activity is running at all while this service is the one acting --
-SecondScreenPresentation grew a forcedMode constructor param for exactly this). It never
-double-covers a display an Activity-based surface already owns: it checks
-SecondScreenOwnership.activityOwnedDisplayId (new, :display -- published by
-SecondScreenPresentation.onStart/onStop, since MainActivity can still be opened as an
-ordinary app from another launcher's drawer whatever Home says, and its own orchestration
-already covers that case correctly) and SecondaryDisplayActivity.resumedDisplayId, and backs
-off from either. Re-evaluated on every display add/remove/change and on every
-ModeStartup.apply() pass (process start, and every mode/Home-role toggle from Settings) via
-SecondScreenAttachService.ensureRunning, which is a no-op that stops itself immediately
-whenever droidtop already holds Home -- so exactly one mechanism is ever active for a given
-display at a time.
-
-**A real, honest limit, recorded rather than glossed over**: droidtop registers no boot
-receiver (section 2c) and this service does not add one. Nothing starts this service, or
-droidtop's process at all, purely because Android booted while another app holds Home -- the
-person has to open droidtop at least once (its one launcher icon, reachable from whichever
-launcher IS Home) before this can attach. From that point on it persists as an ordinary
-foreground service -- surviving the opening Activity closing, reattaching across display
-add/remove and across the other launcher's own foreground/background changes -- until Android
-kills the process or the device reboots.
-
-**Needs a rig check**: with a second launcher installed (the stock AOSP one satisfies this --
-Settings > Apps > Default apps > Home app, or an installed one like Nova), set it as Home,
-open droidtop once from that launcher's drawer so its process starts, then background
-droidtop entirely (Home back to the other launcher). Confirm the attached display keeps
-showing droidtop's own Standard second screen (system bar, notifications, quick launch,
-widgets) rather than falling to the other launcher's own secondary-display handling or a
-mirror, and that it survives a few minutes of using the other launcher normally. Then switch
-Home back to droidtop and confirm SecondScreenAttachService stands down (no duplicate
-window, no lingering persistent notification) and the platform's own SecondaryDisplayActivity
-placement takes back over. Also confirm a genuinely cold boot with another launcher as Home
-does NOT show droidtop's second screen until droidtop is opened once, matching the documented
-limit above -- if it does not need opening first, or if this session's build had no second
-launcher available to install, that should be re-verified with one.
+**Needs a rig check** (the coordinator's own console test, verbatim): set the home
+implementation to Alternative through droidtop's own Settings or onboarding, pick the
+console's stock launcher (or any other installed one), press Home and confirm it forwards
+cleanly with no flash and no loop, confirm the Standard second screen attaches (system bar,
+notifications, quick launch, widgets -- not a stale Gaming/Desktop companion and not the bare
+system fallback), confirm the mode switcher's "Android" entry opens that same chosen
+launcher, then switch back to Standard afterwards and confirm the second screen follows.
 
 ## 4d. The companion screen, designed (research 2026-09-01)
 

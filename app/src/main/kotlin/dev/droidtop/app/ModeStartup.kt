@@ -43,19 +43,12 @@ object ModeStartup {
         }
         // Standard's own second screen (docs/SPEC.md 4c) is registered
         // once, unconditionally, and never unregistered: unlike Gaming's
-        // and Desktop's, it is not gated on a ModePiece, because it is
-        // droidtop's default/ambient second-screen surface -- the one
-        // SecondScreenAttachService shows precisely when droidtop is NOT
-        // the effective Home app (Standard's own Activity therefore not
-        // running), so tying the registration to `launcherIsDroidtopHome`
-        // would remove it exactly when it is needed most.
+        // and Desktop's, it is not gated on a ModePiece at all -- the
+        // platform only ever places :display's SecondaryDisplayActivity
+        // (which reads this registry) while droidtop holds Home, so an
+        // unregistered Standard content would only ever matter in a state
+        // nothing can show it in anyway.
         SecondaryDisplayRegistrations.registerStandard()
-        // Re-evaluated every time this pass runs (process start, and
-        // every mode/Home-role toggle from Settings): a no-op that stops
-        // itself immediately whenever droidtop already holds Home, since
-        // the platform's own SECONDARY_HOME placement already owns that
-        // case (docs/SPEC.md 4c, "Attaching without Home").
-        SecondScreenAttachService.ensureRunning(app)
 
         // The Quick Menu's Notifications tab is the only reader of the
         // listener, and a NotificationListenerService is bound by the

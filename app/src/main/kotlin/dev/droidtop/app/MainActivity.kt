@@ -938,16 +938,26 @@ class MainActivity : AppCompatActivity() {
         // does not reproduce it.
         val presentation = secondScreenPresentation
         val presentationDisplayId = presentation?.display?.displayId
+        // The other real reason to tear this down: MainActivity itself is
+        // leaving its mode, not merely losing foreground to a launched
+        // game -- Home pressed to Standard/Alternative, or a mode switch.
+        // HomeTrampolineActivity/AlternativeLauncherActivity/BackButtonMenu
+        // all update Modes.lastMode BEFORE this Activity's onStop runs
+        // (the new foreground Activity's own onCreate always precedes the
+        // old one's onStop in Android's transition order), so comparing
+        // it against the mode THIS instance was showing tells the two
+        // cases apart without this class needing to know why it stopped.
+        val modeDeparted = mode != null && Modes.lastMode(this) != mode?.id
         if (presentation != null && presentationDisplayId != null &&
-            presentationDisplayId == dev.droidtop.library.LaunchDisplay.parkedDisplayId
+            (presentationDisplayId == dev.droidtop.library.LaunchDisplay.parkedDisplayId || modeDeparted)
         ) {
             // The just-launched app parked onto the SAME display as the
-            // companion: it really would sit underneath the
-            // Presentation's window, so it has to come down, and the
-            // display must not be left EMPTY (an empty secondary display
-            // mirrors the default one) -- the idle surface is asserted
-            // there first, best-effort; this Activity is still visible
-            // during onStop, and a refusal is logged, never fatal.
+            // companion, or the mode itself is going away: either way the
+            // companion has to come down, and the display must not be
+            // left EMPTY (an empty secondary display mirrors the default
+            // one) -- the idle surface is asserted there first,
+            // best-effort; this Activity is still visible during onStop,
+            // and a refusal is logged, never fatal.
             runCatching {
                 startActivity(
                     Intent(this, dev.droidtop.display.SecondaryDisplayActivity::class.java)

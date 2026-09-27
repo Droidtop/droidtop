@@ -6,17 +6,22 @@ import dev.droidtop.display.SecondaryDisplayContent
 /**
  * What each mode draws on a secondary screen, registered per mode rather
  * than all at once: a mode that is off registers nothing, so the platform
- * placing :display's SecondaryDisplayActivity (or, when droidtop does not
- * hold Home, SecondScreenAttachService's own Presentation -- docs/SPEC.md
- * section 4c, "Attaching without Home") can never compose a disabled
+ * placing :display's SecondaryDisplayActivity can never compose a disabled
  * mode's surface (docs/SPEC.md section 4c and "Modes and what each
  * contributes").
  *
  * Gaming and Desktop each draw either the companion surface or the input
  * surface, per the user's role choice for that mode; Standard draws its
- * own launcher-style surface (StandardSecondScreenSurface). The role is
- * read at composition rather than captured once, so a role changed in
- * settings takes effect the next time that screen comes up.
+ * own launcher-style surface (StandardSecondScreenSurface) -- shown on the
+ * secondary display whenever droidtop holds the HOME role, whether Home
+ * itself renders Standard's own Launcher3 fork or forwards to a different
+ * chosen launcher via the Alternative implementation (docs/SPEC.md section
+ * 4c, "The Alternative forwarder keeps the second screen"): holding the
+ * role is what places [dev.droidtop.display.SecondaryDisplayActivity] on
+ * the secondary display, independent of which activity is answering Home
+ * on the primary one. The role is read at composition rather than
+ * captured once, so a role changed in settings takes effect the next time
+ * that screen comes up.
  *
  * Real bug this replaced (owner, 2026-09-27, "it seems we use the same
  * dual screen mode for standard and gaming"): Standard used to hand off
