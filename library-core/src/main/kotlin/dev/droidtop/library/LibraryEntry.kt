@@ -971,30 +971,6 @@ class Library(
     //    Here: each provider runs as its own coroutine, failures are
     //    caught and logged per-provider rather than propagating, and every
     //    other provider's results still come back.
-    suspend fun scanAll(): List<LibraryEntry> = scanKinds(LibraryEntryKind.entries.toSet())
-
-    /**
-     * Real bug this fixes, reported directly: Apps was showing empty even
-     * though NativeAppProvider itself completes almost instantly, because
-     * [scanAll] combined every provider into one list and only ever
-     * returned once *all* of them finished -- a slow ConsoleRomProvider
-     * scan (a real SD card, real folder sizes) silently gated Apps' own,
-     * already-ready results. shell-gamepad now calls this once per section
-     * (Games' kinds, Apps' kinds) as two fully independent scans, so one
-     * section's slow provider can never block another section's fast one
-     * from ever rendering.
-     */
-    suspend fun scanKinds(kinds: Set<LibraryEntryKind>): List<LibraryEntry> = withContext(Dispatchers.IO) {
-        val scanned = coroutineScope {
-            providers
-                .filter { provider -> provider.kinds.any { it in kinds } }
-                .map { provider -> async { scanProviderSafely(provider) } }
-                .awaitAll()
-                .flatten()
-        }
-        withLibraryFacts(scanned)
-    }
-
     /**
      * Starts the slow rebuild pass' recurring loop, once per process
      * (docs/SPEC.md 7g, step 4: "kept honest ... over time," not a

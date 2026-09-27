@@ -15,73 +15,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.room.migration.Migration
 
 /**
- * Real, persistent ROM-scan cache -- the actual fix for a real, reported
- * problem: [ConsoleRomProvider.scan] used to walk every configured ROMs
- * root's entire filesystem tree from scratch on every single call (every
- * time the Games section is opened), and a real collection's own "j2me"
- * system folder alone had 18,126 files. That's real, repeated I/O work
- * for data that doesn't change between app launches in the common case.
- *
- * [RomEntity] rows are keyed by the ROM file's own absolute path (stable
- * across app restarts, and naturally unique). [ScanMetadataEntity] tracks
- * completion per (root, system folder) pair, not per root -- a real,
- * reported problem with the earlier per-root granularity: one pathological
- * folder (a real device's "j2me" folder turned out to contain a corrupted
- * directory entry that hung even a plain `ls` indefinitely) meant
- * [kotlinx.coroutines.awaitAll] over that root's folders never returned,
- * so nothing for that root -- not even the fast, already-finished
- * nes/gba/psx folders sitting right next to it -- ever got persisted.
- * [ConsoleRomProvider.scan]/[ConsoleRomProvider.scanProgressive] now treat
- * each system folder as its own independently cacheable unit: a folder
- * with a metadata row is skipped and served from cache, a folder without
- * one is walked and persisted the moment ITS OWN scan finishes, regardless
- * of whether sibling folders in the same root are still running or stuck.
- * [ConsoleRomProvider.rescanProgressive] forces
- * a real walk regardless of cache state, for an explicit user-triggered
- * "my ROMs changed, rescan" action -- same per-folder persistence timing,
- * so one stuck folder can't block every other folder's fresh results from
- * being saved during a rescan either.
- */
-@Entity(tableName = "rom_entries")
-data class RomEntity(
-    @PrimaryKey val id: String,
-    val title: String,
-    val systemId: String,
-    val artworkUri: String?,
-    // Real ES-DE `manuals` media presence (see EsDeArtwork.resolveManual's
-    // own doc comment for why this is filesystem-derived, not a metadata
-    // field) -- resolved and cached at scan time exactly like [artworkUri]
-    // already is, not part of GameMetadataEntity.
-    @ColumnInfo(name = "manual_uri") val manualUri: String? = null,
-    // Real ES-DE `videos` media presence -- same filesystem-derived,
-    // scan-time-resolved convention as [manualUri] (see
-    // EsDeArtwork.resolveVideo's own doc comment).
-    @ColumnInfo(name = "video_uri") val videoUri: String? = null,
-    @ColumnInfo(name = "roms_root") val romsRoot: String,
-    // The folder actually scanned to produce this row -- deliberately
-    // separate from [systemId], which may have been corrected by
-    // [ConsoleRomProvider]'s own content/filename detection to a
-    // *different* system than the folder it was found in. Clearing/
-    // re-inserting a folder's rows on rescan has to key off which folder
-    // produced them, not each row's own possibly-reassigned systemId, or
-    // a misfiled disc image could get silently orphaned or double-counted
-    // across two folders' cache slices.
-    @ColumnInfo(name = "system_folder_id") val systemFolderId: String,
-)
-
-/**
- * Real per-game metadata -- deliberately a SEPARATE table from [RomEntity],
- * not more columns bolted onto it: [RomEntity] rows are a pure filesystem-
- * scan cache, destructively cleared and rebuilt every time
- * [ConsoleRomProvider.scanSystemFolder]'s own folder gets rescanned (see
- * [RomEntity]'s own doc comment) -- this table holds real user- and
- * scraper-written data that a filesystem rescan can neither regenerate nor
- * should ever silently discard. Keyed by the same real id
- * ([RomEntity.id], the ROM file's own absolute path) so it survives
- * indefinitely across rescans of the folder it lives in, merged back onto
- * the scanned [dev.droidtop.library.LibraryEntry] at read time (see
- * [ConsoleRomProvider]'s own metadata-merge helper) rather than being
- * part of the scan-and-replace cycle at all.
+ * Real per-game metadata -- deliberately a SEPARATE table, not more columns
+ * bolted onto a scan cache: this holds real user- and scraper-written data
+ * that a filesystem rescan can neither regenerate nor should ever silently
+ * discard.
  *
  * Full field set confirmed directly against real ES-DE source
  * (`es-app/src/MetaData.cpp`'s own `gameDecls` table -- a real local
@@ -204,18 +141,6 @@ data class GameMetadataEntity(
     @ColumnInfo(name = "icon_path") val iconPath: String? = null,
 )
 
-@Entity(tableName = "scan_metadata", primaryKeys = ["roms_root", "system_folder_id"])
-data class ScanMetadataEntity(
-    @ColumnInfo(name = "roms_root") val romsRoot: String,
-    @ColumnInfo(name = "system_folder_id") val systemFolderId: String,
-    @ColumnInfo(name = "last_scanned_epoch_ms") val lastScannedEpochMs: Long,
-)
-
-data class ScannedFolderKey(
-    @ColumnInfo(name = "roms_root") val romsRoot: String,
-    @ColumnInfo(name = "system_folder_id") val systemFolderId: String,
-)
-
 /**
  * Real custom collection -- droidtop's own equivalent of real ES-DE's
  * `CollectionSystemType.CUSTOM_COLLECTION` (confirmed against
@@ -241,7 +166,7 @@ data class CollectionEntity(
  * collections at once (real ES-DE's own actual model, confirmed via
  * `CollectionSystemsManager::toggleGameInCollection`'s per-collection
  * config-file membership, not a single collection-per-game field).
- * [gameId] matches [RomEntity.id]/[LibraryEntry.id] (the ROM file's own
+ * [gameId] matches [LibraryEntry.id] (the ROM file's own
  * absolute path).
  */
 @Entity(tableName = "collection_members", primaryKeys = ["collection_id", "game_id"])
@@ -252,21 +177,6 @@ data class CollectionMemberEntity(
 
 @Dao
 interface RomDao {
-    @Query("SELECT * FROM rom_entries WHERE roms_root IN (:romsRoots)")
-    suspend fun getEntries(romsRoots: List<String>): List<RomEntity>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertEntries(entries: List<RomEntity>)
-
-    @Query("DELETE FROM rom_entries WHERE roms_root = :romsRoot AND system_folder_id = :systemFolderId")
-    suspend fun clearSystemFolder(romsRoot: String, systemFolderId: String)
-
-    @Query("SELECT roms_root, system_folder_id FROM scan_metadata WHERE roms_root IN (:romsRoots)")
-    suspend fun getScannedSystemFolders(romsRoots: List<String>): List<ScannedFolderKey>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun markScanned(metadata: ScanMetadataEntity)
-
     @Query("SELECT * FROM game_metadata WHERE id IN (:ids)")
     suspend fun getGameMetadata(ids: List<String>): List<GameMetadataEntity>
 
@@ -521,12 +431,19 @@ val MIGRATION_9_10 = object : Migration(9, 10) {
     }
 }
 
+val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("DROP TABLE IF EXISTS rom_entries")
+        db.execSQL("DROP TABLE IF EXISTS scan_metadata")
+    }
+}
+
 @Database(
     entities = [
-        RomEntity::class, ScanMetadataEntity::class, GameMetadataEntity::class,
+        GameMetadataEntity::class,
         CollectionEntity::class, CollectionMemberEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = false,
 )
 abstract class RomDatabase : RoomDatabase() {
@@ -551,7 +468,7 @@ abstract class RomDatabase : RoomDatabase() {
                     // because game_metadata holds real user data that
                     // must survive it -- see that migration's own doc
                     // comment.
-                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build().also { instance = it }
             }
