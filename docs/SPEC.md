@@ -2622,6 +2622,166 @@ Also confirm the pill does not appear/flicker during an ordinary game launch or 
 the shell's own relocation to the addon, which both change display state through the
 same orchestration pass.
 
+### An N64 launch, root-caused: `onStop` churned an unrelated display (rig, 2026-09-27)
+
+Reproduced live on the Retroid Pocket 5 (p1-dt-n64-black-screen-hang): launching an N64
+ROM (RetroArch AArch64, mupen64plus_next) from Gaming with "Games launch on: Same display
+as the shell" (built-in) and a second display attached left the built-in screen solid
+black for 45s+ -- RetroArch's own logcat goes silent right after "Auto-start game" and
+never renders a frame, eventually hitting Android's ANR dialog -- while the addon
+simultaneously fell back from droidtop's own companion to the bare system
+`SecondaryDisplayLauncher`.
+
+`MainActivity.onStop()` was the cause, not RetroArch or mupen64plus_next: on every stop,
+regardless of WHICH display the newly-foregrounded thing was actually on, it
+unconditionally dismissed `secondScreenPresentation` (the live companion, on the ADDON
+display) and reasserted `SecondaryDisplayActivity` there -- even when the launch that
+triggered the stop had nothing to do with that display at all, exactly this repro's case
+(the game landed on the built-in display, same as the shell; the addon's content never
+changed). Two real, connected effects followed: the reassertion racing and losing gave
+the addon nothing until Android's own fallback picked it (the companion-fallback half of
+this bug and of p1-dt-companion-text-overlap's own notification finding), and the extra
+cross-display `dismiss()` + `startActivity` pair fired on the main thread at the exact
+moment RetroArch was trying to claim its own EGL surface on the OTHER display --
+contention plausible enough, and exactly timed enough against "goes silent right after
+Auto-start game", to be the more likely explanation for the hang itself than a
+RetroArch/mupen64plus_next-side defect for this specific core and ROM.
+
+Fixed by only touching the companion in `onStop` when the launch actually parked onto
+ITS display (`LaunchDisplay.parkedDisplayId == secondScreenPresentation.display.displayId`)
+-- the one case where something genuinely now sits underneath the Presentation's window.
+A `Presentation` is a `WindowManager` window on its own `Display`, not something tied to
+the owning Activity's own foreground state, so leaving it alone when the addon itself was
+never touched is correct, not merely "less churn": the companion was always meant to keep
+showing "widgets and game info" while a game plays on the OTHER screen (this section's own
+design), and tearing it down on every unrelated `onStop` never matched that.
+
+**Needs a rig check**: repeat the exact repro (Gaming, built-in shell, N64 ROM, "Games
+launch on: Same display as the shell", a second display attached) and confirm the
+built-in screen shows a rendered frame within a few seconds rather than 45s+ of black,
+and that the addon keeps showing droidtop's own companion throughout rather than falling
+to `SecondaryDisplayLauncher`. Also confirm the companion still tears down correctly when
+a game DOES launch onto the addon itself (Games launch on: Second screen, or Ask -> Second
+screen) -- that is the one case this fix still acts on.
+
+### The second screen is per-mode, not one surface for all three (directed 2026-09-27)
+
+The owner, after this session's other dual-screen fixes: "it seems we use the same dual
+screen mode for standard and gaming. The second screen needs to apply more to the mode."
+True of the code as it stood: SecondScreenPresentation (the LIVE surface, shown whenever
+MainActivity itself drives the second screen) never branched on mode at all and always drew
+the game companion, and Standard's own registration
+(SecondaryDisplayRegistrations.registerLauncherHandoff) handed off to Launcher3's bare
+SecondaryDisplayLauncher -- a near-empty system stub, not a droidtop surface, and the exact
+thing rp5test's screenshots kept catching (this section's own "companion-fallback" finding
+above). droidtop has three modes and now three second-screen designs:
+
+- **Gaming**: the game companion, unchanged (CompanionSurface, section 4d) -- the focused
+  game's art and metadata, play time, "Runs with", updates, and the idle rotation/status
+  strip while browsing.
+- **Standard**: StandardSecondScreenSurface (:app) -- a launcher-style surface, built
+  from pieces droidtop already has rather than a new system: CompanionSystemBar and
+  CompanionNotifications (the SAME droidtop-styled clock/battery/network/controls and
+  notification rows Gaming's companion draws -- no second implementation), a "Quick launch"
+  row backed by RecentAppsStore (:shell-default's own real, already-recorded
+  recent/frequently-used app history -- not a fabricated list), and already-added Android
+  widgets through the SAME CompanionWidgets host and CompanionWidgetPrefs set the
+  companion's own widget picker manages (one widget set across the whole companion
+  experience; Standard has no add/remove UI of its own, the same constraint every
+  non-owning companion host already documents). No media-session "now playing": docs/SPEC.md
+  section 7e is scoped but not built, and there is nothing real to show without fabricating
+  it; a plugin status tile is an ordinary Android widget (PluginStatusWidgetProvider),
+  already covered by the widget area.
+- **Desktop**: unchanged -- keyboard and trackpad (SecondScreenInputSurface), or the
+  companion when the user picks that role instead (SecondScreenInputPrefs).
+
+**One registry, one mechanism (fixed the same pass).** SecondaryDisplayContent (:display)
+already held a per-mode composable registry that only SecondaryDisplayActivity (the idle,
+platform-placed SECONDARY_HOME surface) read from; SecondScreenPresentation (the live,
+shell-owned surface) duplicated its own role-branch and hardcoded CompanionSurface
+regardless of what SecondaryDisplayContent.currentMode said. SecondScreenPresentation now
+reads the SAME registry (SecondaryDisplayContent.contentFor(mode)) the idle surface does,
+so the two can never disagree about what a mode's second screen is again. The dead
+handoff-to-an-Activity mechanism (SecondaryDisplayContent.registerHandoff, added only for
+Standard's old bare-launcher-3 hand-off) is removed with it: Standard registers real
+composable content the same way Gaming and Desktop do, and ModePiece.LAUNCHER_SECOND_SCREEN
+(the mode-piece that used to gate that hand-off) is gone -- Standard's second screen is not
+gated on a mode piece at all (see "Attaching without Home" below for why).
+
+### Attaching without Home (directed 2026-09-27)
+
+Second owner requirement, same pass: "Our standard mode's second screen should still attach
+when we're running other launcher intents (when a user chose a different launcher)." The
+mechanism above only reaches the second screen two ways, and both depend on droidtop holding
+Home:
+
+- SecondaryDisplayActivity is SECONDARY_HOME -- the platform places it on a secondary
+  display only while droidtop IS the current default Home app. Pick Nova, Pixel Launcher, or
+  the stock AOSP one instead, and THAT app's own SECONDARY_HOME activity (or the platform's
+  bare fallback) gets placed there instead; droidtop's content never appears.
+- SecondScreenPresentation is owned by MainActivity, which only runs while Gaming or
+  Desktop is the foreground mode -- nothing shows it while droidtop is sitting unopened
+  behind another launcher.
+
+**What the platform actually allows a normal, non-privileged app to do here** (checked
+against AOSP's own multi-display activity-launch policy,
+source.android.com/docs/core/display/multi_display/activity-launch, since this needed
+answering rather than assuming): starting an ACTIVITY on any display, including a secondary
+one, from a background component (a Service with no foreground Activity of its own) is
+restricted since Android 10's background-activity-launch policy, and the documented
+exemptions (INTERNAL_SYSTEM_WINDOW, ACTIVITY_EMBEDDING, being the display's own creator)
+are all privileged or don't apply here -- no blanket "secondary display" exemption exists for
+an ordinary background service. SYSTEM_ALERT_WINDOW is the wrong tool for a different
+reason: it gates TYPE_APPLICATION_OVERLAY, a window drawn on top of OTHER apps on the SAME
+(default) display, not a window on a display of its own. A Presentation, though, is neither
+of those: it is a Dialog-style window added directly through WindowManager, scoped to a
+Display-bound Context the app already legitimately holds via the
+android.software.presentation feature (already declared, already how SecondScreenPresentation
+itself works) -- not an activity launch, and not subject to the BAL restriction at all. This
+is the same standard pattern wireless-display and media-route-provider apps use to keep
+content on an external display independent of whichever app is foreground, and needs no root.
+
+**Built**: SecondScreenAttachService (:app), a foreground service
+(foregroundServiceType="specialUse", the same declared use as DesktopSessionService) that
+watches DisplayManager for a secondary display and, whenever droidtop does NOT currently
+hold Home (HomeRolePrefs.isDroidtopHome), shows a SecondScreenPresentation there with
+Standard's content forced (never the possibly-stale currentMode()/last-used mode, since by
+definition no droidtop Activity is running at all while this service is the one acting --
+SecondScreenPresentation grew a forcedMode constructor param for exactly this). It never
+double-covers a display an Activity-based surface already owns: it checks
+SecondScreenOwnership.activityOwnedDisplayId (new, :display -- published by
+SecondScreenPresentation.onStart/onStop, since MainActivity can still be opened as an
+ordinary app from another launcher's drawer whatever Home says, and its own orchestration
+already covers that case correctly) and SecondaryDisplayActivity.resumedDisplayId, and backs
+off from either. Re-evaluated on every display add/remove/change and on every
+ModeStartup.apply() pass (process start, and every mode/Home-role toggle from Settings) via
+SecondScreenAttachService.ensureRunning, which is a no-op that stops itself immediately
+whenever droidtop already holds Home -- so exactly one mechanism is ever active for a given
+display at a time.
+
+**A real, honest limit, recorded rather than glossed over**: droidtop registers no boot
+receiver (section 2c) and this service does not add one. Nothing starts this service, or
+droidtop's process at all, purely because Android booted while another app holds Home -- the
+person has to open droidtop at least once (its one launcher icon, reachable from whichever
+launcher IS Home) before this can attach. From that point on it persists as an ordinary
+foreground service -- surviving the opening Activity closing, reattaching across display
+add/remove and across the other launcher's own foreground/background changes -- until Android
+kills the process or the device reboots.
+
+**Needs a rig check**: with a second launcher installed (the stock AOSP one satisfies this --
+Settings > Apps > Default apps > Home app, or an installed one like Nova), set it as Home,
+open droidtop once from that launcher's drawer so its process starts, then background
+droidtop entirely (Home back to the other launcher). Confirm the attached display keeps
+showing droidtop's own Standard second screen (system bar, notifications, quick launch,
+widgets) rather than falling to the other launcher's own secondary-display handling or a
+mirror, and that it survives a few minutes of using the other launcher normally. Then switch
+Home back to droidtop and confirm SecondScreenAttachService stands down (no duplicate
+window, no lingering persistent notification) and the platform's own SecondaryDisplayActivity
+placement takes back over. Also confirm a genuinely cold boot with another launcher as Home
+does NOT show droidtop's second screen until droidtop is opened once, matching the documented
+limit above -- if it does not need opening first, or if this session's build had no second
+launcher available to install, that should be re-verified with one.
+
 ## 4d. The companion screen, designed (research 2026-09-01)
 
 droidtop's companion currently renders a status bar, notifications and
