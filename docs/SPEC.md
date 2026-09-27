@@ -9838,6 +9838,47 @@ describes.
   Settings > App integrations > Jobs (`SCREEN_JOBS`, registered next to
   Plugins), on both renderers via the same shared-registry mechanism
   every other cross-module screen already uses.
+  - **Two real bugs found on the rig (dq-pluginui-01, 2026-09-27) and
+    fixed the same day, both in `plugin-host`.** First, a race in
+    `PluginJobsCenter.start` itself: it compared an incoming callback's
+    jobId against a `var` only assigned AFTER `NativePluginRunner.startJob`
+    returned, and added the job's own `Entry` to `state` only after
+    that too -- but :pluginhost dispatches a job to its own executor
+    (and can call back) the INSTANT the AIDL `startJob` call arrives on
+    its side, not after the call returns, so a small, fast job (a real
+    buildbot core zip) could complete before either existed, silently
+    dropping the update and freezing the row at "Starting.../0%"
+    forever even though the plugin genuinely finished. Second, and
+    deeper: `PluginRuntimeService` held ONE global
+    `IPluginRuntimeCallback` field (`setCallback`), but every concurrent
+    `NativePluginRunner` connection from `:app` binds the SAME
+    `:pluginhost` Service instance -- `PluginJobsCenter` deliberately
+    opens one dedicated connection per job so several can run at once,
+    so a second job (or even just a settings screen making its own
+    short-lived `invoke()` call) silently STOLE callback delivery from
+    every earlier connection still bound, freezing an earlier job's row
+    even after the first bug's own fix.
+  - **The fix, in order.** (1) `IPluginRuntime.startJob` now takes a
+    CALLER-chosen `jobId` instead of generating and returning one --
+    `PluginJobsCenter.start` picks it before calling anything, so
+    `Entry.jobId` IS the real job id from the very start; no ordering
+    requirement, no race. (2) `IPluginRuntime.registerCallback`/
+    `unregisterCallback` replaced `setCallback`; `PluginRuntimeService`
+    now holds every connected caller in a `RemoteCallbackList` and
+    broadcasts every job-progress/job-complete/plugin-crashed event to
+    ALL of them (`NativePluginRunner.unbind` unregisters its own
+    callback so a closed connection stops paying for broadcasts).
+    Broadcasting to everyone means every caller can now receive OTHER
+    jobs' events too, so `PluginJobsCenter.start`'s own progress/
+    complete closures filter on `eventJobId == jobId` -- a plain `val`
+    comparison fixed before any call that could produce an event, not a
+    race. Unit-tested in `PluginJobsCenterTest.kt` via a new
+    `PluginJobRunner` interface (`PluginCrashPolicy` is the real
+    implementation; tests substitute a fake that fires callbacks at
+    arbitrary, caller-controlled times, including "before `startJob`
+    itself returns" -- the exact ordering that broke) -- no real
+    Android Service/RemoteCallbackList/binder connection needed to cover
+    the routing logic itself.
 - **Event hooks (`PluginEvent`, `plugin-host`; `PluginEventBus`,
   `library-core`).** The OUTGOING half of the plugin API, mirroring
   `PluginCapability` (the incoming half): droidtop fires a closed,
@@ -9878,11 +9919,40 @@ describes.
     cancellation point -- `DroidtopPlugin.cancelJob`'s default is a
     no-op, so this had to be real plugin-side work, not just a droidtop
     UI wiring change).
+  - **A real bug meant this could never fire for ANY plugin (found and
+    fixed 2026-09-27, dq-pluginui-01).** `PluginRecord.toJson`/`fromJson`
+    (`plugin-host`) never carried `PluginManifest.subscribedEvents` at
+    all. `PluginStore.installed()` -- what `PluginEventBus` and every
+    other real call site reads -- always goes through this exact round
+    trip (`record.json`, written right after install and re-read on
+    every later call), so a plugin's real, signed subscription was
+    silently reset to empty the moment droidtop persisted its own copy
+    of the record, regardless of what the manifest actually declared.
+    Confirmed live: `droidtop-plugin-retroarch` v11d72ad's manifest
+    genuinely declared `subscribedEvents: ["default_player_changed"]`
+    and ps2's own real platform data genuinely carries
+    `retroArchCore: "pcee2"` (checked directly against
+    `droidtop-platforms`), so setting ps2's Player to RetroArch on the
+    rig SHOULD have started a job and did not -- `PluginEventBus`'s own
+    `it.manifest.subscribedEvents` filter was checking a set this bug
+    had already zeroed out. Fixed by carrying the field through both
+    directions of `PluginRecord`'s own JSON, with a round-trip unit test
+    (`PluginRecordTest.kt`) reproducing the exact bug (a manifest that
+    DOES subscribe, round-tripped the same way `PluginStore` does).
 
-**Rig-checked on BlueStacks (2026-09-27, agent `pluginui`)**: see the
-commit description for exact results against
+**Rig-checked on BlueStacks (2026-09-27, agent `pluginui`)**: settings_rows,
+app_status (both the Plugins screen and a system's Player choice screen),
+and starting/tracking a job from the UI all passed against
 `droidtop-plugin-retroarch`'s manifest+code update (subscribedEvents,
-`onEvent`, job hints, real `cancelJob`) pushed alongside this change.
+`onEvent`, job hints, real `cancelJob`). The two bugs above were found
+live on the rig during that same session (a job's row freezing, and the
+event hook producing no job), root-caused, fixed, unit-tested, and
+re-verified on BlueStacks the same day: two concurrent core downloads
+plus reopening the app_status screen mid-download all completed
+correctly (the callback-theft bug no longer drops or misroutes any of
+them), setting a system's Player to an installed RetroArch with a real,
+undownloaded core now starts the reaction job, and cancel stopped a
+large in-flight download before it finished.
 
 **The "Get games" UI, unifying both acquire_content mechanisms (built
 2026-09-26).** Until now `acquire_content` had a real JSON half (§12) and

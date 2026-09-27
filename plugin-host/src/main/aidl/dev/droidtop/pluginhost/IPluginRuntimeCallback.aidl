@@ -1,11 +1,18 @@
 package dev.droidtop.pluginhost;
 
 /**
- * Handed to {@link IPluginRuntime#setCallback} so the :pluginhost process
- * can report a crash back to :app without :app having to poll. This is
- * the other half of PluginCrashPolicy's containment: the binder
+ * Handed to {@link IPluginRuntime#registerCallback} so the :pluginhost
+ * process can report a crash back to :app without :app having to poll.
+ * This is the other half of PluginCrashPolicy's containment: the binder
  * DeathRecipient catches the process dying outright, this callback
  * catches a plugin that threw but left the process alive.
+ *
+ * PluginRuntimeService now broadcasts every notification to EVERY
+ * currently registered callback (a RemoteCallbackList), not just one --
+ * see registerCallback's own doc comment for the bug this replaced. A
+ * receiver whose own connection is dedicated to one job (PluginJobsCenter's
+ * normal shape) will get other jobs' onJobProgress/onJobComplete calls
+ * too and is expected to filter by the jobId it already knows about.
  */
 oneway interface IPluginRuntimeCallback {
     /** capability is empty ("") when the crash happened outside any one invoke() call, e.g. during load. */

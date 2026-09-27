@@ -5,9 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.os.RemoteCallbackList
 import dalvik.system.DexClassLoader
 import java.io.File
-import java.util.UUID
 import java.util.concurrent.Executors
 import org.json.JSONObject
 
@@ -26,7 +26,20 @@ import org.json.JSONObject
  */
 class PluginRuntimeService : Service() {
     private val loaded = mutableMapOf<String, DroidtopPlugin>()
-    private var callback: IPluginRuntimeCallback? = null
+
+    /**
+     * Every caller currently connected, not just the most recent one --
+     * see [IPluginRuntime.registerCallback]'s own doc comment for the
+     * bug this replaced (a single nullable field, silently stolen by
+     * the second concurrent connection). [RemoteCallbackList] is the
+     * standard AIDL idiom for this: thread-safe register/unregister,
+     * and it drops a registered callback on its own once the binder
+     * behind it dies, so a :app-side connection that vanishes without
+     * calling [IPluginRuntime.unregisterCallback] (a process kill, not
+     * just an unbind) can never leave a stale entry broadcasts keep
+     * paying for.
+     */
+    private val callbacks = RemoteCallbackList<IPluginRuntimeCallback>()
 
     // One shared pool for every plugin's jobs in this process. A job is
     // expected to run minutes (docs/SPEC.md 12a's job shape), so it must
@@ -34,8 +47,12 @@ class PluginRuntimeService : Service() {
     private val jobExecutor = Executors.newCachedThreadPool()
 
     private val binder = object : IPluginRuntime.Stub() {
-        override fun setCallback(cb: IPluginRuntimeCallback?) {
-            callback = cb
+        override fun registerCallback(cb: IPluginRuntimeCallback?) {
+            cb?.let { callbacks.register(it) }
+        }
+
+        override fun unregisterCallback(cb: IPluginRuntimeCallback?) {
+            cb?.let { callbacks.unregister(it) }
         }
 
         override fun loadPlugin(pluginId: String, installDir: String, entryClass: String, rootApproved: Boolean): Boolean {
@@ -215,25 +232,24 @@ class PluginRuntimeService : Service() {
             }
         }
 
-        override fun startJob(pluginId: String, capability: String, argsJson: String): String? {
-            val plugin = loaded[pluginId] ?: return null
-            val cap = PluginCapability.fromId(capability) ?: return null
-            val jobId = UUID.randomUUID().toString()
+        override fun startJob(pluginId: String, capability: String, argsJson: String, jobId: String): Boolean {
+            val plugin = loaded[pluginId] ?: return false
+            val cap = PluginCapability.fromId(capability) ?: return false
             val argsMap = try {
                 buildMap<String, String> {
                     val obj = JSONObject(argsJson)
                     obj.keys().forEach { key -> put(key, obj.optString(key)) }
                 }
             } catch (t: Throwable) {
-                return null
+                return false
             }
             val progress = object : PluginJobProgress {
                 override fun report(percent: Int, statusLine: String) {
-                    runCatching { callback?.onJobProgress(pluginId, jobId, percent, statusLine) }
+                    broadcastJobProgress(pluginId, jobId, percent, statusLine)
                 }
 
                 override fun complete(result: PluginResult) {
-                    runCatching { callback?.onJobComplete(pluginId, jobId, encode(result)) }
+                    broadcastJobComplete(pluginId, jobId, result)
                 }
             }
             jobExecutor.execute {
@@ -243,13 +259,13 @@ class PluginRuntimeService : Service() {
                     // A plugin that never overrode startJob() -- an
                     // ordinary, expected shape, not a crash: report it as
                     // a normal job failure and leave the plugin running.
-                    runCatching { callback?.onJobComplete(pluginId, jobId, encode(PluginResult.failure("this plugin does not support jobs"))) }
+                    broadcastJobComplete(pluginId, jobId, PluginResult.failure("this plugin does not support jobs"))
                 } catch (t: Throwable) {
                     reportCrash(pluginId, capability, t.message ?: t::class.java.simpleName)
-                    runCatching { callback?.onJobComplete(pluginId, jobId, encode(PluginResult.failure(t.message ?: "job failed"))) }
+                    broadcastJobComplete(pluginId, jobId, PluginResult.failure(t.message ?: "job failed"))
                 }
             }
-            return jobId
+            return true
         }
 
         override fun cancelJob(pluginId: String, jobId: String) {
@@ -258,6 +274,12 @@ class PluginRuntimeService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder = binder
+
+    /** Releases every still-registered callback's binder reference -- the process is going away with them regardless, but [RemoteCallbackList.kill] is the documented, clean way to say so rather than just dropping the field. */
+    override fun onDestroy() {
+        callbacks.kill()
+        super.onDestroy()
+    }
 
     private fun encode(result: PluginResult): String {
         val json = JSONObject()
@@ -278,8 +300,49 @@ class PluginRuntimeService : Service() {
     }
 
     private fun reportCrash(pluginId: String, capability: String, reason: String) {
-        runCatching { callback?.onPluginCrashed(pluginId, capability, reason) }
+        broadcastPluginCrashed(pluginId, capability, reason)
         loaded.remove(pluginId)
+    }
+
+    /**
+     * Fan-out to every currently registered [IPluginRuntimeCallback]
+     * (see [callbacks]' own doc comment) -- the standard
+     * begin/get/finishBroadcast dance [RemoteCallbackList] requires. One
+     * dead or misbehaving callback (`runCatching` per item) never stops
+     * the rest from being delivered.
+     */
+    private fun broadcastJobProgress(pluginId: String, jobId: String, percent: Int, statusLine: String) {
+        val n = callbacks.beginBroadcast()
+        try {
+            for (i in 0 until n) {
+                runCatching { callbacks.getBroadcastItem(i).onJobProgress(pluginId, jobId, percent, statusLine) }
+            }
+        } finally {
+            callbacks.finishBroadcast()
+        }
+    }
+
+    private fun broadcastJobComplete(pluginId: String, jobId: String, result: PluginResult) {
+        val json = encode(result)
+        val n = callbacks.beginBroadcast()
+        try {
+            for (i in 0 until n) {
+                runCatching { callbacks.getBroadcastItem(i).onJobComplete(pluginId, jobId, json) }
+            }
+        } finally {
+            callbacks.finishBroadcast()
+        }
+    }
+
+    private fun broadcastPluginCrashed(pluginId: String, capability: String, reason: String) {
+        val n = callbacks.beginBroadcast()
+        try {
+            for (i in 0 until n) {
+                runCatching { callbacks.getBroadcastItem(i).onPluginCrashed(pluginId, capability, reason) }
+            }
+        } finally {
+            callbacks.finishBroadcast()
+        }
     }
 
     private fun nativeLibraryDirFor(installDir: File): String? {
