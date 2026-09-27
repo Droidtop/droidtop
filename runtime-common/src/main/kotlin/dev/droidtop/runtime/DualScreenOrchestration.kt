@@ -86,7 +86,7 @@ object DualScreenOrchestration {
      * [displaysNeedingIdleCover] does not watch -- an app on the addon
      * exits on its own, with droidtop's own shell never losing foreground
      * on ITS display, so nothing re-runs role orchestration and the addon
-     * is left with neither a live [dev.droidtop.app.SecondScreenPresentation]
+     * is left with neither a live [dev.droidtop.display.SecondScreenPresentation]
      * nor the idle SECONDARY_HOME cover -- which is exactly when Android
      * falls back to mirroring it. This is the same "is anything of ours
      * actually on the addon" question [displaysNeedingIdleCover] asks
