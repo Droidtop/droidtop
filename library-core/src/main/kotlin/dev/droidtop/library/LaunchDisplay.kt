@@ -21,8 +21,9 @@ import android.view.Display
  * The priority chain itself is [LaunchScreenResolution], pure and
  * unit-tested.
  *
- * Everything here is process state, set by the shell (MainActivity
- * resolves it from DisplayRolePrefs + the live display list) rather than
+ * Everything here is process state, set by the shell (:display's
+ * SecondScreenOrchestrator resolves it from DisplayRolePrefs + the live
+ * display list, through MainActivity's SecondScreenHost) rather than
  * each library-core call site re-reading preferences it shouldn't know
  * the shape of.
  */

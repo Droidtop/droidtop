@@ -1,4 +1,4 @@
-package dev.droidtop.app
+package dev.droidtop.display
 
 import android.content.Context
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
@@ -9,6 +9,9 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * Same shared LAUNCHER_PREFS_FILE_NAME file/`KEY_`-object convention
  * as every other settings concern, written by :shell-default's settings
  * rows and read here.
+ *
+ * Lives in the :display module alongside [SecondScreenOrchestrator], the one
+ * reader of [gameLaunchTarget] (docs/SPEC.md §4/§4c).
  *
  * Which panel the shell itself renders on is not here: that is
  * [dev.droidtop.runtime.MainScreen], the one role model both Gaming and

@@ -1,4 +1,4 @@
-package dev.droidtop.app
+package dev.droidtop.display
 
 import android.content.Context
 import android.os.Bundle
@@ -22,7 +22,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
  * The LIVE companion on the second screen, driven by the Gaming shell
  * while that shell is foreground on the primary display.
  *
- * This coexists with `:display`'s `SecondaryDisplayActivity`; they are not
+ * This coexists with SecondaryDisplayActivity (this module); they are not
  * alternatives, and an earlier pass deleting this one in favour of that
  * one was a mistake, made on a premise that turned out to be false.
  *
@@ -77,8 +77,8 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
         // hosting/listening is the registered content's own concern now
         // (CompanionSurfaceHost's DisposableEffect, StandardSecondScreenSurface's
         // own), not duplicated here.
-        val mode = dev.droidtop.display.SecondaryDisplayContent.currentMode(context)
-        val content = dev.droidtop.display.SecondaryDisplayContent.contentFor(mode)
+        val mode = SecondaryDisplayContent.currentMode(context)
+        val content = SecondaryDisplayContent.contentFor(mode)
         val composeView = ComposeView(context).apply {
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(savedStateOwner)

@@ -2838,6 +2838,38 @@ Standard and Alternative normally, then open Recents the user way (the Recents g
 button, not `dumpsys`) and confirm exactly one droidtop card appears (or none, when nothing
 app-hosted is running), never `com.android.launcher3.Launcher` as a separate switchable entry.
 
+### The relocation/companion orchestration moved into `:display` (2026-09-27)
+
+The one-role-store consolidation (`MainScreen`, commit `c91e1948`, "Keep one answer to
+which screen is the main one") already replaced the two disagreeing display-role stores with a
+single persisted choice back on 2026-09-24; nothing since had reintroduced a second one. What
+was still outstanding was where the *code* that acts on that choice lived: the roughly 350
+lines of relocation/companion decision logic (display topology tracking, the relocation
+cooldown, the live `SecondScreenPresentation`/idle-cover handoff, the companion re-assert) sat
+in `MainActivity` (`:app`) rather than `:display`, where this section says droidtop's
+secondary-display decisions belong.
+
+Moved to `SecondScreenOrchestrator` (`:display`), along with `DisplayRolePrefs` (the
+per-launch game-display-target reader it is the one caller of) and `SecondScreenPresentation`
+(already self-contained -- it only ever read `SecondaryDisplayContent`, also in this module).
+`MainActivity` now implements a small `SecondScreenHost` interface: the handful of things
+that must be the foreground Activity (its own current display id, relaunching itself) or that
+only `:app` owns (`CompanionActivity`, `dev.droidtop.library.LaunchDisplay` -- `:display`
+still has no dependency on `:library-core`). Every decision -- topology change detection, the
+relocation give-up policy, which surface covers which display -- is now orchestrator code, not
+Activity code. The relocation cooldown counters stay process-wide (a companion object on the
+orchestrator class, same as `MainActivity`'s own former `DisplayRelocation` companion
+object), since a relocation recreates the Activity (and with it a fresh
+`SecondScreenOrchestrator` instance) mid-guard-window.
+
+Behavior is unchanged -- this is a move, not a redesign: explicit launch-display targeting,
+the Standard second screen (via `reassertSecondaryDisplays`, untouched), the Alternative
+forwarder, and `reassertSecondaryDisplays` itself all keep working exactly as before.
+
+**Needs a rig check** (emulator-5560, fake second display via
+`settings put global overlay_display_devices`): Gaming, Standard and Desktop second screens,
+plus a game launch, to confirm the move introduced no behavior change.
+
 ## 4d. The companion screen, designed (research 2026-09-01)
 
 droidtop's companion currently renders a status bar, notifications and

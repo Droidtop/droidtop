@@ -2,7 +2,6 @@ package dev.droidtop.app
 
 import android.content.Intent
 import android.os.Build
-import android.hardware.display.DisplayManager
 import android.os.Bundle
 import android.view.KeyEvent
 import androidx.activity.compose.setContent
@@ -30,17 +29,16 @@ import dev.droidtop.runtime.ContainerApp
 import dev.droidtop.runtime.ContainerApplications
 import dev.droidtop.runtime.ContainerTerminal
 import dev.droidtop.runtime.nameOf
-import dev.droidtop.runtime.DisplayOutputKind
-import dev.droidtop.runtime.DisplayOutputRepository
+import dev.droidtop.runtime.DualScreenOrchestration
+import dev.droidtop.display.SecondScreenHost
+import dev.droidtop.display.SecondScreenOrchestrator
 import dev.droidtop.shell.desktop.DesktopSessionMessage
 import dev.droidtop.shell.desktop.DesktopShell
 import dev.droidtop.shell.gamepad.GamepadShell
 import dev.droidtop.shell.standard.BackButtonMenu
 import dev.droidtop.shell.standard.OnboardingGate
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * Not an app-drawer entry point — droidtop defaults to the normal Android
@@ -70,7 +68,7 @@ import kotlinx.coroutines.withContext
  * [dev.droidtop.shell.desktop.DesktopSessionMessage] rather than a single
  * generic placeholder, including what a booting container last reported.
  */
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), SecondScreenHost {
 
     private lateinit var library: Library
     private var mode by mutableStateOf<Mode?>(null)
@@ -93,23 +91,13 @@ class MainActivity : AppCompatActivity() {
     private var gamingTriggerRescan by mutableStateOf(false)
     private var gamingTriggerBrowseThemes by mutableStateOf(false)
 
-    // Re-runs the dual-screen role orchestration on demand (home-press
-    // reinit, explicit shell re-entry, a game launch) -- display
-    // attach/detach events alone don't cover those triggers.
-    private val roleRefresh = kotlinx.coroutines.flow.MutableStateFlow(0)
-
-    // The display ids the last orchestration pass saw. A CHANGE to this
-    // set is a real topology event (a screen plugged in or unplugged),
-    // which must not be swallowed by the relocation cooldown -- that
-    // cooldown exists to stop a relaunch LOOP, and "the hardware changed"
-    // is the opposite of a loop. Without this, plugging a screen in
-    // within the cooldown window did nothing at all until something else
-    // happened to retrigger orchestration.
-    private var lastDisplayIds: Set<Int> = emptySet()
-
-    // Last seen DisplayArrangement.refresh value, so an explicit swap is
-    // distinguishable from an ordinary re-emission.
-    private var lastArrangementSeq: Int = -1
+    // Owns the dual-screen relocation/companion decisions
+    // (docs/SPEC.md section 4/4c); this Activity supplies SecondScreenHost,
+    // the handful of things only the foreground Activity can do. Created
+    // fresh each onCreate, like the fields it replaces -- see its own doc
+    // comment for why the relocation cooldown counters are process-wide
+    // instead.
+    private lateinit var displayOrchestrator: SecondScreenOrchestrator
 
     /**
      * The host↔container clipboard bridge for the CURRENT desktop session,
@@ -129,25 +117,9 @@ class MainActivity : AppCompatActivity() {
     private val notificationPermission =
         registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { }
 
-    // The LIVE companion window on the second screen, owned by this
-    // foreground shell. :display's SecondaryDisplayActivity is the IDLE
-    // surface underneath it; see that class and SecondScreenPresentation
-    // for why droidtop needs both rather than one.
-    private var secondScreenPresentation: SecondScreenPresentation? = null
-
     // This instance's companion tap-to-launch seam -- kept so onDestroy
     // can identity-check before clearing the process-wide hook.
     private var companionLaunchSeam: ((dev.droidtop.library.LibraryEntry) -> Unit)? = null
-
-    // The "an app on the addon exited on its own" case has no event this
-    // process can listen for without a privileged task-stack API a
-    // sideloaded launcher is not guaranteed to hold (docs/SPEC.md section
-    // 4c) -- so instead, while this Activity is started, orchestration
-    // is bumped on a plain timer, which self-heals through the SAME pass
-    // every other display change already runs. Cheap: the pass reads
-    // already-observed display state and one SharedPreferences value on
-    // Dispatchers.IO, never a scan or a per-game lookup.
-    private var secondScreenHealthCheckJob: kotlinx.coroutines.Job? = null
 
     /**
      * Re-runs orchestration from scratch: drops the parked display and the
@@ -157,38 +129,7 @@ class MainActivity : AppCompatActivity() {
      * swap/reinitialize actions.
      */
     fun reinitializeDisplays() {
-        dev.droidtop.library.LaunchDisplay.parkedDisplayId = null
-        lastRelocationAttemptMs = 0L
-        relocationAttempts = 0
-        lastDisplayIds = emptySet()
-        roleRefresh.value++
-    }
-
-    companion object DisplayRelocation {
-        // Process-wide (companion), not per-instance: the relaunch loop
-        // recreates the Activity, so an instance field would reset each
-        // hop and guard nothing.
-        @Volatile
-        private var lastRelocationAttemptMs = 0L
-        private const val RELOCATION_COOLDOWN_MS = 5000L
-
-        // How often the started Activity re-checks the addon for the
-        // "an app exited on its own and left it uncovered" case (see
-        // secondScreenHealthCheckJob). Frequent enough that a person who
-        // just backed out of a game does not sit looking at a mirror for
-        // long; infrequent enough to cost nothing on a handheld -- the
-        // pass this triggers does no disk or scan work of its own.
-        private const val SECOND_SCREEN_HEALTH_CHECK_MS = 4000L
-
-        // How many relocation attempts this display topology has consumed
-        // without the shell verifiably ending up on the addon. Once
-        // DualScreenOrchestration.relocationHasFailed says so, the
-        // orchestration stops fighting a display that refuses activity
-        // launches and falls back to shell-on-built-in with the live
-        // companion covering the addon -- so the addon shows droidtop's
-        // surface instead of a mirror. Reset wherever the cooldown is.
-        @Volatile
-        private var relocationAttempts = 0
+        displayOrchestrator.reinitialize()
     }
 
     private fun applyGamingDeepLink(intent: Intent) {
@@ -247,6 +188,7 @@ class MainActivity : AppCompatActivity() {
         }
         CompanionState.onLaunchEntry = companionLaunchSeam
 
+        displayOrchestrator = SecondScreenOrchestrator(applicationContext, this)
         observeSecondScreen()
         observeClipboardBridge()
 
@@ -412,7 +354,7 @@ class MainActivity : AppCompatActivity() {
         if (intent.getBooleanExtra(BackButtonMenu.EXTRA_DISPLAY_REINIT_FORCE, false)) {
             reinitializeDisplays()
         } else {
-            roleRefresh.value++
+            displayOrchestrator.refresh()
         }
     }
 
@@ -562,336 +504,97 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * Dual-screen role orchestration (docs/SPEC.md §4, Gaming-mode
-     * dual-screen roles — directed after the first live addon session):
-     * when a second display is present and [dev.droidtop.runtime.MainScreen]
-     * says so (the default), the SHELL ITSELF moves to it (the
-     * addon is the upper/main screen) and the built-in screen gets the
-     * widgets panel ([CompanionActivity] — a real Activity, since
-     * `Presentation` can only target non-default displays). The
-     * companion path stays as the real implementation of
-     * the other choice (shell on built-in, widgets on the addon). Launch
-     * ordering under SECOND_WHEN_PRESENT: companion first, then the shell
-     * task moves (singleTask + setLaunchDisplayId relocates this same
-     * instance) — so window focus, and every gamepad event with it, ends
-     * on the shell. Also maintains [LaunchDisplay.targetDisplayId] — the
-     * launcher-wide "games launch on which display" setting. Desktop mode
-     * relocates the same way (§4c, external screen priority) but takes no
-     * part in game launch targeting: its windows are the compositor's.
+     * dual-screen roles — directed after the first live addon session).
+     * The decision logic itself now lives in SecondScreenOrchestrator
+     * (:display, docs/SPEC.md §4/§4c) -- this just wires the two things
+     * only this Activity can supply: itself as SecondScreenHost, and the
+     * LaunchDisplay hooks the orchestrator has no dependency on.
      */
     private fun observeSecondScreen() {
-        val displayOutputs = DisplayOutputRepository(applicationContext)
-        val displayManager = getSystemService(DisplayManager::class.java)
-
         // A game launch also retriggers orchestration (so the widgets
         // Presentation is dismissed off a display a game just went to --
         // Presentation windows layer ABOVE activities on that display).
-        dev.droidtop.library.LaunchDisplay.onLaunched = { roleRefresh.value++ }
+        dev.droidtop.library.LaunchDisplay.onLaunched = { displayOrchestrator.refresh() }
 
         // The mirroring fix (docs/SPEC.md section 4c): before a launch is
         // dispatched, droidtop's idle surface is placed explicitly on any
-        // secondary display the launch would otherwise leave empty. An
-        // empty secondary display MIRRORS the default display -- that is
-        // Android's fallback, and it was the "launching apps mirrors
-        // them" report. The platform's own SECONDARY_HOME placement can't
-        // be relied on for this (it needs the HOME role AND system decor
-        // support on that display), so droidtop places its own. The
-        // covering surface starts BEFORE the game so the game's window
-        // lands last and keeps input focus. Which displays qualify is
-        // pure and unit-tested (DualScreenOrchestration).
+        // secondary display the launch would otherwise leave empty.
         dev.droidtop.library.LaunchDisplay.coverVacatedDisplays = { launchTarget ->
-            val outputs = displayOutputs.currentOutputsSnapshot()
-            val secondaryIds = outputs
-                .filter { it.kind == DisplayOutputKind.SECOND_SCREEN }
-                .map { it.androidDisplayId }
-            val shellDisplayId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                display?.displayId ?: android.view.Display.DEFAULT_DISPLAY
-            } else {
-                @Suppress("DEPRECATION")
-                windowManager.defaultDisplay.displayId
-            }
-            dev.droidtop.runtime.DualScreenOrchestration
-                .displaysNeedingIdleCover(
-                    secondaryDisplayIds = secondaryIds,
-                    launchTargetDisplayId = launchTarget,
-                    shellDisplayId = shellDisplayId,
-                    parkedDisplayId = dev.droidtop.library.LaunchDisplay.parkedDisplayId,
-                )
-                .forEach { displayId ->
-                    runCatching {
-                        startActivity(
-                            Intent(this@MainActivity, dev.droidtop.display.SecondaryDisplayActivity::class.java)
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                            android.app.ActivityOptions.makeBasic()
-                                .setLaunchDisplayId(displayId)
-                                .toBundle(),
-                        )
-                    }.onFailure {
-                        android.util.Log.w("droidtop.MainActivity", "Idle cover on display $displayId refused", it)
-                    }
-                }
+            displayOrchestrator.coverVacatedDisplays(launchTarget)
         }
 
         lifecycleScope.launch {
-            kotlinx.coroutines.flow.combine(
-                displayOutputs.observe(),
-                roleRefresh,
-                // Swapping panels writes a preference and changes nothing
-                // Android reports, so without this the new assignment
-                // would sit unused until some unrelated display event.
-                dev.droidtop.runtime.DisplayArrangement.refresh,
-            ) { outputs, _, arrangement -> outputs to arrangement }
-                .collectLatest { pair ->
-                val (outputs, arrangementSeq) = pair
-                // An explicit swap or reinitialize must actually act: it
-                // leaves the display id set identical, so the check below
-                // would never clear the cooldown for it.
-                if (arrangementSeq != lastArrangementSeq) {
-                    lastArrangementSeq = arrangementSeq
-                    dev.droidtop.library.LaunchDisplay.parkedDisplayId = null
-                    lastRelocationAttemptMs = 0L
-                    relocationAttempts = 0
-                }
-                val displayIds = outputs.map { it.androidDisplayId }.toSet()
-                if (displayIds != lastDisplayIds) {
-                    lastDisplayIds = displayIds
-                    lastRelocationAttemptMs = 0L
-                    relocationAttempts = 0
-                }
-                // A shell left on a display that no longer exists is the
-                // unplug case: Android does not necessarily bring the
-                // activity home by itself, and a shell nobody can see is
-                // indistinguishable from a crash. Come back to the
-                // built-in screen immediately, ahead of any role logic.
-                val currentDisplay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    display?.displayId ?: android.view.Display.DEFAULT_DISPLAY
-                } else {
-                    @Suppress("DEPRECATION")
-                    windowManager.defaultDisplay.displayId
-                }
-                if (currentDisplay != android.view.Display.DEFAULT_DISPLAY && currentDisplay !in displayIds) {
-                    dev.droidtop.library.LaunchDisplay.parkedDisplayId = null
-                    startActivity(
-                        Intent(intent).setClass(this@MainActivity, MainActivity::class.java)
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                        android.app.ActivityOptions.makeBasic()
-                            .setLaunchDisplayId(android.view.Display.DEFAULT_DISPLAY)
-                            .toBundle(),
-                    )
-                    return@collectLatest
-                }
-                val second = outputs.firstOrNull { it.kind == DisplayOutputKind.SECOND_SCREEN }
-                val gaming = mode == Mode.GAMING
-                val desktop = mode == Mode.DESKTOP
-                // Always current, whatever the mode: LaunchDisplay resolves
-                // a remembered "add-on screen" choice through this.
-                dev.droidtop.library.LaunchDisplay.secondDisplayId = second?.androidDisplayId
-                // A display an app was launched onto is PARKED: droidtop
-                // keeps its hands off it entirely (no shell relocation, no
-                // widgets Presentation over the running app) until an
-                // explicit shell entry reclaims it -- the "don't interfere
-                // with apps we've launched" half of the home-press reinit.
-                val parked = dev.droidtop.library.LaunchDisplay.parkedDisplayId
-                val secondAvailable = second != null && second.androidDisplayId != parked
-                // Which panel is the main output: one persisted, relative
-                // choice (MainScreen), flipped by Swap screens and set by
-                // the Main screen row. Read off the main thread -- the
-                // first read loads a preferences file from disk.
-                val mainScreen = withContext(Dispatchers.IO) {
-                    dev.droidtop.runtime.MainScreen.choice(applicationContext)
-                }
-                // Gaming AND Desktop both put the shell on the addon by
-                // default -- the add-on is the better surface and droidtop
-                // treats it as the main output, not an afterthought (per
-                // direction; docs/SPEC.md section 4). Standard stays with
-                // the platform's own Launcher3 secondary-display handling.
-                val wantShellOnSecond = (gaming || desktop) && secondAvailable &&
-                    mainScreen == dev.droidtop.runtime.MainScreenChoice.SECOND_WHEN_PRESENT
-                // Relocation give-up: a display can refuse activity
-                // launches, and after MAX_RELOCATION_ATTEMPTS whole
-                // cooldown windows without the shell actually being on the
-                // addon, fall back to shell-on-built-in with the live
-                // companion covering the addon. Without this, a refusing
-                // addon left the shell built-in AND the addon empty --
-                // which Android renders as a mirror of the built-in panel.
-                val relocationGaveUp = currentDisplay != second?.androidDisplayId &&
-                    dev.droidtop.runtime.DualScreenOrchestration.relocationHasFailed(relocationAttempts)
-                val shellOnSecond = wantShellOnSecond && !relocationGaveUp
-
-                val launchTarget = if (gaming && second != null) DisplayRolePrefs.gameLaunchTarget(this@MainActivity) else null
-                dev.droidtop.library.LaunchDisplay.targetDisplayId = when (launchTarget) {
-                    null, DisplayRolePrefs.GameLaunchTarget.ASK, DisplayRolePrefs.GameLaunchTarget.BUILT_IN -> null
-                    DisplayRolePrefs.GameLaunchTarget.FOLLOW_SHELL ->
-                        if (shellOnSecond) second!!.androidDisplayId else null
-                    DisplayRolePrefs.GameLaunchTarget.SECOND -> second!!.androidDisplayId
-                }
-                // Per direction, ASK is the default: with two displays and
-                // no explicit target, every launch asks which screen via
-                // the shell's chooser (LaunchDisplay.chooser).
-                dev.droidtop.library.LaunchDisplay.askOptions =
-                    if (launchTarget == DisplayRolePrefs.GameLaunchTarget.ASK) {
-                        // Relative first, absolute only as the clarifier
-                        // (docs/SPEC.md section 4c), and the ADD-ON row
-                        // first in both arrangements so the
-                        // default-highlighted choice is the better screen.
-                        // Candidate ordering is pure and unit-tested.
-                        dev.droidtop.runtime.DualScreenOrchestration
-                            .chooserCandidates(second!!.androidDisplayId, shellOnSecond)
-                            .map { dev.droidtop.library.LaunchDisplayOption(it.displayId, it.label) }
-                    } else {
-                        null
-                    }
-
-                // Two surfaces cover the second display (docs/SPEC.md 4c):
-                // :display's SECONDARY_HOME activity is the IDLE one the
-                // platform places while droidtop is not foreground, and
-                // the Presentation below is the LIVE one this foreground
-                // shell owns. SECONDARY_HOME never applies to the DEFAULT
-                // display, so when the addon is the main output the shell
-                // moves there and the built-in gets CompanionActivity.
-                //
-                // Second screen, shell NOT on it: this shell is foreground
-                // on the built-in panel, so it drives the companion
-                // directly as a Presentation. The SECONDARY_HOME activity
-                // stays underneath as the idle surface for when droidtop
-                // is not foreground; this window sits above it while it is.
-                //
-                // No longer gated on `gaming`: Desktop mode wants this
-                // window too, because that is where its second-screen
-                // keyboard and trackpad live (docs/SPEC.md 4, 6c), and the
-                // live window is the one that exists whether or not
-                // droidtop holds the home role.
-                if (!shellOnSecond && second != null && secondAvailable) {
-                    if (secondScreenPresentation?.display?.displayId != second.androidDisplayId) {
-                        secondScreenPresentation?.dismiss()
-                        val display = displayManager.getDisplay(second.androidDisplayId)
-                        secondScreenPresentation = display?.let {
-                            SecondScreenPresentation(applicationContext, it).also { p -> p.show() }
-                        }
-                    }
-                } else {
-                    // No second display, one parked by a launched app (a
-                    // Presentation would layer ABOVE that app), or the
-                    // shell itself lives there.
-                    secondScreenPresentation?.dismiss()
-                    secondScreenPresentation = null
-                }
-
-                if (shellOnSecond && second != null) {
-                        val currentDisplayId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                            display?.displayId ?: android.view.Display.DEFAULT_DISPLAY
-                        } else {
-                            @Suppress("DEPRECATION")
-                            windowManager.defaultDisplay.displayId
-                        }
-                        // ONE relocation attempt per cooldown window --
-                        // confirmed-live relaunch loop this guards: right
-                        // after the relocation startActivity, the
-                        // (re)created instance can still read its display
-                        // as DEFAULT before window attach, see a mismatch
-                        // here, and relaunch again, forever. If relocation
-                        // genuinely didn't take after an attempt (some
-                        // displays refuse activity launches), the shell
-                        // stays where it is instead of looping.
-                        val now = android.os.SystemClock.elapsedRealtime()
-                        if (currentDisplayId == second.androidDisplayId) {
-                            // Relocation verifiably took; the give-up
-                            // counter starts over for this topology.
-                            relocationAttempts = 0
-                        }
-                        if (currentDisplayId != second.androidDisplayId &&
-                            now - lastRelocationAttemptMs > RELOCATION_COOLDOWN_MS
-                        ) {
-                            lastRelocationAttemptMs = now
-                            relocationAttempts++
-                            // Companion FIRST (built-in screen), then move
-                            // this singleTask instance to the addon so the
-                            // shell ends up focused.
-                            // Companion explicitly on the BUILT-IN display:
-                            // startActivity without options launches on the
-                            // CALLER's display, which after relocation is
-                            // the addon -- confirmed live: the companion
-                            // landed behind the shell on the addon and the
-                            // built-in screen kept showing the Standard
-                            // launcher.
-                            // A display is allowed to refuse activity
-                            // launches (SecurityException); that must count
-                            // as a failed attempt and re-run orchestration
-                            // -- with the give-up policy above, that path
-                            // ends at shell-on-built-in with the companion
-                            // covering the addon, never at a crash or a
-                            // mirrored addon.
-                            runCatching {
-                                startActivity(
-                                    Intent(this@MainActivity, CompanionActivity::class.java)
-                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                                    android.app.ActivityOptions.makeBasic()
-                                        .setLaunchDisplayId(android.view.Display.DEFAULT_DISPLAY)
-                                        .toBundle(),
-                                )
-                                startActivity(
-                                    Intent(intent).setClass(this@MainActivity, MainActivity::class.java)
-                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                                    android.app.ActivityOptions.makeBasic()
-                                        .setLaunchDisplayId(second.androidDisplayId)
-                                        .toBundle(),
-                                )
-                            }.onFailure {
-                                android.util.Log.w("droidtop.MainActivity", "Relocation to display ${second.androidDisplayId} refused", it)
-                                // A synchronous refusal is definitive --
-                                // no point burning the remaining attempts.
-                                relocationAttempts = dev.droidtop.runtime.DualScreenOrchestration.MAX_RELOCATION_ATTEMPTS
-                                roleRefresh.value++
-                            }
-                        } else if (currentDisplayId == second.androidDisplayId && !CompanionActivity.visible &&
-                            now - lastRelocationAttemptMs > RELOCATION_COOLDOWN_MS
-                        ) {
-                            // Same cooldown as relocation: the companion's
-                            // visible flag races its own onStart, and an
-                            // unguarded re-assert would ping-pong.
-                            lastRelocationAttemptMs = now
-                            // Already relocated but the built-in screen
-                            // lost/never showed the companion (confirmed
-                            // live: it stayed on Android Settings after
-                            // the shell moved). Re-assert it, then
-                            // re-front this shell so gamepad focus stays
-                            // here, not on the companion.
-                            // Built-in display explicitly -- see the
-                            // relocation branch above for the confirmed
-                            // caller's-display default.
-                            startActivity(
-                                Intent(this@MainActivity, CompanionActivity::class.java)
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                                android.app.ActivityOptions.makeBasic()
-                                    .setLaunchDisplayId(android.view.Display.DEFAULT_DISPLAY)
-                                    .toBundle(),
-                            )
-                            startActivity(
-                                Intent(intent).setClass(this@MainActivity, MainActivity::class.java)
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                            )
-                        }
-                }
-
-                // "Reinitialize displays," made automatic (docs/SPEC.md
-                // section 4c): this pass just decided, with the same
-                // facts the mirroring fix already uses, whether anything
-                // of droidtop's own is actually on the addon --
-                // [secondScreenPresentation] above (or its own idle-cover
-                // Activity underneath it) -- or whether it is a parked
-                // display an app owns on purpose. Published so the pill
-                // (CompanionState.dualScreenBroken, drawn over both
-                // shells below) can tell a person immediately instead of
-                // them noticing a mirror with no idea what to do.
-                CompanionState.dualScreenBroken.value =
-                    dev.droidtop.runtime.DualScreenOrchestration.secondScreenNeedsReinit(
-                        secondDisplayId = second?.androidDisplayId,
-                        parkedDisplayId = parked,
-                        shellOnSecond = shellOnSecond,
-                        presentationDisplayId = secondScreenPresentation?.display?.displayId,
-                        idleCoverDisplayId = dev.droidtop.display.SecondaryDisplayActivity.resumedDisplayId,
-                    )
-            }
+            displayOrchestrator.observe()
         }
+    }
+
+    // --- SecondScreenHost: the handful of decisions SecondScreenOrchestrator
+    // needs this Activity for, because they are genuinely Activity-only
+    // (its own current display) or :app-only (CompanionActivity, LaunchDisplay). ---
+
+    override fun currentDisplayId(): Int =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            display?.displayId ?: android.view.Display.DEFAULT_DISPLAY
+        } else {
+            @Suppress("DEPRECATION")
+            windowManager.defaultDisplay.displayId
+        }
+
+    override fun activityMode(): Mode? = mode
+
+    override fun parkedDisplayId(): Int? = dev.droidtop.library.LaunchDisplay.parkedDisplayId
+
+    override fun clearParkedDisplayId() {
+        dev.droidtop.library.LaunchDisplay.parkedDisplayId = null
+    }
+
+    override fun publishLaunchTargeting(
+        secondDisplayId: Int?,
+        targetDisplayId: Int?,
+        askOptions: List<DualScreenOrchestration.ChooserCandidate>?,
+    ) {
+        dev.droidtop.library.LaunchDisplay.secondDisplayId = secondDisplayId
+        dev.droidtop.library.LaunchDisplay.targetDisplayId = targetDisplayId
+        // Relative first, absolute only as the clarifier (docs/SPEC.md
+        // section 4c), and the ADD-ON row first in both arrangements so
+        // the default-highlighted choice is the better screen -- candidate
+        // ordering itself is pure and unit-tested (DualScreenOrchestration).
+        dev.droidtop.library.LaunchDisplay.askOptions = askOptions?.map {
+            dev.droidtop.library.LaunchDisplayOption(it.displayId, it.label)
+        }
+    }
+
+    override fun relaunchOnDisplay(displayId: Int) {
+        startActivity(
+            Intent(intent).setClass(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            android.app.ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle(),
+        )
+    }
+
+    override fun bringSelfForward() {
+        startActivity(
+            Intent(intent).setClass(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+
+    // Companion explicitly on the BUILT-IN display: startActivity without
+    // options launches on the CALLER's display, which after relocation is
+    // the addon -- confirmed live: the companion landed behind the shell
+    // on the addon and the built-in screen kept showing the Standard
+    // launcher.
+    override fun startCompanionOnBuiltIn() {
+        startActivity(
+            Intent(this, CompanionActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            android.app.ActivityOptions.makeBasic()
+                .setLaunchDisplayId(android.view.Display.DEFAULT_DISPLAY)
+                .toBundle(),
+        )
+    }
+
+    override fun companionVisible(): Boolean = CompanionActivity.visible
+
+    override fun setDualScreenBroken(broken: Boolean) {
+        CompanionState.dualScreenBroken.value = broken
     }
 
     /**
@@ -905,94 +608,36 @@ class MainActivity : AppCompatActivity() {
      */
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
-        lastRelocationAttemptMs = 0L
-        relocationAttempts = 0
-        roleRefresh.value++
+        displayOrchestrator.onConfigurationChanged()
     }
 
     override fun onStop() {
         super.onStop()
-        // The live companion Presentation lives on its OWN Display and
-        // keeps rendering regardless of this Activity's own foreground
-        // state (it is a WindowManager window, not something tied to
-        // this Activity's visibility) -- it only needs tearing down when
-        // whatever just took over foreground IS that same display, which
-        // would otherwise sit underneath the Presentation's window.
-        //
-        // This used to dismiss the Presentation on EVERY onStop
-        // unconditionally, then reassert droidtop's idle cover Activity
-        // there unless a launch had parked onto that same display --
-        // meaning a game launched onto a DIFFERENT display (e.g. "Games
-        // launch on: Same display as the shell", the common case) still
-        // tore the companion down and re-launched SecondaryDisplayActivity
-        // in its place, racing that unrelated cross-display
-        // dismiss+startActivity pair against the just-launched game's own
-        // surface/EGL setup at the exact moment it matters most.
-        // Root-caused live (rig, p1-dt-n64-black-screen-hang): launching
-        // an N64 ROM (RetroArch, built-in display, matching the shell's
-        // own) both fell the companion back to the bare system
-        // SecondaryDisplayLauncher (this reassertion racing and losing)
-        // and hung the game's own surface for 45s+ into an ANR -- not a
-        // RetroArch/mupen64plus_next defect, since the same core launched
-        // directly from RetroArch's own UI (bypassing this path entirely)
-        // does not reproduce it.
-        val presentation = secondScreenPresentation
-        val presentationDisplayId = presentation?.display?.displayId
-        // The other real reason to tear this down: MainActivity itself is
-        // leaving its mode, not merely losing foreground to a launched
-        // game -- Home pressed to Standard/Alternative, or a mode switch.
-        // HomeTrampolineActivity/AlternativeLauncherActivity/BackButtonMenu
-        // all update Modes.lastMode BEFORE this Activity's onStop runs
-        // (the new foreground Activity's own onCreate always precedes the
-        // old one's onStop in Android's transition order), so comparing
-        // it against the mode THIS instance was showing tells the two
-        // cases apart without this class needing to know why it stopped.
+        // The other real reason to tear the companion down: MainActivity
+        // itself is leaving its mode, not merely losing foreground to a
+        // launched game -- Home pressed to Standard/Alternative, or a mode
+        // switch. HomeTrampolineActivity/AlternativeLauncherActivity/
+        // BackButtonMenu all update Modes.lastMode BEFORE this Activity's
+        // onStop runs (the new foreground Activity's own onCreate always
+        // precedes the old one's onStop in Android's transition order), so
+        // comparing it against the mode THIS instance was showing tells
+        // the two cases apart without SecondScreenOrchestrator needing to
+        // know why it stopped.
         val modeDeparted = mode != null && Modes.lastMode(this) != mode?.id
-        if (presentation != null && presentationDisplayId != null &&
-            (presentationDisplayId == dev.droidtop.library.LaunchDisplay.parkedDisplayId || modeDeparted)
-        ) {
-            // The just-launched app parked onto the SAME display as the
-            // companion, or the mode itself is going away: either way the
-            // companion has to come down, and the display must not be
-            // left EMPTY (an empty secondary display mirrors the default
-            // one) -- the idle surface is asserted there first,
-            // best-effort; this Activity is still visible during onStop,
-            // and a refusal is logged, never fatal.
-            runCatching {
-                startActivity(
-                    Intent(this, dev.droidtop.display.SecondaryDisplayActivity::class.java)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                    android.app.ActivityOptions.makeBasic()
-                        .setLaunchDisplayId(presentationDisplayId)
-                        .toBundle(),
-                )
-            }.onFailure {
-                android.util.Log.w("droidtop.MainActivity", "Idle cover on display $presentationDisplayId refused at onStop", it)
-            }
-            presentation.dismiss()
-            secondScreenPresentation = null
-        }
-        secondScreenHealthCheckJob?.cancel()
-        secondScreenHealthCheckJob = null
-        CompanionState.dualScreenBroken.value = false
+        displayOrchestrator.onActivityStop(modeDeparted)
     }
 
     override fun onStart() {
         super.onStart()
         // Coming back to the foreground re-asserts the live companion,
-        // through the same orchestration pass everything else uses.
-        roleRefresh.value++
-        secondScreenHealthCheckJob = lifecycleScope.launch {
-            while (true) {
-                kotlinx.coroutines.delay(SECOND_SCREEN_HEALTH_CHECK_MS)
-                roleRefresh.value++
-            }
-        }
+        // through the same orchestration pass everything else uses, and
+        // restarts the "an app on the addon exited on its own" health
+        // check (see SecondScreenOrchestrator.onActivityStart).
+        displayOrchestrator.onActivityStart(lifecycleScope)
     }
 
     override fun onDestroy() {
-        secondScreenPresentation?.dismiss()
-        secondScreenPresentation = null
+        displayOrchestrator.onActivityDestroy()
         // The companion's launch seam captures this instance's scope and
         // library; a destroyed Activity must not be reachable through it.
         // Identity-guarded: the relocation flow creates the NEW instance

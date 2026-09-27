@@ -34,7 +34,7 @@ class SecondaryDisplayActivity : ComponentActivity() {
          * Which display this idle SECONDARY_HOME surface is actually
          * resumed on right now -- read by
          * [dev.droidtop.runtime.DualScreenOrchestration.secondScreenNeedsReinit]
-         * alongside [dev.droidtop.app.SecondScreenPresentation]'s own
+         * alongside [SecondScreenPresentation]'s own
          * `display` to tell "the addon has droidtop's idle cover on it"
          * from "nothing of ours is there," the same way
          * `CompanionActivity.visible` already does for the built-in

@@ -80,7 +80,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * :display's SecondaryDisplayActivity on the addon when the shell
  * stays built-in).
  * A process-wide flow rather than a field on either host, since which
- * host exists changes with [DisplayRolePrefs] + live display attach.
+ * host exists changes with [dev.droidtop.display.DisplayRolePrefs] + live display attach.
  */
 object CompanionState {
     val focusedEntry = MutableStateFlow<LibraryEntry?>(null)
