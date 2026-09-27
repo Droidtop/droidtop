@@ -178,6 +178,29 @@ class PluginRuntimeService : Service() {
 
         override fun invoke(pluginId: String, capability: String, argsJson: String): String? {
             val plugin = loaded[pluginId] ?: return null
+            // PluginEvent ids and PluginCapability ids share this one
+            // AIDL string slot on purpose (docs/SPEC.md 12a "Event
+            // hooks"): both are "JSON in, JSON out, one watchdog-bound
+            // call" already, and events are droidtop calling OUT rather
+            // than a plugin capability droidtop calls INTO, so they need
+            // no new binder method -- only a different id namespace and
+            // a different plugin-side handler ([DroidtopPlugin.onEvent]
+            // instead of [DroidtopPlugin.invoke]). Checked first since
+            // the two id sets are disjoint by construction (PluginEvent's
+            // ids are never also PluginCapability ids).
+            val event = PluginEvent.fromId(capability)
+            if (event != null) {
+                return try {
+                    val argsMap = buildMap<String, String> {
+                        val obj = JSONObject(argsJson)
+                        obj.keys().forEach { key -> put(key, obj.optString(key)) }
+                    }
+                    encode(plugin.onEvent(event, PluginArgs(argsMap)))
+                } catch (t: Throwable) {
+                    reportCrash(pluginId, capability, t.message ?: t::class.java.simpleName)
+                    null
+                }
+            }
             val cap = PluginCapability.fromId(capability) ?: return null
             return try {
                 val argsMap = buildMap<String, String> {

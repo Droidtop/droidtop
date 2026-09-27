@@ -1,0 +1,61 @@
+package dev.droidtop.pluginhost
+
+/**
+ * Something droidtop itself did that an approved plugin may care about --
+ * the OUTGOING half of the plugin API (docs/SPEC.md 12a "Event hooks"),
+ * mirror image of [PluginCapability] (the incoming half: what droidtop
+ * calls a plugin FOR). A closed set, same reasoning as
+ * [PluginCapability]: droidtop only ever fires an event it actually
+ * defines here, and only to a plugin that declared it wants that event
+ * ([PluginManifest.subscribedEvents]) -- there is no ambient "tell me
+ * about everything" subscription.
+ *
+ * Versioned separately from [PLUGIN_CONTRACT_VERSION] ([PLUGIN_EVENT_CONTRACT_VERSION])
+ * because the event set can grow independently of the capability/API
+ * surface -- adding a new event never changes what [DroidtopPlugin.invoke]
+ * or [PluginContext] mean, and a plugin that doesn't know about a newer
+ * event id simply never subscribes to it (an unrecognised id in
+ * [PluginManifest.subscribedEvents] is silently never matched, not a
+ * validation failure -- see [PluginManifest.structuralProblems]).
+ */
+enum class PluginEvent(val id: String, val display: String) {
+    /**
+     * Fired after [dev.droidtop.library.consoles.PlayerOverridePrefs.set]
+     * (or the "first installed" default resolving to a different player)
+     * changes which player/emulator/core is the default for one console
+     * system. This is the real, cited need that drove building the event
+     * mechanism at all (docs/SPEC.md 12a): a RetroArch-manager-shaped
+     * plugin wants to know "the user just picked me as SNES's player, is
+     * the core I'd launch with actually downloaded yet" without polling.
+     *
+     * Args (all plain strings, [PluginArgs]): `systemId`, `systemName`,
+     * `playerId`, `playerName`, `playerPackage` (empty when the chosen
+     * player has no package, e.g. a bare am-start template), `core`
+     * (the system's own configured core short name, e.g.
+     * [dev.droidtop.library.consoles.ConsoleSystemDef.retroArchCore] --
+     * empty when the system declares none).
+     *
+     * A plugin's [DroidtopPlugin.onEvent] answer may ask droidtop to
+     * start a job in response: returning [PluginResult.success] with a
+     * `startJob` value set to a [PluginCapability.id] and a `job` value
+     * naming the job (both plugin-defined; droidtop passes the REST of
+     * the returned values straight through as that job's own args) makes
+     * the caller ([dev.droidtop.library.integrations.PluginEventBus])
+     * turn around and call [dev.droidtop.pluginhost.PluginCrashPolicy.startJob]
+     * with exactly those args, tracked in [PluginJobsCenter] like any
+     * other job. A plugin that has nothing to do returns
+     * `PluginResult.success()` with no `startJob` key -- the default
+     * [DroidtopPlugin.onEvent] implementation already does this, so a
+     * plugin that never overrides it is simply never affected by any
+     * event it happens to subscribe to.
+     */
+    DEFAULT_PLAYER_CHANGED("default_player_changed", "Default player/core changed"),
+    ;
+
+    companion object {
+        fun fromId(id: String): PluginEvent? = entries.firstOrNull { it.id == id.trim().lowercase() }
+    }
+}
+
+/** The event contract version this build of droidtop speaks -- see [PluginEvent]'s own doc comment for why this is separate from [PLUGIN_CONTRACT_VERSION]. */
+const val PLUGIN_EVENT_CONTRACT_VERSION = 1
