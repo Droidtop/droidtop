@@ -65,6 +65,22 @@ class GamepadSwapTest {
     }
 
     @Test
+    fun `Page Up and Page Down are the keyboard's own L1 R1`() {
+        // The top bar can never take real D-pad focus any more
+        // (GamepadShell's SectionTabBar), so a keyboard-only session needs
+        // a route to the shoulder buttons that switch Games/Apps/Settings
+        // that isn't "click the tab" (owner, 2026-09-27).
+        assertEquals(GamepadAction.L, GamepadKeyMap.actionFor(Key.PageUp))
+        assertEquals(GamepadAction.R, GamepadKeyMap.actionFor(Key.PageDown))
+    }
+
+    @Test
+    fun `the face-button swap never touches Page Up or Page Down`() = withSwap(true) {
+        assertEquals(GamepadAction.L, GamepadKeyMap.actionFor(Key.PageUp))
+        assertEquals(GamepadAction.R, GamepadKeyMap.actionFor(Key.PageDown))
+    }
+
+    @Test
     fun `a press is named by where it is on the pad, never by what it means`() {
         assertEquals("the bottom face button", GamepadKeyMap.positionName(Key.ButtonA))
         withSwap(true) {

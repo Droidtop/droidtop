@@ -2,6 +2,7 @@ package dev.droidtop.shell.gamepad
 
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -427,6 +428,9 @@ fun GamepadShell(
             dispatchLaunch(entry)
         }
     }
+    // Anchor for [requestFocusWhenAttached] below -- attached to the
+    // invisible Spacer in the content Box, never to the tab bar (owner,
+    // 2026-09-27: the top bar must never be a D-pad focus target).
     val tabBarFocus = remember { FocusRequester() }
     // Where an unhandled B goes: the same dispatcher every BackHandler in
     // this shell registers on (see Modifier.ownPadButtons).
@@ -501,11 +505,12 @@ fun GamepadShell(
     // there is no focused node to bubble from, so those handlers silently
     // never fire. Confirmed as the real cause of a reported "L1/R1 doesn't
     // do anything" -- landing on the default Games tab with an empty
-    // library left nothing focused. Grabbing focus onto the tab bar itself
-    // on first composition guarantees a valid focus target always exists;
-    // GamesSection/AppsSection still steal focus onto real content once it
-    // loads, same as before.
-    LaunchedEffect(Unit) { tabBarFocus.requestFocus() }
+    // library left nothing focused. Grabbing focus onto the invisible
+    // anchor Spacer in the content Box (never the tab bar -- see its own
+    // comment, owner 2026-09-27) on first composition guarantees a valid
+    // focus target always exists; GamesSection/AppsSection still steal
+    // focus onto real content once it loads, same as before.
+    LaunchedEffect(Unit) { requestFocusWhenAttached(tabBarFocus, "Shell anchor") }
 
     // Outermost back swallow: droidtop is the HOME surface -- system back
     // (which this hardware's B button doubles as) at the shell's top level
@@ -669,7 +674,6 @@ fun GamepadShell(
             SectionTabBar(
                 current = section,
                 onSelect = selectSection,
-                currentTabFocus = tabBarFocus,
                 onQuickMenu = { quickMenuOpen = true },
                 sections = sectionsFor(uiMode),
             )
@@ -765,6 +769,16 @@ fun GamepadShell(
             )
         }
         Box(modifier = Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
+            // A zero-size, invisible focus anchor -- not the top bar
+            // (owner, 2026-09-27: the top bar itself must never be a
+            // D-pad focus target). Real content steals focus the
+            // moment it has any (GamesSection/AppsSection/etc. each
+            // call requestFocusWhenAttached on their own first row);
+            // this exists only so L1/R1/Page Up/Page Down still fire
+            // on the very first frame or a genuinely empty library,
+            // where nothing else has focus yet to bubble the key
+            // event up from (see tabBarFocus's own comment).
+            Spacer(Modifier.size(0.dp).focusRequester(tabBarFocus).focusable())
             // ONE transition for every screen the shell itself draws.
             // Opening a game's detail out of a themed gamelist used to be
             // a cut straight into droidtop's own chrome, while moving
@@ -1322,7 +1336,6 @@ private val GAME_KINDS = LibraryKinds.GAMES
 private fun SectionTabBar(
     current: GamingSection,
     onSelect: (GamingSection) -> Unit,
-    currentTabFocus: FocusRequester,
     onQuickMenu: () -> Unit,
     sections: List<GamingSection> = GamingSection.entries,
 ) {
@@ -1356,39 +1369,31 @@ private fun SectionTabBar(
         ) {
             sections.forEach { entrySection ->
                 val isCurrent = entrySection == current
-                var focused by remember { mutableStateOf(false) }
                 Text(
                     text = entrySection.displayName(),
                     color = if (isCurrent) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = (if (isCurrent) Modifier.focusRequester(currentTabFocus) else Modifier)
+                    modifier = Modifier
                         .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
-                        .onFocusChanged { focused = it.isFocused }
-                        // Ahead of the focus targets, not after them: see
-                        // [GameCard].
-                        .onKeyEvent { event ->
-                            if (event.type == KeyEventType.KeyUp &&
-                                GamepadKeyMap.actionFor(event.key) == GamepadAction.A
-                            ) {
-                                onSelect(entrySection)
-                                true
-                            } else {
-                                false
-                            }
-                        }
-                        .focusable()
-                        // Same real touch-input fix as GameCard -- see its own
-                        // comment. This is the top-level Games/Apps/Settings
-                        // tab bar, the very first thing a user taps.
+                        // Deliberately NOT focusable (owner, 2026-09-27:
+                        // "the D-pad must NEVER be able to reach the top
+                        // bar"). Before this, Compose's own default 2D
+                        // focus search could land Up here from the first
+                        // row of a themed carousel or grid -- reachable
+                        // ONLY by touch (this clickable) or by L1/R1/Page
+                        // Up/Page Down (selectSection, in the shell's own
+                        // onKeyEvent), never by directional search. No
+                        // focus ring is possible here any more, so the
+                        // current tab keeps only its raised fill.
                         .clickable(onClick = { onSelect(entrySection) })
-                        // The one selection idiom: the ring only while the
-                        // pad is on the tab; the section you are in keeps
-                        // the raised fill so it reads as current from
-                        // anywhere below it.
-                        .selectionFrame(
-                            selected = focused,
-                            shape = RoundedCornerShape(50),
-                            rest = if (isCurrent) MenuTokens.SurfaceSelected else Color.Transparent,
+                        .then(
+                            if (isCurrent) {
+                                Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(MenuTokens.SurfaceSelected)
+                            } else {
+                                Modifier
+                            },
                         )
                         .padding(horizontal = 14.dp, vertical = 6.dp),
                 )

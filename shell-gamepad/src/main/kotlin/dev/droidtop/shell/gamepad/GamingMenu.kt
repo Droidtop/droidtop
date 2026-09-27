@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -255,10 +257,28 @@ internal fun MenuRow(
     onAdjust: ((Int) -> Unit)? = null,
 ) {
     val window = LocalShellWindow.current
+    // Real bug this fixes (owner, 2026-09-27): every menu built from
+    // MenuPanel/MenuRow (Quick Menu, Settings, and PcGameMenu's L2 game
+    // options) drives its own virtual cursor -- `selected` here, not real
+    // Compose focus (see e.g. PcGameMenu's own onKey/focusIndex) -- so
+    // Up/Down moving that cursor past the visible viewport changed which
+    // row was selected without ever scrolling MenuPanel's own
+    // verticalScroll Column to show it. A menu longer than one screenful
+    // (PcGameMenu's Runs with/Play/Engine/F95zone thread/Manage install/
+    // Saves/Controls/Engine settings/ProtonDB/Lutris import/same-game
+    // merge/versions/Stores and folders list, reported "inaccessible")
+    // silently stopped responding to Down the moment the selection walked
+    // off the bottom edge. BringIntoViewRequester is the real fix, once,
+    // here, rather than in every menu that uses this row: any scrollable
+    // ancestor (MenuPanel's Column) is asked to scroll this row into view
+    // exactly when it becomes the selected one.
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    LaunchedEffect(selected) { if (selected) bringIntoViewRequester.bringIntoView() }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
+            .bringIntoViewRequester(bringIntoViewRequester)
             // The one height rule, plus a touch target where fingers are
             // the input: a 56dp row is uniform everywhere, and on a
             // touch-first window it is at least one touch target tall.
