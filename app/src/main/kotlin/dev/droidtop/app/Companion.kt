@@ -154,13 +154,14 @@ internal fun settledFocusedEntry(): LibraryEntry? {
 private const val FOCUS_SETTLE_MS = 350L
 
 @Composable
-internal fun CompanionContent(entry: LibraryEntry?) {
+internal fun CompanionContent(entry: LibraryEntry?, topInset: androidx.compose.ui.unit.Dp = 0.dp) {
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         // Nothing focused: a slow rotation of the user's own library
         // artwork (docs/SPEC.md section 4d, from iiSU's "Show Hero on Idle
         // Bottom Screen"). This used to paint a "droidtop" wordmark, which
         // is the one thing a glanceable surface must never do: occupy a
-        // whole panel and say nothing.
+        // whole panel and say nothing. Its own caption sits at the
+        // bottom already (CompanionIdle), clear of [topInset].
         if (entry == null) {
             val entries by CompanionState.libraryEntries.collectAsState()
             CompanionIdle(entries)
@@ -175,8 +176,16 @@ internal fun CompanionContent(entry: LibraryEntry?) {
         // rather than filling the backdrop, which stays this panel's
         // ambient art (idle rotation) rather than a second copy of
         // the shell's own hero art.
+        //
+        // [topInset] is the measured height of the foreground status
+        // bar / notifications / "Continue playing" rail block
+        // (CompanionSurface), so this Row's own title/description text
+        // never draws underneath it -- found overlapping it directly on
+        // the console (rig, p1-dt-companion-text-overlap): this panel is
+        // the background layer by direction, but "background" never
+        // meant "drawn under other text".
         Row(
-            modifier = Modifier.fillMaxSize().padding(48.dp),
+            modifier = Modifier.fillMaxSize().padding(top = topInset + 48.dp, start = 48.dp, end = 48.dp, bottom = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(40.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

@@ -2880,7 +2880,10 @@ Top to bottom, each layer earning its space:
   calm, and an explicit way to show more.
 - **Yield completely.** When a game or app owns that panel, the companion
   is gone — not layered over it. This is already why a launched display is
-  parked (§4c) and why the Presentation is dismissed on `onStop`.
+  parked (§4c) and why the Presentation is dismissed on `onStop` when a
+  launch parks onto the SAME display the companion is on (§4c, "An N64
+  launch, root-caused") — never on an unrelated display change, which
+  the companion has no reason to react to at all.
 - **Never a placeholder.** An idle companion shows something real or
   shows the ground. A wordmark on a black rectangle is the bug this
   section exists to close.
@@ -2950,6 +2953,43 @@ owner's own rule against fabricated content rules out inventing one for this pas
 
 All three are real, scoped gaps for a follow-up pass, not oversights folded into this
 one -- each needs its own real data source before it can honestly appear here at all.
+
+### Layout overlap and a duplicate rail entry, fixed (rig, 2026-09-27)
+
+Reproduced live (p1-dt-companion-text-overlap): with a game's detail open on the built-in
+screen, the addon's description paragraph was drawn directly across the "Continue
+playing" thumbnail row, illegible where the two crossed, and the same game ("Glover
+(USA)") appeared twice in that rail at once.
+
+The overlap was a real layout bug, not a data one: `CompanionSurface` stacks
+`CompanionContent` (the focused-entry text, full-screen, vertically centred -- "the
+BACKGROUND layer" by direction) UNDER a foreground `Column` (status bar, notifications,
+the rail) in a plain `Box`, and neither composable knew the other's size -- "background"
+never meant "drawn under other text". `CompanionSurface` now measures the foreground
+block's real height (`Modifier.onSizeChanged`, since notifications and the rail can vary
+it) and `CompanionContent` takes that as a `topInset`, so its own title/description Row
+never draws above where the foreground block ends. The foreground block also gained a
+real scrim (`MaterialTheme.colorScheme.background` at partial alpha, existing theme
+tokens, no new art) behind the status bar/notifications/rail, since the same rig review
+read live Android notifications rendered there as unstyled system clutter -- they already
+draw through droidtop's own themed row (`CompanionNotifications`: `Text` + a "Dismiss"
+button, never the system's own notification view), what was missing was a surface of
+their own to sit on.
+
+The duplicate rail entry was `CompanionRecents` trusting every id in
+`CompanionState.libraryEntries` to be unique per game, which is not guaranteed while a
+rescan is settling an entry's id (the exact class of problem
+`PlayHistoryDatabase.moveTo` exists to reconcile once it has). The rail -- sorted by
+recency and shown to the user directly -- now dedupes defensively rather than assuming
+the feed already has: first by `id` (a literal duplicate), then by
+`title + systemId` (two ids, one game), keeping the more-recently-played of a pair since
+the list is already recency-sorted at that point.
+
+**Needs a rig check**: open a game's detail view on the built-in screen with a second
+display attached and confirm the addon's description text no longer crosses the
+"Continue playing" row at any point, that notifications/status/rail read as one droidtop
+surface rather than loose text over the art, and that no game appears twice in the rail
+across a normal browsing session.
 
 ### Browsing/idle status strip: what is real today, what still is not
 

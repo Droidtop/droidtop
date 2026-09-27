@@ -2,17 +2,24 @@ package dev.droidtop.app
 
 import android.appwidget.AppWidgetHost
 import android.appwidget.AppWidgetManager
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -54,11 +61,35 @@ fun CompanionSurface(
     controls: (@Composable () -> Unit)? = null,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
+        val density = LocalDensity.current
+        // The status bar / notifications / "Continue playing" rail sit
+        // above the focused-game info as their own measured block, so
+        // CompanionContent can reserve exactly that much top space and
+        // never draw its title/description text underneath them (rig,
+        // p1-dt-companion-text-overlap: they overlapped directly on the
+        // console because neither composable knew the other's size).
+        var topBlockHeightPx by remember { mutableStateOf(0) }
         // droidtop's own focused-game info stays the BACKGROUND layer;
         // everything else composites above it (per direction).
-        CompanionContent(entry)
-        val density = LocalDensity.current
-        Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+        CompanionContent(entry, topInset = with(density) { topBlockHeightPx.toDp() })
+        Column(
+            modifier = Modifier.fillMaxWidth()
+                .onSizeChanged { topBlockHeightPx = it.height }
+                // A real scrim, not raw text over the backdrop art: the
+                // owner's own notification finding (rig,
+                // p1-dt-companion-text-overlap) read live Android
+                // notifications here as unstyled system clutter laid over
+                // the art. They already draw through droidtop's own row
+                // (CompanionNotifications, themed text + Dismiss button,
+                // not the system's own notification view) -- what was
+                // missing was a surface of their own to sit on, the same
+                // one the clock/status row and the rail already share.
+                .background(
+                    MaterialTheme.colorScheme.background.copy(alpha = 0.72f),
+                    RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
+                )
+                .padding(24.dp),
+        ) {
             // Status + controls bar, always the first row -- the companion
             // is the glanceable screen, and "is my Wi-Fi ok / how much
             // battery" is the glance.
@@ -70,6 +101,15 @@ fun CompanionSurface(
             // Continue-playing rail: tap a recent game to launch it,
             // through the one real launch path -- see CompanionRecents.
             CompanionRecents()
+        }
+        // Starts exactly where the measured block above ends (that
+        // block already carries its own 24dp top padding) -- not a
+        // second 24dp gap stacked under it.
+        Column(
+            modifier = Modifier.fillMaxSize()
+                .padding(start = 24.dp, end = 24.dp, bottom = 24.dp)
+                .padding(top = with(density) { topBlockHeightPx.toDp() }),
+        ) {
             widgetIds.forEach { widgetId ->
                 val info = widgetManager.getAppWidgetInfo(widgetId)
                 if (info != null) {

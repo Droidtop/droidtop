@@ -48,6 +48,18 @@ internal fun CompanionRecents() {
     val recents = remember(entries) {
         entries.filter { it.lastPlayedEpochMs != null }
             .sortedByDescending { it.lastPlayedEpochMs }
+            // Real, reported bug (rig, p1-dt-companion-text-overlap): the
+            // same game showed twice in this rail. A rescan can hand back
+            // two LibraryEntry ids for one game while its id is settling
+            // (the exact case PlayHistoryDatabase.moveTo exists to
+            // reconcile once it does), so this rail -- sorted by recency,
+            // shown to the user directly -- dedupes defensively rather
+            // than trusting every id in the feed to be unique per game:
+            // first by id (a literal duplicate), then by title+system
+            // (two ids, one game), keeping the more-recently-played of
+            // each pair since the list is already sorted that way.
+            .distinctBy { it.id }
+            .distinctBy { it.title.trim().lowercase() to it.systemId }
             .take(MAX_RECENTS)
     }
     if (recents.isEmpty()) return
