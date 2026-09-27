@@ -2866,9 +2866,21 @@ Behavior is unchanged -- this is a move, not a redesign: explicit launch-display
 the Standard second screen (via `reassertSecondaryDisplays`, untouched), the Alternative
 forwarder, and `reassertSecondaryDisplays` itself all keep working exactly as before.
 
-**Needs a rig check** (emulator-5560, fake second display via
-`settings put global overlay_display_devices`): Gaming, Standard and Desktop second screens,
-plus a game launch, to confirm the move introduced no behavior change.
+**Rig-checked (emulator-5560, 2026-09-27)**, fake second display via
+`settings put global overlay_display_devices 1280x800/213`: with `MainScreen` at its default
+(`SECOND_WHEN_PRESENT`), a Gaming-mode launch relocated `MainActivity` onto the overlay display
+and started `CompanionActivity` on the built-in one; a Desktop-mode launch did the same
+(`DesktopSessionService` itself then failed for an unrelated, pre-existing reason -- no desktop
+image configured on the test install -- which does not touch the orchestrator). No crash, no
+`SecurityException`/relocation-refused log line, in either mode. Standard mode was NOT
+re-verified through this path: `MainActivity` is not how Standard mode actually runs (the real
+Standard home is `com.android.launcher3.Launcher`/`HomeTrampolineActivity`, whose second screen
+goes through the untouched `reassertSecondaryDisplays`, not `SecondScreenOrchestrator`), so
+launching `MainActivity` directly with a `standard` mode extra -- which this Activity itself
+only ever draws as a blank screen for -- exercises no code this change moved. A live game
+launch (the `coverVacatedDisplays` idle-cover path) was not exercised live this pass; it is
+unchanged code moved verbatim and worth a follow-up device-queue item rather than blocking on it
+here.
 
 ## 4d. The companion screen, designed (research 2026-09-01)
 
