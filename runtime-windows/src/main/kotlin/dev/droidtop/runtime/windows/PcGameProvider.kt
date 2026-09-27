@@ -372,6 +372,6 @@ class PcGameProvider(
     }
 
     private companion object {
-        val STORE_ID_PREFIXES = setOf("steam", "gog", "epic", "amazon", "folder")
+        val STORE_ID_PREFIXES = setOf("steam", "gog", "epic", "amazon", "itch", "folder")
     }
 }
