@@ -7126,6 +7126,12 @@ name is no system's gets one only by the person's choice: "Choose a system
 for another folder" marks it Not set (`SystemOverridePrefs.NOT_SET`), and
 the system chosen on its page counts wherever the folder sits.
 
+**Fixed (H6): the Console systems page now classifies folders.** A folder
+that is a PC store root (Steam, GOG, etc.) or contains engine games shows
+"Steam (PC games, detected per game: N games)" or "Engine games (detected
+per game: N games)" with no system picker. Only folders that are truly
+unrecognized ROM folders show "Not set" and offer the system picker.
+
 **A time limit belongs to the unit of work it can bound, which is one
 folder's own step.** The whole-provider timeouts (60 s streaming, 15 s not) are gone,
 and what replaces them is `ScanBudget`: per folder, and checked *inside*
