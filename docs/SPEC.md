@@ -4275,6 +4275,8 @@ Onboarding is one scaffold, not a set of unrelated screens. The scaffold owns:
   nothing focused; the window owns the pad (`ownPadButtons`), so B is Back; and
   a hint row (A Select, B Back) is the touch route to both. On the rig, A did nothing on Welcome, no
   focus showed anywhere, and D-pad Down went up to Back (dq-coordinator-24).
+  **Fixed:** `ownPadButtons` now only consumes B; A reaches the focused element via
+  `padSelectable`, so hint-bar taps work like real pad presses.
 - **Back**, always available, stepping back through the path actually taken. System Back
   is the same control. Leaving onboarding is a deliberate act with a confirmation — never
   one Back press, which today drops to the system home.
@@ -8153,8 +8155,11 @@ Every screen here acts on the UP edge, so the unhandled DOWN of A on a card
 became a DPAD_CENTER pair that pressed the primary button of the detail the
 A had just opened (build 552). The outermost node of every window
 (`Modifier.ownPadButtons`: the shell's root, the Quick Menu's dialog)
-consumes every pad button nothing below it wanted and gives B its one
-meaning explicitly, the back dispatcher. A `BackHandler` is therefore a
+consumes only the one fallback the shell means — B is Back — and gives B
+its one meaning explicitly, the back dispatcher. Other gamepad buttons are
+not consumed at the root; they either reach the focused element (which
+handles A via `padSelectable`) or fall through to Android's default
+handling, exactly like a physical pad press. A `BackHandler` is therefore a
 complete answer to B for pad and touch alike -- a hint pill dispatches a
 real `BUTTON_B` into the window and it arrives at the root exactly as a
 pad's does -- and a screen with nothing focusable (an empty list) must have
@@ -8168,14 +8173,16 @@ key-input modifiers between the ACTIVE focus target and the root:
 in the same chain (compose ui 1.7.2). `Modifier.clickable` delegates a
 `FocusableNode` of its own, so in `.focusable().clickable { }
 .onKeyEvent { }` the handler is behind a focus target and is never
-dispatched at all -- only ancestors get the event. What hides it is
+dispatched at all -- only ancestors get the event. What hid it was
 Android's own key-character-map fallback: an unhandled `BUTTON_A` is
 re-sent as `DPAD_CENTER` (`Generic.kcm`), which `clickable` treats as a
-click, so A appears to work through the click path while every other
-action written the same way (X for favourite, Y for a detail) is dead,
+click, so A appeared to work through the click path while every other
+action written the same way (X for favourite, Y for a detail) was dead,
 and every hint-bar tap -- a direct `dispatchKeyEvent`, which gets no
-fallback -- does nothing (rig, build 548: the PC grid's own `A Open` hint
-inert while `B` and `Y`, handled on ancestors, worked).
+fallback -- did nothing (rig, build 548: the PC grid's own `A Open` hint
+inert while `B` and `Y`, handled on ancestors, worked). With `ownPadButtons`
+no longer consuming A, a hint-bar tap now reaches the focused element
+exactly like a pad press.
 
 **A hint row promises only what dispatches.** A row is this shell's touch
 control surface, so a hint that names an action nothing handles is a
