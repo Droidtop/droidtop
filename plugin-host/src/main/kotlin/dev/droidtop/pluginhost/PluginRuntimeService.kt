@@ -295,6 +295,15 @@ class PluginRuntimeService : Service() {
             applicationContext.startActivity(intent)
             true
         }.getOrDefault(false)
+
+        override fun launchAppWithExtras(packageName: String, extras: Map<String, String>, action: String?): Boolean = runCatching {
+            val intent = applicationContext.packageManager.getLaunchIntentForPackage(packageName) ?: return@runCatching false
+            action?.let { intent.action = it }
+            extras.forEach { (key, value) -> intent.putExtra(key, value) }
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            applicationContext.startActivity(intent)
+            true
+        }.getOrDefault(false)
     }
 
     private fun checkPackageInstalled(context: Context, packageName: String): Boolean = runCatching {

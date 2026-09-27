@@ -152,6 +152,26 @@ interface PluginContext {
      * installed or declares no launcher activity.
      */
     fun launchApp(packageName: String): Boolean
+
+    /**
+     * Launches [packageName]'s own default launcher activity like
+     * [launchApp], but with [extras] attached as String extras and,
+     * optionally, [action] overriding the intent's action -- the
+     * generalisation an `app_status` plugin needs when the other app
+     * documents its own Intent-extra launch contract (e.g. RetroArch's
+     * `ROM`/`LIBRETRO`/`CONFIGFILE` extras, read directly from its own
+     * source rather than guessed) and there is no other supported way to
+     * aim that launch at a specific config, since [launchApp] alone
+     * cannot attach anything to the Intent it builds.
+     *
+     * Still never hands the plugin a `Context` or an `Intent` object --
+     * it stays a data-in call across the same boundary [launchApp]
+     * already crosses, so the trust shape is identical: a plugin picks
+     * string key/value pairs, droidtop's own process builds and fires
+     * the actual `Intent`. Returns false, never throws, when
+     * [packageName] isn't installed or declares no launcher activity.
+     */
+    fun launchAppWithExtras(packageName: String, extras: Map<String, String>, action: String? = null): Boolean
 }
 
 /**
