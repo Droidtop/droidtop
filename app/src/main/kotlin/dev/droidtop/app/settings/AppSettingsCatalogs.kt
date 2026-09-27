@@ -30,6 +30,10 @@ import dev.droidtop.library.integrations.PluginEventBus
 import dev.droidtop.library.integrations.PluginAppStatus
 import dev.droidtop.library.integrations.PluginSettingsRows
 import dev.droidtop.library.integrations.PluginJobsScreen
+import dev.droidtop.library.PcFolderScan
+import dev.droidtop.library.GameEngineDetector
+import dev.droidtop.library.EnginesDatabase
+import dev.droidtop.library.ScanPrune
 import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.PluginKind
 import dev.droidtop.pluginhost.PluginTrustState
@@ -62,6 +66,51 @@ import dev.droidtop.library.theme.SystemThemeColors
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+/**
+ * Classification of a folder for the Console systems page.
+ * PC/store and engine folders are not console system folders; they are
+ * managed by the PC/engine library scans and should not show a system picker.
+ */
+private sealed interface FolderKind {
+    data class ConsoleSystem(val resolvedSystem: ConsoleSystemDef?): FolderKind
+    data class PcStore(val storeName: String, val gameCount: Int): FolderKind
+    data class Engine(val gameCount: Int): FolderKind
+}
+
+/**
+ * Classify [folder] and count its games for the Console systems page.
+ * Returns the folder kind and game count (0 if not counted).
+ */
+private suspend fun classifyFolder(
+    context: Context,
+    folder: File,
+    systemsById: Map<String, ConsoleSystemDef>,
+): FolderKind = withContext(Dispatchers.IO) {
+    // Store root (e.g., Steam, GOG Galaxy) or folder inside a store tree
+    val storeOwner = ScanPrune.storeRootOwner(folder) ?: ScanPrune.storeTreeRoot(folder)?.let { ScanPrune.storeRootOwner(it) }
+    if (storeOwner != null) {
+        val defs = runCatching { EnginesDatabase.defs(context) }.getOrDefault(emptyList())
+        val topFolders = PcFolderScan.gamesByTopLevelFolder(folder, defs) { _, _ -> false }
+        val gameCount = topFolders.sumOf { it.games.size }
+        return@withContext FolderKind.PcStore(storeOwner, gameCount)
+    }
+    // Engine games folder
+    val defs = runCatching { EnginesDatabase.defs(context) }.getOrDefault(emptyList())
+    if (defs.isNotEmpty() && GameEngineDetector.holdsSeveralGames(folder, defs, systemsById)) {
+        // Count engine games directly under this folder
+        var count = 0
+        for (child in folder.listFiles().orEmpty()) {
+            if (!child.isDirectory) continue
+            if (!ScanPrune.isScannableFolder(child)) continue
+            if (GameEngineDetector.isGameRoot(child, defs)) count++
+        }
+        return@withContext FolderKind.Engine(count)
+    }
+    // Console system folder (or unrecognized folder the user picked)
+    val resolved = SystemOverridePrefs.resolveForFolder(context, folder.absolutePath, folder.name, systemsById)
+    FolderKind.ConsoleSystem(resolved)
+}
 
 /**
  * :app's management screens as settings-catalog data (docs/SPEC.md
@@ -127,10 +176,15 @@ object AppSettingsCatalogs {
         // the folders it scans as console systems, plus the ones the person
         // picked to choose a system for. A folder the library reads as PC
         // or engine games is not a console system folder and is not here.
-        val folders = SystemFolders.all(context, systemsById).map { it.first }
+        val rawFolders = SystemFolders.all(context, systemsById).map { it.first }
             .plus(SystemFolders.awaitingSystem(context))
             .distinctBy { it.absolutePath }
             .sortedBy { it.name.lowercase() }
+        // Classify each folder: console system, PC/store, or engine.
+        val classifiedFolders = mutableListOf<Pair<File, FolderKind>>()
+        for (folder in rawFolders) {
+            classifiedFolders += folder to classifyFolder(context, folder, systemsById)
+        }
         // Read here, on IO: a value label is drawn on the main thread.
         val activeIntegrations = IntegrationStore.available(context).size
         val installedPlugins = PluginStore.installed(context)
@@ -250,7 +304,7 @@ object AppSettingsCatalogs {
             CatalogGroup(
                 id = "console_systems_folders",
                 title = "System folders",
-                items = (if (folders.isEmpty()) {
+                items = (if (classifiedFolders.isEmpty()) {
                     listOf<CatalogItem>(
                         ActionItem(
                             id = "console_systems_no_folders",
@@ -260,22 +314,46 @@ object AppSettingsCatalogs {
                         ),
                     )
                 } else {
-                    folders.map<File, CatalogItem> { folder ->
-                        val resolved = SystemOverridePrefs.resolveForFolder(context, folder.absolutePath, folder.name, systemsById)
-                        NestedScreenItem(
-                            id = "console_folder_${folder.absolutePath}",
-                            title = folder.name,
-                            subtitle = when {
-                                resolved == null -> "Not set: open to choose its system"
-                                resolvePlayer(context, resolved) == null -> "${resolved.displayName}: no emulator installed yet"
-                                else -> resolved.displayName
-                            },
-                            inline = folderScreen(folder),
-                            valueLabel = { ctx ->
-                                resolved?.let { resolvePlayer(ctx, it)?.name } ?: ""
-                            },
-                            accent = resolved?.let { SystemThemeColors.forSystem(context, it.id) },
-                        )
+                    classifiedFolders.map<Pair<File, FolderKind>, CatalogItem> { (folder, kind) ->
+                        when (kind) {
+                            is FolderKind.PcStore -> {
+                                val gameText = if (kind.gameCount == 1) "1 game" else "${kind.gameCount} games"
+                                NestedScreenItem(
+                                    id = "console_folder_${folder.absolutePath}",
+                                    title = folder.name,
+                                    subtitle = "${kind.storeName} (PC games, detected per game: $gameText)",
+                                    inline = folderScreen(folder, kind),
+                                    valueLabel = { gameText },
+                                )
+                            }
+                            is FolderKind.Engine -> {
+                                val gameText = if (kind.gameCount == 1) "1 game" else "${kind.gameCount} games"
+                                NestedScreenItem(
+                                    id = "console_folder_${folder.absolutePath}",
+                                    title = folder.name,
+                                    subtitle = "Engine games (detected per game: $gameText)",
+                                    inline = folderScreen(folder, kind),
+                                    valueLabel = { gameText },
+                                )
+                            }
+                            is FolderKind.ConsoleSystem -> {
+                                val resolved = kind.resolvedSystem
+                                NestedScreenItem(
+                                    id = "console_folder_${folder.absolutePath}",
+                                    title = folder.name,
+                                    subtitle = when {
+                                        resolved == null -> "Not set: open to choose its system"
+                                        resolvePlayer(context, resolved) == null -> "${resolved.displayName}: no emulator installed yet"
+                                        else -> resolved.displayName
+                                    },
+                                    inline = folderScreen(folder, kind),
+                                    valueLabel = { ctx ->
+                                        resolved?.let { resolvePlayer(ctx, it)?.name } ?: ""
+                                    },
+                                    accent = resolved?.let { SystemThemeColors.forSystem(context, it.id) },
+                                )
+                            }
+                        }
                     }
                 }) + FolderPickItem(
                     id = "console_systems_choose_folder",
@@ -300,152 +378,195 @@ object AppSettingsCatalogs {
         )
     }
 
-    private fun folderScreen(folder: File) = CatalogScreen(
+    private fun folderScreen(folder: File, kind: FolderKind) = CatalogScreen(
         id = "console_folder_${folder.absolutePath}",
         title = folder.name,
         groups = { context ->
             withContext(Dispatchers.IO) {
-                val systems = ConsoleSystemsRepository.allSystems(context)
-                val systemsById = systems.associateBy { it.id }
-                val resolved = SystemOverridePrefs.resolveForFolder(context, folder.absolutePath, folder.name, systemsById)
-                buildList {
-                    add(
-                        CatalogGroup(
-                            id = "folder_system",
-                            title = null,
-                            items = buildList {
-                                add(systemChoiceItem(context, folder, systems))
-                                if (resolved != null) {
-                                    add(playerChoiceItem(context, resolved))
-                                    // docs/SPEC.md 12a "app_status": where droidtop
-                                    // shows an installed app -- here, the emulator
-                                    // this system's player choice actually resolved
-                                    // to -- an approved app_status plugin managing
-                                    // that same package gets a real entry, not just
-                                    // its own separate Plugins-screen row. On-demand
-                                    // only (this screen's own single open), never
-                                    // list rendering.
-                                    val chosenPlayer = resolvePlayer(context, resolved)
-                                    if (chosenPlayer != null) {
-                                        val appStatusPlugins = PluginAppStatus.sourcesFor(context, chosenPlayer.packageName)
-                                        appStatusPlugins.forEach { record ->
-                                            add(
-                                                NestedScreenItem(
-                                                    id = "folder_player_app_status_${resolved.id}_${record.manifest.id}",
-                                                    title = "${chosenPlayer.name}: ${record.manifest.label}",
-                                                    subtitle = "Status and actions this plugin offers for ${chosenPlayer.name}",
-                                                    inline = PluginAppStatus.screenFor(record),
-                                                ),
-                                            )
-                                        }
-                                    }
-                                    add(
-                                        NestedScreenItem(
-                                            id = "folder_add_player_${resolved.id}",
-                                            title = "Add a custom player",
-                                            subtitle = "Point ${resolved.displayName} at any installed app via am start arguments",
-                                            inline = addCustomPlayerScreen(resolved),
-                                        ),
-                                    )
-                                    add(
-                                        AsyncActionItem(
-                                            id = "folder_scrape_${folder.absolutePath}",
-                                            title = "Scrape missing artwork & metadata",
-                                            subtitle = "Fills box art, descriptions, ratings and more for games that lack them",
-                                            run = { ctx, onStatus ->
-                                                scrapeSystemArtwork(ctx, folder, resolved) { done, total ->
-                                                    onStatus("Scraping ${resolved.displayName}: $done/$total")
-                                                }
-                                            },
-                                        ),
-                                    )
-                                    add(
-                                        AsyncActionItem(
-                                            id = "folder_gamelist_${folder.absolutePath}",
-                                            title = "Import gamelist.xml",
-                                            subtitle = "Ingests an external scraper's output (Skraper, Skyscraper, ARRM, ES-DE) " +
-                                                "for this folder: metadata into droidtop, media referenced where it sits",
-                                            run = { ctx, _ -> importGamelistXml(ctx, folder) },
-                                        ),
-                                    )
-                                    // Third-party "get games for this system"
-                                    // hooks the user declared (docs/SPEC.md
-                                    // section 12/12a): the JSON and plugin
-                                    // mechanisms unified into ONE "Get
-                                    // games" screen (AcquireContentSources,
-                                    // library-core) -- the system and its
-                                    // real destination folder are both
-                                    // known here, exactly what that screen
-                                    // needs.
-                                    add(
-                                        NestedScreenItem(
-                                            id = "folder_acquire_${resolved.id}",
-                                            title = "Get games",
-                                            subtitle = "Search an installed acquire_content plugin or integration for ${resolved.displayName}",
-                                            inline = AcquireContentSources.systemScreen(resolved.id, resolved.displayName, folder),
-                                        ),
-                                    )
-                                    // EmuDeck-style setup helper: firmware
-                                    // check against the real Batocera BIOS
-                                    // registry, when this system needs any.
-                                    val bios = BiosDatabase.forSystem(context, resolved.id)
-                                    if (bios != null) {
-                                        // The games folder this system folder sits in,
-                                        // which is not always its parent: a system
-                                        // folder may be <root>/roms/<system>.
-                                        val gamesRoot = GamesRootPrefs.gamesRootPaths(context)
-                                            .map { File(it) }
-                                            .filter { folder.absolutePath.startsWith(it.absolutePath.trimEnd('/') + "/") }
-                                            .maxByOrNull { it.absolutePath.length }
-                                            ?: folder.parentFile ?: folder
-                                        // Presence only, counted here on IO (a value
-                                        // label is drawn on the main thread); md5
-                                        // hashing happens inside the screen.
-                                        val biosPresent = bios.files.count { File(gamesRoot, it.file).isFile }
-                                        add(
-                                            NestedScreenItem(
-                                                id = "folder_bios_${resolved.id}",
-                                                title = "BIOS files",
-                                                subtitle = "Firmware ${resolved.displayName} emulators may need, looked for in ${gamesRoot.name}/bios",
-                                                inline = biosScreen(gamesRoot, bios),
-                                                valueLabel = { _ -> "$biosPresent/${bios.files.size}" },
-                                            ),
-                                        )
-                                    }
-                                }
-                            },
-                        ),
-                    )
-                    // EmuDeck-style setup helper: when no installed emulator
-                    // can run this system, offer the real known presets'
-                    // packages for installation instead of a dead end.
-                    if (resolved != null) {
-                        val installedPkgs = availablePlayers(context, resolved).map { it.packageName }.toSet()
-                        val missing = KnownPlayers.forSystem(context, resolved.id)
-                            .filter { it.pkg !in installedPkgs }
-                            .distinctBy { it.pkg }
-                        if (installedPkgs.isEmpty() && missing.isNotEmpty()) {
+                when (kind) {
+                    is FolderKind.PcStore -> {
+                        val gameText = if (kind.gameCount == 1) "1 game" else "${kind.gameCount} games"
+                        buildList {
                             add(
                                 CatalogGroup(
-                                    id = "folder_get_emulator",
-                                    title = "Get an emulator",
-                                    items = missing.take(8).map { preset ->
+                                    id = "folder_pc_store",
+                                    title = null,
+                                    items = listOf(
                                         ActionItem(
-                                            id = "install_${preset.pkg}",
-                                            title = "Get ${preset.label}",
-                                            subtitle = preset.pkg,
-                                            run = installPackageAction(preset.pkg),
-                                        )
+                                            id = "folder_pc_store_info",
+                                            title = "${kind.storeName} library",
+                                            subtitle = "PC games from ${kind.storeName} are detected per game ($gameText). " +
+                                                "They appear in the PC games list (Gaming shell > PC tab).",
+                                            run = {},
+                                        ),
+                                    ),
+                                ),
+                            )
+                        }
+                    }
+                    is FolderKind.Engine -> {
+                        val gameText = if (kind.gameCount == 1) "1 game" else "${kind.gameCount} games"
+                        buildList {
+                            add(
+                                CatalogGroup(
+                                    id = "folder_engine",
+                                    title = null,
+                                    items = listOf(
+                                        ActionItem(
+                                            id = "folder_engine_info",
+                                            title = "Engine games folder",
+                                            subtitle = "Engine games (Ren'Py, RPG Maker, etc.) are detected per game ($gameText). " +
+                                                "They appear in the PC games list (Gaming shell > PC tab) and launch via Enginehost.",
+                                            run = {},
+                                        ),
+                                    ),
+                                ),
+                            )
+                        }
+                    }
+                    is FolderKind.ConsoleSystem -> {
+                        val systems = ConsoleSystemsRepository.allSystems(context)
+                        val systemsById = systems.associateBy { it.id }
+                        val resolved = kind.resolvedSystem
+                        buildList {
+                            add(
+                                CatalogGroup(
+                                    id = "folder_system",
+                                    title = null,
+                                    items = buildList {
+                                        add(systemChoiceItem(context, folder, systems))
+                                        if (resolved != null) {
+                                            add(playerChoiceItem(context, resolved))
+                                            // docs/SPEC.md 12a "app_status": where droidtop
+                                            // shows an installed app -- here, the emulator
+                                            // this system's player choice actually resolved
+                                            // to -- an approved app_status plugin managing
+                                            // that same package gets a real entry, not just
+                                            // its own separate Plugins-screen row. On-demand
+                                            // only (this screen's own single open), never
+                                            // list rendering.
+                                            val chosenPlayer = resolvePlayer(context, resolved)
+                                            if (chosenPlayer != null) {
+                                                val appStatusPlugins = PluginAppStatus.sourcesFor(context, chosenPlayer.packageName)
+                                                appStatusPlugins.forEach { record ->
+                                                    add(
+                                                        NestedScreenItem(
+                                                            id = "folder_player_app_status_${resolved.id}_${record.manifest.id}",
+                                                            title = "${chosenPlayer.name}: ${record.manifest.label}",
+                                                            subtitle = "Status and actions this plugin offers for ${chosenPlayer.name}",
+                                                            inline = PluginAppStatus.screenFor(record),
+                                                        ),
+                                                    )
+                                                }
+                                            }
+                                            add(
+                                                NestedScreenItem(
+                                                    id = "folder_add_player_${resolved.id}",
+                                                    title = "Add a custom player",
+                                                    subtitle = "Point ${resolved.displayName} at any installed app via am start arguments",
+                                                    inline = addCustomPlayerScreen(resolved),
+                                                ),
+                                            )
+                                            add(
+                                                AsyncActionItem(
+                                                    id = "folder_scrape_${folder.absolutePath}",
+                                                    title = "Scrape missing artwork & metadata",
+                                                    subtitle = "Fills box art, descriptions, ratings and more for games that lack them",
+                                                    run = { ctx, onStatus ->
+                                                        scrapeSystemArtwork(ctx, folder, resolved) { done, total ->
+                                                            onStatus("Scraping ${resolved.displayName}: $done/$total")
+                                                        }
+                                                    },
+                                                ),
+                                            )
+                                            add(
+                                                AsyncActionItem(
+                                                    id = "folder_gamelist_${folder.absolutePath}",
+                                                    title = "Import gamelist.xml",
+                                                    subtitle = "Ingests an external scraper's output (Skraper, Skyscraper, ARRM, ES-DE) " +
+                                                        "for this folder: metadata into droidtop, media referenced where it sits",
+                                                    run = { ctx, _ -> importGamelistXml(ctx, folder) },
+                                                ),
+                                            )
+                                            // Third-party "get games for this system"
+                                            // hooks the user declared (docs/SPEC.md
+                                            // section 12/12a): the JSON and plugin
+                                            // mechanisms unified into ONE "Get
+                                            // games" screen (AcquireContentSources,
+                                            // library-core) -- the system and its
+                                            // real destination folder are both
+                                            // known here, exactly what that screen
+                                            // needs.
+                                            add(
+                                                NestedScreenItem(
+                                                    id = "folder_acquire_${resolved.id}",
+                                                    title = "Get games",
+                                                    subtitle = "Search an installed acquire_content plugin or integration for ${resolved.displayName}",
+                                                    inline = AcquireContentSources.systemScreen(resolved.id, resolved.displayName, folder),
+                                                ),
+                                            )
+                                            // EmuDeck-style setup helper: firmware
+                                            // check against the real Batocera BIOS
+                                            // registry, when this system needs any.
+                                            val bios = BiosDatabase.forSystem(context, resolved.id)
+                                            if (bios != null) {
+                                                // The games folder this system folder sits in,
+                                                // which is not always its parent: a system
+                                                // folder may be <root>/roms/<system>.
+                                                val gamesRoot = GamesRootPrefs.gamesRootPaths(context)
+                                                    .map { File(it) }
+                                                    .filter { folder.absolutePath.startsWith(it.absolutePath.trimEnd('/') + "/") }
+                                                    .maxByOrNull { it.absolutePath.length }
+                                                    ?: folder.parentFile ?: folder
+                                                // Presence only, counted here on IO (a value
+                                                // label is drawn on the main thread); md5
+                                                // hashing happens inside the screen.
+                                                val biosPresent = bios.files.count { File(gamesRoot, it.file).isFile }
+                                                add(
+                                                    NestedScreenItem(
+                                                        id = "folder_bios_${resolved.id}",
+                                                        title = "BIOS files",
+                                                        subtitle = "Firmware ${resolved.displayName} emulators may need, looked for in ${gamesRoot.name}/bios",
+                                                        inline = biosScreen(gamesRoot, bios),
+                                                        valueLabel = { _ -> "$biosPresent/${bios.files.size}" },
+                                                    ),
+                                                )
+                                            }
+                                        }
                                     },
                                 ),
                             )
+                            // EmuDeck-style setup helper: when no installed emulator
+                            // can run this system, offer the real known presets'
+                            // packages for installation instead of a dead end.
+                            if (resolved != null) {
+                                val installedPkgs = availablePlayers(context, resolved).map { it.packageName }.toSet()
+                                val missing = KnownPlayers.forSystem(context, resolved.id)
+                                    .filter { it.pkg !in installedPkgs }
+                                    .distinctBy { it.pkg }
+                                if (installedPkgs.isEmpty() && missing.isNotEmpty()) {
+                                    add(
+                                        CatalogGroup(
+                                            id = "folder_get_emulator",
+                                            title = "Get an emulator",
+                                            items = missing.take(8).map { preset ->
+                                                ActionItem(
+                                                    id = "install_${preset.pkg}",
+                                                    title = "Get ${preset.label}",
+                                                    subtitle = preset.pkg,
+                                                    run = installPackageAction(preset.pkg),
+                                                )
+                                            },
+                                        ),
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
         },
     )
-
     // One screen per system's firmware set: every registry file with its
     // real on-disk presence AND md5 verification (catches the classic
     // "right name, wrong dump"), plus the database refresh action.
