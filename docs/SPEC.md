@@ -2756,13 +2756,14 @@ forwarder/switcher BEFORE this Activity's own `onStop` runs, in Android's normal
 transition order, so comparing the two numbers apart needs no extra signalling. A plain game
 launch never touches `Modes.lastMode`, so the N64 fix is unaffected by this addition.
 
-**Needs a rig check** (the coordinator's own console test, verbatim): set the home
-implementation to Alternative through droidtop's own Settings or onboarding, pick the
-console's stock launcher (or any other installed one), press Home and confirm it forwards
-cleanly with no flash and no loop, confirm the Standard second screen attaches (system bar,
-notifications, quick launch, widgets -- not a stale Gaming/Desktop companion and not the bare
-system fallback), confirm the mode switcher's "Android" entry opens that same chosen
-launcher, then switch back to Standard afterwards and confirm the second screen follows.
+**Verified live** (console, 2026-09-27, after the nudge fix below): set the home
+implementation to Alternative through droidtop's own Settings (Global settings > Use droidtop
+as home screen > A launcher you already have > RetroidLauncher, the console's own stock
+launcher), pressed Home — forwarded cleanly, no flash, no loop
+(`com.retroidpocket.gamelauncher/.activities.RpGameLauncher` resumed on the built-in display).
+The mode switcher's "Android" row opens that same launcher. Confirmed the second screen
+attaches (see "The Alternative forwarder needed a nudge" below for the one further fix this
+needed) and switched Home back to Standard afterward, confirmed on both screens.
 
 ### The Alternative forwarder needed a nudge to keep the second screen (rig, 2026-09-27)
 
@@ -2827,9 +2828,14 @@ and (while it was open) the Settings task. Checked each against its manifest dec
   real app-hosted task (Gaming/Desktop), exactly what a person expects to find droidtop under
   in Recents.
 
-**Needs a rig check**: with a second launcher installed and Alternative active, open Recents
-(the user way -- the Recents gesture/button, not `dumpsys`) after a self-update and after
-using Standard normally, and confirm exactly one droidtop card appears (or none, when nothing
+**Partially verified live** (console, 2026-09-27): `dumpsys activity recents` after the
+nudge fix above still showed `com.android.launcher3.Launcher` (task #1743) alongside the real
+app-hosted task -- but that task predates this session's manifest change (created before this
+build was installed), and `excludeFromRecents` is read at task-creation time, not enforced
+retroactively on an existing one; it was never re-verified from a genuinely cold task history.
+**Needs a rig check**: from a clean state (reboot, or after clearing old droidtop tasks), use
+Standard and Alternative normally, then open Recents the user way (the Recents gesture/
+button, not `dumpsys`) and confirm exactly one droidtop card appears (or none, when nothing
 app-hosted is running), never `com.android.launcher3.Launcher` as a separate switchable entry.
 
 ## 4d. The companion screen, designed (research 2026-09-01)
