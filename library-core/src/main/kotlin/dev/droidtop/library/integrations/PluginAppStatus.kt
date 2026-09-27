@@ -42,6 +42,12 @@ import dev.droidtop.pluginhost.PluginStore
  * signature; a plugin returning a failure just shows that failure).
  */
 object PluginAppStatus {
+    /** "downloadedCoreCount" -> "Downloaded core count" -- best-effort camelCase splitter, only used for the generic detail rows above. */
+    private fun humanizeKey(key: String): String {
+        val spaced = key.replace(Regex("([a-z0-9])([A-Z])"), "$1 $2").lowercase()
+        return spaced.replaceFirstChar { it.uppercase() }
+    }
+
     /**
      * Every installed+approved [PluginCapability.APP_STATUS] plugin
      * whose OWN status call currently reports it manages [packageName].
@@ -104,7 +110,21 @@ object PluginAppStatus {
                                 ),
                             )
                             detailKeys.sorted().forEach { key ->
-                                add(ActionItem(id = "plugin_app_status_${m.id}_$key", title = result.values.getValue(key), run = {}))
+                                add(
+                                    ActionItem(
+                                        id = "plugin_app_status_${m.id}_$key",
+                                        // A bare value with no label read as an
+                                        // unlabelled "0"/"false" row on the rig
+                                        // (dq-pluginui-01, 2026-09-27) -- humanize
+                                        // the plugin's own camelCase key so every
+                                        // row reads as a full sentence, matching
+                                        // PluginSettingsRows' "plugin writes a
+                                        // complete sentence" convention as closely
+                                        // as a single opaque value can.
+                                        title = "${humanizeKey(key)}: ${result.values.getValue(key)}",
+                                        run = {},
+                                    ),
+                                )
                             }
                             if (installed) {
                                 add(
