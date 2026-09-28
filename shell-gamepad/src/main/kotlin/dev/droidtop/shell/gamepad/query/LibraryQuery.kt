@@ -163,7 +163,7 @@ data class LibraryQuery(
 
     /** The list as this query shows it: filtered, then sorted, ties by title. */
     fun applyTo(base: List<LibraryEntry>, scope: LibraryQueryScope): List<LibraryEntry> =
-        base.filter { matches(it, scope) }.sortedWith(comparator())
+        base.filter { matches(it, scope) }.sortedWith(sort.comparator())
 }
 
 /** The comparator for [LibrarySortKey]; by name last, so two orders of one sort stay one order. */
@@ -249,8 +249,10 @@ object LibraryViewPrefs {
             val facets = buildMap {
                 val facetJson = json.optJSONObject("facets") ?: JSONObject()
                 facetJson.keys().forEach { key ->
-                    val values = facetJson.optJSONArray(key) ?: continue
-                    put(key, (0 until values.length()).mapNotNull { values.optString(it).ifBlank { null } }.toSet())
+                    val values = facetJson.optJSONArray(key)
+                    if (values != null) {
+                        put(key, (0 until values.length()).mapNotNull { values.optString(it).ifBlank { null } }.toSet())
+                    }
                 }
             }
             LibraryQuery(
