@@ -6628,16 +6628,6 @@ says the folder is not there, with the path under it, and Play is not
 offered. Everything else on that screen stays, because its history, metadata
 and collections are exactly what the entry is being kept for.
 
-**When droidtop first saw a game (2026-09-27).** `LibraryEntry.addedEpochMs`
-is stamped by the `LibrarySlice` merge the first time an id reaches the
-index, and never rewritten: not by a later walk of the same game, and not
-while the game is missing. Games a walk had already found before the field
-existed keep null, and every reader treats null as "unknown" rather than
-guessing a date -- the "Added" sort (7i's library views) puts them after
-every stamped game. The stamp is a fact about droidtop's own history, not
-about the game's: an install that predates the field honestly says "when
-it was added" is not known.
-
 The fold is `Library.replaceMissing(missing, replacement)`, one function for
 both entry points: it moves play history (`PlayHistoryStore.moveTo`, counts
 added and the later last-played kept, Pythia's `record_ownership`

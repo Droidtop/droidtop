@@ -124,25 +124,9 @@ data class LibrarySlice(val segments: List<ScanStep.Segment> = emptyList()) {
 
     private fun mergeSegment(walked: ScanStep.Segment): LibrarySlice {
         val previous = segments.firstOrNull { it.key == walked.key && it.root == walked.root }
-        // When droidtop first saw each game in this part (docs/SPEC.md 7i,
-        // the library views' "Added" sort): stamped here, once, at the ONE
-        // point where a walk's answer meets everything the library already
-        // holds. A walk hands back fresh entries that carry no stamp of
-        // their own (a walk does not know one), so the merge decides: an
-        // id the slice has never seen is new and is stamped now; an id it
-        // has — even one it only holds missing — keeps the stamp from when
-        // it first arrived. [System.currentTimeMillis] rather than a passed
-        // clock: a stamp is a fact about now, and the merge is already the
-        // library's own bookkeeping, not a caller-configurable policy.
-        val knownStamps = segments.flatMap { segment ->
-            segment.entries.mapNotNull { entry -> entry.addedEpochMs?.let { entry.id to it } }
-        }.toMap()
-        val stamped = walked.entries.map { entry ->
-            entry.copy(addedEpochMs = entry.addedEpochMs ?: knownStamps[entry.id] ?: System.currentTimeMillis())
-        }
-        val found = stamped.mapTo(HashSet()) { it.id }
+        val found = walked.entries.mapTo(HashSet()) { it.id }
         val stillMissing = previous?.entries.orEmpty().filterNot { it.id in found }.map { it.asMissing() }
-        val merged = walked.copy(entries = stamped + stillMissing)
+        val merged = walked.copy(entries = walked.entries + stillMissing)
         return if (previous == null) {
             copy(segments = segments + merged)
         } else {
