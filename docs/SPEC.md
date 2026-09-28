@@ -931,12 +931,12 @@ the Gaming shell can see) populates from installed plugins, and each surface
 (the QSB's search results, a home-screen widget slot, a long-press app
 action) reads that registry rather than knowing about plugins directly. This
 keeps Launcher mode buildable now and the plugin surface pluggable in later
-without a second registration mechanism. Scope recorded in `docs/plugin-catalog.md`
-(2026-09-25, agent `plugins`): the registry/catalog pattern is the only
-interface; no plugin surface code is built until §12a manifest/API lands.
-Left undone deliberately: no plugin-facing API, no plugin search results,
-no plugin widgets. Agent `plugins` owns when §12a is ready for this to be
-wired up for real.
+without a second registration mechanism. The plugin surfaces for every
+mode, Launcher mode included (status tiles and home widgets, search
+providers, long-press app actions, drawer groups), are specified in
+`docs/plugin-api.md` §3 C (§12a). The plugin status widget
+(`PluginStatusWidgetProvider`) is built; the rest are on that document's
+roadmap.
 
 **Handheld constraint, restated for this work specifically:** every row above
 must work by controller AND touch, pointer and focus as one selection (§7j),
@@ -10107,6 +10107,65 @@ one runner per kind:
   feasibility citation trail, and the three real bugs `dq-flutterembed-01`
   found and fixed before a plugin could actually run.
 
+**The plugin API design ([docs/plugin-api.md](plugin-api.md), decided
+2026-09-28).** A droidtop device is a general-purpose computer, and plugins
+extend it in context across all three modes (owner, 2026-09-28).
+`docs/plugin-api.md` is the design for that. It is normative for
+everything the API adds from here on, and this section stays the record
+of what is built. The decisions, briefly:
+
+- **Three directions, one broker.**
+  - **Extension points:** droidtop calls into a plugin, declared in
+    `provides`.
+  - **Host APIs:** the plugin calls droidtop, gated by `permissions`.
+  - **Events:** droidtop tells the plugin something happened, declared
+    in `subscribes`.
+  - Every plugin → host call goes through one broker in `:app`. The
+    broker checks the caller's own grant, applies quotas and writes an
+    audit entry. The host builds every intent, path and request itself
+    from data, and plugins never receive objects.
+  - Plugins never draw UI. They fill droidtop's own rows, tiles, menus
+    and sheets.
+- **One contract, one adapter per kind.** `native_bundle`, `python` and
+  `flutter_embed` carry the same JSON envelope (`handle` in,
+  `host.call` out). No kind has a feature the others lack, and a shared
+  conformance script checks this.
+- **Plugin-provided APIs.** A plugin can `export` an API and others can
+  `require` it. droidtop brokers every such call, and the caller needs
+  its own grant for the provider's permission, so A never reaches root
+  through B without the user granting A. **Root and Shizuku are not host
+  features.** They are exported by official provider plugins (a Shizuku
+  provider, and a root/Magisk-module provider) through standard
+  interfaces (`priv.shell`, `priv.packages`, `priv.settings`,
+  `root.modules`). A `requires` on those must be optional, which keeps
+  root an enhancement that is never required.
+- **Permissions.** There are 66 of them, in three tiers:
+  - normal, granted at approval;
+  - dangerous, ticked at approval or asked on first use, and only ever
+    during a user-initiated call;
+  - critical: dangerous plus a written warning, with a few restricted
+    to official origins.
+  They are revocable under Accounts and sources → Plugins. Providing a
+  high-risk extension point is a consent item too. A same-key update
+  keeps its approval, but any dangerous access it newly asks for waits
+  for the user.
+- **Honest enforcement.** Today's `:pluginhost` shares droidtop's UID,
+  so permissions bound only what the host does on a plugin's behalf.
+  The proposed contained tier closes that: one `isolatedProcess` per
+  plugin, everything through the broker. Full trust (droidtop's UID,
+  one process per plugin) stays for providers that need Shizuku or root
+  and for contract 1 plugins.
+- **Compatibility.** Contract 1 bundles keep working unchanged. One
+  translation maps each existing capability, event and `PluginContext`
+  method onto the new model (`docs/plugin-api.md` §6).
+
+The catalogue has 89 entries across ten areas (library and content,
+launch and runtime, UI, system and device, desktop, other apps,
+identity, data, developer, platform). The phased roadmap is 4 P0, 17 P1
+and 47 P2 items. Umbrella: Droidtop/tracker#53.
+`docs/plugin-catalog.md` (the 2026-09-25 launcher-seam scope note) is
+folded into `docs/plugin-api.md` §3 C and deleted.
+
 **The API surface** (`PluginCapability`, a closed set — the trust shape
 differs per capability, same reasoning §12's `IntegrationCapability`
 already uses):
@@ -10476,26 +10535,19 @@ what the index says is display data, never a trust decision.
    describe itself.
 4. Signing is real, not a placeholder gesture: ECDSA P-256/SHA-256 over
    the exact manifest bytes, verified against a per-origin public key
-   (`BundleSignature`, `PluginOriginKeys`) — the official pinned key
-   first, then any user-trusted key "Keys you trust" stores (above).
-   Approval is bound to the exact archive digest
+   (`BundleSignature`, `PluginOriginKeys`): the official pinned key first,
+   then any user-trusted key "Keys you trust" stores (above). Approval is bound to the
+   plugin's identity under a key, not to one byte-string: the record
+   stores the digest it was verified against
    (`PluginRecord.archiveDigest`, a SHA-256 over the signed manifest)
-   and never carries over to a new digest — an update with different
-   bytes starts back at PENDING, even for an id already approved.
- 4. Signing is real, not a placeholder gesture: ECDSA P-256/SHA-256 over
-    the exact manifest bytes, verified against a per-origin pinned public
-    key (`BundleSignature`, `PluginOriginKeys`). Approval is bound to the
-    plugin's identity under a key, not to one byte-string: the record
-    stores the digest it was verified against
-    (`PluginRecord.archiveDigest`, a SHA-256 over the signed manifest)
-    AND the fingerprint of the key approval was bound to
-    (`PluginRecord.approvedKeySha256`). A re-install of the exact same
-    bytes keeps its state; an update with different bytes keeps it too
-    when the new bundle's signature verifies against the SAME pinned key
-    (the catalog's whole job, "The catalog" above), and starts back at
-    PENDING when the key differs, when the origin differs, or when the
-    plugin was never APPROVED in the first place. A DENIED state never
-    carries over under any digest.
+   AND the fingerprint of the key approval was bound to
+   (`PluginRecord.approvedKeySha256`). A re-install of the exact same
+   bytes keeps its state; an update with different bytes keeps it too
+   when the new bundle's signature verifies against the SAME pinned key
+   (the catalog's whole job, "The catalog" above), and starts back at
+   PENDING when the key differs, when the origin differs, or when the
+   plugin was never APPROVED in the first place. A DENIED state never
+   carries over under any digest.
 5. droidtop treats what a plugin returns as untrusted input: every
    binder payload is capped (`PluginRunner.MAX_RESULT_BYTES`, 256 KiB),
    parsed against the capability's own shape, and never used as a path,
@@ -10537,10 +10589,6 @@ is what "Keys you trust" built); `startJob` support for
 python-kind plugins; and the rig check for the python leg specifically
 (queued, `device/QUEUE.md`) — the `native_bundle` leg's own rig check
 (`dq-plugins-01`) already passed.
-below), including `startJob` (built 2026-09-26, above). Open:
-`startJob` support for python-kind plugins; and the rig check for the
-python leg specifically (queued, `device/QUEUE.md`) — the
-`native_bundle` leg's own rig check (`dq-plugins-01`) already passed.
 
 **The rest of the plugin API finally has real UI callers (built
 2026-09-27).** Until this change, `settings_rows`, `app_status` and
