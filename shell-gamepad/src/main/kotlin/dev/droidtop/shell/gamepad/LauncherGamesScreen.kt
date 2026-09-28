@@ -37,6 +37,8 @@ import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
+import dev.droidtop.shell.gamepad.input.HintBinding
+import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.input.ownPadButtons
 
 /**
@@ -87,15 +89,17 @@ fun LauncherGamesScreen(
                 // Its own hint row, as every screen has one: the settings
                 // navigator draws none, and inside the Gaming shell that
                 // row is the shell's (rig, dq-shell2-01: no hint row here).
+                // All three dispatch inside the navigator: A activates the
+                // row, Y is its Info sheet, B pops one level.
                 Column(modifier = Modifier.fillMaxSize()) {
                     Box(modifier = Modifier.weight(1f)) {
                         CatalogNavigator(root = foldersScreen, onExit = { foldersOpen = false })
                     }
-                    TouchHintBar(
-                        hints = listOf(
-                            GamepadAction.A to "Select",
-                            GamepadAction.Y to "Info",
-                            GamepadAction.B to "Back",
+                    HintRow(
+                        bindings = listOf(
+                            HintBinding(GamepadAction.A, "Select"),
+                            HintBinding(GamepadAction.Y, "Info"),
+                            HintBinding(GamepadAction.B, "Back"),
                         ),
                     )
                 }
@@ -207,15 +211,16 @@ private fun GamesGrid(
                 }
             }
         }
-        TouchHintBar(
-            hints = buildList {
-                if (!games.isNullOrEmpty()) {
-                    add(GamepadAction.A to "Play")
-                    add(GamepadAction.Y to "Pin to home screen")
-                }
-                if (onOpenFolders != null) add(GamepadAction.SELECT to "Game folders")
-                add(GamepadAction.B to "Back")
-            },
+        // The same gated row the shell's own footer uses: only what
+        // dispatches right now is named -- A and Y need a card to act
+        // on, Select needs the folders screen to exist, B always leaves.
+        HintRow(
+            bindings = listOf(
+                HintBinding(GamepadAction.A, "Play") { !games.isNullOrEmpty() },
+                HintBinding(GamepadAction.Y, "Pin to home screen") { !games.isNullOrEmpty() },
+                HintBinding(GamepadAction.SELECT, "Game folders") { onOpenFolders != null },
+                HintBinding(GamepadAction.B, "Back"),
+            ),
         )
     }
 }
