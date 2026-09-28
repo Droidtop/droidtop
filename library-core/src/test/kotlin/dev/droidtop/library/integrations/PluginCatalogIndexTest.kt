@@ -185,7 +185,7 @@ class PluginCatalogIndexTest {
     fun `a duplicate plugin id anywhere in the index is refused`() {
         val two = indexJson { origin ->
             val plugins = origin.getJSONArray("plugins")
-            val copy = JSONObject(plugins.getJSONObject(0))
+            val copy = JSONObject(plugins.getJSONObject(0).toString())
             plugins.put(copy)
         }
         assertNull(PluginCatalogIndexParser.parse(two))
