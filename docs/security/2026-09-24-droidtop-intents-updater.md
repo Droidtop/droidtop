@@ -155,12 +155,15 @@ Not verified yet: `su`'s standard input reaching `tar` under KernelSU,
 Magisk and APatch, and a sibling container booting from the new store, on a
 rooted device.
 
-## 8. `GameLaunchActivity` exported (Low, accepted)
+## 8. `GameLaunchActivity` exported (Low, fixed 2026-09-28)
 
-Exported so pinned shortcuts and `am start` work. Any app can launch any
-library entry whose id it knows; ids are only ones droidtop's scan
-produced, and a launch runs exactly what the person's own library would
-run. Kept as designed.
+Not exported (`android:exported="false"`). Every internal caller
+(pinned shortcuts via PendingIntent with explicit component, widget,
+Launcher search via `LibrarySearchBridge`, `LauncherGamesActivity` tap,
+`DesktopShell` start-menu via `library.launchInBackground`) uses an
+explicit component intent or launches through the library directly,
+so no external package needs direct access. The index-backed lookup
+(commit c35c36f4) makes the launch safe without exposing the surface.
 
 ## 9. `MainActivity` exported (Info, accepted)
 
