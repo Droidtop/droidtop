@@ -111,9 +111,8 @@ class LauncherGamesActivity : AppCompatActivity() {
                 library.scanFollowingGamesRoots(applicationContext, LibraryKinds.GAMES)
             }
         }
-        val confirmedLinks = library.getConfirmedStoreLinks()
         val games = library.backgroundScanState(LibraryKinds.GAMES)
-            .map { entries -> entries?.let { shown(it, confirmedLinks) } }
+            .map { entries -> entries?.let { shown(it) } }
             .flowOn(Dispatchers.Default)
         // droidtop's own chrome owns the whole window, as the shells do:
         // the black ground runs under the status bar instead of a stock
@@ -156,10 +155,10 @@ class LauncherGamesActivity : AppCompatActivity() {
          * not "30YearOldVirgin 0.37.dv pc"; rig, dq-shell2-02), and a tap
          * plays the copy that card's Play would.
          */
-        private suspend fun shown(entries: List<LibraryEntry>, confirmedLinks: Map<String, String>): List<LibraryEntry> {
+        private fun shown(entries: List<LibraryEntry>): List<LibraryEntry> {
             val playable = entries.filter { !it.hidden && !it.missing }
             val (pc, others) = playable.partition { it.isPcOrEngineGame }
-            return (LibraryGrouping.group(pc, confirmedLinks).map { it.displayEntry } + others)
+            return (LibraryGrouping.group(pc).map { it.displayEntry } + others)
                 .sortedBy { GameNaming.displayName(it.title).lowercase() }
         }
 

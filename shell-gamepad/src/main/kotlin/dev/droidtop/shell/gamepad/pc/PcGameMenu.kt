@@ -192,8 +192,7 @@ internal fun PcGameMenu(
     // row offers a version, a replacement or a merge.
     val worked by produceState(DetailNames.NONE, entry, siblings) {
         value = withContext(Dispatchers.Default) {
-            val confirmedLinks = library.getConfirmedStoreLinks()
-            val groups = LibraryGrouping.group(siblings, confirmedLinks)
+            val groups = LibraryGrouping.group(siblings)
             val grouping = groups.firstOrNull { it.entriesByPath.containsKey(entry.id) }
             DetailNames(
                 forId = entry.id,
