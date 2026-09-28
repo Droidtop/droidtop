@@ -12,6 +12,9 @@ private class FakeProvider(
     private val failLaunch: Boolean = false,
 ) : LibraryProvider {
     override val kinds = setOf(kind)
+    // One slice per provider: two instances of this class in one Library
+    // must not share the default class-name key (see LibraryProvider.indexKey).
+    override val indexKey = "fake-${kind.name}"
     val launched = mutableListOf<LibraryEntry>()
 
     override suspend fun scan(): List<LibraryEntry> = entries
@@ -140,7 +143,7 @@ class LibraryTest {
         assertTrue(entries!!.single().favorite)
 
         // Toggling the scanned (now favourite) entry turns it off again.
-        assertEquals(false, library.toggleFavorite(wineEntry))
+        assertEquals(false, library.toggleFavorite(entries.single()))
         assertTrue(favorites.ids.isEmpty())
     }
 

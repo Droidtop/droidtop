@@ -735,6 +735,15 @@ class Library(
     private val updates = F95UpdateCheck(links, f95Api)
 
     private val scanScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    init {
+        // One provider, one slice: two providers on one indexKey would merge
+        // their walks into a single slice and each publish the other's games
+        // (two instances of a class that keeps the class-name default).
+        val clashing = providers.groupBy { it.indexKey }.filterValues { it.size > 1 }.keys
+        require(clashing.isEmpty()) { "Library providers share an indexKey: $clashing" }
+    }
+
     private val backgroundScanStates = ConcurrentHashMap<Set<LibraryEntryKind>, MutableStateFlow<List<LibraryEntry>?>>()
 
     /** Ids whose play history or favourite changed; a publishing scan asks about them again (see LibraryFacts). */
