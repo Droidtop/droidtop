@@ -36,9 +36,14 @@ class PluginRecordTest {
         payload = listOf(PluginPayloadFile("classes.jar", "a".repeat(64))),
     )
 
-    private fun record(disabledReason: String? = null, enabled: Boolean = true) = PluginRecord(
+    private fun record(
+        disabledReason: String? = null,
+        enabled: Boolean = true,
+        approvedKeySha256: String = "",
+    ) = PluginRecord(
         manifest = manifest(),
         archiveDigest = "b".repeat(64),
+        approvedKeySha256 = approvedKeySha256,
         trust = PluginTrustState.APPROVED,
         enabled = enabled,
         rootApproved = false,
@@ -72,6 +77,25 @@ class PluginRecordTest {
         val withEvent = manifest().copy(subscribedEvents = setOf("default_player_changed"))
         val roundTripped = PluginRecord.fromJson(record().copy(manifest = withEvent).toJson())!!
         assertEquals(setOf("default_player_changed"), roundTripped.manifest.subscribedEvents)
+    }
+
+    @Test
+    fun `the approved key fingerprint round-trips, not silently dropped to empty`() {
+        // Same class of bug as subscribedEvents (above): the field that
+        // decides whether an update's approval carries over (docs/SPEC.md
+        // 12a "Trust over updates") must survive the record.json round
+        // trip PluginStore does on every read, or every update of a
+        // plugin installed by a pre-carry-over build would start PENDING
+        // on a device that approved it under a known key.
+        val roundTripped = PluginRecord.fromJson(record(approvedKeySha256 = "c".repeat(64)).toJson())!!
+        assertEquals("c".repeat(64), roundTripped.approvedKeySha256)
+    }
+
+    @Test
+    fun `a record with no key fingerprint field (pre-carry-over build) reads as empty, not garbage`() {
+        val json = record().toJson().apply { remove("approvedKeySha256") }
+        val roundTripped = PluginRecord.fromJson(json)!!
+        assertEquals("", roundTripped.approvedKeySha256)
     }
 
     @Test

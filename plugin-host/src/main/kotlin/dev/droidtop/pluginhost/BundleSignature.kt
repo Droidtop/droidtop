@@ -55,6 +55,21 @@ object PluginOriginKeys {
     /** True when [origin] is the official one certified inside droidtop's own binary -- the row the "Keys you trust" screen labels "Official" and never offers to remove. */
     fun isOfficial(origin: String): Boolean = origin == OFFICIAL_ORIGIN
 
+    /**
+     * The fingerprint [PluginRecord.approvedKeySha256] stores -- the hex
+     * SHA-256 of the pinned public key's own DER (SubjectPublicKeyInfo,
+     * the same bytes [PINNED] base64-encodes) -- or null when no key is
+     * pinned for [origin]. This is what makes "signed by the same key"
+     * decidable for the carry-over rule (docs/SPEC.md 12a, "Trust over
+     * updates"): the install path verifies the signature against this
+     * exact pinned key, so two bundles that both pass it are, by
+     * construction, signed by the same key.
+     */
+    fun keyFingerprintFor(origin: String): String? {
+        val key = resolve(origin) ?: return null
+        return sha256(key.encoded)
+    }
+
     /** Test/tooling hook -- lets unit tests and the sample-bundle packager pin a throwaway key without touching [PINNED]. */
     fun withOrigin(origin: String, publicKeyBase64: String, block: () -> Unit) {
         val previous = overrides[origin]

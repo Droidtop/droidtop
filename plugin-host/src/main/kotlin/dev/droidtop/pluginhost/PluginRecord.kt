@@ -12,8 +12,20 @@ import org.json.JSONObject
  */
 data class PluginRecord(
     val manifest: PluginManifest,
-    /** SHA-256 over the exact signed manifest bytes -- what approval is bound to (checklist point 4: "approval that never carries over to a new digest"). */
+    /** SHA-256 over the exact signed manifest bytes -- what this installed copy was verified against. */
     val archiveDigest: String,
+    /**
+     * The fingerprint ([BundleSignature.keyFingerprintFor]) of the pinned
+     * key this bundle's signature verified against when it was
+     * (re)installed -- what approval is bound to, alongside the digest
+     * (docs/SPEC.md 12a checklist point 4, "Trust over updates"): an
+     * update that verifies against this same key carries the APPROVED
+     * state over to its new digest, and anything else starts PENDING.
+     * Empty for records written by builds before the field existed: they
+     * get no carry-over on their first update, one re-approval, the safe
+     * direction.
+     */
+    val approvedKeySha256: String = "",
     val trust: PluginTrustState,
     val enabled: Boolean,
     /** True only once the user approved THIS plugin's root request on the approval screen. Independent of whether the device even has root -- PluginRunner checks device root separately at call time, so this bit alone never grants anything. */
@@ -55,6 +67,7 @@ data class PluginRecord(
             ),
         )
         put("archiveDigest", archiveDigest)
+        put("approvedKeySha256", approvedKeySha256)
         put("trust", trust.name)
         put("enabled", enabled)
         put("rootApproved", rootApproved)
@@ -119,6 +132,9 @@ data class PluginRecord(
             return PluginRecord(
                 manifest = manifest,
                 archiveDigest = json.optString("archiveDigest"),
+                // Missing (a record a pre-carry-over build wrote) is "",
+                // which is exactly "no carry-over", the safe default.
+                approvedKeySha256 = json.optString("approvedKeySha256"),
                 trust = trust,
                 enabled = json.optBoolean("enabled", trust == PluginTrustState.APPROVED),
                 rootApproved = json.optBoolean("rootApproved", false),

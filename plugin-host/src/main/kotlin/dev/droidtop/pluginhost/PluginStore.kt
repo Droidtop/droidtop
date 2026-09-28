@@ -11,8 +11,8 @@ import java.io.File
  * lives at `filesDir/plugins/<id>/` (payload + `record.json`); nothing
  * here is synced, bundled or auto-downloaded -- a plugin arrives the way
  * an [dev.droidtop.library.integrations.Integration] file does: the user
- * picks it, or (future work) a catalog repo lists it and the user picks
- * from there.
+ * picks it, or the catalog lists it and the user installs it from there
+ * (docs/SPEC.md 12a "The catalog").
  */
 object PluginStore {
     fun root(context: Context): File = File(context.filesDir, "plugins")
