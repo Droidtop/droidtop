@@ -255,6 +255,21 @@ internal fun MenuRow(
     // a slider in Settings has no touch route at all, in either
     // direction, and a cycling choice only has a forwards one.
     onAdjust: ((Int) -> Unit)? = null,
+    // True from a caller that already keeps the selected row in view
+    // itself (docs/SPEC.md "Settings scrolling polish", 2026-09-28): the
+    // Settings catalog's own LazyColumn and its Choice picker both run a
+    // `LazyListState.keepInView` on every selection change, edge-aware
+    // and non-animated-jump (see keepInView's own doc comment). Before
+    // this flag, EVERY row still also armed its own BringIntoViewRequester
+    // below, so a single Up/Down press fired two independent scroll
+    // animations against the same LazyListState at once -- the real
+    // cause of "settings scrolling isn't smooth" (owner, tracker#2):
+    // `dumpsys gfxinfo` showed the jank, two competing scrolls is why.
+    // Left false (the original always-on behaviour) for every menu built
+    // on a plain `verticalScroll` Column with no scroll-keeping of its
+    // own (Quick Menu, PcGameMenu, GamelistOptionsMenu and friends),
+    // which still need MenuRow to scroll itself into view.
+    ownScrollKeeping: Boolean = false,
 ) {
     val window = LocalShellWindow.current
     // Real bug this fixes (owner, 2026-09-27): every menu built from
@@ -271,14 +286,18 @@ internal fun MenuRow(
     // off the bottom edge. BringIntoViewRequester is the real fix, once,
     // here, rather than in every menu that uses this row: any scrollable
     // ancestor (MenuPanel's Column) is asked to scroll this row into view
-    // exactly when it becomes the selected one.
+    // exactly when it becomes the selected one -- UNLESS the caller
+    // already owns that job ([ownScrollKeeping]), where a second,
+    // independent scroll would only fight the first one.
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
-    LaunchedEffect(selected) { if (selected) bringIntoViewRequester.bringIntoView() }
+    LaunchedEffect(selected, ownScrollKeeping) {
+        if (selected && !ownScrollKeeping) bringIntoViewRequester.bringIntoView()
+    }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .bringIntoViewRequester(bringIntoViewRequester)
+            .then(if (ownScrollKeeping) Modifier else Modifier.bringIntoViewRequester(bringIntoViewRequester))
             // The one height rule, plus a touch target where fingers are
             // the input: a 56dp row is uniform everywhere, and on a
             // touch-first window it is at least one touch target tall.

@@ -639,6 +639,11 @@ private fun CatalogRowView(
         onClick = onClick,
         onLongClick = onLongClick,
         onAdjust = onAdjust,
+        // The enclosing LazyColumn (CatalogNavigator, just above) already
+        // runs `listState.keepInView` on every selection change -- see
+        // MenuRow's own `ownScrollKeeping` doc comment for why a second,
+        // independent scroll animation here was the real jank.
+        ownScrollKeeping = true,
     )
 }
 
@@ -730,6 +735,10 @@ internal fun CatalogChoicePicker(
                     title = option.label,
                     selected = index == selected,
                     onClick = { onPick(option.value) },
+                    // This screen's own listState.keepInView (above)
+                    // already follows `selected` -- see MenuRow's
+                    // `ownScrollKeeping` doc comment.
+                    ownScrollKeeping = true,
                 )
             }
         }
