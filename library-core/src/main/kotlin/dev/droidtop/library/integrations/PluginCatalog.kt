@@ -66,7 +66,7 @@ object PluginCatalog {
             System.currentTimeMillis() - cacheFile(context).lastModified() >= REFETCH_AFTER_MS
         if (!stale) return@withContext Load(cached, null)
         try {
-            fetchAndCache(context)
+            Load(fetchAndCache(context), null)
         } catch (failure: Exception) {
             Load(
                 cached,

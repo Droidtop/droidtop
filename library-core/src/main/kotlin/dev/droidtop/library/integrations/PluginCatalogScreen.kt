@@ -83,7 +83,7 @@ object PluginCatalogScreen {
     private fun rowFor(origin: PluginCatalogOrigin, plugin: PluginCatalogPlugin, installed: PluginRecord?): CatalogItem {
         val subtitle = buildString {
             append(plugin.description ?: "No description")
-            append(" - ").append(plugin.origin)
+            append(" - ").append(origin.origin)
         }
         val latest = PluginCatalog.latestStable(plugin)
         val isUpdate = installed != null && latest != null &&
