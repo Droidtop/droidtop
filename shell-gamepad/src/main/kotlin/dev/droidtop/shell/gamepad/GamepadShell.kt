@@ -649,6 +649,20 @@ fun GamepadShell(
                     }
                     return@onKeyEvent true
                 }
+                // Start/Menu opens the same menu (owner direction: "one
+                // obvious, consistent way into Settings" -- Start is the
+                // button most pads and most players already read as
+                // "menu", and it did nothing at all in the shell before
+                // this). Same KeyDown-opens contract as R2 above, and it
+                // is additive: R2 stays the one named on screen, this is
+                // muscle-memory support for a button that would otherwise
+                // sit dead in a gaming shell.
+                if (GamepadKeyMap.actionFor(event.key) == GamepadAction.START) {
+                    if (event.type == KeyEventType.KeyDown && !quickMenuOpen) {
+                        quickMenuOpen = true
+                    }
+                    return@onKeyEvent true
+                }
                 // HOLD Select stays as the fallback trigger for pads
                 // whose triggers are analog-only and never emit an R2
                 // KEY event at all -- a different failure domain, not a

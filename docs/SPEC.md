@@ -6481,6 +6481,75 @@ were already on the game's own detail and the system's own screen
 respectively (§7i, §7f) and stay there — this decision is about
 consolidating the PROVIDER/ACCOUNT layer, not those.
 
+### One consistent way into Settings (directed 2026-09-28)
+
+**Audit.** Before this pass droidtop already had one real, working route
+from every mode into settings -- `BackButtonMenu`'s mode switcher (long-press
+Back, the Android home screen's own long-press menu, the Desktop taskbar's
+"Modes" button, and Gaming's own "Switch mode" quick-settings tile all open
+the SAME dialog, whose "Modes and settings" row opens Global settings) -- plus
+Desktop's own taskbar carries a second, direct "Settings" button straight to
+`SettingsDesktopFragment` (Desktop's own settings, not Global's; a
+deliberate, non-duplicate distinction -- every mode's own settings catalog
+leads with a "Global settings" row to reach the other one, the same pattern
+Gaming's Settings section already uses). What was missing was specific to
+Gaming, where the owner's ask was sharpest:
+
+- **Controller: no direct route from the Quick Menu.** The System tab
+  already rendered the settings catalog's live `quickOnly` group as tiles,
+  but that is a *view* of one settings GROUP, not a way to reach the
+  Settings SECTION itself (Library, Appearance, Input, and everything
+  else). The only path from the Quick Menu was two hops through "Switch
+  mode" -> "Modes and settings", which lands on Global settings, not
+  Gaming's own -- and Start, the button most pads and most players already
+  read as "menu", did nothing at all in the shell.
+- **Per-system settings** (folder, emulator/player, BIOS -- Settings >
+  Library > Console systems) had no route from a system's own gamelist:
+  its options menu offered "Scrape this system", "Get games" and a
+  launch-screen choice, but nothing to configure the system itself.
+- **Search** (`SettingsSearchIndex`, built 2026-09-26) was already real and
+  already controller-driven (D-pad moves the result list, A picks) -- no
+  gap found here.
+
+**What changed, no new mechanism added:**
+
+- **Start/Menu opens the Quick Menu**, exactly like R2 (`GamepadShell`'s
+  key handler, `QuickMenu`'s own toggle-closed check) -- additive, since
+  Start dispatched nothing in the shell before this. R2 stays the one
+  named on screen (the R2 pill); Start needs no pill because most pads
+  already read it as "menu" without one.
+- **The Quick Menu's System tab gained a "Settings" tile**
+  (`GamingSettingsCatalog.ID_SYSTEM_OPEN_SETTINGS`, in the existing
+  `quickOnly` System group, right after "Switch mode") that deep-links
+  into Gaming's own Settings section the same way "Browse themes" already
+  does -- `EXTRA_GAMING_START_SECTION` back into the running shell's own
+  `deepLinkToken` effect -- rather than a second settings surface or a
+  hand-rolled navigation call from inside the tile grid. Drawn with a new
+  gear glyph (`QuickGlyph.SETTINGS`) distinct from the existing
+  `ANDROID` glyph "Android settings" already used, so the two
+  settings-shaped tiles read as different destinations.
+- **A system's gamelist options menu gained "System settings"**
+  (`GamelistOptionsMenu`, shown whenever the list has a real console
+  system id), opening the SAME registered Console systems screen
+  (`SettingsScreenRegistry.get("console_systems")`) Settings > Library
+  already renders, through the same generic `CatalogNavigator` dialog the
+  menu already uses for "Get games" -- not a second folder/emulator
+  picker. It lists every system's folder rather than jumping straight to
+  this one (that screen has no per-system deep link yet), but it removes
+  the Settings detour a system's own options menu used to require.
+
+Touch was already covered per surface and stays that way, deliberately
+not consolidated into a single new widget: Gaming's own "Settings" tab in
+the section tab bar (touch-reachable per §7j, `SectionTabBar`'s
+`onQuickMenu` pill besides it), Desktop's taskbar "Settings" button, and
+Standard's own long-press-wallpaper settings entry (stock launcher3
+behaviour, left alone per this repo's "vendored trees ... hook or extend,
+never rewrite" rule) are three different, already-obvious touch
+affordances for three different shells with three different settings
+surfaces -- collapsing them into one shared widget would be a fourth
+mechanism competing with three that already work, not a consolidation.
+
+
 ## 7g. One library across every source (audit + plan, directed 2026-09-01)
 
 A full audit of droidtop and every vendored repo, against the question

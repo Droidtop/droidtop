@@ -55,6 +55,7 @@ object GamingSettingsCatalog {
     const val ID_SYSTEM_VPN = "pref_gaming_system_vpn"
     const val ID_SYSTEM_LEAVE_UI_MODE = "pref_gaming_system_leave_ui_mode"
     const val ID_SYSTEM_SWITCH_MODE = "pref_gaming_system_switch_mode"
+    const val ID_SYSTEM_OPEN_SETTINGS = "pref_gaming_system_open_settings"
     const val ID_SYSTEM_DND = "pref_gaming_system_dnd"
     const val ID_SYSTEM_DND_GRANT = "pref_gaming_system_dnd_grant"
     const val ID_SYSTEM_ADAPTIVE = "pref_gaming_system_adaptive"
@@ -380,6 +381,28 @@ object GamingSettingsCatalog {
                         title = "Switch mode",
                         subtitle = "The Android home screen, Desktop, or droidtop's modes and settings",
                         run = launchComponent("dev.droidtop.shell.standard.ModeSwitcherActivity"),
+                    ),
+                )
+                // The direct route into Gaming's own Settings section
+                // (docs/SPEC.md "One settings entry point"): Start/Menu
+                // and the R2 pill both open this menu, and until this row
+                // existed the only way from here into Settings was two
+                // hops through Switch mode -> Modes and settings, which
+                // lands on GLOBAL settings, not Gaming's own. Deep-links
+                // back into the already-running shell the same way Browse
+                // themes does (EXTRA_GAMING_START_SECTION, read by
+                // GamepadShell's own deepLinkToken effect) rather than a
+                // second settings surface.
+                add(
+                    ActionItem(
+                        id = ID_SYSTEM_OPEN_SETTINGS,
+                        title = "Settings",
+                        subtitle = "Library, appearance, input, and everything else Gaming configures",
+                        run = launchComponent(
+                            "dev.droidtop.app.MainActivity",
+                            "dev.droidtop.app.EXTRA_MODE" to "gaming",
+                            "dev.droidtop.app.EXTRA_GAMING_START_SECTION" to "SETTINGS",
+                        ),
                     ),
                 )
                 add(

@@ -58,7 +58,11 @@ import dev.droidtop.shell.gamepad.input.ownPadButtons
  * top-right corner. Hold-SELECT remains only as the fallback for pads
  * whose triggers are analog-only and never emit an R2 key event
  * (short-press SELECT keeps its existing meaning; chords were rejected
- * as undiscoverable).
+ * as undiscoverable). START/Menu opens and toggles it too (owner
+ * direction, "one obvious, consistent way into Settings"): unlike R2 it
+ * carries no on-screen pill of its own, because most pads already read
+ * Start as "menu" without one -- it is muscle-memory support on top of
+ * the named trigger, not a second thing to discover.
  *
  * ENTIRELY controller-driven, per direction: L1/R1 switch tabs, D-pad
  * moves, A opens, X dismisses, Y clears all, B closes. The System tab
@@ -126,7 +130,7 @@ internal fun QuickMenu(onDismiss: () -> Unit) {
                         // swallowed, never acted on -- the same
                         // flash-open-shut hazard the SELECT note below
                         // describes.
-                        if (action == GamepadAction.R2) {
+                        if (action == GamepadAction.R2 || action == GamepadAction.START) {
                             if (event.type == KeyEventType.KeyDown) onDismiss()
                             return@onPreviewKeyEvent true
                         }

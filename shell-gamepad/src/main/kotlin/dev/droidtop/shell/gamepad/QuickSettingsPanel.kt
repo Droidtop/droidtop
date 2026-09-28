@@ -619,6 +619,21 @@ internal fun QuickGlyphIcon(glyph: QuickGlyph, tint: Color, modifier: Modifier =
                 )
                 line(10f, 12f, 21f, 12f); line(17f, 8f, 21f, 12f); line(17f, 16f, 21f, 12f)
             }
+            QuickGlyph.SETTINGS -> {
+                // A gear: a ring, eight spokes, and a filled hub -- drawn
+                // apart from QuickGlyph.ANDROID's six-spoke, hub-less ring
+                // (the "Android settings" tile's own glyph) so the two
+                // settings-shaped tiles read as different destinations at
+                // a glance, not the same icon twice.
+                ring(12f, 12f, 5.5f)
+                listOf(0f, 45f, 90f, 135f, 180f, 225f, 270f, 315f).forEach { deg ->
+                    val rad = Math.toRadians(deg.toDouble())
+                    val dx = Math.cos(rad).toFloat()
+                    val dy = Math.sin(rad).toFloat()
+                    line(12f + dx * 7.5f, 12f + dy * 7.5f, 12f + dx * 10f, 12f + dy * 10f)
+                }
+                dot(12f, 12f, 1.8f)
+            }
             QuickGlyph.GENERIC -> {
                 ring(12f, 12f, 8f)
                 dot(12f, 12f, 2.2f)

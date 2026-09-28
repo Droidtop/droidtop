@@ -30,6 +30,7 @@ import dev.droidtop.shell.gamepad.pc.PC_SYSTEM_ID
 import dev.droidtop.library.scraper.scrapeSystemArtwork
 import dev.droidtop.library.integrations.AcquireContentSources
 import dev.droidtop.library.settings.CatalogScreen
+import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
@@ -117,6 +118,7 @@ object GamelistSortPrefs {
 /** The one label for the PC/engine scrape action, shared by the list that offers it and the handler that runs it. */
 private const val SCRAPE_PC_GAMES = "Scrape PC & engine games"
 private const val STORES_AND_FOLDERS = "Stores and folders"
+private const val SYSTEM_SETTINGS = "System settings"
 private const val ORPHANS_FIND = "Find orphaned media"
 private const val ORPHANS_DELETE = "Delete orphaned media: press A again"
 
@@ -155,11 +157,16 @@ internal fun GamelistOptionsMenu(
     var sort by remember { mutableStateOf(GamelistSortPrefs.get(context, groupKey)) }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
-    // Non-null while the "Get games" screen (AcquireContentSources,
-    // docs/SPEC.md 12/12a) is up -- rendered by the SAME generic
+    // Non-null while a real settings catalog screen is hosted over this
+    // menu -- the "Get games" screen (AcquireContentSources, docs/SPEC.md
+    // 12/12a) or Console systems ("System settings" below, docs/SPEC.md
+    // "One settings entry point") -- rendered by the SAME generic
     // CatalogNavigator Gaming's own Settings section uses, so real
-    // controller/touch text entry and a focusable results list come
-    // for free rather than a second hand-built input widget here.
+    // controller/touch text entry and a focusable results list come for
+    // free rather than a second hand-built input widget here. One state
+    // slot for both: only ever one of them is open at a time, and a
+    // second slot would be a second mechanism for "show a settings
+    // screen over this menu".
     var acquireScreen by remember { mutableStateOf<CatalogScreen?>(null) }
     var filter by remember { mutableStateOf(GamelistFilterPrefs.get(context, groupKey)) }
     // Per-system launch-screen default (docs/SPEC.md section 4c: "Select
@@ -201,6 +208,7 @@ internal fun GamelistOptionsMenu(
             }
             if (systemId != null) {
                 add("Launch screen: " + (systemLaunchScreen?.label ?: "Ask"))
+                add(SYSTEM_SETTINGS)
                 add("Scrape this system")
                 add("Import gamelist.xml")
                 add("Get games")
@@ -444,6 +452,19 @@ internal fun GamelistOptionsMenu(
             STORES_AND_FOLDERS -> {
                 onDismiss()
                 onOpenStores()
+            }
+            SYSTEM_SETTINGS -> {
+                // The same registered screen Settings > Library > Console
+                // systems opens (registryId "console_systems",
+                // AppSettingsCatalogs) -- resolved through the registry
+                // like every other :app-owned screen this module reaches,
+                // never a second copy of the folder/emulator picker. It
+                // lists every system's folder, not just this one, because
+                // that screen has no per-system deep link yet; landing on
+                // it from here still saves the Settings detour this
+                // system's folder/emulator/BIOS config used to need.
+                val screen = SettingsScreenRegistry.get("console_systems")
+                if (screen != null) acquireScreen = screen else status = "Settings screen unavailable"
             }
             "Close" -> onDismiss()
         }
