@@ -30,14 +30,20 @@ object PluginStore {
     }
 
     /** Installed, approved, enabled and re-verified plugins that declared [capability] -- what an actual call site (a status tile row, a metadata pass) should iterate. */
-    fun runnableFor(context: Context, capability: PluginCapability): List<PluginRecord> =
-        installed(context).filter { it.runnable() && capability in it.manifest.capabilities }
-            .filter { PluginBundleInstaller.verifyInstalled(root(context), it) == null }
+    fun runnableFor(context: Context, capability: PluginCapability): List<PluginRecord> {
+        val dir = root(context)
+        val userKeys = UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))
+        return installed(context).filter { it.runnable() && capability in it.manifest.capabilities }
+            .filter { PluginBundleInstaller.verifyInstalled(dir, it, userKeys) == null }
+    }
 
     /**
      * Installs a bundle the user picked via the system file picker (the
      * same "Add integration file"-shaped flow [dev.droidtop.library.integrations.IntegrationStore.import]
      * already uses). Returns a message for the approval screen to show.
+     * Verifies against the user-trusted keys too ("Keys you trust"),
+     * so a bundle from an origin the user trusted installs here exactly
+     * like an official one.
      */
     fun importFromPicker(context: Context, uri: Uri): String {
         val bytes = runCatching {
@@ -46,7 +52,8 @@ object PluginStore {
         val tmp = File.createTempFile("plugin-import", ".droidplugin.tar.xz", context.cacheDir)
         return try {
             tmp.writeBytes(bytes)
-            when (val result = PluginBundleInstaller.install(tmp, root(context))) {
+            val userKeys = UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))
+            when (val result = PluginBundleInstaller.install(tmp, root(context), userKeys)) {
                 is PluginInstallResult.Installed ->
                     "Installed ${result.record.manifest.label} -- approve it below before it runs"
                 is PluginInstallResult.Refused -> "Refused: ${result.error.reason}"

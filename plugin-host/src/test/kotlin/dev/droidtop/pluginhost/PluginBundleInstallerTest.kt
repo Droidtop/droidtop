@@ -105,6 +105,56 @@ class PluginBundleInstallerTest {
     }
 
     @Test
+    fun `refuses a bundle from an origin no key anywhere resolves for`() {
+        val pair = freshKeyPair()
+        val pluginsRoot = tmp.newFolder("plugins")
+        // No withOrigin hook, no user keys: "stranger" is unknown, and an
+        // unknown origin is refused outright -- never "installed but
+        // unverified".
+        val result = PluginBundleInstaller.install(buildBundle("stranger", pair.private), pluginsRoot)
+        assertTrue(result is PluginInstallResult.Refused)
+        assertTrue((result as PluginInstallResult.Refused).error.reason.contains("trusted key"))
+    }
+
+    @Test
+    fun `installs a user-trusted origin's bundle, then refuses its update once the key is removed`() {
+        val pair = freshKeyPair()
+        val pluginsRoot = tmp.newFolder("plugins")
+        val keyStore = tmp.newFile("plugin-user-keys.json")
+        UserOriginKeys.add(keyStore, "acme", Base64.getEncoder().encodeToString(pair.public.encoded), source = "https://github.com/acme/acme-plugins")
+
+        val userKeys = UserOriginKeys.loadBase64(keyStore)
+        val installed = PluginBundleInstaller.install(buildBundle("acme", pair.private), pluginsRoot, userKeys)
+        assertTrue(installed is PluginInstallResult.Installed)
+
+        // An update (different bytes, same origin, same key) verifies while the key is trusted...
+        val update = PluginBundleInstaller.install(
+            buildBundle("acme", pair.private, manifestOverride = { it.put("label", "Sample status tile v2") }),
+            pluginsRoot,
+            userKeys,
+        )
+        assertTrue(update is PluginInstallResult.Installed)
+        val record = (update as PluginInstallResult.Installed).record
+
+        // ...and is refused the moment the origin's key is removed: no key
+        // resolves for "acme" anymore, so the signature check fails the
+        // same way an unknown origin's always did.
+        assertTrue(UserOriginKeys.remove(keyStore, "acme"))
+        val removedKeys = UserOriginKeys.loadBase64(keyStore)
+        val refusedUpdate = PluginBundleInstaller.install(buildBundle("acme", pair.private), pluginsRoot, removedKeys)
+        assertTrue(refusedUpdate is PluginInstallResult.Refused)
+        assertTrue((refusedUpdate as PluginInstallResult.Refused).error.reason.contains("signature"))
+
+        // The already-installed plugin stops running too: re-verification
+        // before activation fails on the same missing key.
+        val problem = PluginBundleInstaller.verifyInstalled(pluginsRoot, record, removedKeys)
+        assertTrue(problem != null && problem.reason.contains("signature"))
+        // Nothing was lost: with the key trusted again, the same files verify.
+        UserOriginKeys.add(keyStore, "acme", Base64.getEncoder().encodeToString(pair.public.encoded), source = null)
+        assertTrue(PluginBundleInstaller.verifyInstalled(pluginsRoot, record, UserOriginKeys.loadBase64(keyStore)) == null)
+    }
+
+    @Test
     fun `refuses a bundle whose payload hash does not match`() {
         val pair = freshKeyPair()
         val pluginsRoot = tmp.newFolder("plugins")

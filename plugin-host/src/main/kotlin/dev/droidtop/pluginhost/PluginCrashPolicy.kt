@@ -51,10 +51,7 @@ class PluginCrashPolicy(
             return PluginResult.failure("no runner for kind ${record.manifest.kind.id} yet")
         }
         val dir = PluginStore.payloadDirFor(context, record.manifest.id)
-        if (PluginBundleInstaller.verifyInstalled(PluginStore.root(context), record) != null) {
-            PluginStore.disableWithReason(context, record.manifest.id, "files changed on disk since approval")
-            return PluginResult.failure("re-verification failed")
-        }
+        gateOnVerification(record)?.let { return it }
         if (!runner.load(record, dir.absolutePath)) {
             return PluginResult.failure("plugin failed to load")
         }
@@ -75,10 +72,7 @@ class PluginCrashPolicy(
     override suspend fun startJob(record: PluginRecord, capability: PluginCapability, args: Map<String, String>, jobId: String): Boolean {
         if (!record.runnable()) return false
         if (record.manifest.kind !in RUNNABLE_KINDS) return false
-        if (PluginBundleInstaller.verifyInstalled(PluginStore.root(context), record) != null) {
-            PluginStore.disableWithReason(context, record.manifest.id, "files changed on disk since approval")
-            return false
-        }
+        gateOnVerification(record)?.let { return false }
         val dir = PluginStore.payloadDirFor(context, record.manifest.id)
         if (!runner.load(record, dir.absolutePath)) return false
         return runner.startJob(record.manifest.id, capability, args, jobId)
@@ -97,13 +91,30 @@ class PluginCrashPolicy(
         if (event.id !in record.manifest.subscribedEvents) return null
         if (!record.runnable()) return null
         if (record.manifest.kind !in RUNNABLE_KINDS) return null
-        if (PluginBundleInstaller.verifyInstalled(PluginStore.root(context), record) != null) {
-            PluginStore.disableWithReason(context, record.manifest.id, "files changed on disk since approval")
-            return null
-        }
+        gateOnVerification(record)?.let { return null }
         val dir = PluginStore.payloadDirFor(context, record.manifest.id)
         if (!runner.load(record, dir.absolutePath)) return null
         return runner.notifyEvent(record.manifest.id, event, args)
+    }
+
+    /**
+     * The shared re-verification gate of [invoke]/[startJob]/
+     * [notifyEvent]: re-checks the installed files AND the signature
+     * (against the official pinned key first, then the user-trusted
+     * keys, [UserOriginKeys]) before every activation, disabling the
+     * plugin with the REAL problem as the reason -- "signature no
+     * longer verifies" for a plugin whose origin's key was removed
+     * from "Keys you trust", "<file> changed on disk since approval"
+     * for a tampered payload -- rather than one generic sentence for
+     * all of them. Returns the failure result [invoke] should return,
+     * or null when the plugin is fit to run.
+     */
+    private fun gateOnVerification(record: PluginRecord): PluginResult? {
+        val userKeys = UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))
+        val problem = PluginBundleInstaller.verifyInstalled(PluginStore.root(context), record, userKeys)
+        if (problem == null) return null
+        PluginStore.disableWithReason(context, record.manifest.id, problem.reason)
+        return PluginResult.failure(problem.reason)
     }
 
     override fun cancelJob(pluginId: String, jobId: String) {

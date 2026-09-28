@@ -10002,7 +10002,7 @@ the secondary path for sources that publish no key.
   as `droidtop-plugin-key.json` at the source's root; a catalog index
   carries the same two fields at its top level. The key is validated
   before it is ever shown: base64 → X.509 SPKI → EC → exactly P-256
-  (`UserOriginKeys.parseKey`); anything else is refused.
+  (`PluginOriginKeys.parseSpki`); anything else is refused.
 - **A changed key is never silently accepted.** Trusting a source
   stores origin → key plus the source URL it was fetched from, so the
   row shows provenance. A later fetch of a source that publishes a
