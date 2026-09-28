@@ -49,7 +49,7 @@ android {
         // "is this newer" numerically against the published release-info.
         // Local builds without the env var stay at 1.
         versionCode = versionRevision.toIntOrNull()?.coerceAtLeast(1) ?: 1
-        versionName = "0.1.0-dev-$versionRevision"
+        versionName = "0.2.0-dev.$versionRevision"
         // The ABIs droidtop ships (arm64-v8a for real hardware, x86_64 for
         // x86 devices and emulators) are set by `splits` below and the
         // packaging excludes, not an ndk abiFilters block: AGP refuses the

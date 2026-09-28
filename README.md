@@ -117,6 +117,10 @@ bundled-database copy task fails without it.
 
 ## Builds and releases
 
+See [CHANGELOG.md](CHANGELOG.md) for droidtop's version history in plain
+language; each dev build's own release notes (below) are generated the
+same way but list every build, not just numbered versions.
+
 Builds are made by CI. `.github/workflows/android-build.yml` runs on every
 push to `main` and on every pull request. It builds the native vendor
 dependencies, then `:app:assembleRelease` and `:app:assembleDebug`, and
@@ -127,23 +131,26 @@ change `docs/**`, `README.md`, `NOTICE.md` or `LICENSE` skip the build.
 the unit tests in a separate run on the same pushes, so the checks never
 hold up the APK.
 
-On a push to `main`, the build replaces the rolling GitHub release named
-**`latest`**, which holds three files: `droidtop-latest.apk` (the release
-build — the one to install), `droidtop-latest-debug.apk` (the same code
-built debuggable, for inspecting droidtop with adb, several times slower to
-start and navigate), and `release-info.json` (version code, both APK names,
-their SHA-256 digests and the commit).
+On a push to `main`, the build publishes a brand new GitHub release, tagged
+by version (`v0.2.0-dev.<versionCode>`) and never rewritten — droidtop's
+build history is its release list. Each one holds three files:
+`droidtop.apk` (the release build — the one to install),
+`droidtop-debug.apk` (the same code built debuggable, for inspecting
+droidtop with adb, several times slower to start and navigate), and
+`release-info.json` (version code, both APK names, their SHA-256 digests
+and the commit). The release notes list what changed since the previous
+build's release, grouped Added / Changed / Fixed, one line per commit.
 
 Both APKs are fat APKs for arm64-v8a and x86_64, signed with the same
 persistent key so a newer build installs over an older one. `versionCode`
 is the number of commits reachable from the built commit, and
-`versionName` is `0.1.0-dev-<versionCode>`.
+`versionName` is `0.2.0-dev.<versionCode>`.
 
-The `testing` and `stable` releases are published by running the
-**Release promote** workflow by hand. It builds nothing: it publishes the
-APKs that a commit's own **Android build** run already made (by default,
-whatever commit `latest` carries now), and only if that commit's build and
-checks both passed.
+The `testing` and `stable` releases are moving pointers, published by
+running the **Release promote** workflow by hand. It builds nothing: it
+publishes the APKs that a commit's own **Android build** run already made
+(by default, the commit the newest per-build release carries), and only if
+that commit's build and checks both passed.
 
 ## In-app updater
 
@@ -155,13 +162,14 @@ against the published SHA-256, and hands it to Android's PackageInstaller.
 Android shows its own confirmation, except where Android itself allows a
 silent update.
 
-The build channel is Unstable (the `latest` release, every push to `main`,
-the default), Testing (`testing`) or Stable (`stable`); a channel that
-hasn't been published yet reports there's nothing there. Install debug
-builds follows the channel's debug APK instead of the release APK — off by
-default, and the setting warns about the slowdown. The check schedule is
-never, daily (the default), weekly or monthly, with an option to check only
-on unmetered networks, plus a manual check.
+The build channel is Unstable (the newest per-build release, one per push
+to `main`, the default — found through the GitHub API, since there's no
+fixed tag for it any more), Testing (`testing`) or Stable (`stable`); a
+channel that hasn't been published yet reports there's nothing there.
+Install debug builds follows the channel's debug APK instead of the release
+APK — off by default, and the setting warns about the slowdown. The check
+schedule is never, daily (the default), weekly or monthly, with an option
+to check only on unmetered networks, plus a manual check.
 
 To check and install now from a computer, whatever the schedule says:
 

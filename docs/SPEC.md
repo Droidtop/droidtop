@@ -4905,9 +4905,12 @@ so neither app assumes the other:
   the channel chosen in one place, and a home screen that IS the library
   (every game added, scanned or launched, most recent first).
 - **What is published is a release build**, with the same signing-key
-  continuity, rolling `latest` and `release-info.json` shape as droidtop
-  (§10b); the debug installer activities live in the debug source set
-  only.
+  continuity and `release-info.json` shape as droidtop (§10b); the debug
+  installer activities live in the debug source set only. Enginehost still
+  publishes every push to its own rolling `latest` release -- droidtop
+  moved to one permanent release per build, tagged by version
+  (Droidtop/tracker#119, §10b "Build history"); enginehost has not been
+  changed to match.
 
 ## 7e. Second-screen / ambient integrations (Spotify now-playing, Discord presence)
 
@@ -9551,11 +9554,68 @@ API because CI checks out one commit): it belongs to the commit, grows with
 every commit on `main` as long as `main` is never rewritten (the rule is
 rebase and push, never force), and a rebuild of a commit gets the same
 number. The switch moved the number up, not down (run 587, commit count
-about 700), so no installed build saw a downgrade. The rolling
-`latest` release carries `release-info.json` -- formatVersion, versionCode,
-versionName, apkName, apkSha256, commit -- published by the same workflow
-run that built the APK. Enginehost mirrors this exactly (its
-`agent/engine-bundles` line publishes the same shape of rolling release).
+about 700), so no installed build saw a downgrade. Every build carries
+`release-info.json` -- formatVersion, versionCode, versionName, apkName,
+apkSha256, commit -- published by the same workflow run that built the APK.
+
+**Build history, not one rewritten release (owner, Droidtop/tracker#119:
+"droidtop releases just constantly rewrite the same release. We need
+histories and fixes.").** Through 2026-09-28 every push to `main` replaced
+the same GitHub release (`latest`): the download link never moved, but
+nothing else survived a push either -- no earlier build's APK, no record of
+what changed. `android-build.yml`'s publish job now runs
+`release_channel.py publish-build`, which creates a brand new, permanent
+release per build, tagged `v0.2.0-dev.<versionCode>` (matching `versionName`
+with a `v` in front) and marked prerelease while every version is 0.x-dev.
+Its notes are generated from the commit subjects since the previous
+per-build release (`build_notes`, via the shared `categorize_commits` /
+`render_sections`): grouped Added (subject starts with "add"/"adds"/"added"),
+Changed and Fixed ("fix"/"fixed"/"fixes") -- Keep a Changelog's own
+vocabulary, one line per subject, merge commits and any line naming a
+private plugin (`PRIVATE_NAMES`) dropped, never a link to the private
+tracker. A rebuild of the same commit (workflow_dispatch, or a retry after
+this exact run was cancelled) reuses the same tag and replaces only that
+release; every other version's release is untouched, so nothing is ever
+pruned by this path (old releases are kept; a future pruning pass would
+still keep every non-dev version and at least the last 50).
+
+**Version bump to 0.2.0 and CHANGELOG.md (owner, Droidtop/tracker#119,
+2026-09-28).** `BASE_VERSION` in `release_channel.py` is the one place the
+version base lives; `app/build.gradle.kts`'s `versionName` and this script's
+own `versionName`/tag both read from it, so a future bump is one edit. The
+per-build suffix changed shape too, `-dev.<versionCode>` (a dot, matching
+Keep a Changelog's own dotted identifiers) rather than `-dev-<versionCode>`
+(a dash): `v0.2.0-dev.1234`, not `v0.1.0-dev-1234`. `CHANGELOG.md` (Keep a
+Changelog format: an Unreleased section, then one section per version,
+newest first) is droidtop's human-readable version history, separate from
+the per-build Unstable release notes above: release notes are generated
+from raw commit subjects for every single dev build and read by testers
+following Unstable, most of them developer-facing ("Container audio: bridge
+proot..."); CHANGELOG.md entries are curated, in end-user language, and
+only written when a real version is cut, which is not every dev build.
+Both documents group the same way (Added / Changed / Fixed) and share the
+same commit-categorizing code (`categorize_commits`, `render_sections` in
+`release_channel.py`) -- one mechanism, not two -- but CHANGELOG.md is never
+machine-written: `release_channel.py changelog-entry FROM TO` prints that
+grouping for a commit range so a person (or an agent acting on the owner's
+behalf) can rewrite it into plain language and paste it in, the same way
+the 0.2.0 section was seeded from droidtop's git history to date. Never a
+tracker link, a private plugin name, or an AI model/tool name in it.
+
+Two channels, one job each, deliberately not the same mechanism (one
+mechanism per job, not one mechanism forced onto two different jobs): every
+push to `main` needs a release nobody has to name, so Unstable is the
+version-tagged history above and the updater finds "newest" by asking the
+GitHub API which per-build release is newest
+(`AppSelfUpdate.fetchNewestBuild`, matching the same tag pattern
+`release_channel.py`'s `BUILD_TAG_RE` does) rather than reading a fixed URL.
+Promoting to Testing or Stable is a rare, deliberate action where the person
+promoting wants one unchanging download link, so those two stay the
+original moving-pointer release (`release_channel.py publish`, tag =
+channel name, asset-swap on republish) and the updater still reads them by
+their fixed tag. Enginehost mirrors the pre-2026-09-28 shape (its
+`agent/engine-bundles` line still publishes one rolling release) and has not
+been changed here; Droidtop/tracker#119 is a droidtop issue.
 
 **What is published is a release build (2026-09-21).** Through build 556 CI
 published the `debug` variant, the only build type the app had, and on the
@@ -9564,12 +9624,12 @@ effect. A debuggable package is never compiled ahead of time (the installed
 app's dexopt state was `extract`), ART runs it without inlining so that a
 debugger can attach anywhere, and the baseline profiles Compose ships are not
 installed for it. CI now builds `:app:assembleRelease`: not debuggable, signed
-with the same persistent key so it installs over any earlier `latest`,
+with the same persistent key so it installs over any earlier build,
 `androidx.profileinstaller` on the classpath so library baseline profiles are
 installed, and `<profileable android:shell="true">` so the shell's profilers
-still attach to the build people actually run. The asset is
-`droidtop-latest.apk`; the updater reads the name from `release-info.json`,
-so installed debug builds update to it by themselves. Code shrinking (R8) is
+still attach to the build people actually run. The asset is `droidtop.apk`;
+the updater reads the name from `release-info.json`, so installed debug
+builds update to it by themselves. Code shrinking (R8) is
 deliberately the next step and not this one: the vendored launcher,
 gamenative and keyboard trees load classes by name and through JNI, and their
 keep rules have to be proven on a device before a shrunk build is published.
@@ -9579,41 +9639,50 @@ tests run on.
 **Channels, and the debug APK beside the release one (directed 2026-09-22).**
 The user: "add two toggles to the update and etc checker: branch (so, stable,
 unstable, etc), and a debug checkbox, along with a warning if it's enabled."
-A channel is a GitHub release tag carrying its own `release-info.json` and
-both APKs: `latest` (what the updater calls Unstable, published by every push
-to main), `testing` and `stable` (published by the `release-promote.yml`
-workflow, run by hand). Promotion builds nothing (changed 2026-09-24; it used
-to build the current main again, so Testing could carry bytes nobody had
-tried and a main that had moved on). The build run uploads its APKs WITH
-their `release-info.json` as the `droidtop-apk` artifact, and promotion
-publishes exactly that artifact: by default the commit `latest` carries now,
-or a commit named by hand, and only when that commit's `android-build.yml`
-and `android-checks.yml` runs on main both succeeded. Artifacts are kept for
-the repository's retention period (90 days by default), so a commit older than
+A channel is a GitHub release (or, for Unstable, a release list) carrying
+`release-info.json` and both APKs: Unstable (every push to main, one new
+per-build release each time -- see "Build history" above), `testing` and
+`stable` (published by the `release-promote.yml` workflow, run by hand,
+each one moving-pointer release at its channel's own fixed tag). Promotion
+builds nothing (changed 2026-09-24; it used to build the current main again,
+so Testing could carry bytes nobody had tried and a main that had moved on).
+The build run uploads its APKs WITH their `release-info.json` as the
+`droidtop-apk` artifact, and promotion publishes exactly that artifact: by
+default the commit the newest per-build release carries, or a commit named
+by hand, and only when that commit's `android-build.yml` and
+`android-checks.yml` runs on main both succeeded. Artifacts are kept for the
+repository's retention period (90 days by default), so a commit older than
 that can no longer be promoted.
 
-Publishing never deletes a release (changed 2026-09-24; it used to delete and
-recreate, and a run cancelled between the two left the channel with no
-release, which every installed build reads as "nothing here"). One script,
-`build-scripts/release_channel.py publish`, serves every channel: it moves
-the channel's tag to the commit (one ref write), uploads the new files under
-a `next.` prefix while the old ones keep serving, then swaps each asset
-(delete old, rename new, `release-info.json` last). An interrupted publish
-leaves the release in place with either build complete, or for about a second
-a new APK beside the old `release-info.json`, which the updater rejects by
-digest and retries at its next check; the next publish clears any leftover
-`next.` uploads. Asset names and `release-info.json` fields are unchanged. The device picks a channel in Settings; the default is
-Unstable, because it is the only channel droidtop has ever had, and a channel
-nothing has been promoted to yet simply reports that there is nothing there.
+Testing and Stable publishing never deletes a release (changed 2026-09-24;
+it used to delete and recreate, and a run cancelled between the two left the
+channel with no release, which every installed build reads as "nothing
+here"). One script, `build-scripts/release_channel.py publish`, serves both:
+it moves the channel's tag to the commit (one ref write), uploads the new
+files under a `next.` prefix while the old ones keep serving, then swaps
+each asset (delete old, rename new, `release-info.json` last). An
+interrupted publish leaves the release in place with either build complete,
+or for about a second a new APK beside the old `release-info.json`, which
+the updater rejects by digest and retries at its next check; the next
+publish clears any leftover `next.` uploads. Asset names and
+`release-info.json` fields are unchanged. Unstable publishing is a
+different job with a different mechanism (`release_channel.py
+publish-build`, "Build history" above): a brand new release per commit, not
+a moving pointer, so there is nothing to swap in place -- an interrupted run
+either published its release or did not, and a retry replaces only that
+same commit's release. The device picks a channel in Settings; the default
+is Unstable, because it is the only channel droidtop has ever had, and a
+channel nothing has been promoted to yet simply reports that there is
+nothing there.
 
 The token that can write releases never shares a job with the build (decided
 2026-09-24, Droidtop/enginehost `docs/security/2026-09-24-ci-supply-chain.md`
 H3). `android-build.yml`'s build job, which runs Gradle, its plugins and the
 vendor-deps scripts, has a read-only token and checks out without leaving it
 in `.git/config`; a separate `publish` job with `contents: write` downloads the
-`droidtop-apk` artifact and runs only `release_channel.py publish`, exactly as
-`release-promote.yml` does. Every action is pinned to a commit SHA; moving one
-is a reviewed commit.
+`droidtop-apk` artifact and runs only `release_channel.py publish-build`,
+the same shape `release-promote.yml` uses for `release_channel.py publish`.
+Every action is pinned to a commit SHA; moving one is a reviewed commit.
 
 **Debug-build-installed, "Install debug builds" Off -- investigated, not a
 bug (rig, p1-dt-updater-debug-build-mismatch, 2026-09-27).** The console was
@@ -9642,10 +9711,10 @@ actually happens: Check now still finds and installs the release build.
 GitHub API: force-pushes and deletion are blocked, linear history is required,
 and the "Android build" workflow must pass (strict status checks). This
 prevents a mistaken or compromised push from publishing a signed APK to the
-`latest` channel without a successful build.
+Unstable channel without a successful build.
 
-Every build publishes BOTH variants: `droidtop-latest.apk` (release) and
-`droidtop-latest-debug.apk` (the same code, debuggable). The debug APK exists
+Every build publishes BOTH variants: `droidtop.apk` (release) and
+`droidtop-debug.apk` (the same code, debuggable). The debug APK exists
 because making the published build a release build took `adb shell run-as`
 and on-device inspection away with it -- the storage-redesign agent could not
 list `files/library/games/` on the rig for exactly this reason -- so the

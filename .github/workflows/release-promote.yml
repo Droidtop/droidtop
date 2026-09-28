@@ -3,8 +3,9 @@ name: Release promote
 # Publishes a build that CI already made and checked to the Testing or Stable
 # channel. Nothing is built here: the APKs and release-info.json are the
 # droidtop-apk artifact of that commit's own android-build.yml run, byte for
-# byte what "latest" carried and what was installed and tried on a rig. A
-# promotion refuses a commit whose build or checks run did not succeed.
+# byte what its own per-build history release carried and what was installed
+# and tried on a rig. A promotion refuses a commit whose build or checks run
+# did not succeed.
 
 on:
   workflow_dispatch:
@@ -14,7 +15,7 @@ on:
         type: choice
         options: [testing, stable]
       commit:
-        description: "Commit to promote. Empty: the commit the latest channel carries now."
+        description: "Commit to promote. Empty: the commit the newest per-build history release carries."
         type: string
         required: false
 
@@ -45,7 +46,18 @@ jobs:
           COMMIT: ${{ inputs.commit }}
         run: |
           if [ -z "$COMMIT" ]; then
-            COMMIT=$(gh release download latest --pattern release-info.json --output - | jq -r .commit)
+            # No fixed "latest" release exists any more (docs/SPEC.md 10b):
+            # the newest per-build history release is whichever one the
+            # GitHub API lists first (newest first, its default order)
+            # whose tag matches the version pattern -- excluding the
+            # "testing"/"stable" moving-pointer releases, which never match.
+            NEWEST_TAG=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+              --jq '[.[] | select(.tag_name | test("^v0\\.2\\.0-dev\\.[0-9]+$"))][0].tag_name')
+            if [ -z "$NEWEST_TAG" ] || [ "$NEWEST_TAG" = "null" ]; then
+              echo "::error::No per-build history release found to promote from."
+              exit 1
+            fi
+            COMMIT=$(gh release download "$NEWEST_TAG" --pattern release-info.json --output - | jq -r .commit)
           fi
           COMMIT=$(gh api "repos/$GITHUB_REPOSITORY/commits/$COMMIT" --jq .sha)
           echo "Promoting $COMMIT"
@@ -56,7 +68,7 @@ jobs:
           }
           build_run=$(latest_success android-build.yml)
           if [ -z "$build_run" ]; then
-            echo "::error::No successful android-build.yml run on main for $COMMIT. Only a commit whose APK CI built and published to latest can be promoted."
+            echo "::error::No successful android-build.yml run on main for $COMMIT. Only a commit whose APK CI built and published its own release can be promoted."
             exit 1
           fi
           if [ -z "$(latest_success android-checks.yml)" ]; then

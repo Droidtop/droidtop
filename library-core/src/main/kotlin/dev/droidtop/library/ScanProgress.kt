@@ -238,7 +238,7 @@ object ScanLog {
         val dir = File(base, LOG_DIR)
         runCatching { dir.mkdirs() }
         logFile = File(dir, LOG_NAME)
-        // The version NAME carries the build number ("0.1.0-dev-539"),
+        // The version NAME carries the build number ("0.2.0-dev.539"),
         // so one line says which build produced everything under it.
         val version = runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName

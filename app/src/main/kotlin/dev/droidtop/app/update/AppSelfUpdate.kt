@@ -29,12 +29,26 @@ import java.security.MessageDigest
  *
  * "Is this newer" is answered by versionCode, which CI sets to the number of
  * commits reachable from the built commit (a plain monotonic integer) and
- * publishes with the APK in release-info.json on the channel's release. The check downloads
- * that one small file, unauthenticated; nothing about the device or its
- * library is ever sent. Offline or failed checks are silent.
+ * publishes with the APK in release-info.json. Testing and Stable are each
+ * one moving-pointer release (a fixed tag), read the same way as always: one
+ * unauthenticated fetch of that release's release-info.json. Unstable is
+ * every push to main, each its own permanent release tagged by version
+ * (docs/SPEC.md 10b) -- there is no fixed tag to read any more, so that
+ * channel instead asks the GitHub API which per-build release is newest and
+ * reads release-info.json out of its assets (fetchNewestBuild). Either way
+ * nothing about the device or its library is ever sent. Offline or failed
+ * checks are silent.
  */
 object AppSelfUpdate {
     private const val DOWNLOADS = "https://github.com/Droidtop/droidtop/releases/download"
+    private const val API_RELEASES = "https://api.github.com/repos/Droidtop/droidtop/releases"
+
+    // Every per-build history release's tag (build-scripts/release_channel.py
+    // BASE_VERSION/BUILD_TAG_RE): "v" + versionName. testing/stable never
+    // match this, so they are never picked up as an Unstable build by
+    // accident.
+    private val BUILD_TAG = Regex("""^v0\.2\.0-dev\.\d+$""")
+
     private const val PREFS = "app_update_check"
     private const val KEY_CHECK_DAILY = "updates_check_daily"
     private const val KEY_FREQUENCY = "updates_frequency"
@@ -54,9 +68,12 @@ object AppSelfUpdate {
     }
 
     /**
-     * Which line of builds to follow. Each is its own GitHub release tag
-     * carrying its own `release-info.json`, so switching channel changes
-     * which build "newer" is measured against -- nothing else.
+     * Which line of builds to follow. [STABLE] and [TESTING] are each one
+     * GitHub release at a fixed tag, carrying its own `release-info.json`;
+     * [tag] is that release's tag for those two. [UNSTABLE] has no fixed
+     * tag -- every push to main gets its own permanent, versioned release
+     * (docs/SPEC.md 10b) -- so its [tag] is unused and `fetch` finds the
+     * newest one through the GitHub API instead (fetchNewestBuild).
      *
      * [UNSTABLE] is every push to main and is the default, because it is
      * the only channel droidtop has ever published; the other two exist
@@ -66,7 +83,7 @@ object AppSelfUpdate {
     enum class Channel(val tag: String, val label: String) {
         STABLE("stable", "Stable"),
         TESTING("testing", "Testing"),
-        UNSTABLE("latest", "Unstable (every build)"),
+        UNSTABLE("", "Unstable (every build)"),
     }
 
     /**
@@ -85,9 +102,8 @@ object AppSelfUpdate {
         val apkSha256: String,
         val channel: Channel,
         val debug: Boolean,
-    ) {
-        val apkUrl: String get() = "$DOWNLOADS/${channel.tag}/$apkName"
-    }
+        val apkUrl: String,
+    )
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -221,35 +237,101 @@ object AppSelfUpdate {
     fun fetch(context: Context): Info {
         val channel = channel(context)
         val wantDebug = debugBuilds(context)
-        val connection = URL("$DOWNLOADS/${channel.tag}/release-info.json").openConnection() as HttpURLConnection
+        return if (channel == Channel.UNSTABLE) {
+            fetchNewestBuild(wantDebug)
+        } else {
+            parseReleaseInfo(
+                channel,
+                wantDebug,
+                openJson("$DOWNLOADS/${channel.tag}/release-info.json"),
+            ) { name -> "$DOWNLOADS/${channel.tag}/$name" }
+        }
+    }
+
+    /**
+     * Unstable has no fixed tag any more: every push to main publishes its
+     * own permanent release (docs/SPEC.md 10b), so "the newest build" is
+     * answered by asking the GitHub API which per-build release is newest,
+     * the same list release-promote.yml reads to find a commit to promote.
+     * The API's default order for this endpoint is newest-created-first, so
+     * the first tag matching the per-build pattern is Unstable's current
+     * build; testing/stable never match it. release-info.json and the APK
+     * both come from that one release's own assets, never a fixed URL.
+     */
+    private fun fetchNewestBuild(wantDebug: Boolean): Info {
+        val releases = JSONArrayCompat(openJsonArray("$API_RELEASES?per_page=100"))
+        val release = releases.firstOrNull { BUILD_TAG.matches(it.getString("tag_name")) }
+            ?: throw IllegalStateException("No per-build release found on the Unstable channel")
+        val assets = release.getJSONArray("assets")
+        val urls = HashMap<String, String>()
+        for (i in 0 until assets.length()) {
+            val asset = assets.getJSONObject(i)
+            urls[asset.getString("name")] = asset.getString("browser_download_url")
+        }
+        val infoUrl = urls["release-info.json"]
+            ?: throw IllegalStateException("Release ${release.getString("tag_name")} carries no release-info.json")
+        return parseReleaseInfo(Channel.UNSTABLE, wantDebug, openJson(infoUrl)) { name ->
+            urls[name] ?: throw IllegalStateException("Release ${release.getString("tag_name")} carries no asset named $name")
+        }
+    }
+
+    private fun parseReleaseInfo(channel: Channel, wantDebug: Boolean, json: JSONObject, urlFor: (String) -> String): Info {
+        require(json.getInt("formatVersion") == 1) { "Unsupported release info" }
+        // The debug APK is an added key, not a new format: a build from
+        // before it existed reads the same document and sees the release
+        // APK it always did.
+        val debug = wantDebug && json.optString("debugApkName").isNotBlank()
+        val name = if (debug) json.getString("debugApkName") else json.getString("apkName")
+        val digest = (if (debug) json.getString("debugApkSha256") else json.getString("apkSha256")).uppercase()
+        require(digest.matches(Regex("[A-F0-9]{64}"))) { "Release info carries no valid APK digest" }
+        // A bare file name, never a path: it only ever selects an asset.
+        require(name.matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]*\\.apk"))) { "Release info names no valid APK file" }
+        return Info(
+            json.getLong("versionCode"),
+            json.getString("versionName"),
+            name,
+            digest,
+            channel,
+            debug,
+            urlFor(name),
+        )
+    }
+
+    private fun openJson(url: String): JSONObject {
+        val connection = URL(url).openConnection() as HttpURLConnection
         connection.connectTimeout = 15_000
         connection.readTimeout = 30_000
         connection.instanceFollowRedirects = true
         connection.setRequestProperty("User-Agent", "droidtop")
         try {
-            require(connection.responseCode in 200..299) { "Release info returned HTTP ${connection.responseCode}" }
-            val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
-            require(json.getInt("formatVersion") == 1) { "Unsupported release info" }
-            // The debug APK is an added key, not a new format: a build from
-            // before it existed reads the same document and sees the release
-            // APK it always did.
-            val debug = wantDebug && json.optString("debugApkName").isNotBlank()
-            val name = if (debug) json.getString("debugApkName") else json.getString("apkName")
-            val digest = (if (debug) json.getString("debugApkSha256") else json.getString("apkSha256")).uppercase()
-            require(digest.matches(Regex("[A-F0-9]{64}"))) { "Release info carries no valid APK digest" }
-            // A bare file name on this release, never a path: the name is
-            // appended to the channel's download URL.
-            require(name.matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]*\\.apk"))) { "Release info names no valid APK file" }
-            return Info(
-                json.getLong("versionCode"),
-                json.getString("versionName"),
-                name,
-                digest,
-                channel,
-                debug,
-            )
+            require(connection.responseCode in 200..299) { "$url returned HTTP ${connection.responseCode}" }
+            return JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
         } finally {
             connection.disconnect()
+        }
+    }
+
+    private fun openJsonArray(url: String): org.json.JSONArray {
+        val connection = URL(url).openConnection() as HttpURLConnection
+        connection.connectTimeout = 15_000
+        connection.readTimeout = 30_000
+        connection.instanceFollowRedirects = true
+        connection.setRequestProperty("User-Agent", "droidtop")
+        connection.setRequestProperty("Accept", "application/vnd.github+json")
+        try {
+            require(connection.responseCode in 200..299) { "$url returned HTTP ${connection.responseCode}" }
+            return org.json.JSONArray(connection.inputStream.bufferedReader().use { it.readText() })
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    /** A thin, allocation-free view over a JSONArray of JSONObjects so callers can use firstOrNull. */
+    private class JSONArrayCompat(private val array: org.json.JSONArray) : Iterable<JSONObject> {
+        override fun iterator(): Iterator<JSONObject> = object : Iterator<JSONObject> {
+            private var index = 0
+            override fun hasNext() = index < array.length()
+            override fun next(): JSONObject = array.getJSONObject(index++)
         }
     }
 

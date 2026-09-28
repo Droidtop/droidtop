@@ -19,6 +19,7 @@ on:
       - "NOTICE.md"
       - "LICENSE"
       - "AGENTS.md"
+      - "CHANGELOG.md"
   pull_request:
     # A commit that only edits prose does not need a 25-minute Android
     # build. Deliberately NOT a blanket "**.md": the decaffe ES-DE theme
@@ -30,14 +31,18 @@ on:
       - "NOTICE.md"
       - "LICENSE"
       - "AGENTS.md"
-  # By hand it rebuilds and republishes "latest". Testing and Stable are
-  # published by release-promote.yml from an existing run's artifact.
+      - "CHANGELOG.md"
+  # By hand it rebuilds this commit and publishes its per-build history
+  # release again (build-scripts/release_channel.py publish-build replaces
+  # a release for the exact same tag rather than failing). Testing and
+  # Stable are published by release-promote.yml from an existing run's
+  # artifact.
   workflow_dispatch:
 
 # Read-only by default. Only the publish job, which runs no build code, gets
 # a token that can write releases: Gradle, its plugins and the vendor-deps
-# build run in the build job and must not be able to rewrite "latest", which
-# the in-app updater installs (Droidtop/enginehost
+# build run in the build job and must not be able to publish the release the
+# in-app updater installs (Droidtop/enginehost
 # docs/security/2026-09-24-ci-supply-chain.md, H3).
 permissions:
   contents: read
@@ -49,10 +54,12 @@ permissions:
 # and pull requests never cancel each other.
 #
 # This applies to main as well, where roughly two thirds of this repo's
-# runs happen. A cancellation during the publish step cannot leave "latest"
-# missing: build-scripts/release_channel.py swaps assets inside the existing
-# release instead of deleting it, and the only thing that can cancel a main
-# run is a newer main run, which republishes when it finishes.
+# runs happen. Each push publishes its own new, permanent release (tagged by
+# version, docs/SPEC.md 10b): a cancellation during the publish step leaves
+# no release for that commit rather than a half-built one, and the only
+# thing that can cancel a main run is a newer main run, which publishes its
+# own release when it finishes -- a cancelled commit's history entry is
+# simply missing, never wrong.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -104,9 +111,9 @@ jobs:
         # likely failed because of a workflow file issue" — zero jobs ever
         # started). See app/build.gradle.kts for why a persistent keystore
         # matters: without one, every CI run signs with a brand-new random
-        # debug key (fresh runner VM, no persisted debug.keystore), so
-        # every past "latest" release had a different signing identity and
-        # users had to fully uninstall before installing a newer build.
+        # debug key (fresh runner VM, no persisted debug.keystore), so every
+        # past build's release would have had a different signing identity
+        # and users had to fully uninstall before installing a newer build.
         env:
           SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
         run: |
@@ -369,10 +376,12 @@ jobs:
     # mechanism: permanent, one clean download URL, and what the in-app
     # updater reads. Workflow artifacts are ephemeral and buried. Only
     # real pushes to main (or a hand-started run on main) publish; a
-    # PR's build is not something to hand out yet. This is the "latest"
-    # channel, which the updater calls Unstable. Testing and Stable are
-    # published by release-promote.yml, which takes an earlier run's
-    # artifact rather than building main again.
+    # PR's build is not something to hand out yet. Every build gets its own
+    # release, tagged by version and never rewritten (docs/SPEC.md 10b) --
+    # this is what the updater calls Unstable, found through the GitHub API
+    # rather than a fixed tag. Testing and Stable stay moving-pointer
+    # releases, published by release-promote.yml, which takes an earlier
+    # run's artifact rather than building main again.
     #
     # Its own job so the write token never shares a runner with Gradle: it
     # downloads the droidtop-apk artifact the build job made (whose layout
@@ -398,7 +407,7 @@ jobs:
           name: droidtop-apk
           path: outputs
 
-      - name: Publish to the latest channel
+      - name: Publish this build's release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 build-scripts/release_channel.py publish latest outputs
+        run: python3 build-scripts/release_channel.py publish-build outputs
