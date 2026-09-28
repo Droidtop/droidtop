@@ -1,10 +1,10 @@
 name: Commit hygiene
 
-# The owner forbids AI attribution in this repository's history: no
-# Co-Authored-By trailers naming an AI, no "Generated with" lines, no commits
-# authored by an AI identity. This fails a push or PR that adds any, so it
-# cannot creep back in after the history was cleaned. Seconds, not minutes:
-# it reads commit messages and needs no build.
+# Review gate: this repository's history carries no references to AI models
+# or AI coding tools: none in commit messages (co-author trailers,
+# "Generated with" lines, session links, tool or model names) and none in
+# author or committer identities. A push or pull request adding such a
+# commit fails here. It reads commit metadata only and needs no build.
 on:
   push:
   pull_request:
@@ -13,14 +13,14 @@ permissions:
   contents: read
 
 jobs:
-  no-ai-attribution:
+  no-model-references:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Reject commits carrying AI attribution
+      - name: Reject commits that reference an AI model or tool
         env:
           BEFORE: ${{ github.event.before }}
           BASE: ${{ github.event.pull_request.base.sha }}
@@ -29,16 +29,16 @@ jobs:
           if [ -n "$BASE" ]; then range="$BASE..$HEAD"
           elif [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] && git cat-file -e "$BEFORE" 2>/dev/null; then range="$BEFORE..$HEAD"
           else range="$HEAD~1..$HEAD"; fi
-          # The author line is checked too: a commit AUTHORED by an AI identity
-          # (Claude <noreply@anthropic.com>, the cloud container's default) and a
-          # AI-session trailer or session link got past the old pattern.
-          pattern='(Co-Authored-By|Co-authored-by):.*(Claude|Anthropic|Codex|OpenAI|Copilot)|noreply@anthropic\.com|codex@openai\.com|Generated with \[?Claude|🤖 Generated|AI-session:|claude\.ai/code/session'
+          # Vendors, models and coding tools, matched as whole words in the
+          # author, committer and full message of every commit in the push.
+          words='anthropic|claude|openai|chatgpt|gpt-?[0-9o]+|codex|copilot|gemini|bard|llama|mistral|mixtral|deepseek|qwen|kimi|moonshot|glm-?[0-9]|zhipu|nemotron|grok|xai|cohere|ollama|openrouter|opencode|windsurf|tabnine|llms?|large language model'
+          pattern="(^|[^a-z0-9])(${words})([^a-z0-9]|\$)|🤖|co-authored-by:.*(noreply|bot)@"
           bad=$(git log --format='%H%x09%an <%ae>%x09%s' "$range" | while IFS=$'\t' read -r sha who subj; do
-            if git log -1 --format='%an <%ae>%n%B' "$sha" | grep -Eiq "$pattern"; then echo "$sha $who: $subj"; fi
+            if git log -1 --format='%an <%ae>%n%cn <%ce>%n%B' "$sha" | grep -Eiq "$pattern"; then echo "$sha $who: $subj"; fi
           done)
           if [ -n "$bad" ]; then
-            echo "These commits carry AI attribution, which this repository does not accept:"
+            echo "These commits reference an AI model or tool, which this repository does not accept:"
             echo "$bad"
             exit 1
           fi
-          echo "No AI attribution in $range."
+          echo "No AI model or tool references in $range."
