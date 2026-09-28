@@ -67,7 +67,7 @@ object PluginOriginKeys {
      */
     fun keyFingerprintFor(origin: String): String? {
         val key = resolve(origin) ?: return null
-        return sha256(key.encoded)
+        return BundleSignature.sha256(key.encoded)
     }
 
     /** Test/tooling hook -- lets unit tests and the sample-bundle packager pin a throwaway key without touching [PINNED]. */

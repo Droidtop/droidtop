@@ -3,11 +3,11 @@ package dev.droidtop.library.integrations
 import android.content.Context
 import dev.droidtop.library.consoles.PlatformDatabaseSource
 import dev.droidtop.library.consoles.PlatformDatabaseTransport
-import dev.droidtop.pluginhost.BundleSignature
 import dev.droidtop.pluginhost.PluginBundleInstaller
 import dev.droidtop.pluginhost.PluginInstallResult
 import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginStore
+import dev.droidtop.pluginhost.PluginOriginKeys
 import dev.droidtop.pluginhost.PluginTrustState
 import java.io.File
 import java.io.FileOutputStream
@@ -108,7 +108,7 @@ object PluginCatalog {
      * is not installable no matter what the index says.
      */
     fun originOffered(origin: String, indexKeySha256: String?): Boolean {
-        val pin = BundleSignature.keyFingerprintFor(origin) ?: return false
+        val pin = PluginOriginKeys.keyFingerprintFor(origin) ?: return false
         val declared = indexKeySha256?.uppercase() ?: return false
         return pin.equals(declared, ignoreCase = true)
     }

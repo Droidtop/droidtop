@@ -71,7 +71,8 @@ object PluginSourceKeys {
     fun parsePublishedKey(text: String): PublishedKey? {
         val json = runCatching { org.json.JSONObject(text) }.getOrNull() ?: return null
         val origin = json.optString("origin").trim().takeIf { it.isNotBlank() } ?: return null
-        val key = json.optString("key").trim().takeIf { it.isNotBlank() } ?: return null
+        // "publicKey" is accepted as a spelling of "key"; either names the same SPKI.
+        val key = (json.optString("key").takeIf { it.isNotBlank() } ?: json.optString("publicKey")).trim().takeIf { it.isNotBlank() } ?: return null
         return PublishedKey(origin, key)
     }
 

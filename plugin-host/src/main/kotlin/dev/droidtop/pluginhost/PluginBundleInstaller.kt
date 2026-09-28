@@ -139,7 +139,7 @@ object PluginBundleInstaller {
         // (the signature check above refused the install otherwise), so
         // its fingerprint is exactly what "signed by the same key" means
         // for the carry-over rule below.
-        val keyFingerprint = BundleSignature.keyFingerprintFor(manifest.origin).orEmpty()
+        val keyFingerprint = PluginOriginKeys.keyFingerprintFor(manifest.origin).orEmpty()
         // Approval carries over to an update signed by the SAME key the
         // plugin was approved under (docs/SPEC.md 12a, "Trust over
         // updates"): a re-install of the exact same bytes keeps whatever

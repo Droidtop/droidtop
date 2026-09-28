@@ -10042,7 +10042,8 @@ the secondary path for sources that publish no key.
   deliberately two fields:
   `{ "origin": "acme", "key": "<base64 of a P-256 public key as X.509 SubjectPublicKeyInfo — the same SPKI shape the official pinned key uses>" }`
   as `droidtop-plugin-key.json` at the source's root; a catalog index
-  carries the same two fields at its top level. The key is validated
+  carries the same two fields at its top level. `publicKey` is read as
+  a spelling of `key`. The key is validated
   before it is ever shown: base64 → X.509 SPKI → EC → exactly P-256
   (`PluginOriginKeys.parseSpki`); anything else is refused.
 - **A changed key is never silently accepted.** Trusting a source

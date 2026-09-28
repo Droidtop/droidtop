@@ -15,7 +15,7 @@ data class PluginRecord(
     /** SHA-256 over the exact signed manifest bytes -- what this installed copy was verified against. */
     val archiveDigest: String,
     /**
-     * The fingerprint ([BundleSignature.keyFingerprintFor]) of the pinned
+     * The fingerprint ([PluginOriginKeys.keyFingerprintFor]) of the pinned
      * key this bundle's signature verified against when it was
      * (re)installed -- what approval is bound to, alongside the digest
      * (docs/SPEC.md 12a checklist point 4, "Trust over updates"): an
