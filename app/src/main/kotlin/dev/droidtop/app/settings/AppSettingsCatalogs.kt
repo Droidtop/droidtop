@@ -29,6 +29,8 @@ import dev.droidtop.library.integrations.IntegrationStore
 import dev.droidtop.library.integrations.AcquireContentSources
 import dev.droidtop.library.integrations.PluginEventBus
 import dev.droidtop.library.integrations.PluginAppStatus
+import dev.droidtop.library.integrations.PluginCatalog
+import dev.droidtop.library.integrations.PluginCatalogScreen
 import dev.droidtop.library.integrations.PluginSettingsRows
 import dev.droidtop.library.integrations.PluginJobsScreen
 import dev.droidtop.library.PcFolderScan
@@ -1600,353 +1602,467 @@ object AppSettingsCatalogs {
         id = SCREEN_PLUGINS,
         title = "Plugins",
         subtitle = "Real code, run in its own process and approved by you -- for crash containment, not as a security sandbox",
-        groups = { context ->
-            val (installed, userKeys) = withContext(Dispatchers.IO) {
-                PluginStore.installed(context) to UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))
-            }
-            listOf(
-                CatalogGroup(
-                    id = "plugins_list",
-                    title = null,
-                    items = buildList {
-                        if (installed.isEmpty()) {
+        groups = { context -> pluginsGroups(context) },
+    )
+
+    private suspend fun pluginsGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
+        val installed = PluginStore.installed(context)
+        val cachedIndex = PluginCatalog.lastGoodIndex(context)
+        val updates = cachedIndex?.let { PluginCatalog.updatesFor(installed, it) }.orEmpty()
+        // Read once here, off the main thread; valueLabel below is a
+        // plain (non-suspend) closure the renderer may call on the main
+        // thread, so it must not touch the key store itself.
+        val userKeys = UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))
+
+        listOf(
+            CatalogGroup(
+                id = "plugins_installed",
+                title = if (installed.isEmpty()) null else "Installed",
+                items = buildList {
+                    if (installed.isEmpty()) {
+                        add(
+                            ActionItem(
+                                id = "plugins_none",
+                                title = "No plugins installed",
+                                subtitle = "Add one below -- a plugin never runs until you approve it on its own page",
+                                run = {},
+                            ),
+                        )
+                    }
+                    installed.forEach { record -> add(pluginCard(record, userKeys)) }
+                },
+            ),
+        ) + (
+            if (installed.isEmpty()) {
+                emptyList()
+            } else {
+                listOf(
+                    CatalogGroup(
+                        id = "plugins_updates",
+                        title = "Updates",
+                        items = buildList {
                             add(
                                 ActionItem(
-                                    id = "plugins_none",
-                                    title = "No plugins installed",
-                                    subtitle = "Install a plugin bundle below. A plugin never runs until you approve it here.",
+                                    id = "plugins_updates_status",
+                                    title = if (updates.isEmpty()) "Up to date" else "${updates.size} update${if (updates.size == 1) "" else "s"} available",
+                                    subtitle = if (cachedIndex == null) {
+                                        "Catalog not fetched yet -- open Add to check"
+                                    } else {
+                                        updates.joinToString { (record, release) -> "${record.manifest.label} -> ${release.version}" }
+                                            .ifEmpty { "Every installed plugin matches the catalog's latest stable release" }
+                                    },
                                     run = {},
                                 ),
                             )
-                        }
-                        installed.forEach { record ->
-                            val m = record.manifest
-                            val statusLine = buildString {
-                                append(
-                                    when (record.trust) {
-                                        PluginTrustState.PENDING -> "Awaiting approval"
-                                        PluginTrustState.DENIED -> "Denied"
-                                        PluginTrustState.APPROVED -> if (record.disabledReason != null) {
-                                            // The reason names what disabled it (a crash,
-                                            // a tampered file, a signature whose origin key
-                                            // was removed from Keys you trust) -- not every
-                                            // disable is a crash anymore.
-                                            "Disabled: ${record.disabledReason}"
-                                        } else if (record.enabled) "Running" else "Disabled"
-                                    },
+                            if (updates.isNotEmpty()) {
+                                add(
+                                    AsyncActionItem(
+                                        id = "plugins_update_all",
+                                        title = "Update all",
+                                        subtitle = "Downloads and verifies each update, then installs it the same way a single update would",
+                                        run = { ctx, onStatus -> PluginCatalog.updateAll(ctx, onStatus) },
+                                    ),
                                 )
-                                append(" - ").append(m.origin)
-                                // The trust badge (docs/SPEC.md 12a "Keys
-                                // you trust"): which key tier actually
-                                // verifies this plugin's signature --
-                                // and a visible flag when none does
-                                // anymore, rather than a silent
-                                // "Running" for a plugin whose origin
-                                // key was removed.
-                                when {
-                                    PluginOriginKeys.isOfficial(m.origin) -> append(" - Official")
-                                    userKeys.containsKey(m.origin) -> append(" - Added by you")
-                                    else -> append(" - NOT TRUSTED: no trusted key for this origin anymore (see Keys you trust)")
-                                }
-                                append(" - ")
-                                append(m.capabilities.joinToString { it.display })
-                                if (m.requestsRoot) {
-                                    append(if (record.rootApproved) " - uses root (approved)" else " - can use root (not granted)")
-                                }
-                                if (m.kind == PluginKind.PYTHON && !PythonRuntimeManager.isInstalled(context)) {
-                                    append(" - needs the Python runtime, not downloaded yet (see below)")
-                                }
-                                if (m.kind == PluginKind.FLUTTER_EMBED && !FlutterRuntimeManager.isInstalled(context)) {
-                                    append(" - needs the Flutter runtime, not downloaded yet (see below)")
-                                }
                             }
-                            add(ActionItem(id = "plugin_${m.id}_info", title = m.label, subtitle = statusLine, run = {}))
-                            when (record.trust) {
-                                PluginTrustState.PENDING -> {
-                                    add(
-                                        ActionItem(
-                                            id = "plugin_${m.id}_approve",
-                                            title = "Approve \"${m.label}\"",
-                                            subtitle = if (m.requestsRoot) {
-                                                "This plugin can also use root as an optional enhancement when your device has it -- its core function must still work without it. Approving here does NOT grant root; use \"Approve and allow root\" for that."
-                                            } else {
-                                                "Runs in its own process from now on"
-                                            },
-                                            run = { ctx -> PluginStore.setApproval(ctx, m.id, approved = true, grantRoot = false); PluginStatusWidgetProvider.requestUpdate(ctx) },
-                                        ),
-                                    )
-                                    if (m.requestsRoot) {
-                                        add(
-                                            ActionItem(
-                                                id = "plugin_${m.id}_approve_root",
-                                                title = "Approve and allow root",
-                                                subtitle = "Only takes effect if this device actually has root; root stays an enhancement, never a requirement",
-                                                confirmTitle = "Let \"${m.label}\" use root on this device?",
-                                                run = { ctx -> PluginStore.setApproval(ctx, m.id, approved = true, grantRoot = true); PluginStatusWidgetProvider.requestUpdate(ctx) },
-                                            ),
-                                        )
-                                    }
-                                    add(
-                                        ActionItem(
-                                            id = "plugin_${m.id}_deny",
-                                            title = "Deny \"${m.label}\"",
-                                            subtitle = "Stays installed but never runs. A future update (a new signed archive) can be approved again.",
-                                            run = { ctx -> PluginStore.setApproval(ctx, m.id, approved = false, grantRoot = false); PluginStatusWidgetProvider.requestUpdate(ctx) },
-                                        ),
-                                    )
-                                }
-                                PluginTrustState.APPROVED -> {
-                                    add(
-                                        ToggleItem(
-                                            id = "plugin_${m.id}_enabled",
-                                            title = "Enabled",
-                                            current = record.enabled,
-                                            onToggle = { ctx, on -> PluginStore.setEnabled(ctx, m.id, on); PluginStatusWidgetProvider.requestUpdate(ctx) },
-                                        ),
-                                    )
-                                    // A live call, not just the status line above: the
-                                    // real way to "see" a status_tile plugin's own
-                                    // output (dq-plugins-01), through the same
-                                    // PluginCrashPolicy.invoke every other capability
-                                    // call site is meant to use -- a short-lived
-                                    // policy per tap, torn down right after, since this
-                                    // screen has no ongoing binder connection to keep
-                                    // warm between taps.
-                                    if (record.runnable() && PluginCapability.STATUS_TILE in m.capabilities) {
-                                        add(
-                                            AsyncActionItem(
-                                                id = "plugin_${m.id}_call_status_tile",
-                                                title = "Call \"${m.label}\"'s status tile",
-                                                subtitle = "Runs a real invoke() through the isolated plugin process and shows what it returns",
-                                                run = { ctx, _ ->
-                                                    val policy = PluginCrashPolicy(ctx.applicationContext)
-                                                    try {
-                                                        val result = policy.invoke(record, PluginCapability.STATUS_TILE, emptyMap())
-                                                        if (result.ok) {
-                                                            result.values.entries.joinToString(", ") { (k, v) -> "$k=$v" }
-                                                                .ifEmpty { "OK, no values" }
-                                                        } else {
-                                                            "Failed: ${result.error}"
-                                                        }
-                                                    } finally {
-                                                        policy.shutdown()
-                                                    }
-                                                },
-                                            ),
-                                        )
-                                        // Debug builds only -- this is a test-only hook
-                                        // (the "query" arg exists in this sample plugin
-                                        // for dq-plugins-01, never in a droidtop call
-                                        // site), not a real user feature, so it never
-                                        // ships in a release build.
-                                        if (ctxIsDebuggable(context)) {
-                                            add(
-                                                AsyncActionItem(
-                                                    id = "plugin_${m.id}_force_crash",
-                                                    title = "Debug: force \"${m.label}\" to crash",
-                                                    subtitle = "Confirms crash containment -- droidtop should survive and disable this plugin",
-                                                    confirmTitle = "Force ${m.label} to crash now?",
-                                                    run = { ctx, _ ->
-                                                        val policy = PluginCrashPolicy(ctx.applicationContext)
-                                                        try {
-                                                            val result = policy.invoke(record, PluginCapability.STATUS_TILE, mapOf("query" to "force-crash"))
-                                                            if (result.ok) {
-                                                                "Unexpected success: ${result.values}"
-                                                            } else {
-                                                                "Crashed as expected: ${result.error}"
-                                                            }
-                                                        } finally {
-                                                            policy.shutdown()
-                                                        }
-                                                    },
-                                                ),
-                                            )
-                                        }
-                                    }
-                                    // The plugin half's other two real user-facing
-                                    // surfaces (docs/SPEC.md 12a): settings_rows
-                                    // renders in droidtop's own settings style, and
-                                    // app_status is this plugin's status/actions for
-                                    // whatever OTHER installed app it manages -- both
-                                    // real nested screens, not just the debug-only
-                                    // status_tile call above. Siblings of the
-                                    // STATUS_TILE block above, not nested in it: a
-                                    // plugin can declare any subset of the three.
-                                    if (record.runnable() && PluginCapability.SETTINGS_ROWS in m.capabilities) {
-                                        add(
-                                            NestedScreenItem(
-                                                id = "plugin_${m.id}_settings_rows",
-                                                title = "${m.label} settings",
-                                                subtitle = "Settings this plugin contributes",
-                                                inline = PluginSettingsRows.screenFor(record),
-                                            ),
-                                        )
-                                    }
-                                    if (record.runnable() && PluginCapability.APP_STATUS in m.capabilities) {
-                                        add(
-                                            NestedScreenItem(
-                                                id = "plugin_${m.id}_app_status",
-                                                title = "${m.label}: app status",
-                                                subtitle = "Status and actions for the app this plugin manages",
-                                                inline = PluginAppStatus.screenFor(record),
-                                            ),
-                                        )
-                                    }
-                                }
-                                PluginTrustState.DENIED -> Unit
-                            }
-                            add(
-                                ActionItem(
-                                    id = "plugin_${m.id}_uninstall",
-                                    title = "Uninstall \"${m.label}\"",
-                                    confirmTitle = "Remove ${m.label} and its data?",
-                                    run = { ctx -> PluginStore.uninstall(ctx, m.id); PluginStatusWidgetProvider.requestUpdate(ctx) },
-                                ),
-                            )
-                        }
-                        // The python kind's runtime is a separate, explicit
-                        // download (docs/SPEC.md 12a) -- never triggered
-                        // implicitly by loading a plugin -- so it gets its
-                        // own row here rather than happening silently
-                        // behind a plugin's first invoke().
-                        val pythonInstalled = PythonRuntimeManager.isInstalled(context)
-                        val pythonVersion = PythonRuntimeManager.installedVersion(context)
-                            ?: PythonRuntimeManager.pinnedVersion(context)
-                        add(
-                            ActionItem(
-                                id = "plugins_python_runtime_status",
-                                title = "Python runtime",
-                                subtitle = if (pythonInstalled) {
-                                    "Installed: CPython $pythonVersion (${PythonRuntimeManager.currentAbi()}), official python.org Android build"
-                                } else {
-                                    "Not installed -- needed by any python-kind plugin. CPython $pythonVersion (${PythonRuntimeManager.currentAbi()}), ~22 MB, downloaded from python.org and SHA-256 verified"
-                                },
-                                run = {},
-                            ),
-                        )
-                        if (pythonInstalled) {
-                            add(
-                                ActionItem(
-                                    id = "plugins_python_runtime_remove",
-                                    title = "Remove Python runtime",
-                                    subtitle = "Any installed python-kind plugin stops working until it's downloaded again",
-                                    confirmTitle = "Remove the downloaded Python runtime?",
-                                    run = { ctx -> PythonRuntimeManager.remove(ctx) },
-                                ),
-                            )
-                        } else {
-                            add(
-                                AsyncActionItem(
-                                    id = "plugins_python_runtime_download",
-                                    title = "Download Python runtime",
-                                    subtitle = "Fetches the official CPython Android build for this device's ABI and verifies it before use",
-                                    run = { ctx, onStatus ->
-                                        val error = PythonRuntimeManager.ensureInstalled(ctx) { progress ->
-                                            val text = when (progress) {
-                                                is PythonRuntimeManager.Progress.Downloading -> {
-                                                    if (progress.totalBytes > 0) {
-                                                        val pct = (progress.bytesRead * 100 / progress.totalBytes).toInt()
-                                                        "Downloading... $pct% (${progress.bytesRead / 1024 / 1024} MB / ${progress.totalBytes / 1024 / 1024} MB)"
-                                                    } else {
-                                                        "Downloading... ${progress.bytesRead / 1024 / 1024} MB"
-                                                    }
-                                                }
-                                                PythonRuntimeManager.Progress.Verifying -> "Verifying SHA-256..."
-                                                PythonRuntimeManager.Progress.Extracting -> "Extracting..."
-                                                PythonRuntimeManager.Progress.Done -> "Done"
-                                            }
-                                            onStatus(text)
-                                        }
-                                        error ?: "Python runtime installed"
-                                    },
-                                ),
-                            )
-                        }
-                        // Same "separate, explicit download" treatment as the
-                        // python runtime above, for flutter_embed
-                        // (docs/SPEC.md 12a): never triggered implicitly
-                        // by loading a plugin.
-                        val flutterInstalled = FlutterRuntimeManager.isInstalled(context)
-                        val flutterVersion = FlutterRuntimeManager.pinnedVersion(context)
-                        add(
-                            ActionItem(
-                                id = "plugins_flutter_runtime_status",
-                                title = "Flutter runtime",
-                                subtitle = if (flutterInstalled) {
-                                    "Installed: Flutter engine $flutterVersion (${FlutterRuntimeManager.currentAbi()}), official Flutter engine build"
-                                } else {
-                                    "Not installed -- needed by any flutter_embed-kind plugin. Flutter engine $flutterVersion (${FlutterRuntimeManager.currentAbi()}), ~40 MB, downloaded from Flutter's own release CDN and SHA-256 verified"
-                                },
-                                run = {},
-                            ),
-                        )
-                        if (flutterInstalled) {
-                            add(
-                                ActionItem(
-                                    id = "plugins_flutter_runtime_remove",
-                                    title = "Remove Flutter runtime",
-                                    subtitle = "Any installed flutter_embed-kind plugin stops working until it's downloaded again",
-                                    confirmTitle = "Remove the downloaded Flutter runtime?",
-                                    run = { ctx -> FlutterRuntimeManager.remove(ctx) },
-                                ),
-                            )
-                        } else {
-                            add(
-                                AsyncActionItem(
-                                    id = "plugins_flutter_runtime_download",
-                                    title = "Download Flutter runtime",
-                                    subtitle = "Fetches the official Flutter engine build for this device's ABI and verifies it before use",
-                                    run = { ctx, onStatus ->
-                                        val error = FlutterRuntimeManager.ensureInstalled(ctx) { progress ->
-                                            val text = when (progress) {
-                                                is FlutterRuntimeManager.Progress.Downloading -> {
-                                                    if (progress.totalBytes > 0) {
-                                                        val pct = (progress.bytesRead * 100 / progress.totalBytes).toInt()
-                                                        "Downloading... $pct% (${progress.bytesRead / 1024 / 1024} MB / ${progress.totalBytes / 1024 / 1024} MB)"
-                                                    } else {
-                                                        "Downloading... ${progress.bytesRead / 1024 / 1024} MB"
-                                                    }
-                                                }
-                                                FlutterRuntimeManager.Progress.Verifying -> "Verifying SHA-256..."
-                                                FlutterRuntimeManager.Progress.Extracting -> "Extracting..."
-                                                FlutterRuntimeManager.Progress.Done -> "Done"
-                                            }
-                                            onStatus(text)
-                                        }
-                                        error ?: "Flutter runtime installed"
-                                    },
-                                ),
-                            )
-                        }
-                        // Where third-party plugins come from at all: a
-                        // bundle only verifies if its origin's key is
-                        // trusted -- the official one, or one the user
-                        // added here (docs/SPEC.md 12a "Keys you trust").
-                        add(
-                            NestedScreenItem(
-                                id = "plugins_keys_you_trust",
-                                title = "Keys you trust",
-                                subtitle = "Origins whose plugin signatures droidtop verifies: the official one, and any you add",
-                                registryId = SCREEN_PLUGIN_KEYS,
-                                valueLabel = {
-                                    if (userKeys.isEmpty()) "Official only" else "Official + ${userKeys.size} added by you"
-                                },
-                            ),
-                        )
-                        add(
-                            DocumentPickItem(
-                                id = "plugins_add",
-                                title = "Install plugin file",
-                                subtitle = "Pick a signed .droidplugin.tar.xz bundle -- validated before anything runs, never run until approved above",
-                                mimeType = "*/*",
-                                onPicked = { ctx, uri -> PluginStore.importFromPicker(ctx, uri) },
-                            ),
-                        )
-                    },
+                        },
+                    ),
+                )
+            }
+        ) + listOf(
+            CatalogGroup(
+                id = "plugins_add",
+                title = "Add",
+                items = listOf(
+                    NestedScreenItem(
+                        id = "plugins_add_catalog",
+                        title = "Browse catalog",
+                        subtitle = "Plugins published by droidtop-platforms and any third-party origin you've trusted",
+                        inline = PluginCatalogScreen.screen(),
+                    ),
+                    DocumentPickItem(
+                        id = "plugins_add_file",
+                        title = "Install plugin file",
+                        subtitle = "Pick a signed .droidplugin.tar.xz bundle -- validated before anything runs, never run until approved",
+                        mimeType = "*/*",
+                        onPicked = { ctx, uri -> PluginStore.importFromPicker(ctx, uri) },
+                    ),
                 ),
-            )
+            ),
+            CatalogGroup(
+                id = "plugins_advanced",
+                title = "Advanced",
+                items = listOf(
+                    NestedScreenItem(
+                        id = "plugins_keys_you_trust",
+                        title = "Keys you trust",
+                        subtitle = "Origins whose plugin signatures droidtop verifies: the official one, and any you add",
+                        registryId = SCREEN_PLUGIN_KEYS,
+                        valueLabel = {
+                            if (userKeys.isEmpty()) "Official only" else "Official + ${userKeys.size} added by you"
+                        },
+                    ),
+                ),
+            ),
+        )
+    }
+
+    /** The installed-plugins list row: what it's called, what it adds in plain words, its trust badge and its state -- the whole card, one tap into [pluginDetailScreen]. */
+    private fun pluginCard(record: dev.droidtop.pluginhost.PluginRecord, userKeys: Map<String, String>): NestedScreenItem {
+        val m = record.manifest
+        val state = when {
+            record.trust == PluginTrustState.PENDING -> "Needs approval"
+            record.trust == PluginTrustState.DENIED -> "Denied"
+            record.disabledReason != null -> "Crashed"
+            record.trust == PluginTrustState.APPROVED && !record.enabled -> "Disabled"
+            record.trust == PluginTrustState.APPROVED -> "Running"
+            else -> "Unknown"
+        }
+        val trustBadge = when {
+            PluginOriginKeys.isOfficial(m.origin) -> "Official"
+            userKeys.containsKey(m.origin) -> "Added by you"
+            else -> "NOT TRUSTED"
+        }
+        return NestedScreenItem(
+            id = "plugin_${m.id}",
+            title = m.label,
+            subtitle = pluginSummary(m) + " - " + trustBadge,
+            inline = pluginDetailScreen(m.id),
+            valueLabel = { state },
+        )
+    }
+
+    /**
+     * One plugin's own page (owner: "actual design", not a flat list):
+     * what it does, its trust and running state, approve/deny/enable,
+     * what a python/flutter-kind plugin still needs before it can run,
+     * its version and any catalog update, and Uninstall -- with the
+     * fingerprint-and-digest technical fields set apart under "Details"
+     * rather than mixed into the status line. Permission grant/revoke
+     * per plugin is agent pluginapi's model landing separately
+     * (docs/plugin-api.md); this page has the seam (the "What it can
+     * do" group below) but no controls yet -- nothing here should invent
+     * a permissions UI ahead of that data actually existing.
+     *
+     * `groups` re-reads [PluginStore] and the cached catalog index fresh
+     * on every (re)entry (same contract as every other [CatalogScreen]),
+     * so approving, enabling or uninstalling on this page and coming
+     * back always shows the current record, never one captured when the
+     * parent list was built.
+     */
+    private fun pluginDetailScreen(pluginId: String) = CatalogScreen(
+        id = "plugin_detail_$pluginId",
+        title = pluginId,
+        groups = { context ->
+            withContext(Dispatchers.IO) {
+                val record = PluginStore.installed(context).firstOrNull { it.manifest.id == pluginId }
+                if (record == null) {
+                    listOf(
+                        CatalogGroup(
+                            id = "plugin_detail_gone",
+                            title = null,
+                            items = listOf(
+                                ActionItem(
+                                    id = "plugin_detail_gone_row",
+                                    title = "This plugin is no longer installed",
+                                    run = {},
+                                ),
+                            ),
+                        ),
+                    )
+                } else {
+                    val userKeys = UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))
+                    pluginDetailGroups(context, record, userKeys)
+                }
+            }
         },
     )
+
+    private fun pluginDetailGroups(
+        context: Context,
+        record: dev.droidtop.pluginhost.PluginRecord,
+        userKeys: Map<String, String>,
+    ): List<CatalogGroup> {
+        val m = record.manifest
+        val statusGroup = buildList<CatalogItem> {
+            val statusLine = when {
+                record.trust == PluginTrustState.PENDING -> "Awaiting approval"
+                record.trust == PluginTrustState.DENIED -> "Denied"
+                record.disabledReason != null -> "Disabled: ${record.disabledReason}"
+                record.trust == PluginTrustState.APPROVED && record.enabled -> "Running"
+                else -> "Disabled"
+            }
+            val trustLine = when {
+                PluginOriginKeys.isOfficial(m.origin) -> "Official"
+                userKeys.containsKey(m.origin) -> "Added by you"
+                else -> "NOT TRUSTED: no trusted key for this origin anymore (see Keys you trust)"
+            }
+            add(ActionItem(id = "plugin_${m.id}_status", title = statusLine, subtitle = trustLine, run = {}))
+            when (record.trust) {
+                PluginTrustState.PENDING -> {
+                    add(
+                        ActionItem(
+                            id = "plugin_${m.id}_approve",
+                            title = "Approve",
+                            subtitle = if (m.requestsRoot) {
+                                "This plugin can also use root as an optional enhancement when your device has it -- its core function must still work without it. Approving here does NOT grant root; use \"Approve and allow root\" for that."
+                            } else {
+                                "Runs in its own process from now on"
+                            },
+                            run = { ctx -> PluginStore.setApproval(ctx, m.id, approved = true, grantRoot = false); PluginStatusWidgetProvider.requestUpdate(ctx) },
+                        ),
+                    )
+                    if (m.requestsRoot) {
+                        add(
+                            ActionItem(
+                                id = "plugin_${m.id}_approve_root",
+                                title = "Approve and allow root",
+                                subtitle = "Only takes effect if this device actually has root; root stays an enhancement, never a requirement",
+                                confirmTitle = "Let \"${m.label}\" use root on this device?",
+                                run = { ctx -> PluginStore.setApproval(ctx, m.id, approved = true, grantRoot = true); PluginStatusWidgetProvider.requestUpdate(ctx) },
+                            ),
+                        )
+                    }
+                    add(
+                        ActionItem(
+                            id = "plugin_${m.id}_deny",
+                            title = "Deny",
+                            subtitle = "Stays installed but never runs. A future update (a new signed archive) can be approved again.",
+                            run = { ctx -> PluginStore.setApproval(ctx, m.id, approved = false, grantRoot = false); PluginStatusWidgetProvider.requestUpdate(ctx) },
+                        ),
+                    )
+                }
+                PluginTrustState.APPROVED -> {
+                    add(
+                        ToggleItem(
+                            id = "plugin_${m.id}_enabled",
+                            title = "Enabled",
+                            current = record.enabled,
+                            onToggle = { ctx, on -> PluginStore.setEnabled(ctx, m.id, on); PluginStatusWidgetProvider.requestUpdate(ctx) },
+                        ),
+                    )
+                }
+                PluginTrustState.DENIED -> Unit
+            }
+            if (m.requestsRoot) {
+                add(
+                    ActionItem(
+                        id = "plugin_${m.id}_root",
+                        title = if (record.rootApproved) "Uses root" else "Can use root",
+                        subtitle = if (record.rootApproved) "Approved" else "Not granted -- approve with root above to allow it",
+                        run = {},
+                    ),
+                )
+            }
+        }
+
+        val providesGroup = buildList<CatalogItem> {
+            add(
+                ActionItem(
+                    id = "plugin_${m.id}_provides",
+                    title = "What it provides",
+                    subtitle = m.capabilities.joinToString { it.display }.ifEmpty { "No capabilities declared" },
+                    run = {},
+                ),
+            )
+            if (record.runnable() && PluginCapability.STATUS_TILE in m.capabilities) {
+                add(
+                    AsyncActionItem(
+                        id = "plugin_${m.id}_call_status_tile",
+                        title = "Call its status tile",
+                        subtitle = "Runs a real invoke() through the isolated plugin process and shows what it returns",
+                        run = { ctx, _ ->
+                            val policy = PluginCrashPolicy(ctx.applicationContext)
+                            try {
+                                val result = policy.invoke(record, PluginCapability.STATUS_TILE, emptyMap())
+                                if (result.ok) {
+                                    result.values.entries.joinToString(", ") { (k, v) -> "$k=$v" }.ifEmpty { "OK, no values" }
+                                } else {
+                                    "Failed: ${result.error}"
+                                }
+                            } finally {
+                                policy.shutdown()
+                            }
+                        },
+                    ),
+                )
+                if (ctxIsDebuggable(context)) {
+                    add(
+                        AsyncActionItem(
+                            id = "plugin_${m.id}_force_crash",
+                            title = "Debug: force a crash",
+                            subtitle = "Confirms crash containment -- droidtop should survive and disable this plugin",
+                            confirmTitle = "Force ${m.label} to crash now?",
+                            run = { ctx, _ ->
+                                val policy = PluginCrashPolicy(ctx.applicationContext)
+                                try {
+                                    val result = policy.invoke(record, PluginCapability.STATUS_TILE, mapOf("query" to "force-crash"))
+                                    if (result.ok) "Unexpected success: ${result.values}" else "Crashed as expected: ${result.error}"
+                                } finally {
+                                    policy.shutdown()
+                                }
+                            },
+                        ),
+                    )
+                }
+            }
+            if (record.runnable() && PluginCapability.SETTINGS_ROWS in m.capabilities) {
+                add(
+                    NestedScreenItem(
+                        id = "plugin_${m.id}_settings_rows",
+                        title = "Settings",
+                        subtitle = "Settings this plugin contributes",
+                        inline = PluginSettingsRows.screenFor(record),
+                    ),
+                )
+            }
+            if (record.runnable() && PluginCapability.APP_STATUS in m.capabilities) {
+                add(
+                    NestedScreenItem(
+                        id = "plugin_${m.id}_app_status",
+                        title = "App status",
+                        subtitle = "Status and actions for the app this plugin manages",
+                        inline = PluginAppStatus.screenFor(record),
+                    ),
+                )
+            }
+        }
+
+        // Shown on THIS plugin's own page, not as a top-level runtimes
+        // list (owner direction): a python/flutter_embed-kind plugin is
+        // the only reason the runtime matters, so the download/remove
+        // action lives where that reason is visible. Fetching it
+        // automatically as part of approval is agent pluginapi's
+        // permission-model work landing separately; today it is still an
+        // explicit action, same as before.
+        val runtimeGroup: List<CatalogItem> = when (m.kind) {
+            PluginKind.PYTHON -> listOf(pythonRuntimeItem(context, forPluginLabel = m.label))
+            PluginKind.FLUTTER_EMBED -> listOf(flutterRuntimeItem(context, forPluginLabel = m.label))
+            else -> emptyList()
+        }
+
+        val updateGroup = buildList<CatalogItem> {
+            val index = PluginCatalog.lastGoodIndex(context)
+            val release = index?.let { PluginCatalog.updateFor(it, record) }
+            val plugin = index?.pluginById(m.id)
+            add(
+                if (release != null && plugin != null) {
+                    AsyncActionItem(
+                        id = "plugin_${m.id}_update",
+                        title = "Version ${m.version}",
+                        subtitle = "An update is available in the catalog",
+                        value = "Update to ${release.version}",
+                        run = { ctx, onStatus -> PluginCatalog.install(ctx, plugin, release, onStatus) },
+                    )
+                } else {
+                    ActionItem(
+                        id = "plugin_${m.id}_version",
+                        title = "Version ${m.version}",
+                        subtitle = if (index == null) "Catalog not fetched yet -- open Add > Browse catalog to check" else "Matches the catalog's latest stable release",
+                        run = {},
+                    )
+                },
+            )
+        }
+
+        val detailsGroup = listOf(
+            ActionItem(id = "plugin_${m.id}_id", title = "Plugin id", subtitle = m.id, run = {}),
+            ActionItem(id = "plugin_${m.id}_origin", title = "Origin", subtitle = m.origin, run = {}),
+            ActionItem(id = "plugin_${m.id}_digest", title = "Archive digest", subtitle = record.archiveDigest, run = {}),
+        )
+
+        return listOfNotNull(
+            CatalogGroup(id = "plugin_${m.id}_status_group", title = null, items = statusGroup),
+            CatalogGroup(id = "plugin_${m.id}_provides_group", title = "What it provides", items = providesGroup),
+            if (runtimeGroup.isEmpty()) null else CatalogGroup(id = "plugin_${m.id}_runtime_group", title = "Runtime", items = runtimeGroup),
+            CatalogGroup(id = "plugin_${m.id}_update_group", title = "Version", items = updateGroup),
+            CatalogGroup(id = "plugin_${m.id}_details_group", title = "Details", items = detailsGroup),
+            CatalogGroup(
+                id = "plugin_${m.id}_uninstall_group",
+                title = null,
+                items = listOf(
+                    ActionItem(
+                        id = "plugin_${m.id}_uninstall",
+                        title = "Uninstall",
+                        confirmTitle = "Remove ${m.label} and its data?",
+                        run = { ctx -> PluginStore.uninstall(ctx, m.id); PluginStatusWidgetProvider.requestUpdate(ctx) },
+                    ),
+                ),
+            ),
+        )
+    }
+
+    private fun pythonRuntimeItem(context: Context, forPluginLabel: String): CatalogItem {
+        val installed = PythonRuntimeManager.isInstalled(context)
+        val version = PythonRuntimeManager.installedVersion(context) ?: PythonRuntimeManager.pinnedVersion(context)
+        return if (installed) {
+            ActionItem(
+                id = "plugins_python_runtime_remove",
+                title = "Python runtime",
+                subtitle = "Installed: CPython $version (${PythonRuntimeManager.currentAbi()}). Removing it stops $forPluginLabel (and any other python-kind plugin) until it's downloaded again.",
+                confirmTitle = "Remove the downloaded Python runtime?",
+                run = { ctx -> PythonRuntimeManager.remove(ctx) },
+            )
+        } else {
+            AsyncActionItem(
+                id = "plugins_python_runtime_download",
+                title = "Python runtime",
+                subtitle = "Not installed -- $forPluginLabel needs it to run. CPython $version (${PythonRuntimeManager.currentAbi()}), ~22 MB from python.org, SHA-256 verified.",
+                run = { ctx, onStatus ->
+                    val error = PythonRuntimeManager.ensureInstalled(ctx) { progress -> onStatus(runtimeProgressText(progress)) }
+                    error ?: "Python runtime installed"
+                },
+            )
+        }
+    }
+
+    private fun flutterRuntimeItem(context: Context, forPluginLabel: String): CatalogItem {
+        val installed = FlutterRuntimeManager.isInstalled(context)
+        val version = FlutterRuntimeManager.pinnedVersion(context)
+        return if (installed) {
+            ActionItem(
+                id = "plugins_flutter_runtime_remove",
+                title = "Flutter runtime",
+                subtitle = "Installed: Flutter engine $version (${FlutterRuntimeManager.currentAbi()}). Removing it stops $forPluginLabel (and any other flutter_embed-kind plugin) until it's downloaded again.",
+                confirmTitle = "Remove the downloaded Flutter runtime?",
+                run = { ctx -> FlutterRuntimeManager.remove(ctx) },
+            )
+        } else {
+            AsyncActionItem(
+                id = "plugins_flutter_runtime_download",
+                title = "Flutter runtime",
+                subtitle = "Not installed -- $forPluginLabel needs it to run. Flutter engine $version (${FlutterRuntimeManager.currentAbi()}), ~40 MB from Flutter's own release CDN, SHA-256 verified.",
+                run = { ctx, onStatus ->
+                    val error = FlutterRuntimeManager.ensureInstalled(ctx) { progress -> onStatus(runtimeProgressText(progress)) }
+                    error ?: "Flutter runtime installed"
+                },
+            )
+        }
+    }
+
+    private fun runtimeProgressText(progress: PythonRuntimeManager.Progress): String = when (progress) {
+        is PythonRuntimeManager.Progress.Downloading -> downloadProgressText(progress.bytesRead, progress.totalBytes)
+        PythonRuntimeManager.Progress.Verifying -> "Verifying SHA-256..."
+        PythonRuntimeManager.Progress.Extracting -> "Extracting..."
+        PythonRuntimeManager.Progress.Done -> "Done"
+    }
+
+    private fun runtimeProgressText(progress: FlutterRuntimeManager.Progress): String = when (progress) {
+        is FlutterRuntimeManager.Progress.Downloading -> downloadProgressText(progress.bytesRead, progress.totalBytes)
+        FlutterRuntimeManager.Progress.Verifying -> "Verifying SHA-256..."
+        FlutterRuntimeManager.Progress.Extracting -> "Extracting..."
+        FlutterRuntimeManager.Progress.Done -> "Done"
+    }
+
+    private fun downloadProgressText(bytesRead: Long, totalBytes: Long): String = if (totalBytes > 0) {
+        val pct = (bytesRead * 100 / totalBytes).toInt()
+        "Downloading... $pct% (${bytesRead / 1024 / 1024} MB / ${totalBytes / 1024 / 1024} MB)"
+    } else {
+        "Downloading... ${bytesRead / 1024 / 1024} MB"
+    }
+
+    /** What a plugin adds, in plain words, for the installed-list row. */
+    private fun pluginSummary(m: dev.droidtop.pluginhost.PluginManifest): String =
+        m.capabilities.joinToString { it.display }.ifEmpty { "No capabilities declared" }
 
     // ------------------------------------------------------------------
     // Keys you trust (docs/SPEC.md 12a): user-trusted plugin origin keys.

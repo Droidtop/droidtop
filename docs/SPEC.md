@@ -10480,26 +10480,67 @@ what the index says is display data, never a trust decision.
   and a first install (nothing to carry). Records written by builds
   before this rule have no key fingerprint and get no carry-over on their
   first update — one re-approval, the safe direction.
-- **The flow.** Settings → App integrations → Plugins, the one tidy
-  settings area — no new top-level surface, no per-origin screens
-  (an origin is a detail on a row, the same as it is on the installed
-  rows today). The installed list comes first exactly as before, with
-  (a) an "Update <label>" row under each installed plugin that has an
-  update, (b) an "Update all (N)" row when N of them do, and (c) an
-  "Add" row that opens the catalog screen: one row per catalog plugin —
-  label, description and version, the row's own action being Install
-  (not installed), Update to <version> (an update is available), or no
-  action at all with "Installed <version>" in the value column (current);
-  unpinned-origin plugins and plugins with no stable release yet are
-  listed without an action and say why. The file-picker "Install plugin
-  file" row stays, for bundles the catalog does not list. Install and
-  update are the SAME download-verify-install path (`PluginCatalog.
-  install`): fetch to cache, whole-file SHA-256 against the index's
-  `sha256` first, then the existing `PluginBundleInstaller` validation in
-  full, so a catalog bundle gets no shortcut past signature/hash checks;
-  a new id lands PENDING and asks for approval on the plugins screen the
-  way a picked file does. "Update all" runs the same path per plugin,
-  reports each one's result, and says so in its summary.
+- **The flow — REDESIGNED (2026-09-28, agent pluginsui).** Settings →
+  Library → Accounts and sources → Plugins (moved under uisources's
+  Accounts and sources consolidation, above; still the one tidy settings
+  area, no new top-level surface). The old shape was one flat list mixing
+  per-plugin rows, the Python/Flutter runtime rows, Keys you trust and
+  the file picker in installation order — "blindly shoving things into
+  the list", the owner's own words. The screen is now four groups:
+  - **Installed** — one row per installed plugin (its capabilities in
+    plain words and its trust badge as the subtitle, its state — Needs
+    approval / Running / Disabled / Crashed / Denied — as the value),
+    opening that plugin's own detail page rather than spreading its
+    actions across the parent list. The detail page groups: status
+    (Approve/Deny or the Enabled toggle, root use if requested), "What
+    it provides" (capabilities, and the real `status_tile`/`settings_
+    rows`/`app_status` callers the "real UI callers" pass above added,
+    carried over unchanged), a **Runtime** group that exists only for a
+    python/flutter_embed-kind plugin and shows that plugin's own
+    download/remove action (moved off the parent screen — the owner's
+    direction that a runtime row belongs where the plugin that needs it
+    is, not as a top-level list item; automatically fetching it as part
+    of approval, with consent, is follow-up work once pluginapi's
+    permission model lands and there is a real consent step to hang it
+    off), **Version** (the installed version, and an "Update to
+    <version>" action when the catalog has one — same `PluginCatalog.
+    install` path as below), and **Details** (plugin id, origin, archive
+    digest — the technical fields, kept out of the status line), ending
+    in **Uninstall**. A per-plugin permission grant/revoke list belongs
+    here too once agent pluginapi's permission model (`docs/plugin-
+    api.md`) exists; this page has the group structure for it already
+    but no invented controls ahead of that data being real.
+  - **Updates** (only shown once a plugin is installed) — "N updates
+    available" or "Up to date" against the last fetched catalog index,
+    with "Update all" (`PluginCatalog.updateAll`) when any exist.
+  - **Add** — "Browse catalog" (the catalog screen below) and "Install
+    plugin file" (the file picker), both install sources in one place
+    instead of the file picker being the very last row of the old flat
+    list.
+  - **Advanced** — "Keys you trust" (unchanged). A single-item group
+    today; anything else that is genuinely advanced (rather than
+    per-plugin) configuration lands here rather than back at the top
+    level.
+
+  The catalog screen itself (opened from Add) is unchanged from the
+  paragraph below: one row per catalog plugin — label, description and
+  version, the row's own action being Install (not installed), Update to
+  <version> (an update is available), or no action at all with
+  "Installed <version>" in the value column (current); unpinned-origin
+  plugins and plugins with no stable release yet are listed without an
+  action and say why. Install and update are the SAME download-verify-
+  install path (`PluginCatalog.install`): fetch to cache, whole-file
+  SHA-256 against the index's `sha256` first, then the existing
+  `PluginBundleInstaller` validation in full, so a catalog bundle gets no
+  shortcut past signature/hash checks; a new id lands PENDING and asks
+  for approval on that plugin's own detail page the way a picked file
+  does. "Update all" runs the same path per plugin, reports each one's
+  result, and says so in its summary. Debug-only rows (the status-tile
+  test call, the forced-crash test) stay on the plugin's own detail page,
+  gated on a debuggable build exactly as before — they are plugin-scoped
+  already, not a reason to add a separate top-level debug group.
+
+  Tracked in Droidtop/tracker (app:droidtop, P1): the redesign above.
 - **Staleness.** The last successfully fetched index is kept in
   `filesDir/plugin-catalog/index.json`; the catalog screen re-fetches on
   entry when that copy is missing or more than an hour old, and always
