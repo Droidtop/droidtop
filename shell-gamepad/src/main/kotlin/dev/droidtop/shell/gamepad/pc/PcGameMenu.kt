@@ -60,6 +60,7 @@ import dev.droidtop.library.displayName
 import dev.droidtop.library.SimilarGames
 import dev.droidtop.library.scraper.PcScraper
 import dev.droidtop.library.scraper.ProtonDbClient
+import dev.droidtop.library.scraper.ProtonDbMemory
 import dev.droidtop.library.scraper.ProtonDbSummary
 import dev.droidtop.library.scraper.ScrapeLookup
 import dev.droidtop.library.scraper.line
@@ -141,6 +142,15 @@ internal fun PcGameMenu(
     var importingLutris by remember(entry) { mutableStateOf(false) }
     var wineSettings by remember(entry) { mutableStateOf<WineGameSettings?>(null) }
     var protonDb by remember(entry) { mutableStateOf<ProtonDbState>(ProtonDbState.NotAsked) }
+    // What ProtonDB last answered about this game, if the person asked
+    // before (ProtonDbMemory): read off the main thread, and the row below
+    // starts from it rather than from "never asked" -- an answer the user
+    // already asked for is a fact worth keeping on the row too.
+    LaunchedEffect(entry) {
+        protonDb = withContext(Dispatchers.IO) {
+            ProtonDbMemory.get(context, entry.id)?.let { ProtonDbState.of(it) } ?: ProtonDbState.NotAsked
+        }
+    }
 
     LaunchedEffect(entry, reloadToken) {
         loaded = false
@@ -642,7 +652,31 @@ internal fun PcGameMenu(
                                     }.getOrElse { "There is no browser on this device to open ProtonDB in." }
                                     else -> {
                                         protonDb = ProtonDbState.Looking
-                                        scope.launch { protonDb = lookUpProtonDb(entry, gameName) }
+                                        scope.launch {
+                                            val state = lookUpProtonDb(entry, gameName)
+                                            protonDb = state
+                                            // The ask is remembered (ProtonDbMemory) so
+                                            // the answer outlives this dialog: the PC
+                                            // library's focused-game panel and its tier
+                                            // filter draw what was asked for, and the
+                                            // ask itself never moves -- it still ran
+                                            // only because the person selected the row.
+                                            withContext(Dispatchers.IO) {
+                                                ProtonDbMemory.remember(
+                                                    context,
+                                                    entry.id,
+                                                    ProtonDbMemory.Answer(
+                                                        appId = state.appIdForMemory(),
+                                                        tier = (state as? ProtonDbState.Found)?.summary?.tier,
+                                                        total = (state as? ProtonDbState.Found)?.summary?.total ?: 0,
+                                                        confidence = (state as? ProtonDbState.Found)?.summary?.confidence,
+                                                        trendingTier = (state as? ProtonDbState.Found)?.summary?.trendingTier,
+                                                        askedAtEpochMs = System.currentTimeMillis(),
+                                                        line = (state as? ProtonDbState.Unavailable)?.line,
+                                                    ),
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -1148,7 +1182,7 @@ private sealed interface ProtonDbState {
     data object NotAsked : ProtonDbState
     data object Looking : ProtonDbState
     data class Found(val summary: ProtonDbSummary, val appId: Long) : ProtonDbState
-    data class Unavailable(val line: String) : ProtonDbState
+    data class Unavailable(val line: String, val appId: Long = 0L) : ProtonDbState
 
     fun detail(): String = when (this) {
         NotAsked -> "Look up other people's reports for this game"
@@ -1156,6 +1190,24 @@ private sealed interface ProtonDbState {
         is Found -> "Reports from Linux PCs running Proton, not from this device. Select to open ProtonDB"
         is Unavailable -> line
     }
+
+    companion object {
+        /** The remembered answer from a previous ask (ProtonDbMemory), as the row's state. */
+        fun of(answer: ProtonDbMemory.Answer): ProtonDbState = when {
+            answer.tier != null -> Found(
+                ProtonDbSummary(answer.tier, answer.total, answer.confidence, answer.trendingTier),
+                answer.appId,
+            )
+            else -> Unavailable(answer.line ?: "Asked before; no answer was recorded", answer.appId)
+        }
+    }
+}
+
+/** The app id to remember an answer under; a refusal that never reached a lookup has none. */
+private fun ProtonDbState.appIdForMemory(): Long = when (this) {
+    is ProtonDbState.Found -> appId
+    is ProtonDbState.Unavailable -> appId
+    else -> 0L
 }
 
 /** Network: the IO dispatcher. Every outcome is a sentence, never a silent blank. */
@@ -1165,8 +1217,8 @@ private suspend fun lookUpProtonDb(entry: LibraryEntry, name: String): ProtonDbS
             ?: return@runCatching ProtonDbState.Unavailable("No Steam app id is known for $name, and ProtonDB lists only Steam games")
         when (val lookup = ProtonDbClient.summary(appId)) {
             is ScrapeLookup.Found -> ProtonDbState.Found(lookup.value, appId)
-            ScrapeLookup.NoMatch -> ProtonDbState.Unavailable("ProtonDB has no reports for this game yet")
-            is ScrapeLookup.Refused -> ProtonDbState.Unavailable("ProtonDB refused the request (HTTP ${lookup.httpStatus})")
+            ScrapeLookup.NoMatch -> ProtonDbState.Unavailable("ProtonDB has no reports for this game yet", appId)
+            is ScrapeLookup.Refused -> ProtonDbState.Unavailable("ProtonDB refused the request (HTTP ${lookup.httpStatus})", appId)
         }
     }.getOrElse { ProtonDbState.Unavailable("ProtonDB could not be reached: ${it.message ?: it}") }
 }
