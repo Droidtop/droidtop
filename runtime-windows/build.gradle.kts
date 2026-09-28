@@ -198,8 +198,8 @@ dependencies {
     // deviations, each explained where it happens.
     // ------------------------------------------------------------------
     implementation(gn.material)
-    implementation("androidx.browser:browser:1.8.0")
-    implementation("androidx.documentfile:documentfile:1.0.1")
+    implementation(libs.browser)
+    implementation(libs.documentfile)
 
     // JavaSteam (the SNAPSHOT repo is declared in settings.gradle).
     implementation(gn.javasteam) { isChanging = true }
@@ -252,8 +252,8 @@ dependencies {
     // references it unconditionally) but the empty POSTHOG_API_KEY above
     // keeps it inert. Removing the calls belongs in the fork, once,
     // rather than being patched around here.
-    implementation("com.posthog:posthog-android:3.8.0")
-    implementation("com.auth0.android:jwtdecode:2.0.2")
+    implementation(libs.posthog.android)
+    implementation(libs.jwtdecode)
 
     // Real, proprietary Samsung Performance SDK jar, referenced directly
     // from the vendor tree (live reference, not a copy). On non-Samsung

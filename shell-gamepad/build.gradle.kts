@@ -48,7 +48,7 @@ dependencies {
     // ("Cannot access 'Animatable2Compat'", real CI failure). The apng
     // artifact declares it only transitively-invisibly, so it is named
     // here directly.
-    implementation("androidx.vectordrawable:vectordrawable-animated:1.2.0")
+    implementation(libs.vectordrawable.animated)
     implementation(project(":library-core"))
     // Real, direct dependency: the ES-DE theme engine (dev.droidtop.library.theme
     // -- EsDeThemeParser/EsDeTheme/ThemeAssets/ThemePrefs/ThemeDownloader/
@@ -108,5 +108,5 @@ dependencies {
     // runs in JVM unit tests against org.json; android.jar's org.json is
     // a throwing stub there, so the real library backs the tests (the
     // same reasoning and version as library-core's own test classpath).
-    testImplementation("org.json:json:20240303")
+    testImplementation(libs.json.v20240303)
 }

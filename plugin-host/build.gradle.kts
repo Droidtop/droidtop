@@ -51,7 +51,7 @@ dependencies {
     // OciFlattener): commons-compress needs org.tukaani:xz on the
     // classpath itself to read the xz codec, so it is declared here too.
     implementation(libs.commons.compress)
-    implementation("org.tukaani:xz:1.9")
+    implementation(libs.xz)
     // docs/SPEC.md 12a, flutter_embed kind: the Flutter embedding's own
     // Java classes (FlutterEngine/FlutterJNI/FlutterLoader/MethodChannel),
     // pinned to the EXACT engine version
@@ -65,5 +65,5 @@ dependencies {
     // main sourceset relies on the real implementation bundled in the
     // Android platform, but a plain JVM unit test needs a real jar (same
     // pattern as :library-core).
-    testImplementation("org.json:json:20240303")
+    testImplementation(libs.json.v20240303)
 }

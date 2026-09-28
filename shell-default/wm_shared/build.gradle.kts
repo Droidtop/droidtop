@@ -35,12 +35,12 @@ val frameworkStubs = configurations.detachedConfiguration(
 ).apply { isTransitive = false }
 
 dependencies {
-    implementation("androidx.core:core:1.16.0")
-    implementation("androidx.annotation:annotation:1.9.1")
-    implementation("androidx.core:core-animation:1.0.0")
-    implementation("androidx.dynamicanimation:dynamicanimation-ktx:1.1.0")
-    implementation("androidx.window:window:1.5.1")
-    implementation("javax.inject:javax.inject:1")
+    implementation(libs.core.v116)
+    implementation(libs.annotation)
+    implementation(libs.androidx.core.animation)
+    implementation(libs.dynamicanimation.ktx)
+    implementation(libs.androidx.window)
+    implementation(libs.javax.inject)
     implementation(libs.kotlinx.coroutines)
     compileOnly(project(":flags"))
 }
