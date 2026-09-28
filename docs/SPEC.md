@@ -1941,8 +1941,10 @@ the `ContainerRuntime` interface that already exists (§3):
   display's row says Main and links to the Main screen row. Every other
   display's row is a choice of role: **Input surface** (§6c), **Companion**
   (§4d), **Virtual controller** (§4), **Extended desktop output** (Desktop
-  only: a second headless output in the compositor, sized to the display,
-  with the taskbar's "move to" action reaching it), or **Mirror** (Android's
+  only: a second headless output in the compositor, sized to the display;
+  real multi-output support in `:host-bridge` — today single-output-only,
+  see §2a's taskbar paragraph — is needed before this role or a taskbar
+  "move to" action can exist), or **Mirror** (Android's
   own mirroring, chosen rather than fallen into). The per-mode
   second-screen role rows are these same rows filtered to the mode. A
   display in a fallback mode the add-on is known to come up in (480x640
@@ -4155,17 +4157,30 @@ app-drawer icon or a floating switcher button:
   the `SurfaceView` frame-passthrough viewport (via `:host-bridge`'s
   `HostBridge`), and around it a taskbar, a Start menu and a tray
   (`DesktopShell`). **The taskbar IS the cross-container task manager**
-  (decided 2026-09-24): `:host-bridge` binds
+  (decided 2026-09-24, built 2026-09-28 — Droidtop/tracker#94):
+  `:host-bridge`'s native Wayland client binds
   `wlr-foreign-toplevel-management-unstable-v1` beside screencopy and the
-  virtual-input protocols, and the taskbar lists every toplevel the
-  compositor has — title, app id, which container it came from where the
-  helper knows, focused and minimized state — activating one on tap,
-  minimizing it on a second tap, closing it from its long-press menu, and
-  moving it to another output where one exists (§4). Android tasks
-  droidtop itself launched onto the desktop's display (a game, a Wine
-  activity) appear in the same bar from `LaunchDisplay`'s record, so one
-  bar answers "what is running" across containers and Android alike. The
-  Start menu lists the primary container's installed applications and the
+  virtual-input protocols (`wayland_client.cpp`'s `ToplevelState`/
+  `kToplevelManagerListener`), and the taskbar (`TaskbarWindowList` in
+  `DesktopShell.kt`) lists every toplevel the compositor reports — title,
+  app id, activated/minimized/maximized/fullscreen state — tap activates
+  the row (and un-minimizes it first if needed), a second tap on the
+  already-activated row minimizes it, and its long-press menu offers
+  Restore/Minimize and Close (`zwlr_foreign_toplevel_handle_v1`'s
+  activate/set_minimized/unset_minimized/close requests). **Not built**:
+  which container a toplevel came from (there is only ever one primary
+  container today, so nothing distinguishes this yet), moving a toplevel to
+  another output (the protocol itself has no such request — only
+  activate/set_minimized/unset_minimized/close/set_fullscreen/
+  set_rectangle — and host-bridge's own capture/output handling is still
+  single-output-only besides, see `WaylandGlobals`'s comment in
+  `wayland_client.cpp`; real "move to output" needs real multi-output
+  support in host-bridge first), and folding Android tasks droidtop itself
+  launched onto the desktop's display (a game, a Wine activity) into the
+  same bar via `LaunchDisplay`'s record — all three are backlog, not
+  shipped, corrected here after an earlier draft of this section described
+  them as already decided/built. The Start menu lists the primary
+  container's installed applications and the
   library's entries (§2a, §2b) until the container-side launcher exists,
   and is replaced by it, not joined. The live desktop connection is
   `DesktopSessionService` (`:app`), over either backend (§3).

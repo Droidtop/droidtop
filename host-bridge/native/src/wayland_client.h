@@ -3,6 +3,8 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <string>
+#include <vector>
 
 // Thin C++ wrapper around a wl_display connection to the primary container's
 // compositor, plus the registry globals hostbridge needs. See wayland_client.cpp
@@ -43,6 +45,33 @@ struct DispatchTasks;
  * trampoline, and this keeps the header free of <functional>.
  */
 using ClipboardTextCallback = void (*)(void* userData, const char* utf8Text, size_t length);
+
+/**
+ * Called on the dispatch thread (see wayland_client.cpp) whenever the
+ * container-side toplevel list changes — a window opened, closed, or had
+ * its title/app-id/activated/minimized/maximized state change. Carries no
+ * data: the callee (hostbridge_jni.cpp's trampoline) is expected to call
+ * back into snapshotToplevels() for the current list, the same
+ * fetch-on-notify shape as everything else this class exposes to Kotlin.
+ */
+using ToplevelsChangedCallback = void (*)(void* userData);
+
+/**
+ * One opened window as wlr-foreign-toplevel-management-unstable-v1 reports
+ * it. `id` is the zwlr_foreign_toplevel_handle_v1 pointer reinterpreted as
+ * an integer — stable for the handle's lifetime, which is exactly the
+ * lifetime a taskbar row needs it for, and never reused while that handle
+ * is still alive (a fresh object gets a fresh pointer).
+ */
+struct ToplevelInfo {
+    uint64_t id = 0;
+    std::string title;
+    std::string appId;
+    bool activated = false;
+    bool minimized = false;
+    bool maximized = false;
+    bool fullscreen = false;
+};
 
 class WaylandClient {
 public:
@@ -93,6 +122,34 @@ public:
     void injectPointerAxis(double horizontal, double vertical);
     void injectKey(uint32_t evdevKeyCode, bool pressed);
 
+    // ---- Windows, over wlr-foreign-toplevel-management-unstable-v1 ----
+    //
+    // Non-fatal when the compositor doesn't advertise this global (like the
+    // clipboard's ext-data-control-v1 below): the desktop's own single
+    // presented surface still works, the taskbar just has no window list to
+    // show. Registers the sink the same way setClipboardListener does —
+    // before connect() is not required here since the manager delivers the
+    // FULL current toplevel list as a burst of events right after binding,
+    // and a listener set any time before the first snapshotToplevels() call
+    // sees it.
+    void setToplevelsListener(ToplevelsChangedCallback callback, void* userData);
+
+    // A copy of the current list, safe to call from any thread. Entries are
+    // only ever mutated on the dispatch thread; reads take the same mutex
+    // that guards those mutations (see ToplevelState in the .cpp).
+    std::vector<ToplevelInfo> snapshotToplevels();
+
+    // Requests below run on the dispatch thread (like setOutputSize) rather
+    // than marshaling the Wayland request directly from the calling thread:
+    // the handle they act on can be destroyed by a `closed` event arriving
+    // on the dispatch thread at any time, and only that thread is allowed to
+    // decide a given id is still live. Each returns false when `id` no
+    // longer names a live toplevel (already closed, or never existed) or
+    // when the compositor offers no foreign-toplevel-management at all.
+    bool activateToplevel(uint64_t id);
+    bool setToplevelMinimized(uint64_t id, bool minimized);
+    bool closeToplevel(uint64_t id);
+
     // ---- Clipboard, over ext-data-control-v1 ----
     //
     // Registers the sink for container -> Android text. Must be set before
@@ -128,6 +185,7 @@ private:
     WaylandGlobals* globals_ = nullptr;
     OutputCapture* capture_ = nullptr;
     ClipboardState* clipboard_ = nullptr;
+    struct ToplevelState* toplevels_ = nullptr;
 
     void* dispatchThreadHandle_ = nullptr; // pthread_t, opaque here to avoid pulling <pthread.h> into the header
     std::atomic<bool> dispatchThreadRunning_{false};

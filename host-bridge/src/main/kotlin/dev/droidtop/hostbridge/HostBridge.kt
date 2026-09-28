@@ -5,6 +5,31 @@ import androidx.annotation.Keep
 import dev.droidtop.runtime.DisplayOutput
 
 /**
+ * One opened window in the primary container, over
+ * wlr-foreign-toplevel-management-unstable-v1 (see the native client for
+ * the protocol handling). [id] is stable for the toplevel's lifetime —
+ * it is the compositor's own handle pointer, reinterpreted as a number on
+ * the native side purely so it can cross JNI — and is what
+ * [HostBridge.activateToplevel]/[setToplevelMinimized]/[closeToplevel] take.
+ *
+ * Constructed only from JNI (hostbridge_jni.cpp's nativeGetToplevels), by
+ * class name and constructor signature rather than Kotlin code calling
+ * `Toplevel(...)` anywhere — [Keep] for the same reason
+ * [HostBridge.onContainerClipboardText] carries it: R8 would otherwise be
+ * free to rename this class or drop the "unused" constructor.
+ */
+@Keep
+data class Toplevel(
+    val id: Long,
+    val title: String,
+    val appId: String,
+    val activated: Boolean,
+    val minimized: Boolean,
+    val maximized: Boolean,
+    val fullscreen: Boolean,
+)
+
+/**
  * Android's ONLY privileged surface in the whole system, mirroring dom0's
  * narrow GUI-daemon role in Qubes. Does not implement a compositor, window
  * manager, or any Wayland server logic — that all runs inside the primary
@@ -18,6 +43,8 @@ import dev.droidtop.runtime.DisplayOutput
  *  4. Bridges the seat's clipboard selection both ways over
  *     ext-data-control-v1 (see [ClipboardBridge] for the Android-side
  *     policy, and the native client for why that protocol).
+ *  5. Surfaces the container's window list (wlr-foreign-toplevel-management)
+ *     for the taskbar, and its activate/minimize/close requests.
  */
 class HostBridge : HostBridgeInput {
     private var connected = false
@@ -89,6 +116,41 @@ class HostBridge : HostBridgeInput {
         nativeInjectKey(evdevKeyCode, pressed)
     }
 
+    // ---- Windows, over wlr-foreign-toplevel-management-unstable-v1 ----
+    //
+    // The taskbar's real per-window list (docs/SPEC.md's Desktop shell
+    // section): tap activates, a second tap on the already-activated one
+    // minimizes it, long-press closes it. Empty when the compositor never
+    // advertised the protocol -- callers don't need to special-case that,
+    // an empty taskbar row list is already the right rendering for it.
+
+    /** Called from a native worker thread whenever the window list changes -- callers post to the main thread themselves, same convention as [containerClipboardListener]. */
+    @Volatile
+    var toplevelsChangedListener: (() -> Unit)? = null
+
+    /** The window list as of right now. Safe to call from any thread. */
+    fun toplevels(): List<Toplevel> = nativeGetToplevels().toList()
+
+    /** Requests activation (raise + focus). Returns false if [id] is no longer a live toplevel. */
+    fun activateToplevel(id: Long): Boolean = nativeActivateToplevel(id)
+
+    /** Requests minimize/unminimize. Returns false if [id] is no longer a live toplevel. */
+    fun setToplevelMinimized(id: Long, minimized: Boolean): Boolean = nativeSetToplevelMinimized(id, minimized)
+
+    /** Requests the toplevel close itself (e.g. the app's own window-close handling). Not a guarantee it exits. */
+    fun closeToplevel(id: Long): Boolean = nativeCloseToplevel(id)
+
+    /**
+     * Called from JNI (hostbridge_jni.cpp's toplevelsChangedTrampoline).
+     * [Keep] for the same reflection-from-native reason as
+     * [onContainerClipboardText].
+     */
+    @Keep
+    @Suppress("unused")
+    private fun onToplevelsChanged() {
+        toplevelsChangedListener?.invoke()
+    }
+
     // ---- Clipboard, driven by ClipboardBridge ----
 
     /**
@@ -132,6 +194,10 @@ class HostBridge : HostBridgeInput {
     private external fun nativeInjectPointerAxis(horizontal: Double, vertical: Double)
     private external fun nativeInjectKey(evdevKeyCode: Int, pressed: Boolean)
     private external fun nativeOfferClipboardText(utf8: ByteArray): Boolean
+    private external fun nativeGetToplevels(): Array<Toplevel>
+    private external fun nativeActivateToplevel(id: Long): Boolean
+    private external fun nativeSetToplevelMinimized(id: Long, minimized: Boolean): Boolean
+    private external fun nativeCloseToplevel(id: Long): Boolean
 
     companion object {
         init {

@@ -55,6 +55,32 @@ struct ClipboardSink {
 std::mutex g_sinksMutex;
 std::unordered_map<jint, std::shared_ptr<ClipboardSink>> g_clipboardSinks;
 
+/**
+ * The Kotlin end of the toplevel-list-changed notification: a global ref to
+ * one HostBridge instance plus its no-arg onToplevelsChanged() method. Same
+ * shared_ptr-under-its-own-lock shape as ClipboardSink and for the same
+ * reason — the native callback can fire from the dispatch thread at any
+ * point up to disconnect().
+ */
+struct ToplevelsSink {
+    jobject bridgeRef = nullptr;
+    jmethodID method = nullptr;
+
+    ~ToplevelsSink() {
+        if (!bridgeRef || !g_vm) return;
+        JNIEnv* env = nullptr;
+        bool attached = false;
+        if (g_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+            if (g_vm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
+            attached = true;
+        }
+        env->DeleteGlobalRef(bridgeRef);
+        if (attached) g_vm->DetachCurrentThread();
+    }
+};
+
+std::unordered_map<jint, std::shared_ptr<ToplevelsSink>> g_toplevelsSinks;
+
 // One WaylandClient per HostBridge.kt instance. In practice there's only
 // ever one (the DesktopSessionService's connection to the primary
 // container), but keying by the Kotlin object's identity hash rather than
@@ -127,6 +153,42 @@ void clipboardTrampoline(void* userData, const char* utf8Text, size_t length) {
     if (attached) g_vm->DetachCurrentThread();
 }
 
+/**
+ * Fires whenever the container-side window list changes. `userData` is the
+ * client's identity-hash key, same convention as clipboardTrampoline. Takes
+ * no data itself — HostBridge.kt's onToplevelsChanged() is expected to call
+ * back into nativeGetToplevels() for the current snapshot, matching the
+ * native side's fetch-on-notify shape (see ToplevelsChangedCallback in
+ * wayland_client.h).
+ */
+void toplevelsChangedTrampoline(void* userData) {
+    if (!g_vm) return;
+    auto key = static_cast<jint>(reinterpret_cast<intptr_t>(userData));
+
+    std::shared_ptr<ToplevelsSink> sink;
+    {
+        std::lock_guard<std::mutex> lock(g_sinksMutex);
+        auto it = g_toplevelsSinks.find(key);
+        if (it != g_toplevelsSinks.end()) sink = it->second;
+    }
+    if (!sink) return;
+
+    JNIEnv* env = nullptr;
+    bool attached = false;
+    if (g_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        if (g_vm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
+        attached = true;
+    }
+
+    env->CallVoidMethod(sink->bridgeRef, sink->method);
+    if (env->ExceptionCheck()) {
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+    }
+
+    if (attached) g_vm->DetachCurrentThread();
+}
+
 } // namespace
 
 extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
@@ -159,6 +221,23 @@ Java_dev_droidtop_hostbridge_HostBridge_nativeConnect(JNIEnv* env, jobject thiz,
         LOGI("onContainerClipboardText not found — container clipboard will not reach Android");
     }
 
+    // Same registered-before-connect() reasoning as the clipboard sink
+    // above: connect() is what pulls in the toplevel manager's initial
+    // burst of `toplevel` events for windows that already existed.
+    auto toplevelsSink = std::make_shared<ToplevelsSink>();
+    toplevelsSink->bridgeRef = env->NewGlobalRef(thiz);
+    toplevelsSink->method = env->GetMethodID(env->GetObjectClass(thiz), "onToplevelsChanged", "()V");
+    if (toplevelsSink->method) {
+        {
+            std::lock_guard<std::mutex> lock(g_sinksMutex);
+            g_toplevelsSinks[key] = toplevelsSink;
+        }
+        client->setToplevelsListener(toplevelsChangedTrampoline, reinterpret_cast<void*>(static_cast<intptr_t>(key)));
+    } else {
+        env->ExceptionClear();
+        LOGI("onToplevelsChanged not found — the taskbar's window list will not update");
+    }
+
     bool ok = client->connect(path);
 
     env->ReleaseStringUTFChars(waylandSocketPath, path);
@@ -169,6 +248,7 @@ Java_dev_droidtop_hostbridge_HostBridge_nativeConnect(JNIEnv* env, jobject thiz,
     } else {
         std::lock_guard<std::mutex> lock(g_sinksMutex);
         g_clipboardSinks.erase(key);
+        g_toplevelsSinks.erase(key);
     }
 
     return ok ? JNI_TRUE : JNI_FALSE;
@@ -199,6 +279,7 @@ Java_dev_droidtop_hostbridge_HostBridge_nativeDisconnect(JNIEnv* env, jobject th
     {
         std::lock_guard<std::mutex> lock(g_sinksMutex);
         g_clipboardSinks.erase(key);
+        g_toplevelsSinks.erase(key);
     }
     std::lock_guard<std::mutex> lock(g_clientsMutex);
     // Capture stops before its window is released: the dispatch thread
@@ -295,6 +376,68 @@ Java_dev_droidtop_hostbridge_HostBridge_nativeSetOutputSize(JNIEnv* env, jobject
     std::lock_guard<std::mutex> lock(g_clientsMutex);
     if (auto* client = findClient(identityHash(env, thiz))) {
         return client->setOutputSize(width, height) ? JNI_TRUE : JNI_FALSE;
+    }
+    return JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_dev_droidtop_hostbridge_HostBridge_nativeGetToplevels(JNIEnv* env, jobject thiz) {
+    std::vector<hostbridge::ToplevelInfo> snapshot;
+    {
+        std::lock_guard<std::mutex> lock(g_clientsMutex);
+        if (auto* client = findClient(identityHash(env, thiz))) {
+            snapshot = client->snapshotToplevels();
+        }
+    }
+
+    jclass cls = env->FindClass("dev/droidtop/hostbridge/Toplevel");
+    if (!cls) {
+        env->ExceptionClear();
+        return env->NewObjectArray(0, env->FindClass("java/lang/Object"), nullptr);
+    }
+    jmethodID ctor = env->GetMethodID(cls, "<init>", "(JLjava/lang/String;Ljava/lang/String;ZZZZ)V");
+    jobjectArray result = env->NewObjectArray(static_cast<jsize>(snapshot.size()), cls, nullptr);
+    for (size_t i = 0; i < snapshot.size(); i++) {
+        const auto& e = snapshot[i];
+        jstring title = env->NewStringUTF(e.title.c_str());
+        jstring appId = env->NewStringUTF(e.appId.c_str());
+        jobject obj = env->NewObject(cls, ctor, static_cast<jlong>(e.id), title, appId,
+                                      e.activated ? JNI_TRUE : JNI_FALSE,
+                                      e.minimized ? JNI_TRUE : JNI_FALSE,
+                                      e.maximized ? JNI_TRUE : JNI_FALSE,
+                                      e.fullscreen ? JNI_TRUE : JNI_FALSE);
+        env->SetObjectArrayElement(result, static_cast<jsize>(i), obj);
+        env->DeleteLocalRef(obj);
+        env->DeleteLocalRef(title);
+        env->DeleteLocalRef(appId);
+    }
+    env->DeleteLocalRef(cls);
+    return result;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_dev_droidtop_hostbridge_HostBridge_nativeActivateToplevel(JNIEnv* env, jobject thiz, jlong id) {
+    std::lock_guard<std::mutex> lock(g_clientsMutex);
+    if (auto* client = findClient(identityHash(env, thiz))) {
+        return client->activateToplevel(static_cast<uint64_t>(id)) ? JNI_TRUE : JNI_FALSE;
+    }
+    return JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_dev_droidtop_hostbridge_HostBridge_nativeSetToplevelMinimized(JNIEnv* env, jobject thiz, jlong id, jboolean minimized) {
+    std::lock_guard<std::mutex> lock(g_clientsMutex);
+    if (auto* client = findClient(identityHash(env, thiz))) {
+        return client->setToplevelMinimized(static_cast<uint64_t>(id), minimized == JNI_TRUE) ? JNI_TRUE : JNI_FALSE;
+    }
+    return JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_dev_droidtop_hostbridge_HostBridge_nativeCloseToplevel(JNIEnv* env, jobject thiz, jlong id) {
+    std::lock_guard<std::mutex> lock(g_clientsMutex);
+    if (auto* client = findClient(identityHash(env, thiz))) {
+        return client->closeToplevel(static_cast<uint64_t>(id)) ? JNI_TRUE : JNI_FALSE;
     }
     return JNI_FALSE;
 }

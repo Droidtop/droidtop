@@ -5,8 +5,11 @@ import android.content.Context
 import android.content.Intent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -17,10 +20,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,11 +40,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.droidtop.hostbridge.HostBridge
+import dev.droidtop.hostbridge.Toplevel
 import dev.droidtop.input.DesktopInputRouter
 import dev.droidtop.input.InputSeats
 import dev.droidtop.input.PointerTransform
@@ -107,6 +117,7 @@ fun DesktopShell(
         DesktopViewport(hostBridge, primaryOutput, sessionMessage, onStartSession)
 
         Taskbar(
+            hostBridge = hostBridge,
             startMenuOpen = startMenuOpen,
             onToggleStartMenu = { startMenuOpen = !startMenuOpen },
             // Absent rather than disabled when there is no live session:
@@ -325,6 +336,7 @@ private fun BoxScope.DesktopViewport(
 
 @Composable
 private fun BoxScope.Taskbar(
+    hostBridge: HostBridge?,
     startMenuOpen: Boolean,
     onToggleStartMenu: () -> Unit,
     onOpenTerminal: (() -> Unit)?,
@@ -350,7 +362,7 @@ private fun BoxScope.Taskbar(
             Text(if (startMenuOpen) "Close" else "Start")
         }
         Spacer(modifier = Modifier.width(1.dp).height(32.dp).background(MaterialTheme.colorScheme.outline))
-        Spacer(modifier = Modifier.weight(1f))
+        TaskbarWindowList(hostBridge, modifier = Modifier.weight(1f))
         if (onOpenTerminal != null) {
             Button(onClick = onOpenTerminal, modifier = Modifier.padding(horizontal = 8.dp)) {
                 Text("Terminal")
@@ -369,6 +381,106 @@ private fun BoxScope.Taskbar(
         }
         SystemTray()
         Text(clockText, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(horizontal = 16.dp))
+    }
+}
+
+/**
+ * The taskbar's real cross-container task manager (docs/SPEC.md's Desktop
+ * shell section, Droidtop/tracker#94): one row per toplevel host-bridge
+ * reports over wlr-foreign-toplevel-management. Tap activates it (raises +
+ * focuses); tapping the already-activated one minimizes it instead, so a
+ * single action both switches windows and gets one out of the way, the same
+ * "click its taskbar button again" convention as a desktop OS. Long-press
+ * opens a small menu for Restore/Minimize and Close -- the destructive one
+ * deliberately not on a plain tap.
+ *
+ * Empty (no row shown at all, not even a placeholder) when [hostBridge] is
+ * null or the compositor never advertised the protocol: an empty window
+ * list and "there is no session"/"the protocol isn't there" look the same
+ * to a user with nothing open, and this row isn't where either gets
+ * explained.
+ *
+ * "Move to another output" (an earlier draft of docs/SPEC.md's Desktop
+ * section) is NOT built here: wlr-foreign-toplevel-management-unstable-v1
+ * has no such request (only activate/set_minimized/unset_minimized/close/
+ * set_fullscreen/set_rectangle -- checked against the protocol XML), and
+ * host-bridge's own output handling is still single-output-only (see
+ * wayland_client.cpp's WaylandGlobals comment). Real "move to output" needs
+ * real multi-output support first; SPEC.md is corrected alongside this
+ * change to stop claiming it as already built.
+ */
+@Composable
+private fun TaskbarWindowList(hostBridge: HostBridge?, modifier: Modifier = Modifier) {
+    var toplevels by remember(hostBridge) { mutableStateOf(hostBridge?.toplevels() ?: emptyList()) }
+
+    DisposableEffect(hostBridge) {
+        val mainHandler = Handler(Looper.getMainLooper())
+        hostBridge?.toplevelsChangedListener = {
+            // Fires from a native worker thread (see HostBridge.kt).
+            mainHandler.post { toplevels = hostBridge.toplevels() }
+        }
+        onDispose { hostBridge?.toplevelsChangedListener = null }
+    }
+
+    if (toplevels.isEmpty()) {
+        Spacer(modifier = modifier)
+        return
+    }
+
+    LazyRow(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        items(toplevels, key = { it.id }) { toplevel ->
+            TaskbarWindowRow(
+                toplevel = toplevel,
+                onTap = {
+                    if (toplevel.activated) {
+                        hostBridge?.setToplevelMinimized(toplevel.id, true)
+                    } else {
+                        if (toplevel.minimized) hostBridge?.setToplevelMinimized(toplevel.id, false)
+                        hostBridge?.activateToplevel(toplevel.id)
+                    }
+                },
+                onClose = { hostBridge?.closeToplevel(toplevel.id) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun TaskbarWindowRow(toplevel: Toplevel, onTap: () -> Unit, onClose: () -> Unit) {
+    var menuOpen by remember { mutableStateOf(false) }
+    Box {
+        Text(
+            toplevel.title.ifBlank { toplevel.appId.ifBlank { "(untitled window)" } },
+            color = if (toplevel.activated) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            fontWeight = if (toplevel.activated) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .widthIn(max = 180.dp)
+                .combinedClickable(onClick = onTap, onLongClick = { menuOpen = true })
+                .background(
+                    if (toplevel.minimized) {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.surface
+                    },
+                )
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+        )
+        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            DropdownMenuItem(
+                text = { Text(if (toplevel.minimized) "Restore" else "Minimize") },
+                onClick = { menuOpen = false; onTap() },
+            )
+            DropdownMenuItem(
+                text = { Text("Close") },
+                onClick = { menuOpen = false; onClose() },
+            )
+        }
     }
 }
 

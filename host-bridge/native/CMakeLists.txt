@@ -4,7 +4,7 @@ project(hostbridge)
 # host-bridge is a Wayland CLIENT of the primary container's compositor — it
 # does not build or link wlroots/sway (those run inside the container,
 # cross-compiled separately for the container's userland, not for Android).
-# It links against wayland-client itself and generates C bindings for five
+# It links against wayland-client itself and generates C bindings for six
 # non-core protocols via wayland-scanner:
 #
 #   - wlr-screencopy-unstable-v1   (vendor/wlroots/protocol)   — frame capture
@@ -13,6 +13,9 @@ project(hostbridge)
 #   - ext-data-control-v1 (vendor/wayland-protocols/staging)    — clipboard
 #   - wlr-output-management-unstable-v1 (vendor/wlroots/protocol) — sizing the
 #     headless output to the Android view that shows it
+#   - wlr-foreign-toplevel-management-unstable-v1 (vendor/wlroots/protocol) —
+#     the taskbar's window list (title/app-id/activated/minimized state) and
+#     activate/minimize/close requests, docs/SPEC.md's Desktop shell section
 #
 # The wlr protocols live under vendor/wlroots/protocol, not
 # vendor/wayland-protocols — confirmed against the actual repo layout,
@@ -47,6 +50,7 @@ set(HOSTBRIDGE_PROTOCOLS
     "virtual-keyboard-unstable-v1;${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/wlroots/protocol/virtual-keyboard-unstable-v1.xml"
     "ext-data-control-v1;${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/wayland-protocols/staging/ext-data-control/ext-data-control-v1.xml"
     "wlr-output-management-unstable-v1;${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/wlroots/protocol/wlr-output-management-unstable-v1.xml"
+    "wlr-foreign-toplevel-management-unstable-v1;${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/wlroots/protocol/wlr-foreign-toplevel-management-unstable-v1.xml"
 )
 
 set(GENERATED_SOURCES "")
