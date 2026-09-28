@@ -93,8 +93,17 @@ internal class GridPad(val state: LazyGridState, private val scope: CoroutineSco
             withTimeoutOrNull(1000) {
                 snapshotFlow { state.layoutInfo.visibleItemsInfo.any { it.index == index } }.first { it }
             }
-            // Focus brings a card only partly on screen fully into view.
-            runCatching { requester(index).requestFocus() }
+            // A card "visible" in layoutInfo (the check just above) is not
+            // the same instant as its own FocusRequester modifier actually
+            // attaching -- a one-shot requestFocus() here raced that gap
+            // often enough to be the real cause of Up/Down at a page
+            // boundary sometimes just not moving anything (owner, console,
+            // Droidtop/tracker#1: "Up is now swallowed, not moved").
+            // requestFocusWhenAttached already exists for exactly this
+            // (GamepadShell.kt's own doc comment, the identical race for a
+            // themed list's first row) -- reused here instead of a second,
+            // weaker one-shot attempt.
+            requestFocusWhenAttached(requester(index), "GridPad")
         }
     }
 }

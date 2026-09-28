@@ -3,7 +3,10 @@ package dev.droidtop.app
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.KeyEvent
+import android.view.MotionEvent
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.collectAsState
@@ -69,6 +72,18 @@ import kotlinx.coroutines.launch
  * generic placeholder, including what a booting container last reported.
  */
 class MainActivity : AppCompatActivity(), SecondScreenHost {
+
+    // Lazy: only ever touched from onResume/onPause/dispatchGenericMotionEvent,
+    // all on the main thread, well after the window (and this Activity's own
+    // dispatchKeyEvent target) exists. See GamepadAxisNav's own doc comment --
+    // Droidtop/tracker#1, a real gamepad's D-pad/stick reported through the
+    // joystick MotionEvent axes rather than real KeyEvents.
+    private val gamepadAxisNav by lazy { gamepadAxisNavFor(this, Handler(Looper.getMainLooper())) }
+
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        gamepadAxisNav.onGenericMotionEvent(event)
+        return super.dispatchGenericMotionEvent(event)
+    }
 
     private lateinit var library: Library
     private var mode by mutableStateOf<Mode?>(null)
@@ -392,6 +407,10 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // Cleared rather than left stale, so a trackpad swipe cannot
         // deliver keys into a window the user has navigated away from.
         if (ForegroundShell.current() === this) ForegroundShell.set(null)
+        // Same reasoning as ForegroundShell just above: a repeat in
+        // flight must not keep firing dispatchKeyEvent into a window
+        // that is no longer the one the user is looking at.
+        gamepadAxisNav.cancel()
         super.onPause()
     }
 

@@ -372,13 +372,14 @@ fun EsDeSystemListView(
         // The grid doesn't get onFocusedIndexChanged wired through -- it
         // still delegates its cursor to LazyVerticalGrid's own focus
         // traversal and has no single cursor of its own to report.
-        "grid" -> EsDeGrid(element, typedItems, firstItemFocus, modifier, resolvedWidth, resolvedHeight)
+        "grid" -> EsDeGrid(element, typedItems, firstItemFocus, modifier, resolvedWidth, resolvedHeight, gamelist = gamelist)
         // textlist DOES get onFocusedIndexChanged now: it owns its own
         // cursor (real TextListComponent architecture, see EsDeTextList),
         // so a theme whose system view is a textlist rather than a
         // carousel gets the same real per-system theme reloading.
         "textlist" -> EsDeTextList(
             element, items, firstItemFocus, modifier, onFocusedIndexChanged, resolvedWidth, resolvedHeight,
+            gamelist = gamelist,
         )
         // "carousel", or no theme-declared element at all -- carousel is
         // ES-DE's own real default shape and the one droidtop already
@@ -1230,6 +1231,17 @@ private fun EsDeTextList(
     onFocusedIndexChanged: (Int) -> Unit,
     screenWidth: Dp,
     screenHeight: Dp,
+    // Real ES-DE quicksysselect (Droidtop/tracker#43): Left/Right in a
+    // GAMELIST textlist means "jump to the sibling system's gamelist",
+    // the same convention the main system carousel and EsDeGrid's own
+    // edge already have -- never "move within this list" (a vertical
+    // textlist has no horizontal movement of its own to begin with). A
+    // SYSTEM-level textlist (a theme that lists systems as text rather
+    // than a carousel) is left at its previous behaviour -- swallowed,
+    // since droidtop has no established meaning for Left/Right there and
+    // changing it without a theme to verify against risks a regression
+    // nobody asked for.
+    gamelist: Boolean = false,
 ) {
     // Real ES-DE default font size for a textlist. Fraction of the THEMED
     // area (see EsDeSystemListView's own screenWidth/screenHeight doc
@@ -1266,11 +1278,17 @@ private fun EsDeTextList(
                     }
                     GamepadAction.UP -> step(-1)
                     GamepadAction.DOWN -> step(1)
-                    // Consumed so a stray horizontal press can't escape
-                    // the list and move Compose focus onto another
-                    // surface -- same reasoning as the carousel's own
-                    // cross-axis handling.
-                    GamepadAction.LEFT, GamepadAction.RIGHT -> true
+                    // A gamelist bubbles Left/Right to the sibling-system
+                    // switch above it (GamesSection's own onKeyEvent,
+                    // GamepadShell.kt); the old unconditional `true` here
+                    // predates the top-bar focus fix and was really
+                    // defending against THAT bug (a stray horizontal
+                    // press escaping via focus search) -- the top bar can
+                    // no longer take focus at all (SectionTabBar), so
+                    // this no longer needs to swallow the press to stay
+                    // safe, and swallowing it was also silently eating
+                    // the real feature (tracker#43).
+                    GamepadAction.LEFT, GamepadAction.RIGHT -> !gamelist
                     else -> false
                 }
             },
@@ -1500,6 +1518,14 @@ private fun EsDeGrid(
     modifier: Modifier,
     screenWidth: Dp,
     screenHeight: Dp,
+    // Same real quicksysselect convention as EsDeTextList's own
+    // (Droidtop/tracker#43): a GAMELIST grid steps within its own row on
+    // Left/Right same as always, but AT the row's edge, bubbles to the
+    // sibling-system switch instead of doing nothing -- matching
+    // GridPad's already-correct edge behaviour for droidtop's own
+    // unthemed grids (GridPad.kt's own doc comment). A SYSTEM-level grid
+    // keeps its previous always-consumed behaviour.
+    gamelist: Boolean = false,
 ) {
     val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
     val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * esDeFontScreenSize(screenWidth, screenHeight).value).dp.toSp() }
@@ -1572,13 +1598,28 @@ private fun EsDeGrid(
                         cursor = (cursor + delta).coerceIn(0, items.size - 1)
                         return true
                     }
+                    // Left/Right at a real edge of the current row: not
+                    // consumed when this is a gamelist, so it bubbles to
+                    // the sibling-system switch (tracker#43); consumed
+                    // (a no-op) otherwise, same as every edge before this.
+                    fun stepColumn(delta: Int): Boolean {
+                        if (items.isEmpty()) return true
+                        val atEdge = if (delta < 0) {
+                            cursor % layout.columns == 0
+                        } else {
+                            cursor % layout.columns == layout.columns - 1 || cursor == items.lastIndex
+                        }
+                        if (atEdge) return !gamelist
+                        cursor = (cursor + delta).coerceIn(0, items.size - 1)
+                        return true
+                    }
                     when (GamepadKeyMap.actionFor(event.key)) {
                         GamepadAction.A -> {
                             items.getOrNull(cursor)?.onSelect?.invoke()
                             true
                         }
-                        GamepadAction.LEFT -> step(-1)
-                        GamepadAction.RIGHT -> step(1)
+                        GamepadAction.LEFT -> stepColumn(-1)
+                        GamepadAction.RIGHT -> stepColumn(1)
                         GamepadAction.UP -> step(-layout.columns)
                         GamepadAction.DOWN -> step(layout.columns)
                         else -> false
