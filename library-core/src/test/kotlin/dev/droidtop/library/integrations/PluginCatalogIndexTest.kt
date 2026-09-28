@@ -42,11 +42,15 @@ class PluginCatalogIndexTest {
         )
     }
 
+    /** A trailing lambda edits the plugin entry; [originOverride] edits its origin. */
+    private fun indexWithPlugin(pluginOverride: (JSONObject) -> Unit) = indexJson(pluginOverride = pluginOverride)
+
+    /** A trailing lambda edits the origin entry. */
     private fun indexJson(
         schemaVersion: Int = 1,
-        originOverride: (JSONObject) -> Unit = {},
         pluginOverride: (JSONObject) -> Unit = {},
         dropOrigins: Boolean = false,
+        originOverride: (JSONObject) -> Unit = {},
     ): String {
         val plugin = JSONObject().apply {
             put("id", "droidtop.sample")
@@ -170,10 +174,10 @@ class PluginCatalogIndexTest {
     @Test
     fun `a plugin id not namespaced under its own origin is refused`() {
         assertNull(
-            PluginCatalogIndexParser.parse(indexJson { plugin -> plugin.put("id", "otherorigin.sample") }),
+            PluginCatalogIndexParser.parse(indexWithPlugin { plugin -> plugin.put("id", "otherorigin.sample") }),
         )
         assertNull(
-            PluginCatalogIndexParser.parse(indexJson { plugin -> plugin.put("id", "droidtop.Sample") }),
+            PluginCatalogIndexParser.parse(indexWithPlugin { plugin -> plugin.put("id", "droidtop.Sample") }),
         )
     }
 
@@ -190,7 +194,7 @@ class PluginCatalogIndexTest {
     @Test
     fun `a plugin with no releases is refused, not listed as installable-nothing`() {
         assertNull(
-            PluginCatalogIndexParser.parse(indexJson { plugin -> plugin.put("releases", JSONArray()) }),
+            PluginCatalogIndexParser.parse(indexWithPlugin { plugin -> plugin.put("releases", JSONArray()) }),
         )
     }
 
@@ -199,7 +203,7 @@ class PluginCatalogIndexTest {
         // manifestSha256 not 64 hex
         assertNull(
             PluginCatalogIndexParser.parse(
-                indexJson { plugin ->
+                indexWithPlugin { plugin ->
                     plugin.getJSONArray("releases").getJSONObject(0).put("manifestSha256", "zzz")
                 },
             ),
@@ -207,7 +211,7 @@ class PluginCatalogIndexTest {
         // bundle url not https
         assertNull(
             PluginCatalogIndexParser.parse(
-                indexJson { plugin ->
+                indexWithPlugin { plugin ->
                     plugin.getJSONArray("releases").getJSONObject(0).getJSONObject("bundle").put("url", "http://insecure.example/bundle.tar.xz")
                 },
             ),
@@ -215,7 +219,7 @@ class PluginCatalogIndexTest {
         // bundle size negative
         assertNull(
             PluginCatalogIndexParser.parse(
-                indexJson { plugin ->
+                indexWithPlugin { plugin ->
                     plugin.getJSONArray("releases").getJSONObject(0).getJSONObject("bundle").put("size", -1)
                 },
             ),
@@ -223,7 +227,7 @@ class PluginCatalogIndexTest {
         // bundle sha256 not hex
         assertNull(
             PluginCatalogIndexParser.parse(
-                indexJson { plugin ->
+                indexWithPlugin { plugin ->
                     plugin.getJSONArray("releases").getJSONObject(0).getJSONObject("bundle").put("sha256", "nope")
                 },
             ),
@@ -234,14 +238,14 @@ class PluginCatalogIndexTest {
     fun `an unknown stream name is refused, the known ones pass`() {
         assertNull(
             PluginCatalogIndexParser.parse(
-                indexJson { plugin ->
+                indexWithPlugin { plugin ->
                     plugin.getJSONArray("releases").getJSONObject(0).put("stream", "nightly")
                 },
             ),
         )
         for (stream in listOf("stable", "testing", "unstable")) {
             val ok = PluginCatalogIndexParser.parse(
-                indexJson { plugin ->
+                indexWithPlugin { plugin ->
                     plugin.getJSONArray("releases").getJSONObject(0).put("stream", stream)
                 },
             )
@@ -252,7 +256,7 @@ class PluginCatalogIndexTest {
     @Test
     fun `a null publishedAt parses as null and sorts as oldest`() {
         val index = PluginCatalogIndexParser.parse(
-            indexJson { plugin ->
+            indexWithPlugin { plugin ->
                 val releases = JSONArray()
                 releases.put(releaseJson(publishedAt = JSONObject.NULL, version = "1.0"))
                 releases.put(releaseJson(publishedAt = "2026-09-28T12:00:00Z", version = "0.9"))
@@ -308,7 +312,7 @@ class PluginCatalogIndexTest {
         val oldDigest = "a".repeat(64)
         val newDigest = "c".repeat(64)
         val index = PluginCatalogIndexParser.parse(
-            indexJson { plugin ->
+            indexWithPlugin { plugin ->
                 val releases = JSONArray()
                 releases.put(releaseJson(version = "1.0", manifestSha256 = oldDigest))
                 releases.put(releaseJson(version = "1.1", manifestSha256 = newDigest))
