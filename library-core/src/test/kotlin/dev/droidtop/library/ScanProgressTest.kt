@@ -299,6 +299,7 @@ class ScanProgressTest {
         private val failAfterBatches: Int = -1,
     ) : LibraryProvider {
         override val kinds = setOf(kind)
+        override val indexKey = "streaming-${kind.name}"
         override suspend fun scan(): List<LibraryEntry> = batches.flatten()
         override suspend fun launch(entry: LibraryEntry) = Unit
         override fun scanProgressive(): Flow<ScanStep> = flow {
