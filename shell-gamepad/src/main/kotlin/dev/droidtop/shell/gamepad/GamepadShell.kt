@@ -1956,17 +1956,15 @@ private fun GamesSection(
             } else {
                 collectionGroupMembers[group].orEmpty().sortedBy { it.title.lowercase() }
             }
-            // The stored per-group sort (GamelistSortPrefs), NAME by
-            // default which is real ES-DE's own gamelist default, and
-            // the stored per-group filter (ALL by default). PC draws from
-            // the folded one-card-per-game list above instead of the raw
-            // entries, same as PcSurface always did.
             // PC draws from the folded one-card-per-game list, in its own
             // LibraryQuery-driven order (PcLibraryContent) -- the console
             // GamelistFilter/GamelistSort prefs below are a second sort/
             // filter mechanism this group no longer offers (their Select-
             // menu rows are hidden for it, see GamelistOptionsMenu).
             is GameGroup.Pc -> pcGrouped.orEmpty().sortedBy { it.title.lowercase() }
+            // The stored per-group sort (GamelistSortPrefs), NAME by
+            // default which is real ES-DE's own gamelist default, and
+            // the stored per-group filter (ALL by default).
             else -> {
                 val filter = GamelistFilterPrefs.get(context, group.label)
                 entries.filter { it.gameGroup() == group }
