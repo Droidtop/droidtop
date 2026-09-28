@@ -9924,15 +9924,102 @@ hold this to "enhancement, not mechanism" (owner directive, 2026-09-25):
    for anything they do; only plugin code that explicitly asked, and was
    explicitly granted, ever calls into it.
 
-**Install sources.** Today: a user-picked file through the system picker
+**Install sources.** A user-picked file through the system picker
 (`PluginStore.importFromPicker`), the same "Add integration file" shape
-§12's JSON half already uses. A catalog-repo source — the "official
-origin + third-party key" idea droidtop-platforms already uses for its
-own lists — fits the same shape later (an origin is already a first-class
-concept in the manifest and the pinned-key map) but is not built: nothing
-today resolves a plugin id against a remote catalog, so adding one is a
-`PluginOriginKeys` entry and a fetch step in front of the same install
-path, not a redesign.
+§12's JSON half already uses — plus, since 2026-09-28, any origin whose
+key the user has trusted under "Keys you trust" (next paragraph): a
+bundle from such an origin verifies and installs through exactly the
+same path as an official one. What is still NOT built is the catalog
+half — nothing resolves a plugin id against a remote catalog or
+downloads bundles from one; when that lands it is a fetch step in front
+of the same install path, not a redesign.
+
+**User-trusted origin keys ("Keys you trust", built 2026-09-28).** Until
+this change `PluginOriginKeys` pinned exactly one origin ("droidtop",
+shipped in the binary and certified by droidtop itself), so nobody else
+could publish a droidtop plugin at all: every third-party bundle died in
+`PluginBundleInstaller.install` with "signature doesn't verify against
+the pinned key". The owner's revision of the design (2026-09-28) is also
+explicit that users should not normally add keys BY HAND — the primary
+path FETCHES the key from the source the user adds; manual paste/file is
+the secondary path for sources that publish no key.
+
+- **Three tiers, one resolution order.** An origin is OFFICIAL
+  ("droidtop" — the one pinned entry in `PluginOriginKeys`, certified
+  exactly as before: pinned in the app binary; the §8 production-root
+  follow-up note stands), USER-TRUSTED (an origin the user chose to
+  trust, stored in droidtop's own private storage, never in the pinned
+  set), or unknown (refused outright, as always). `PluginOriginKeys.
+  resolve` checks the official pinned key FIRST, then user-trusted
+  keys, so a user-trusted entry can never shadow the official origin
+  even if the store file were edited by hand — and `UserOriginKeys.add`
+  refuses the origin id "droidtop" outright: an origin may not claim
+  the official id. Plugin ids stay namespaced `<origin>.<name>`
+  (`PluginManifest.structuralProblems`), which together with that
+  refusal means no third-party origin can produce an id under the
+  official "droidtop." namespace either.
+- **The primary path: trust-on-first-use from a source.** The Plugins
+  screen's "Keys you trust" screen (Settings → App integrations →
+  Plugins → Keys you trust) takes a plugin source URL — a GitHub repo
+  (`https://github.com/<owner>/<repo>`), a catalog index (any https
+  URL ending in `.json`), or a plain https root — and fetches the
+  source's PUBLISHED key: the well-known file `droidtop-plugin-key.json`
+  at the source's root (for a github.com URL droidtop derives
+  `https://raw.githubusercontent.com/<owner>/<repo>/HEAD/droidtop-plugin-key.json`
+  itself, so the user can paste the address they actually see in a
+  browser), or the catalog index's own `origin`/`key` fields. Nothing is
+  trusted at fetch time. The screen shows WHO (the origin id) and WHICH
+  key (a SHA-256 fingerprint of the SPKI bytes, in groups of four so it
+  is comparable by eye) and says what trusting does NOT mean
+  ("third-party source, not official — droidtop has not vetted it"),
+  and the user confirms once. https only: a plaintext fetch would make
+  the TOFU step itself the attack.
+- **The key file format plugin authors publish** — the whole contract,
+  deliberately two fields:
+  `{ "origin": "acme", "key": "<base64 of a P-256 public key as X.509 SubjectPublicKeyInfo — the same SPKI shape the official pinned key uses>" }`
+  as `droidtop-plugin-key.json` at the source's root; a catalog index
+  carries the same two fields at its top level. The key is validated
+  before it is ever shown: base64 → X.509 SPKI → EC → exactly P-256
+  (`UserOriginKeys.parseKey`); anything else is refused.
+- **A changed key is never silently accepted.** Trusting a source
+  stores origin → key plus the source URL it was fetched from, so the
+  row shows provenance. A later fetch of a source that publishes a
+  DIFFERENT key for an already-trusted origin stops dead: nothing is
+  written; the screen shows a warning naming BOTH fingerprints (the
+  one you trusted, the one now published) and the only way forward is
+  an explicit "replace the stored key" confirmation. This is the
+  rotation-vs-compromise fork and droidtop cannot tell the two apart,
+  so the human who took the original TOFU decision makes the call.
+  Plugins signed by the old key stop verifying the moment a key is
+  replaced or removed, exactly as under "Removal" below. The manual
+  paste/file path never replaces at all — a different key for an origin
+  you already trust is refused with that reason; rotating by hand means
+  removing the origin and adding it again, two explicit steps.
+- **Removal is real.** Removing a user-trusted key makes every plugin
+  signed by it untrusted at once: updates are refused (install fails
+  signature verification again, the same "unknown origin" refusal),
+  the plugins stop running (`verifyInstalled` consults the user keys
+  too, so `runnableFor` and every `PluginCrashPolicy` gate refuse them
+  and the disable reason says "signature no longer verifies"), and the
+  Plugins screen flags the line instead of showing "Running".
+  Re-adding the same key restores them — approval, bound per archive
+  digest, was never destroyed, only signature resolution was.
+- **The badge.** Every plugin's line on the Plugins screen carries its
+  trust tier: "Official" (origin certified in droidtop's binary) or
+  "Added by you" (user-trusted origin — the label never borrows
+  "Official"). A user-origin whose key is gone shows the flagged
+  not-trusted state instead.
+- **Storage.** `filesDir/plugin-user-keys.json`, droidtop's private
+  storage, writable only by the app, written via a temp file + rename
+  so a failed write cannot leave a half-written store:
+  `{ "<origin>": { "key": "<SPKI base64>", "source": "<url it was fetched from, absent when pasted by hand>" } }`.
+  The official origin has no entry there and never can.
+
+Unit-tested in `plugin-host` (`UserOriginKeysTest`, `PluginSourceKeysTest`,
+`BundleSignatureTest`, `PluginBundleInstallerTest`): official verify,
+user-key verify, unknown origin refused, user key removed then refused,
+user origin claiming "droidtop" refused, official-first resolution, and
+the changed-key case never writing without the explicit replace.
 
 **The trust-boundary checklist** (unchanged in substance from the
 2026-09-02 text, now checked against `PluginBundleInstaller` and
@@ -9953,12 +10040,13 @@ path, not a redesign.
    fails any step never has its code loaded, not even to ask it to
    describe itself.
 4. Signing is real, not a placeholder gesture: ECDSA P-256/SHA-256 over
-   the exact manifest bytes, verified against a per-origin pinned public
-   key (`BundleSignature`, `PluginOriginKeys`). Approval is bound to the
-   exact archive digest (`PluginRecord.archiveDigest`, a SHA-256 over the
-   signed manifest) and never carries over to a new digest — an update
-   with different bytes starts back at PENDING, even for an id already
-   approved.
+   the exact manifest bytes, verified against a per-origin public key
+   (`BundleSignature`, `PluginOriginKeys`) — the official pinned key
+   first, then any user-trusted key "Keys you trust" stores (above).
+   Approval is bound to the exact archive digest
+   (`PluginRecord.archiveDigest`, a SHA-256 over the signed manifest)
+   and never carries over to a new digest — an update with different
+   bytes starts back at PENDING, even for an id already approved.
 5. droidtop treats what a plugin returns as untrusted input: every
    binder payload is capped (`PluginRunner.MAX_RESULT_BYTES`, 256 KiB),
    parsed against the capability's own shape, and never used as a path,
@@ -9988,8 +10076,13 @@ does. The `flutter_embed` runner (`FlutterRuntimeManager`,
 `FlutterDroidtopPlugin`, above) and its own sample
 (`samples/plugin-sample-flutter-statustile`) are built and rig-verified
 the same way (`dq-flutterembed-01` — see "The `flutter_embed` kind"
-below), including `startJob` (built 2026-09-26, above). Open: a
-catalog-repo install source for plugins; `startJob` support for
+below), including `startJob` (built 2026-09-26, above). Built 2026-09-28:
+the user-trusted origin keys ("Keys you trust", above) — the store, the
+official-first resolution, the source-key fetch with its TOFU confirm
+and changed-key warning, and the trust badge on the Plugins screen.
+Open: the catalog half of a plugin source (listing plugins in, and
+downloading bundles from, a source whose key you trusted — the KEY half
+is what "Keys you trust" built); `startJob` support for
 python-kind plugins; and the rig check for the python leg specifically
 (queued, `device/QUEUE.md`) — the `native_bundle` leg's own rig check
 (`dq-plugins-01`) already passed.
