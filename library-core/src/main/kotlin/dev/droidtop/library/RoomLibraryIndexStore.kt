@@ -185,7 +185,6 @@ private fun LibraryEntry.toIndexRow(provider: String, part: String?, root: Strin
     players = players,
     rating = rating,
     releaseDate = releaseDate,
-    addedEpochMs = addedEpochMs,
     artworkUri = artworkUri,
     recordPath = recordPathFor(id),
 )

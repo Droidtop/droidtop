@@ -219,17 +219,6 @@ data class LibraryEntry(
     val heroUri: String? = null,
     val logoUri: String? = null,
     val iconUri: String? = null,
-    /**
-     * When droidtop first recorded this game: stamped once, by the
-     * [LibrarySlice] merge that first sees the id, and never rewritten —
-     * a later walk finds the same game and changes nothing about when it
-     * arrived. Null for every game a walk had already found before this
-     * field existed; "when it was added" is a statement about droidtop's
-     * own history, not about the game's, and pretending to know a date
-     * it never recorded would be fabrication. The "Added" sort (docs/
-     * SPEC.md 7i's library views) reads it, unknowns last.
-     */
-    val addedEpochMs: Long? = null,
 ) {
     /**
      * The image file this entry should show for a themed element that
