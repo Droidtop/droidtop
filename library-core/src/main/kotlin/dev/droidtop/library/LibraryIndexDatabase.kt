@@ -41,6 +41,8 @@ data class GameIndexEntity(
     val players: String?,
     val rating: Float?,
     val releaseDate: String?,
+    /** When droidtop first recorded this game (see [LibraryEntry.addedEpochMs]); null for pre-existing games. */
+    val addedEpochMs: Long?,
     val artworkUri: String?,
     /** Where [GameRecordStore] keeps this game's full record -- see [recordPathFor]. */
     val recordPath: String,
