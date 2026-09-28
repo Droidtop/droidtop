@@ -6549,6 +6549,66 @@ affordances for three different shells with three different settings
 surfaces -- collapsing them into one shared widget would be a fourth
 mechanism competing with three that already work, not a consolidation.
 
+### Settings and menu scrolling polish (directed 2026-09-28)
+
+**Audit, not a guess.** No device rig was free for a Perfetto/`dumpsys
+gfxinfo` trace in this pass (see below); the fix traces to a concrete,
+readable main-thread cost, not a hunch: `CatalogRowView` calls a
+`NestedScreenItem`'s `valueLabel` lambda directly inside Compose
+composition (`AppSettingsCatalogs.kt`'s own doc comment already states
+the intended contract -- "Read here, on IO: a value label is drawn on
+the main thread" -- meaning the EXPENSIVE read happens once during the
+suspend `groups()` build, and the lambda just returns the captured
+result). Console systems' per-folder rows broke that contract: their
+`valueLabel` called `resolvePlayer(ctx, resolved)` again from inside the
+lambda, which walks every known player for that system and calls the
+PackageManager (`isPackageInstalled`) for each one -- real binder IPC,
+not free -- and Compose invokes a row's composable body on every
+recomposition of that row, including every scroll frame that brings it
+onto screen. A system list with many folders configured (exactly what
+Console systems is) paid that cost on every fling. Fixed by resolving
+the player ONCE per folder inside the existing `withContext(Dispatchers.IO)`
+block (which already computed it once for the subtitle, wastefully
+computing it a second time for the value column) and closing over the
+result; no other `valueLabel` in the codebase used this pattern.
+
+**Missing list keys**, the other concrete, addressable cause: none of
+`SettingsCatalogView`'s three `LazyColumn`s (the settings list itself,
+the choice picker, the search results) nor the Quick Menu's two lists
+(the System tab's tile grid, the Notifications tab) passed a `key` to
+`itemsIndexed`. Without one, Compose keys a row by its POSITION in the
+list, so any state change anywhere (a toggle flipping, an async status
+line landing, a selection moving) cannot tell "this is still the same
+row" from "a different item is now here," which costs a wider
+re-measure than the one row that actually changed and can lose a
+row's own remembered state (`MenuRow`'s `bringIntoViewRequester` effect)
+on the way. All five now key by the catalog item's own id (or the
+notification's own key) -- the same identity every other mechanism in
+this codebase already keys by (search results, pending focus).
+
+**Not done in this pass, and why:** an animated (rather than instant)
+focus/press transition on `Modifier.selectionFrame` -- the shell's one
+shared selection idiom, used by every menu row, chip, tile and card --
+was considered (design-language "press and focus animations") but
+would require making a `Modifier` extension function `@Composable`
+across 9 files and 14 call sites with no device to verify the result
+against, for a purely cosmetic change unrelated to the reported
+janky-scroll symptom. Flagged as a follow-up rather than shipped
+unverified.
+
+**Needs a rig check:** confirm the fix with real frame numbers, not
+just the code-level reasoning above. On `emulator-5560`:
+1. Install the CI debug APK built from this commit.
+2. Open Gaming > Settings > Library > Console systems with at least
+   a handful of system folders configured (mixed installed/missing
+   emulators, so `resolvePlayer` has real candidates to walk).
+3. `adb -s emulator-5560 shell dumpsys gfxinfo dev.droidtop.app reset`,
+   then fling the list top-to-bottom several times by touch and by
+   D-pad, then `adb -s emulator-5560 shell dumpsys gfxinfo dev.droidtop.app`
+   for the frame-time histogram and janky-frame percentage.
+4. Repeat on the previous build (`efd887ba` or earlier) for a real
+   before/after, since this build already carries the fix.
+
 
 ## 7g. One library across every source (audit + plan, directed 2026-09-01)
 

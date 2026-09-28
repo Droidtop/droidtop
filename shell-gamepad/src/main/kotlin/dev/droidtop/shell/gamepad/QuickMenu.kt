@@ -309,7 +309,7 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                 // The hint bar's own room (MenuTokens.HintBarRoom).
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = MenuTokens.HintBarRoom),
             ) {
-                itemsIndexed(items) { index, item ->
+                itemsIndexed(items, key = { _, item -> item.key }) { index, item ->
                     val focused = index == focusIndex
                     Column(
                         modifier = Modifier

@@ -303,18 +303,31 @@ object AppSettingsCatalogs {
                             }
                             is FolderKind.ConsoleSystem -> {
                                 val resolved = kind.resolvedSystem
+                                // Resolved ONCE here, on IO, like every other
+                                // read this loop makes -- resolvePlayer walks
+                                // every known player and calls the
+                                // PackageManager per candidate
+                                // (isPackageInstalled), so a valueLabel that
+                                // called it again from inside its own lambda
+                                // ran that same PackageManager walk on the
+                                // MAIN thread on every recomposition of this
+                                // row (every scroll frame that brought it on
+                                // screen, every selection change) instead of
+                                // once per real library change. The settings
+                                // scrolling jank the owner reported traced
+                                // to exactly this on Console systems, which
+                                // can list dozens of these rows at once.
+                                val player = resolved?.let { resolvePlayer(context, it) }
                                 NestedScreenItem(
                                     id = "console_folder_${folder.absolutePath}",
                                     title = folder.name,
                                     subtitle = when {
                                         resolved == null -> "Not set: open to choose its system"
-                                        resolvePlayer(context, resolved) == null -> "${resolved.displayName}: no emulator installed yet"
+                                        player == null -> "${resolved.displayName}: no emulator installed yet"
                                         else -> resolved.displayName
                                     },
                                     inline = folderScreen(folder, kind),
-                                    valueLabel = { ctx ->
-                                        resolved?.let { resolvePlayer(ctx, it)?.name } ?: ""
-                                    },
+                                    valueLabel = { player?.name ?: "" },
                                     accent = resolved?.let { SystemThemeColors.forSystem(context, it.id) },
                                 )
                             }

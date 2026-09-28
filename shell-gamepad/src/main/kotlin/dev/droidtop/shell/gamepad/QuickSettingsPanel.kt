@@ -245,7 +245,7 @@ internal fun QuickSettingsPanel(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            itemsIndexed(panel.tiles) { index, tile ->
+            itemsIndexed(panel.tiles, key = { _, tile -> tile.item.id }) { index, tile ->
                 QuickTileView(
                     tile = tile,
                     focused = focusIndex == panel.sliders.size + index,

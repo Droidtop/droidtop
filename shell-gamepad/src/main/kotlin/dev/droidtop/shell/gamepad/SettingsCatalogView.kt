@@ -466,7 +466,19 @@ fun CatalogNavigator(
             contentPadding = MenuListContentPadding,
             verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
         ) {
-            itemsIndexed(rows) { index, row ->
+            // A stable key per row (docs/SPEC.md "Settings scrolling
+            // polish", 2026-09-28): without one, every recomposition of
+            // this list re-keys rows by POSITION, so Compose cannot tell
+            // "row 6 is still Bluetooth" from "row 6 is now something
+            // else" -- any state change anywhere in the list (a toggle
+            // flipping, a status line appearing) treated every visible
+            // row as a fresh item instead of the one that actually
+            // changed, costing a full re-measure/re-layout pass on
+            // scroll and losing per-row remembered state (MenuRow's own
+            // selection-follow effect) on the way. A catalog item's own
+            // id is already what every other mechanism here keys by
+            // (search results, pending focus) -- one identity, reused.
+            itemsIndexed(rows, key = { _, row -> row.item.id }) { index, row ->
                 Column {
                     row.headerAbove?.let { header -> MenuSectionLabel(header) }
                     CatalogRowView(
@@ -713,7 +725,7 @@ internal fun CatalogChoicePicker(
             contentPadding = MenuListContentPadding,
             verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
         ) {
-            itemsIndexed(item.options) { index, option ->
+            itemsIndexed(item.options, key = { _, option -> option.value }) { index, option ->
                 MenuRow(
                     title = option.label,
                     selected = index == selected,
@@ -885,7 +897,7 @@ private fun SettingsSearchOverlay(
                     contentPadding = MenuListContentPadding,
                     verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
                 ) {
-                    itemsIndexed(results) { index, result ->
+                    itemsIndexed(results, key = { _, result -> result.itemId }) { index, result ->
                         MenuRow(
                             title = result.itemTitle,
                             subtitle = "In ${result.screenTitle}" + (result.itemSubtitle?.let { " -- $it" } ?: ""),
