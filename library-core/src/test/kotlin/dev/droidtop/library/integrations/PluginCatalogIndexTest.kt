@@ -266,8 +266,30 @@ class PluginCatalogIndexTest {
         val plugin = index.origins[0].plugins[0]
         assertNull(plugin.releases[0].publishedAt)
         assertEquals(0L, plugin.releases[0].publishedAtMillis())
-        // Newest stable wins on the stamp, not the version string.
-        assertEquals("0.9", PluginCatalog.latestStable(plugin)?.version)
+        // A missing date says nothing, so the version decides.
+        assertEquals("1.0", PluginCatalog.latestStable(plugin)?.version)
+    }
+
+    @Test
+    fun `version and date decide together, and a disagreement offers nothing`() {
+        fun plugin(vararg releases: Pair<String, String>) = PluginCatalogPlugin(
+            id = "droidtop.sample",
+            label = "Sample",
+            description = null,
+            releases = releases.map { (version, date) ->
+                PluginCatalogRelease(version, "stable", date, "a".repeat(64), PluginCatalogBundle("n", "https://x", 1, "b".repeat(64)))
+            },
+        )
+        // Same date: the version decides.
+        assertEquals("1.1", PluginCatalog.latestStable(plugin("1.0" to "2026-09-28T12:00:00Z", "1.1" to "2026-09-28T12:00:00Z"))?.version)
+        // Same version string: the date decides.
+        assertEquals("2026-09-29T12:00:00Z", PluginCatalog.latestStable(plugin("1.0" to "2026-09-28T12:00:00Z", "1.0" to "2026-09-29T12:00:00Z"))?.publishedAt)
+        // Both agree.
+        assertEquals("0.10", PluginCatalog.latestStable(plugin("0.9" to "2026-09-01T00:00:00Z", "0.10" to "2026-09-02T00:00:00Z"))?.version)
+        // Newer version published earlier: the index is wrong, nothing is offered.
+        val wrong = plugin("1.1" to "2026-09-01T00:00:00Z", "1.0" to "2026-09-02T00:00:00Z")
+        assertTrue(PluginCatalog.hasOrderConflict(wrong))
+        assertNull(PluginCatalog.latestStable(wrong))
     }
 
     @Test

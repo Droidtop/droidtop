@@ -14,6 +14,7 @@ import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
+import kotlin.math.sign
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -113,9 +114,46 @@ object PluginCatalog {
         return pin.equals(declared, ignoreCase = true)
     }
 
-    /** The newest stable release of [plugin], or null when it has none. */
-    fun latestStable(plugin: PluginCatalogPlugin): PluginCatalogRelease? =
-        plugin.releases.filter { it.stream == STREAM_STABLE }.maxByOrNull { it.publishedAtMillis() }
+    /**
+     * The newest stable release of [plugin], or null when it has none, or
+     * when its stable releases disagree about which is newest.
+     *
+     * Newest is decided by BOTH the version string and `publishedAt`
+     * (SPEC 12a "What the catalog offers"): where one of them ties (or a
+     * date is missing), the other decides; where both speak, they must
+     * agree. A newer version published earlier than an older one is not
+     * something a publisher does on purpose; it means the index was built
+     * wrong, and droidtop offers nothing for that plugin rather than guess
+     * ([hasOrderConflict]).
+     */
+    fun latestStable(plugin: PluginCatalogPlugin): PluginCatalogRelease? {
+        val stable = plugin.releases.filter { it.stream == STREAM_STABLE }
+        if (hasOrderConflict(stable)) return null
+        return stable.maxWithOrNull { a, b -> compareReleases(a, b) ?: 0 }
+    }
+
+    /** Whether [plugin]'s stable releases disagree between version order and publish order (see [latestStable]). */
+    fun hasOrderConflict(plugin: PluginCatalogPlugin): Boolean =
+        hasOrderConflict(plugin.releases.filter { it.stream == STREAM_STABLE })
+
+    private fun hasOrderConflict(releases: List<PluginCatalogRelease>): Boolean =
+        releases.indices.any { i -> (i + 1 until releases.size).any { j -> compareReleases(releases[i], releases[j]) == null } }
+
+    /** Version and date together: positive when [a] is newer, null when the two orders disagree. */
+    private fun compareReleases(a: PluginCatalogRelease, b: PluginCatalogRelease): Int? {
+        val byVersion = dev.droidtop.library.GameVersion.compareVersions(a.version, b.version).sign
+        val byDate = if (a.publishedAt != null && b.publishedAt != null) {
+            a.publishedAtMillis().compareTo(b.publishedAtMillis()).sign
+        } else {
+            0
+        }
+        return when {
+            byVersion == 0 -> byDate
+            byDate == 0 -> byVersion
+            byVersion == byDate -> byVersion
+            else -> null
+        }
+    }
 
     /** The update [record] has in [index]: the newest stable release of its id with a different manifest digest. Null when installed and current, or not listed. */
     fun updateFor(index: PluginCatalogIndex, record: PluginRecord): PluginCatalogRelease? {

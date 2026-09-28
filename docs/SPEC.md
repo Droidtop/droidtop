@@ -10162,7 +10162,12 @@ what the index says is display data, never a trust decision.
   guessed at), the same validate-before-replace posture as the platform
   databases.
 - **What the catalog offers.** Only `stable`-stream releases: a plugin's
-  offer is its newest stable release by `publishedAt`, and droidtop never
+  offer is its newest stable release, judged by BOTH its version string
+  and `publishedAt` (owner, 2026-09-28): when one ties or a date is
+  missing, the other decides; when both speak they must agree. A newer
+  version published before an older one means the index was built wrong,
+  so that plugin is offered nothing and its row says the catalog is
+  inconsistent, rather than droidtop guessing. droidtop never
   offers a testing/unstable release for install or update (the index may
   carry them; this build does not act on them). An installed plugin has
   an UPDATE when the newest stable release's `manifestSha256` differs

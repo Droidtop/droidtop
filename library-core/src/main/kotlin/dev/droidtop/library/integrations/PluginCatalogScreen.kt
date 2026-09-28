@@ -84,6 +84,9 @@ object PluginCatalogScreen {
         val subtitle = buildString {
             append(plugin.description ?: "No description")
             append(" - ").append(origin.origin)
+            if (PluginCatalog.hasOrderConflict(plugin)) {
+                append(" - the catalog lists releases whose versions and dates disagree, so none is offered until it is fixed")
+            }
         }
         val latest = PluginCatalog.latestStable(plugin)
         val isUpdate = installed != null && latest != null &&
