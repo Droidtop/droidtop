@@ -2309,11 +2309,13 @@ private fun GamesSection(
                             // though focus itself never left it.
                             EsDeNavigationSounds.play("scroll")
                             focusedGameIndex = (focusedGameIndex - 1).coerceAtLeast(0)
+                            android.util.Log.d("droidtop.input", "GamesSection.headless up index=$focusedGameIndex")
                         }
                     action == GamepadAction.DOWN && group != null && group !is GameGroup.Pc && themed && !gamelistHasListWidget && systemGamesForGroup.isNotEmpty() ->
                         handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, true) {
                             EsDeNavigationSounds.play("scroll")
                             focusedGameIndex = (focusedGameIndex + 1).coerceAtMost(systemGamesForGroup.size - 1)
+                            android.util.Log.d("droidtop.input", "GamesSection.headless down index=$focusedGameIndex")
                         }
                     action == GamepadAction.A && group != null && group !is GameGroup.Pc && themed && !gamelistHasListWidget && isUp -> {
                         systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onLaunch(it) } != null

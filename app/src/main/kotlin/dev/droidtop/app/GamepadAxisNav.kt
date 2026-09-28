@@ -31,23 +31,74 @@ import android.view.MotionEvent
  * producing new samples entirely, which would silently stop a
  * motion-driven repeat that only reacted to incoming events.
  *
- * Per-device dedupe (owner's own safeguard request, tracker#43 triage):
+ * Per-KEY dedupe (owner's own safeguard request, tracker#43 triage):
  * a gamepad that reports its D-pad through BOTH a real `KeyEvent` stream
  * AND the hat axis would otherwise get this translated on top of the
  * real one, doubling every press. [noteRealDpadKeyEvent] is called from
  * `MainActivity.dispatchKeyEvent` for every real (non-synthetic) DPAD key
- * seen; once a device has sent ONE, its hat/stick motion is never
- * translated again for the rest of the process -- a real key beats a
- * translated one permanently, per device, rather than a per-event race
- * that could still double an occasional press.
+ * seen; once a (device, keyCode) pair has sent ONE, that exact key's own
+ * hat/stick motion is never translated again for the rest of the process
+ * -- a real key beats a translated one permanently, per key, rather than
+ * a per-event race that could still double an occasional press.
+ *
+ * Real bug this fixes (owner, console, Droidtop/tracker#1/#43,
+ * 2026-09-28): "Up still isn't processed" / "Left and up ... are just
+ * inert." This dedupe used to be keyed on the DEVICE alone: the first
+ * real DOWN or RIGHT `KeyEvent` seen from the pad permanently disabled
+ * hat/stick translation for that ENTIRE device, UP and LEFT included --
+ * and the Retroid Pocket 5's own D-pad, per the owner's report, only
+ * ever sends DOWN/RIGHT as real `KeyEvent`s; UP/LEFT arrive solely as hat
+ * axis motion. One real DOWN press was enough to permanently blind this
+ * class to the hat's own UP/LEFT motion for the rest of the process --
+ * exactly "inert, on press or release," and exactly the two directions
+ * the device does not send as real keys. Keying the dedupe per exact
+ * keyCode instead means a real DOWN only ever suppresses translated
+ * DOWN; UP keeps translating from the hat for as long as the device
+ * never sends a real UP itself.
  */
+/**
+ * The pure direction/edge/dedupe decision [GamepadAxisNav.updateAxis]
+ * delegates to, pulled out exactly like [dev.droidtop.shell.gamepad.gridPadTarget]
+ * so [GamepadAxisNavTest] can exercise the hysteresis and the per-KEY
+ * dedupe directly, with no real `MotionEvent`/`InputDevice` needed (those
+ * throw `Stub!` outside an instrumented/Robolectric runtime -- see that
+ * test's own doc comment). [suppressed] answers per exact keyCode, never
+ * per axis or per device: this is the whole of the fix for
+ * Droidtop/tracker#1/#43 (own doc comment above) -- a real DOWN must
+ * suppress only a translated DOWN, never a translated UP the device only
+ * ever sends through the hat.
+ */
+internal fun axisTargetKey(
+    value: Float,
+    currentKey: Int?,
+    negativeKey: Int,
+    positiveKey: Int,
+    suppressed: (keyCode: Int) -> Boolean,
+): Int? {
+    // Hysteresis: a direction ENTERS at the larger threshold and only
+    // EXITS once the axis has actually returned near center, so a stick
+    // sitting right at the edge of the threshold cannot chatter
+    // press/release every other sample.
+    val rawKey = when {
+        value <= -AXIS_ENTER_THRESHOLD -> negativeKey
+        value >= AXIS_ENTER_THRESHOLD -> positiveKey
+        currentKey != null && kotlin.math.abs(value) > AXIS_EXIT_THRESHOLD -> currentKey
+        else -> null
+    }
+    return rawKey?.takeUnless(suppressed)
+}
+
+internal const val AXIS_ENTER_THRESHOLD = 0.5f
+internal const val AXIS_EXIT_THRESHOLD = 0.3f
+
 internal class GamepadAxisNav(
     private val handler: Handler,
     private val dispatch: (down: Boolean, keyCode: Int) -> Unit,
 ) {
     private var verticalKey: Int? = null
     private var horizontalKey: Int? = null
-    private val devicesWithRealDpad = HashSet<Int>()
+    /** (deviceId, keyCode) pairs seen as a real KeyEvent -- see this class's own "Per-KEY dedupe" doc comment. */
+    private val realDpadKeys = HashSet<Pair<Int, Int>>()
 
     private val verticalRepeat = object : Runnable {
         override fun run() {
@@ -70,8 +121,8 @@ internal class GamepadAxisNav(
      * events always carry deviceId 0, see [gamepadAxisNavFor]'s own
      * `KeyEvent` construction, so they never register here by accident).
      */
-    fun noteRealDpadKeyEvent(deviceId: Int) {
-        if (deviceId > 0) devicesWithRealDpad.add(deviceId)
+    fun noteRealDpadKeyEvent(deviceId: Int, keyCode: Int) {
+        if (deviceId > 0) realDpadKeys.add(deviceId to keyCode)
     }
 
     /** Call from `Activity.dispatchGenericMotionEvent`; never consumes the event. */
@@ -82,7 +133,6 @@ internal class GamepadAxisNav(
         val isPad = (sources and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK ||
             (sources and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD
         if (!isPad) return false
-        if (device.id in devicesWithRealDpad) return false
         // The hat switch (a real D-pad reported as an axis) wins over the
         // left stick when a device reports both non-zero at once --
         // that never happens in practice (a person uses one or the
@@ -92,12 +142,14 @@ internal class GamepadAxisNav(
         val stickX = event.getAxisValue(MotionEvent.AXIS_X)
         val stickY = event.getAxisValue(MotionEvent.AXIS_Y)
         updateAxis(
+            deviceId = device.id,
             value = if (hatY != 0f) hatY else stickY,
             negativeKey = KeyEvent.KEYCODE_DPAD_UP,
             positiveKey = KeyEvent.KEYCODE_DPAD_DOWN,
             vertical = true,
         )
         updateAxis(
+            deviceId = device.id,
             value = if (hatX != 0f) hatX else stickX,
             negativeKey = KeyEvent.KEYCODE_DPAD_LEFT,
             positiveKey = KeyEvent.KEYCODE_DPAD_RIGHT,
@@ -114,17 +166,10 @@ internal class GamepadAxisNav(
         horizontalKey = null
     }
 
-    private fun updateAxis(value: Float, negativeKey: Int, positiveKey: Int, vertical: Boolean) {
+    private fun updateAxis(deviceId: Int, value: Float, negativeKey: Int, positiveKey: Int, vertical: Boolean) {
         val currentKey = if (vertical) verticalKey else horizontalKey
-        // Hysteresis: a direction ENTERS at the larger threshold and only
-        // EXITS once the axis has actually returned near center, so a
-        // stick sitting right at the edge of the threshold cannot chatter
-        // press/release every other sample.
-        val newKey = when {
-            value <= -ENTER_THRESHOLD -> negativeKey
-            value >= ENTER_THRESHOLD -> positiveKey
-            currentKey != null && kotlin.math.abs(value) > EXIT_THRESHOLD -> currentKey
-            else -> null
+        val newKey = axisTargetKey(value, currentKey, negativeKey, positiveKey) { keyCode ->
+            (deviceId to keyCode) in realDpadKeys
         }
         if (newKey == currentKey) return
         if (vertical) verticalKey = newKey else horizontalKey = newKey
@@ -150,8 +195,6 @@ internal class GamepadAxisNav(
     }
 
     private companion object {
-        const val ENTER_THRESHOLD = 0.5f
-        const val EXIT_THRESHOLD = 0.3f
         // Matches the shell's own long-press timing elsewhere
         // (GamepadShell's Select-hold uses the system long-press
         // timeout); a plain, conventional key-repeat feel otherwise --

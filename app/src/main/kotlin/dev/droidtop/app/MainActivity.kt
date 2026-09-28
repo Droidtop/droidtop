@@ -88,23 +88,29 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
 
     /**
      * Two jobs, both Droidtop/tracker#1/#43 (owner, on the console with a
-     * real gamepad): teach [gamepadAxisNav] about a device that ALSO sends
-     * real DPAD KeyEvents (so it stops translating that device's hat/stick
-     * -- a device sending both was doubling every press), and log every
-     * DPAD press so the owner's next on-console test can be read back from
-     * logcat without a debugger, since this session cannot reach the
-     * console itself to watch it live.
+     * real gamepad): teach [gamepadAxisNav] about a (device, key) pair that
+     * ALSO sends real DPAD KeyEvents (so it stops translating just that
+     * exact key's own hat/stick motion -- a device sending both was
+     * doubling every press), and log every DPAD press, its source, and
+     * whether it was handled, so the owner's next on-console test can be
+     * read back from logcat without a debugger, since this session cannot
+     * reach the console itself to watch it live.
      *
      * `event.deviceId` is how "real" is told from "this app's own
      * synthetic dispatch": a real hardware event always carries the
      * originating `InputDevice`'s positive id; [GamepadAxisNav]'s own
      * synthetic `KeyEvent`s (this class's own `gamepadAxisNavFor`, and
      * `ForegroundShell.send` for the second screen) are built with no
-     * device id at all, which defaults to 0.
+     * device id at all, which defaults to 0. Per-KEY, not per-device
+     * (Droidtop/tracker#1/#43, 2026-09-28): the Retroid Pocket 5's own pad
+     * sends DOWN/RIGHT as real KeyEvents but UP/LEFT only through the hat
+     * axis, so a device-wide dedupe here blinded [gamepadAxisNav] to the
+     * hat's own UP/LEFT the moment the first real DOWN arrived -- see
+     * [GamepadAxisNav]'s own "Per-KEY dedupe" doc comment.
      */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val dpadName = dpadKeyName(event.keyCode)
-        if (dpadName != null && event.deviceId > 0) gamepadAxisNav.noteRealDpadKeyEvent(event.deviceId)
+        if (dpadName != null && event.deviceId > 0) gamepadAxisNav.noteRealDpadKeyEvent(event.deviceId, event.keyCode)
         val handled = super.dispatchKeyEvent(event)
         if (dpadName != null) {
             val edge = when (event.action) {

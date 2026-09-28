@@ -1266,6 +1266,7 @@ private fun EsDeTextList(
         if (items.isEmpty()) return true
         cursor = (cursor + delta).coerceIn(0, items.size - 1)
         onFocusedIndexChanged(cursor)
+        android.util.Log.d("droidtop.input", "EsDeTextList.step delta=$delta index=$cursor")
         return true
     }
 
@@ -1613,6 +1614,7 @@ private fun EsDeGrid(
                     // the matching UP that must not move it again.
                     fun step(delta: Int): Boolean = handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, true) {
                         if (items.isNotEmpty()) cursor = (cursor + delta).coerceIn(0, items.size - 1)
+                        android.util.Log.d("droidtop.input", "EsDeGrid.step delta=$delta index=$cursor")
                     }
                     // Left/Right at a real edge of the current row: not
                     // consumed when this is a gamelist, so it bubbles to
@@ -1627,6 +1629,7 @@ private fun EsDeGrid(
                         }
                         return handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, !atEdge || !gamelist) {
                             if (!atEdge) cursor = (cursor + delta).coerceIn(0, items.size - 1)
+                            android.util.Log.d("droidtop.input", "EsDeGrid.stepColumn delta=$delta atEdge=$atEdge index=$cursor")
                         }
                     }
                     when (GamepadKeyMap.actionFor(event.key)) {

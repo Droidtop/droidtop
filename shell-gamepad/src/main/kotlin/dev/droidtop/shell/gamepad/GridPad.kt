@@ -93,6 +93,7 @@ internal class GridPad(val state: LazyGridState, private val scope: CoroutineSco
     fun move(direction: FocusDirection): Boolean {
         val target = targetFor(direction) ?: return false
         focus(target)
+        android.util.Log.d("droidtop.input", "GridPad.move direction=$direction index=$target")
         return true
     }
 
