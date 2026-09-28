@@ -1900,7 +1900,11 @@ private fun GamesSection(
     // are ready.
     val pcGrouped by produceState<List<LibraryEntry>?>(initialValue = null, entries) {
         value = withContext(Dispatchers.Default) {
-            dev.droidtop.library.LibraryGrouping.group(entries.filter { it.gameGroup() == GameGroup.Pc }).map { it.displayEntry }
+            val confirmedLinks = library.getConfirmedStoreLinks()
+            dev.droidtop.library.LibraryGrouping.group(
+                entries.filter { it.gameGroup() == GameGroup.Pc },
+                confirmedLinks,
+            ).map { it.displayEntry }
         }
     }
     // Alphabetical -- real ES-DE's own default gamelist sort order, and a

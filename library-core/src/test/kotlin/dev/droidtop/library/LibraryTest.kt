@@ -215,7 +215,7 @@ class LibraryTest {
         playHistory.recordPlay(older.id, 1_000L)
         playHistory.recordPlay(newer.id, 3_000L)
         favorites.setFavorite(older.id, true)
-        val groups = LibraryGrouping.group(listOf(older, newer))
+        val groups = LibraryGrouping.group(listOf(older, newer), emptyMap())
         assertEquals(2, groups.size)
 
         assertTrue(library.mergeGames(groups.first { it.game.name == "StarHarbor" }, groups.first { it.game.name == "Star_Harbour" }))
@@ -225,7 +225,7 @@ class LibraryTest {
         // older card's history and favourite are there now.
         library.rescanNow(LibraryEntryKind.entries.toSet())
         val scanned = library.backgroundScanState(LibraryEntryKind.entries.toSet()).value ?: emptyList()
-        val merged = LibraryGrouping.group(scanned).single()
+        val merged = LibraryGrouping.group(scanned, emptyMap()).single()
         assertEquals("StarHarbor", merged.game.name)
         assertEquals(setOf(older.id, newer.id), merged.entriesByPath.keys)
         assertEquals(newer.id, merged.displayEntry.id)
@@ -242,7 +242,7 @@ class LibraryTest {
         val folder = LibraryEntry(id = "/games/renpy/StarHarbor-0.3-pc", title = "StarHarbor", kind = LibraryEntryKind.RENPY)
         val store = LibraryEntry(id = "steam:1", title = "Star Harbor", kind = LibraryEntryKind.WINE_PROFILE)
         val library = Library(listOf(FoldingProvider(LibraryEntryKind.RENPY, listOf(folder))), links = FakeGameLinksStore())
-        val groups = LibraryGrouping.group(listOf(folder, store))
+        val groups = LibraryGrouping.group(listOf(folder, store), emptyMap())
 
         assertFalse(library.mergeGames(groups[0], groups[0]))
         assertFalse(library.mergeGames(groups.first { it.game.name == "StarHarbor" }, groups.first { it.game.name == "Star Harbor" }))

@@ -17,7 +17,7 @@ class SimilarGamesTest {
         game("/games/renpy/StarHarbr Gone-0.1", missing = true),
     ) + LibraryEntry(id = "steam:1", title = "Star Harbour", kind = LibraryEntryKind.WINE_PROFILE)
 
-    private val groups = LibraryGrouping.group(library)
+    private val groups = LibraryGrouping.group(library, emptyMap())
     private fun named(name: String) = groups.first { it.game.name == name }
 
     @Test

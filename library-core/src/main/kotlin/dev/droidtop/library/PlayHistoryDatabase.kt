@@ -134,6 +134,13 @@ data class F95ThreadEntity(
     fun toCheck() = F95ThreadCheck(threadId, lastChanged, version, checkedAt, gone)
 }
 
+/** One row per user-confirmed cross-store link: storeId -> gameName. */
+@Entity(tableName = "store_links")
+data class StoreLinkEntity(
+    @PrimaryKey @ColumnInfo(name = "store_id") val storeId: String,
+    @ColumnInfo(name = "game_name") val gameName: String,
+)
+
 @Dao
 interface GameLinksDao {
     @Query("SELECT * FROM game_links WHERE id IN (:ids)")
@@ -183,6 +190,16 @@ interface GameLinksDao {
         putOrDrop(to.copy(gameName = to.gameName ?: from.gameName, f95Thread = to.f95Thread ?: from.f95Thread))
         deleteLink(fromId)
     }
+
+    // Store links (cross-store identification)
+    @androidx.room.Insert(onConflict = androidx.room.OnConflictStrategy.REPLACE)
+    suspend fun putStoreLink(row: StoreLinkEntity)
+
+    @Query("DELETE FROM store_links WHERE store_id = :storeId")
+    suspend fun deleteStoreLink(storeId: String)
+
+    @Query("SELECT * FROM store_links")
+    suspend fun getAllStoreLinks(): List<StoreLinkEntity>
 }
 
 /** Writes [row], or drops it when it no longer says anything. */
@@ -191,8 +208,8 @@ private suspend fun GameLinksDao.putOrDrop(row: GameLinkEntity) {
 }
 
 @Database(
-    entities = [PlayHistoryEntity::class, FavoriteEntity::class, GameLinkEntity::class, F95ThreadEntity::class],
-    version = 3,
+    entities = [PlayHistoryEntity::class, FavoriteEntity::class, GameLinkEntity::class, F95ThreadEntity::class, StoreLinkEntity::class],
+    version = 4,
     exportSchema = false,
 )
 abstract class PlayHistoryDatabase : RoomDatabase() {
@@ -229,13 +246,23 @@ abstract class PlayHistoryDatabase : RoomDatabase() {
             }
         }
 
+        // Cross-store links: new table for user-confirmed storeId -> gameName links
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `store_links` (`store_id` TEXT NOT NULL, " +
+                        "`game_name` TEXT NOT NULL, PRIMARY KEY(`store_id`))",
+                )
+            }
+        }
+
         fun get(context: Context): PlayHistoryDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     PlayHistoryDatabase::class.java,
                     "droidtop-play-history.db",
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
             }
     }
 }
@@ -257,6 +284,12 @@ class RoomGameLinksStore(context: Context) : GameLinksStore {
     override suspend fun setGameName(ids: Collection<String>, name: String) = dao.setGameName(ids, name)
 
     override suspend fun setF95Thread(ids: Collection<String>, thread: Long?) = dao.setF95Thread(ids, thread)
+
+    override suspend fun setStoreLink(storeId: String, gameName: String) = dao.putStoreLink(StoreLinkEntity(storeId, gameName))
+
+    override suspend fun removeStoreLink(storeId: String) = dao.deleteStoreLink(storeId)
+
+    override suspend fun getStoreLinks(): Map<String, String> = dao.getAllStoreLinks().associate { it.storeId to it.gameName }
 
     override suspend fun moveTo(fromId: String, toId: String) = dao.moveTo(fromId, toId)
 
