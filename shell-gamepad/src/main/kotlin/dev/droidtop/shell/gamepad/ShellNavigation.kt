@@ -32,8 +32,9 @@ internal sealed interface ShellPlace {
 
     /**
      * A group's own options screen, opened from it and over it: the PC
-     * surface's "Stores and folders" (sign in to a store, add a games
-     * folder, set up Windows games). It is a LEVEL, not an overlay the
+     * surface's "PC setup" (add a games folder, set up Windows games, see
+     * downloads -- store sign-in moved to Settings' "Accounts and
+     * sources"). It is a LEVEL, not an overlay the
      * screen under it owns, because B out of it has to land back on the
      * grid it was opened from -- with the card the user was on still
      * under the cursor -- and a screen that holds that answer itself

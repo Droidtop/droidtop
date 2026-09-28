@@ -117,7 +117,11 @@ object GamelistSortPrefs {
 
 /** The one label for the PC/engine scrape action, shared by the list that offers it and the handler that runs it. */
 private const val SCRAPE_PC_GAMES = "Scrape PC & engine games"
-private const val STORES_AND_FOLDERS = "Stores and folders"
+// Renamed from "Stores and folders" (uisources agent, 2026-09-28): the
+// settings screen it opens now holds only Game folders, Windows games
+// and Downloads -- store accounts moved to the "Accounts and sources"
+// settings area.
+private const val PC_SETUP = "PC setup"
 private const val SYSTEM_SETTINGS = "System settings"
 private const val ORPHANS_FIND = "Find orphaned media"
 private const val ORPHANS_DELETE = "Delete orphaned media: press A again"
@@ -200,8 +204,14 @@ internal fun GamelistOptionsMenu(
             add(orphansLabel)
             add("Update platform databases")
         } else {
-            add("Sort: ${sort.label}")
-            add("Show: ${filter.label}")
+            // The PC group's own filter/sort/search is the chip row over
+            // its grid now (dev.droidtop.shell.gamepad.query.LibraryQuery,
+            // docs/SPEC.md 7i, redecided 2026-09-28) -- these two rows
+            // would be a second, always-out-of-sync mechanism for it.
+            if (systemId != PC_SYSTEM_ID) {
+                add("Sort: ${sort.label}")
+                add("Show: ${filter.label}")
+            }
             if (games.isNotEmpty()) {
                 add("Jump to letter")
                 add("Random game")
@@ -223,7 +233,7 @@ internal fun GamelistOptionsMenu(
             // whole gamelist -- not "All games" or another collection
             // that merely happens to contain a PC entry, which is not
             // where a store login belongs.
-            if (systemId == PC_SYSTEM_ID) add(STORES_AND_FOLDERS)
+            if (systemId == PC_SYSTEM_ID) add(PC_SETUP)
         }
         add("Close")
     }
@@ -449,7 +459,7 @@ internal fun GamelistOptionsMenu(
                     }
                 }
             }
-            STORES_AND_FOLDERS -> {
+            PC_SETUP -> {
                 onDismiss()
                 onOpenStores()
             }

@@ -78,17 +78,19 @@ import kotlinx.coroutines.withContext
 /**
  * The PC-only actions on one PC or engine game -- docs/SPEC.md §7i's
  * "Game options", an ES-DE-style in-context menu over the themed
- * gamelist (redecided 2026-09-26), not a screen of its own.
+ * gamelist (redecided 2026-09-26, then again 2026-09-28: PC library view over the theme's frame only), not a screen of its own.
  *
  * What used to live here as a full-screen "detail" -- a hero-art header,
  * the scraped description/developer/rating/genre "About this game" --
- * is gone: the active theme's own gamelist already shows all of that for
- * the focused game (md_image/md_description/md_developer/md_rating and
- * the rest, bound from the exact same [LibraryEntry] fields), exactly as
- * it does for a console ROM. This menu is only what the theme cannot
- * show: the resolved runner and its picker, Wine/container settings,
- * ProtonDB, the Lutris import, the F95 link and update state, merge and
- * versions/segments, favourite/collections/scrape.
+ * is gone, but not because a theme shows it any more: the 2026-09-28
+ * redecision took PC games OFF the theme own gamelist widget entirely
+ * (a frame-only render, PcLibraryView), so that content now lives in
+ * PcLibraryView own focused-game panel instead, bound from the exact
+ * same [LibraryEntry] fields. This menu is only what NEITHER the theme
+ * NOR that panel show: the resolved runner and its picker, Wine/
+ * container settings, ProtonDB, the Lutris import, the F95 link and
+ * update state, merge and versions/segments, favourite/collections/
+ * scrape.
  *
  * A itself no longer opens this menu (docs/SPEC.md 7i): on the gamelist,
  * A launches when the resolved runner is ready and runs the one setup
@@ -96,7 +98,7 @@ import kotlinx.coroutines.withContext
  * exactly like a console ROM's A. This menu opens on Y ("Game options"),
  * the same in-context-menu convention [dev.droidtop.shell.gamepad
  * .GamelistOptionsMenu] already uses for the whole gamelist's own
- * actions (sort/scrape/"Stores and folders").
+ * actions (sort/scrape/"PC setup").
  *
  * Store management and prefix configuration are not droidtop's own
  * screens: :runtime-windows compiles the whole vendored gamenative tree,
@@ -882,8 +884,9 @@ private fun rememberPcActions(
                     },
                 ),
                 // The global download queue is not this game's; it is
-                // under Stores and folders with the stores it serves (UI
-                // pass 2026-09-24, M7).
+                // under "PC setup" (UI pass 2026-09-24, M7; renamed from
+                // "Stores and folders" when store accounts moved to
+                // "Accounts and sources").
             ),
         ),
         // ONE runner section, for the runner this game actually uses.

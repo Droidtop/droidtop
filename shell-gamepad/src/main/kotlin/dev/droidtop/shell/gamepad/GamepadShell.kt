@@ -74,9 +74,7 @@ import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.shell.gamepad.pc.PC_SYSTEM_ID
 import dev.droidtop.shell.gamepad.pc.PC_STORES_SCREEN_ID
-import dev.droidtop.shell.gamepad.pc.sourceLabel
-import dev.droidtop.shell.gamepad.pc.engineLabel
-import dev.droidtop.shell.gamepad.pc.PcExpandedOverlay
+import dev.droidtop.shell.gamepad.pc.PcLibraryContent
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.consoles.PlatformsDatabase
 import dev.droidtop.library.displayName
@@ -1809,13 +1807,11 @@ private fun GamesSection(
     // detail screen: the PC surface's separate full-screen detail is
     // gone, along with its own back-stack level.
     var pcMenuEntry by remember { mutableStateOf<LibraryEntry?>(null) }
-    // The PC group's own organisation (owner direction 2026-09-26: "the
-    // store/source and engine filters, and install state") -- droidtop's
-    // own chrome, drawn as PcExpandedOverlay's own chip row over the
-    // themed canvas, never a theme concept.
-    var pcSources by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var pcEngines by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var pcInstalledOnly by remember { mutableStateOf(false) }
+    // The PC group's own filter/sort/search state now lives inside
+    // PcLibraryContent itself (dev.droidtop.shell.gamepad.query.
+    // LibraryQuery, docs/SPEC.md 7i, redecided 2026-09-28) -- persisted
+    // there per list, the same way GamelistFilterPrefs already persists a
+    // console gamelist's.
     // Which theme folder the PC card wears under this theme (see
     // GameGroup.Pc.systemThemeFolder): known at once when this theme has
     // been checked before, otherwise worked out off the main thread.
@@ -1946,7 +1942,7 @@ private fun GamesSection(
     // Alphabetical -- real ES-DE's own default gamelist sort order, and a
     // real, stable Up/Down order for the headless (no list widget) case
     // below, unlike allGames' own natural Library order.
-    val systemGamesForGroup = remember(selectedGroup, entries, collectionGroupMembers, sortVersion, pcGrouped, pcSources, pcEngines, pcInstalledOnly) {
+    val systemGamesForGroup = remember(selectedGroup, entries, collectionGroupMembers, sortVersion, pcGrouped) {
         val group = selectedGroup
         when (group) {
             null -> emptyList()
@@ -1965,17 +1961,16 @@ private fun GamesSection(
             // the stored per-group filter (ALL by default). PC draws from
             // the folded one-card-per-game list above instead of the raw
             // entries, same as PcSurface always did.
+            // PC draws from the folded one-card-per-game list, in its own
+            // LibraryQuery-driven order (PcLibraryContent) -- the console
+            // GamelistFilter/GamelistSort prefs below are a second sort/
+            // filter mechanism this group no longer offers (their Select-
+            // menu rows are hidden for it, see GamelistOptionsMenu).
+            group is GameGroup.Pc -> pcGrouped.orEmpty().sortedBy { it.title.lowercase() }
             else -> {
                 val filter = GamelistFilterPrefs.get(context, group.label)
-                val base = if (group is GameGroup.Pc) {
-                    pcGrouped.orEmpty()
-                        .filter { pcSources.isEmpty() || it.sourceLabel() in pcSources }
-                        .filter { pcEngines.isEmpty() || it.engineLabel() in pcEngines }
-                        .filter { !pcInstalledOnly || it.pcInfo?.installed != false }
-                } else {
-                    entries.filter { it.gameGroup() == group }
-                }
-                base.filter { filter.matches(it) }
+                entries.filter { it.gameGroup() == group }
+                    .filter { filter.matches(it) }
                     .sortedWith(GamelistSortPrefs.comparator(GamelistSortPrefs.get(context, group.label)))
             }
         }
@@ -2263,7 +2258,7 @@ private fun GamesSection(
                     // sibling-system convention above already owns
                     // Left/Right regardless, so there's no conflict either
                     // way.
-                    action == GamepadAction.UP && group != null && themed && !gamelistHasListWidget && systemGamesForGroup.isNotEmpty() -> {
+                    action == GamepadAction.UP && group != null && group !is GameGroup.Pc && themed && !gamelistHasListWidget && systemGamesForGroup.isNotEmpty() -> {
                         // Real ES-DE scroll sound -- per-game movement
                         // inside a gamelist plays SCROLLSOUND (GamelistBase.
                         // cpp:133/174/182 and every primary component when
@@ -2272,12 +2267,12 @@ private fun GamesSection(
                         focusedGameIndex = (focusedGameIndex - 1 + systemGamesForGroup.size) % systemGamesForGroup.size
                         true
                     }
-                    action == GamepadAction.DOWN && group != null && themed && !gamelistHasListWidget && systemGamesForGroup.isNotEmpty() -> {
+                    action == GamepadAction.DOWN && group != null && group !is GameGroup.Pc && themed && !gamelistHasListWidget && systemGamesForGroup.isNotEmpty() -> {
                         EsDeNavigationSounds.play("scroll")
                         focusedGameIndex = (focusedGameIndex + 1) % systemGamesForGroup.size
                         true
                     }
-                    action == GamepadAction.A && group != null && themed && !gamelistHasListWidget -> {
+                    action == GamepadAction.A && group != null && group !is GameGroup.Pc && themed && !gamelistHasListWidget -> {
                         systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onLaunch(it) } != null
                     }
                     // Y/Info applies regardless of widget presence -- a
@@ -2287,10 +2282,8 @@ private fun GamesSection(
                     // elements show it while browsing): Y opens the same
                     // in-context "Game options" menu L2 does, so a player
                     // who does not know the L2 convention still finds it.
-                    action == GamepadAction.Y && group != null && themed -> {
-                        systemGamesForGroup.getOrNull(focusedGameIndex)?.let {
-                            if (it.isPcOrEngineGame) pcMenuEntry = it else onShowDetail(it)
-                        } != null
+                    action == GamepadAction.Y && group != null && group !is GameGroup.Pc && themed -> {
+                        systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onShowDetail(it) } != null
                     }
                     // X/favorite-toggle applies regardless of widget
                     // presence, same reasoning as Y/Info above.
@@ -2769,88 +2762,117 @@ private fun GamesSection(
                     LaunchedEffect(group, gamelistHasListWidget, gamelistWidgetItems) {
                         // Same never-crash boundary AND same frame-retry as the
                         // system-list screen's own focus request above (see
-                        // requestFocusWhenAttached).
-                        if (gamelistHasListWidget && gamelistWidgetItems.isNotEmpty()) {
+                        // requestFocusWhenAttached). PC owns its own focus
+                        // request now (PcLibraryContent's grid, docs/SPEC.md
+                        // 7i redecided 2026-09-28) -- this widget-attach path
+                        // never applies to it, since the PC render below passes
+                        // no items for a widget to attach to.
+                        if (group !is GameGroup.Pc && gamelistHasListWidget && gamelistWidgetItems.isNotEmpty()) {
                             requestFocusWhenAttached(firstFocus, "Gamelist")
                         }
                     }
-                    // A Box, not a Column: PcExpandedOverlay's own two strips
-                    // are droidtop's own chrome layered OVER this canvas, at
-                    // its own size, never a sibling that would shrink it
-                    // (docs/SPEC.md 7j's help-row lesson applies here too).
-                    // The gamelist's per-game hints below are gated on this:
-                    // every one of them acts on the game under the cursor,
-                    // and an empty gamelist has none.
+                    // Per-game hints below are gated on this: every one of
+                    // them acts on the game under the cursor, and an empty
+                    // gamelist has none.
                     val gameUnderCursor = systemGamesForGroup.isNotEmpty()
-                    Box(modifier = Modifier.fillMaxSize()) {
-                    EsDeThemedView(
-                        view = gamelistView,
-                        items = gamelistWidgetItems,
-                        firstItemFocus = if (gamelistHasListWidget) firstFocus else null,
-                        modifier = Modifier.fillMaxSize(),
-                        // Same real SCROLLSOUND as the headless Up/Down branch
-                        // above (a widget hosted in a gamelist scrolls with the
-                        // scroll sound, CarouselComponent.h:105-108) -- guarded on
-                        // a real index change, same reason as the system carousel.
-                        onFocusedIndexChanged = {
-                            if (it != focusedGameIndex) EsDeNavigationSounds.play("scroll")
-                            focusedGameIndex = it
-                        },
-                        focusedSystemEntries = systemGamesForGroup,
-                        focusedGameIndex = focusedGameIndex,
-                        // A always launches (or runs the one setup step) exactly
-                        // like a console ROM's, PC and engine games included
-                        // (docs/SPEC.md 7i, redecided 2026-09-26): the resolved-
-                        // runner decision lives in the one onLaunch handler now,
-                        // not in what this hint row says. PC swaps Y's "Info" --
-                        // the theme's own gamelist already shows that while
-                        // browsing -- for L2's "Game options", the one thing the
-                        // theme cannot show. Every per-game action is gated on a
-                        // game being under the cursor: an empty gamelist (a
-                        // custom collection whose members are all gone from the
-                        // library) launches, informs, favourites and
-                        // option-menus nothing, so none of them is promised
-                        // while it is empty (SPEC 7j).
-                        hints = rememberHintList(
-                            listOf(
-                                HintBinding(GamepadAction.A, "Launch") { gameUnderCursor },
-                                if (group is GameGroup.Pc) {
-                                    HintBinding(GamepadAction.L2, "Game options") { gameUnderCursor }
-                                } else {
-                                    HintBinding(GamepadAction.Y, "Info") { gameUnderCursor }
-                                },
-                                HintBinding(GamepadAction.X, "Favorite") { gameUnderCursor },
-                                HintBinding(GamepadAction.B, "Back"),
-                            )
-                        ),
-                        systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
-                            name = selectedGroupLabel,
-                            gameCount = systemGamesForGroup.size,
-                            favoriteCount = systemGamesForGroup.count { it.favorite },
-                            countsOnly = (group as? GameGroup.Collection)?.id
-                                ?.let { it == AutoCollections.FAVORITES_ID || it == AutoCollections.LAST_PLAYED_ID } == true,
-                        ),
-                        backgroundDimmed = gamelistOptionsOpen,
-                        gamelist = true,
-                        collectionGamelist = inCollectionGamelist,
-                        transition = esDeTransition,
-                    )
-                    // The PC group's own "expanded view" (owner direction
-                    // 2026-09-26): filters and per-game runner/source/
-                    // playtime facts, none of them an ES-DE concept, layered
-                    // over the same canvas the theme just drew.
-                    if (group is GameGroup.Pc) {
-                        PcExpandedOverlay(
-                            entries = systemGamesForGroup,
-                            focused = systemGamesForGroup.getOrNull(focusedGameIndex),
-                            sources = pcSources,
-                            engines = pcEngines,
-                            installedOnly = pcInstalledOnly,
-                            onSourcesChanged = { pcSources = it },
-                            onEnginesChanged = { pcEngines = it },
-                            onInstalledOnlyChanged = { pcInstalledOnly = it },
+                    val pcHints = rememberHintList(
+                        listOf(
+                            HintBinding(GamepadAction.A, "Launch") { gameUnderCursor },
+                            HintBinding(GamepadAction.L2, "Game options") { gameUnderCursor },
+                            HintBinding(GamepadAction.X, "Favorite") { gameUnderCursor },
+                            HintBinding(GamepadAction.B, "Back"),
                         )
-                    }
+                    )
+                    if (group is GameGroup.Pc) {
+                        // The PC library redesign (docs/SPEC.md 7i, redecided
+                        // 2026-09-28): the theme's FRAME only (background,
+                        // colour, font, header, help area, proportions) --
+                        // droidtop draws its own cover-art grid and
+                        // focused-game panel over it (PcLibraryContent), not
+                        // the theme's own gamelist widget. A plain Box, not
+                        // BoxWithConstraints: PcLibraryContent sizes itself
+                        // to the frame it is drawn over, the same as every
+                        // other full-bleed surface in this shell.
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            EsDeThemedView(
+                                view = gamelistView,
+                                items = emptyList(),
+                                firstItemFocus = null,
+                                modifier = Modifier.fillMaxSize(),
+                                focusedSystemEntries = systemGamesForGroup,
+                                focusedGameIndex = focusedGameIndex,
+                                hints = pcHints,
+                                systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
+                                    name = selectedGroupLabel,
+                                    gameCount = systemGamesForGroup.size,
+                                    favoriteCount = systemGamesForGroup.count { it.favorite },
+                                    countsOnly = false,
+                                ),
+                                backgroundDimmed = gamelistOptionsOpen,
+                                gamelist = true,
+                                collectionGamelist = inCollectionGamelist,
+                                transition = esDeTransition,
+                                frameOnly = true,
+                            )
+                            val plateColor = remember(GameGroup.Pc.themeFolder) {
+                                dev.droidtop.library.theme.SystemThemeColors.forSystem(context, dev.droidtop.shell.gamepad.pc.PC_SYSTEM_ID)
+                                    ?.let { Color(it) }
+                            }
+                            PcLibraryContent(
+                                entries = systemGamesForGroup,
+                                focused = systemGamesForGroup.getOrNull(focusedGameIndex),
+                                onFocusEntry = { entry ->
+                                    val index = systemGamesForGroup.indexOf(entry)
+                                    if (index >= 0 && index != focusedGameIndex) {
+                                        EsDeNavigationSounds.play("scroll")
+                                        focusedGameIndex = index
+                                    }
+                                },
+                                onLaunch = onLaunch,
+                                onToggleFavorite = onToggleFavorite,
+                                onOpenMenu = { pcMenuEntry = it },
+                                firstFocus = firstFocus,
+                                plateColor = plateColor,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                    } else {
+                        EsDeThemedView(
+                            view = gamelistView,
+                            items = gamelistWidgetItems,
+                            firstItemFocus = if (gamelistHasListWidget) firstFocus else null,
+                            modifier = Modifier.fillMaxSize(),
+                            // Same real SCROLLSOUND as the headless Up/Down
+                            // branch above (a widget hosted in a gamelist
+                            // scrolls with the scroll sound, CarouselComponent.
+                            // h:105-108) -- guarded on a real index change,
+                            // same reason as the system carousel.
+                            onFocusedIndexChanged = {
+                                if (it != focusedGameIndex) EsDeNavigationSounds.play("scroll")
+                                focusedGameIndex = it
+                            },
+                            focusedSystemEntries = systemGamesForGroup,
+                            focusedGameIndex = focusedGameIndex,
+                            hints = rememberHintList(
+                                listOf(
+                                    HintBinding(GamepadAction.A, "Launch") { gameUnderCursor },
+                                    HintBinding(GamepadAction.Y, "Info") { gameUnderCursor },
+                                    HintBinding(GamepadAction.X, "Favorite") { gameUnderCursor },
+                                    HintBinding(GamepadAction.B, "Back"),
+                                )
+                            ),
+                            systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
+                                name = selectedGroupLabel,
+                                gameCount = systemGamesForGroup.size,
+                                favoriteCount = systemGamesForGroup.count { it.favorite },
+                                countsOnly = (group as? GameGroup.Collection)?.id
+                                    ?.let { it == AutoCollections.FAVORITES_ID || it == AutoCollections.LAST_PLAYED_ID } == true,
+                            ),
+                            backgroundDimmed = gamelistOptionsOpen,
+                            gamelist = true,
+                            collectionGamelist = inCollectionGamelist,
+                            transition = esDeTransition,
+                        )
                     }
                 }
             } else {
@@ -3274,6 +3296,10 @@ internal fun GameCard(
     onShowDetail: () -> Unit,
     onFocused: () -> Unit = {},
     onToggleFavorite: () -> Unit = {},
+    // The PC library grid's own theme-coloured plate for a game with no
+    // art (docs/SPEC.md 7i): null keeps every other caller's plain
+    // MenuTokens.Surface fallback unchanged.
+    plateColor: Color? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
     val window = LocalShellWindow.current
@@ -3353,7 +3379,7 @@ internal fun GameCard(
             .selectionFrame(
                 selected = focused,
                 shape = RoundedCornerShape(12.dp),
-                rest = MenuTokens.Surface,
+                rest = if (entry.artworkUri == null) (plateColor ?: MenuTokens.Surface) else MenuTokens.Surface,
                 restOutline = MenuTokens.CardOutline,
             ),
     ) {

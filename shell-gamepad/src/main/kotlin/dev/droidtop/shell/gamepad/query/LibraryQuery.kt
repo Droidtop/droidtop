@@ -30,7 +30,6 @@ enum class LibrarySortKey(val label: String) {
     NAME("Name"),
     RECENT("Last played"),
     PLAYTIME("Playtime"),
-    ADDED("Added"),
     YEAR("Release year"),
     RATING("Rating"),
     SIZE("Size"),
@@ -174,10 +173,6 @@ fun LibrarySortKey.comparator(): Comparator<LibraryEntry> {
         LibrarySortKey.NAME -> byTitle
         LibrarySortKey.RECENT -> compareByDescending<LibraryEntry> { it.lastPlayedEpochMs ?: 0L }.thenBy { it.title.lowercase() }
         LibrarySortKey.PLAYTIME -> compareByDescending<LibraryEntry> { it.playtimeSeconds }.thenBy { it.title.lowercase() }
-        // Unknown is last, never guessed: a game droidtop has no stamp for
-        // does not sort as if it were older or newer than every other one
-        // by accident of the number chosen to stand for "unknown".
-        LibrarySortKey.ADDED -> compareByDescending<LibraryEntry> { it.addedEpochMs ?: -1L }.thenBy { it.title.lowercase() }
         LibrarySortKey.YEAR -> compareBy<LibraryEntry> { it.releaseDate ?: "99999999" }.thenBy { it.title.lowercase() }
         LibrarySortKey.RATING -> compareByDescending<LibraryEntry> { it.rating ?: -1f }.thenBy { it.title.lowercase() }
         LibrarySortKey.SIZE -> compareByDescending<LibraryEntry> { it.pcInfo?.sizeBytes ?: 0L }.thenBy { it.title.lowercase() }

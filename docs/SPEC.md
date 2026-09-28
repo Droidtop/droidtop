@@ -8021,6 +8021,65 @@ home. Real follow-up work, not implemented in this pass.
 The original decision text follows, still current except where a
 revision above says otherwise.
 
+**Redecided again 2026-09-28: droidtop's own content over the theme's FRAME
+only, not the theme's gamelist widget.** Live use of the 2026-09-26
+"expanded view" (above) showed the shape it actually produced: PC and
+engine games still rendered through the theme's own primary list widget
+(a real `<carousel>`/`<grid>`/`<textlist>`), which is right for a console
+system with a handful of boxart-shaped entries and wrong for PC, whose
+library is orders of magnitude larger and needs real per-game facts
+(runner, store, install/update state) legible AT A GLANCE, not just on
+L2. The owner's correction: "take the GENERAL menu layout from the
+selected theme, but fill the rest in -- a blanket list like we currently
+have for ArtBookNext is a terrible idea." Two changes from this:
+
+- **The PC group's list is now a frame-only themed render.** `EsDeThemedView`
+  gained a `frameOnly` mode (`esDeElementBindsGame`, `EsDeThemeRenderer.kt`):
+  every element that binds to the FOCUSED GAME -- the primary list widget,
+  `md_*` metadata, badges, rating, gameselector-fed art -- is dropped: only
+  the theme's background, colours, fonts, header/logo, help area and
+  proportions remain. `PcExpandedOverlay`'s two strips (layered OVER the
+  theme's own full render) are retired along with the full render itself
+  for this one group; `PcLibraryView.kt`'s `PcLibraryContent` draws the
+  content area instead: a cover-art grid (`GameCard`, reused unchanged from
+  every other card grid in this shell -- missing art now takes an optional
+  theme-coloured plate, `GameCard`'s new `plateColor` parameter, the same
+  per-system accent `SystemThemeColors.forSystem` already gives a drill-down
+  screen) and a focused-game panel (hero art or the same plate, description,
+  playtime, the resolved runner, source/store, update state, and a note that
+  ProtonDB is asked for on `PcGameMenu` rather than fetched here -- compat
+  info stays "evidence, never a gate," so this panel never fetches it on its
+  own). `PcGameMenu` (L2, and now Y/long-press through `GameCard`'s own
+  binding) is unchanged: everything ES-DE has no slot for still lives there.
+- **Filter, sort and search are the one shared model, as clearable chips,
+  not the console Select-menu's "Sort"/"Show" rows.** `dev.droidtop.shell.
+  gamepad.query.LibraryQuery` (`LibraryQuery.kt`/`LibraryQueryUi.kt`) is a
+  UI-free, Context-free search+filter+sort pass any list can use --
+  `LibraryQueryScope` states which facets and sorts a list offers, `apply
+  To` filters then sorts, and `LibraryQueryChips`/`LibraryFilterDialog`/
+  `LibrarySearchDialog` are the one chip row, filter dialog and search
+  field. The PC library's own scope offers store, engine, install state,
+  favourites, played, recently played, genre, developer, year, update,
+  missing art and hidden as facets (never runner/ready/ProtonDB -- those
+  cost a folder walk or a network ask per entry, which this pass never
+  pays for a whole list at once) and name/last-played/playtime/year/
+  rating/SIZE as sorts -- closing the "no size sort" gap the 2026-09-26
+  pass left open, by the same mechanism rather than a patch to
+  `GamelistSort`. "Continue playing" and "Installed" (owner direction) are
+  this model's own built-in `NamedLibraryView`s, exactly like a person's
+  own saved view -- one mechanism for both, not a second "sections" concept.
+  `GamelistOptionsMenu`'s "Sort"/"Show" rows are hidden for the PC group
+  specifically (`systemId == PC_SYSTEM_ID`), since the chip row is now the
+  one place that filter and sort live for it; its `"PC setup"` row (renamed
+  from "Stores and folders" once store sign-in moved to Settings' "Accounts
+  and sources") is unchanged.
+- **Console gamelists are untouched.** `LibraryQuery` is shared
+  infrastructure, not wired into any console system's list in this pass --
+  a real follow-up, not implemented here.
+
+The original decision text below predates BOTH the 2026-09-26 and
+2026-09-28 revisions; where they disagree with it, the revisions above win.
+
 The user's framing (2026-09-10): "we explicitly want THAT category to
 break from the ESDE theme, because of how much infrastructure we have to
 build. It needs to be a PC in a box, like droidtop, controlling

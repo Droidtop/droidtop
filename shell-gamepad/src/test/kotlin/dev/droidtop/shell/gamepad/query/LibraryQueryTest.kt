@@ -27,7 +27,6 @@ class LibraryQueryTest {
         lastPlayedEpochMs: Long? = null,
         releaseDate: String? = null,
         rating: Float? = null,
-        addedEpochMs: Long? = null,
         genre: String? = null,
         developer: String? = null,
         artworkUri: String? = null,
@@ -43,7 +42,6 @@ class LibraryQueryTest {
         lastPlayedEpochMs = lastPlayedEpochMs,
         releaseDate = releaseDate,
         rating = rating,
-        addedEpochMs = addedEpochMs,
         genre = genre,
         developer = developer,
         artworkUri = artworkUri,
@@ -65,7 +63,7 @@ class LibraryQueryTest {
     )
     private val gogNotInstalled = game(
         "gog:2", "Wiedzm", pcInfo = PcInfo(source = "GOG", installed = false, sizeBytes = 30),
-        addedEpochMs = 900_000_000, favorite = true,
+        favorite = true,
     )
     private val folder = game("/games/folder/Game Three", pcInfo = null, hidden = true)
 
@@ -132,16 +130,6 @@ class LibraryQueryTest {
         val shown = query.applyTo(listOf(fresh, stale, never), scope)
 
         assertEquals(listOf("a"), shown.map { it.title })
-    }
-
-    @Test
-    fun `the added sort puts unknown last and newest first`() {
-        val known = listOf(game("new", addedEpochMs = 900), game("old", addedEpochMs = 100))
-        val unknown = game("unknown", addedEpochMs = null)
-
-        val shown = LibraryQuery(sort = LibrarySortKey.ADDED).applyTo(known + unknown, scope)
-
-        assertEquals(listOf("new", "old", "unknown"), shown.map { it.title })
     }
 
     @Test

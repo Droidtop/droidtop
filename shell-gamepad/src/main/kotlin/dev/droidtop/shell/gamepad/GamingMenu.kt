@@ -266,7 +266,7 @@ internal fun MenuRow(
     // verticalScroll Column to show it. A menu longer than one screenful
     // (PcGameMenu's Runs with/Play/Engine/F95zone thread/Manage install/
     // Saves/Controls/Engine settings/ProtonDB/Lutris import/same-game
-    // merge/versions/Stores and folders list, reported "inaccessible")
+    // merge/versions/PC setup list, reported "inaccessible")
     // silently stopped responding to Down the moment the selection walked
     // off the bottom edge. BringIntoViewRequester is the real fix, once,
     // here, rather than in every menu that uses this row: any scrollable

@@ -8,13 +8,17 @@ import dev.droidtop.library.displayName
 internal const val PC_SYSTEM_ID = "pc"
 
 /**
- * :app's "Stores and folders" settings screen, by [dev.droidtop.library.settings.SettingsScreenRegistry]
+ * :app's "PC setup" settings screen (folders, Windows games,
+ * downloads -- renamed from "Stores and folders" when store sign-in moved
+ * to "Accounts and sources"), by [dev.droidtop.library.settings.SettingsScreenRegistry]
  * id because this module cannot depend on :app -- the same way
  * `GamingSettingsCatalog` names the console-systems and Windows-games
  * screens it opens. Reached from the gamelist's own Select menu
- * (`GamelistOptionsMenu`'s "Stores and folders" row) now that the PC
- * group's list is the same themed gamelist every other system uses
- * (docs/SPEC.md 7i, revised 2026-09-26) rather than a screen of its own.
+ * (`GamelistOptionsMenu`'s "PC setup" row), or automatically when the PC
+ * group is empty (docs/SPEC.md 7i, redecided 2026-09-28: the PC group's
+ * own content -- a cover-art grid and a focused-game panel, PcLibraryView
+ * -- drawn over the active theme's FRAME only, not the theme's own
+ * gamelist widget).
  */
 internal const val PC_STORES_SCREEN_ID = "pc_stores"
 
