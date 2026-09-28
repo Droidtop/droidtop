@@ -315,7 +315,7 @@ class PluginCatalogIndexTest {
             indexWithPlugin { plugin ->
                 val releases = JSONArray()
                 releases.put(releaseJson(version = "1.0", manifestSha256 = oldDigest))
-                releases.put(releaseJson(version = "1.1", manifestSha256 = newDigest))
+                releases.put(releaseJson(version = "1.1", publishedAt = "2026-09-28T13:00:00Z", manifestSha256 = newDigest))
                 plugin.put("releases", releases)
             },
         )!!
