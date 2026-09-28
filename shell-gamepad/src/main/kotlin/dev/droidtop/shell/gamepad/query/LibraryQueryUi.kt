@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,11 +29,16 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.integrations.AcquireContentOption
+import dev.droidtop.library.integrations.GameSources
+import dev.droidtop.library.integrations.PluginSearchAggregator
+import dev.droidtop.library.integrations.SourceHit
 import dev.droidtop.shell.gamepad.MenuHint
 import dev.droidtop.shell.gamepad.MenuPanel
 import dev.droidtop.shell.gamepad.MenuRow
@@ -43,6 +49,9 @@ import dev.droidtop.shell.gamepad.TextEditDialog
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
+import java.io.File
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * The chips row every library list leads with (docs/SPEC.md 7i): the
@@ -275,10 +284,24 @@ internal fun LibraryFilterDialog(
 }
 
 /**
- * Text search over one list: a field, and the live count of what it
- * matches behind it. Typing is text entry -- the platform's own keyboard,
- * touched or attached -- and B leaves without clearing what was typed, so
- * the chips row keeps showing the search as an active, clearable filter.
+ * Text search over one list: a field, the live count of what it matches,
+ * and -- the "Search fan-out" mechanism, docs/SPEC.md 12a -- a "Get more"
+ * group below it fed by every approved+enabled acquire_content source
+ * plugin ([GameSources.plugins]), searched in parallel and debounced so a
+ * keystroke doesn't fire a plugin round trip. This is the ONE shared
+ * search surface (the commit that built this component: "console lists
+ * get the same component"), so any list that opens this dialog gets
+ * plugin results for free, never a second, plugin-specific search screen.
+ *
+ * [systemId]/[systemFolder] scope a plugin search to one system and give
+ * downloads a real destination -- both null for a cross-system list (the
+ * PC library today): results still show, but a result with no resolvable
+ * destination cannot be downloaded from here and says so, rather than
+ * silently failing a `startJob` call with an invalid path.
+ *
+ * Typing is text entry -- the platform's own keyboard, touched or
+ * attached -- and B leaves without clearing what was typed, so the chips
+ * row keeps showing the search as an active, clearable filter.
  */
 @Composable
 internal fun LibrarySearchDialog(
@@ -287,11 +310,37 @@ internal fun LibrarySearchDialog(
     totalCount: Int,
     onTextChange: (String) -> Unit,
     onDismiss: () -> Unit,
+    systemId: String? = null,
+    systemFolder: File? = null,
 ) {
     var text by remember { mutableStateOf(query.text) }
     val fieldFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         runCatching { fieldFocus.requestFocus() }
+    }
+
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    var sourceHits by remember { mutableStateOf<List<SourceHit>>(emptyList()) }
+    var searching by remember { mutableStateOf(false) }
+    var pickedHit by remember { mutableStateOf<SourceHit?>(null) }
+    var statusLine by remember { mutableStateOf<String?>(null) }
+
+    // Debounced fan-out: a keystroke doesn't itself trigger a plugin round
+    // trip, only the text settling for a beat does -- the same reasoning
+    // every existing debounced search in droidtop uses.
+    LaunchedEffect(text, systemId) {
+        val q = text.trim()
+        if (q.isBlank()) {
+            sourceHits = emptyList()
+            searching = false
+            return@LaunchedEffect
+        }
+        delay(350)
+        searching = true
+        val sources = GameSources.plugins(context)
+        sourceHits = if (sources.isEmpty()) emptyList() else PluginSearchAggregator.searchAll(context, sources, q, systemId)
+        searching = false
     }
 
     Dialog(
@@ -352,7 +401,121 @@ internal fun LibrarySearchDialog(
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(top = 8.dp),
             )
+            if (text.isNotBlank()) {
+                MenuSectionLabel(if (searching) "Get more (searching…)" else "Get more (${sourceHits.size})")
+                if (!searching && sourceHits.isEmpty()) {
+                    Text(
+                        "No matching source has this",
+                        color = MenuTokens.OnSurfaceMuted,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(vertical = 4.dp),
+                    )
+                }
+                sourceHits.forEach { hit ->
+                    MenuRow(
+                        title = hit.result.title,
+                        subtitle = listOfNotNull(hit.source.label, hit.result.platform, hit.result.sizeLabel).joinToString(" · "),
+                        onClick = {
+                            if (hit.result.options.size <= 1) {
+                                coroutineScope.launch {
+                                    statusLine = startAcquire(context, hit, hit.result.options.firstOrNull()?.index ?: 0, systemFolder)
+                                }
+                            } else {
+                                pickedHit = hit
+                            }
+                        },
+                    )
+                }
+                statusLine?.let { line ->
+                    Text(line, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+                }
+            }
             MenuHint("B keeps what is typed; clear it from the chip row")
         }
+    }
+
+    pickedHit?.let { hit ->
+        SourceOptionsDialog(
+            hit = hit,
+            onPick = { option ->
+                pickedHit = null
+                coroutineScope.launch {
+                    statusLine = startAcquire(context, hit, option.index, systemFolder)
+                }
+            },
+            onDismiss = { pickedHit = null },
+        )
+    }
+}
+
+/**
+ * The options sheet a "Get more" result opens on selection when it
+ * carries more than one choice (a mirror, a region, a format) -- droidtop
+ * never assumes index 0 when a plugin actually offered a choice
+ * (docs/SPEC.md 12a "Search fan-out": "Selecting a result shows the
+ * plugin's own options in a droidtop sheet").
+ */
+@Composable
+private fun SourceOptionsDialog(
+    hit: SourceHit,
+    onPick: (AcquireContentOption) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        MenuPanel(
+            modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(480.dp)),
+            focusLabel = "Choose an option",
+            onKey = { event ->
+                if (event.type == KeyEventType.KeyUp &&
+                    (GamepadKeyMap.actionFor(event.key) == GamepadAction.B || GamepadKeyMap.actionFor(event.key) == GamepadAction.BACK)
+                ) {
+                    onDismiss()
+                    true
+                } else {
+                    false
+                }
+            },
+        ) {
+            Text(hit.result.title, style = MaterialTheme.typography.titleLarge, color = MenuTokens.OnSurface)
+            Text("via ${hit.source.label}", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall)
+            hit.result.options.forEach { option ->
+                MenuRow(title = option.label, onClick = { onPick(option) })
+            }
+            MenuHint("A picks; B cancels")
+        }
+    }
+}
+
+/**
+ * Starts the real download job through [SourceHit.source]'s
+ * [dev.droidtop.library.integrations.GameSourceProvider.acquire] --
+ * progress and completion appear in droidtop's existing jobs surface
+ * ([dev.droidtop.pluginhost.PluginJobsCenter]/the Jobs screen it already
+ * feeds), so this dialog only needs an immediate one-line acknowledgement,
+ * not its own progress bar. Returns null (no message shown) when
+ * [systemFolder] is unresolved -- a cross-system search (the PC library
+ * today) has nowhere to write a download to yet.
+ */
+private suspend fun startAcquire(
+    context: android.content.Context,
+    hit: SourceHit,
+    choice: Int,
+    systemFolder: File?,
+): String {
+    if (systemFolder == null) {
+        return "No download destination configured for this list -- open ${hit.result.title} from its own system to download it"
+    }
+    val job = hit.source.acquire(
+        context = context,
+        result = hit.result,
+        choice = choice,
+        destination = systemFolder,
+        onProgress = { _, _ -> },
+        onComplete = { },
+    )
+    return if (job == null) {
+        "Couldn't start the download: ${hit.source.label} has no running job support"
+    } else {
+        "Downloading ${hit.result.title} -- see Jobs for progress"
     }
 }

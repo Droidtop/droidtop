@@ -33,28 +33,34 @@ import org.json.JSONArray
  *   `startJob(action=download)` is a real job with progress and a real
  *   completion signal droidtop rescans on.
  *
- * [systemScreen] is the one entry point both surfaces use: a
- * [CatalogScreen] listing every available source, rendered by whichever
- * generic catalog renderer that surface already has (:app's Preference
- * surface, :shell-gamepad's `CatalogNavigator`) -- so the on-screen
- * keyboard / controller text entry, the focusable results list, and the
- * progress row all come from that ONE shared renderer, not a second
- * hand-built UI here.
+ * [systemScreen] is the per-system "Get games" entry point both :app and
+ * :shell-gamepad's gamelist options menu still offer. As of the "Search
+ * fan-out" change (SPEC 12a), [search] is also the backing call for the
+ * generic mechanism in `dev.droidtop.library.integrations.PluginSearchAggregator`,
+ * which every existing game-search surface (the shared LibraryQuery
+ * search, the launcher drawer/QSB search) asks in parallel and folds into
+ * a "Get more" group -- so a plugin never needs a second, dedicated
+ * screen to be found; droidtop's own search already asks it.
  *
- * **The wire contract for a plugin's `acquire_content` calls** (there was
- * none before this file -- this is the first real caller, both `invoke`
- * and `startJob`):
+ * **The wire contract for a plugin's `acquire_content` calls**:
  * - `invoke(ACQUIRE_CONTENT, {"action": "search", "query", "systemId",
  *   "systemName"})` -> `PluginResult.success(values = {"entries": <a JSON
- *   array string>})`. Each element is a JSON object; droidtop only reads
- *   `title` (or `name`), `platform`, and a size label (`size_str`,
- *   `sizeLabel`, or the first entry of a `links` array's own `size_str`)
- *   -- everything else in the object is opaque and round-tripped back to
- *   the plugin unread (§12a point 5: a plugin's own values are untrusted
- *   and never parsed beyond what droidtop actually needs).
+ *   array string>})`. Each element is a JSON object; droidtop reads a
+ *   generic shape -- `id` (or `slug`/`rom_id`, falling back to a hash of
+ *   the object when neither is present), `title` (or `name`), `platform`,
+ *   a size label (`size_str`, `sizeLabel`, or the first `links` entry's
+ *   own `size_str`), an optional `boxart`/`boxart_url`/`artUrl`, an
+ *   optional `subtitle` (falling back to the comma-joined `regions`, if
+ *   any), and an `options` list built from a `links` array (each link's
+ *   `name`/`host`/`size_str` joined as the option's label, its position
+ *   as the index `startJob`'s `linkIndex` expects) -- everything else in
+ *   the object is opaque and round-tripped back to the plugin unread
+ *   (§12a point 5: a plugin's own values are untrusted and never parsed
+ *   beyond what droidtop actually needs).
  * - `startJob(ACQUIRE_CONTENT, {"action": "download", "entry": <the exact
  *   JSON object a search result came from>, "destinationPath": <the
- *   system's real, already-resolved folder>, "linkIndex": "0"})`,
+ *   system's real, already-resolved folder>, "linkIndex": <the chosen
+ *   option's index, "0" when a result has no options>})`,
  *   progress/completion over the normal `PluginJobProgress` callback.
  */
 sealed interface AcquireContentSource {
@@ -76,14 +82,31 @@ sealed interface AcquireContentSource {
 }
 
 /**
+ * One labelled choice a result carries -- a mirror, a region, a format --
+ * shown in the options sheet the search surfaces (LibraryQueryUi's "Get
+ * more" group, docs/SPEC.md 12a "Search fan-out") open on selection.
+ * [index] round-trips back as `linkIndex` in the download job, the same
+ * field [searchScreen] already defaults to 0.
+ */
+data class AcquireContentOption(val label: String, val index: Int)
+
+/**
  * One search result a plugin returned. [raw] is the exact JSON object the
  * plugin sent, round-tripped back unchanged in the download job -- droidtop
- * never re-derives or edits it, only reads the three display fields below.
+ * never re-derives or edits it beyond the generic display shape SPEC 12a
+ * settled on: [id], [title], [subtitle], [platform], an optional [artUrl],
+ * and an [options] list of labelled choices (source/mirror/region/format).
+ * [sizeLabel] is kept for the older per-system "Get games" screen this
+ * file already renders.
  */
 data class AcquireContentResult(
+    val id: String,
     val title: String,
+    val subtitle: String?,
     val sizeLabel: String?,
     val platform: String?,
+    val artUrl: String?,
+    val options: List<AcquireContentOption>,
     val raw: String,
 )
 
@@ -110,6 +133,10 @@ object AcquireContentSources {
     fun available(context: Context): List<AcquireContentSource> =
         PluginStore.runnableFor(context, PluginCapability.ACQUIRE_CONTENT).map { AcquireContentSource.Plugin(it) } +
             IntegrationStore.available(context, IntegrationCapability.ACQUIRE_CONTENT).map { AcquireContentSource.Json(it) }
+
+    /** Just the plugin sources -- what [PluginSearchAggregator] fans a query out to; JSON integrations stay one-way/fire-and-forget and have no results to merge. */
+    fun availablePlugins(context: Context): List<AcquireContentSource.Plugin> =
+        PluginStore.runnableFor(context, PluginCapability.ACQUIRE_CONTENT).map { AcquireContentSource.Plugin(it) }
 
     /**
      * The one "Get games" screen for one system -- lists every source
@@ -220,10 +247,9 @@ object AcquireContentSources {
      * A plugin's own "Get games" screen: a live query field and its
      * results, each a real [AsyncActionItem] that starts the real
      * download job and shows its progress inline (the async item's own
-     * `onStatus` stream) -- the FIRST real UI caller of [startDownload]/
-     * `PluginCrashPolicy.startJob` anywhere in droidtop (docs/SPEC.md
-     * 12a: "not yet exercised on the rig... there is no equivalent
-     * generic trigger for acquire_content yet").
+     * `onStatus` stream). Kept alongside the generic search fan-out
+     * (SPEC 12a "Search fan-out") for a person who wants to search ONE
+     * named source directly rather than through the shared game search.
      *
      * `currentQuery`/`lastResults`/`lastError` are plain closure state,
      * not persisted -- this screen is rebuilt fresh from [available] each
@@ -290,7 +316,7 @@ object AcquireContentSources {
                                     id = "acquire_result_${source.id}_${result.raw.hashCode()}",
                                     title = result.title,
                                     subtitle = listOfNotNull(result.platform, result.sizeLabel).joinToString(" · ").ifBlank { null },
-                                    run = { ctx, onStatus -> runDownloadAndAwait(ctx, source, systemFolder, result, onStatus) },
+                                    run = { ctx, onStatus -> runDownloadAndAwait(ctx, source, systemFolder, result, onStatus, linkIndex = 0) },
                                 )
                             }
                         },
@@ -304,7 +330,11 @@ object AcquireContentSources {
      * Searches a plugin source. Bounded by `PluginCrashPolicy.invoke`'s
      * own watchdog (`PluginRunner.CALL_TIMEOUT_MS`, 15s) -- fine for a
      * local index, tight for a live network search, the same tradeoff
-     * every `invoke()` call already has (§12a).
+     * every `invoke()` call already has (§12a). [systemId]/[systemName]
+     * are blank when a search is not scoped to one system (the shared
+     * game search calling this through [PluginSearchAggregator] outside
+     * a per-system list) -- a plugin sees an empty string, not a made-up
+     * system.
      */
     suspend fun search(
         context: Context,
@@ -330,18 +360,54 @@ object AcquireContentSources {
         }
     }
 
-    private fun parseResults(entriesJson: String): List<AcquireContentResult> {
+    /** Pure so it is unit-tested without a plugin connection -- see AcquireContentSourcesParseTest. */
+    internal fun parseResults(entriesJson: String): List<AcquireContentResult> {
         val array = runCatching { JSONArray(entriesJson) }.getOrNull() ?: return emptyList()
         return buildList {
             for (i in 0 until array.length()) {
                 val obj = array.optJSONObject(i) ?: continue
                 val title = obj.optString("title").ifBlank { obj.optString("name") }
                 if (title.isBlank()) continue
+                val id = obj.optString("id").ifBlank { obj.optString("slug") }
+                    .ifBlank { obj.optString("rom_id") }
+                    .ifBlank { obj.toString().hashCode().toString() }
                 val platform = obj.optString("platform").takeIf { it.isNotBlank() }
                 val sizeLabel = obj.optString("size_str").takeIf { it.isNotBlank() }
                     ?: obj.optString("sizeLabel").takeIf { it.isNotBlank() }
                     ?: obj.optJSONArray("links")?.optJSONObject(0)?.optString("size_str")?.takeIf { it.isNotBlank() }
-                add(AcquireContentResult(title = title, sizeLabel = sizeLabel, platform = platform, raw = obj.toString()))
+                val artUrl = obj.optString("artUrl").takeIf { it.isNotBlank() }
+                    ?: obj.optString("boxart").takeIf { it.isNotBlank() }
+                    ?: obj.optString("boxart_url").takeIf { it.isNotBlank() }
+                val regions = obj.optJSONArray("regions")?.let { arr ->
+                    (0 until arr.length()).mapNotNull { arr.optString(it).takeIf(String::isNotBlank) }
+                }.orEmpty()
+                val subtitle = obj.optString("subtitle").takeIf { it.isNotBlank() }
+                    ?: regions.takeIf { it.isNotEmpty() }?.joinToString(", ")
+                val options = obj.optJSONArray("links")?.let { links ->
+                    buildList {
+                        for (li in 0 until links.length()) {
+                            val link = links.optJSONObject(li) ?: continue
+                            val label = listOfNotNull(
+                                link.optString("name").takeIf { it.isNotBlank() },
+                                link.optString("host").takeIf { it.isNotBlank() },
+                                link.optString("size_str").takeIf { it.isNotBlank() },
+                            ).joinToString(" · ").ifBlank { "Option ${li + 1}" }
+                            add(AcquireContentOption(label = label, index = li))
+                        }
+                    }
+                }.orEmpty()
+                add(
+                    AcquireContentResult(
+                        id = id,
+                        title = title,
+                        subtitle = subtitle,
+                        sizeLabel = sizeLabel,
+                        platform = platform,
+                        artUrl = artUrl,
+                        options = options,
+                        raw = obj.toString(),
+                    ),
+                )
             }
         }
     }
@@ -400,12 +466,13 @@ object AcquireContentSources {
      * mechanism every other screen that offers a rescan already uses), so
      * the new file shows up without a separate manual step.
      */
-    private suspend fun runDownloadAndAwait(
+    internal suspend fun runDownloadAndAwait(
         context: Context,
         source: AcquireContentSource.Plugin,
         systemFolder: File,
         result: AcquireContentResult,
         onStatus: (String) -> Unit,
+        linkIndex: Int,
     ): String {
         val done = CompletableDeferred<Boolean>()
         var finalMessage = ""
@@ -414,6 +481,7 @@ object AcquireContentSources {
             source = source,
             systemFolder = systemFolder,
             result = result,
+            linkIndex = linkIndex,
             onProgress = { percent, statusLine ->
                 onStatus(if (percent >= 0) "$statusLine ($percent%)" else statusLine)
             },

@@ -11098,6 +11098,208 @@ fit inside a single `FlutterEngine`'s asset/native-lib model the same way
 this sample's trivial UI-less Dart does — untested here, and specific to
 whatever plugin is being built, not this runner itself.
 
+**Search fan-out, the Sources API and the Recommendations API
+(2026-09-28).** The owner's rule for this whole piece: "droidtop doesn't
+implement plugin specific features. If the search function already
+exists in droidtop, the plugin should handle the rest" — and "we need to
+think in terms of APIs." Three pieces, kept deliberately separate:
+
+**1. The Sources API (`dev.droidtop.library.integrations.GameSourceProvider`,
+`library-core`).** The one interface droidtop's UI talks to for "search
+for a game" and "where can I get this game" — a built-in store and a
+content plugin are interchangeable implementations of the same interface;
+droidtop's UI never imports or branches on a store's or a plugin's own
+type.
+
+```kotlin
+interface GameSourceProvider {
+    val id: String
+    val label: String
+    suspend fun search(context, query, platform): Result<List<AcquireContentResult>>
+    suspend fun lookup(context, title, platform, ids = emptyMap()): Result<List<AcquireContentResult>> // default: search by title
+    suspend fun options(context, result): List<AcquireContentOption> // default: result.options
+    suspend fun acquire(context, result, choice, destination, onProgress, onComplete): AcquireContentJob?
+}
+```
+
+- **Result shape** (`AcquireContentResult`): `id`, `title`, `subtitle`,
+  `platform`, `artUrl`, `sizeLabel` (kept for the older per-system "Get
+  games" screen), `options: List<AcquireContentOption>` (`label`,
+  `index`), and `raw` — the exact JSON object round-tripped back to the
+  source, unread beyond these fields (unchanged trust rule from before
+  this change: a plugin's own values are untrusted).
+- **Threading/timeout/errors**: every method is `suspend` and expected to
+  do its own work off the caller's thread; a plugin implementation is
+  bounded by the plugin runner's own watchdog (`PluginRunner.CALL_TIMEOUT_MS`,
+  15s) for `search`/`lookup`, with `PluginSearchAggregator.PER_SOURCE_TIMEOUT_MS`
+  (16s) as the caller-side backstop for a source that never returns;
+  `search`/`lookup` return `Result.failure` rather than throwing across
+  this boundary. A future store adapter must honor the same shape.
+- **Versioning**: this is droidtop's own internal Kotlin interface, not a
+  wire contract. `PluginGameSource` is the one real implementation today,
+  adapting a plugin declaring `PluginCapability.ACQUIRE_CONTENT` onto this
+  interface via the EXISTING `invoke`/`startJob` wire contract
+  `AcquireContentSources`'s own doc comment documents (unchanged: `invoke`
+  action=search returns `{"entries": <json array>}`; `startJob` action=
+  download takes `entry`/`destinationPath`/`linkIndex`). `ACQUIRE_CONTENT`
+  IS the "source" extension point in `PluginCapability`'s existing closed
+  set — that capability already reaches a plugin identically regardless
+  of kind (`native_bundle`, `python`, `flutter_embed`), since
+  `PluginRuntimeService`'s `invoke()`/`startJob()` dispatch is kind-agnostic
+  by construction (one `DroidtopPlugin` interface, one adapter per kind:
+  `NativePluginRunner`, `PythonDroidtopPlugin`, `FlutterDroidtopPlugin|
+  FlutterRuntimeManager`) — no new capability id or contract-version bump
+  was needed to make `acquire_content` a proper "source" extension point;
+  it already was one. **Not built in this change**: built-in store
+  adapters (Steam/GOG/Epic/Amazon/itch/DLsite, and later official
+  re-release markets) as further `GameSourceProvider` implementations —
+  each needs its own store search/catalog API or scrape, separate
+  infrastructure from this interface; a dedicated per-kind `source`
+  sample plugin beyond the existing `acquire_content` wire contract
+  samples already exercise; a distinct `recommender` plugin capability
+  (Recommendations stays droidtop's own and plugin-independent by owner
+  directive below, so this is not planned unless that direction changes).
+  Tracked on Droidtop/tracker (see the Recommendations issue below).
+
+**2. `PluginSearchAggregator` (`library-core`) — the ONE generic search
+fan-out mechanism** every existing game-search surface asks instead of
+hand-rolling its own plugin loop: `searchAll(context, sources, query,
+platform)` runs every `GameSourceProvider.search` concurrently
+(`kotlinx.coroutines.async`), each individually bounded by
+`PER_SOURCE_TIMEOUT_MS` and individually failure-isolated (a source that
+throws or times out contributes nothing and never delays or fails
+another source's results); `merge` keeps each source's own result order
+and the sources' own encounter order, no cross-source resorting, so a
+source's own relevance ranking survives into the UI's "Get more" group.
+Unit-tested (`PluginSearchAggregatorTest`) against fake
+`GameSourceProvider`s under real (not virtual-clock) short delays: merge
+order, a throwing source not affecting others, a source slower than the
+timeout being dropped while a fast one still returns, and parallel (not
+sequential) execution.
+
+**Search surfaces wired (2026-09-28).** The shared `LibraryQuery` search
+(`LibrarySearchDialog`, `shell-gamepad/query/LibraryQueryUi.kt` — the
+component the "one shared filter/sort/search component reusable by
+console lists" commit built, today consumed by the PC library view,
+`PcLibraryView.kt`, which IS "the PC view's search dialog": one and the
+same component) now debounces the typed query (350ms) and fans it out via
+`PluginSearchAggregator.searchAll` to `GameSources.plugins(context)`,
+rendering a "Get more" group below the local match count using the
+existing `MenuRow` row component, labelled by each hit's source. Picking
+a result with more than one `AcquireContentOption` opens a droidtop sheet
+(`SourceOptionsDialog`) to choose one; picking a single-option (or
+option-less) result, or confirming a choice, calls
+`GameSourceProvider.acquire` directly — progress and completion surface
+through the EXISTING jobs mechanism (`PluginJobsCenter`/the Jobs screen),
+not a new progress UI in this dialog, which only shows one
+acknowledgement line. A cross-system list (the PC library) has no natural
+download destination; `LibrarySearchDialog` takes an optional
+`systemFolder: File?`/`systemId: String?` — null means Get More still
+shows results, but picking one explains there's nowhere configured to
+download to here, rather than silently sending an invalid path to
+`startJob`. **Not wired in this change**: the launcher drawer/QSB search
+(`LibrarySearchBridge`, `:runtime-common`, commit b91c4496) and any
+per-system console gamelist search, since neither yet calls into
+`LibraryQueryUi`'s shared component (only `PcLibraryView` does today) —
+extending the same debounced fan-out to those call sites is the direct
+next step and needs no new mechanism, only a new caller. Tracked on
+Droidtop/tracker.
+
+**3. The Recommendations API (`dev.droidtop.library.integrations.RecommendationProvider`,
+`library-core`) — droidtop's OWN feature, never plugin-fed, never
+plugin-named** (owner directive, verbatim: "droidtop gets its own,
+plugin-independent Recommendations feature... it never mentions or
+depends on any plugin"):
+
+```kotlin
+interface RecommendationProvider {
+    suspend fun recommend(context, scope: RecommendationScope, limit: Int): List<Recommendation>
+}
+sealed interface RecommendationScope { Overall; Platform(systemId); BecauseOf(ownedTitle) }
+data class Recommendation(title, platform, reason, artUrl?, description?, score)
+```
+
+Shaped as an interface for the same reason as the Sources API: a future
+re-ranking provider (a server-side model, a second local heuristic) can
+be added or swapped with no UI change. `LocalSimilarityRecommendations`
+is the one built-in implementation's home for the ranking math, both
+pure and unit-tested (`LocalSimilarityRecommendationsTest`):
+- `weightedRating(rating, count, priorMean, priorCount)` — the standard
+  IMDB/Bayesian formula, so a title with few votes is pulled toward the
+  catalog average rather than letting "5 votes of 100" outrank "5,000
+  votes of 90" (owner's own example);
+- `librarySimilarity(candidateGenre, candidateDeveloper, ownedWeights)` —
+  genre/developer overlap with the user's own library, 0..1, normalized
+  so library size doesn't inflate the score;
+- `playWeight(playtimeSeconds, daysSinceLastPlayed)` — how much one owned
+  game counts toward similarity: log-scaled playtime (an hour and a
+  hundred hours don't differ 100x) times a recency multiplier (played in
+  the last week counts most), floored so an unplayed-but-owned game still
+  counts a little.
+
+**Why `recommend()` itself returns nothing yet.** Every signal the owner
+specified — IGDB `total_rating`/`total_rating_count`/`similar_games`,
+ScreenScraper ratings, a RetroAchievements popularity proxy — needs a
+scraped CATALOG OF GAMES THE USER DOES NOT OWN to rank in the first
+place, and droidtop has no scraper (the standing gap this file has
+already named: "droidtop has no media-scraper of its own"). Without a
+scraper there is no candidate pool at all — not "a ranking bug", a
+missing input. `LocalSimilarityRecommendations.recommend()` is real,
+wired API-shaped code that honestly returns an empty list rather than
+recommending games the user already owns (the only real data on hand) or
+fabricating candidate titles (droidtop's own no-fabricated-content rule).
+The ranking math above is ready the moment a real candidate catalog
+exists; only the fetch/cache/rebuild-in-background layer over a real
+scraper is new work from there. Tracked as its own item — Droidtop/tracker,
+"Recommendations: droidtop's own games-you-might-like feature", P1,
+app:droidtop, referenced by this change's commits — covering: the scraper
+prerequisite itself (already tracked separately as a standing gap), the
+IGDB/ScreenScraper/RetroAchievements fetch+cache layer, the local
+similarity index's background rebuild and on-device storage, and the
+first-class "Top rated on `<system>`"/"Because you played `<game>`"
+presentation in the gaming shell and the launcher search (not built in
+this change).
+
+**Layering — how the three pieces compose (owner directive, verbatim
+below each rule).** A separate `GetMoreComposer` object
+(`library-core/integrations/RecommendationProvider.kt`) holds the
+composition so neither API needs to know about the other:
+- *"search results = library + Sources.search"* — `GetMoreComposer.
+  composeSearch` is exactly `PluginSearchAggregator.searchAll`, unchanged
+  from point 2 above; the local library match and the Sources fan-out are
+  two separate lists the UI already renders separately (the existing
+  local list, then "Get more" below it).
+- *"'Get more' with no query = Recommendations.recommend ∩ Sources.lookup"*
+  — `GetMoreComposer.composeEmpty(context, sources, recommendations,
+  scope, limit)` asks the Recommendations API for `scope`'s ranked
+  candidates, then fans EACH candidate's title+platform out to every
+  `GameSourceProvider.lookup` the same way `composeSearch` fans out a
+  typed query, pairing each `Recommendation` with whichever sources
+  answered (`RecommendedRow(recommendation, hits)`).
+- *"most ROMs have no official source... show the recommendation anyway,
+  and simply list no source"* — `composeEmpty` keeps every recommendation
+  in its result list regardless of whether any source matched;
+  `RecommendedRow.hits` is simply empty, never dropped.
+- *"'Where to get it' = Sources.lookup for one game"* — the same
+  `GameSourceProvider.lookup` call `composeEmpty` already makes per
+  recommendation is the whole mechanism for a single game's own
+  "where to get it" row; no second lookup path exists or is needed.
+- *"stores and markets could themselves be source plugins in future...
+  keep the list a single mechanism, fed by both the built-in stores and
+  plugins, so adding a source never needs new UI"* — this is exactly why
+  `composeEmpty`/`composeSearch` both take `List<GameSourceProvider>`
+  rather than "plugins" specifically: `GameSources.plugins(context)` is
+  today's only real source of that list, and a store adapter is a second
+  `GameSourceProvider` added to the same list, not a UI change.
+- **Get more's UI wiring for the empty-query/Recommendations case is NOT
+  built in this change** — `GetMoreComposer.composeEmpty` exists and is
+  reachable, but with `LocalSimilarityRecommendations.recommend()`
+  honestly returning nothing (see above), there is nothing yet for
+  `LibrarySearchDialog` to show on an empty query; wiring it in now would
+  be dead code with no way to verify it on a real device. It is the
+  direct next step once a candidate catalog exists, tracked on the same
+  Recommendations issue.
+
 ## 13. UI v2 — end-user redesign direction (dtv2ui audit, 2026-09-28)
 
 **Scope of this pass.** A code- and spec-level audit (SPEC, DESIGN-LANGUAGE.md,
