@@ -21,7 +21,12 @@ sealed interface PluginInstallResult {
  * failure refuses the whole install -- nothing partial is ever left
  * approved. Signature and hashes are re-checked by [verifyInstalled]
  * before every activation too (checklist point 1's "not only at
- * install"), not just here.
+ * install"), not just here. `userKeys` carries the user-trusted origin
+ * keys ("Keys you trust", [UserOriginKeys.loadBase64]): signature
+ * verification resolves the official pinned key first, then those,
+ * so a bundle from an origin the user trusted verifies here exactly
+ * like an official one and an origin no key resolves for is still
+ * refused outright.
  *
  * Bundle layout (tar, then xz -- same tar.xz choice as enginehost's
  * bundles and droidtop's own OCI layer handling, so this is the second
@@ -35,7 +40,7 @@ object PluginBundleInstaller {
     private const val MAX_MANIFEST_BYTES = 64 * 1024
     private const val MAX_ENTRY_BYTES = 64L * 1024 * 1024
 
-    fun install(bundleFile: File, pluginsRoot: File): PluginInstallResult {
+    fun install(bundleFile: File, pluginsRoot: File, userKeys: Map<String, String> = emptyMap()): PluginInstallResult {
         val entries = linkedMapOf<String, ByteArray>()
         try {
             TarArchiveInputStream(XZCompressorInputStream(bundleFile.inputStream().buffered())).use { tar ->
@@ -78,8 +83,8 @@ object PluginBundleInstaller {
         }
 
         // Checklist point 3: signature and schema before anything else touches disk as "the plugin".
-        if (!BundleSignature.verifyManifest(manifestBytes, signatureBase64, manifest.origin)) {
-            return PluginInstallResult.Refused(PluginInstallError("signature doesn't verify against the pinned key for origin \"${manifest.origin}\""))
+        if (!BundleSignature.verifyManifest(manifestBytes, signatureBase64, manifest.origin, userKeys)) {
+            return PluginInstallResult.Refused(PluginInstallError("signature doesn't verify against a trusted key for origin \"${manifest.origin}\""))
         }
 
         // Checklist point 2: never shadow a built-in id or one another origin already installed under.
@@ -151,9 +156,12 @@ object PluginBundleInstaller {
      * Re-verifies an already-installed plugin's files against its own
      * recorded hashes and signature before every activation (checklist
      * point 1). A file changed on disk after approval -- however that
-     * happened -- fails this and [PluginStore] refuses to run it.
+     * happened -- fails this and [PluginStore] refuses to run it; so
+     * does a plugin whose origin's user-trusted key was removed from
+     * "Keys you trust", since [userKeys] is the same store
+     * [install] verified against.
      */
-    fun verifyInstalled(pluginsRoot: File, record: PluginRecord): PluginInstallError? {
+    fun verifyInstalled(pluginsRoot: File, record: PluginRecord, userKeys: Map<String, String> = emptyMap()): PluginInstallError? {
         val dir = File(pluginsRoot, record.manifest.id)
         val manifestFile = File(dir, "manifest.json")
         val sigFile = File(dir, "manifest.sig")
@@ -162,7 +170,7 @@ object PluginBundleInstaller {
         if (BundleSignature.sha256(manifestBytes) != record.archiveDigest) {
             return PluginInstallError("manifest.json changed on disk since approval")
         }
-        if (!BundleSignature.verifyManifest(manifestBytes, sigFile.readText(), record.manifest.origin)) {
+        if (!BundleSignature.verifyManifest(manifestBytes, sigFile.readText(), record.manifest.origin, userKeys)) {
             return PluginInstallError("signature no longer verifies")
         }
         for (file in record.manifest.payload) {
