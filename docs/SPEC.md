@@ -6676,6 +6676,50 @@ whichever folder holds it (`LibraryGameGroup.f95Thread`); a missing game
 folded into its replacement carries its link across (`GameLinksStore.moveTo`,
 only into an empty place).
 
+**The watch list, imported once** (`F95CheckerImport`, 2026-09-28; Settings >
+Library > "Import from F95Checker"). Pasting a link per game is honest work
+but the user has already told F95Checker every thread they watch, and that
+is the one other source that can say which thread a game is. Its local
+database, `db.sqlite3` (F95Checker's own `modules/db.py`), keeps one `games`
+table whose row `id` IS the F95zone thread id -- `create_game` inserts
+`thread.id` as the row's own id -- while custom rows (a game with no
+thread) carry a negative id and `custom` set and are not watch-list
+threads at all. The user picks that file through the system file picker and
+droidtop reads it the same way the user's own Pythia reads it
+(`plugin_sources/library/f95/plugin.py`: a read-only connection, negative
+ids skipped): READ-ONLY, straight from the picked document's own file
+descriptor (`/proc/self/fd`, `SQLiteDatabase`'s `OPEN_READONLY`) -- never
+copied anywhere, never written, never held open past the reading of five
+columns. Nothing leaves the device; the F95Checker index is not told.
+
+Only the thread links are imported. The `name` and the two version strings
+F95Checker keeps (`version`, the thread's newest, and `installed`, the
+version the user marked installed there) are EVIDENCE for matching, never
+data to write: a watch row names a library game when the two names are
+equal the way `GameNaming.nameKey` compares names (case and punctuation
+aside -- the same equality that already decides two folders are one game),
+and the row CORROBORATES the match when either of its versions equals one
+of the game's own versions the way `GameUpdates` compares versions (as both
+sides write them, less a leading `v`). A name that is merely similar never
+matches, for the same reason the scan never merges merely similar folder
+names (its corpus holds three folder names 0.94 similar that are three
+different games); similar names stay for a person to link by hand on the
+game's own screen.
+
+Nothing is linked by the import itself. The screen shows one row per name
+match with both sides' versions on it; a corroborated match is shown marked,
+every other match unmarked, and the two cases that make a pairing
+ambiguous -- two watch rows sharing one name (a game and its mod), or one
+watch row naming two library games -- are always unmarked, as is a game
+already linked to a different thread. A game already linked to the row's own
+thread is not offered at all. One action then links the marked games, with
+a confirm step, through the ONE write path a pasted link already uses
+(`Library.linkF95Thread`: every folder of the game at once, and the ask
+about the new thread at once), so an import changes nothing a paste would
+not, and reads the library the library already published
+(`backgroundScanState` over the game kinds, grouping and matching in
+memory; a walk is never started for it).
+
 **What is kept.** Two tables in the library's own database beside play
 history and favourites (`PlayHistoryDatabase`, `game_links` and
 `f95_threads`): the user's links, and for each linked thread the index's

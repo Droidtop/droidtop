@@ -90,7 +90,14 @@ object GameUpdates {
     fun line(available: String): String =
         (if (available.firstOrNull()?.isDigit() == true) "v$available" else available) + " is available"
 
-    private fun normalize(version: String): String = version.trim().removePrefix("v").removePrefix("V").trim()
+    /**
+     * The ONE way both sides of a version comparison lose their leading
+     * `v`: the update rule above, and the F95Checker watch-list import's
+     * corroboration (dev.droidtop.library.f95checker.F95CheckerImport),
+     * which compares a watch row's versions with a game's own the same
+     * way so the two never disagree about what counts as equal.
+     */
+    internal fun normalize(version: String): String = version.trim().removePrefix("v").removePrefix("V").trim()
 }
 
 /** One part of a game: `Week 1` of Fetish Locator, `Part 3` of Thief of Hearts. */
