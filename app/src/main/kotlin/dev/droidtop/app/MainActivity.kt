@@ -73,16 +73,60 @@ import kotlinx.coroutines.launch
  */
 class MainActivity : AppCompatActivity(), SecondScreenHost {
 
-    // Lazy: only ever touched from onResume/onPause/dispatchGenericMotionEvent,
-    // all on the main thread, well after the window (and this Activity's own
-    // dispatchKeyEvent target) exists. See GamepadAxisNav's own doc comment --
-    // Droidtop/tracker#1, a real gamepad's D-pad/stick reported through the
-    // joystick MotionEvent axes rather than real KeyEvents.
+    // Lazy: only ever touched from onResume/onPause/dispatchGenericMotionEvent/
+    // dispatchKeyEvent, all on the main thread, well after the window (and
+    // this Activity's own dispatchKeyEvent target) exists. See
+    // GamepadAxisNav's own doc comment -- Droidtop/tracker#1, a real
+    // gamepad's D-pad/stick reported through the joystick MotionEvent axes
+    // rather than real KeyEvents.
     private val gamepadAxisNav by lazy { gamepadAxisNavFor(this, Handler(Looper.getMainLooper())) }
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
         gamepadAxisNav.onGenericMotionEvent(event)
         return super.dispatchGenericMotionEvent(event)
+    }
+
+    /**
+     * Two jobs, both Droidtop/tracker#1/#43 (owner, on the console with a
+     * real gamepad): teach [gamepadAxisNav] about a device that ALSO sends
+     * real DPAD KeyEvents (so it stops translating that device's hat/stick
+     * -- a device sending both was doubling every press), and log every
+     * DPAD press so the owner's next on-console test can be read back from
+     * logcat without a debugger, since this session cannot reach the
+     * console itself to watch it live.
+     *
+     * `event.deviceId` is how "real" is told from "this app's own
+     * synthetic dispatch": a real hardware event always carries the
+     * originating `InputDevice`'s positive id; [GamepadAxisNav]'s own
+     * synthetic `KeyEvent`s (this class's own `gamepadAxisNavFor`, and
+     * `ForegroundShell.send` for the second screen) are built with no
+     * device id at all, which defaults to 0.
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val dpadName = dpadKeyName(event.keyCode)
+        if (dpadName != null && event.deviceId > 0) gamepadAxisNav.noteRealDpadKeyEvent(event.deviceId)
+        val handled = super.dispatchKeyEvent(event)
+        if (dpadName != null) {
+            val edge = when (event.action) {
+                KeyEvent.ACTION_DOWN -> "down"
+                KeyEvent.ACTION_UP -> "up"
+                else -> "action${event.action}"
+            }
+            val source = if (event.deviceId > 0) "key" else "axis"
+            android.util.Log.d(
+                "droidtop.input",
+                "$dpadName edge=$edge source=$source device=${event.deviceId} repeat=${event.repeatCount} handled=$handled",
+            )
+        }
+        return handled
+    }
+
+    private fun dpadKeyName(keyCode: Int): String? = when (keyCode) {
+        KeyEvent.KEYCODE_DPAD_UP -> "UP"
+        KeyEvent.KEYCODE_DPAD_DOWN -> "DOWN"
+        KeyEvent.KEYCODE_DPAD_LEFT -> "LEFT"
+        KeyEvent.KEYCODE_DPAD_RIGHT -> "RIGHT"
+        else -> null
     }
 
     private lateinit var library: Library

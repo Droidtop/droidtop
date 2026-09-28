@@ -18,6 +18,31 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
+ * The card edge math [GridPad.targetFor] delegates to, pulled out as a
+ * plain function of primitives (not [GridPad]'s own live [LazyGridState])
+ * so [GridPadTargetTest] can exercise "previous item from the middle of a
+ * long list" and "previous item from the very first one" directly, with
+ * no Compose runtime needed to build a real grid to scroll -- see that
+ * test's own doc comment. Returns the target index, or null at a genuine
+ * edge (row 0 for Up, column 0 for Left, and so on).
+ */
+internal fun gridPadTarget(at: Int, count: Int, cols: Int, direction: FocusDirection): Int? {
+    if (at !in 0 until count || cols <= 0) return null
+    return when (direction) {
+        FocusDirection.Left -> if (at % cols == 0) null else at - 1
+        FocusDirection.Right -> if (at % cols == cols - 1 || at + 1 >= count) null else at + 1
+        FocusDirection.Up -> if (at < cols) null else at - cols
+        FocusDirection.Down -> when {
+            at + cols < count -> at + cols
+            // The last row is shorter than this column: its last card.
+            at / cols < (count - 1) / cols -> count - 1
+            else -> null
+        }
+        else -> null
+    }
+}
+
+/**
  * The D-pad over a grid of cards: one card per press, straight along the
  * row or the column, by index. The shell's three card grids (the Games
  * section's unthemed grid, the PC surface, the Launcher's Games grid) all
@@ -51,24 +76,22 @@ internal class GridPad(val state: LazyGridState, private val scope: CoroutineSco
     /** Whether the focused card is in the grid's first row. */
     val onTopRow: Boolean get() = focused in 0 until columns()
 
+    /**
+     * The card [direction] would move to, or null at the grid's edge --
+     * pure, no mutation, so a caller can ask "would this move" on both
+     * the DOWN edge of a press (to decide whether to actually [move]) and
+     * the matching UP edge (to decide whether to consume the release
+     * too, Droidtop/tracker#1) without moving twice for one press.
+     */
+    private fun targetFor(direction: FocusDirection): Int? =
+        gridPadTarget(at = focused, count = state.layoutInfo.totalItemsCount, cols = columns(), direction = direction)
+
+    /** Whether [move] would actually move a card in [direction] right now -- see [targetFor]. */
+    fun canMove(direction: FocusDirection): Boolean = targetFor(direction) != null
+
     /** Moves one card in [direction]; false when there is no card that way. */
     fun move(direction: FocusDirection): Boolean {
-        val count = state.layoutInfo.totalItemsCount
-        val at = focused
-        if (at !in 0 until count) return false
-        val cols = columns()
-        val target = when (direction) {
-            FocusDirection.Left -> if (at % cols == 0) return false else at - 1
-            FocusDirection.Right -> if (at % cols == cols - 1 || at + 1 >= count) return false else at + 1
-            FocusDirection.Up -> if (at < cols) return false else at - cols
-            FocusDirection.Down -> when {
-                at + cols < count -> at + cols
-                // The last row is shorter than this column: its last card.
-                at / cols < (count - 1) / cols -> count - 1
-                else -> return false
-            }
-            else -> return false
-        }
+        val target = targetFor(direction) ?: return false
         focus(target)
         return true
     }

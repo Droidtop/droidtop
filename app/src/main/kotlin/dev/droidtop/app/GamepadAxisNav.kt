@@ -30,6 +30,16 @@ import android.view.MotionEvent
  * to arrive -- a stick held rock-steady at full deflection can stop
  * producing new samples entirely, which would silently stop a
  * motion-driven repeat that only reacted to incoming events.
+ *
+ * Per-device dedupe (owner's own safeguard request, tracker#43 triage):
+ * a gamepad that reports its D-pad through BOTH a real `KeyEvent` stream
+ * AND the hat axis would otherwise get this translated on top of the
+ * real one, doubling every press. [noteRealDpadKeyEvent] is called from
+ * `MainActivity.dispatchKeyEvent` for every real (non-synthetic) DPAD key
+ * seen; once a device has sent ONE, its hat/stick motion is never
+ * translated again for the rest of the process -- a real key beats a
+ * translated one permanently, per device, rather than a per-event race
+ * that could still double an occasional press.
  */
 internal class GamepadAxisNav(
     private val handler: Handler,
@@ -37,6 +47,7 @@ internal class GamepadAxisNav(
 ) {
     private var verticalKey: Int? = null
     private var horizontalKey: Int? = null
+    private val devicesWithRealDpad = HashSet<Int>()
 
     private val verticalRepeat = object : Runnable {
         override fun run() {
@@ -53,13 +64,25 @@ internal class GamepadAxisNav(
         }
     }
 
+    /**
+     * Call from `MainActivity.dispatchKeyEvent` for every real DPAD
+     * `KeyEvent` (a positive `deviceId`; this class's own synthetic
+     * events always carry deviceId 0, see [gamepadAxisNavFor]'s own
+     * `KeyEvent` construction, so they never register here by accident).
+     */
+    fun noteRealDpadKeyEvent(deviceId: Int) {
+        if (deviceId > 0) devicesWithRealDpad.add(deviceId)
+    }
+
     /** Call from `Activity.dispatchGenericMotionEvent`; never consumes the event. */
     fun onGenericMotionEvent(event: MotionEvent): Boolean {
         if (event.action != MotionEvent.ACTION_MOVE) return false
-        val sources = event.device?.sources ?: 0
+        val device = event.device ?: return false
+        val sources = device.sources
         val isPad = (sources and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK ||
             (sources and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD
         if (!isPad) return false
+        if (device.id in devicesWithRealDpad) return false
         // The hat switch (a real D-pad reported as an axis) wins over the
         // left stick when a device reports both non-zero at once --
         // that never happens in practice (a person uses one or the
@@ -113,6 +136,14 @@ internal class GamepadAxisNav(
         }
     }
 
+    /**
+     * One physical press worth of synthetic input: navigation now acts
+     * only on the DOWN half (Droidtop/tracker#1's `handleGamepadKeyDown`,
+     * own doc comment) and treats UP as a plain, un-acted-on release, so
+     * sending a full down/up pair per repeat tick is the correct
+     * equivalent of a real held key's repeated DOWNs -- each pair moves
+     * the selection exactly once, on its own DOWN.
+     */
     private fun press(keyCode: Int) {
         dispatch(true, keyCode)
         dispatch(false, keyCode)
@@ -135,7 +166,9 @@ internal class GamepadAxisNav(
  * `dispatchKeyEvent`, the same "this window, ordinary dispatch" route
  * [ForegroundShell] documents. `SystemClock.uptimeMillis()` is shared
  * between the down and up event of one press, same as
- * `ForegroundShell.send`.
+ * `ForegroundShell.send`. deviceId is left at its default (0) deliberately
+ * -- see [GamepadAxisNav.noteRealDpadKeyEvent]'s own doc comment, which
+ * relies on synthetic events never colliding with a real device's id.
  */
 internal fun gamepadAxisNavFor(activity: android.app.Activity, handler: Handler): GamepadAxisNav =
     GamepadAxisNav(handler) { down, keyCode ->

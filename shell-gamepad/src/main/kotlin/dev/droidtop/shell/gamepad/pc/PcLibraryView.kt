@@ -45,6 +45,7 @@ import dev.droidtop.library.PcRunnerOptions
 import dev.droidtop.library.ResolvedRunner
 import dev.droidtop.shell.gamepad.GameCard
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
+import dev.droidtop.shell.gamepad.input.handleGamepadKeyDown
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.input.GamepadAction
@@ -214,8 +215,14 @@ internal fun PcLibraryContent(
                                     GamepadAction.RIGHT -> FocusDirection.Right
                                     else -> null
                                 } ?: return@onKeyEvent false
-                                if (event.type == KeyEventType.KeyDown) return@onKeyEvent true
-                                event.type == KeyEventType.KeyUp && (pad.move(direction) || direction == FocusDirection.Up)
+                                // DOWN edge moves, repeats included
+                                // (Droidtop/tracker#1); canMove is pure
+                                // (GridPad's own doc comment) so the UP
+                                // edge answers the same true/false without
+                                // moving a second card.
+                                handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, pad.canMove(direction) || direction == FocusDirection.Up) {
+                                    pad.move(direction)
+                                }
                             },
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
