@@ -1069,6 +1069,14 @@ class Library(
         outcome.error
     }
 
+    /**
+     * Returns all user-confirmed cross-store links: storeId -> gameName.
+     * Used by grouping to fold entries the user has confirmed are the same game.
+     */
+    suspend fun getConfirmedStoreLinks(): Map<String, String> = withContext(Dispatchers.IO) {
+        links.getStoreLinks()
+    }
+
     /** One round, cancelled by an ordinary walk starting or by the last observer leaving. */
     private suspend fun runObservedRound() = coroutineScope {
         val round = scanScope.coroutineLaunch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
@@ -1499,8 +1507,11 @@ class Library(
         links.setGameName(fold, name)
         // The card the merged game will draw, worked out the way the list
         // will work it out, so the facts land on the entry that shows them.
-        val merged = LibraryGrouping.group(game.entriesByPath.values + other.entriesByPath.values.map { it.copy(gameName = name) })
-            .singleOrNull()
+        val confirmedLinks = links.getStoreLinks()
+        val merged = LibraryGrouping.group(
+            game.entriesByPath.values + other.entriesByPath.values.map { it.copy(gameName = name) },
+            confirmedLinks,
+        ).singleOrNull()
         val target = (merged ?: game).displayEntry.id
         for (source in setOf(game.displayEntry.id, other.displayEntry.id) - target) {
             playHistory.moveTo(source, target)

@@ -189,7 +189,7 @@ class GameGroupingTest {
             )
         } + LibraryEntry(id = "steam:440", title = "Team Fortress 2", kind = LibraryEntryKind.WINE_PROFILE)
 
-        val groups = LibraryGrouping.group(entries)
+        val groups = LibraryGrouping.group(entries, emptyMap())
 
         assertEquals(listOf("Fetish Locator", "Team Fortress 2"), groups.map { it.game.name })
         val locator = groups.first()
