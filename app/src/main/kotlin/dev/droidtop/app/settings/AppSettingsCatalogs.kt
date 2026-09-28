@@ -40,8 +40,13 @@ import dev.droidtop.pluginhost.PluginKind
 import dev.droidtop.pluginhost.PluginTrustState
 import dev.droidtop.pluginhost.PluginCapability
 import dev.droidtop.pluginhost.PluginCrashPolicy
+import dev.droidtop.pluginhost.PluginOriginKeys
+import dev.droidtop.pluginhost.PluginSourceKeys
 import dev.droidtop.pluginhost.PythonRuntimeManager
 import dev.droidtop.pluginhost.FlutterRuntimeManager
+import dev.droidtop.pluginhost.UserOriginKey
+import dev.droidtop.pluginhost.UserOriginKeys
+import dev.droidtop.pluginhost.AddKeyOutcome
 import dev.droidtop.library.consoles.resolvePlayer
 import dev.droidtop.library.scraper.ScraperPrefs
 import dev.droidtop.library.scraper.ScraperSource
@@ -131,6 +136,7 @@ object AppSettingsCatalogs {
     const val SCREEN_PLATFORMS = "manage_platforms"
     const val SCREEN_INTEGRATIONS = "integrations"
     const val SCREEN_PLUGINS = "plugins"
+    const val SCREEN_PLUGIN_KEYS = "plugin_keys"
     const val SCREEN_JOBS = "plugin_jobs"
     const val SCREEN_WINDOWS_GAMES = "windows_games"
     const val SCREEN_PC_STORES = "pc_stores"
@@ -149,6 +155,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(platformsScreen())
         SettingsScreenRegistry.register(integrationsScreen())
         SettingsScreenRegistry.register(pluginsScreen())
+        SettingsScreenRegistry.register(pluginKeysScreen())
         SettingsScreenRegistry.register(PluginJobsScreen.screen())
         SettingsScreenRegistry.register(windowsGamesScreen())
         SettingsScreenRegistry.register(pcStoresScreen())
@@ -1395,7 +1402,9 @@ object AppSettingsCatalogs {
         title = "Plugins",
         subtitle = "Real code, run in its own process and approved by you -- for crash containment, not as a security sandbox",
         groups = { context ->
-            val installed = withContext(Dispatchers.IO) { PluginStore.installed(context) }
+            val (installed, userKeys) = withContext(Dispatchers.IO) {
+                PluginStore.installed(context) to UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))
+            }
             listOf(
                 CatalogGroup(
                     id = "plugins_list",
@@ -1419,11 +1428,28 @@ object AppSettingsCatalogs {
                                         PluginTrustState.PENDING -> "Awaiting approval"
                                         PluginTrustState.DENIED -> "Denied"
                                         PluginTrustState.APPROVED -> if (record.disabledReason != null) {
-                                            "Disabled after a crash: ${record.disabledReason}"
+                                            // The reason names what disabled it (a crash,
+                                            // a tampered file, a signature whose origin key
+                                            // was removed from Keys you trust) -- not every
+                                            // disable is a crash anymore.
+                                            "Disabled: ${record.disabledReason}"
                                         } else if (record.enabled) "Running" else "Disabled"
                                     },
                                 )
-                                append(" - ").append(m.origin).append(" - ")
+                                append(" - ").append(m.origin)
+                                // The trust badge (docs/SPEC.md 12a "Keys
+                                // you trust"): which key tier actually
+                                // verifies this plugin's signature --
+                                // and a visible flag when none does
+                                // anymore, rather than a silent
+                                // "Running" for a plugin whose origin
+                                // key was removed.
+                                when {
+                                    PluginOriginKeys.isOfficial(m.origin) -> append(" - Official")
+                                    userKeys.containsKey(m.origin) -> append(" - Added by you")
+                                    else -> append(" - NOT TRUSTED: no trusted key for this origin anymore (see Keys you trust)")
+                                }
+                                append(" - ")
                                 append(m.capabilities.joinToString { it.display })
                                 if (m.requestsRoot) {
                                     append(if (record.rootApproved) " - uses root (approved)" else " - can use root (not granted)")
@@ -1693,6 +1719,21 @@ object AppSettingsCatalogs {
                                 ),
                             )
                         }
+                        // Where third-party plugins come from at all: a
+                        // bundle only verifies if its origin's key is
+                        // trusted -- the official one, or one the user
+                        // added here (docs/SPEC.md 12a "Keys you trust").
+                        add(
+                            NestedScreenItem(
+                                id = "plugins_keys_you_trust",
+                                title = "Keys you trust",
+                                subtitle = "Origins whose plugin signatures droidtop verifies: the official one, and any you add",
+                                registryId = SCREEN_PLUGIN_KEYS,
+                                valueLabel = {
+                                    if (userKeys.isEmpty()) "Official only" else "Official + ${userKeys.size} added by you"
+                                },
+                            ),
+                        )
                         add(
                             DocumentPickItem(
                                 id = "plugins_add",
@@ -1707,6 +1748,312 @@ object AppSettingsCatalogs {
             )
         },
     )
+
+    // ------------------------------------------------------------------
+    // Keys you trust (docs/SPEC.md 12a): user-trusted plugin origin keys.
+    // ------------------------------------------------------------------
+
+    /**
+     * A fetched key awaiting the user's one TOFU confirmation -- shown
+     * as explicit rows, never trusted on fetch. [existing] is non-null
+     * when the source now publishes a DIFFERENT key than the one already
+     * trusted for that origin: then the only way forward is the
+     * explicit replace, behind a warning naming both fingerprints.
+     */
+    private data class ProposedKey(
+        val origin: String,
+        val keyBase64: String,
+        val sourceUrl: String,
+        val existing: UserOriginKey?,
+    )
+
+    // Buffers between the text fields and their actions, the same
+    // pending-buffer shape pendingRootPath uses below.
+    private var pendingKeySourceUrl = ""
+    private var pendingKeyManualOrigin = ""
+    private var pendingKeyManualKey = ""
+    private var pendingKeyProposal: ProposedKey? = null
+
+    private fun pluginKeysScreen() = CatalogScreen(
+        id = SCREEN_PLUGIN_KEYS,
+        title = "Keys you trust",
+        subtitle = "Origins whose plugin signatures droidtop verifies. The official one is certified inside droidtop itself; " +
+            "any other is one YOU chose to trust -- third-party, not official, and droidtop has not vetted it",
+        groups = { context ->
+            val userKeys = withContext(Dispatchers.IO) { UserOriginKeys.load(UserOriginKeys.storeFile(context)) }
+            val proposal = pendingKeyProposal
+            listOf(
+                CatalogGroup(
+                    id = "plugin_keys_trusted",
+                    title = "Trusted origins",
+                    items = buildList {
+                        add(
+                            ActionItem(
+                                id = "plugin_keys_official",
+                                title = PluginOriginKeys.OFFICIAL_ORIGIN,
+                                subtitle = "Official -- certified inside droidtop itself. Key fingerprint " +
+                                    (UserOriginKeys.fingerprint(PluginOriginKeys.officialKeyBase64()) ?: "unavailable"),
+                                run = {},
+                            ),
+                        )
+                        if (userKeys.isEmpty()) {
+                            add(
+                                ActionItem(
+                                    id = "plugin_keys_none",
+                                    title = "No keys added by you",
+                                    subtitle = "Only the official origin is trusted. Add a plugin source below and droidtop fetches its key, or paste one by hand",
+                                    run = {},
+                                ),
+                            )
+                        }
+                        userKeys.values.sortedBy { it.origin }.forEach { entry ->
+                            add(
+                                ActionItem(
+                                    id = "plugin_key_${entry.origin}",
+                                    title = entry.origin,
+                                    subtitle = buildString {
+                                        append("Added by you -- third-party, NOT official. Key fingerprint ")
+                                        append(UserOriginKeys.fingerprint(entry.keyBase64) ?: "unreadable")
+                                        entry.source?.let { append(". Added from $it") }
+                                    },
+                                    run = {},
+                                ),
+                            )
+                            add(
+                                AsyncActionItem(
+                                    id = "plugin_key_${entry.origin}_remove",
+                                    title = "Stop trusting \"${entry.origin}\"",
+                                    subtitle = "Plugins it signed stop running and can no longer be updated, until you trust it again",
+                                    confirmTitle = "Stop trusting \"${entry.origin}\"?",
+                                    run = { ctx, _ ->
+                                        if (UserOriginKeys.remove(UserOriginKeys.storeFile(ctx), entry.origin)) {
+                                            PluginStatusWidgetProvider.requestUpdate(ctx)
+                                            "No longer trusting \"${entry.origin}\" -- its plugins are flagged on the Plugins screen"
+                                        } else {
+                                            "Nothing to remove"
+                                        }
+                                    },
+                                ),
+                            )
+                        }
+                    },
+                ),
+                CatalogGroup(
+                    id = "plugin_keys_source",
+                    title = "Add a plugin source -- fetches its key",
+                    items = listOf(
+                        TextInputItem(
+                            id = "plugin_keys_source_url",
+                            title = "Source address",
+                            subtitle = "A GitHub plugin repo (https://github.com/<owner>/<repo>), a catalog index ending in .json, " +
+                                "or a plain https address. droidtop fetches the key it publishes and asks you to trust it below -- " +
+                                "plaintext http is refused",
+                            value = pendingKeySourceUrl,
+                            onChange = { _, v -> pendingKeySourceUrl = v.trim() },
+                        ),
+                        AsyncActionItem(
+                            id = "plugin_keys_source_fetch",
+                            title = "Fetch this source's key",
+                            subtitle = "Trust-on-first-use: nothing is trusted until you confirm it below",
+                            run = { ctx, onStatus -> fetchSourceKey(ctx, pendingKeySourceUrl, onStatus) },
+                        ),
+                    ),
+                ),
+            ) + listOfNotNull(
+                proposal?.let { proposedKeyGroup(it) },
+                CatalogGroup(
+                    id = "plugin_keys_manual",
+                    title = "Add a key by hand -- for sources that publish no key",
+                    items = listOf(
+                        TextInputItem(
+                            id = "plugin_keys_manual_origin",
+                            title = "Origin id",
+                            subtitle = "The origin's own id, e.g. acme -- it prefixes every plugin id it signs (<origin>.<name>). " +
+                                "It can never be \"${PluginOriginKeys.OFFICIAL_ORIGIN}\": that one is official",
+                            value = pendingKeyManualOrigin,
+                            onChange = { _, v -> pendingKeyManualOrigin = v.trim() },
+                        ),
+                        TextInputItem(
+                            id = "plugin_keys_manual_key",
+                            title = "Public key",
+                            subtitle = "Base64 of the P-256 public key (X.509 SubjectPublicKeyInfo), as its author publishes it",
+                            value = pendingKeyManualKey,
+                            multiline = true,
+                            onChange = { _, v -> pendingKeyManualKey = v.trim() },
+                        ),
+                        AsyncActionItem(
+                            id = "plugin_keys_manual_add",
+                            title = "Add this key",
+                            subtitle = "Shown as \"Added by you\" on every plugin it signs -- third-party, never official",
+                            run = { ctx, _ -> addManualKey(ctx, pendingKeyManualOrigin, pendingKeyManualKey) },
+                        ),
+                        DocumentPickItem(
+                            id = "plugin_keys_manual_file",
+                            title = "Add key from a file",
+                            subtitle = "A droidtop-plugin-key.json (origin + key), or a raw base64 key file with the Origin id filled in above",
+                            // Not application/json: many file managers label a
+                            // .json as octet-stream, which a narrower filter
+                            // would hide. The file is parsed before it is kept.
+                            mimeType = "*/*",
+                            onPicked = { ctx, uri -> importKeyFile(ctx, uri) },
+                        ),
+                    ),
+                ),
+            )
+        },
+    )
+
+    /** The fetched-key review: WHO, WHICH key, what trusting does NOT mean -- and the changed-key warning when it is one. */
+    private fun proposedKeyGroup(proposal: ProposedKey): CatalogGroup {
+        val fingerprint = UserOriginKeys.fingerprint(proposal.keyBase64) ?: "unreadable"
+        val existingFingerprint = proposal.existing?.let { UserOriginKeys.fingerprint(it.keyBase64) ?: "unreadable" }
+        return CatalogGroup(
+            id = "plugin_keys_proposal",
+            title = "Review before trusting",
+            items = listOf(
+                ActionItem(
+                    id = "plugin_keys_proposal_info",
+                    title = if (proposal.existing == null) {
+                        "Origin \"${proposal.origin}\", from ${proposal.sourceUrl}"
+                    } else {
+                        "WARNING: ${proposal.sourceUrl} now publishes a DIFFERENT key for \"${proposal.origin}\""
+                    },
+                    subtitle = if (proposal.existing == null) {
+                        "Key fingerprint $fingerprint. Third-party source, not official: droidtop has not vetted this key " +
+                            "or anything it signs -- trusting it is your call. Plugins from it will show as \"Added by you\"."
+                    } else {
+                        "You trusted fingerprint $existingFingerprint; this fetch publishes $fingerprint. A changed key can " +
+                            "mean the source rotated it, or that the source or this fetch is compromised -- droidtop cannot " +
+                            "tell the two apart. Nothing has been changed yet; replacing the stored key means plugins signed " +
+                            "by the OLD key stop running."
+                    },
+                    run = {},
+                ),
+                AsyncActionItem(
+                    id = "plugin_keys_proposal_trust",
+                    title = if (proposal.existing == null) {
+                        "Trust origin \"${proposal.origin}\" from this source"
+                    } else {
+                        "Replace the stored key for \"${proposal.origin}\""
+                    },
+                    subtitle = if (proposal.existing == null) {
+                        "Updates from this source are then verified against this key automatically"
+                    } else {
+                        "Only do this if you have reason to believe the source really rotated its key"
+                    },
+                    confirmTitle = if (proposal.existing == null) {
+                        "Trust origin \"${proposal.origin}\" and everything it signs?"
+                    } else {
+                        "Replace the trusted key for \"${proposal.origin}\"? Plugins signed by the old key will stop running."
+                    },
+                    run = { ctx, _ -> commitTrustedKey(ctx, proposal) },
+                ),
+                ActionItem(
+                    id = "plugin_keys_proposal_discard",
+                    title = "Discard",
+                    subtitle = "Trust nothing, change nothing",
+                    run = { _ -> pendingKeyProposal = null },
+                ),
+            ),
+        )
+    }
+
+    /**
+     * The fetch half of trust-on-first-use: fetches the source's
+     * published key (validating it) and only ever PROPOSES it -- the
+     * group above is where the user decides. Runs on the renderers' IO
+     * dispatcher (an [AsyncActionItem] run), like every other network
+     * action on this screen.
+     */
+    private fun fetchSourceKey(context: Context, url: String, onStatus: (String) -> Unit): String {
+        if (url.isBlank()) return "Type the source's address first"
+        onStatus("Fetching $url...")
+        return when (val fetched = PluginSourceKeys.fetchKey(url)) {
+            is PluginSourceKeys.FetchResult.Failed -> fetched.reason
+            is PluginSourceKeys.FetchResult.Fetched -> {
+                val published = fetched.key
+                val existing = UserOriginKeys.load(UserOriginKeys.storeFile(context))[published.origin]
+                when {
+                    existing != null && UserOriginKeys.fingerprint(published.keyBase64) == UserOriginKeys.fingerprint(existing.keyBase64) ->
+                        "Origin \"${published.origin}\" is already trusted with this same key -- nothing to do"
+                    existing != null -> {
+                        pendingKeyProposal = ProposedKey(published.origin, published.keyBase64, url, existing)
+                        "This source now publishes a DIFFERENT key for \"${published.origin}\" than you trusted. Review the warning below -- nothing has been changed."
+                    }
+                    else -> {
+                        pendingKeyProposal = ProposedKey(published.origin, published.keyBase64, url, null)
+                        "Origin \"${published.origin}\" wants to be trusted. Review it below -- nothing is trusted until you confirm."
+                    }
+                }
+            }
+        }
+    }
+
+    /** The confirm half: writes the proposal (add, or the explicitly-confirmed replace) and clears it. */
+    private fun commitTrustedKey(context: Context, proposal: ProposedKey): String {
+        val store = UserOriginKeys.storeFile(context)
+        val outcome = if (proposal.existing == null) {
+            UserOriginKeys.add(store, proposal.origin, proposal.keyBase64, proposal.sourceUrl)
+        } else {
+            UserOriginKeys.replace(store, proposal.origin, proposal.keyBase64, proposal.sourceUrl)
+        }
+        val message = when (outcome) {
+            is AddKeyOutcome.Added ->
+                if (proposal.existing == null) {
+                    "Origin \"${proposal.origin}\" is now trusted -- plugins it signs will verify against this key"
+                } else {
+                    "Replaced the key for \"${proposal.origin}\" -- plugins signed by the OLD key no longer verify"
+                }
+            AddKeyOutcome.AlreadyTrustedSameKey -> "Origin \"${proposal.origin}\" is already trusted with this same key"
+            is AddKeyOutcome.KeyChanged ->
+                "The stored key for \"${proposal.origin}\" changed since this fetch -- fetch the source again and review the warning"
+            is AddKeyOutcome.Refused -> "Refused: ${outcome.reason}"
+        }
+        pendingKeyProposal = null
+        PluginStatusWidgetProvider.requestUpdate(context)
+        return message
+    }
+
+    private fun addManualKey(context: Context, origin: String, key: String): String {
+        if (origin.isBlank()) return "Type the origin's id first"
+        if (key.isBlank()) return "Paste the origin's public key first"
+        return addKeyOutcomeMessage(UserOriginKeys.add(UserOriginKeys.storeFile(context), origin, key, source = null))
+    }
+
+    /**
+     * A picked key file: the published JSON shape (origin + key, the
+     * same two fields a source publishes) or, failing that, a raw
+     * base64 key file whose origin comes from the Origin id field.
+     * Runs on the renderers' IO dispatcher, like every other
+     * [DocumentPickItem] onPicked.
+     */
+    private fun importKeyFile(context: Context, uri: Uri): String {
+        val text = runCatching {
+            context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
+        }.getOrNull() ?: return "Couldn't read that file"
+        val store = UserOriginKeys.storeFile(context)
+        PluginSourceKeys.parsePublishedKey(text)?.let { published ->
+            return addKeyOutcomeMessage(UserOriginKeys.add(store, published.origin, published.keyBase64, source = null))
+        }
+        if (pendingKeyManualOrigin.isBlank()) {
+            return "That file isn't a droidtop-plugin-key.json (it needs \"origin\" and \"key\"), " +
+                "and the Origin id field above is empty -- fill it in to add a raw base64 key file"
+        }
+        return addKeyOutcomeMessage(UserOriginKeys.add(store, pendingKeyManualOrigin, text, source = null))
+    }
+
+    /** The one wording for what [UserOriginKeys.add] decided, shared by every manual add path. */
+    private fun addKeyOutcomeMessage(outcome: AddKeyOutcome): String = when (outcome) {
+        is AddKeyOutcome.Added ->
+            "Origin \"${outcome.entry.origin}\" is now trusted -- plugins it signs will verify against this key"
+        AddKeyOutcome.AlreadyTrustedSameKey ->
+            "That origin is already trusted with this same key"
+        is AddKeyOutcome.KeyChanged ->
+            "Refused: \"${outcome.stored.origin}\" is already trusted with a DIFFERENT key. If its source really rotated " +
+                "the key, add the source's address above and fetch it so you can compare both fingerprints -- or stop " +
+                "trusting the origin first, then add the new key."
+        is AddKeyOutcome.Refused -> "Refused: ${outcome.reason}"
+    }
 
     // ------------------------------------------------------------------
     // ROM folders (games roots).
