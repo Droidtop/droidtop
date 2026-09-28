@@ -31,9 +31,14 @@ enum class PluginEvent(val id: String, val display: String) {
      * Args (all plain strings, [PluginArgs]): `systemId`, `systemName`,
      * `playerId`, `playerName`, `playerPackage` (empty when the chosen
      * player has no package, e.g. a bare am-start template), `core`
-     * (the system's own configured core short name, e.g.
-     * [dev.droidtop.library.consoles.ConsoleSystemDef.retroArchCore] --
-     * empty when the system declares none).
+     * (the core the chosen player will actually launch with: the core
+     * its own `LIBRETRO` extra names when the entry carries one -- a
+     * players-database RetroArch entry names its specific core, which
+     * is not always the system-level default -- otherwise the system's
+     * own configured core short name,
+     * [dev.droidtop.library.consoles.ConsoleSystemDef.retroArchCore];
+     * empty when the entry names no core and the system declares
+     * none).
      *
      * A plugin's [DroidtopPlugin.onEvent] answer may ask droidtop to
      * start a job in response: returning [PluginResult.success] with a
@@ -57,5 +62,8 @@ enum class PluginEvent(val id: String, val display: String) {
     }
 }
 
-/** The event contract version this build of droidtop speaks -- see [PluginEvent]'s own doc comment for why this is separate from [PLUGIN_CONTRACT_VERSION]. */
-const val PLUGIN_EVENT_CONTRACT_VERSION = 1
+/** The event contract version this build of droidtop speaks -- see [PluginEvent]'s own doc comment for why this is separate from [PLUGIN_CONTRACT_VERSION].
+ * 2: `default_player_changed`'s `core` arg now reports the CHOSEN entry's own core when its `LIBRETRO` template names one
+ * (1 always reported the system's configured core, which made a manager plugin ensure the wrong core for the
+ * players database's per-entry cores, e.g. psx "beetle psx hw" = `mednafen_psx_hw` vs the system's `mednafen_psx`). */
+const val PLUGIN_EVENT_CONTRACT_VERSION = 2

@@ -22,6 +22,7 @@ import dev.droidtop.library.consoles.BiosDatabase
 import dev.droidtop.library.consoles.KnownPlayers
 import dev.droidtop.library.consoles.SystemBiosSpec
 import dev.droidtop.library.consoles.availablePlayers
+import dev.droidtop.library.consoles.libretroCoreId
 import dev.droidtop.library.integrations.IntegrationCapability
 import dev.droidtop.library.integrations.IntegrationPlaceholders
 import dev.droidtop.library.integrations.IntegrationStore
@@ -666,7 +667,10 @@ object AppSettingsCatalogs {
                 // one place that fires PluginEvent.DEFAULT_PLAYER_CHANGED
                 // -- a resolved player (the one actually chosen, "first
                 // installed" included, not just an explicit override) so
-                // a subscribed plugin sees the real effective choice.
+                // a subscribed plugin sees the real effective choice, and
+                // a resolved core: the chosen entry's own LIBRETRO core
+                // when its template names one, else the system's
+                // configured core.
                 val chosenPlayer = players.firstOrNull { it.id == value } ?: players.firstOrNull()
                 if (chosenPlayer != null) {
                     PluginEventBus.notifyDefaultPlayerChangedAsync(
@@ -676,7 +680,7 @@ object AppSettingsCatalogs {
                         playerId = chosenPlayer.id,
                         playerName = chosenPlayer.name,
                         playerPackage = (chosenPlayer as? dev.droidtop.library.consoles.Player.AmStart)?.packageName,
-                        core = system.retroArchCore,
+                        core = libretroCoreId(chosenPlayer, system.retroArchCore),
                     )
                 }
             },
