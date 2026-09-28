@@ -19,7 +19,7 @@ import org.junit.Test
 class EsDeFrameOnlyTest {
 
     private fun element(type: String, vararg properties: Pair<String, EsDeThemeValue>) =
-        EsDeThemeElement(type = type, key = "$type_test", properties = properties.toMap())
+        EsDeThemeElement(type = type, key = "${type}_test", properties = properties.toMap())
 
     private fun image(imageType: String? = null, metadataElement: Boolean? = null, path: String? = null) = element(
         "image",
