@@ -31,7 +31,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -40,7 +42,7 @@ import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.PcRunnerOptions
 import dev.droidtop.library.ResolvedRunner
 import dev.droidtop.shell.gamepad.GameCard
-import dev.droidtop.shell.gamepad.GamepadKeyMap
+import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.input.GamepadAction

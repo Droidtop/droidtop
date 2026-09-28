@@ -1966,7 +1966,7 @@ private fun GamesSection(
             // GamelistFilter/GamelistSort prefs below are a second sort/
             // filter mechanism this group no longer offers (their Select-
             // menu rows are hidden for it, see GamelistOptionsMenu).
-            group is GameGroup.Pc -> pcGrouped.orEmpty().sortedBy { it.title.lowercase() }
+            is GameGroup.Pc -> pcGrouped.orEmpty().sortedBy { it.title.lowercase() }
             else -> {
                 val filter = GamelistFilterPrefs.get(context, group.label)
                 entries.filter { it.gameGroup() == group }
