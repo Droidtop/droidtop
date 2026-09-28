@@ -8072,19 +8072,24 @@ filtered on by the user's own act, and it may never hide an entry, reorder
 the library, or block a download (directed 2026-09-01).
 
 **ProtonDB, read-only, asked for rather than fetched (§7e3, built
-2026-09-25).** For a game with a Windows route or a known Steam app id,
-the detail offers a "ProtonDB" row; selecting it looks up
-`protondb.com`'s own public summary endpoint and, once found, opens
-ProtonDB's own page for that app rather than droidtop rendering a
-verdict of its own. The lookup runs only on selection, never on open —
-the same "asked for, not fetched" rule gamenative's compatibility badge
-already follows — and every outcome, including no reports, no known
-Steam app id, or the request being refused, is a sentence on the row
-itself rather than a silent blank. The Steam app id it looks up is the
-game's own when it is a Steam entry, otherwise the id Lutris lists for a
-game of EXACTLY the same name (`ProtonDbClient.steamAppIdFor`) — a
-similar name is a suggestion, not an automatic identity, so it is never
-guessed.
+2026-09-25; the answer is remembered 2026-09-27).** For a game with a
+Windows route or a known Steam app id, the game's own rows offer a
+"ProtonDB" row; selecting it looks up `protondb.com`'s own public summary
+endpoint and, once found, opens ProtonDB's own page for that app rather
+than droidtop rendering a verdict of its own. The lookup runs only on
+selection, never on open — the same "asked for, not fetched" rule
+gamenative's compatibility badge already follows — and every outcome,
+including no reports, no known Steam app id, or the request being
+refused, is a sentence on the row itself rather than a silent blank. The
+Steam app id it looks up is the game's own when it is a Steam entry,
+otherwise the id Lutris lists for a game of EXACTLY the same name
+(`ProtonDbClient.steamAppIdFor`) — a similar name is a suggestion, not an
+automatic identity, so it is never guessed. What the ask answered is
+remembered per game (`ProtonDbMemory`): the ask still never happens on
+its own, but the answer outlives the dialog that asked, so the PC
+library's focused-game panel and its ProtonDB-tier filter show real
+content for games that have been asked about, each answer dated, and a
+remembered refusal still reads as the refusal it was.
 
 **First run.** An empty PC library offers concrete repairs — sign in to a
 store, add a games folder, set up Windows games, see what is downloading
