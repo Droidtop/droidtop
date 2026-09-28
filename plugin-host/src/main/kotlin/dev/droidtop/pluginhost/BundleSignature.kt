@@ -101,7 +101,7 @@ object PluginOriginKeys {
         }.getOrNull() as? ECPublicKey ?: return null
         // P-256 exactly: a P-384/P-521 SPKI parses fine as "EC", so the
         // curve's own field size is the check that pins the algorithm.
-        if (key.params?.curve?.fieldSize != 256) return null
+        if (key.params?.curve?.field?.fieldSize != 256) return null
         return key
     }
 }
