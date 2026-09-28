@@ -27,6 +27,7 @@ import com.winlator.container.Container
 import com.winlator.container.ContainerData
 import dev.droidtop.app.ui.DroidtopTheme
 import dev.droidtop.runtime.windows.PcContainers
+import dev.droidtop.runtime.windows.WindowsBackbone
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -43,6 +44,12 @@ import kotlinx.coroutines.withContext
  * this game runs in. That answer comes from [PcContainers.forGame], the
  * same function the launch path uses, so the prefix a person configures
  * here is provably the prefix the game starts in.
+ *
+ * Waits on [WindowsBackbone.awaitReady] before touching gamenative's
+ * container utilities, showing "Preparing Windows support…" while it is
+ * pending (Droidtop/tracker#41: the bootstrap used to run synchronously
+ * on the caller's thread, so every screen reachable right after a mode
+ * switch could assume it had already finished; it no longer can).
  */
 class PcContainerConfigActivity : AppCompatActivity() {
 
@@ -82,6 +89,7 @@ private fun ContainerConfig(entryId: String?, gameTitle: String?, onClose: () ->
     var resolved by remember(entryId) { mutableStateOf(false) }
 
     LaunchedEffect(entryId) {
+        WindowsBackbone.awaitReady(context)
         val found = withContext(Dispatchers.IO) { PcContainers.forGame(context, entryId) }
         container = found
         config = found?.let { withContext(Dispatchers.IO) { runCatching { ContainerUtils.toContainerData(it) }.getOrNull() } }
@@ -120,5 +128,7 @@ private fun ContainerConfig(entryId: String?, gameTitle: String?, onClose: () ->
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    } else {
+        PreparingWindowsSupport()
     }
 }

@@ -25,6 +25,7 @@ import app.gamenative.ui.screen.downloads.HomeDownloadsScreen
 import app.gamenative.ui.screen.library.AppScreen
 import dev.droidtop.app.ui.DroidtopTheme
 import dev.droidtop.runtime.windows.PcLibrary
+import dev.droidtop.runtime.windows.WindowsBackbone
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -50,6 +51,13 @@ import kotlinx.coroutines.withContext
  * it -- and a store-installed engine game is the case that proves the
  * point: gamenative would launch it under Wine, while droidtop runs it on
  * enginehost.
+ *
+ * Every screen here is backed by gamenative's own services, which only
+ * start once [WindowsBackbone] has finished its (now background)
+ * bootstrap (Droidtop/tracker#41) -- so both branches below wait on
+ * [WindowsBackbone.awaitReady] first and show "Preparing Windows
+ * support…" rather than assuming the mode-switch that got the user here
+ * already finished it.
  */
 @dagger.hilt.android.AndroidEntryPoint
 class PcStoreActivity : AppCompatActivity() {
@@ -60,14 +68,7 @@ class PcStoreActivity : AppCompatActivity() {
         setContent {
             DroidtopTheme(darkTheme = true) {
                 if (entryId == null) {
-                    // Every download rather than one game's: the queue,
-                    // its storage manager and its per-game rows.
-                    HomeDownloadsScreen(
-                        onBack = { finish() },
-                        onClickPlay = { _, _ -> finish() },
-                        onTestGraphics = { finish() },
-                        onPlayWithDiagnostics = { finish() },
-                    )
+                    DownloadsQueue(onBack = { finish() })
                 } else {
                     StoreGame(entryId = entryId, onBack = { finish() })
                 }
@@ -95,12 +96,33 @@ class PcStoreActivity : AppCompatActivity() {
 }
 
 @Composable
+private fun DownloadsQueue(onBack: () -> Unit) {
+    val context = LocalContext.current
+    var ready by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        WindowsBackbone.awaitReady(context)
+        ready = true
+    }
+    if (ready) {
+        HomeDownloadsScreen(
+            onBack = onBack,
+            onClickPlay = { _, _ -> onBack() },
+            onTestGraphics = { onBack() },
+            onPlayWithDiagnostics = { onBack() },
+        )
+    } else {
+        PreparingWindowsSupport()
+    }
+}
+
+@Composable
 private fun StoreGame(entryId: String, onBack: () -> Unit) {
     val context = LocalContext.current
     var item by remember(entryId) { mutableStateOf<LibraryItem?>(null) }
     var resolved by remember(entryId) { mutableStateOf(false) }
 
     LaunchedEffect(entryId) {
+        WindowsBackbone.awaitReady(context)
         item = withContext(Dispatchers.IO) { PcLibrary.libraryItemFor(context, entryId) }
         resolved = true
     }
@@ -126,6 +148,12 @@ private fun StoreGame(entryId: String, onBack: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        else -> Text("Loading...", modifier = Modifier.padding(24.dp))
+        else -> PreparingWindowsSupport()
     }
+}
+
+/** Shared "still waking up gamenative" state (Droidtop/tracker#41). */
+@Composable
+internal fun PreparingWindowsSupport() {
+    Text("Preparing Windows support…", modifier = Modifier.padding(24.dp))
 }

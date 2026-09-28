@@ -46,6 +46,7 @@ import app.gamenative.ui.screen.login.QrCodeImage
 import dev.droidtop.app.ui.DroidtopTheme
 import dev.droidtop.library.GamesRoots
 import dev.droidtop.runtime.windows.SteamAccess
+import dev.droidtop.runtime.windows.WindowsBackbone
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -63,7 +64,6 @@ import kotlinx.coroutines.withContext
 class SteamLoginActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        SteamAccess.ensureRunning(this)
         setContent {
             DroidtopTheme(darkTheme = true) {
                 Scaffold { padding ->
@@ -82,6 +82,25 @@ class SteamLoginActivity : AppCompatActivity() {
 
 @Composable
 private fun SteamScreen() {
+    val context = LocalContext.current
+    // The Steam foreground service is gamenative's, and gamenative isn't
+    // up until WindowsBackbone's (now background) bootstrap has finished
+    // (Droidtop/tracker#41) -- starting it is deferred to here, behind an
+    // explicit wait, instead of onCreate assuming it already ran.
+    var backboneReady by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        WindowsBackbone.awaitReady(context)
+        SteamAccess.ensureRunning(context)
+        backboneReady = true
+    }
+    if (!backboneReady) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator()
+            Spacer(Modifier.width(12.dp))
+            Text("Preparing Windows support…")
+        }
+        return
+    }
     val phase by SteamAccess.phase.collectAsState()
     when (val current = phase) {
         SteamAccess.Phase.Idle, SteamAccess.Phase.Connecting -> {
