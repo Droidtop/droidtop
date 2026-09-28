@@ -6449,6 +6449,38 @@ Update platform databases and Rebuild the library index (Data). A
 setting exists in one place and a count is one number: the carousel and
 the PC grid agree on what they count or say what each counts.
 
+**Accounts and sources, not one screen per provider (directed
+2026-09-28).** Users see games and systems. A source — a store, a
+scraper, a plugin, a site — is a detail on a game and a filter, never
+its own screen; droidtop is adding more of them, and provider-organized
+settings do not scale the way a game-organized library does. Before this
+decision a store sign-in lived on its own "Stores and folders" screen
+(`pc_stores`), a scraper's credentials were split across one settings
+group per provider on the Scraper screen (ScreenScraper, TheGamesDB,
+IGDB, SteamGridDB), and Plugins/App integrations/Jobs were buried three
+levels deep under Console systems, which is about ROM systems and had
+nothing to do with any of them — four different places doing the same
+job of "manage where droidtop gets something from." All of it now lives
+in one settings-catalog screen, **Accounts and sources**
+(`AppSettingsCatalogs.accountsAndSourcesScreen`, registry id
+`accounts_and_sources`, reached from Settings > Library next to Scraper
+and Console systems): one row per account or source — Steam, GOG, Epic,
+Amazon Games, ScreenScraper, TheGamesDB, IGDB, SteamGridDB, Plugins, App
+integrations, Jobs — showing that source's real status in the value
+column (signed in / not, configured / not, how many active) with its own
+actions and fields inside the row it opens. The screens that used to
+carry these rows keep only what is genuinely theirs: `pc_stores`
+(retitled "PC setup") keeps game folders, the Windows/Wine setup and
+Downloads, linking into Accounts and sources for the store sign-ins
+themselves; the Scraper screen keeps scrape BEHAVIOR (which source is
+active, what content to fetch) and links into Accounts and sources for
+credentials; Console systems keeps platform management and Enginehost,
+with Plugins/App integrations/Jobs moved out entirely. Per-game
+management (runner, versions, links, updates) and per-system settings
+were already on the game's own detail and the system's own screen
+respectively (§7i, §7f) and stay there — this decision is about
+consolidating the PROVIDER/ACCOUNT layer, not those.
+
 ## 7g. One library across every source (audit + plan, directed 2026-09-01)
 
 A full audit of droidtop and every vendored repo, against the question

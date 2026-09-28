@@ -41,6 +41,7 @@ object GamingSettingsCatalog {
     const val ID_DEFAULT_SECTION = "pref_gaming_default_section"
     const val ID_SHOW_HINTS = "pref_gaming_show_hints"
     const val ID_SCRAPER = "pref_gaming_scraper"
+    const val ID_ACCOUNTS_AND_SOURCES = "pref_gaming_accounts_and_sources"
     const val ID_SCREENSAVER = "pref_gaming_screensaver"
     const val ID_UI_MODE = "pref_gaming_ui_mode"
     const val ID_CONSOLE_SYSTEMS = "pref_gaming_console_systems"
@@ -189,6 +190,21 @@ object GamingSettingsCatalog {
                         subtitle = "Folders, per-system emulators, artwork scraping, platforms",
                         registryId = "console_systems",
                         icon = CatalogIcon.CONSOLE_SYSTEMS,
+                    ),
+                )
+                // The one place for every account and source droidtop
+                // has -- store sign-ins, scraper credentials, plugins and
+                // app integrations (docs/SPEC.md settings architecture:
+                // "a source is a detail on a game and a filter, never its
+                // own screen"). Next to Scraper and Console systems,
+                // where the other library-source rows already live.
+                add(
+                    NestedScreenItem(
+                        id = ID_ACCOUNTS_AND_SOURCES,
+                        title = "Accounts and sources",
+                        subtitle = "Store sign-ins, scraper credentials, plugins and app integrations -- one row per source",
+                        registryId = "accounts_and_sources",
+                        icon = CatalogIcon.INTEGRATIONS,
                     ),
                 )
                 add(

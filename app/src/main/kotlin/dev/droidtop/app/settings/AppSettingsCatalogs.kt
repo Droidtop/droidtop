@@ -140,6 +140,7 @@ object AppSettingsCatalogs {
     const val SCREEN_JOBS = "plugin_jobs"
     const val SCREEN_WINDOWS_GAMES = "windows_games"
     const val SCREEN_PC_STORES = "pc_stores"
+    const val SCREEN_ACCOUNTS_AND_SOURCES = "accounts_and_sources"
     const val SCREEN_ANDROID_SETTINGS = "android_settings"
     const val SCREEN_ENGINEHOST = "enginehost"
     const val SCREEN_UPDATES = "updates"
@@ -160,6 +161,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(PluginJobsScreen.screen())
         SettingsScreenRegistry.register(windowsGamesScreen())
         SettingsScreenRegistry.register(pcStoresScreen())
+        SettingsScreenRegistry.register(accountsAndSourcesScreen())
         SettingsScreenRegistry.register(androidSettingsScreen())
         SettingsScreenRegistry.register(enginehostScreen())
         SettingsScreenRegistry.register(updatesScreen())
@@ -195,21 +197,17 @@ object AppSettingsCatalogs {
         for (folder in rawFolders) {
             classifiedFolders += folder to classifyFolder(context, folder, systemsById)
         }
-        // Read here, on IO: a value label is drawn on the main thread.
-        val activeIntegrations = IntegrationStore.available(context).size
-        val installedPlugins = PluginStore.installed(context)
-        val pluginsValueLabel = when {
-            installedPlugins.isEmpty() -> "none"
-            installedPlugins.any { it.trust == PluginTrustState.PENDING } ->
-                "${installedPlugins.count { it.trust == PluginTrustState.PENDING }} awaiting approval"
-            else -> "${installedPlugins.count { it.runnable() }} active"
-        }
-
         listOf(
             // Regrouped from one flat run of five unrelated rows into
             // labeled sections (settings polish pass, 2026-09-25): this
             // was the one management screen with no section label at all
             // while its sibling Settings screens already used them.
+            // App integrations, Plugins and their Jobs moved out to
+            // Settings > Accounts and sources (droidtop UI pass, "sources
+            // are a detail, never their own screen" -- docs/SPEC.md
+            // settings architecture): they are not console-system
+            // management, and burying them here was one more place a
+            // provider-ish row hid instead of standing with its own kind.
             CatalogGroup(
                 id = "console_systems_management",
                 title = "Management",
@@ -220,49 +218,6 @@ object AppSettingsCatalogs {
                         subtitle = "Add, edit, or delete the platforms droidtop recognizes",
                         registryId = SCREEN_PLATFORMS,
                         icon = CatalogIcon.PLATFORMS,
-                    ),
-                ),
-            ),
-            CatalogGroup(
-                id = "console_systems_integrations_group",
-                title = "Integrations",
-                items = listOf(
-                    // Game folders and the Scraper are rows of Settings >
-                    // Library, directly above this screen's own row; a
-                    // second way in here was one setting in two places (UI
-                    // pass 2026-09-24, M8).
-                    NestedScreenItem(
-                        id = "console_systems_integrations",
-                        title = "App integrations",
-                        subtitle = "Hook other installed apps into droidtop, e.g. a downloader for a system's games",
-                        registryId = SCREEN_INTEGRATIONS,
-                        valueLabel = { if (activeIntegrations == 0) "none" else "$activeIntegrations active" },
-                        icon = CatalogIcon.INTEGRATIONS,
-                    ),
-                    // The plugin half (docs/SPEC.md 12a): real code
-                    // droidtop installs, approves and runs itself, next
-                    // to the JSON-only integrations above rather than
-                    // buried somewhere unrelated -- the two are the same
-                    // idea ("hook something into droidtop") at different
-                    // trust levels.
-                    NestedScreenItem(
-                        id = "console_systems_plugins",
-                        title = "Plugins",
-                        subtitle = "Installed plugin code -- searched, approved and run in its own process, never droidtop's databases",
-                        registryId = SCREEN_PLUGINS,
-                        valueLabel = { pluginsValueLabel },
-                    ),
-                    // The shared jobs surface (docs/SPEC.md 12a
-                    // "Jobs"): every plugin download or long-running
-                    // action, wherever it was started -- a Get-games
-                    // download, an app_status action, an event-hook
-                    // reaction -- shows up here with live progress and
-                    // cancel.
-                    NestedScreenItem(
-                        id = "console_systems_plugin_jobs",
-                        title = "Jobs",
-                        subtitle = "Plugin downloads and long-running actions, with progress and cancel",
-                        registryId = SCREEN_JOBS,
                     ),
                     NestedScreenItem(
                         id = "console_systems_enginehost",
@@ -1214,31 +1169,114 @@ object AppSettingsCatalogs {
      */
     private fun pcStoresScreen() = CatalogScreen(
         id = SCREEN_PC_STORES,
-        title = "Stores and folders",
-        subtitle = "Where PC games come from: your store accounts, the folders droidtop scans, and what is downloading",
+        // Not "Stores and folders" any more: the store SIGN-INS moved to
+        // Settings > Accounts and sources with every other account and
+        // source droidtop has (docs/SPEC.md settings architecture, "a
+        // source is a detail on a game and a filter, never its own
+        // screen"). This screen is what is left once accounts are gone:
+        // the PC surface's own first-run setup for folders and downloads.
+        title = "PC setup",
+        subtitle = "The folders droidtop scans, the Wine environment for Windows games, and what is downloading",
         groups = { context -> pcStoresGroups(context) },
     )
 
     private suspend fun pcStoresGroups(context: Context): List<CatalogGroup> {
-        val steamSignedIn = withContext(Dispatchers.IO) {
-            runCatching { app.gamenative.utils.SteamUtils.hasStoredCredentials() }.getOrDefault(false)
-        }
-        val gogSignedIn = withContext(Dispatchers.IO) {
-            runCatching { app.gamenative.service.gog.GOGService.hasStoredCredentials(context) }.getOrDefault(false)
-        }
-        val epicSignedIn = withContext(Dispatchers.IO) {
-            runCatching { app.gamenative.service.epic.EpicService.hasStoredCredentials(context) }.getOrDefault(false)
-        }
-        val amazonSignedIn = withContext(Dispatchers.IO) {
-            runCatching { app.gamenative.service.amazon.AmazonService.hasStoredCredentials(context) }.getOrDefault(false)
-        }
         val folders = withContext(Dispatchers.IO) { GamesRootPrefs.gamesRootPaths(context) }
-
-        fun signedIn(yes: Boolean): String = if (yes) "Signed in" else "Not signed in yet"
+        val signedInCount = withContext(Dispatchers.IO) { signedInStoreCount(context) }
 
         return listOf(
             CatalogGroup(
                 id = "pc_stores_accounts",
+                title = null,
+                items = listOf(
+                    NestedScreenItem(
+                        id = "pc_stores_accounts_link",
+                        title = "Accounts and sources",
+                        subtitle = "Sign in to Steam, GOG, Epic or Amazon Games to download your library",
+                        registryId = SCREEN_ACCOUNTS_AND_SOURCES,
+                        valueLabel = { "$signedInCount of 4 stores signed in" },
+                        icon = CatalogIcon.GLOBAL,
+                    ),
+                ),
+            ),
+            CatalogGroup(
+                id = "pc_stores_folders",
+                title = "Folders and setup",
+                items = listOf(
+                    NestedScreenItem(
+                        id = "pc_stores_game_folders",
+                        title = "Game folders",
+                        subtitle = "The folders droidtop scans for games, Windows and engine games alike",
+                        registryId = SCREEN_ROM_FOLDERS,
+                        valueLabel = { if (folders.isEmpty()) "none yet" else "${folders.size}" },
+                        icon = CatalogIcon.GAME_FOLDERS,
+                    ),
+                    NestedScreenItem(
+                        id = "pc_stores_windows",
+                        title = "Windows games",
+                        subtitle = "The Wine environment Windows games run inside, and the folders it can reach",
+                        registryId = SCREEN_WINDOWS_GAMES,
+                        icon = CatalogIcon.WINDOWS_GAMES,
+                    ),
+                    ActionItem(
+                        id = "pc_stores_downloads",
+                        title = "Downloads",
+                        subtitle = "What is downloading or waiting, and the storage it is going into",
+                        run = { ctx -> ctx.startActivity(dev.droidtop.app.PcStoreActivity.intent(ctx, entryId = null)) },
+                    ),
+                ),
+            ),
+        )
+    }
+
+    private suspend fun signedInStoreCount(context: Context): Int {
+        val steam = runCatching { app.gamenative.utils.SteamUtils.hasStoredCredentials() }.getOrDefault(false)
+        val gog = runCatching { app.gamenative.service.gog.GOGService.hasStoredCredentials(context) }.getOrDefault(false)
+        val epic = runCatching { app.gamenative.service.epic.EpicService.hasStoredCredentials(context) }.getOrDefault(false)
+        val amazon = runCatching { app.gamenative.service.amazon.AmazonService.hasStoredCredentials(context) }.getOrDefault(false)
+        return listOf(steam, gog, epic, amazon).count { it }
+    }
+
+    /**
+     * The ONE settings area for every account and source droidtop has --
+     * store sign-ins, scraper credentials, plugin code and the app
+     * integrations and keys that go with it (docs/SPEC.md settings
+     * architecture). Per direction: users see games and systems; a
+     * source (store, plugin, scraper, site) is a detail on a game and a
+     * filter, never its own screen. Before this pass a store's sign-in
+     * lived on "Stores and folders", a scraper's credentials lived under
+     * the Scraper screen split into one group per provider, and Plugins/
+     * App integrations/Jobs were buried three levels deep under Console
+     * systems (which is about ROM systems, not sources) -- four
+     * mechanisms doing the same job of "manage where droidtop gets
+     * something from". This is the one.
+     */
+    private fun accountsAndSourcesScreen() = CatalogScreen(
+        id = SCREEN_ACCOUNTS_AND_SOURCES,
+        title = "Accounts and sources",
+        subtitle = "Every account, scraper, plugin and integration droidtop can use -- one row per source, its status and its actions",
+        groups = { context -> accountsAndSourcesGroups(context) },
+    )
+
+    private suspend fun accountsAndSourcesGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
+        fun signedIn(yes: Boolean): String = if (yes) "Signed in" else "Not signed in yet"
+        val steamSignedIn = runCatching { app.gamenative.utils.SteamUtils.hasStoredCredentials() }.getOrDefault(false)
+        val gogSignedIn = runCatching { app.gamenative.service.gog.GOGService.hasStoredCredentials(context) }.getOrDefault(false)
+        val epicSignedIn = runCatching { app.gamenative.service.epic.EpicService.hasStoredCredentials(context) }.getOrDefault(false)
+        val amazonSignedIn = runCatching { app.gamenative.service.amazon.AmazonService.hasStoredCredentials(context) }.getOrDefault(false)
+
+        val activeIntegrations = IntegrationStore.available(context).size
+        val installedPlugins = PluginStore.installed(context)
+        val pluginsValueLabel = when {
+            installedPlugins.isEmpty() -> "none"
+            installedPlugins.any { it.trust == PluginTrustState.PENDING } ->
+                "${installedPlugins.count { it.trust == PluginTrustState.PENDING }} awaiting approval"
+            else -> "${installedPlugins.count { it.runnable() }} active"
+        }
+
+        listOf(
+            CatalogGroup(
+                id = "accounts_stores",
                 title = "Store accounts",
                 items = listOf(
                     ActionItem(
@@ -1294,34 +1332,180 @@ object AppSettingsCatalogs {
                 ),
             ),
             CatalogGroup(
-                id = "pc_stores_folders",
-                title = "Folders and setup",
+                id = "accounts_scrapers",
+                title = "Scraper sources",
                 items = listOf(
                     NestedScreenItem(
-                        id = "pc_stores_game_folders",
-                        title = "Game folders",
-                        subtitle = "The folders droidtop scans for games, Windows and engine games alike",
-                        registryId = SCREEN_ROM_FOLDERS,
-                        valueLabel = { if (folders.isEmpty()) "none yet" else "${folders.size}" },
-                        icon = CatalogIcon.GAME_FOLDERS,
+                        id = "accounts_screenscraper",
+                        title = "ScreenScraper",
+                        subtitle = "Works without an account; your own login raises how much you can scrape per day",
+                        inline = screenScraperAccountScreen(),
+                        valueLabel = {
+                            if (ScreenScraperPrefs.userId(context).isBlank()) "No account (still works)" else "Signed in as ${ScreenScraperPrefs.userId(context)}"
+                        },
                     ),
                     NestedScreenItem(
-                        id = "pc_stores_windows",
-                        title = "Windows games",
-                        subtitle = "The Wine environment Windows games run inside, and the folders it can reach",
-                        registryId = SCREEN_WINDOWS_GAMES,
-                        icon = CatalogIcon.WINDOWS_GAMES,
+                        id = "accounts_thegamesdb",
+                        title = "TheGamesDB",
+                        subtitle = "Free API key from thegamesdb.net -- required before it can scrape at all",
+                        inline = theGamesDbAccountScreen(),
+                        valueLabel = { if (TheGamesDbPrefs.apiKey(context).isBlank()) "Not set" else "Configured" },
                     ),
-                    ActionItem(
-                        id = "pc_stores_downloads",
-                        title = "Downloads",
-                        subtitle = "What is downloading or waiting, and the storage it is going into",
-                        run = { ctx -> ctx.startActivity(dev.droidtop.app.PcStoreActivity.intent(ctx, entryId = null)) },
+                    NestedScreenItem(
+                        id = "accounts_igdb",
+                        title = "IGDB (PC & engine games)",
+                        subtitle = "Your own free Twitch developer application credentials",
+                        inline = igdbAccountScreen(),
+                        valueLabel = { if (ScraperPrefs.clientId(context).isBlank()) "Not set" else "Configured" },
+                    ),
+                    NestedScreenItem(
+                        id = "accounts_steamgriddb",
+                        title = "SteamGridDB (PC & engine games)",
+                        subtitle = "Covers, hero art, logos and icons for PC and engine games",
+                        inline = steamGridDbAccountScreen(),
+                        valueLabel = {
+                            if (dev.droidtop.library.scraper.SteamGridDbPrefs.apiKey(context).isBlank()) "Not set" else "Configured"
+                        },
+                    ),
+                ),
+            ),
+            CatalogGroup(
+                id = "accounts_plugins",
+                title = "Plugins and integrations",
+                items = listOf(
+                    NestedScreenItem(
+                        id = "accounts_plugins_screen",
+                        title = "Plugins",
+                        subtitle = "Installed plugin code -- searched, approved and run in its own process, never droidtop's databases",
+                        registryId = SCREEN_PLUGINS,
+                        valueLabel = { pluginsValueLabel },
+                    ),
+                    NestedScreenItem(
+                        id = "accounts_integrations_screen",
+                        title = "App integrations",
+                        subtitle = "Hook other installed apps into droidtop, e.g. a downloader for a system's games",
+                        registryId = SCREEN_INTEGRATIONS,
+                        valueLabel = { if (activeIntegrations == 0) "none" else "$activeIntegrations active" },
+                        icon = CatalogIcon.INTEGRATIONS,
+                    ),
+                    NestedScreenItem(
+                        id = "accounts_jobs_screen",
+                        title = "Jobs",
+                        subtitle = "Plugin downloads and long-running actions, with progress and cancel",
+                        registryId = SCREEN_JOBS,
                     ),
                 ),
             ),
         )
     }
+
+    private fun screenScraperAccountScreen() = CatalogScreen(
+        id = "accounts_screenscraper_edit",
+        title = "ScreenScraper account",
+        subtitle = "Account fields only -- the developer ID droidtop registers with ScreenScraper is compiled in, never a user-facing field",
+        groups = { context ->
+            listOf(
+                CatalogGroup(
+                    id = "accounts_screenscraper_fields",
+                    title = null,
+                    items = listOf(
+                        screenScraperField(context, "ss_user_id", "Username", ScreenScraperPrefs.userId(context)) { c, v ->
+                            ScreenScraperPrefs.set(c, ScreenScraperPrefs.devId(c), ScreenScraperPrefs.devPassword(c), v, ScreenScraperPrefs.userPassword(c))
+                        },
+                        screenScraperField(context, "ss_user_password", "Password", ScreenScraperPrefs.userPassword(context), secret = true) { c, v ->
+                            ScreenScraperPrefs.set(c, ScreenScraperPrefs.devId(c), ScreenScraperPrefs.devPassword(c), ScreenScraperPrefs.userId(c), v)
+                        },
+                    ),
+                ),
+            )
+        },
+    )
+
+    private fun theGamesDbAccountScreen() = CatalogScreen(
+        id = "accounts_thegamesdb_edit",
+        title = "TheGamesDB",
+        subtitle = "Free at thegamesdb.net",
+        groups = { context ->
+            listOf(
+                CatalogGroup(
+                    id = "accounts_thegamesdb_fields",
+                    title = null,
+                    items = listOf(
+                        TextInputItem(
+                            id = "tgdb_api_key",
+                            title = "API key",
+                            subtitle = "Free at thegamesdb.net -- required before TheGamesDB can scrape at all",
+                            value = TheGamesDbPrefs.apiKey(context),
+                            onChange = { c, v -> TheGamesDbPrefs.set(c, v.trim()) },
+                        ),
+                    ),
+                ),
+            )
+        },
+    )
+
+    private fun igdbAccountScreen() = CatalogScreen(
+        id = "accounts_igdb_edit",
+        title = "IGDB",
+        subtitle = "Your own free Twitch developer application, never droidtop's",
+        groups = { context ->
+            listOf(
+                CatalogGroup(
+                    id = "accounts_igdb_fields",
+                    title = null,
+                    items = listOf(
+                        // The user's own credentials, never droidtop's:
+                        // IGDB authenticates through a free, self-service
+                        // Twitch developer application, and the ID and
+                        // secret belong to whoever created it.
+                        TextInputItem(
+                            id = "igdb_client_id",
+                            title = "Client ID",
+                            subtitle = "Create an application at dev.twitch.tv/console -- free, instant, no approval queue",
+                            value = ScraperPrefs.clientId(context),
+                            onChange = { c, v -> ScraperPrefs.set(c, v.trim(), ScraperPrefs.clientSecret(c)) },
+                        ),
+                        TextInputItem(
+                            id = "igdb_client_secret",
+                            title = "Client Secret",
+                            subtitle = "From the same Twitch application; stays on this device",
+                            value = ScraperPrefs.clientSecret(context),
+                            secret = true,
+                            onChange = { c, v -> ScraperPrefs.set(c, ScraperPrefs.clientId(c), v.trim()) },
+                        ),
+                    ),
+                ),
+            )
+        },
+    )
+
+    private fun steamGridDbAccountScreen() = CatalogScreen(
+        id = "accounts_steamgriddb_edit",
+        title = "SteamGridDB",
+        subtitle = "Free: sign in at steamgriddb.com, then Preferences > API",
+        groups = { context ->
+            listOf(
+                CatalogGroup(
+                    id = "accounts_steamgriddb_fields",
+                    title = null,
+                    items = listOf(
+                        // The user's own key, stored like every credential
+                        // here: droidtop ships none, and a key belongs to
+                        // the steamgriddb.com account that made it.
+                        TextInputItem(
+                            id = "steamgriddb_api_key",
+                            title = "API key",
+                            subtitle = "Free: sign in at steamgriddb.com, then Preferences > API. " +
+                                "Covers, hero art, logos and icons for PC and engine games",
+                            value = dev.droidtop.library.scraper.SteamGridDbPrefs.apiKey(context),
+                            secret = true,
+                            onChange = { c, v -> dev.droidtop.library.scraper.SteamGridDbPrefs.set(c, v.trim()) },
+                        ),
+                    ),
+                ),
+            )
+        },
+    )
 
     private fun integrationsScreen() = CatalogScreen(
         id = SCREEN_INTEGRATIONS,
@@ -2327,76 +2511,22 @@ object AppSettingsCatalogs {
                     ),
                 ),
                 CatalogGroup(
-                    id = "scraper_screenscraper",
-                    // Account fields ONLY: the dev ID/password pair is an
-                    // APPLICATION credential (real ES-DE embeds its own and
-                    // never surfaces it) -- it arrives via the debug
-                    // credentials file below, or a compiled-in registered
-                    // pair once droidtop has one, never a user-facing field.
-                    title = "ScreenScraper account (optional)",
+                    // ScreenScraper/TheGamesDB/IGDB/SteamGridDB account
+                    // fields moved to Settings > Accounts and sources,
+                    // with every other account droidtop has (docs/SPEC.md
+                    // settings architecture): a scraper's credentials are
+                    // a source's detail, not this screen's own -- this
+                    // screen is scrape BEHAVIOR (which source, what to
+                    // fetch), not accounts.
+                    id = "scraper_accounts_link",
+                    title = null,
                     items = listOf(
-                        screenScraperField(context, "ss_user_id", "Username", ScreenScraperPrefs.userId(context)) { c, v ->
-                            ScreenScraperPrefs.set(c, ScreenScraperPrefs.devId(c), ScreenScraperPrefs.devPassword(c), v, ScreenScraperPrefs.userPassword(c))
-                        },
-                        screenScraperField(context, "ss_user_password", "Password", ScreenScraperPrefs.userPassword(context), secret = true) { c, v ->
-                            ScreenScraperPrefs.set(c, ScreenScraperPrefs.devId(c), ScreenScraperPrefs.devPassword(c), ScreenScraperPrefs.userId(c), v)
-                        },
-                    ),
-                ),
-                CatalogGroup(
-                    id = "scraper_thegamesdb",
-                    title = "TheGamesDB",
-                    items = listOf(
-                        TextInputItem(
-                            id = "tgdb_api_key",
-                            title = "API key",
-                            subtitle = "Free at thegamesdb.net — required before TheGamesDB can scrape at all",
-                            value = TheGamesDbPrefs.apiKey(context),
-                            onChange = { c, v -> TheGamesDbPrefs.set(c, v.trim()) },
-                        ),
-                    ),
-                ),
-                CatalogGroup(
-                    id = "scraper_igdb",
-                    title = "IGDB (PC & engine games)",
-                    items = listOf(
-                        // The user's own credentials, never droidtop's:
-                        // IGDB authenticates through a free, self-service
-                        // Twitch developer application, and the ID and
-                        // secret belong to whoever created it. droidtop
-                        // ships none and never fills these in.
-                        TextInputItem(
-                            id = "igdb_client_id",
-                            title = "Client ID",
-                            subtitle = "Create an application at dev.twitch.tv/console — free, instant, no approval queue",
-                            value = ScraperPrefs.clientId(context),
-                            onChange = { c, v -> ScraperPrefs.set(c, v.trim(), ScraperPrefs.clientSecret(c)) },
-                        ),
-                        TextInputItem(
-                            id = "igdb_client_secret",
-                            title = "Client Secret",
-                            subtitle = "From the same Twitch application; stays on this device",
-                            value = ScraperPrefs.clientSecret(context),
-                            secret = true,
-                            onChange = { c, v -> ScraperPrefs.set(c, ScraperPrefs.clientId(c), v.trim()) },
-                        ),
-                    ),
-                ),
-                CatalogGroup(
-                    id = "scraper_steamgriddb",
-                    title = "SteamGridDB (PC & engine games)",
-                    items = listOf(
-                        // The user's own key, stored like every credential
-                        // on this screen: droidtop ships none, and a key
-                        // belongs to the steamgriddb.com account that made it.
-                        TextInputItem(
-                            id = "steamgriddb_api_key",
-                            title = "API key",
-                            subtitle = "Free: sign in at steamgriddb.com, then Preferences > API. " +
-                                "Covers, hero art, logos and icons for PC and engine games",
-                            value = dev.droidtop.library.scraper.SteamGridDbPrefs.apiKey(context),
-                            secret = true,
-                            onChange = { c, v -> dev.droidtop.library.scraper.SteamGridDbPrefs.set(c, v.trim()) },
+                        NestedScreenItem(
+                            id = "scraper_accounts_link_row",
+                            title = "Accounts and sources",
+                            subtitle = "ScreenScraper, TheGamesDB, IGDB and SteamGridDB credentials",
+                            registryId = SCREEN_ACCOUNTS_AND_SOURCES,
+                            icon = CatalogIcon.GLOBAL,
                         ),
                     ),
                 ),

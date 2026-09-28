@@ -24,13 +24,18 @@ data class SettingsSearchResult(
  * satisfying "no file/database work ... in list rendering".
  *
  * Deliberately shallow: it walks the root's own groups (depth 0) and, for
- * a [NestedScreenItem] found there, ONE level into whatever [CatalogScreen]
- * it opens (depth 1) -- never further. Every depth-0 and depth-1 screen is
- * either the root itself or reached through [SettingsScreenRegistry], the
- * small, developer-declared, FIXED set of top-level screens; a screen a
- * catalog builds for one instance (a single ROM folder, one platform, one
- * container) is never indexed, so this stays flat against the size of
- * anyone's library or platform list instead of growing with it.
+ * a [NestedScreenItem] found there, TWO levels into whatever [CatalogScreen]
+ * it opens (depths 1 and 2) -- never further. Depth 2 exists for Settings >
+ * Accounts and sources: its own rows (Steam, ScreenScraper, SteamGridDB...)
+ * are themselves depth-1 [NestedScreenItem]s opening a small screen of just
+ * that account's fields, and those fields must stay searchable the same way
+ * they were when they sat directly on the old per-provider screens. Every
+ * depth-0/1/2 screen is either the root itself, reached through
+ * [SettingsScreenRegistry], or one of these small inline account screens --
+ * all fixed and developer-declared; a screen a catalog builds for one
+ * instance (a single ROM folder, one platform, one container) is never
+ * indexed, so this stays flat against the size of anyone's library or
+ * platform list instead of growing with it.
  */
 object SettingsSearchIndex {
     suspend fun build(context: Context, root: CatalogScreen): List<SettingsSearchResult> {
@@ -51,7 +56,7 @@ object SettingsSearchIndex {
                         itemSubtitle = item.subtitle,
                         icon = item.icon,
                     )
-                    if (depth == 0 && item is NestedScreenItem) {
+                    if (depth <= 1 && item is NestedScreenItem) {
                         item.resolve()?.let { indexScreen(it, depth + 1) }
                     }
                 }
