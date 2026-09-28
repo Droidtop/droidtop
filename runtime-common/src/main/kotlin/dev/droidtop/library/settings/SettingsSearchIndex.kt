@@ -63,7 +63,11 @@ object SettingsSearchIndex {
             }
         }
         indexScreen(root, 0)
-        return results
+        // A screen reachable along two paths (the Plugins row sits under
+        // Accounts and sources, which more than one parent opens) would be
+        // indexed twice; the results list keys rows by item id, so a
+        // duplicate id crashed it. The first path found wins.
+        return results.distinctBy { it.itemId }
     }
 
     /** Pure, in-memory: safe to call on every keystroke. */
