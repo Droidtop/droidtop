@@ -118,6 +118,82 @@ interface PcGameRuntime {
      * calls this, with the changes it showed (docs/SPEC.md 7e3).
      */
     suspend fun applyPrefixChanges(entryId: String?, changes: dev.droidtop.library.lutris.WinePrefixChanges): PcProvisionResult
+
+    /**
+     * Runs an arbitrary Windows executable (or .msi) in the prefix
+     * belonging to [entryId] (or droidtop's shared prefix when null).
+     * File picker scoped to the game folder; .msi handed to Wine's
+     * `start /unix`. Same launch path as a library game.
+     */
+    suspend fun runExeInPrefix(
+        entryId: String?,
+        exeFile: java.io.File,
+        workingDir: java.io.File,
+        arguments: List<String> = emptyList(),
+    ): PcLaunchResult
+
+    /**
+     * Opens the prefix's drive_c in a way the system file picker can
+     * reach (shared storage bind, §3d). Returns the path to browse.
+     */
+    fun prefixBrowsePath(entryId: String?): java.io.File?
+
+    /**
+     * Kills all Wine processes belonging to the prefix for [entryId]
+     * (or the shared prefix). Runs `wineserver -k` in the prefix's
+     * environment.
+     */
+    suspend fun killPrefixProcesses(entryId: String?): PcProvisionResult
+
+    /**
+     * Runs winecfg in the prefix.
+     */
+    suspend fun runWinecfg(entryId: String?): PcLaunchResult
+
+    /**
+     * Runs regedit in the prefix.
+     */
+    suspend fun runRegedit(entryId: String?): PcLaunchResult
+
+    /**
+     * Runs wineconsole cmd in the prefix (Windows command prompt).
+     */
+    suspend fun runWineConsole(entryId: String?): PcLaunchResult
+
+    /**
+     * Toggles a gamenative Windows component (winetricks verb) in the
+     * prefix. [componentId] is one of gamenative's wincomponents.json keys.
+     */
+    suspend fun togglePrefixComponent(entryId: String?, componentId: String, enable: Boolean): PcProvisionResult
+
+    /**
+     * Runs an arbitrary Linux program/script in the game's container
+     * environment (for patchers, tools, etc.). The game folder is the
+     * working directory. FEX handles x86/x86-64 binaries transparently
+     * where registered.
+     */
+    suspend fun runInGameEnvironment(
+        entryId: String,
+        program: File,
+        workingDir: File,
+        arguments: List<String> = emptyList(),
+    ): PcLaunchResult
+
+    /**
+     * Opens a terminal (foot) in the game's container with the game
+     * folder as the working directory.
+     */
+    suspend fun openGameTerminal(entryId: String, gameRoot: File): PcLaunchResult
+
+    /**
+     * Returns the browsable path for the game folder (shared storage bind).
+     */
+    fun gameBrowsePath(entryId: String): File?
+
+    /**
+     * Kills processes belonging to the game in its container.
+     */
+    suspend fun killGameProcesses(entryId: String, gameRoot: File): PcProvisionResult
 }
 
 /**

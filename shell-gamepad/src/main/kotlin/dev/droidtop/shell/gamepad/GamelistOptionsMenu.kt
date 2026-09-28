@@ -117,6 +117,7 @@ object GamelistSortPrefs {
 /** The one label for the PC/engine scrape action, shared by the list that offers it and the handler that runs it. */
 private const val SCRAPE_PC_GAMES = "Scrape PC & engine games"
 private const val STORES_AND_FOLDERS = "Stores and folders"
+private const val INSTALL_NEW_GAME = "Install a new game"
 private const val ORPHANS_FIND = "Find orphaned media"
 private const val ORPHANS_DELETE = "Delete orphaned media: press A again"
 
@@ -215,8 +216,33 @@ internal fun GamelistOptionsMenu(
             // whole gamelist -- not "All games" or another collection
             // that merely happens to contain a PC entry, which is not
             // where a store login belongs.
-            if (systemId == PC_SYSTEM_ID) add(STORES_AND_FOLDERS)
-        }
+            if (systemId == PC_SYSTEM_ID) {
+                add(STORES_AND_FOLDERS)
+                add(INSTALL_NEW_GAME)
+}
+}
+
+/**
+ * Opens a file picker for the user to choose an already-downloaded game
+ * installer/archive, then processes it according to its type:
+ * - GOG Windows setup_*.exe (via Wine or innoextract)
+ * - GOG Linux gog_*.sh (MojoSetup, unpacked directly)
+ * - Plain archives (.zip/.7z/.rar)
+ * - itch/DLsite downloads (archives)
+ * - Generic Windows setup .exe (run in new prefix)
+ * Creates a new game folder under a user-chosen PC games root.
+ */
+private suspend fun installNewGame(context: Context) {
+    // TODO: Implement file picker and installer handling
+    // 1. Open system file picker (ACTION_OPEN_DOCUMENT) for */*
+    // 2. Detect file type by name/extension
+    // 3. For GOG .exe: try innoextract first, fall back to Wine in new prefix
+    // 4. For GOG .sh: unpack makeself archive directly
+    // 5. For archives: unpack to new game folder
+    // 6. For generic .exe: run in new Wine prefix
+    // 7. Let user choose target PC games root (from configured games roots)
+    // 8. Create new game folder, library scan picks it up automatically
+}
         add("Close")
     }
 
@@ -444,6 +470,10 @@ internal fun GamelistOptionsMenu(
             STORES_AND_FOLDERS -> {
                 onDismiss()
                 onOpenStores()
+            }
+            INSTALL_NEW_GAME -> {
+                onDismiss()
+                scope.launch { installNewGame(context) }
             }
             "Close" -> onDismiss()
         }

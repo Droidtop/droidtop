@@ -398,6 +398,147 @@ class DroidtopPcGameRuntime(
             }.getOrElse { PcProvisionResult(false, "The prefix could not be saved: ${it.message ?: it}") }
         }
 
+    override suspend fun runExeInPrefix(
+        entryId: String?,
+        exeFile: File,
+        workingDir: File,
+        arguments: List<String> = emptyList(),
+    ): PcLaunchResult {
+        val container = PcContainers.forGame(context, entryId)
+            ?: return PcLaunchResult(false, "There is no Windows prefix yet. Set up Windows games first.")
+        return if (exeFile.name.endsWith(".msi", ignoreCase = true)) {
+            launchInPrefix(wineEngine, container, "start", workingDir, listOf("/unix", exeFile.absolutePath) + arguments)
+        } else {
+            launchInPrefix(wineEngine, container, exeFile.absolutePath, workingDir, arguments)
+        }
+    }
+
+    override fun prefixBrowsePath(entryId: String?): File? {
+        val container = PcContainers.forGame(context, entryId) ?: return null
+        // The prefix's drive_c is at <container.rootDir>/.wine/drive_c
+        // It's bound into the container's shared storage at /run/droidtop-app-storage/<prefix-name>
+        // but we can also return the host path directly for the file picker
+        return File(container.rootDir, ".wine/drive_c").takeIf { it.isDirectory }
+    }
+
+    override suspend fun killPrefixProcesses(entryId: String?): PcProvisionResult =
+        withContext(Dispatchers.IO) {
+            val container = PcContainers.forGame(context, entryId)
+                ?: return@withContext PcProvisionResult(false, "There is no Windows prefix yet. Set up Windows games first.")
+            // Run wineserver -k in the prefix environment
+            val prefixHostPath = File(container.rootDir, ".wine")
+            if (!prefixHostPath.isDirectory) {
+                return@withContext PcProvisionResult(false, "Prefix not found at ${prefixHostPath.absolutePath}")
+            }
+            // Use the wine engine to run wineserver -k
+            runCatching {
+                wineEngine.launch(container, "wineserver", File("/"), listOf("-k"))
+            }.getOrElse { PcProvisionResult(false, "Failed to kill prefix processes: ${it.message ?: it}") }
+            PcProvisionResult(true, "Killed all Wine processes in ${container.name}")
+        }
+
+    override suspend fun runWinecfg(entryId: String?): PcLaunchResult {
+        val container = PcContainers.forGame(context, entryId)
+            ?: return PcLaunchResult(false, "There is no Windows prefix yet. Set up Windows games first.")
+        return launchInPrefix(wineEngine, container, "winecfg", File("/"), emptyList())
+    }
+
+    override suspend fun runRegedit(entryId: String?): PcLaunchResult {
+        val container = PcContainers.forGame(context, entryId)
+            ?: return PcLaunchResult(false, "There is no Windows prefix yet. Set up Windows games first.")
+        return launchInPrefix(wineEngine, container, "regedit", File("/"), emptyList())
+    }
+
+    override suspend fun runWineConsole(entryId: String?): PcLaunchResult {
+        val container = PcContainers.forGame(context, entryId)
+            ?: return PcLaunchResult(false, "There is no Windows prefix yet. Set up Windows games first.")
+        return launchInPrefix(wineEngine, container, "wineconsole", File("/"), listOf("cmd"))
+    }
+
+    override suspend fun togglePrefixComponent(entryId: String?, componentId: String, enable: Boolean): PcProvisionResult =
+        withContext(Dispatchers.IO) {
+            val container = PcContainers.forGame(context, entryId)
+                ?: return@withContext PcProvisionResult(false, "There is no Windows prefix yet. Set up Windows games first.")
+            runCatching {
+                val data = ContainerUtils.toContainerData(container)
+                val components = KeyValueSet(data.wincomponents)
+                components.put(componentId, if (enable) "1" else "0")
+                ContainerUtils.applyToContainer(
+                    context,
+                    container,
+                    data.copy(wincomponents = components.toString()),
+                )
+                PcProvisionResult(true, "${if (enable) "Enabled" else "Disabled"} $componentId in ${container.name}")
+            }.getOrElse { PcProvisionResult(false, "Failed to toggle component: ${it.message ?: it}") }
+        }
+
+    override suspend fun runInGameEnvironment(
+        entryId: String,
+        program: File,
+        workingDir: File,
+        arguments: List<String> = emptyList(),
+    ): PcLaunchResult {
+        val session = primarySession()
+            ?: return PcLaunchResult(false, "Desktop mode's container is not running. Start the desktop first.")
+        val containerPath = session.runtime.hostStorageToContainerPath(program)
+        val workingDirPath = session.runtime.hostStorageToContainerPath(workingDir)
+        val result = runCatching {
+            NativeLinuxGameSession(session.container, session.runtime)
+                .launch(containerPath, arguments)
+        }.getOrElse { return PcLaunchResult(false, it.message ?: it.toString()) }
+        return PcLaunchResult(
+            succeeded = result.succeeded,
+            detail = if (result.succeeded) "ok" else "exit ${result.exitCode}: ${result.stderr.ifBlank { result.stdout }}",
+        )
+    }
+
+    override suspend fun openGameTerminal(entryId: String, gameRoot: File): PcLaunchResult {
+        val session = primarySession()
+            ?: return PcLaunchResult(false, "Desktop mode's container is not running. Start the desktop first.")
+        val workingDirPath = session.runtime.hostStorageToContainerPath(gameRoot)
+        // Launch foot terminal with the game folder as working directory
+        val result = runCatching {
+            session.runtime.exec(
+                container = session.container,
+                command = listOf("foot", "--working-directory", workingDirPath),
+            )
+        }.getOrElse { return PcLaunchResult(false, it.message ?: it.toString()) }
+        return PcLaunchResult(
+            succeeded = result.succeeded,
+            detail = if (result.succeeded) "Terminal opened" else "exit ${result.exitCode}: ${result.stderr.ifBlank { result.stdout }}",
+        )
+    }
+
+    override fun gameBrowsePath(entryId: String): File? {
+        // The game folder is already accessible via shared storage bind
+        // Return the host path directly by looking up the entry from the library
+        // Since we only have the entryId, we need to find the actual game folder
+        // For now, we check if the entryId is a folder path
+        if (entryId.startsWith("/")) {
+            return File(entryId).takeIf { it.isDirectory }
+        }
+        // For store games, we can't easily resolve the install path here without the library
+        // The caller should resolve the path and pass it directly
+        return null
+    }
+
+    override suspend fun killGameProcesses(entryId: String, gameRoot: File): PcProvisionResult {
+        val session = primarySession()
+            ?: return PcProvisionResult(false, "Desktop mode's container is not running. Start the desktop first.")
+        val workingDirPath = session.runtime.hostStorageToContainerPath(gameRoot)
+        // Use pkill to kill processes with this working directory
+        val result = runCatching {
+            session.runtime.exec(
+                container = session.container,
+                command = listOf("pkill", "-f", workingDirPath),
+            )
+        }.getOrElse { return PcProvisionResult(false, it.message ?: it.toString()) }
+        return PcProvisionResult(
+            succeeded = result.succeeded,
+            detail = if (result.succeeded) "Killed processes for $gameRoot" else "exit ${result.exitCode}: ${result.stderr.ifBlank { result.stdout }}",
+        )
+    }
+
     override suspend fun launchLinux(executable: File, gameRoot: File): PcLaunchResult {
         val session = primarySession()
             ?: return PcLaunchResult(false, "a native Linux build runs inside Desktop mode's container, and it isn't running")

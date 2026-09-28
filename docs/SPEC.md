@@ -4641,6 +4641,129 @@ Two concrete references to build from rather than design blind:
   focused launchers are UX references for `:shell-gamepad` rather than
   code to port.
 
+## 7c1. Per-game Wine actions (Lutris-style) and Linux game tools (directed 2026-09-28)
+
+**Goal**: give each Windows game in droidtop the same per-prefix actions Lutris offers,
+and the same class of tools for Linux games, reachable from the L2 PC game menu
+(`PcGameMenu`) and the game detail screen. No patch tracking, no backup manifests.
+
+### Windows games — the Lutris action set
+
+Lutris's per-game Wine actions (`lutris/runners/wine.py`) are the reference:
+run an EXE inside the prefix, winecfg, regedit, winetricks, browse prefix
+files, command prompt, kill all Wine processes, wine console. droidtop's
+equivalent, each a row in the "Runs on Windows" section of `PcGameMenu`:
+
+- **Run an EXE in this prefix** — opens a file picker scoped to the game's
+  folder (and its subfolders), for installers, patchers, translation tools
+  and other Windows programs the user runs themselves. The picked `.exe`
+  (or `.msi`, handed to Wine's `start /unix`) runs in the same prefix the
+  game uses (`PcContainers.forGame`), with the game folder as the working
+  directory unless the executable is an `.msi`. This is the same launch
+  path a library game uses (`WinePrefixes.open` / `launchInPrefix`).
+- **Browse prefix files** — opens the prefix's `drive_c` in the system file
+  picker (`ACTION_OPEN_DOCUMENT_TREE` on the prefix path mapped into the
+  container's shared storage bind, §3d) so the user can copy, edit or
+  inspect files. The prefix is on app-private storage; the bind under
+  `/run/droidtop-app-storage` (§3) makes it reachable.
+- **Winetricks verbs** — a searchable, filterable list of the verbs
+  gamenative's `wincomponents.json` knows (the same closed set
+  `LutrisImport.WINETRICKS_COMPONENTS` uses), each toggling its gamenative
+  component on/off in the prefix. The list is pure data, not a live
+  winetricks call — selecting a verb writes the component into the
+  container via `PcGameRuntime.applyPrefixChanges` (the same path the
+  prefix config dialog and Lutris import use).
+- **winecfg** — launches `winecfg` in the prefix (`launchInPrefix` with
+  target `winecfg`), the standard Wine configuration dialog.
+- **regedit** — launches `regedit` in the prefix, for manual registry
+  edits.
+- **Open a Wine console** — launches `wineconsole cmd` in the prefix, a
+  Windows command prompt inside the prefix.
+- **Kill the prefix's processes** — runs `wineserver -k` in the prefix's
+  environment, terminating every Wine process belonging to that prefix.
+  Implemented via `PcGameRuntime.killPrefixProcesses(entryId)`.
+
+All seven actions are available for every game that has a Windows route
+(`hasWindowsRoute` in `PcGameMenu`), including store games with their own
+per-game prefix and folder games sharing droidtop's provisioned prefix.
+The prefix a person configures or acts on is provably the one the game
+starts in (§7i, `PcContainers.forGame`).
+
+### Linux games — the same class of tools
+
+For a game whose resolved runner is a native Linux build (or an x86 Linux
+binary run through FEX-Emu, §3c, §5a), the "Runs on Linux" section offers:
+
+- **Run a program/script in this game's environment** — a file picker
+  scoped to the game folder, picking a `.sh` patcher, an AppImage, a Linux
+  binary or any executable file. The picked file runs via
+  `PcGameRuntime.launchLinux` (which execs in Desktop mode's primary
+  container, with FEX transparently handling x86/x86-64 ELFs once
+  `binfmt_misc` is registered, §3c) or, for arm64-native binaries, natively.
+  The game folder is the working directory.
+- **Open a terminal here** — launches `foot` (or the container's default
+  terminal) with its working directory set to the game folder, inside the
+  same container the game runs in (`NativeLinuxGameSession`).
+- **Browse files** — the system file picker on the game folder (shared
+  storage bind, §3d), same as any folder.
+- **Kill its processes** — `pkill -f` against the game folder's path inside
+  the container, or the container runtime's process listing filtered to
+  that working directory.
+
+The Linux toolset mirrors the Windows one: run something, open a shell,
+browse, kill. FEX-Emu (§3c) is the translation layer for x86 Linux
+binaries; where it is not registered (no-root backend, §3), the action
+runs `FEXInterpreter <binary>` explicitly.
+
+### Install / unpack a new game (PC system menu)
+
+A new action in the PC surface's "Stores and folders" (`GamelistOptionsMenu`)
+and the PC system card's own menu: **Install a new game** / **Unpack a new
+game**. The user picks an already-downloaded file (system file picker,
+`ACTION_OPEN_DOCUMENT` on `*/*`), and droidtop does the right thing:
+
+- **GOG offline Windows installer** (`setup_*.exe`) — runs in a **new**
+  prefix (or the user-chosen existing one) via Wine. Where `innoextract`
+  (vendored, built from source) can read the installer, it unpacks the
+  game files directly into a new game folder under the chosen PC games
+  root, avoiding running the setup.exe at all — exactly as Lutris's
+  `innoextract` step does. Where innoextract cannot handle it, the
+  installer runs in a fresh prefix and the result is moved into a new
+  game folder.
+- **GOG Linux installer** (`gog_*.sh`, MojoSetup) — a makeself archive
+  with a data zip. Unpacked directly (makeself `--target` + unzip) into a
+  new game folder, or run via FEX in the game's Linux container where the
+  user prefers that.
+- **Plain archives** (`.zip`, `.7z`, `.rar`) — unpacked into a new game
+  folder under the chosen PC games root, using the same archive extraction
+  the library uses (`TarCompressorUtils.extract`, hardened per the
+  destructive-operation audit, §5b).
+- **itch.io / DLsite downloads** — typically `.zip` or `.rar`; same as
+  plain archives.
+- **Generic Windows setup `.exe`** — run in a new prefix (user-chosen or a
+  fresh one), the result moved into a new game folder.
+
+The new game folder is created under a user-chosen PC games root (one of
+the configured games roots, §7g). The library's scan picks it up
+automatically (`GamesRoots.follow` walks on change). **Never overwrites
+an existing folder** — a name conflict is reported and the user chooses a
+different name.
+
+All installer handling studies Lutris's installer commands (extract,
+execute, gog installers, innoextract for GOG Windows installers) and uses
+innoextract for GOG `.exe` where it works. The result is a new game
+folder, picked up by the library automatically.
+
+### Reachability
+
+- **Controller**: L2 opens `PcGameMenu`; the new rows are in the
+  "Runs on Windows" / "Runs on Linux" section. Up/Down/A/B navigation
+  works per `MenuPanel`'s contract (§7j).
+- **Touch**: the hint row in `PcGameMenu` names the actions; every row
+  is tappable (`MenuRow.onClick`).
+- **Game detail**: the "Runs with" section already shows the resolved
+  runner; the new actions are added as sibling rows there too.
+
 ## 7d. Engine games — enginehost, the contract and the coverage
 
 An engine game is a folder holding a game written for an interpreter

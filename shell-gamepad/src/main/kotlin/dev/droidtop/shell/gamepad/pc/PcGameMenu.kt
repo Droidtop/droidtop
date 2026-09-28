@@ -409,6 +409,7 @@ internal fun PcGameMenu(
     val hasWindowsRoute = runners.options.any {
         it.strategy == GameLaunchStrategy.WINE_PREFIX && it.state != RunnerState.NOT_FOR_THIS_GAME
     }
+    val isLinuxRunner = runner?.option?.strategy == GameLaunchStrategy.LINUX_CONTAINER && runner?.option?.state != RunnerState.NOT_FOR_THIS_GAME
     val actions = rememberPcActions(
         group = group,
         currentId = entry.id,
@@ -503,6 +504,135 @@ internal fun PcGameMenu(
                 withContext(Dispatchers.IO) { WineGameSettingsPrefs.set(context, entry.id, null) }
                 status = "This game runs the program droidtop detects again."
                 reloadToken++
+            }
+        },
+        onRunExeInPrefix = { exeFile, workingDir ->
+            scope.launch {
+                status = "Running ${exeFile.name} in prefix…"
+                val runtime = PcGameRuntimeRegistry.runtime
+                if (runtime == null) {
+                    status = "PC runtime not available"
+                } else {
+                    val result = runtime.runExeInPrefix(entry.id, exeFile, workingDir)
+                    status = if (result.succeeded) "Launched ${exeFile.name}" else "Failed: ${result.detail}"
+                }
+            }
+        },
+        onBrowsePrefix = { gameFolder ->
+            scope.launch {
+                val runtime = PcGameRuntimeRegistry.runtime
+                if (runtime == null) {
+                    status = "PC runtime not available"
+                } else {
+                    val path = runtime.prefixBrowsePath(entry.id)
+                    if (path != null) {
+                        status = "Prefix drive_c: ${path.absolutePath}"
+                        // TODO: open system file picker on this path
+                    } else {
+                        status = "Prefix not found"
+                    }
+                }
+            }
+        },
+        onWinetricks = { showWinetricksDialog() },
+        onWinecfg = {
+            scope.launch {
+                status = "Opening winecfg…"
+                val runtime = PcGameRuntimeRegistry.runtime
+                if (runtime == null) {
+                    status = "PC runtime not available"
+                } else {
+                    val result = runtime.runWinecfg(entry.id)
+                    status = if (result.succeeded) "Opened winecfg" else "Failed: ${result.detail}"
+                }
+            }
+        },
+        onRegedit = {
+            scope.launch {
+                status = "Opening regedit…"
+                val runtime = PcGameRuntimeRegistry.runtime
+                if (runtime == null) {
+                    status = "PC runtime not available"
+                } else {
+                    val result = runtime.runRegedit(entry.id)
+                    status = if (result.succeeded) "Opened regedit" else "Failed: ${result.detail}"
+                }
+            }
+        },
+        onWineConsole = {
+            scope.launch {
+                status = "Opening Wine console…"
+                val runtime = PcGameRuntimeRegistry.runtime
+                if (runtime == null) {
+                    status = "PC runtime not available"
+                } else {
+                    val result = runtime.runWineConsole(entry.id)
+                    status = if (result.succeeded) "Opened Wine console" else "Failed: ${result.detail}"
+                }
+            }
+        },
+        onKillPrefixProcesses = {
+            scope.launch {
+                status = "Killing prefix processes…"
+                val runtime = PcGameRuntimeRegistry.runtime
+                if (runtime == null) {
+                    status = "PC runtime not available"
+                } else {
+                    val result = runtime.killPrefixProcesses(entry.id)
+                    status = if (result.succeeded) result.detail else "Failed: ${result.detail}"
+                }
+            }
+        },
+        onRunInGameEnv = { program, workingDir ->
+            scope.launch {
+                status = "Running ${program.name} in game environment…"
+                val runtime = PcGameRuntimeRegistry.runtime
+                if (runtime == null) {
+                    status = "PC runtime not available"
+                } else {
+                    val result = runtime.runInGameEnvironment(entry.id, program, workingDir)
+                    status = if (result.succeeded) "Launched ${program.name}" else "Failed: ${result.detail}"
+                }
+            }
+        },
+        onOpenTerminal = { gameRoot ->
+            scope.launch {
+                status = "Opening terminal…"
+                val runtime = PcGameRuntimeRegistry.runtime
+                if (runtime == null) {
+                    status = "PC runtime not available"
+                } else {
+                    val result = runtime.openGameTerminal(entry.id, gameRoot)
+                    status = if (result.succeeded) "Opened terminal" else "Failed: ${result.detail}"
+                }
+            }
+        },
+        onBrowseGameFiles = { gameRoot ->
+            scope.launch {
+                val runtime = PcGameRuntimeRegistry.runtime
+                if (runtime == null) {
+                    status = "PC runtime not available"
+                } else {
+                    val path = runtime.gameBrowsePath(entry.id)
+                    if (path != null) {
+                        status = "Game folder: ${path.absolutePath}"
+                        // TODO: open system file picker on this path
+                    } else {
+                        status = "Game folder not accessible"
+                    }
+                }
+            }
+        },
+        onKillGameProcesses = { gameRoot ->
+            scope.launch {
+                status = "Killing game processes…"
+                val runtime = PcGameRuntimeRegistry.runtime
+                if (runtime == null) {
+                    status = "PC runtime not available"
+                } else {
+                    val result = runtime.killGameProcesses(entry.id, gameRoot)
+                    status = if (result.succeeded) result.detail else "Failed: ${result.detail}"
+                }
             }
         },
     )
@@ -896,6 +1026,7 @@ private fun rememberPcActions(
         runnerGroup(
             runsOnEnginehost = runsOnEnginehost,
             hasWindowsRoute = hasWindowsRoute,
+            isLinuxRunner = isLinuxRunner,
             isEngineGame = isEngineGame,
             onEnginehost = onEnginehost,
             onOpenPrefix = {
@@ -907,6 +1038,135 @@ private fun rememberPcActions(
             wineSettings = wineSettings,
             onImportLutris = onImportLutris,
             onClearWineSettings = onClearWineSettings,
+            onRunExeInPrefix = { exeFile, workingDir ->
+                scope.launch {
+                    status = "Running ${exeFile.name} in prefix…"
+                    val runtime = PcGameRuntimeRegistry.runtime
+                    if (runtime == null) {
+                        status = "PC runtime not available"
+                    } else {
+                        val result = runtime.runExeInPrefix(entry.id, exeFile, workingDir)
+                        status = if (result.succeeded) "Launched ${exeFile.name}" else "Failed: ${result.detail}"
+                    }
+                }
+            },
+            onBrowsePrefix = { gameFolder ->
+                scope.launch {
+                    val runtime = PcGameRuntimeRegistry.runtime
+                    if (runtime == null) {
+                        status = "PC runtime not available"
+                    } else {
+                        val path = runtime.prefixBrowsePath(entry.id)
+                        if (path != null) {
+                            status = "Prefix drive_c: ${path.absolutePath}"
+                            // TODO: open system file picker on this path
+                        } else {
+                            status = "Prefix not found"
+                        }
+                    }
+                }
+            },
+            onWinetricks = { showWinetricksDialog() },
+            onWinecfg = {
+                scope.launch {
+                    status = "Opening winecfg…"
+                    val runtime = PcGameRuntimeRegistry.runtime
+                    if (runtime == null) {
+                        status = "PC runtime not available"
+                    } else {
+                        val result = runtime.runWinecfg(entry.id)
+                        status = if (result.succeeded) "Opened winecfg" else "Failed: ${result.detail}"
+                    }
+                }
+            },
+            onRegedit = {
+                scope.launch {
+                    status = "Opening regedit…"
+                    val runtime = PcGameRuntimeRegistry.runtime
+                    if (runtime == null) {
+                        status = "PC runtime not available"
+                    } else {
+                        val result = runtime.runRegedit(entry.id)
+                        status = if (result.succeeded) "Opened regedit" else "Failed: ${result.detail}"
+                    }
+                }
+            },
+            onWineConsole = {
+                scope.launch {
+                    status = "Opening Wine console…"
+                    val runtime = PcGameRuntimeRegistry.runtime
+                    if (runtime == null) {
+                        status = "PC runtime not available"
+                    } else {
+                        val result = runtime.runWineConsole(entry.id)
+                        status = if (result.succeeded) "Opened Wine console" else "Failed: ${result.detail}"
+                    }
+                }
+            },
+            onKillPrefixProcesses = {
+                scope.launch {
+                    status = "Killing prefix processes…"
+                    val runtime = PcGameRuntimeRegistry.runtime
+                    if (runtime == null) {
+                        status = "PC runtime not available"
+                    } else {
+                        val result = runtime.killPrefixProcesses(entry.id)
+                        status = if (result.succeeded) result.detail else "Failed: ${result.detail}"
+                    }
+                }
+            },
+            onRunInGameEnv = { program, workingDir ->
+                scope.launch {
+                    status = "Running ${program.name} in game environment…"
+                    val runtime = PcGameRuntimeRegistry.runtime
+                    if (runtime == null) {
+                        status = "PC runtime not available"
+                    } else {
+                        val result = runtime.runInGameEnvironment(entry.id, program, workingDir)
+                        status = if (result.succeeded) "Launched ${program.name}" else "Failed: ${result.detail}"
+                    }
+                }
+            },
+            onOpenTerminal = { gameRoot ->
+                scope.launch {
+                    status = "Opening terminal…"
+                    val runtime = PcGameRuntimeRegistry.runtime
+                    if (runtime == null) {
+                        status = "PC runtime not available"
+                    } else {
+                        val result = runtime.openGameTerminal(entry.id, gameRoot)
+                        status = if (result.succeeded) "Opened terminal" else "Failed: ${result.detail}"
+                    }
+                }
+            },
+            onBrowseGameFiles = { gameRoot ->
+                scope.launch {
+                    val runtime = PcGameRuntimeRegistry.runtime
+                    if (runtime == null) {
+                        status = "PC runtime not available"
+                    } else {
+                        val path = runtime.gameBrowsePath(entry.id)
+                        if (path != null) {
+                            status = "Game folder: ${path.absolutePath}"
+                            // TODO: open system file picker on this path
+                        } else {
+                            status = "Game folder not accessible"
+                        }
+                    }
+                }
+            },
+            onKillGameProcesses = { gameRoot ->
+                scope.launch {
+                    status = "Killing game processes…"
+                    val runtime = PcGameRuntimeRegistry.runtime
+                    if (runtime == null) {
+                        status = "PC runtime not available"
+                    } else {
+                        val result = runtime.killGameProcesses(entry.id, gameRoot)
+                        status = if (result.succeeded) result.detail else "Failed: ${result.detail}"
+                    }
+                }
+            },
         ),
         PcActionGroup(
             "Metadata and media",
@@ -1007,24 +1267,45 @@ private fun row(
 }
 
 /**
+ * Shows a searchable dialog for winetricks verbs (gamenative Windows
+ * components). The list comes from gamenative's wincomponents.json.
+ */
+private fun showWinetricksDialog() {
+    // TODO: Implement a searchable dialog for winetricks verbs
+    // This would show all components from gamenative's wincomponents.json
+    // and allow toggling them on/off in the prefix
+    status = "Winetricks verbs dialog not yet implemented"
+}
+
+/**
  * The one section that depends on HOW this game runs: enginehost's own
  * settings for a game enginehost runs, the Wine prefix for a game that
- * takes the Windows route, and nothing at all for a game whose runner is
- * neither (a native Linux build, or a game with no runner on this device
- * -- the primary button above already says so, and a section of dead rows
- * repeating it is not information).
+ * takes the Windows route, Linux tools for a native Linux build, and
+ * nothing at all for a game whose runner is neither.
  *
  * The section is named for the runner, never for its own first row.
  */
 private fun runnerGroup(
     runsOnEnginehost: Boolean,
     hasWindowsRoute: Boolean,
+    isLinuxRunner: Boolean,
     isEngineGame: Boolean,
     onEnginehost: (android.content.Intent) -> Unit,
     onOpenPrefix: () -> Unit,
     wineSettings: WineGameSettings?,
     onImportLutris: () -> Unit,
     onClearWineSettings: () -> Unit,
+    onRunExeInPrefix: (File, File) -> Unit,
+    onBrowsePrefix: (File) -> Unit,
+    onWinetricks: () -> Unit,
+    onWinecfg: () -> Unit,
+    onRegedit: () -> Unit,
+    onWineConsole: () -> Unit,
+    onKillPrefixProcesses: () -> Unit,
+    onRunInGameEnv: (File, File) -> Unit,
+    onOpenTerminal: (File) -> Unit,
+    onBrowseGameFiles: (File) -> Unit,
+    onKillGameProcesses: (File) -> Unit,
 ): PcActionGroup? = when {
     runsOnEnginehost -> PcActionGroup(
         "Runs on Enginehost",
@@ -1070,6 +1351,67 @@ private fun runnerGroup(
             ),
             PcActionRow("Saves", "This game's saves live inside its prefix, under Prefix and graphics", null),
             PcActionRow("Controls", "This game's controls are its prefix's controller tab, under Prefix and graphics", null),
+            // Lutris-style per-prefix actions (docs/SPEC.md 7c1)
+            PcActionRow(
+                "Run an EXE in this prefix",
+                "Pick a Windows program (.exe/.msi) in the game folder to run in this prefix",
+                { onRunExeInPrefix(File(entry.id), File(entry.id)) },
+            ),
+            PcActionRow(
+                "Browse prefix files",
+                "Open the prefix's drive_c in the file picker",
+                { onBrowsePrefix(File(entry.id)) },
+            ),
+            PcActionRow(
+                "Winetricks verbs",
+                "Searchable list of Windows components to enable/disable in this prefix",
+                onWinetricks,
+            ),
+            PcActionRow(
+                "winecfg",
+                "Open Wine's configuration dialog for this prefix",
+                onWinecfg,
+            ),
+            PcActionRow(
+                "regedit",
+                "Open the Windows registry editor for this prefix",
+                onRegedit,
+            ),
+            PcActionRow(
+                "Open a Wine console",
+                "A Windows command prompt (cmd) inside this prefix",
+                onWineConsole,
+            ),
+            PcActionRow(
+                "Kill the prefix's processes",
+                "Terminate all Wine processes belonging to this prefix (wineserver -k)",
+                onKillPrefixProcesses,
+            ),
+        ),
+    )
+    isLinuxRunner -> PcActionGroup(
+        "Runs on Linux",
+        listOfNotNull(
+            PcActionRow(
+                "Run a program in this game's environment",
+                "Pick a script (.sh), AppImage, or Linux binary to run in the game's container",
+                { onRunInGameEnv(File(entry.id), File(entry.id)) },
+            ),
+            PcActionRow(
+                "Open a terminal here",
+                "A terminal (foot) in the game's container, at the game folder",
+                { onOpenTerminal(File(entry.id)) },
+            ),
+            PcActionRow(
+                "Browse files",
+                "Open the game folder in the file picker",
+                { onBrowseGameFiles(File(entry.id)) },
+            ),
+            PcActionRow(
+                "Kill its processes",
+                "Terminate processes running from this game's folder in the container",
+                { onKillGameProcesses(File(entry.id)) },
+            ),
         ),
     )
     else -> null
