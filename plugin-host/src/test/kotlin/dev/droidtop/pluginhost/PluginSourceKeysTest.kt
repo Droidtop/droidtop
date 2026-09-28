@@ -59,12 +59,12 @@ class PluginSourceKeysTest {
 
     @Test
     fun `plaintext http and things that are not URLs are refused`() {
-        assertNull(PluginSourceKeys.keyUrlsFor("http://example.com/plugins"))
-        assertNull(PluginSourceKeys.keyUrlsFor("http://example.com/plugins/index.json"))
-        assertNull(PluginSourceKeys.keyUrlsFor("github.com/acme/acme-plugins"))
-        assertNull(PluginSourceKeys.keyUrlsFor(""))
-        assertNull(PluginSourceKeys.keyUrlsFor("not a url at all"))
-        assertNull(PluginSourceKeys.keyUrlsFor("https://github.com/only-owner"))
+        assertTrue(PluginSourceKeys.keyUrlsFor("http://example.com/plugins").isEmpty())
+        assertTrue(PluginSourceKeys.keyUrlsFor("http://example.com/plugins/index.json").isEmpty())
+        assertTrue(PluginSourceKeys.keyUrlsFor("github.com/acme/acme-plugins").isEmpty())
+        assertTrue(PluginSourceKeys.keyUrlsFor("").isEmpty())
+        assertTrue(PluginSourceKeys.keyUrlsFor("not a url at all").isEmpty())
+        assertTrue(PluginSourceKeys.keyUrlsFor("https://github.com/only-owner").isEmpty())
     }
 
     @Test
