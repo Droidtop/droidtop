@@ -55,6 +55,7 @@ its group, is placed in numeric order, and gets a line in the contents below.
 - [10c. Diagnostics, crash recovery and privacy](#10c-diagnostics-crash-recovery-and-privacy)
 - [11. Open risks to verify hands-on, not assume](#11-open-risks-to-verify-hands-on-not-assume)
 - [12. Third-party app integration system](#12-third-party-app-integration-system)
+- [13. UI v2 — end-user redesign direction (dtv2ui audit, 2026-09-28)](#13-ui-v2--end-user-redesign-direction-dtv2ui-audit-2026-09-28)
 
 ## 1. Product vision
 
@@ -11088,3 +11089,128 @@ Dart dependencies (image/network libraries with their OWN native code)
 fit inside a single `FlutterEngine`'s asset/native-lib model the same way
 this sample's trivial UI-less Dart does — untested here, and specific to
 whatever plugin is being built, not this runner itself.
+
+## 13. UI v2 — end-user redesign direction (dtv2ui audit, 2026-09-28)
+
+**Scope of this pass.** A code- and spec-level audit (SPEC, DESIGN-LANGUAGE.md,
+the Gaming/Settings/PC-surface sections above, and the settings-catalog and
+Quick Menu source) done from a cloud session with no device rig time. It is
+NOT the hands-on, screenshot-by-screenshot walk of every mode the owner
+asked for — that still needs a rig pass (see "Needs a rig check" below and
+`/repos/ws/dtv2ui/review-notes.md`). Findings below are grounded in what the
+code and this file already say, not device observation; where this pass
+would have needed a screenshot to confirm something, it says so rather than
+asserting it.
+
+**Framing.** §7j, §7k and DESIGN-LANGUAGE.md already got droidtop most of
+the way from "software a developer touches" to "software an end user
+touches" — one selection idiom, one spacing/type/colour source, the Quick
+Menu's status-header-plus-tiles pattern, capture-style input binding, the
+hint row as the touch route to pad buttons. The `## 7i` PC-surface history
+above (three redecisions in three weeks, each one walking back a more
+developer-shaped answer toward a themed, task-first one) is the clearest
+evidence of the "accumulation" the owner named: not bad taste, but each
+mode having grown its own answer to the same handful of questions
+("how does a person reach settings", "how does a person see what a thing
+is", "how does a list get filtered") before a shared answer existed. UI v2
+is not a rewrite of the shell; it is finishing that convergence
+deliberately, mode by mode, instead of letting the next surface reinvent it.
+
+### Gaming mode
+
+**Today.** Real per §7f/§7i/§7j: themed carousel and gamelists, an
+expanded frame-only PC library view with `LibraryQuery` chips, `PcGameMenu`
+on L2/Y, Quick Menu with a Settings tile (`## One consistent way into
+Settings`, above), Start opening the Quick Menu.
+
+**What still reads as accumulation:**
+- Three different entry points into "configure this system" exist because
+  they were added at three different times: the gamelist options menu's
+  new "System settings" row (which opens the whole Console systems list,
+  not this system — noted as a known gap in that section above), the
+  Settings catalog's own Library > Console systems row, and the Quick
+  Menu's Settings tile. Each is individually justified in the sections
+  above; together they are three paths to the same screen with no single
+  one that is obviously "the" way in for a player who just wants to fix
+  this system's emulator.
+- `PcGameMenu` (ES-DE-style, L2/Y) carries runner, container settings,
+  ProtonDB, Lutris import, F95 link/update, and merge/versions in one flat
+  list — a direct translation of what `## 7i` calls "everything ES-DE has
+  no slot for", not a list a first-time player would recognise as grouped
+  by task ("play differently" vs. "about this copy" vs. "fix a problem").
+
+**v2 direction:**
+- Give the gamelist options menu's "System settings" row (§ above) the
+  per-system deep link the section already flags as missing, so the three
+  paths converge on identical behaviour instead of three routes that
+  happen to land on the same screen through different navigation depths.
+- Group `PcGameMenu` rows under three headers (Play, About, Fix/Advanced)
+  instead of one flat list — same rows, same actions, no new screens;
+  ProtonDB/merge/container internals move under "Advanced" per the
+  progressive-disclosure goal below.
+- Keep everything else: the frame-only themed render, the chip-row
+  filter/sort model, capture-style input, L2/Y binding.
+
+### Launcher mode
+
+Not covered in this pass — the SPEC sections for launcher (§2c "Launcher
+mode", the survey against Nova/Apex) already describe a task-first home,
+drawer and search; this pass found no code-level contradiction of that in
+the time available, but did not walk it live. Needs its own rig pass
+before a v2 subsection here is worth writing, rather than a desk-based
+guess about a stock-launcher-derived surface (`vendor/`-adjacent code,
+"hook or extend, do not rewrite").
+
+### Desktop mode
+
+Not walked live this pass either. The one code-visible pattern worth
+flagging for the rig pass: the Desktop taskbar carries its own direct
+"Settings" button straight to `SettingsDesktopFragment` (§ "One consistent
+way into Settings", above, calls this "a deliberate, non-duplicate
+distinction" from Global settings) — verify on-device that the two
+settings surfaces are visually distinguishable enough that a player
+opening "Settings" from the taskbar can tell it is Desktop-scoped, not
+"the" settings; the SPEC text asserts the distinction is deliberate but
+does not record a rig check of whether it reads that way.
+
+### Settings, everywhere
+
+**Today.** One `AppSettingsCatalogs.kt`-driven catalog per mode, search
+across all of them (`SettingsSearchIndex`), Quick Menu tiles as a live
+view of one `quickOnly` group, Accounts and sources / PC setup as
+catalog-registered screens.
+
+**What reads as accumulation:** the catalog is flat groups of rows;
+nothing in the code read this pass distinguishes "a setting most players
+touch once" (game folders, controller mapping) from "a setting only a
+person debugging something needs" (per-engine container internals,
+digest/plugin trust details, `## Debug-credentials pathway`-style rows).
+DESIGN-LANGUAGE's own lesson log already names this shape of problem
+repeatedly ("one concept, one name", "state belongs in the value column")
+but has no lesson yet about disclosure depth.
+
+**v2 direction:** an `advanced: Boolean` flag on the existing catalog row
+model (additive to `AppSettingsCatalogs.kt`, not a new screen type), with
+advanced rows collapsed behind a per-group "Advanced" row that expands in
+place — same `CatalogRowView`/`LazyColumn`, same search index (search
+still finds an advanced row by name; expanding is a display concern only,
+never a plugin-vs-official-style capability gate). This is additive to
+every mode's existing catalog rather than a second settings mechanism.
+
+### Onboarding
+
+Not re-audited this pass; DESIGN-LANGUAGE's lesson log already carries
+detailed, dated onboarding lessons (skip granted permissions, rationale
+before prompt, Back inside the flow, progress counted from the real
+pipeline) that read as already-applied fixes, not open problems. No new
+direction proposed without a live walk to check against those lessons.
+
+**Needs a rig check.** This whole section is directional, not verified:
+walk onboarding, Gaming (Art Book Next and decaffe), Launcher, Desktop
+(including Containers) and Settings everywhere by D-pad and touch on
+`emulator-5560`, screenshot each screen, and check specifically: the
+three-paths-to-system-settings claim above, whether the Desktop taskbar
+Settings button reads as Desktop-scoped versus Global, and whether
+`PcGameMenu`'s flat row list actually feels ungrouped to a first-time
+player or reads fine in practice. Log findings against this section and
+correct it — this is a starting hypothesis from the code, not a ledger.
