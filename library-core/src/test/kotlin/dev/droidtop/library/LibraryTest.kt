@@ -65,9 +65,10 @@ class LibraryTest {
         val wineProvider = FakeProvider(LibraryEntryKind.WINE_PROFILE, listOf(wineEntry))
         val library = Library(listOf(nativeProvider, wineProvider))
 
-        library.scanInBackground(LibraryEntryKind.entries.toSet())
+        library.rescanNow(LibraryEntryKind.entries.toSet())
         val entries = library.backgroundScanState(LibraryEntryKind.entries.toSet()).value ?: emptyList()
 
+        assertEquals(2, entries.size)
         assertTrue(entries.contains(nativeEntry))
         assertTrue(entries.contains(wineEntry))
     }
@@ -96,7 +97,7 @@ class LibraryTest {
 
         library.launch(nativeEntry)
         library.launch(nativeEntry)
-        library.scanInBackground(setOf(LibraryEntryKind.NATIVE_ANDROID_APP))
+        library.rescanNow(setOf(LibraryEntryKind.NATIVE_ANDROID_APP))
         val scanned = library.backgroundScanState(setOf(LibraryEntryKind.NATIVE_ANDROID_APP)).value ?: emptyList()
 
         assertEquals(listOf(nativeEntry.id, nativeEntry.id), playHistory.recordCalls)
@@ -132,7 +133,7 @@ class LibraryTest {
         assertEquals(true, library.toggleFavorite(wineEntry))
         assertEquals(setOf(wineEntry.id), favorites.ids)
 
-        library.scanInBackground(setOf(LibraryEntryKind.WINE_PROFILE))
+        library.rescanNow(setOf(LibraryEntryKind.WINE_PROFILE))
         val state = library.backgroundScanState(setOf(LibraryEntryKind.WINE_PROFILE))
         val entries = state.value?.filter { it.id == wineEntry.id }
         assertTrue(!entries.isNullOrEmpty())
@@ -222,7 +223,7 @@ class LibraryTest {
         // One game, named for the game it was asked from, with both folders
         // still in it; the newer version is what its card draws, so the
         // older card's history and favourite are there now.
-        library.scanInBackground(LibraryEntryKind.entries.toSet())
+        library.rescanNow(LibraryEntryKind.entries.toSet())
         val scanned = library.backgroundScanState(LibraryEntryKind.entries.toSet()).value ?: emptyList()
         val merged = LibraryGrouping.group(scanned).single()
         assertEquals("StarHarbor", merged.game.name)
