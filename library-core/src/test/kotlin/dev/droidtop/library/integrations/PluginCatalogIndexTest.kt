@@ -343,6 +343,7 @@ class PluginCatalogIndexTest {
         )!!
         assertEquals(newDigest, PluginCatalog.updateFor(index, record(oldDigest))?.manifestSha256)
         assertNull(PluginCatalog.updateFor(index, record(newDigest)))
-        assertNull(PluginCatalog.updateFor(index, record("f".repeat(64))))
+        // An installed build the catalog does not list (same id, other digest) is offered the newest stable (SPEC 12a).
+        assertEquals(newDigest, PluginCatalog.updateFor(index, record("f".repeat(64)))?.manifestSha256)
     }
 }
