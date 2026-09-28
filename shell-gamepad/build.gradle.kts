@@ -104,9 +104,4 @@ dependencies {
     implementation(libs.apng.gif)
 
     testImplementation(libs.junit)
-    // The library query model's saved-view and active-query persistence
-    // runs in JVM unit tests against org.json; android.jar's org.json is
-    // a throwing stub there, so the real library backs the tests (the
-    // same reasoning and version as library-core's own test classpath).
-    testImplementation("org.json:json:20240303")
 }
