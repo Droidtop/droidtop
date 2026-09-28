@@ -21,24 +21,6 @@ import kotlinx.coroutines.launch
  */
 object PluginEventBus {
     /**
-     * Fires [PluginEvent.DEFAULT_PLAYER_CHANGED] at every approved,
-     * enabled plugin that both declares [PluginCapability.APP_STATUS]
-     * (the capability [PluginEvent.DEFAULT_PLAYER_CHANGED]'s own doc
-     * comment ties job-reactions to) AND subscribed to that event id --
-     * [PluginCrashPolicy.notifyEvent] itself is the cheap early-out for
-     * everything else, so this is safe to call on every player change
-     * regardless of how many plugins are installed.
-     *
-     * A plugin's answer may ask droidtop to start a job in reaction
-     * (`values["startJob"]` names a [PluginCapability.id], `values["job"]`
-     * names the job, every OTHER returned value becomes that job's own
-     * args) -- read [PluginEvent.DEFAULT_PLAYER_CHANGED]'s doc comment
-     * for the exact shape. That job is tracked the normal way, through
-     * [PluginJobsCenter], so it shows up on the shared Jobs screen and
-     * any inline progress row exactly like a job the user started by
-     * hand.
-     */
-    /**
      * Fire-and-forget wrapper around [notifyDefaultPlayerChanged] for a
      * non-suspend call site -- [dev.droidtop.library.settings.ChoiceItem.onSelect]
      * (the player-choice row's own write path) is plain `(Context,
@@ -61,6 +43,24 @@ object PluginEventBus {
         }
     }
 
+    /**
+     * Fires [PluginEvent.DEFAULT_PLAYER_CHANGED] at every approved,
+     * enabled plugin that both declares [PluginCapability.APP_STATUS]
+     * (the capability [PluginEvent.DEFAULT_PLAYER_CHANGED]'s own doc
+     * comment ties job-reactions to) AND subscribed to that event id --
+     * [PluginCrashPolicy.notifyEvent] itself is the cheap early-out for
+     * everything else, so this is safe to call on every player change
+     * regardless of how many plugins are installed.
+     *
+     * A plugin's answer may ask droidtop to start a job in reaction
+     * (`values["startJob"]` names a [PluginCapability.id], `values["job"]`
+     * names the job, every OTHER returned value becomes that job's own
+     * args) -- read [PluginEvent.DEFAULT_PLAYER_CHANGED]'s doc comment
+     * for the exact shape. That job is tracked the normal way, through
+     * [PluginJobsCenter], so it shows up on the shared Jobs screen and
+     * any inline progress row exactly like a job the user started by
+     * hand.
+     */
     suspend fun notifyDefaultPlayerChanged(
         context: Context,
         systemId: String,
@@ -70,14 +70,7 @@ object PluginEventBus {
         playerPackage: String?,
         core: String?,
     ) {
-        val args = mapOf(
-            "systemId" to systemId,
-            "systemName" to systemName,
-            "playerId" to playerId,
-            "playerName" to playerName,
-            "playerPackage" to (playerPackage ?: ""),
-            "core" to (core ?: ""),
-        )
+        val args = defaultPlayerChangedArgs(systemId, systemName, playerId, playerName, playerPackage, core)
         val candidates = PluginStore.runnableFor(context, PluginCapability.APP_STATUS)
             .filter { PluginEvent.DEFAULT_PLAYER_CHANGED.id in it.manifest.subscribedEvents }
         if (candidates.isEmpty()) return
@@ -105,3 +98,28 @@ object PluginEventBus {
         }
     }
 }
+
+/**
+ * The exact args map [PluginEventBus.notifyDefaultPlayerChanged] delivers
+ * as [PluginEvent.DEFAULT_PLAYER_CHANGED]'s payload -- pulled out of the
+ * suspend dispatch (which needs a real [Context], the plugin store and a
+ * bound runtime) purely so the payload contract itself is unit-testable,
+ * the same way [dev.droidtop.library.consoles.usableEmulatorNames] is.
+ * All plain strings: a plugin reads them through PluginArgs, which has no
+ * null string, so an absent fact arrives as "" (no package, no core).
+ */
+internal fun defaultPlayerChangedArgs(
+    systemId: String,
+    systemName: String,
+    playerId: String,
+    playerName: String,
+    playerPackage: String?,
+    core: String?,
+): Map<String, String> = mapOf(
+    "systemId" to systemId,
+    "systemName" to systemName,
+    "playerId" to playerId,
+    "playerName" to playerName,
+    "playerPackage" to (playerPackage ?: ""),
+    "core" to (core ?: ""),
+)

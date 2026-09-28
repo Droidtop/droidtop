@@ -10123,8 +10123,30 @@ describes.
     fired from the one real write path that changes a system's default
     player (`AppSettingsCatalogs.playerChoiceItem`'s `onSelect`, via
     `PluginEventBus.notifyDefaultPlayerChangedAsync`) with the resolved
-    player's id/name/package and the system's own configured core
-    (`ConsoleSystemDef.retroArchCore`). A plugin's answer MAY ask
+    player's id/name/package and the core that player will actually
+    launch with. The `core` arg is the chosen entry's OWN core when its
+    `LIBRETRO` extra names one -- `libretroCoreId` (`library-core`
+    `consoles`) reads it out of the template with the same tokenizer
+    that builds the launch Intent, so both real `.so` shapes
+    (`<core>_libretro_android.so`, droidtop's own
+    `<core>_android.so`) reduce to the same buildbot core id. The real
+    case that demands it: psx's configured core is `mednafen_psx`
+    (platforms-database.json) while the players database's six
+    RetroArch entries each name theirs in the template, so choosing
+    "Retroarch - beetle psx hw" launches `mednafen_psx_hw` -- an event
+    reporting the system core would make a manager plugin ensure the
+    wrong core. Entries naming no core (the generated
+    `DefaultPlayers.retroArch` entry embeds the system's value, a
+    standalone emulator carries no LIBRETRO extra, and a malformed
+    template must never break the player-choice write path) fall back
+    to the per-system core setting, `ConsoleSystemDef.retroArchCore`;
+    an absent fact arrives as "" (no package, no core). The args map is
+    built by one internal function, `defaultPlayerChangedArgs`
+    (`PluginEventBus.kt`), so the payload contract is unit-tested
+    without a plugin runtime (`LibretroCoreIdTest`,
+    `DefaultPlayerChangedArgsTest`). This `core` semantics is
+    `PLUGIN_EVENT_CONTRACT_VERSION` 2 (1 always reported the system's
+    configured core). A plugin's answer MAY ask
     droidtop to start a job in reaction: `values["startJob"]` names a
     `PluginCapability.id`, `values["job"]` names the job, every OTHER
     returned value becomes that job's own args --
@@ -10133,7 +10155,7 @@ describes.
     job is tracked and shown exactly like a job the user started by
     hand. `droidtop-plugin-retroarch`'s `RetroArchPlugin.onEvent` is the
     first (and so far only) real subscriber: when the event names an
-    installed RetroArch package as the new player and the system's core
+    installed RetroArch package as the new player and the core
     isn't downloaded yet, it asks for `JOB_DOWNLOAD_CORE` -- the actual,
     cited reason this mechanism was built (`RetroArchPlugin` also gained
     a real `cancelJob` in the same change: it checks a cancellation flag

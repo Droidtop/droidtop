@@ -87,6 +87,55 @@ fun resolvePlayer(context: Context, system: ConsoleSystemDef, altEmulator: Strin
     return candidates.firstOrNull { it.id == overrideId } ?: candidates.firstOrNull()
 }
 
+// The `-e`/`--es` string-extra flags from AmStartCommandToIntentConverter's
+// own grammar -- only a LIBRETRO that follows one of these is the core
+// extra, never a same-named value of some other extra.
+private val STRING_EXTRA_FLAGS = setOf("-e", "--es")
+
+// RetroArch core `.so` naming, most specific first: buildbot (and the
+// players database's real entries) ship `<core>_libretro_android.so`,
+// while [DefaultPlayers.retroArch] writes `<core>_android.so` -- both
+// reduce to the same core id.
+private val LIBRETRO_CORE_SO_SUFFIXES = listOf("_libretro_android.so", "_android.so")
+
+/**
+ * The libretro core a player choice for a system actually means -- the
+ * `core` value [dev.droidtop.library.integrations.PluginEventBus] puts
+ * in the `default_player_changed` payload (docs/SPEC.md 12a), which is
+ * what a manager plugin uses to ensure the right core is downloaded.
+ *
+ * The chosen entry's OWN core first: a [Player.AmStart] carrying
+ * RetroArch's documented `LIBRETRO` extra names the exact core it will
+ * launch with, and that is not always the system-level default -- the
+ * real case is psx, whose configured core is `mednafen_psx`
+ * (platforms-database.json) while the players database's six real
+ * RetroArch entries each name theirs in the template, so choosing
+ * "Retroarch - beetle psx hw" launches `mednafen_psx_hw`, and an event
+ * reporting the system core would make a manager plugin ensure the
+ * wrong one. Read out with the same tokenizer that builds the launch
+ * Intent, so quoting and the `-e`/`--es` shapes stay one mechanism --
+ * and a template the tokenizer rejects (an unterminated quote, a
+ * `{file.inject:...}` with no game) degrades to the fallback instead of
+ * breaking the player-choice write path.
+ *
+ * [systemConfiguredCore] -- the per-system core setting,
+ * [ConsoleSystemDef.retroArchCore] -- is that fallback, for entries
+ * that name no core of their own: [DefaultPlayers.retroArch]'s
+ * generated entry embeds exactly that value in its template, and a
+ * standalone emulator carries no LIBRETRO extra at all.
+ */
+fun libretroCoreId(player: Player, systemConfiguredCore: String?): String? {
+    val template = (player as? Player.AmStart)?.argumentsTemplate ?: return systemConfiguredCore
+    val tokens = runCatching { AmStartCommandToIntentConverter.tokenize(template, null, null) }.getOrNull()
+        ?: return systemConfiguredCore
+    for (i in 1 until tokens.size) {
+        if (tokens[i] != "LIBRETRO" || tokens[i - 1] !in STRING_EXTRA_FLAGS || i + 1 >= tokens.size) continue
+        val so = File(tokens[i + 1]).name
+        LIBRETRO_CORE_SO_SUFFIXES.firstOrNull { so.endsWith(it) }?.let { return so.removeSuffix(it) }
+    }
+    return systemConfiguredCore
+}
+
 /**
  * Real emulator names from the players database's own labels, in order,
  * deduplicated.
