@@ -27,8 +27,11 @@ class F95CheckerImportTest {
     private fun watched(threadId: Long, name: String, version: String? = null, installed: String? = null) =
         F95CheckerImport.WatchedGame(threadId, name, version, installed)
 
-    private fun match(vararg watch: F95CheckerImport.WatchedGame, vararg entries: LibraryEntry) =
-        F95CheckerImport.match(watch.toList(), LibraryGrouping.group(entries.toList()))
+    // One vararg (Kotlin allows only one): watched games and library folders, in any order.
+    private fun match(vararg items: Any) = F95CheckerImport.match(
+        items.filterIsInstance<F95CheckerImport.WatchedGame>(),
+        LibraryGrouping.group(items.filterIsInstance<LibraryEntry>()),
+    )
 
     @Test
     fun `a name and version that match a game corroborate the pairing`() {

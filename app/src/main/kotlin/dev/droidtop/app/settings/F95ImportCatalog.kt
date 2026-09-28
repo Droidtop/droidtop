@@ -259,8 +259,6 @@ object F95ImportCatalog {
                 (if (unasked == 0) "" else "; $unasked new threads could not be asked about the index right now (they are asked again later)")
         }
 
-    private companion object {
-        /** How long the screen waits for a first library scan to publish before saying it is still running. */
-        const val WAIT_FOR_LIBRARY_MS = 15_000L
-    }
+    /** How long the screen waits for a first library scan to publish before saying it is still running. */
+    private const val WAIT_FOR_LIBRARY_MS = 15_000L
 }
