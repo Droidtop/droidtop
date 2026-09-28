@@ -159,6 +159,12 @@ class DesktopSessionService : Service() {
 
         val primary = try {
             findOrCreatePrimary(runtime, repository, provisioning)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // The session was stopped while the primary was still being
+            // made (the notification's Stop during the image download,
+            // the one phase long enough to press it in): that is not a
+            // failure to report either.
+            throw e
         } catch (t: Throwable) {
             fail("Couldn't create the primary container: ${t.message}", t)
             return
@@ -255,6 +261,13 @@ class DesktopSessionService : Service() {
     private suspend fun logContainerIdentity(runtime: ContainerRuntime, primary: Container) {
         val probe = runCatching {
             runtime.exec(primary, listOf("/bin/sh", "-c", "uname -m; . /etc/os-release && echo \"\$PRETTY_NAME\"; id -u"))
+        }
+        // runCatching would also swallow the session's own cancellation
+        // (the notification's Stop while the probe ran) as an exec
+        // failure, and connect() would walk on to the host bridge of a
+        // session that is being stopped. That is not a failure to report.
+        probe.exceptionOrNull()?.let { failure ->
+            if (failure is kotlinx.coroutines.CancellationException) throw failure
         }
         probe.onSuccess { result ->
             android.util.Log.i(
