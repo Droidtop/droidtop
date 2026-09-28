@@ -1098,6 +1098,9 @@ object AppSettingsCatalogs {
         val amazonSignedIn = withContext(Dispatchers.IO) {
             runCatching { app.gamenative.service.amazon.AmazonService.hasStoredCredentials(context) }.getOrDefault(false)
         }
+        val itchSignedIn = withContext(Dispatchers.IO) {
+            runCatching { app.gamenative.service.itch.ItchService.hasStoredCredentials(context) }.getOrDefault(false)
+        }
         val folders = withContext(Dispatchers.IO) { GamesRootPrefs.gamesRootPaths(context) }
 
         fun signedIn(yes: Boolean): String = if (yes) "Signed in" else "Not signed in yet"
@@ -1154,6 +1157,16 @@ object AppSettingsCatalogs {
                                     ctx,
                                     dev.droidtop.app.PcStoreSignInActivity.Store.AMAZON,
                                 ),
+                            )
+                        },
+                    ),
+                    ActionItem(
+                        id = "pc_store_itch",
+                        title = "itch.io",
+                        subtitle = "${signedIn(itchSignedIn)} - paste your personal API key from itch.io settings",
+                        run = { ctx ->
+                            ctx.startActivity(
+                                dev.droidtop.app.ItchSignInActivity.intent(ctx),
                             )
                         },
                     ),

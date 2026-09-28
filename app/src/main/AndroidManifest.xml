@@ -439,6 +439,9 @@
             android:name=".PcStoreSignInActivity"
             android:exported="false" />
         <activity
+            android:name=".ItchSignInActivity"
+            android:exported="false" />
+        <activity
             android:name=".PcContainerConfigActivity"
             android:exported="false"
             android:theme="@style/Theme.DroidTop.Dark"

@@ -6402,27 +6402,28 @@ tested services droidtop reaches none of:
 
 | Capability | Where it lives | User-visible value today |
 |---|---|---|
-| GOG library, auth, manifests, downloads, cloud saves | `service/gog/` (11 files) | none — invisible |
-| Epic, same shape | `service/epic/` (12 files) | none — invisible |
-| Amazon, same shape | `service/amazon/` (11 files) | none — invisible |
-| Loose/DRM-free Windows games in a folder | `utils/CustomGameScanner.kt` | none — invisible |
-| Per-game compatibility rating | `GameCompatibilityStatus` | none |
-| Automatic per-game workarounds | `gamefixes/` | none |
-| Playtime + last-played | `LibraryPlayHistoryDao` | none (playtime reads 0) |
-| Mods / Workshop | `mods/`, `workshop/` | none |
+| GOG library, auth, manifests, downloads, cloud saves | `service/gog/` (11 files) | wired — appears in PC library |
+| Epic, same shape | `service/epic/` (12 files) | wired — appears in PC library |
+| Amazon, same shape | `service/amazon/` (11 files) | wired — appears in PC library |
+| itch.io library, API key auth, downloads | `service/itch/` (10 files) | wired — appears in PC library |
+| Loose/DRM-free Windows games in a folder | `utils/CustomGameScanner.kt` | wired — appears in PC library |
+| Per-game compatibility rating | `GameCompatibilityStatus` | shown in detail |
+| Automatic per-game workarounds | `gamefixes/` | applied at launch |
+| Playtime + last-played | `LibraryPlayHistoryDao` | shown in detail |
+| Mods / Workshop | `mods/`, `workshop/` | not yet exposed |
 
-`data/LibraryItem.kt` + `GameSource` (STEAM, GOG, EPIC, AMAZON,
+`data/LibraryItem.kt` + `GameSource` (STEAM, GOG, EPIC, AMAZON, ITCH,
 CUSTOM_GAME) is already the unified model, and `sync/FrontendSyncManager`
 exists specifically to publish installed games to a frontend launcher
-like ES-DE. droidtop **is** that frontend, in-process — so it should read
+like ES-DE. droidtop **is** that frontend, in-process — so it reads
 the DAOs directly rather than consume that manager's exported file drops.
 
 So the gap was never "droidtop cannot discover Windows games." It is that
 `PcGameProvider.scan()` reads Wine container shortcuts and `SteamAccess`
 wraps `SteamService` alone. Everything else is built and unplugged.
 
-Not present upstream, genuinely absent: **itch.io** (the keyword hits are
-`switch`/`IconSwitcher`). Origin/Uplay unverified.
+itch.io is now wired alongside the other stores (API key auth, not OAuth).
+Origin/Uplay unverified.
 
 ### What is best for users, concretely
 
@@ -7917,7 +7918,7 @@ instead of offering a launch that cannot work. Root remains desktop-only.
   Room database and DataStore out of `/data/data/app.gamenative`, which
   no non-root app can read, and Android offers no sanctioned hand-off of
   another app's private data. It is deleted, with its settings rows.
-  Signing in to Steam/GOG/Epic/Amazon in droidtop rebuilds the library.
+  Signing in to Steam/GOG/Epic/Amazon/itch.io in droidtop rebuilds the library.
 
 ### Views
 
@@ -8000,7 +8001,7 @@ similar name is a suggestion, not an automatic identity, so it is never
 guessed.
 
 **First run.** An empty PC library offers concrete repairs — sign in to a
-store, add a games folder, set up Windows games, see what is downloading
+store (Steam, GOG, Epic, Amazon, itch.io), add a games folder, set up Windows games, see what is downloading
 — never an empty grid. They are optional, skippable, and reachable again
 from the surface's options menu, which is the SAME list: implementation
 showed that "three first-run cards" and "the options menu" were the same
@@ -8072,7 +8073,8 @@ Those entry points are `:app` Activities, because the Gaming shell
 cannot depend on `:app` and these screens are Compose UI rather than
 catalog data: the store's own app screen for one game (which brings its
 install, verify, update, DLC and delete dialogs with it), the downloads
-queue, an OAuth shim per store, and the container-configuration dialog.
+queue, an OAuth shim per store (Steam QR/password, GOG/Epic/Amazon OAuth,
+itch.io API key), and the container-configuration dialog.
 Which container a game's prefix row opens is droidtop's own question and
 has one answer shared with the launch path — the game's own prefix when a
 store app id keyed one, droidtop's single provisioned container otherwise
