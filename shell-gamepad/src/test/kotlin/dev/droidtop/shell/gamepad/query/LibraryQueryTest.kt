@@ -184,10 +184,17 @@ class LibraryQueryTest {
 
     @Test
     fun `update, artwork, hidden and favourites facets read the entry's own flags`() {
-        val updating = game("updating", availableUpdate = "1.1")
+        // Every entry but `artless` carries real art -- the MISSING_ART
+        // check needs at least one entry WITH artworkUri to actually be a
+        // test: `game()` defaults artworkUri to null, so leaving these
+        // three at the default made every entry in `base` "missing art"
+        // and the assertion below passed only by accident of list order
+        // (real bug this fixes, caught live: CI's own testDebugUnitTest,
+        // 2026-09-28).
+        val updating = game("updating", availableUpdate = "1.1", artworkUri = "art://updating")
         val artless = game("artless", artworkUri = null)
-        val hidden = game("hidden", hidden = true)
-        val favourite = game("favourite", favorite = true)
+        val hidden = game("hidden", hidden = true, artworkUri = "art://hidden")
+        val favourite = game("favourite", favorite = true, artworkUri = "art://favourite")
 
         val base = listOf(updating, artless, hidden, favourite)
         assertEquals(

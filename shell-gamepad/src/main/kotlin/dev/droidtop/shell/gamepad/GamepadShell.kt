@@ -50,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
@@ -1413,16 +1414,26 @@ private fun SectionTabBar(
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier
                         .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
-                        // Deliberately NOT focusable (owner, 2026-09-27:
-                        // "the D-pad must NEVER be able to reach the top
-                        // bar"). Before this, Compose's own default 2D
-                        // focus search could land Up here from the first
-                        // row of a themed carousel or grid -- reachable
-                        // ONLY by touch (this clickable) or by L1/R1/Page
-                        // Up/Page Down (selectSection, in the shell's own
-                        // onKeyEvent), never by directional search. No
-                        // focus ring is possible here any more, so the
-                        // current tab keeps only its raised fill.
+                        // Deliberately NOT a directional-search target
+                        // (owner, 2026-09-27: "the D-pad must NEVER be
+                        // able to reach the top bar"; still reproduced
+                        // live 2026-09-28, Droidtop/tracker#1, uiautomator
+                        // dump showing the "Games" label itself focused).
+                        // The comment this replaced claimed plain
+                        // `.clickable()` was enough because the label was
+                        // "deliberately NOT focusable" -- wrong:
+                        // `Modifier.clickable` always chains its own
+                        // internal `.focusable()` so hardware keyboards
+                        // can activate it, which is exactly the node
+                        // Compose's default 2D focus search picked up Up
+                        // from the first row of any list. `canFocus =
+                        // false` ahead of the clickable in the same chain
+                        // (same fix already used for the touch hint bar,
+                        // TouchActions.kt's own TouchHint) makes the node
+                        // itself unfocusable while leaving the tap
+                        // intact; L1/R1/Page Up/Page Down remain the only
+                        // D-pad route.
+                        .focusProperties { canFocus = false }
                         .clickable(onClick = { onSelect(entrySection) })
                         .then(
                             if (isCurrent) {
@@ -1450,6 +1461,11 @@ private fun SectionTabBar(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier
                 .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
+                // Same reasoning and same fix as the tab labels just
+                // above: `.clickable()` alone is a directional-search
+                // target, and this pill sits right beside them in the
+                // top bar the D-pad must never reach.
+                .focusProperties { canFocus = false }
                 .clickable(onClick = onQuickMenu),
         ) {
             Text(
@@ -2261,13 +2277,23 @@ private fun GamesSection(
                         // inside a gamelist plays SCROLLSOUND (GamelistBase.
                         // cpp:133/174/182 and every primary component when
                         // hosted in a gamelist, CarouselComponent.h:105-108).
+                        // Clamped, not wrapped (Droidtop/tracker#1): real
+                        // ES-DE builds a textlist with
+                        // ListLoopType::LIST_PAUSE_AT_END (see
+                        // EsDeTextList's own `step`, EsDeSystemListView.kt),
+                        // so a themeless/widgetless gamelist -- this
+                        // headless path -- must answer the same way. The
+                        // old `% size` wraparound jumped straight to the
+                        // last game on an Up press at the first row, which
+                        // read exactly like "Up escaped the list" even
+                        // though focus itself never left it.
                         EsDeNavigationSounds.play("scroll")
-                        focusedGameIndex = (focusedGameIndex - 1 + systemGamesForGroup.size) % systemGamesForGroup.size
+                        focusedGameIndex = (focusedGameIndex - 1).coerceAtLeast(0)
                         true
                     }
                     action == GamepadAction.DOWN && group != null && group !is GameGroup.Pc && themed && !gamelistHasListWidget && systemGamesForGroup.isNotEmpty() -> {
                         EsDeNavigationSounds.play("scroll")
-                        focusedGameIndex = (focusedGameIndex + 1) % systemGamesForGroup.size
+                        focusedGameIndex = (focusedGameIndex + 1).coerceAtMost(systemGamesForGroup.size - 1)
                         true
                     }
                     action == GamepadAction.A && group != null && group !is GameGroup.Pc && themed && !gamelistHasListWidget -> {

@@ -262,20 +262,31 @@ object LibraryViewPrefs {
             )
         }.getOrNull() ?: LibraryQuery()
     }
-    /** Pure, for the JVM tests. */
+    /**
+     * Pure, for the JVM tests. A JSONArray, not a name-keyed JSONObject:
+     * `org.json:json`'s own JSONObject does not promise its `keys()`
+     * iteration order matches insertion order (confirmed live -- the
+     * round trip test below caught it reordering two views), and this
+     * list's own order is a real, stated guarantee ("saved views keep
+     * their order").
+     */
     internal fun encodeViews(views: List<NamedLibraryView>): String {
-        val json = JSONObject()
-        views.forEach { view -> json.put(view.name, JSONObject(encodeQuery(view.query))) }
-        return json.toString()
+        val array = org.json.JSONArray()
+        views.forEach { view ->
+            array.put(JSONObject().put("name", view.name).put("query", JSONObject(encodeQuery(view.query))))
+        }
+        return array.toString()
     }
 
-    /** Pure, for the JVM tests. */
+    /** Pure, for the JVM tests. A JSONObject from before this format is simply empty, never an error. */
     internal fun decodeViews(raw: String?): List<NamedLibraryView> {
         if (raw.isNullOrBlank()) return emptyList()
         return runCatching {
-            val json = JSONObject(raw)
-            json.keys().asSequence().toList().mapNotNull { name ->
-                val query = json.optJSONObject(name)?.toString()?.let { decodeQuery(it) } ?: return@mapNotNull null
+            val array = org.json.JSONArray(raw)
+            (0 until array.length()).mapNotNull { i ->
+                val entry = array.optJSONObject(i) ?: return@mapNotNull null
+                val name = entry.optString("name").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                val query = entry.optJSONObject("query")?.toString()?.let { decodeQuery(it) } ?: return@mapNotNull null
                 NamedLibraryView(name, query)
             }
         }.getOrDefault(emptyList())
