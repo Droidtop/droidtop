@@ -9924,15 +9924,142 @@ hold this to "enhancement, not mechanism" (owner directive, 2026-09-25):
    for anything they do; only plugin code that explicitly asked, and was
    explicitly granted, ever calls into it.
 
-**Install sources.** Today: a user-picked file through the system picker
-(`PluginStore.importFromPicker`), the same "Add integration file" shape
-§12's JSON half already uses. A catalog-repo source — the "official
-origin + third-party key" idea droidtop-platforms already uses for its
-own lists — fits the same shape later (an origin is already a first-class
-concept in the manifest and the pinned-key map) but is not built: nothing
-today resolves a plugin id against a remote catalog, so adding one is a
-`PluginOriginKeys` entry and a fetch step in front of the same install
-path, not a redesign.
+**The catalog (built 2026-09-28).** The second install source, beside
+the file picker `PluginStore.importFromPicker` still offers, is the
+catalog: built in droidtop's own code against its own trust rules, not
+Enginehost's. It mirrors Enginehost's plugin catalog
+(`plugins/index.json` in the same droidtop-platforms repo) conceptually —
+one small index file listing what has been published, fetched from
+`raw.githubusercontent.com` with no API allowance, a signed bundle per
+release, the signature verified against a pinned key before anything is
+trusted — but the trust model stays the one this section already fixed:
+droidtop pins its own keys, a plugin must be approved before it runs, and
+what the index says is display data, never a trust decision.
+
+- **The index** is `droidtop-plugins/index.json` in droidtop-platforms,
+  a sibling of Enginehost's `plugins/index.json` in the same repo (same
+  distribution story: one file, one raw URL, the same platform-database
+  base-URL override the app already has for that repository applies to it).
+  Its format (schema version 1):
+
+      {
+       "schemaVersion": 1,
+       "generatedAt": "<ISO-8601 UTC>",
+       "origins": [
+        {
+         "origin": "<the manifest origin id, e.g. droidtop>",
+         "trust": "official" | "third-party",
+         "key": {
+          "formatVersion": 1,
+          "algorithm": "SHA256withECDSA",
+          "origin": "<the same origin id>",
+          "publicKeySpki": "<base64 SubjectPublicKeyInfo, EC P-256>",
+          "keySha256": "<hex SHA-256 of the DER>"
+         },
+         "plugins": [
+          {
+           "id": "<origin>.<name>, the plugin id>",
+           "label": "<display name, from the signed manifest>",
+           "description": "<one line, or null>",
+           "releases": [
+            {
+             "version": "<the manifest's version string>",
+             "stream": "stable" | "testing" | "unstable",
+             "publishedAt": "<ISO-8601 UTC, or null>",
+             "manifestSha256": "<hex SHA-256 of the signed manifest.json bytes>",
+             "bundle": {
+              "name": "<file name>",
+              "url": "<https download URL>",
+              "size": <bytes>,
+              "sha256": "<hex SHA-256 of the whole .droidplugin.tar.xz>"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+
+  Everything in it is UNTRUSTED: a tampered index can only hide entries,
+  lie about labels, or point at a download whose own bytes still have to
+  verify (the whole-file SHA-256 against the index's `sha256`, then the
+  bundle's manifest signature against the pinned key and every payload
+  hash, inside the existing install path) before any of it is acted on —
+  the same "the index can make the catalog fast or stale, not lying"
+  posture Enginehost's own index lives by. The `key` block is
+  cross-checked, not trusted: an origin is offered at all only when this
+  build of droidtop pins a key for it (`PluginOriginKeys`) AND the
+  index's `keySha256` matches that pin's own fingerprint, so a tampered
+  index cannot rebind a pinned origin to a new key; an origin whose key
+  this build does not pin is listed but not installable. (Pinning a new
+  origin is an app change today — a `PluginOriginKeys` entry — and the
+  Enginehost-style offline root that certifies new origins without an app
+  change remains the deferred step §12a already noted for
+  `PluginOriginKeys` itself, now with a real second use.) An index with
+  an unknown `schemaVersion` is refused whole (a newer format is not
+  guessed at), the same validate-before-replace posture as the platform
+  databases.
+- **What the catalog offers.** Only `stable`-stream releases: a plugin's
+  offer is its newest stable release by `publishedAt`, and droidtop never
+  offers a testing/unstable release for install or update (the index may
+  carry them; this build does not act on them). An installed plugin has
+  an UPDATE when the newest stable release's `manifestSha256` differs
+  from the installed record's `archiveDigest` — version strings are
+  deliberately not compared, the digest is the identity. An installed
+  plugin with no catalog entry at all (side-loaded through the file
+  picker) has no catalog update; that path is unchanged.
+- **Trust over updates.** This is the one rule the catalog changed in
+  this section's own checklist (point 4): approval was previously bound
+  to the exact archive digest and never carried over to new bytes. Now
+  approval is bound to the plugin's identity under a key — the record
+  stores the fingerprint of the key it was approved against
+  (`PluginRecord.approvedKeySha256`) alongside the digest — so an update
+  whose signature verifies against the SAME pinned key carries the
+  APPROVED state (and the enabled/root-approved bits) over to the new
+  digest in one step. That is the point of a catalog: the user already
+  decided to trust this plugin from this origin, and re-asking on every
+  byte change would turn every update into a second approval ceremony.
+  What does NOT carry over: a DENIED state (the user said no to this
+  plugin; its update re-enters at PENDING like a first install), an
+  update signed by a DIFFERENT key (a rotation is a new trust decision),
+  and a first install (nothing to carry). Records written by builds
+  before this rule have no key fingerprint and get no carry-over on their
+  first update — one re-approval, the safe direction.
+- **The flow.** Settings → App integrations → Plugins, the one tidy
+  settings area — no new top-level surface, no per-origin screens
+  (an origin is a detail on a row, the same as it is on the installed
+  rows today). The installed list comes first exactly as before, with
+  (a) an "Update <label>" row under each installed plugin that has an
+  update, (b) an "Update all (N)" row when N of them do, and (c) an
+  "Add" row that opens the catalog screen: one row per catalog plugin —
+  label, description and version, the row's own action being Install
+  (not installed), Update to <version> (an update is available), or no
+  action at all with "Installed <version>" in the value column (current);
+  unpinned-origin plugins and plugins with no stable release yet are
+  listed without an action and say why. The file-picker "Install plugin
+  file" row stays, for bundles the catalog does not list. Install and
+  update are the SAME download-verify-install path (`PluginCatalog.
+  install`): fetch to cache, whole-file SHA-256 against the index's
+  `sha256` first, then the existing `PluginBundleInstaller` validation in
+  full, so a catalog bundle gets no shortcut past signature/hash checks;
+  a new id lands PENDING and asks for approval on the plugins screen the
+  way a picked file does. "Update all" runs the same path per plugin,
+  reports each one's result, and says so in its summary.
+- **Staleness.** The last successfully fetched index is kept in
+  `filesDir/plugin-catalog/index.json`; the catalog screen re-fetches on
+  entry when that copy is missing or more than an hour old, and always
+  offers a manual refresh row; a failed refresh falls back to the copy
+  and says which one it is showing. "Update all" fetches fresh itself
+  before comparing. The index is a snapshot and says when it was made
+  (`generatedAt`), the same posture Enginehost's index has.
+- **Not built:** the droidtop-platforms side that populates
+  `droidtop-plugins/index.json` (its own generator and workflow,
+  mirroring `generator/plugins_index.py`, in that repository — until it
+  exists the app's catalog is empty and the file-picker path is the only
+  install source, which is a working state, not a broken one); the
+  deferred droidtop root key that would certify new origins without an
+  app change; and offering testing/unstable streams.
 
 **The trust-boundary checklist** (unchanged in substance from the
 2026-09-02 text, now checked against `PluginBundleInstaller` and
@@ -9952,13 +10079,20 @@ path, not a redesign.
    contract version, both ABIs when native libraries ship. A plugin that
    fails any step never has its code loaded, not even to ask it to
    describe itself.
-4. Signing is real, not a placeholder gesture: ECDSA P-256/SHA-256 over
-   the exact manifest bytes, verified against a per-origin pinned public
-   key (`BundleSignature`, `PluginOriginKeys`). Approval is bound to the
-   exact archive digest (`PluginRecord.archiveDigest`, a SHA-256 over the
-   signed manifest) and never carries over to a new digest — an update
-   with different bytes starts back at PENDING, even for an id already
-   approved.
+ 4. Signing is real, not a placeholder gesture: ECDSA P-256/SHA-256 over
+    the exact manifest bytes, verified against a per-origin pinned public
+    key (`BundleSignature`, `PluginOriginKeys`). Approval is bound to the
+    plugin's identity under a key, not to one byte-string: the record
+    stores the digest it was verified against
+    (`PluginRecord.archiveDigest`, a SHA-256 over the signed manifest)
+    AND the fingerprint of the key approval was bound to
+    (`PluginRecord.approvedKeySha256`). A re-install of the exact same
+    bytes keeps its state; an update with different bytes keeps it too
+    when the new bundle's signature verifies against the SAME pinned key
+    (the catalog's whole job, "The catalog" above), and starts back at
+    PENDING when the key differs, when the origin differs, or when the
+    plugin was never APPROVED in the first place. A DENIED state never
+    carries over under any digest.
 5. droidtop treats what a plugin returns as untrusted input: every
    binder payload is capped (`PluginRunner.MAX_RESULT_BYTES`, 256 KiB),
    parsed against the capability's own shape, and never used as a path,
@@ -9972,6 +10106,8 @@ path, not a redesign.
 
 **What is built vs. open.** Built: the manifest format and validation,
 signing/hashing, install/uninstall/enable/approve, the approval screen,
+the plugin catalog (the droidtop-platforms index, install/update/Update
+all from Settings → Plugins, "The catalog" above),
 the `native_bundle` runner (isolated process, binder API, crash
 containment via `PluginCrashPolicy`), the job shape, the `python` runner
 (`PythonRuntimeManager`, the `plugin-host/native` dlopen bridge,
@@ -9988,11 +10124,10 @@ does. The `flutter_embed` runner (`FlutterRuntimeManager`,
 `FlutterDroidtopPlugin`, above) and its own sample
 (`samples/plugin-sample-flutter-statustile`) are built and rig-verified
 the same way (`dq-flutterembed-01` — see "The `flutter_embed` kind"
-below), including `startJob` (built 2026-09-26, above). Open: a
-catalog-repo install source for plugins; `startJob` support for
-python-kind plugins; and the rig check for the python leg specifically
-(queued, `device/QUEUE.md`) — the `native_bundle` leg's own rig check
-(`dq-plugins-01`) already passed.
+below), including `startJob` (built 2026-09-26, above). Open:
+`startJob` support for python-kind plugins; and the rig check for the
+python leg specifically (queued, `device/QUEUE.md`) — the
+`native_bundle` leg's own rig check (`dq-plugins-01`) already passed.
 
 **The rest of the plugin API finally has real UI callers (built
 2026-09-27).** Until this change, `settings_rows`, `app_status` and
