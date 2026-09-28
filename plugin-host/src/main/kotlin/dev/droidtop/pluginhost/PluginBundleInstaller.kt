@@ -130,17 +130,39 @@ object PluginBundleInstaller {
         }
 
         val digest = BundleSignature.sha256(manifestBytes)
+        // The key this bundle verified against is the origin's pinned key
+        // (the signature check above refused the install otherwise), so
+        // its fingerprint is exactly what "signed by the same key" means
+        // for the carry-over rule below.
+        val keyFingerprint = BundleSignature.keyFingerprintFor(manifest.origin).orEmpty()
+        // Approval carries over to an update signed by the SAME key the
+        // plugin was approved under (docs/SPEC.md 12a, "Trust over
+        // updates"): a re-install of the exact same bytes keeps whatever
+        // state it had, and a different digest keeps APPROVED -- with its
+        // enabled and root-approved bits -- when it verifies against that
+        // same pinned key. Everything else starts PENDING: a first
+        // install, an update of a plugin that was only ever PENDING, an
+        // update signed by a different key (a rotation is a new trust
+        // decision), and any update of a DENIED plugin (the user said no;
+        // it re-enters at PENDING).
+        val sameBytes = existingState?.archiveDigest == digest
+        val carriedOver = sameBytes || (
+            existingState?.trust == PluginTrustState.APPROVED &&
+                existingState.manifest.origin == manifest.origin &&
+                existingState.approvedKeySha256.isNotEmpty() &&
+                existingState.approvedKeySha256 == keyFingerprint
+            )
         val record = PluginRecord(
             manifest = manifest,
             archiveDigest = digest,
-            // A digest already approved (a re-install of the exact same
-            // bytes) stays approved; anything else -- first install, or
-            // an update with a different digest -- starts PENDING.
-            // Checklist point 4: "approval that never carries over to a
-            // new digest".
-            trust = if (existingState?.archiveDigest == digest) existingState.trust else PluginTrustState.PENDING,
-            enabled = existingState?.archiveDigest == digest && existingState.enabled,
-            rootApproved = existingState?.archiveDigest == digest && existingState.rootApproved,
+            approvedKeySha256 = keyFingerprint,
+            trust = when {
+                sameBytes -> existingState!!.trust
+                carriedOver -> PluginTrustState.APPROVED
+                else -> PluginTrustState.PENDING
+            },
+            enabled = carriedOver && existingState!!.enabled,
+            rootApproved = carriedOver && existingState!!.rootApproved && manifest.requestsRoot,
             disabledReason = null,
         )
         writeRecord(pluginsRoot, record)

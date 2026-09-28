@@ -29,8 +29,9 @@ class PluginBundleInstallerTest {
         manifestOverride: (JSONObject) -> Unit = {},
         tamperPayloadAfterSigning: Boolean = false,
         includeExtraUndeclaredFile: Boolean = false,
+        payloadBytes: ByteArray = classesJarBytes,
     ): File {
-        val classesSha = BundleSignature.sha256(classesJarBytes)
+        val classesSha = BundleSignature.sha256(payloadBytes)
         val manifestJson = JSONObject().apply {
             put("id", "$origin.sample-statustile")
             put("origin", origin)
@@ -50,7 +51,7 @@ class PluginBundleInstallerTest {
         }.sign()
         val signatureBase64 = Base64.getEncoder().encodeToString(signature)
 
-        val payloadBytes = if (tamperPayloadAfterSigning) "tampered!".toByteArray() else classesJarBytes
+        val actualPayloadBytes = if (tamperPayloadAfterSigning) "tampered!".toByteArray() else payloadBytes
 
         val out = ByteArrayOutputStream()
         TarArchiveOutputStream(XZCompressorOutputStream(out)).use { tar ->
@@ -63,7 +64,7 @@ class PluginBundleInstallerTest {
             }
             putEntry("manifest.json", manifestBytes)
             putEntry("manifest.sig", signatureBase64.toByteArray())
-            putEntry("classes.jar", payloadBytes)
+            putEntry("classes.jar", actualPayloadBytes)
             if (includeExtraUndeclaredFile) putEntry("sneaky.jar", "extra".toByteArray())
         }
         val file = tmp.newFile("bundle-${System.nanoTime()}.droidplugin.tar.xz")
@@ -176,6 +177,109 @@ class PluginBundleInstallerTest {
             edited.writeBytes("edited on disk".toByteArray())
             val problem = PluginBundleInstaller.verifyInstalled(pluginsRoot, record)
             assertTrue(problem != null && problem.reason.contains("classes.jar"))
+        }
+    }
+
+    /** Simulates the approval screen: the one place allowed to move a record PENDING -> APPROVED. */
+    private fun approve(pluginsRoot: File, record: PluginRecord, enabled: Boolean = true, rootApproved: Boolean = false) {
+        PluginBundleInstaller.writeRecord(
+            pluginsRoot,
+            record.copy(trust = PluginTrustState.APPROVED, enabled = enabled, rootApproved = rootApproved),
+        )
+    }
+
+    @Test
+    fun `an update signed by the same key carries approval over to the new digest`() {
+        val pair = freshKeyPair()
+        val pluginsRoot = tmp.newFolder("plugins")
+        PluginOriginKeys.withOrigin("testorigin", Base64.getEncoder().encodeToString(pair.public.encoded)) {
+            val installed = PluginBundleInstaller.install(buildBundle("testorigin", pair.private), pluginsRoot)
+            val first = (installed as PluginInstallResult.Installed).record
+            approve(pluginsRoot, first)
+            // A genuinely different digest: new payload bytes, same signer.
+            val updated = buildBundle("testorigin", pair.private, payloadBytes = "payload, version two".toByteArray())
+            val result = PluginBundleInstaller.install(updated, pluginsRoot)
+            val record = (result as PluginInstallResult.Installed).record
+            assertTrue(record.archiveDigest != first.archiveDigest)
+            assertEquals(PluginTrustState.APPROVED, record.trust)
+            assertTrue(record.enabled)
+        }
+    }
+
+    @Test
+    fun `an update signed by a different key does not carry approval over`() {
+        val pair = freshKeyPair()
+        val rotated = freshKeyPair()
+        val pluginsRoot = tmp.newFolder("plugins")
+        PluginOriginKeys.withOrigin("testorigin", Base64.getEncoder().encodeToString(pair.public.encoded)) {
+            val installed = PluginBundleInstaller.install(buildBundle("testorigin", pair.private), pluginsRoot)
+            approve(pluginsRoot, (installed as PluginInstallResult.Installed).record)
+        }
+        // The origin now publishes a different key: a rotation is a new trust decision.
+        PluginOriginKeys.withOrigin("testorigin", Base64.getEncoder().encodeToString(rotated.public.encoded)) {
+            val updated = buildBundle("testorigin", rotated.private, payloadBytes = "payload, version two".toByteArray())
+            val result = PluginBundleInstaller.install(updated, pluginsRoot)
+            val record = (result as PluginInstallResult.Installed).record
+            assertEquals(PluginTrustState.PENDING, record.trust)
+        }
+    }
+
+    @Test
+    fun `an update of a denied plugin does not carry the denial state over, but never approves either`() {
+        val pair = freshKeyPair()
+        val pluginsRoot = tmp.newFolder("plugins")
+        PluginOriginKeys.withOrigin("testorigin", Base64.getEncoder().encodeToString(pair.public.encoded)) {
+            val installed = PluginBundleInstaller.install(buildBundle("testorigin", pair.private), pluginsRoot)
+            val first = (installed as PluginInstallResult.Installed).record
+            PluginBundleInstaller.writeRecord(pluginsRoot, first.copy(trust = PluginTrustState.DENIED, enabled = false))
+            val updated = buildBundle("testorigin", pair.private, payloadBytes = "payload, version two".toByteArray())
+            val result = PluginBundleInstaller.install(updated, pluginsRoot)
+            val record = (result as PluginInstallResult.Installed).record
+            assertEquals(PluginTrustState.PENDING, record.trust)
+        }
+    }
+
+    @Test
+    fun `root approval carries over to an update that still requests root, and drops when it stops`() {
+        val pair = freshKeyPair()
+        val pluginsRoot = tmp.newFolder("plugins")
+        val requestsRoot: (JSONObject) -> Unit = { json -> json.put("requestsRoot", true) }
+        PluginOriginKeys.withOrigin("testorigin", Base64.getEncoder().encodeToString(pair.public.encoded)) {
+            val installed = PluginBundleInstaller.install(
+                buildBundle("testorigin", pair.private, manifestOverride = requestsRoot),
+                pluginsRoot,
+            )
+            approve(pluginsRoot, (installed as PluginInstallResult.Installed).record, rootApproved = true)
+
+            val stillAsking = buildBundle(
+                "testorigin",
+                pair.private,
+                manifestOverride = requestsRoot,
+                payloadBytes = "payload, version two".toByteArray(),
+            )
+            val record = (PluginBundleInstaller.install(stillAsking, pluginsRoot) as PluginInstallResult.Installed).record
+            assertEquals(PluginTrustState.APPROVED, record.trust)
+            assertTrue(record.rootApproved)
+
+            val stoppedAsking = buildBundle("testorigin", pair.private, payloadBytes = "payload, version three".toByteArray())
+            val after = (PluginBundleInstaller.install(stoppedAsking, pluginsRoot) as PluginInstallResult.Installed).record
+            assertEquals(PluginTrustState.APPROVED, after.trust)
+            assertTrue(!after.rootApproved)
+        }
+    }
+
+    @Test
+    fun `a re-install of the exact same bytes keeps its existing state, approved or denied`() {
+        val pair = freshKeyPair()
+        val pluginsRoot = tmp.newFolder("plugins")
+        PluginOriginKeys.withOrigin("testorigin", Base64.getEncoder().encodeToString(pair.public.encoded)) {
+            val installed = PluginBundleInstaller.install(buildBundle("testorigin", pair.private), pluginsRoot)
+            val first = (installed as PluginInstallResult.Installed).record
+            approve(pluginsRoot, first)
+            val reinstalled = (PluginBundleInstaller.install(buildBundle("testorigin", pair.private), pluginsRoot) as PluginInstallResult.Installed).record
+            assertEquals(first.archiveDigest, reinstalled.archiveDigest)
+            assertEquals(PluginTrustState.APPROVED, reinstalled.trust)
+            assertTrue(reinstalled.enabled)
         }
     }
 }

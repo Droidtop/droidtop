@@ -11,9 +11,9 @@ enum class PluginTrustState {
     /** Installed and validated, waiting on the approval screen. Never run. */
     PENDING,
 
-    /** The user approved this exact archive digest. Runs, unless [PluginRecord.enabled] is false or [PluginRecord.rootApproved] is required and missing. */
+    /** The user approved this plugin under the key recorded in [PluginRecord.approvedKeySha256] -- an update whose signature verifies against that same pinned key carries the approval over to its new digest (docs/SPEC.md 12a, "Trust over updates"), a different key or a first install does not. Runs, unless [PluginRecord.enabled] is false or [PluginRecord.rootApproved] is required and missing. */
     APPROVED,
 
-    /** The user explicitly declined it. Never re-offered for the same digest; a new digest (an update) is a new approval. */
+    /** The user explicitly declined it. The state never carries over: an update (a new digest) re-enters at PENDING and needs a fresh approval, whatever key signed it. */
     DENIED,
 }
