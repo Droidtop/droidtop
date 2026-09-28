@@ -356,6 +356,8 @@ it plus the integrations only that surface can offer.
 | Crash reporting | `CrashReporting`, `LauncherApplication` |
 | Keeping the index honest over time: the slow rebuild pass (§7g) | `Library` (`:library-core`) |
 
+`GameLaunchActivity` is not exported (`android:exported="false"`, 2026-09-28): every internal caller uses an explicit component intent or the library's direct `launchInBackground`, so no external package needs direct access. The index-backed lookup (c35c36f4) makes the surface safe to narrow.
+
 The slow rebuild pass is core, not Gaming's: every surface that shows the
 library reads the same index (the Launcher's Games grid, Gaming's rows,
 Desktop's objects), and it runs only while one of them is observing the
