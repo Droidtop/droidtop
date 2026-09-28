@@ -106,6 +106,7 @@ class ProotRuntime(
     private val log = ContainerLog(context)
     private val processes = ProotProcesses()
     private val names = ContainerNames(File(baseDir, ContainerNames.FILE_NAME))
+    private val audioServer = HostAudioServer(context)
 
     override val siblingsNeedStart: Boolean = false
 
@@ -196,6 +197,12 @@ class ProotRuntime(
             // look like a live compositor to the wait below.
             socketsDir.listFiles()?.forEach { if (!it.isDirectory) it.delete() }
             writeNetworkFiles()
+            // Audio never holds up the desktop, same rule as a daemon
+            // inside the container (ContainerLayout.primaryInitScript,
+            // dq-desk2-01): a program that dials PULSE_SERVER before this
+            // is up just finds nothing listening, same as CUPS off.
+            audioServer.start(File(socketsDir, ContainerLayout.AUDIO_SOCKET).absolutePath)
+                ?.let { log.line("${container.id}: audio bridge did not start: $it") }
         }
 
         val script = ContainerLayout.primaryInitScript(plan)
@@ -274,24 +281,25 @@ class ProotRuntime(
         names.named(found)
     }
 
-    /** Read from [configOf]'s own KEY_SOCKET_WAYLAND -- audio has no proot bridge at all, see [audioSharingUnavailableReason]. */
+    /** Read from [configOf]'s own KEY_SOCKET_WAYLAND/KEY_SOCKET_AUDIO. */
     override suspend fun sockets(container: Container): ContainerSockets = withContext(Dispatchers.IO) {
         val config = runCatching { readConfig(container.id) }.getOrNull()
         ContainerSockets(
             waylandShared = config?.getProperty(KEY_SOCKET_WAYLAND)?.toBooleanStrictOrNull() ?: true,
-            audioShared = false,
+            audioShared = config?.getProperty(KEY_SOCKET_AUDIO)?.toBooleanStrictOrNull() ?: true,
         )
     }
 
     override suspend fun setSockets(container: Container, sockets: ContainerSockets) = withContext(Dispatchers.IO) {
         val config = readConfig(container.id)
         config[KEY_SOCKET_WAYLAND] = sockets.waylandShared.toString()
+        config[KEY_SOCKET_AUDIO] = sockets.audioShared.toString()
         configOf(container.id).outputStream().use { config.store(it, "droidtop proot container") }
         Unit
     }
 
-    override val audioSharingUnavailableReason: String =
-        "Audio sharing needs the root container backend; proot has no audio bridge."
+    /** Real now (Droidtop/tracker#95): see [HostAudioServer]. */
+    override val audioSharingUnavailableReason: String? = null
 
     override suspend fun extraMounts(container: Container): List<ExtraMount> = withContext(Dispatchers.IO) {
         readExtraMounts(container.id)
@@ -459,14 +467,15 @@ class ProotRuntime(
     ): Process {
         val rootfs = rootfsOf(containerId)
         val marker = ProotProcesses.sessionEnvironment(containerId, sessionId)
-        val waylandSocketName = if (readSocketsSync(containerId).waylandShared) {
+        val sessionSockets = readSocketsSync(containerId)
+        val waylandSocketName = if (sessionSockets.waylandShared) {
             ContainerLayout.findWaylandSocket(socketsDir)?.name
         } else {
             null
         }
         val guestEnvironment = LinkedHashMap<String, String>().apply {
             putAll(baseGuestEnvironment)
-            putAll(ContainerLayout.clientEnvironment(waylandSocketName))
+            putAll(ContainerLayout.clientEnvironment(waylandSocketName, sessionSockets.audioShared))
             putAll(env)
             putAll(marker)
         }
@@ -534,6 +543,9 @@ class ProotRuntime(
      * killing proot is the leak this exists to close.
      */
     private suspend fun stopProcess(name: String) = withContext(NonCancellable + Dispatchers.IO) {
+        // The audio bridge is the PRIMARY's own, same lifetime as its
+        // compositor -- a sibling's stopProcess() never touches it.
+        if (name == PRIMARY_NAME) audioServer.stop()
         val process = running.remove(name)
         val found = processes.ofContainer(name)
         if (process == null && found.isEmpty()) return@withContext
@@ -559,7 +571,10 @@ class ProotRuntime(
     /** Synchronous read for [startSession], which already runs on Dispatchers.IO via its callers. */
     private fun readSocketsSync(name: String): ContainerSockets {
         val config = runCatching { readConfig(name) }.getOrNull()
-        return ContainerSockets(waylandShared = config?.getProperty(KEY_SOCKET_WAYLAND)?.toBooleanStrictOrNull() ?: true)
+        return ContainerSockets(
+            waylandShared = config?.getProperty(KEY_SOCKET_WAYLAND)?.toBooleanStrictOrNull() ?: true,
+            audioShared = config?.getProperty(KEY_SOCKET_AUDIO)?.toBooleanStrictOrNull() ?: true,
+        )
     }
 
     /** One "hostPath\tname" line per extra mount ([ExtraMount], docs/SPEC.md 3d). */
@@ -680,6 +695,7 @@ class ProotRuntime(
         private const val KEY_COMPOSITOR = "provision.compositor"
         private const val KEY_DAEMONS = "provision.daemons"
         private const val KEY_SOCKET_WAYLAND = "socket.wayland"
+        private const val KEY_SOCKET_AUDIO = "socket.audio"
 
         private const val CHECK_TOKEN = "droidtop-proot-ok"
         private const val CHECK_TIMEOUT_S = 30L

@@ -50,6 +50,22 @@ class ContainerLayoutTest {
     }
 
     @Test
+    fun `PULSE_SERVER is set by default and dropped when audio sharing is off`() {
+        val shared = ContainerLayout.clientEnvironment(null)
+        assertEquals("${ContainerLayout.SOCKET_DIR}/${ContainerLayout.AUDIO_SOCKET}", shared["PULSE_SERVER"])
+        val notShared = ContainerLayout.clientEnvironment(null, audioShared = false)
+        assertEquals(null, notShared["PULSE_SERVER"])
+    }
+
+    @Test
+    fun `CUPS_SERVER is unaffected by the audio toggle`() {
+        assertEquals(
+            "${ContainerLayout.SOCKET_DIR}/${ContainerLayout.CUPS_SOCKET}",
+            ContainerLayout.clientEnvironment(null, audioShared = false)["CUPS_SERVER"],
+        )
+    }
+
+    @Test
     fun `the compositor socket is found, whatever it is called`() {
         // sway starts at wayland-1 and never uses wayland-0.
         val dir = java.nio.file.Files.createTempDirectory("sockets").toFile()

@@ -1822,26 +1822,51 @@ the `ContainerRuntime` interface that already exists (§3):
   own path under `ContainerLayout.EXTRA_MOUNTS_DIR`, picked with the
   system folder picker like §4b's shared-storage flow). Sockets and
   Mounts follow the same "one row unlocks a real backend feature" shape
-  as Devices: proot has no audio bridge at all
-  (`audioSharingUnavailableReason`, mirroring `deviceSharingUnavailableReason`),
-  so its Audio row is a message, never a fake toggle; droidspaces wires
-  the toggle straight to droidspaces' own `enable_pulseaudio` config
-  field, already used as-is (`DroidSpacesContainerConfig`). Wayland is
-  real on both backends: off withholds `WAYLAND_DISPLAY` from that
-  container's processes (the shared socket directory itself stays bound,
-  since CUPS and the VPN socket also live there and are a different
-  question). Extra Mounts bind through each backend's own existing
-  primitive (proot's `--bind`, droidspaces' `bind_mounts`) exactly like
-  the shared-storage/USB-device binds already there. The droidspaces
-  backend previously recorded no image reference at all
-  (`ContainerInfo.image`/`digest` were always null for it) --
+  as Devices, except both backends can now bridge host audio in (fixed
+  2026-09-28, Droidtop/tracker#95; `audioSharingUnavailableReason` is
+  null on both -- neither has a message-only Audio row any more).
+  droidspaces wires the toggle straight to droidspaces' own
+  `enable_pulseaudio` config field, already used as-is
+  (`DroidSpacesContainerConfig`): its own host-side PulseAudio daemon,
+  bridged to Android's audio HAL, bind-mounted into any container that
+  asks for it. proot has no kernel namespace and no HAL access at all --
+  the same wall a rootless Wine/box64 guest hits -- so rather than a
+  second audio server it reuses the ONE PulseAudio build already in the
+  tree for that other rootless case: gamenative's Windows runtime
+  (`runtime-windows/WineXSession`, docs/SPEC.md 10b) ships a PulseAudio
+  server built against bionic with an AAudio sink instead of a real
+  ALSA/HAL backend (`libpulseaudio.so` per ABI, `build-scripts/
+  build-vendor-deps.sh`'s "PulseAudio 13.0" section, its x86_64 half).
+  `runtime-linux-noroot`'s `HostAudioServer` runs one instance of that
+  same binary for the whole desktop session -- one long-lived thing the
+  PRIMARY owns, like the compositor and cupsd, not one per launch the way
+  gamenative's own `PulseAudioComponent` runs it for Wine -- listening on
+  `ContainerLayout.AUDIO_SOCKET` under the shared socket directory every
+  container already binds, so a program in any container reaches it
+  through `PULSE_SERVER` (`ContainerLayout.clientEnvironment`) exactly as
+  it would reach a real Linux desktop's PulseAudio; `sockets`/
+  `setSockets` persist a real per-container `audioShared` toggle for it,
+  same as Wayland's. droidspaces' containers keep setting `PULSE_SERVER`
+  through their own bridge instead (`clientEnvironment`'s callers there
+  pass `audioShared = false`), since that variable is already droidspaces'
+  own to set. Wayland is real on both backends: off withholds
+  `WAYLAND_DISPLAY` from that container's processes (the shared socket
+  directory itself stays bound, since CUPS and the VPN socket also live
+  there and are a different question). Extra Mounts bind through each
+  backend's own existing primitive (proot's `--bind`, droidspaces'
+  `bind_mounts`) exactly like the shared-storage/USB-device binds already
+  there. The droidspaces backend previously recorded no image reference
+  at all (`ContainerInfo.image`/`digest` were always null for it) --
   fixed alongside this work, since `recreateFromImage` needed one and the
   container page's own image line was silently blank for every
   droidspaces container. Rig-checked on emulator-5560 (proot backend);
   the droidspaces backend is unverified against a live container, same
   standing caveat as the rest of that class -- no rooted device available
-  here. Still not built: Start with droidtop (autostart with the
-  session).
+  here. The proot audio bridge itself is unverified on a live device too
+  (needs a rig check, see the commit that landed it): the AAudio sink and
+  the extracted-modules path are new here, not proven on-device the way
+  the rest of gamenative's own PulseAudio use is. Still not built: Start
+  with droidtop (autostart with the session).
   **Names (decided 2026-09-25).** A container is called by a name the
   person chooses, never by its id (`droidtop-sibling-8993dfbd` told two
   terminals nothing, dq-desk2-01): `ContainerNames`, one file per backend
@@ -2304,6 +2329,17 @@ not settled designs):
   and making the container's CUPS socket shareable like the other
   sockets in §2. Open: whether a container's CUPS printers should also
   be exposed back to Android as an Android `PrintService`.
+- **Audio output from containers** (Droidtop/tracker#95). As basic an
+  expectation as printing, and unlike USB it affects every container app
+  with sound on the default noroot install, not a niche device case: a
+  Linux GUI app, terminal bell, or Wine game in a container had no path
+  to the device's speakers at all under `ProotRuntime`. Root path:
+  droidspaces already had a real one, its own host-side PulseAudio
+  daemon bridged to Android's audio HAL. Noroot path: reused, not
+  reinvented — the same AAudio-backed PulseAudio build gamenative's
+  Windows runtime already carries for the identical rootless problem
+  (§3d, `HostAudioServer`), one instance for the whole desktop session.
+  See §3d's Sockets paragraph for the real mechanism.
 - **USB peripherals** (flash drives, serial adapters, scanners, audio
   interfaces). Root path: bind the real `/dev` nodes into containers
   (droidspaces `--hw-access`-style device sharing — its own existing

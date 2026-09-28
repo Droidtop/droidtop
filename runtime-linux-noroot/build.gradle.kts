@@ -31,6 +31,12 @@ dependencies {
     implementation(project(":runtime-common"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
+    // Pure-Java tar/zstd, already vendored and proven for :shell-default's
+    // backup restore (BackupHelper.kt) -- HostAudioServer reuses it rather
+    // than adding a second archive library, to unpack the same
+    // pulseaudio-gamenative-*.tzst asset runtime-windows already ships
+    // (docs/SPEC.md 3d, Droidtop/tracker#95).
+    implementation("com.github.alesimula:murine-aircompressor:2.0.9")
 
     testImplementation(libs.junit)
 }

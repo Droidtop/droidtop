@@ -38,6 +38,17 @@ object ContainerLayout {
      */
     const val CUPS_SOCKET = "cups.sock"
 
+    /**
+     * The host-side audio bridge's socket, under [SOCKET_DIR] so every
+     * container reaches it the same way it reaches [CUPS_SOCKET]: clients
+     * find it through `PULSE_SERVER` ([clientEnvironment]). Unlike CUPS
+     * this has nothing to do with a container's own provisioning -- the
+     * server lives entirely on the Android side (see runtime-linux-noroot's
+     * HostAudioServer), since a container has no audio hardware of its own
+     * to provision a daemon against.
+     */
+    const val AUDIO_SOCKET = "audio.sock"
+
     /** Where the app's private storage root (`Context.getFilesDir()`) appears inside every container. */
     const val APP_STORAGE_DIR = "/run/droidtop-app-storage"
 
@@ -100,15 +111,25 @@ object ContainerLayout {
      * Environment every process droidtop starts in a container gets, so a
      * Wayland client reaches the primary compositor: [SOCKET_DIR] as
      * `XDG_RUNTIME_DIR`, and the socket's name ([findWaylandSocket]) as
-     * `WAYLAND_DISPLAY` once the compositor has created it, and CUPS's
-     * shared socket as `CUPS_SERVER`.
+     * `WAYLAND_DISPLAY` once the compositor has created it, CUPS's shared
+     * socket as `CUPS_SERVER`, and, when [audioShared] is true, the audio
+     * bridge's socket as `PULSE_SERVER` -- the same variable PulseAudio
+     * clients everywhere read, so a program in a container reaches host
+     * audio exactly the way it would reach a real Linux desktop's server.
+     * [audioShared] defaults true for a caller with nothing per-container
+     * to say (droidspaces' own PulseAudio bridge owns this variable for
+     * its own containers instead, see DroidSpacesRuntime, so its callers
+     * pass false to leave it unset here).
      */
-    fun clientEnvironment(waylandSocketName: String?): Map<String, String> = buildMap {
+    fun clientEnvironment(waylandSocketName: String?, audioShared: Boolean = true): Map<String, String> = buildMap {
         put("XDG_RUNTIME_DIR", SOCKET_DIR)
         // CUPS clients take a socket path here. With printing off nothing
         // listens there, which to a program is the same as no CUPS.
         put("CUPS_SERVER", "$SOCKET_DIR/$CUPS_SOCKET")
         waylandSocketName?.let { put("WAYLAND_DISPLAY", it) }
+        // With audio sharing off, or no bridge running, nothing listens
+        // there either -- to a program that is the same as no PulseAudio.
+        if (audioShared) put("PULSE_SERVER", "$SOCKET_DIR/$AUDIO_SOCKET")
     }
 
     /**

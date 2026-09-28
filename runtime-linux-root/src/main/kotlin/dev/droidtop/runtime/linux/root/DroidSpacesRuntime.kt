@@ -186,7 +186,13 @@ class DroidSpacesRuntime(
         envFile.parentFile?.mkdirs()
         // The socket's name is only known once the compositor has made it,
         // so WAYLAND_DISPLAY is added per exec (see [exec]), not here.
-        envFile.writeText(ContainerLayout.clientEnvironment(null).entries.joinToString("") { (key, value) -> "$key=$value\n" })
+        // audioShared is false here regardless of this container's own
+        // setting: PULSE_SERVER is this backend's own to set, exported by
+        // droidspaces' own environment setup once its bridge's socket
+        // exists (vendor/droidspaces src/environment.c, src/android/
+        // pulseaudio.c) -- ContainerLayout's PULSE_SERVER is proot's
+        // HostAudioServer path, which droidspaces does not use.
+        envFile.writeText(ContainerLayout.clientEnvironment(null, audioShared = false).entries.joinToString("") { (key, value) -> "$key=$value\n" })
 
         val sockets = readSockets(name)
         val config = DroidSpacesContainerConfig(
@@ -326,7 +332,9 @@ class DroidSpacesRuntime(
         } else {
             null
         }
-        val fullEnv = ContainerLayout.clientEnvironment(waylandSocketName) + env
+        // Same reasoning as writeConfig: PULSE_SERVER is droidspaces' own
+        // to set, not ContainerLayout's.
+        val fullEnv = ContainerLayout.clientEnvironment(waylandSocketName, audioShared = false) + env
         val envPrefix = fullEnv.entries.joinToString(" ") { (k, v) -> "$k=${shellQuote(v)}" }
         val commandLine = command.joinToString(" ") { shellQuote(it) }
         val shellScript = if (envPrefix.isEmpty()) commandLine else "$envPrefix $commandLine"

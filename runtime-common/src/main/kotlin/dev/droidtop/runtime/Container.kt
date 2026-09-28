@@ -205,9 +205,12 @@ interface ContainerRuntime {
     /**
      * Why this backend cannot bridge host audio into a container; null
      * when it can (docs/SPEC.md 3d Sockets row). Parallels
-     * [deviceSharingUnavailableReason] -- proot has no audio bridge at
-     * all, so [ContainerSockets.audioShared] is never actually
-     * controllable there.
+     * [deviceSharingUnavailableReason]. Both backends can now: droidspaces
+     * bridges Android's audio HAL to its own host-side PulseAudio daemon
+     * (see DroidSpacesRuntime), and proot -- which has no HAL access at
+     * all, same as a rootless Wine/box64 guest -- reuses the AAudio-backed
+     * PulseAudio build already in the tree for that other rootless case
+     * (runtime-linux-noroot's HostAudioServer, docs/SPEC.md 3d).
      */
     val audioSharingUnavailableReason: String?
 
