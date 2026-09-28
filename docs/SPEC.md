@@ -1363,7 +1363,16 @@ not end it), when Desktop mode is switched off (`ModePiece.DESKTOP_SESSION`,
 through `ModeStartup`), when the PRIMARY is stopped in Containers, and
 from the notification's Stop. Ending it stops the PRIMARY with everything
 on the desktop, including a primary still booting (the service tracks
-the container it is booting, not only a connected one). The service is
+the container it is booting, not only a connected one). A stop that
+lands while the session is still coming up is a stop, not a failed
+start: every phase of the connecting coroutine treats its own
+cancellation as the session ending — the image download and container
+creation as much as the boot wait, and the post-boot identity probe —
+so the person who pressed Stop sees the stopped screen, never "failed
+to start" over a "Job was cancelled" that only meant the stop worked.
+The boot wait alone has had this since e1de60f9 (rig dq-desk2-01 step 4
+saw the message); the image download, the one phase long enough to
+press Stop in, still reported it until now. The service is
 not sticky: a process Android killed does not come back as a desktop
 nobody opened. The PRIMARY's running state in the container manager IS
 the session: Start opens Desktop (which starts the session with the
