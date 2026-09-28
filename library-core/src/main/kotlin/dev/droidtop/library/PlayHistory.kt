@@ -104,20 +104,6 @@ interface GameLinksStore {
     suspend fun setF95Thread(ids: Collection<String>, thread: Long?)
 
     /**
-     * Links a store entry [storeId] (e.g. "steam:440") to a game name,
-     * confirming they are the same game (docs/SPEC.md 7m cross-store).
-     * Only for SUGGESTED-confidence links; CERTAIN links (same stable id)
-     * are folded automatically and not stored here.
-     */
-    suspend fun setStoreLink(storeId: String, gameName: String)
-
-    /** Removes a user-confirmed store link. */
-    suspend fun removeStoreLink(storeId: String)
-
-    /** All user-confirmed store links: storeId -> gameName. */
-    suspend fun getStoreLinks(): Map<String, String>
-
-    /**
      * Carries [fromId]'s links to [toId] when a missing game is folded
      * into the game that replaced it ([Library.replaceMissing]). Only into
      * an empty place: a game that already has its own name or thread keeps
@@ -138,9 +124,6 @@ object NoOpGameLinksStore : GameLinksStore {
     override suspend fun getAll(ids: Collection<String>): Map<String, GameLinks> = emptyMap()
     override suspend fun setGameName(ids: Collection<String>, name: String) {}
     override suspend fun setF95Thread(ids: Collection<String>, thread: Long?) {}
-    override suspend fun setStoreLink(storeId: String, gameName: String) {}
-    override suspend fun removeStoreLink(storeId: String) {}
-    override suspend fun getStoreLinks(): Map<String, String> = emptyMap()
     override suspend fun moveTo(fromId: String, toId: String) {}
     override suspend fun linkedThreads(): Map<Long, F95ThreadCheck?> = emptyMap()
     override suspend fun idsLinkedTo(thread: Long): List<String> = emptyList()

@@ -1,6 +1,5 @@
 package dev.droidtop.library
 
-import dev.droidtop.library.scraper.PcStoreId
 import java.io.File
 
 /**
@@ -46,13 +45,6 @@ data class LibraryGameGroup(
     /** The F95zone thread the user linked to this game, from whichever of its folders holds the link. */
     val f95Thread: Long? get() = entriesByPath.values.firstNotNullOfOrNull { it.f95Thread }
 
-    /** All ownerships of this game (stores, local folders, F95 thread). */
-    val ownerships: Set<Ownership> get() = game.ownerships
-
-    /** A short label for the ownerships: "Owned on Steam and GOG". */
-    val ownershipLabel: String
-        get() = if (ownerships.isEmpty()) "" else "Owned on " + ownerships.joinToString(", ", ", ", " and ") { it.label }
-
     /** The entry one copy of this game is, or null when the scan no longer has it. */
     fun entryFor(copy: GameCopy): LibraryEntry? = entriesByPath[copy.path]
 
@@ -67,25 +59,17 @@ data class LibraryGameGroup(
  * An entry whose id is a path on this device is a folder the scan found,
  * so [GameNaming] can say what its name, version and segment are. An entry
  * with any other id is a store row (`steam:440`) whose name the store
- * already gave. Cross-store identification folds entries with the same
- * stable identity (Steam appid, GOG id, IGDB id, DLsite code, F95 thread)
- * into one game; entries with only a weak title+developer+year match are
- * grouped at SUGGESTED confidence and require user confirmation.
- *
- * User-confirmed cross-store links (from [GameLinksStore.getStoreLinks])
- * are also used to fold entries.
+ * already gave: it becomes a group of one under its own title, because
+ * deriving a version out of a store's title would be guessing where a real
+ * answer exists.
  */
 object LibraryGrouping {
 
     /** Every game in [entries], in the order their names sort. */
-    fun group(entries: List<LibraryEntry>, confirmedStoreLinks: Map<String, String> = emptyMap()): List<LibraryGameGroup> {
-        // Separate folder entries (scanned from disk) and store entries (from store libraries)
-        val folderEntries = entries.filter { it.id.isFolderPath() }
-        val storeEntries = entries.filterNot { it.id.isFolderPath() }
-
-        // 1. Group folder entries using GameGrouping (respects user-confirmed names via gameName)
-        val folderGameGroups = GameGrouping.group(
-            folderEntries.map { entry ->
+    fun group(entries: List<LibraryEntry>): List<LibraryGameGroup> {
+        val byPath = entries.filter { it.id.isFolderPath() }.associateBy { it.id }
+        val grouped = GameGrouping.group(
+            byPath.values.map { entry ->
                 GameGrouping.Found(
                     path = entry.id,
                     installed = entry.pcInfo?.installed != false,
@@ -94,128 +78,15 @@ object LibraryGrouping {
                 )
             },
         )
-
-        // Map: game name key -> (GroupedGame, folder entries)
-        val folderGroupMap = mutableMapOf<String, Pair<GroupedGame, MutableList<LibraryEntry>>>()
-        for (gameGroup in folderGameGroups) {
-            val key = GameNaming.nameKey(gameGroup.name)
-            val groupFolderEntries = folderEntries.filter { entry ->
-                gameGroup.allVersions.flatMap { it.copies }.any { copy -> copy.path == entry.id }
-            }.toMutableList()
-            folderGroupMap[key] = gameGroup to groupFolderEntries
-        }
-
-        // 2. Match store entries to folder groups
-        val storeEntriesByFolderKey = mutableMapOf<String, MutableList<LibraryEntry>>()
-        val unmatchedStoreEntries = mutableListOf<LibraryEntry>()
-
-        for (storeEntry in storeEntries) {
-            var matched = false
-
-            // A. Check confirmed store link (user said this store entry belongs to this game name)
-            val storeId = PcStoreId.parse(storeEntry.pcInfo?.storeId ?: storeEntry.id)
-            storeId?.let { sid ->
-                confirmedStoreLinks[sid.key]?.let { confirmedName ->
-                    val key = GameNaming.nameKey(confirmedName)
-                    if (key in folderGroupMap) {
-                        storeEntriesByFolderKey.getOrPut(key) { mutableListOf() }.add(storeEntry)
-                        matched = true
-                    }
-                }
-            }
-
-            // B. Match by stable identity (Steam appid, GOG id, etc.) if not already matched
-            if (!matched) {
-                val identity = storeEntry.gameIdentity(linkedThread = storeEntry.f95Thread)
-                if (identity.confidence == IdentityConfidence.CERTAIN) {
-                    // For stable IDs, we need to find a folder group that has the same stable ID.
-                    // Since folder entries don't carry stable IDs in their GameGrouping result,
-                    // we match by checking if any folder entry in the group has the same stable ID.
-                    // This is a best-effort match; in practice, store-installed engine games
-                    // are already folded at the provider level (engine entry absorbs store info).
-                    // For pure store entries (Wine games), there's no folder counterpart.
-                    // So we leave them unmatched here; they become their own group below.
-                }
-            }
-
-            if (!matched) {
-                unmatchedStoreEntries.add(storeEntry)
-            }
-        }
-
-        // 3. Build final groups: folder groups with matched store entries, plus unmatched store entries
-        val resultGroups = mutableListOf<LibraryGameGroup>()
-
-        // Folder groups with their matched store entries
-        for ((key, (folderGame, folderEntriesList)) in folderGroupMap) {
-            val matchedStoreEntries = storeEntriesByFolderKey[key] ?: emptyList()
-            val enrichedGame = enrichWithStoreEntries(folderGame, matchedStoreEntries)
-                .copy(ownerships = (folderEntriesList + matchedStoreEntries).ownerships())
-            val entriesByPath = (folderEntriesList + matchedStoreEntries).associateBy { it.id }
-            resultGroups.add(LibraryGameGroup(enrichedGame, entriesByPath))
-        }
-
-        // Unmatched store entries: group by their stable identity
-        val unmatchedByIdentity = unmatchedStoreEntries.groupBy { entry ->
-            entry.gameIdentity(linkedThread = entry.f95Thread).key
-        }
-        for ((_, groupEntries) in unmatchedByIdentity) {
-            val first = groupEntries.first()
-            val game = GroupedGame(
-                name = first.title,
-                versions = listOf(GameVersion(
-                    version = "",
-                    copies = groupEntries.map { entry ->
-                        GameCopy(
-                            path = entry.id,
-                            source = entry.pcInfo?.source,
-                            installed = entry.pcInfo?.installed == true,
-                            platforms = emptyList(),
-                        )
-                    }
-                )),
-                ownerships = groupEntries.ownerships(),
-            )
-            val entriesByPath = groupEntries.associateBy { it.id }
-            resultGroups.add(LibraryGameGroup(game, entriesByPath))
-        }
-
-        return resultGroups.sortedBy { it.game.name.lowercase() }
-    }
-
-    /**
-     * Adds store entries as additional copies to a game's versions.
-     * Store entries become copies with source set to the store name.
-     */
-    private fun enrichWithStoreEntries(game: GroupedGame, storeEntries: List<LibraryEntry>): GroupedGame {
-        if (storeEntries.isEmpty()) return game
-
-        // Add store entries as copies to the newest version, or create a new version
-        val targetVersion = game.defaultVersion
-            ?: game.versions.firstOrNull()
-            ?: game.segments.firstOrNull()?.versions.firstOrNull()
-
-        val storeCopies = storeEntries.map { entry ->
-            GameCopy(
-                path = entry.id,
-                source = entry.pcInfo?.source,
-                installed = entry.pcInfo?.installed == true,
-                platforms = emptyList(),
+            .map { game -> LibraryGameGroup(game, game.allVersions.flatMap { it.copies }.mapNotNull { copy -> byPath[copy.path]?.let { copy.path to it } }.toMap()) }
+            .filter { it.entriesByPath.isNotEmpty() }
+        val ungrouped = entries.filterNot { it.id.isFolderPath() }.map { entry ->
+            LibraryGameGroup(
+                GroupedGame(entry.title, listOf(GameVersion(version = "", copies = listOf(GameCopy(path = entry.id))))),
+                mapOf(entry.id to entry),
             )
         }
-
-        return if (targetVersion != null) {
-            val updatedVersions = game.versions.map { version ->
-                if (version.version == targetVersion.version) {
-                    version.copy(copies = version.copies + storeCopies)
-                } else {
-                    version
-                }
-            }
-            game.copy(versions = updatedVersions)
-        } else {
-            game.copy(versions = listOf(GameVersion(version = "", copies = storeCopies)))
-        }
+        return (grouped + ungrouped).sortedBy { it.game.name.lowercase() }
     }
 
     /**
