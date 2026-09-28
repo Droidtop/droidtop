@@ -43,6 +43,8 @@ import androidx.compose.ui.window.DialogProperties
 import dev.droidtop.runtime.systemstatus.NotificationsStore
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
+import dev.droidtop.shell.gamepad.input.HintBinding
+import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.input.ownPadButtons
 
 /**
@@ -356,22 +358,20 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
         // The legend here named X (dismiss one) and Y (clear all),
         // neither of which had any touch route. As a hint bar the same
         // line IS the route, dispatching into this dialog's own window.
-        TouchHintBar(
-            // Only what dispatches right now: Open and Dismiss need a
-            // notification under the cursor, Dismiss and Clear all need one
-            // that can be cleared, and an empty list offers none of them.
-            hints = buildList {
-                val current = items.getOrNull(focusIndex)
-                when {
-                    !granted -> add(GamepadAction.A to "Grant access")
-                    current != null -> {
-                        add(GamepadAction.A to "Open")
-                        if (current.clearable) add(GamepadAction.X to "Dismiss")
-                    }
-                }
-                if (granted && items.any { it.clearable }) add(GamepadAction.Y to "Clear all")
-                add(GamepadAction.B to "Close")
-            },
+        // Built from gated bindings, like every other row: only what
+        // dispatches right now is named -- Open and Dismiss need a
+        // notification under the cursor, Dismiss and Clear all need one
+        // that can be cleared, and an empty list offers none of them.
+        HintRow(
+            bindings = listOf(
+                HintBinding(GamepadAction.A, "Grant access") { !granted },
+                HintBinding(GamepadAction.A, "Open") { granted && items.getOrNull(focusIndex) != null },
+                HintBinding(GamepadAction.X, "Dismiss") {
+                    granted && items.getOrNull(focusIndex)?.clearable == true
+                },
+                HintBinding(GamepadAction.Y, "Clear all") { granted && items.any { it.clearable } },
+                HintBinding(GamepadAction.B, "Close"),
+            ),
             background = androidx.compose.ui.graphics.Color.Transparent,
             modifier = Modifier.padding(top = 8.dp),
         )

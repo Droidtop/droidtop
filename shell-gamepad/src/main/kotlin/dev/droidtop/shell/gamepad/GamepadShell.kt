@@ -96,7 +96,10 @@ import dev.droidtop.library.theme.EsDeTransitionAnimation
 import dev.droidtop.library.theme.primaryListElement
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
+import dev.droidtop.shell.gamepad.input.HintBinding
+import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.input.ownPadButtons
+import dev.droidtop.shell.gamepad.input.rememberHintList
 import dev.droidtop.shell.gamepad.theme.EsDeListItem
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import dev.droidtop.shell.gamepad.theme.EsDeSystemListView
@@ -755,6 +758,23 @@ fun GamepadShell(
         // "Stores and folders" while none dispatched there (rig, build
         // 550). The hint row promises only what dispatches (SPEC 7j).
         val overlayScreen = detailEntry != null || nav.optionsOpen
+        // Y/Info is bound only where Y acts on something focused (SPEC
+        // 7j: a hint row promises only what dispatches; UI pass
+        // 2026-09-24, H8): on the selected row in Settings (the
+        // catalog's own Y opens its Info sheet), on the focused Apps
+        // tile -- and an empty or still-loading Apps grid has none --
+        // and in an open GAMES gamelist. Never over the GAMES carousel:
+        // the focused thing there is a system and Y dispatches nothing,
+        // the themed system view's own hint list already drops it for
+        // that reason (see systemListHints), and the shell's own row --
+        // which draws over that same canvas on a touch-first window and
+        // always on the unthemed fallback -- had kept promising "Y Info"
+        // to a button that did nothing.
+        val infoBound = !overlayScreen && when (section) {
+            GamingSection.GAMES -> canGoBack
+            GamingSection.APPS -> !appEntries.isNullOrEmpty()
+            GamingSection.SETTINGS -> true
+        }
         val shellHelpRow: @Composable (Color) -> Unit = shellHelpRow@{ background ->
             if (screensaverOn) return@shellHelpRow
             ButtonHintFooter(
@@ -763,7 +783,7 @@ fun GamepadShell(
                 // ("A Play"), and stays "Select" everywhere else.
                 aLabel = detailPrimaryLabel.takeIf { detailEntry != null } ?: "Select",
                 canGoBack = canGoBack || overlayScreen,
-                showInfo = !overlayScreen,
+                showInfo = infoBound,
                 showSystemSwitch = !overlayScreen && section == GamingSection.GAMES && canGoBack,
                 showOptions = !overlayScreen && section == GamingSection.GAMES,
             )
@@ -1276,29 +1296,35 @@ private fun ButtonHintFooter(
     showOptions: Boolean = false,
     background: Color = MenuTokens.HintBar,
 ) {
-    TouchHintBar(
+    // One mechanism per row, shared with every screen's own hints
+    // (input/HintBindings.kt): each promise is a HintBinding gated on
+    // the condition under which that action really dispatches here, and
+    // the row keeps only the ones that hold -- never a hand-built list
+    // that can drift from what the key handlers above actually bind.
+    HintRow(
         background = background,
-        hints = buildList {
-            add(GamepadAction.A to aLabel)
-            if (showInfo) add(GamepadAction.Y to "Info")
-            if (canGoBack) add(GamepadAction.B to "Back")
+        bindings = listOf(
+            HintBinding(GamepadAction.A, aLabel),
+            HintBinding(GamepadAction.Y, "Info") { showInfo },
+            // B is the hint row's own touch route to back.
+            HintBinding(GamepadAction.B, "Back") { canGoBack },
             // Gamelist options (sort/scrape/import for where you are)
             // were on Select and named nowhere on screen: with no pad
             // attached they were unreachable, and with one they were
             // undiscoverable.
-            if (showOptions) add(GamepadAction.SELECT to "Options")
+            HintBinding(GamepadAction.SELECT, "Options") { showOptions },
             // ES-DE's own documented "General navigation": Left/Right
             // inside a gamelist jump to the adjacent system rather than
             // going back and reselecting. Named as two separate hints
             // rather than one compound arrow glyph, because each has to
             // be tappable on its own.
-            if (showSystemSwitch) add(GamepadAction.LEFT to "Previous system")
-            if (showSystemSwitch) add(GamepadAction.RIGHT to "Next system")
+            HintBinding(GamepadAction.LEFT, "Previous system") { showSystemSwitch },
+            HintBinding(GamepadAction.RIGHT, "Next system") { showSystemSwitch },
             // L1/R1 cycling the top-level sections is named beside the
             // tab row itself now, not here (SectionTabBar's own
             // ShoulderGlyph, owner 2026-09-25: "Can remove the
             // next/previous section pills").
-        },
+        ),
     )
 }
 
@@ -2738,6 +2764,10 @@ private fun GamesSection(
                     // are droidtop's own chrome layered OVER this canvas, at
                     // its own size, never a sibling that would shrink it
                     // (docs/SPEC.md 7j's help-row lesson applies here too).
+                    // The gamelist's per-game hints below are gated on this:
+                    // every one of them acts on the game under the cursor,
+                    // and an empty gamelist has none.
+                    val gameUnderCursor = systemGamesForGroup.isNotEmpty()
                     Box(modifier = Modifier.fillMaxSize()) {
                     EsDeThemedView(
                         view = gamelistView,
@@ -2761,22 +2791,24 @@ private fun GamesSection(
                         // not in what this hint row says. PC swaps Y's "Info" --
                         // the theme's own gamelist already shows that while
                         // browsing -- for L2's "Game options", the one thing the
-                        // theme cannot show.
-                        hints = if (group is GameGroup.Pc) {
+                        // theme cannot show. Every per-game action is gated on a
+                        // game being under the cursor: an empty gamelist (a
+                        // custom collection whose members are all gone from the
+                        // library) launches, informs, favourites and
+                        // option-menus nothing, so none of them is promised
+                        // while it is empty (SPEC 7j).
+                        hints = rememberHintList(
                             listOf(
-                                GamepadAction.A to "Launch",
-                                GamepadAction.L2 to "Game options",
-                                GamepadAction.X to "Favorite",
-                                GamepadAction.B to "Back",
+                                HintBinding(GamepadAction.A, "Launch") { gameUnderCursor },
+                                if (group is GameGroup.Pc) {
+                                    HintBinding(GamepadAction.L2, "Game options") { gameUnderCursor }
+                                } else {
+                                    HintBinding(GamepadAction.Y, "Info") { gameUnderCursor }
+                                },
+                                HintBinding(GamepadAction.X, "Favorite") { gameUnderCursor },
+                                HintBinding(GamepadAction.B, "Back"),
                             )
-                        } else {
-                            listOf(
-                                GamepadAction.A to "Launch",
-                                GamepadAction.Y to "Info",
-                                GamepadAction.X to "Favorite",
-                                GamepadAction.B to "Back",
-                            )
-                        },
+                        ),
                         systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
                             name = selectedGroupLabel,
                             gameCount = systemGamesForGroup.size,

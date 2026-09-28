@@ -18,9 +18,10 @@ import dev.droidtop.app.settings.ContainersCatalog
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.shell.gamepad.CatalogNavigator
 import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.HintBinding
+import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuTokens
-import dev.droidtop.shell.gamepad.TouchHintBar
 import dev.droidtop.shell.gamepad.currentShellWindow
 
 /**
@@ -52,11 +53,16 @@ class ContainersActivity : AppCompatActivity() {
                                 refreshKey = session::class to resumed,
                             )
                         }
-                        TouchHintBar(
-                            hints = listOf(
-                                GamepadAction.A to "Select",
-                                GamepadAction.B to "Back",
-                                GamepadAction.Y to "Info",
+                        // The shell's hint row around the navigator, built
+                        // the one way every row is now: gated bindings.
+                        // All three dispatch inside the navigator -- A
+                        // activates the row, Y is its Info sheet, B pops
+                        // one level (and leaves the activity at the root).
+                        HintRow(
+                            bindings = listOf(
+                                HintBinding(GamepadAction.A, "Select"),
+                                HintBinding(GamepadAction.B, "Back"),
+                                HintBinding(GamepadAction.Y, "Info"),
                             ),
                         )
                     }

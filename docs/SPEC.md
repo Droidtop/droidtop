@@ -8296,6 +8296,28 @@ Consequences:
   overrode a claim that was never a theme's (rig, build 547). A claim is
   also scoped to the screen that makes it, so a screen the shell is still
   fading out cannot answer for the screen arriving;
+- **the row's CONTENT is built from what dispatches, not hand-picked per
+  screen.** A hint is one `HintBinding` — action, label, and the
+  condition under which that action is really bound here, right now
+  (`shell-gamepad/input/HintBindings.kt`: `HintRow` for a screen's own
+  row, `rememberHintList` where a plain pair-list is what the caller
+  needs, as a themed gamelist's legend does) — and the row keeps only
+  the bindings whose condition holds, so killing an action kills its
+  hint in the same read rather than in a per-screen `buildList` that can
+  drift from the key handler. H8's residue, closed by this: the shell's
+  own footer no longer names Y over the GAMES carousel — at the carousel
+  the focused thing is a system and Y acts on nothing (the themed system
+  view's own hint list had already dropped it for that reason; the
+  shell's bar draws over that same canvas on a touch-first window and
+  always on the unthemed fallback, and it kept promising `Y Info` to a
+  button that did nothing there) — nor over an empty or still-loading
+  Apps grid, where no tile is focused for Y to open; and a themed
+  gamelist's per-game hints (Launch/Info/Favorite/Game options) promise
+  nothing while no game is under the cursor — a custom collection whose
+  members are all gone from the library still opens a gamelist, and it
+  dispatches none of them. The Quick Menu's Notifications row and the
+  Launcher's games row were already condition-gated the ad-hoc way; they
+  say it the one way now;
 - **the one row is drawn in the one place laid out for it, and paints
   nothing there.** Real ES-DE draws its single `HelpComponent` ON the
   view, at the theme's own `<helpsystem>` position and with no background
