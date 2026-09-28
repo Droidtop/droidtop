@@ -410,7 +410,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         if (!intent.getBooleanExtra(BackButtonMenu.EXTRA_DISPLAY_REINIT, false) &&
             mode == Mode.GAMING
         ) {
-            dev.droidtop.library.LaunchDisplay.parkedDisplayId = null
+            dev.droidtop.library.LaunchDisplay.clearRunning()
         }
         // HARD reinit (double-tap home, per direction): re-assert both
         // displays regardless of what's running -- clear the parked
@@ -614,7 +614,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     override fun parkedDisplayId(): Int? = dev.droidtop.library.LaunchDisplay.parkedDisplayId
 
     override fun clearParkedDisplayId() {
-        dev.droidtop.library.LaunchDisplay.parkedDisplayId = null
+        dev.droidtop.library.LaunchDisplay.clearRunning()
     }
 
     override fun publishLaunchTargeting(

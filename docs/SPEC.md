@@ -2104,6 +2104,39 @@ the `ContainerRuntime` interface that already exists (§3):
   the menu overlays the SHELL only — games are separate activities, and
   a Deck-style in-game overlay is future work tied to this section's
   overlay plans, not claimed here.
+- **Game tab (decided 2026-09-28, Droidtop/tracker#82)**: before this,
+  R2 drew the exact same Notifications/System pair whether or not a
+  game was running — no "you are in a game" surface at all, against
+  every console this mode is modeled on (this section's own Steam Deck
+  QAM survey concluded exactly that and was never built into a third
+  tab). A **Game** tab now exists whenever the shell is showing but the
+  most recent launch is still parked rather than explicitly reclaimed
+  (`LaunchDisplay.parkedDisplayId`/`runningGame`: non-null exactly when
+  a Home press brought the shell back over a game still running in the
+  background, per the previous bullet's own field — an explicit shell
+  entry clears both together, `LaunchDisplay.clearRunning`). When
+  present it is the tab that opens first, not something shoulder-cycled
+  to: the point of a distinct in-game menu is that it greets you. Two
+  rows today, in the same `MenuRow` tile shape Settings and every other
+  menu in this shell already uses: **Resume** relaunches the entry
+  through the shell's one real launch path (`GamepadShell.onLaunch` —
+  console ROM, PC and engine games alike, the same mechanism already
+  decided for the planned Recents tab's own "launch it again" row, not
+  a second resume mechanism), and **Quit to Library** calls
+  `Library.quit`, which dispatches to `LibraryProvider.quit` for the
+  entry's kind — built for console ROMs (`ConsoleRomProvider`, reusing
+  the exact player-resolution and best-effort `killBackgroundProcesses`
+  pre-launch cleanup already runs) and honestly false everywhere else
+  today (PC/engine games, native apps): Android 14+ restricts
+  `killBackgroundProcesses` to the caller's own processes (7i), so a
+  provider with no reliable way to end another app's process says so
+  rather than claiming a result it can't deliver. Either way droidtop's
+  own bookkeeping clears, because from the shell's side the user asked
+  to leave the game. Row list, not a bespoke layout: the same shape a
+  plugin's `ui.quick_tile@1` (docs/plugin-api.md C2, tracker#73) will
+  append to once that extension point's host exists, so it extends this
+  tab instead of needing a second in-game menu built to compete with
+  it.
 - **Display reinit + parked displays (directed 2026-08-30)**: Android
   silently MIRRORS a second display nothing presents on (confirmed live
   on the addon) — droidtop's answer is that some droidtop surface owns

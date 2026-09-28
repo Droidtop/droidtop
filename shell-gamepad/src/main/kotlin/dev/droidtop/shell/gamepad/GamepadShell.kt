@@ -375,10 +375,6 @@ fun GamepadShell(
         )
     }
 
-    if (quickMenuOpen) {
-        QuickMenu(onDismiss = { quickMenuOpen = false })
-    }
-
     // The actual dispatch: unchanged for every entry, PC and engine games
     // included -- once something has decided this game IS ready, it
     // launches exactly the same way a console ROM does.
@@ -430,6 +426,45 @@ fun GamepadShell(
         } else {
             dispatchLaunch(entry)
         }
+    }
+
+    // The Quick Menu's Game tab (docs/SPEC.md, Droidtop/tracker#82):
+    // which entry the most recent still-parked launch was for, resolved
+    // fresh each time the menu opens -- LaunchDisplay.runningGame is
+    // plain process state, not a flow, read the same "ask when you need
+    // it" way LaunchDisplay's chooser/askOptions already are elsewhere
+    // in this file, rather than a second observable copy of it.
+    val runningEntry = remember(quickMenuOpen, gameEntries, appEntries) {
+        if (!quickMenuOpen) {
+            null
+        } else {
+            dev.droidtop.library.LaunchDisplay.runningGame?.gameId?.let { id ->
+                gameEntries.orEmpty().firstOrNull { it.id == id } ?: appEntries.orEmpty().firstOrNull { it.id == id }
+            }
+        }
+    }
+
+    if (quickMenuOpen) {
+        QuickMenu(
+            runningEntry = runningEntry,
+            // The same launch path every entry already goes through
+            // (console ROM, PC and engine games alike) -- relaunching the
+            // entry is what "resume" already means for the planned
+            // Recents tab (docs/SPEC.md, "Recents (decided 2026-08-30)"),
+            // reused here rather than a second resume mechanism.
+            onResume = { entry ->
+                quickMenuOpen = false
+                onLaunch(entry)
+            },
+            onQuit = { entry ->
+                quickMenuOpen = false
+                scope.launch {
+                    runCatching { library.quit(entry) }
+                    dev.droidtop.library.LaunchDisplay.clearRunning()
+                }
+            },
+            onDismiss = { quickMenuOpen = false },
+        )
     }
     // Anchor for [requestFocusWhenAttached] below -- attached to the
     // invisible Spacer in the content Box, never to the tab bar (owner,

@@ -73,6 +73,23 @@ import dev.droidtop.shell.gamepad.input.ownPadButtons
  * tiles carry the catalog's items and every press goes back to the
  * item's own write path.
  *
+ * A third tab, Game, exists only while [runningEntry] is non-null --
+ * exactly when the shell is showing but the most recent launch is still
+ * parked rather than explicitly reclaimed (see
+ * [dev.droidtop.library.LaunchDisplay.parkedDisplayId]'s own doc
+ * comment: a Home press returns here without reclaiming a running
+ * game, an explicit shell entry does reclaim it). Before this the menu
+ * showed the exact same Notifications/System pair whether or not a game
+ * was running (Droidtop/tracker#82) -- no "you are in a game" surface
+ * at all, unlike every console this mode is modeled on. When present,
+ * Game opens first: the point of a distinct in-game menu is that it is
+ * what greets you, not something you have to shoulder-cycle to find.
+ * Its rows (resume, quit to library) are the same [MenuRow] tile shape
+ * a plugin's `ui.quick_tile@1` targeting the game surface will append
+ * to (docs/plugin-api.md C2, Droidtop/tracker#73) once that extension
+ * point's host exists -- this tab's row list is what it extends, not a
+ * second in-game menu built later to compete with it.
+ *
  * WHERE the sheet sits follows the shape of the screen, because the
  * reason it is an edge sheet is that it must not cover the shell behind
  * it. On a landscape screen that edge is the right one, the Steam Deck
@@ -87,12 +104,24 @@ import dev.droidtop.shell.gamepad.input.ownPadButtons
  * modality costs no key-event fencing in the shell underneath.
  */
 @Composable
-internal fun QuickMenu(onDismiss: () -> Unit) {
+internal fun QuickMenu(
+    runningEntry: dev.droidtop.library.LibraryEntry?,
+    onResume: (dev.droidtop.library.LibraryEntry) -> Unit,
+    onQuit: (dev.droidtop.library.LibraryEntry) -> Unit,
+    onDismiss: () -> Unit,
+) {
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        var tab by remember { mutableStateOf(QuickTab.NOTIFICATIONS) }
+        // Game only while a game is actually running (see this
+        // function's own doc comment) -- computed once per sheet
+        // opening, same as runningEntry itself is (GamepadShell only
+        // re-resolves it when quickMenuOpen flips true).
+        val visibleTabs = remember(runningEntry != null) {
+            if (runningEntry != null) QuickTab.entries.toList() else QuickTab.entries.filter { it != QuickTab.GAME }
+        }
+        var tab by remember { mutableStateOf(if (runningEntry != null) QuickTab.GAME else QuickTab.NOTIFICATIONS) }
 
         val window = currentShellWindow()
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -137,10 +166,12 @@ internal fun QuickMenu(onDismiss: () -> Unit) {
                         if (event.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
                         when (action) {
                             GamepadAction.L -> {
-                                tab = tab.previous(); true
+                                val i = visibleTabs.indexOf(tab)
+                                tab = visibleTabs[(i - 1 + visibleTabs.size) % visibleTabs.size]; true
                             }
                             GamepadAction.R -> {
-                                tab = tab.next(); true
+                                val i = visibleTabs.indexOf(tab)
+                                tab = visibleTabs[(i + 1) % visibleTabs.size]; true
                             }
                             // SELECT deliberately does NOT close: the
                             // opening hold's own key-up can land in this
@@ -173,7 +204,7 @@ internal fun QuickMenu(onDismiss: () -> Unit) {
                         // 2026-09-25: "Can remove the next/previous section
                         // pills").
                         ShoulderGlyph("L1", modifier = Modifier.padding(end = 6.dp))
-                        QuickTab.entries.forEach { t ->
+                        visibleTabs.forEach { t ->
                             Text(
                                 t.label,
                                 style = MaterialTheme.typography.titleMedium,
@@ -202,6 +233,7 @@ internal fun QuickMenu(onDismiss: () -> Unit) {
                     // L1/R1 switches tabs; the ShoulderGlyph pair above the
                     // tab row names that now, not a hint-bar pill.
                     when (tab) {
+                        QuickTab.GAME -> runningEntry?.let { GameTab(it, onResume, onQuit, onDismiss) }
                         QuickTab.NOTIFICATIONS -> NotificationsTab(onDismiss)
                         QuickTab.SYSTEM -> QuickSettingsPanel(sheetWidth.value.toInt(), onDismiss)
                     }
@@ -212,11 +244,11 @@ internal fun QuickMenu(onDismiss: () -> Unit) {
 }
 
 private enum class QuickTab(val label: String) {
+    // Listed first: see QuickMenu's own doc comment on why Game opens
+    // before Notifications when it's shown at all.
+    GAME("Game"),
     NOTIFICATIONS("Notifications"),
-    SYSTEM("System");
-
-    fun next() = entries[(ordinal + 1) % entries.size]
-    fun previous() = entries[(ordinal - 1 + entries.size) % entries.size]
+    SYSTEM("System"),
 }
 
 @Composable
@@ -374,6 +406,135 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                     granted && items.getOrNull(focusIndex)?.clearable == true
                 },
                 HintBinding(GamepadAction.Y, "Clear all") { granted && items.any { it.clearable } },
+                HintBinding(GamepadAction.B, "Close"),
+            ),
+            background = androidx.compose.ui.graphics.Color.Transparent,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+}
+
+
+/**
+ * One row this tab can show. Deliberately the same shape a plugin's
+ * `ui.quick_tile@1` op (`state -> {label, value, on?, icon}` plus
+ * `toggle`/`action`, docs/plugin-api.md C2) will hand over for the game
+ * surface once #73's host exists -- [dangerAction] is this list's
+ * `danger` styling, not a fourth quick-tile kind. Only droidtop's own
+ * two core rows exist today; a plugin tile for this surface appends to
+ * this same list rather than drawing a second menu.
+ */
+private data class GameQuickTile(
+    val title: String,
+    val subtitle: String?,
+    val dangerAction: Boolean = false,
+    val action: () -> Unit,
+)
+
+/**
+ * The Quick Menu's Game tab (docs/SPEC.md, Droidtop/tracker#82): who is
+ * running, and the two actions a console's in-game overlay always
+ * offers -- resume and quit to library. Same interaction model as
+ * [NotificationsTab]: a virtual cursor over [MenuRow] tiles, A activates
+ * the focused one, B/Back closes the whole sheet (there is nothing to
+ * back OUT to within this tab -- unlike Notifications' list, one level
+ * is all there is).
+ *
+ * [onResume] is `GamepadShell`'s real `onLaunch`, the one entry point
+ * every launch in the shell already goes through (console ROM, PC and
+ * engine games alike) -- relaunching the SAME entry is what real ES-DE's
+ * own planned Recents tab (docs/SPEC.md, "Recents (decided 2026-08-30)")
+ * already decided "resume" means here, reused rather than invented a
+ * second time. [onQuit] runs [dev.droidtop.library.Library.quit] then
+ * always clears droidtop's own running-game bookkeeping regardless of
+ * whether the underlying process could actually be ended (see
+ * [dev.droidtop.library.LibraryProvider.quit]'s own doc comment on why
+ * that's honest, not a lie).
+ */
+@Composable
+private fun GameTab(
+    entry: dev.droidtop.library.LibraryEntry,
+    onResume: (dev.droidtop.library.LibraryEntry) -> Unit,
+    onQuit: (dev.droidtop.library.LibraryEntry) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var focusIndex by remember(entry.id) { mutableStateOf(0) }
+    val focusRequester = remember { FocusRequester() }
+    val press = rememberGamepadTouch()
+
+    val tiles = remember(entry.id) {
+        listOf(
+            GameQuickTile(
+                title = "Resume",
+                subtitle = "Back to ${entry.title}",
+                action = { onResume(entry) },
+            ),
+            GameQuickTile(
+                title = "Quit to Library",
+                subtitle = "Ends ${entry.title}",
+                dangerAction = true,
+                action = { onQuit(entry) },
+            ),
+        )
+    }
+
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .focusRequester(focusRequester)
+            .focusable()
+            // A dialog is its own window with its own fallbacks: the same
+            // ownership as the shell's root (Modifier.ownPadButtons).
+            .ownPadButtons(onBack = onDismiss)
+            .onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
+                when (GamepadKeyMap.actionFor(event.key)) {
+                    GamepadAction.BACK, GamepadAction.B -> {
+                        onDismiss(); true
+                    }
+                    GamepadAction.UP -> {
+                        focusIndex = (focusIndex - 1 + tiles.size) % tiles.size; true
+                    }
+                    GamepadAction.DOWN -> {
+                        focusIndex = (focusIndex + 1) % tiles.size; true
+                    }
+                    GamepadAction.A -> {
+                        tiles.getOrNull(focusIndex)?.action?.invoke(); true
+                    }
+                    else -> false
+                }
+            },
+    ) {
+        Text(
+            entry.title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MenuTokens.OnSurface,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            modifier = Modifier.padding(bottom = 12.dp),
+        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            tiles.forEachIndexed { index, tile ->
+                MenuRow(
+                    title = tile.title,
+                    subtitle = tile.subtitle,
+                    danger = tile.dangerAction,
+                    selected = index == focusIndex,
+                    onClick = {
+                        focusIndex = index
+                        press(GamepadAction.A)
+                    },
+                )
+            }
+        }
+        HintRow(
+            bindings = listOf(
+                HintBinding(GamepadAction.A, "Select"),
                 HintBinding(GamepadAction.B, "Close"),
             ),
             background = androidx.compose.ui.graphics.Color.Transparent,

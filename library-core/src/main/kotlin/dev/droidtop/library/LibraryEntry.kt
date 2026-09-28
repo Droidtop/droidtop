@@ -625,6 +625,24 @@ interface LibraryProvider {
     suspend fun launch(entry: LibraryEntry)
 
     /**
+     * Best-effort attempt to end this entry's running process, for the
+     * Quick Menu's Game tab quit action (docs/SPEC.md, Droidtop/
+     * tracker#82). Never required to work: Android 14+ restricts
+     * `killBackgroundProcesses` to the caller's own processes for apps
+     * targeting it, so a provider with no reliable way to end another
+     * app's process (docs/SPEC.md 7i) returns false rather than claiming
+     * a result it cannot deliver. The default is that honest false --
+     * only [dev.droidtop.library.consoles.ConsoleRomProvider] overrides
+     * it, reusing the exact player-resolution + best-effort kill it
+     * already runs before a repeat launch. Callers treat
+     * [dev.droidtop.library.LaunchDisplay.clearRunning] as the real "did
+     * the session end" signal regardless of this return value: droidtop
+     * stops tracking the game as running either way, because from the
+     * shell's own side the user asked to leave it.
+     */
+    suspend fun quit(entry: LibraryEntry): Boolean = false
+
+    /**
      * Whether this provider's last complete result is kept in the library
      * index ([LibraryIndexStore]) and shown at the next start instead of
      * walking again. True for everything that reads a filesystem: a games
@@ -1562,6 +1580,16 @@ class Library(
             playHistory.recordPlay(entry.id, System.currentTimeMillis())
             changedFactIds += entry.id
         }
+    }
+
+    /**
+     * Dispatches [LibraryProvider.quit] for whichever provider owns
+     * [entry]'s kind -- the Quick Menu Game tab's one route to "end this
+     * game," never a second per-kind switch here (docs/SPEC.md,
+     * Droidtop/tracker#82).
+     */
+    suspend fun quit(entry: LibraryEntry): Boolean = withContext(Dispatchers.IO) {
+        providers.first { entry.kind in it.kinds }.quit(entry)
     }
 
     /**

@@ -943,6 +943,28 @@ class ConsoleRomProvider(
         dao.moveGameFacts(fromId, toId, keepSource)
     }
 
+    /**
+     * [LibraryProvider.quit] for ROM entries (Droidtop/tracker#82): the
+     * exact same system/player resolution [launch] runs, then the exact
+     * same best-effort kill pre-launch cleanup already uses below --
+     * never a second way to find or end a ROM's player. Returns false
+     * (never attempted, not "failed") when the entry's system or player
+     * can't be resolved at all, e.g. it was uninstalled since launch.
+     */
+    override suspend fun quit(entry: LibraryEntry): Boolean {
+        val romFile = File(entry.id)
+        val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
+        val system = entry.systemId?.let { systemsById[it] }
+            ?: run {
+                val parentFolder = romFile.parentFile
+                SystemOverridePrefs.resolveForFolder(context, parentFolder?.absolutePath ?: "", parentFolder?.name ?: "", systemsById)
+            }
+            ?: return false
+        val player = resolvePlayer(context, system, entry.altEmulator) ?: return false
+        killPackageProcessesBestEffort(player.packageName)
+        return true
+    }
+
     // Players with this Daijishō-preset flag (DuckStation among them) do
     // not reset their own state cleanly on a repeat launch, so a leftover
     // process is ended first. `killBackgroundProcesses` is the non-root

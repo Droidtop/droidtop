@@ -61,6 +61,21 @@ object LaunchDisplay {
     var launchContext: LaunchContext? = null
 
     /**
+     * Which game/app the most recent still-parked launch ([parkedDisplayId])
+     * is for -- unlike [launchContext], which is scoped to a single
+     * [Library.launch] call and cleared the moment that call returns,
+     * this persists for as long as [parkedDisplayId] does, so the Quick
+     * Menu's Game tab (docs/SPEC.md, Droidtop/tracker#82) knows WHICH
+     * entry to show resume/quit for after the user has come back to the
+     * shell (a Home press, per [parkedDisplayId]'s own doc comment) while
+     * it is still running in the background. Set alongside
+     * [parkedDisplayId] in [startOn]; cleared with it, together, by
+     * [clearRunning].
+     */
+    @Volatile
+    var runningGame: LaunchContext? = null
+
+    /**
      * Installed by the shell owning launch UI: presents [askOptions] and
      * invokes the continuation with the chosen option and whether to
      * remember it for this game — or never, if the user backs out (the
@@ -106,7 +121,10 @@ object LaunchDisplay {
         val askable = options != null && options.size > 1 && ask != null
 
         when (val decision = LaunchScreenResolution.decide(remembered, secondDisplayId, askable, targetDisplayId)) {
-            is LaunchScreenResolution.Decision.Start -> startOn(context, intent, decision.displayId)
+            is LaunchScreenResolution.Decision.Start -> {
+                runningGame = ctx
+                startOn(context, intent, decision.displayId)
+            }
             LaunchScreenResolution.Decision.Ask -> ask!!(options!!, ctx != null) { chosen, remember ->
                 if (remember && ctx != null) {
                     LaunchScreenMemory.setGameChoice(
@@ -115,9 +133,24 @@ object LaunchDisplay {
                         LaunchScreenResolution.screenFor(chosen.displayId, secondDisplayId),
                     )
                 }
+                runningGame = ctx
                 startOn(context, intent, chosen.displayId)
             }
         }
+    }
+
+    /**
+     * Clears [parkedDisplayId] and [runningGame] together -- the one
+     * signal an explicit shell entry (BackButtonMenu's Gaming item) or a
+     * hard reinit uses to say "nothing is running any more" (see each
+     * field's own doc comment). The two must never drift apart: a stray
+     * direct write to [parkedDisplayId] alone would leave the Quick
+     * Menu's Game tab naming a game that display-role orchestration has
+     * already stopped treating as parked.
+     */
+    fun clearRunning() {
+        parkedDisplayId = null
+        runningGame = null
     }
 
     private fun startOn(context: Context, intent: Intent, displayId: Int?) {
