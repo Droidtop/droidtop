@@ -83,6 +83,16 @@ maven-plugin-api = "3.9.11"
 richeditor-compose = "1.0.0-beta02"
 uiautomatorV18 = "2.1.3"
 window = "1.5.1"
+savedstate = "1.2.1"
+core-v116 = "1.16.0"
+vectordrawable-animated = "1.2.0"
+browser = "1.8.0"
+documentfile = "1.0.1"
+posthog-android = "3.8.0"
+jwtdecode = "2.0.2"
+json-20240303 = "20240303"
+xz = "1.9"
+javax-inject = "1"
 fragment = "1.8.9"
 collection-ktx = "1.6.0-beta01"
 
@@ -127,6 +137,10 @@ androidx-preference = { module = "androidx.preference:preference", version.ref =
 androidx-recyclerview = { module = "androidx.recyclerview:recyclerview", version.ref = "recyclerview" }
 androidx-rules = { module = "androidx.test:rules", version.ref = "rulesVersion" }
 androidx-slice-builders = { module = "androidx.slice:slice-builders", version.ref = "sliceBuilders" }
+savedstate = { module = "androidx.savedstate:savedstate", version.ref = "savedstate" }
+savedstate-ktx = { module = "androidx.savedstate:savedstate-ktx", version.ref = "savedstate" }
+core-v116 = { module = "androidx.core:core", version.ref = "core-v116" }
+dynamicanimation-ktx = { module = "androidx.dynamicanimation:dynamicanimation-ktx", version.ref = "dynamicanimation" }
 androidx-window = { module = "androidx.window:window", version.ref = "window" }
 androidx-fragment = { module = "androidx.fragment:fragment", version.ref = "fragment" }
 androidx-activity = { module = "androidx.activity:activity", version.ref = "activity" }
@@ -157,6 +171,7 @@ lottie = { module = "com.airbnb.android:lottie", version.ref = "lottie" }
 material = { module = "com.google.android.material:material", version.ref = "material" }
 mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockitoCore" }
 protobuf-javalite = { module = "com.google.protobuf:protobuf-javalite", version.ref = "protobufJavalite" }
+protobuf-java = { module = "com.google.protobuf:protobuf-java", version.ref = "protobufJavalite" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 rules = { module = "com.android.support.test:rules", version.ref = "rules" }
 runner = { module = "com.android.support.test:runner", version.ref = "runner" }
@@ -177,6 +192,8 @@ uiautomator-v18 = { module = "com.android.support.test.uiautomator:uiautomator-v
 # droidtop-specific
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycleRuntimeKtx" }
+lifecycle-runtime = { module = "androidx.lifecycle:lifecycle-runtime", version.ref = "lifecycleRuntimeKtx" }
+lifecycle-viewmodel = { module = "androidx.lifecycle:lifecycle-viewmodel", version.ref = "lifecycleRuntimeKtx" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
@@ -194,6 +211,15 @@ androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = 
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 bouncycastle-bcpkix = { group = "org.bouncycastle", name = "bcpkix-jdk18on", version.ref = "bouncycastle" }
+
+vectordrawable-animated = { module = "androidx.vectordrawable:vectordrawable-animated", version.ref = "vectordrawable-animated" }
+browser = { module = "androidx.browser:browser", version.ref = "browser" }
+documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentfile" }
+posthog-android = { module = "com.posthog:posthog-android", version.ref = "posthog-android" }
+jwtdecode = { module = "com.auth0.android:jwtdecode", version.ref = "jwtdecode" }
+json-v20240303 = { module = "org.json:json", version.ref = "json-20240303" }
+xz = { module = "org.tukaani:xz", version.ref = "xz" }
+javax-inject = { module = "javax.inject:javax.inject", version.ref = "javax-inject" }
 
 [plugins]
 rikka-refine = { id = "dev.rikka.tools.refine", version.ref = "refine" }

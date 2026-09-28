@@ -246,7 +246,7 @@ dependencies {
     // hosting Compose inside an android.app.Presentation, which isn't a LifecycleOwner/
     // SavedStateRegistryOwner on its own the way an Activity is) -- not resolvable
     // transitively via lifecycle-runtime-ktx alone, needs the base artifacts explicitly.
-    implementation("androidx.lifecycle:lifecycle-runtime:2.8.4")
+    implementation(libs.lifecycle.runtime)
     implementation(libs.androidx.lifecycle.runtime.compose)
     // OnboardingActivity's own OnboardingRun (androidx.lifecycle.ViewModel
     // + `by viewModels()`): the onboarding run's answers have to outlive
@@ -254,9 +254,9 @@ dependencies {
     // through androidx.activity, and both are named here for the same
     // reason the lifecycle-runtime base artifacts above are -- a
     // transitive version is not a dependency declaration.
-    implementation("androidx.lifecycle:lifecycle-viewmodel:2.8.4")
-    implementation("androidx.savedstate:savedstate:1.2.1")
-    implementation("androidx.savedstate:savedstate-ktx:1.2.1")
+    implementation(libs.lifecycle.viewmodel)
+    implementation(libs.savedstate)
+    implementation(libs.savedstate.ktx)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
