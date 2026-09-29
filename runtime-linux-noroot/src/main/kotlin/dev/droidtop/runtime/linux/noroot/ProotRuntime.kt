@@ -550,6 +550,7 @@ class ProotRuntime(
                 .forEach { add("--bind=${it.hostPath}:${it.containerPath}") }
             add("--bind=${File(etcDir, "resolv.conf").absolutePath}:/etc/resolv.conf")
             add("--bind=${File(etcDir, "hosts").absolutePath}:/etc/hosts")
+            add("--bind=${File(etcDir, "bwrap").absolutePath}:$BWRAP_SHIM_PATH")
             add("--cwd=/root")
             add("/usr/bin/env")
             add("-i")
@@ -752,6 +753,30 @@ class ProotRuntime(
         private const val CAPTURE_LINES = 2_000
         private const val MAX_LOG_BYTES = 4L * 1024L * 1024L
 
+        /** Where the guest finds [BWRAP_SHIM]: first on the guest's PATH, ahead of the distro's own bwrap. */
+        private const val BWRAP_SHIM_PATH = "/usr/local/bin/bwrap"
+
+        /**
+         * bubblewrap cannot run under proot (it dies reading
+         * /proc/sys/kernel/overflowuid, and could not create a namespace
+         * if it got further). GTK loads every icon and image through
+         * glycin, which runs its decoders under bwrap: PCManFM aborted on
+         * its first icon (Droidtop/tracker#96). glycin probes bwrap once
+         * and, when the probe's stderr says namespaces cannot be created,
+         * runs its decoders unsandboxed instead (glycin's
+         * check_bwrap_syscalls_blocked, in 2.1 as in current releases).
+         * This stands in for bwrap and gives that answer, truthfully. It is
+         * bound in per start like resolv.conf, never written into the
+         * rootfs.
+         */
+        private const val BWRAP_SHIM =
+            "#!/bin/sh
+" +
+                "echo 'bwrap: No permissions to create a new namespace (proot cannot give one)' >&2
+" +
+                "exit 1
+"
+
         /**
          * Every guest process's starting environment. `env -i` means
          * nothing of Android's own environment (its PATH, its
@@ -765,14 +790,6 @@ class ProotRuntime(
             "TERM" to "xterm-256color",
             "LANG" to "C.UTF-8",
             "TMPDIR" to "/tmp",
-            // glycin, the image loader current GTK (and so PCManFM) loads
-            // every PNG and icon through, runs its decoders under bwrap.
-            // bubblewrap needs user namespaces and mounts, which proot
-            // cannot give: the loader exits at once and GTK aborts on its
-            // first icon (Droidtop/tracker#96). This is glycin's own switch
-            // for that case; decoding then runs in the app's process, which
-            // is already the guest's only privilege boundary on this backend.
-            "GLYCIN_DISABLE_SANDBOX" to "i-know-the-risks",
         )
 
         /** The PRIMARY's boot process, by container id, shared by every instance in this app process. */

@@ -1885,12 +1885,14 @@ the `ContainerRuntime` interface that already exists (§3):
   and re-provisioned on an existing one (the plan changed), never an image of ours. Its
   `.desktop` entry puts it in the Start menu; it browses the shared-storage folder (§4b), so
   Android files can be opened, copied and moved with a pointer rather than `cd` and `ls`.
-  On the proot backend every guest process gets `GLYCIN_DISABLE_SANDBOX=i-know-the-risks`
-  (`ProotRuntime.baseGuestEnvironment`): GTK loads its icons and images through glycin, which
-  runs its decoders under bubblewrap, and bubblewrap needs namespaces and mounts that proot
-  cannot give, so PCManFM aborted on its first icon (Droidtop/tracker#96). Glycin's own switch
-  runs the decoders in the process instead; proot is not a security boundary here, and the
-  droidspaces backend is unchanged.
+  On the proot backend `/usr/local/bin/bwrap` is a droidtop-written stand-in (bound in per
+  start beside resolv.conf, `ProotRuntime.BWRAP_SHIM`) that answers "no permissions to create a
+  new namespace": GTK loads its icons and images through glycin, which runs its decoders under
+  bubblewrap, and bubblewrap dies under proot (it cannot read `/proc/sys/kernel/overflowuid`),
+  so PCManFM aborted on its first icon (Droidtop/tracker#96). glycin probes bwrap once and, on
+  that answer, decodes unsandboxed. glycin 2.1, the Alpine 3.24 package, has no
+  `GLYCIN_DISABLE_SANDBOX` (2.2 added it), so the stand-in is the one mechanism that works on
+  both. proot is not a security boundary here; the droidspaces backend is unchanged.
 - **A real terminal into any container** — a computer the user can't
   open a shell on isn't a computer. **Decided and built 2026-09-02, the
   other way round from this section's original sketch**: droidtop does
