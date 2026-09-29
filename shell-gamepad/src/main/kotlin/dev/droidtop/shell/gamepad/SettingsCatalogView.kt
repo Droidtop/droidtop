@@ -147,7 +147,11 @@ fun CatalogNavigator(
     var pendingFolderPick by remember { mutableStateOf<FolderPickItem?>(null) }
     var searchOpen by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
-    var searchIndex by remember { mutableStateOf<List<SettingsSearchResult>>(emptyList()) }
+    // null until the one-time index build below lands: the search overlay
+    // reads null as "still indexing", not "no matches" -- the first search
+    // straight after opening "Search settings" raced the build and answered
+    // "No settings match" over an empty index.
+    var searchIndex by remember { mutableStateOf<List<SettingsSearchResult>?>(null) }
     // A search result's row id (docs/SPEC.md 7k, "picking a search result
     // scrolls its screen ... and gives it initial focus"): set on pick,
     // and consumed once the CURRENT screen's rows actually contain it --
@@ -161,7 +165,7 @@ fun CatalogNavigator(
     val screen = stack.last()
     val depth = stack.lastIndex
     LaunchedEffect(searchOpen) {
-        if (searchOpen && searchIndex.isEmpty()) {
+        if (searchOpen && searchIndex == null) {
             searchIndex = withContext(Dispatchers.IO) { SettingsSearchIndex.build(context, root) }
         }
     }
@@ -320,7 +324,7 @@ fun CatalogNavigator(
         SettingsSearchOverlay(
             query = searchQuery,
             onQueryChange = { searchQuery = it },
-            results = remember(searchIndex, searchQuery) { SettingsSearchIndex.search(searchIndex, searchQuery) },
+            index = searchIndex,
             onPick = { result ->
                 searchOpen = false
                 searchQuery = ""
@@ -813,17 +817,27 @@ internal fun TextEditDialog(
  * lives on. Picking one navigates there -- the same [MenuRow] anatomy and
  * the same A/B/touch input as the list it replaces, so this is one more
  * screen in the shell's own language rather than a second search UI.
+ *
+ * [index] is null while the caller's one-time [SettingsSearchIndex.build]
+ * is still running on IO: the overlay shows "Indexing settings..." rather
+ * than a false "No settings match", and the query re-runs when the index
+ * lands (the first search right after opening "Search settings" raced the
+ * build and answered over an empty index, Droidtop/tracker#101).
  */
 @Composable
 private fun SettingsSearchOverlay(
     query: String,
     onQueryChange: (String) -> Unit,
-    results: List<SettingsSearchResult>,
+    index: List<SettingsSearchResult>?,
     onPick: (SettingsSearchResult) -> Unit,
     onClose: () -> Unit,
 ) {
     val fieldFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { requestFocusWhenAttached(fieldFocus, "Settings search") }
+    // Re-runs on every keystroke and once more when the index lands: search
+    // is pure and in-memory, and a null index (still building) filters to
+    // nothing so the loading line below is what shows.
+    val results = remember(index, query) { SettingsSearchIndex.search(index ?: emptyList(), query) }
     Column(modifier = Modifier.fillMaxSize()) {
         MenuHeader("Search settings", "Type a setting's name")
         Row(
@@ -874,6 +888,13 @@ private fun SettingsSearchOverlay(
             query.trim().length < 2 ->
                 Text(
                     "Keep typing -- at least two letters",
+                    color = MenuTokens.OnSurfaceMuted,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 12.dp),
+                )
+            index == null ->
+                Text(
+                    "Indexing settings...",
                     color = MenuTokens.OnSurfaceMuted,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 12.dp),

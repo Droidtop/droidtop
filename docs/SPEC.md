@@ -9066,7 +9066,13 @@ running on the console and asked for the visual pass on top of it. Decided and b
   mechanism beside them — and opens a full-screen `SettingsSearchOverlay` (a text field plus
   matching rows, each showing which screen it lives on); picking a result pushes that screen
   onto the settings home's own navigation stack, so B from it returns to Settings same as
-  opening the row by hand would have. **Built on the touch/Preference surface (H4
+  opening the row by hand would have. The index reaches the overlay as nullable state:
+  `null` (the one-time `build` still running on IO) shows an "Indexing settings..." line
+  instead of a false "No settings match", and the index landing re-runs the current query
+  without retyping — the first search straight after opening "Search settings" raced the
+  build and answered over an empty index (Droidtop/tracker#101). The Preference surface's
+  dialog needs no such state: it shows an empty list while its own build runs and already
+  re-submits the current query when that lands. **Built on the touch/Preference surface (H4
   shared-row-language pass, agent settingsh4, 2026-09-26):** `CatalogPreferenceNavigator.
   openSearch` builds the same `SettingsSearchIndex` over a synthetic root wrapping whatever
   `rootGroups` that fragment already renders, in a plain `AlertDialog` (an `EditText` plus a
