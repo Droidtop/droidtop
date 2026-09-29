@@ -1,5 +1,6 @@
 package dev.droidtop.library.scraper
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -29,6 +30,20 @@ class ScraperReadinessTest {
     fun `an IGDB sign-in refusal names the Twitch credentials`() {
         val fix = ScraperReadiness.credentialFix(ScrapeLookup.Refused("IGDB (Twitch sign-in)", 403, "invalid client secret"))
         assertTrue(fix.orEmpty(), fix.orEmpty().contains("Client ID and Client Secret"))
+    }
+
+    @Test
+    fun `a 400 from the Twitch sign-in is a rejected credential, and still names the Twitch credentials`() {
+        // Twitch's token endpoint answers a wrong Client ID or Secret with
+        // HTTP 400, not 401/403, so the fix sentence and PcFlavour's
+        // first-refusal silencing both apply to it too.
+        val refusal = ScrapeLookup.Refused(IgdbScraperClient.SIGNIN_SOURCE, 400, "invalid client secret")
+        val fix = ScraperReadiness.credentialFix(refusal)
+        assertTrue(fix.orEmpty(), fix.orEmpty().contains("Client ID and Client Secret"))
+        assertTrue(ScraperReadiness.rejectedCredentials(refusal))
+        // A 400 anywhere else (a query IGDB itself refused) is not the person's to fix.
+        assertFalse(ScraperReadiness.rejectedCredentials(ScrapeLookup.Refused("IGDB", 400, "Bad Request")))
+        assertNull(ScraperReadiness.credentialFix(ScrapeLookup.Refused("IGDB", 400, "Bad Request")))
     }
 
     @Test

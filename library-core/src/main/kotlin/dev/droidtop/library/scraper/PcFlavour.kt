@@ -90,7 +90,8 @@ internal fun IgdbGameMetadata.toPcMatch() = PcMatch(
  * Sources with no key set are simply not asked; the one selected for the
  * name search is the one whose missing key refuses the pass.
  *
- * One instance per pass: a source that refuses a key (401, 403) is not
+ * One instance per pass: a source that refuses a key (401, 403, or the
+ * Twitch sign-in's 400 for a wrong Client ID or Secret) is not
  * asked again in that pass, and nor is one that refused five times in a
  * row, and [notes] says so in the summary.
  */
@@ -174,7 +175,7 @@ internal class PcFlavour(context: Context) {
                 val inARow = (refusedInARow[source] ?: 0) + 1
                 refusedInARow[source] = inARow
                 // A rejected key will not be accepted on the next game.
-                if (lookup.httpStatus == 401 || lookup.httpStatus == 403 || inARow >= REFUSAL_ABORT_THRESHOLD) silenced += source
+                if (ScraperReadiness.rejectedCredentials(lookup) || inARow >= REFUSAL_ABORT_THRESHOLD) silenced += source
                 null
             }
         }
