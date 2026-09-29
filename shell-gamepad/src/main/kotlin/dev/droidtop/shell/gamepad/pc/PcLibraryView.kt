@@ -273,12 +273,20 @@ internal fun PcLibraryContent(
         )
     }
     if (searchOpen) {
+        // Recommendations for the empty search field: worked out off the
+        // main thread, only while the dialog is open (a linear pass over
+        // the group, docs/SPEC.md 12a "Recommendations").
+        val suggestions by produceState(emptyList<dev.droidtop.library.integrations.Recommendation>(), entries) {
+            value = dev.droidtop.library.integrations.LocalSimilarityRecommendations({ entries })
+                .recommend(context, dev.droidtop.library.integrations.RecommendationScope.Overall, 5)
+        }
         LibrarySearchDialog(
             query = query,
             matchCount = filtered.size,
             totalCount = entries.size,
             onTextChange = { query = query.copy(text = it) },
             onDismiss = { searchOpen = false },
+            suggestions = suggestions,
         )
     }
 }

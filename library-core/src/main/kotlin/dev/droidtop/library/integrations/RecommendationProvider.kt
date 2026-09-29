@@ -1,7 +1,11 @@
 package dev.droidtop.library.integrations
 
 import android.content.Context
+import dev.droidtop.library.LibraryEntry
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.ln
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * The Recommendations API (docs/SPEC.md 12a "Recommendations API"):
@@ -43,37 +47,89 @@ data class Recommendation(
 )
 
 /**
- * The built-in [RecommendationProvider]. Owner's specified signal set is
- * IGDB `total_rating`/`total_rating_count` (Bayesian-weighted),
- * `similar_games`, genre/theme/developer overlap with the user's library
- * weighted by play history, ScreenScraper ratings, and a RetroAchievements
- * popularity proxy -- **all of which need droidtop's own scraped catalog
- * of games-not-owned, which does not exist yet** (docs/SPEC.md's own
- * standing gap: "droidtop has no media-scraper of its own"). Without a
- * scraper there is no candidate pool of un-owned titles to rank at all,
- * so [recommend] below is a real, wired implementation of the API and
- * its ranking math ([weightedRating], [librarySimilarity] are both real
- * and unit-tested), honestly returning an empty candidate list rather
- * than a fabricated one until that catalog exists -- tracked as its own
- * item, not folded silently into this change (see the "Recommendations"
- * issue this file's SPEC section references).
+ * The built-in [RecommendationProvider], fed by what droidtop really has:
+ * the library's own scraped facts (genre, developer, rating) and the play
+ * history (play count, playtime, last played). It recommends the games in
+ * the user's library they have NOT played yet that most resemble what they
+ * do play, weighted by how long and how recently they played it -- "Because
+ * you played X". It never recommends a played game and never invents a
+ * title.
  *
- * [librarySimilarity] and [weightedRating] are kept here, pure and
- * public for testing, so the moment a real candidate catalog exists the
- * only new code needed is the fetch/cache layer -- the ranking math
- * this class will use is already correct and already tested.
+ * The owner's fuller signal set (IGDB `total_rating` and `similar_games`,
+ * ScreenScraper ratings, a RetroAchievements popularity proxy) needs a
+ * catalog of games the user does NOT own, which droidtop does not fetch
+ * yet. When one exists it becomes a second candidate pool in [rank]; the
+ * ranking math ([weightedRating], [SimilarityIndex]) is already the shape it
+ * needs. Until then the pool is the user's own unplayed games, which are
+ * already owned, so a [Recommendation] has no "where to get it" to add.
+ *
+ * [library] supplies the entries and is called off the main thread; the
+ * default supplies none, which answers nothing.
  */
-class LocalSimilarityRecommendations : RecommendationProvider {
-    override suspend fun recommend(context: Context, scope: RecommendationScope, limit: Int): List<Recommendation> {
-        // No un-owned candidate catalog yet -- see the class doc. Returning
-        // real library entries here would violate "never recommend a game
-        // the user already owns"; returning invented titles would violate
-        // "no AI-generated/fabricated content". Empty is the only honest
-        // answer until a scraped catalog exists.
-        return emptyList()
-    }
+class LocalSimilarityRecommendations(
+    private val library: suspend () -> List<LibraryEntry> = { emptyList() },
+    private val now: () -> Long = System::currentTimeMillis,
+) : RecommendationProvider {
+    override suspend fun recommend(context: Context, scope: RecommendationScope, limit: Int): List<Recommendation> =
+        try {
+            withContext(Dispatchers.Default) { rank(library(), scope, limit, now()) }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            emptyList()
+        }
 
     companion object {
+        /** Extra score for a well-rated game (rating is 0..1); small next to similarity, which must be above zero for a game to be recommended at all. */
+        private const val RATING_BONUS = 0.25
+        private const val DAY_MS = 86_400_000L
+
+        private fun LibraryEntry.isPlayed(): Boolean = playCount > 0 || playtimeSeconds > 0 || lastPlayedEpochMs != null
+
+        private fun LibraryEntry.signal(nowMs: Long) = OwnedSignal(
+            title = title,
+            genre = genre,
+            developer = developer,
+            weight = playWeight(playtimeSeconds, lastPlayedEpochMs?.let { ((nowMs - it) / DAY_MS).coerceAtLeast(0) }),
+        )
+
+        /**
+         * The ranking over [entries], pure and linear in the library: the
+         * played games (or, for [RecommendationScope.BecauseOf], the one
+         * named game) are folded into a [SimilarityIndex] once, then every
+         * unplayed, visible candidate is scored by lookup. Best first, at
+         * most [limit]; a candidate that resembles nothing played is left out.
+         */
+        fun rank(entries: List<LibraryEntry>, scope: RecommendationScope, limit: Int, nowMs: Long): List<Recommendation> {
+            if (limit <= 0) return emptyList()
+            val visible = entries.filter { !it.hidden && !it.broken }
+            val basis = when (scope) {
+                is RecommendationScope.BecauseOf -> visible.filter { it.title.equals(scope.ownedTitle, ignoreCase = true) }
+                else -> visible.filter { it.isPlayed() }
+            }
+            if (basis.isEmpty()) return emptyList()
+            val index = SimilarityIndex(basis.map { it.signal(nowMs) })
+            val basisIds = basis.mapTo(HashSet()) { it.id }
+            return visible.asSequence()
+                .filter { it.id !in basisIds && !it.isPlayed() }
+                .filter { scope !is RecommendationScope.Platform || it.systemId == scope.systemId }
+                .mapNotNull { candidate ->
+                    val similarity = index.score(candidate.genre, candidate.developer)
+                    if (similarity <= 0.0) return@mapNotNull null
+                    Recommendation(
+                        title = candidate.title,
+                        platform = candidate.systemId,
+                        reason = index.reason(candidate.genre, candidate.developer, scope),
+                        artUrl = candidate.artworkUri,
+                        description = candidate.description,
+                        score = similarity + RATING_BONUS * (candidate.rating?.toDouble() ?: 0.0).coerceIn(0.0, 1.0),
+                    )
+                }
+                .sortedWith(compareByDescending<Recommendation> { it.score }.thenBy { it.title.lowercase() })
+                .take(limit)
+                .toList()
+        }
+
         /**
          * IMDB/Bayesian-weighted rating: a title with few votes is pulled
          * toward [priorMean] (the whole catalog's average) rather than
@@ -108,22 +164,8 @@ class LocalSimilarityRecommendations : RecommendationProvider {
             candidateGenre: String?,
             candidateDeveloper: String?,
             ownedWeights: List<Triple<String?, String?, Double>>,
-        ): Double {
-            if (ownedWeights.isEmpty()) return 0.0
-            var matchedWeight = 0.0
-            var totalWeight = 0.0
-            ownedWeights.forEach { (genre, developer, weight) ->
-                totalWeight += weight
-                val genreMatch = candidateGenre != null && genre != null && candidateGenre.equals(genre, ignoreCase = true)
-                val devMatch = candidateDeveloper != null && developer != null && candidateDeveloper.equals(developer, ignoreCase = true)
-                if (genreMatch || devMatch) {
-                    val strength = (if (genreMatch) 0.6 else 0.0) + (if (devMatch) 0.4 else 0.0)
-                    matchedWeight += weight * strength
-                }
-            }
-            if (totalWeight <= 0.0) return 0.0
-            return (matchedWeight / totalWeight).coerceIn(0.0, 1.0)
-        }
+        ): Double = SimilarityIndex(ownedWeights.map { (genre, developer, weight) -> OwnedSignal("", genre, developer, weight) })
+            .score(candidateGenre, candidateDeveloper)
 
         /** How much one owned game weighs toward similarity: recently played and long-played games count more, but neither factor alone can zero out a game that's merely old or merely short -- log-scaled playtime so an hour and a hundred hours don't differ 100x, floor of 1.0 so an unplayed-but-owned game still counts a little. Pure, unit-tested. */
         fun playWeight(playtimeSeconds: Long, daysSinceLastPlayed: Long?): Double {
@@ -138,6 +180,53 @@ class LocalSimilarityRecommendations : RecommendationProvider {
             }
             return playtimeFactor * recencyFactor
         }
+    }
+}
+
+/** One played game as the similarity index sees it: what it is and how much it counts ([LocalSimilarityRecommendations.playWeight]). */
+internal data class OwnedSignal(val title: String, val genre: String?, val developer: String?, val weight: Double)
+
+/**
+ * The library's genre and developer signal, folded once so scoring a
+ * candidate is two map lookups however large the library is. A genre match
+ * is worth 0.6 and a developer match 0.4 of an owned game's weight; the
+ * score is that matched weight over the total weight, so it stays 0..1 and
+ * a library of one game and of a hundred compare alike.
+ */
+internal class SimilarityIndex(owned: List<OwnedSignal>) {
+    private val total = owned.sumOf { it.weight }
+    private val byGenre = HashMap<String, Double>()
+    private val byDeveloper = HashMap<String, Double>()
+    private val topGenre = HashMap<String, OwnedSignal>()
+    private val topDeveloper = HashMap<String, OwnedSignal>()
+
+    init {
+        owned.forEach { game ->
+            game.genre?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }?.let { key ->
+                byGenre.merge(key, game.weight, Double::plus)
+                topGenre.merge(key, game) { a, b -> if (b.weight > a.weight) b else a }
+            }
+            game.developer?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }?.let { key ->
+                byDeveloper.merge(key, game.weight, Double::plus)
+                topDeveloper.merge(key, game) { a, b -> if (b.weight > a.weight) b else a }
+            }
+        }
+    }
+
+    fun score(genre: String?, developer: String?): Double {
+        if (total <= 0.0) return 0.0
+        val matched = 0.6 * (genre?.trim()?.lowercase()?.let { byGenre[it] } ?: 0.0) +
+            0.4 * (developer?.trim()?.lowercase()?.let { byDeveloper[it] } ?: 0.0)
+        return (matched / total).coerceIn(0.0, 1.0)
+    }
+
+    /** Why a candidate scored: the played game it most resembles, said plainly. */
+    fun reason(genre: String?, developer: String?, scope: RecommendationScope): String {
+        if (scope is RecommendationScope.BecauseOf) return "Because you played ${scope.ownedTitle}"
+        val byGenreGame = genre?.trim()?.lowercase()?.let { topGenre[it] }
+        if (byGenreGame != null) return "Same genre as ${byGenreGame.title}"
+        val byDevGame = developer?.trim()?.lowercase()?.let { topDeveloper[it] }
+        return if (byDevGame != null) "Same developer as ${byDevGame.title}" else "Like games you play"
     }
 }
 

@@ -312,6 +312,10 @@ internal fun LibrarySearchDialog(
     onDismiss: () -> Unit,
     systemId: String? = null,
     systemFolder: File? = null,
+    // droidtop's own Recommendations (docs/SPEC.md 12a), shown while the
+    // field is empty; picking one puts its title in the field. Computed by
+    // the caller off the main thread, never here.
+    suggestions: List<dev.droidtop.library.integrations.Recommendation> = emptyList(),
 ) {
     var text by remember { mutableStateOf(query.text) }
     val fieldFocus = remember { FocusRequester() }
@@ -401,6 +405,19 @@ internal fun LibrarySearchDialog(
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(top = 8.dp),
             )
+            if (text.isBlank() && suggestions.isNotEmpty()) {
+                MenuSectionLabel("Recommended for you")
+                suggestions.forEach { pick ->
+                    MenuRow(
+                        title = pick.title,
+                        subtitle = pick.reason,
+                        onClick = {
+                            text = pick.title
+                            onTextChange(pick.title)
+                        },
+                    )
+                }
+            }
             if (text.isNotBlank()) {
                 MenuSectionLabel(if (searching) "Get more (searching…)" else "Get more (${sourceHits.size})")
                 if (!searching && sourceHits.isEmpty()) {

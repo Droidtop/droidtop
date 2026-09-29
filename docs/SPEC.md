@@ -11617,13 +11617,22 @@ download destination; `LibrarySearchDialog` takes an optional
 `systemFolder: File?`/`systemId: String?` — null means Get More still
 shows results, but picking one explains there's nowhere configured to
 download to here, rather than silently sending an invalid path to
-`startJob`. **Not wired in this change**: the launcher drawer/QSB search
-(`LibrarySearchBridge`, `:runtime-common`, commit b91c4496) and any
-per-system console gamelist search, since neither yet calls into
-`LibraryQueryUi`'s shared component (only `PcLibraryView` does today) —
-extending the same debounced fan-out to those call sites is the direct
-next step and needs no new mechanism, only a new caller. Tracked on
-Droidtop/tracker.
+`startJob`. **Console gamelist search (built 2026-09-29).** A console
+system's (or collection's) Select menu has a "Search" row that opens the
+SAME `LibrarySearchDialog`, with that system's id and its games folder as
+the download destination, so "Get more" works there and a picked download
+lands in the system's own folder. The typed text narrows the gamelist
+through `matchesSearchText`, the one text rule `LibraryQuery.matches` also
+uses (title, genre or developer); the row reads "Search: <text>" while a
+search is on, and clearing the text in the dialog clears it. The search
+lasts as long as the gamelist stays open. The PC group keeps its own chip
+row. **The launcher drawer/QSB search stays library-only, on purpose for
+now**: it is a Launcher3 View list in `:shell-default`, which cannot host
+the Compose dialog and cannot depend on `:library-core`; "Get more" there
+would be a second, View-based renderer over the same
+`PluginSearchAggregator` and a second registered seam beside
+`LibrarySearch`, which this file does not decide to build until the owner
+wants downloads started from the drawer.
 
 **3. The Recommendations API (`dev.droidtop.library.integrations.RecommendationProvider`,
 `library-core`) — droidtop's OWN feature, never plugin-fed, never
@@ -11642,43 +11651,55 @@ data class Recommendation(title, platform, reason, artUrl?, description?, score)
 Shaped as an interface for the same reason as the Sources API: a future
 re-ranking provider (a server-side model, a second local heuristic) can
 be added or swapped with no UI change. `LocalSimilarityRecommendations`
-is the one built-in implementation's home for the ranking math, both
-pure and unit-tested (`LocalSimilarityRecommendationsTest`):
+is the one built-in implementation, and its ranking math is pure and
+unit-tested (`LocalSimilarityRecommendationsTest`):
 - `weightedRating(rating, count, priorMean, priorCount)` — the standard
   IMDB/Bayesian formula, so a title with few votes is pulled toward the
   catalog average rather than letting "5 votes of 100" outrank "5,000
-  votes of 90" (owner's own example);
-- `librarySimilarity(candidateGenre, candidateDeveloper, ownedWeights)` —
-  genre/developer overlap with the user's own library, 0..1, normalized
-  so library size doesn't inflate the score;
-- `playWeight(playtimeSeconds, daysSinceLastPlayed)` — how much one owned
+  votes of 90" (owner's own example); kept for the catalog pool below,
+  which is where vote counts exist;
+- `SimilarityIndex` — the library's genre/developer signal folded once
+  (weight by play), so scoring a candidate is two map lookups and the
+  ranking is linear in the library, never quadratic; 0..1 so library size
+  doesn't inflate it (`librarySimilarity` is the same index behind the
+  old list-shaped signature);
+- `playWeight(playtimeSeconds, daysSinceLastPlayed)` — how much one played
   game counts toward similarity: log-scaled playtime (an hour and a
   hundred hours don't differ 100x) times a recency multiplier (played in
-  the last week counts most), floored so an unplayed-but-owned game still
-  counts a little.
+  the last week counts most).
 
-**Why `recommend()` itself returns nothing yet.** Every signal the owner
-specified — IGDB `total_rating`/`total_rating_count`/`similar_games`,
+**What `recommend()` returns today (built 2026-09-29).** It ranks the games
+already in the user's library that they have NOT played, by how much they
+resemble what they do play: genre (0.6) and developer (0.4) matched
+against the played games, each weighted by `playWeight`, plus a small
+bonus for the game's own scraped rating (0..1, `RATING_BONUS` 0.25). Only
+what droidtop really holds is used (`LibraryEntry` genre, developer,
+rating, play count, playtime, last played); a game that resembles nothing
+played is left out, hidden and broken games are skipped, a played game is
+never recommended, and with no play history the answer is empty rather
+than a guess. `Platform(systemId)` narrows to one console system;
+`BecauseOf(title)` uses that one game as the whole basis and its `reason`
+says so; otherwise the `reason` names the played game it most resembles
+("Same genre as ...", "Same developer as ..."). The provider is handed a
+supplier of the entries and runs on `Dispatchers.Default`.
+The empty search field of `LibrarySearchDialog` shows the top five as
+"Recommended for you" (PC library only today, computed only while the
+dialog is open); picking one puts its title in the field.
+
+**The catalog pool is still the remaining input.** The owner's fuller
+signal set — IGDB `total_rating`/`total_rating_count`/`similar_games`,
 ScreenScraper ratings, a RetroAchievements popularity proxy — needs a
-scraped CATALOG OF GAMES THE USER DOES NOT OWN to rank in the first
-place, and droidtop has no scraper (the standing gap this file has
-already named: "droidtop has no media-scraper of its own"). Without a
-scraper there is no candidate pool at all — not "a ranking bug", a
-missing input. `LocalSimilarityRecommendations.recommend()` is real,
-wired API-shaped code that honestly returns an empty list rather than
-recommending games the user already owns (the only real data on hand) or
-fabricating candidate titles (droidtop's own no-fabricated-content rule).
-The ranking math above is ready the moment a real candidate catalog
-exists; only the fetch/cache/rebuild-in-background layer over a real
-scraper is new work from there. Tracked as its own item — Droidtop/tracker,
-"Recommendations: droidtop's own games-you-might-like feature", P1,
-app:droidtop, referenced by this change's commits — covering: the scraper
-prerequisite itself (already tracked separately as a standing gap), the
-IGDB/ScreenScraper/RetroAchievements fetch+cache layer, the local
-similarity index's background rebuild and on-device storage, and the
-first-class "Top rated on `<system>`"/"Because you played `<game>`"
-presentation in the gaming shell and the launcher search (not built in
-this change).
+catalog of games the user does NOT own, fetched and cached by droidtop.
+That is a second candidate pool in `rank` (the Bayesian rating and the
+same `SimilarityIndex` apply to it unchanged), and it is what gives
+"where to get it" something to look up (`GetMoreComposer.composeEmpty`), a
+recommendation from the library itself being owned already. Nothing is
+fabricated in the meantime: no title enters a list that is not in the
+library. The remaining work is tracked on Droidtop/tracker,
+"Recommendations: droidtop's own games-you-might-like feature": the
+catalog fetch and cache, RetroAchievements popularity, the on-device
+index's background rebuild, store adapters for lookup, and the
+"Top rated on <system>" presentation.
 
 **Layering — how the three pieces compose (owner directive, verbatim
 below each rule).** A separate `GetMoreComposer` object
@@ -11711,14 +11732,11 @@ composition so neither API needs to know about the other:
   rather than "plugins" specifically: `GameSources.plugins(context)` is
   today's only real source of that list, and a store adapter is a second
   `GameSourceProvider` added to the same list, not a UI change.
-- **Get more's UI wiring for the empty-query/Recommendations case is NOT
-  built in this change** — `GetMoreComposer.composeEmpty` exists and is
-  reachable, but with `LocalSimilarityRecommendations.recommend()`
-  honestly returning nothing (see above), there is nothing yet for
-  `LibrarySearchDialog` to show on an empty query; wiring it in now would
-  be dead code with no way to verify it on a real device. It is the
-  direct next step once a candidate catalog exists, tracked on the same
-  Recommendations issue.
+- **Get more's empty-query state**: `LibrarySearchDialog` shows the
+  library recommendations above directly. `GetMoreComposer.composeEmpty`
+  (recommendations paired with `lookup` results) is not called by a
+  surface yet; it is for the catalog pool, whose games are not owned and
+  so have somewhere to be got from.
 
 ## 13. UI v2 — end-user redesign direction (dtv2ui audit, 2026-09-28)
 

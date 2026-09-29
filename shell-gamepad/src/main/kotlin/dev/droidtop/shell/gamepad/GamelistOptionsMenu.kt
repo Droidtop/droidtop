@@ -154,6 +154,13 @@ internal fun GamelistOptionsMenu(
     // the group's own options screen (ShellBackStack.optionsOpen), the
     // same level above the gamelist every group's options screen uses.
     onOpenStores: () -> Unit = {},
+    // The console gamelist's search text (docs/SPEC.md 12a "Search
+    // fan-out"): [games] is already narrowed by it, [totalGames] is the
+    // list before narrowing. Null [onSearchTextChange] means this list has
+    // no search row (the library scope; the PC group has its own chip row).
+    searchText: String = "",
+    totalGames: Int = games.size,
+    onSearchTextChange: ((String) -> Unit)? = null,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
@@ -196,6 +203,8 @@ internal fun GamelistOptionsMenu(
     val orphansLabel = if (orphansArmed) ORPHANS_DELETE else ORPHANS_FIND
 
     val libraryScope = groupKey.isEmpty()
+    val searchRowLabel = if (searchText.isBlank()) "Search" else "Search: ${searchText.trim()}"
+    var searchOpen by remember { mutableStateOf(false) }
     val actions = buildList {
         if (libraryScope) {
             // The library-wide actions that used to live in Settings.
@@ -212,6 +221,7 @@ internal fun GamelistOptionsMenu(
                 add("Sort: ${sort.label}")
                 add("Show: ${filter.label}")
             }
+            if (onSearchTextChange != null && systemId != PC_SYSTEM_ID) add(searchRowLabel)
             if (games.isNotEmpty()) {
                 add("Jump to letter")
                 add("Random game")
@@ -377,6 +387,7 @@ internal fun GamelistOptionsMenu(
                 systemLaunchScreen = next
                 systemId?.let { dev.droidtop.library.LaunchScreenMemory.setSystemChoice(context, it, next) }
             }
+            searchRowLabel -> searchOpen = true
             "Jump to letter" -> {
                 pickingLetter = true
                 focusIndex = 0
@@ -582,6 +593,25 @@ internal fun GamelistOptionsMenu(
                 if (pickingLetter) "Up/Down moves, A jumps, B goes back" else "Up/Down moves, A activates, B closes",
             )
         }
+    }
+
+    // The same search dialog the PC library opens (LibraryQueryUi), so the
+    // "Get more" fan-out to source plugins is one component, not a copy.
+    // Downloads land in this system's own folder.
+    if (searchOpen && onSearchTextChange != null) {
+        var searchFolder by remember { mutableStateOf<java.io.File?>(null) }
+        androidx.compose.runtime.LaunchedEffect(systemId) {
+            searchFolder = systemId?.let { id -> withContext(Dispatchers.IO) { consoleFoldersFor(id).firstOrNull() } }
+        }
+        dev.droidtop.shell.gamepad.query.LibrarySearchDialog(
+            query = dev.droidtop.shell.gamepad.query.LibraryQuery(text = searchText),
+            matchCount = games.size,
+            totalCount = totalGames,
+            onTextChange = onSearchTextChange,
+            onDismiss = { searchOpen = false },
+            systemId = systemId,
+            systemFolder = searchFolder,
+        )
     }
 }
 

@@ -146,15 +146,7 @@ data class LibraryQuery(
 
     /** Whether the entry passes the search text and every selected facet value. */
     fun matches(entry: LibraryEntry, scope: LibraryQueryScope): Boolean {
-        val wanted = text.trim()
-        if (wanted.isNotBlank()) {
-            val haystack = listOfNotNull(
-                entry.title,
-                entry.genre?.takeIf { it.isNotBlank() },
-                entry.developer?.takeIf { it.isNotBlank() },
-            )
-            if (haystack.none { it.contains(wanted, ignoreCase = true) }) return false
-        }
+        if (!matchesSearchText(entry, text)) return false
         return scope.facets.all { facet ->
             val selected = selected(facet)
             selected.isEmpty() || facet.valuesOf(entry, scope.context).any { it in selected }
@@ -164,6 +156,23 @@ data class LibraryQuery(
     /** The list as this query shows it: filtered, then sorted, ties by title. */
     fun applyTo(base: List<LibraryEntry>, scope: LibraryQueryScope): List<LibraryEntry> =
         base.filter { matches(it, scope) }.sortedWith(sort.comparator())
+}
+
+/**
+ * The one search-text rule: a blank text matches everything, otherwise the
+ * text must be inside the title, genre or developer (case-insensitive).
+ * [LibraryQuery.matches] and the console gamelist's search (docs/SPEC.md
+ * 12a "Search fan-out") both call this, so a search means the same thing in
+ * every list.
+ */
+fun matchesSearchText(entry: LibraryEntry, text: String): Boolean {
+    val wanted = text.trim()
+    if (wanted.isBlank()) return true
+    return listOfNotNull(
+        entry.title,
+        entry.genre?.takeIf { it.isNotBlank() },
+        entry.developer?.takeIf { it.isNotBlank() },
+    ).any { it.contains(wanted, ignoreCase = true) }
 }
 
 /** The comparator for [LibrarySortKey]; by name last, so two orders of one sort stay one order. */

@@ -2015,7 +2015,7 @@ private fun GamesSection(
     // Alphabetical -- real ES-DE's own default gamelist sort order, and a
     // real, stable Up/Down order for the headless (no list widget) case
     // below, unlike allGames' own natural Library order.
-    val systemGamesForGroup = remember(selectedGroup, entries, collectionGroupMembers, sortVersion, pcGrouped) {
+    val systemGamesBeforeSearch = remember(selectedGroup, entries, collectionGroupMembers, sortVersion, pcGrouped) {
         val group = selectedGroup
         when (group) {
             null -> emptyList()
@@ -2044,6 +2044,17 @@ private fun GamesSection(
                     .filter { filter.matches(it) }
                     .sortedWith(GamelistSortPrefs.comparator(GamelistSortPrefs.get(context, group.label)))
             }
+        }
+    }
+    // The console gamelist's search (Select menu -> Search, the shared
+    // LibrarySearchDialog, docs/SPEC.md 12a "Search fan-out"): narrows the
+    // list by the one shared text rule. The PC group has its own query.
+    var gamelistSearchText by remember(selectedGroup) { mutableStateOf("") }
+    val systemGamesForGroup = remember(systemGamesBeforeSearch, gamelistSearchText, selectedGroup) {
+        if (gamelistSearchText.isBlank() || selectedGroup == GameGroup.Pc) {
+            systemGamesBeforeSearch
+        } else {
+            systemGamesBeforeSearch.filter { dev.droidtop.shell.gamepad.query.matchesSearchText(it, gamelistSearchText) }
         }
     }
     // Which game the gamelist is on. Restored from the stack, so coming
@@ -2077,6 +2088,12 @@ private fun GamesSection(
                 },
                 onDismiss = { gamelistOptionsOpen = false },
                 games = systemGamesForGroup,
+                searchText = gamelistSearchText,
+                totalGames = systemGamesBeforeSearch.size,
+                onSearchTextChange = if (group == null) null else { text ->
+                    gamelistSearchText = text
+                    focusedGameIndex = 0
+                },
                 onJumpTo = { index ->
                     focusedGameIndex = index.coerceIn(0, (systemGamesForGroup.lastIndex).coerceAtLeast(0))
                 },

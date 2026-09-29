@@ -76,4 +76,51 @@ class LocalSimilarityRecommendationsTest {
         val weight = LocalSimilarityRecommendations.playWeight(playtimeSeconds = 0L, daysSinceLastPlayed = null)
         assertTrue("expected a positive floor weight, got $weight", weight > 0.0)
     }
+
+    private fun game(id: String, genre: String?, developer: String? = null, playSeconds: Long = 0, rating: Float? = null, systemId: String? = null, hidden: Boolean = false) =
+        dev.droidtop.library.LibraryEntry(
+            id = id, title = id, kind = dev.droidtop.library.LibraryEntryKind.CONSOLE_ROM,
+            playtimeSeconds = playSeconds, playCount = if (playSeconds > 0) 1 else 0,
+            genre = genre, developer = developer, rating = rating, systemId = systemId, hidden = hidden,
+        )
+
+    @Test
+    fun `rank suggests only unplayed games that resemble what was played, best first`() {
+        val library = listOf(
+            game("Played Platformer", "Platformer", "Studio A", playSeconds = 36_000),
+            game("Unplayed Platformer", "Platformer"),
+            game("Unplayed Racer", "Racing"),
+            game("Same Studio", null, "Studio A", rating = 0.2f),
+            game("Hidden Platformer", "Platformer", hidden = true),
+        )
+        val picks = LocalSimilarityRecommendations.rank(library, RecommendationScope.Overall, limit = 10, nowMs = 0L)
+        assertEquals(listOf("Unplayed Platformer", "Same Studio"), picks.map { it.title })
+        assertEquals("Same genre as Played Platformer", picks.first().reason)
+    }
+
+    @Test
+    fun `rank recommends nothing without play history and never invents titles`() {
+        val library = listOf(game("A", "Platformer"), game("B", "Platformer"))
+        assertTrue(LocalSimilarityRecommendations.rank(library, RecommendationScope.Overall, 10, 0L).isEmpty())
+        assertTrue(LocalSimilarityRecommendations.rank(emptyList(), RecommendationScope.Overall, 10, 0L).isEmpty())
+    }
+
+    @Test
+    fun `rank narrows to a platform and to one named game`() {
+        val library = listOf(
+            game("Played", "Platformer", playSeconds = 3600),
+            game("On NES", "Platformer", systemId = "nes"),
+            game("On SNES", "Platformer", systemId = "snes"),
+        )
+        assertEquals(listOf("On NES"), LocalSimilarityRecommendations.rank(library, RecommendationScope.Platform("nes"), 10, 0L).map { it.title })
+        val because = LocalSimilarityRecommendations.rank(library, RecommendationScope.BecauseOf("played"), 10, 0L)
+        assertEquals(setOf("On NES", "On SNES"), because.map { it.title }.toSet())
+        assertEquals("Because you played played", because.first().reason)
+    }
+
+    @Test
+    fun `rank honours the limit`() {
+        val library = listOf(game("Played", "Platformer", playSeconds = 3600)) + (1..5).map { game("G$it", "Platformer") }
+        assertEquals(2, LocalSimilarityRecommendations.rank(library, RecommendationScope.Overall, 2, 0L).size)
+    }
 }
