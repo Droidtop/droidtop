@@ -3,7 +3,10 @@ package dev.droidtop.shell.gamepad.input
 import android.view.KeyEvent
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
@@ -68,7 +71,18 @@ fun Modifier.ownPadButtons(onBack: () -> Unit): Modifier = onKeyEvent { event ->
 fun Modifier.padSelectable(
     onFocus: (Boolean) -> Unit = {},
     onPress: () -> Unit,
-): Modifier = this
+): Modifier = composed {
+    // The tap handler is keyed on nothing and reads the CURRENT onPress:
+    // screens pass a fresh lambda on every recomposition, and keying the
+    // pointer input on it restarted the gesture detector on each one, which
+    // cancelled a tap whose DOWN had already landed. Onboarding and the
+    // tutorial recompose right as a step appears (focus retries, state
+    // reads), so a first tap on a secondary button ("Continue without it",
+    // "Skip the tutorial") was dropped and the same tap a moment later
+    // worked (Droidtop/tracker#42).
+    val currentPress by rememberUpdatedState(onPress)
+    val currentFocus by rememberUpdatedState(onFocus)
+    this
     .onKeyEvent { event ->
         val key = event.nativeKeyEvent.keyCode
         val confirms = if (KeyEvent.isGamepadButton(key)) {
@@ -76,13 +90,14 @@ fun Modifier.padSelectable(
         } else {
             key == KeyEvent.KEYCODE_ENTER || key == KeyEvent.KEYCODE_DPAD_CENTER || key == KeyEvent.KEYCODE_NUMPAD_ENTER
         }
-        if (confirms && event.type == KeyEventType.KeyUp) onPress()
+        if (confirms && event.type == KeyEventType.KeyUp) currentPress()
         confirms
     }
-    .onFocusChanged { onFocus(it.isFocused) }
+    .onFocusChanged { currentFocus(it.isFocused) }
     .focusable()
     .semantics {
         role = Role.Button
-        onClick { onPress(); true }
+        onClick { currentPress(); true }
     }
-    .pointerInput(onPress) { detectTapGestures(onTap = { onPress() }) }
+    .pointerInput(Unit) { detectTapGestures(onTap = { currentPress() }) }
+}
