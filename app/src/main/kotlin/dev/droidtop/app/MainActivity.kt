@@ -147,10 +147,12 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     // Reading `intent.getStringExtra(...)` directly inside `setContent`
     // would silently do nothing then: `mode` often doesn't change (already
     // MODE_GAMING), so nothing triggers GamepadShell to recompose with
-    // the new extras. A separate token, bumped on every onCreate/onNewIntent
-    // and read by GamepadShell via LaunchedEffect(token), fires every real
-    // deep-link regardless of whether `mode` itself changed or the extras'
-    // own values happen to repeat (e.g. "Rescan library" pressed twice).
+    // the new extras. A separate token, bumped on every real delivery (a
+    // fresh onCreate, or onNewIntent -- never the recreate the Text size
+    // setting triggers, see onCreate) and read by GamepadShell via
+    // LaunchedEffect(token), fires every real deep-link regardless of
+    // whether `mode` itself changed or the extras' own values happen to
+    // repeat (e.g. "Rescan library" pressed twice).
     private var gamingDeepLinkToken by mutableStateOf(0)
     private var gamingStartSection by mutableStateOf<String?>(null)
     private var gamingTriggerRescan by mutableStateOf(false)
@@ -206,7 +208,16 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        applyGamingDeepLink(intent)
+        // A recreate is not a new delivery of this Intent. The Gaming
+        // deep-link extras it may carry were consumed by the instance
+        // that saved this state, and re-applying them would drag the user
+        // back to the section those extras named -- away from the place
+        // the restored shell state (GamepadShell's saveable back stack,
+        // Droidtop/tracker#87) actually holds. The Text size setting
+        // triggers exactly such a recreate (AccessibilityPrefs). Real
+        // re-deliveries still arrive, and are applied, through
+        // onNewIntent below.
+        if (savedInstanceState == null) applyGamingDeepLink(intent)
 
         // A third crash while starting sends the app to Global settings,
         // where Data > Share diagnostics is, instead of into any shell

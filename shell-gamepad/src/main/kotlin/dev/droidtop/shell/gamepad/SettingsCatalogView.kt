@@ -35,7 +35,12 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,6 +71,7 @@ import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.SettingsSearchIndex
 import dev.droidtop.library.settings.SettingsSearchResult
+import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.library.settings.SubScreenItem
 import dev.droidtop.library.settings.TextInputItem
@@ -125,9 +131,14 @@ fun CatalogNavigator(
 ) {
     val context = LocalContext.current
     var version by remember { mutableStateOf(0) }
-    val stack = remember { mutableStateListOf(root) }
+    // Both place-holding states below are saveable because the Activity
+    // recreate the Text size setting triggers (AccessibilityPrefs,
+    // Droidtop/tracker#87) used to rebuild them from nothing: the user
+    // changing their text size inside a pushed settings screen landed
+    // back on this root with row 0 selected, their place gone.
+    val stack = rememberSaveable(saver = catalogStackSaver(root)) { mutableStateListOf(root) }
     // Selection is per-depth so popping restores where the user was.
-    val selectionByDepth = remember { mutableStateMapOf<Int, Int>() }
+    val selectionByDepth = rememberSaveable(saver = selectionByDepthSaver) { mutableStateMapOf<Int, Int>() }
     // And so is the scroll: one list shows every depth, so coming back
     // from a sub-screen found the list where the sub-screen had left it
     // and scrolled the restored row to the top, and the row under the
@@ -524,6 +535,51 @@ fun CatalogNavigator(
         }
     }
 }
+
+/**
+ * The settings navigator's screen stack as one savable value: the live
+ * [CatalogScreen]s carry builder lambdas and cannot go into saved state,
+ * so the stack saves as its screens' ids and re-resolves the pushed ones
+ * through [SettingsScreenRegistry] on the way out. Every screen the
+ * Settings tab itself can push is a registered one -- the root catalogs
+ * reference them by registryId precisely so this module does not depend
+ * on their data -- and an id that resolves to nothing (a screen some
+ * surface pushed inline, or one whose owner no longer registers it)
+ * ends the restore at the last resolvable screen rather than dropping
+ * the whole stack. The root always comes from the caller, never from the
+ * saved ids, so a call site that changed its root keeps its new one.
+ */
+internal fun catalogStackSaver(root: CatalogScreen): Saver<SnapshotStateList<CatalogScreen>, Any> = listSaver(
+    save = { screens -> screens.map { it.id } },
+    restore = { ids ->
+        if (ids.firstOrNull() != root.id) {
+            null
+        } else {
+            mutableStateListOf(root).apply {
+                for (id in ids.drop(1)) {
+                    val screen = SettingsScreenRegistry.get(id) ?: break
+                    add(screen)
+                }
+            }
+        }
+    },
+)
+
+/** Each depth's selected row, flattened into one savable list. */
+internal val selectionByDepthSaver: Saver<SnapshotStateMap<Int, Int>, Any> = listSaver(
+    save = { byDepth -> byDepth.flatMap { (depth, row) -> listOf(depth, row) } },
+    restore = { values ->
+        mutableStateMapOf<Int, Int>().apply {
+            var i = 0
+            while (i + 1 < values.size) {
+                val depth = values[i] as? Int ?: break
+                val row = values[i + 1] as? Int ?: break
+                put(depth, row)
+                i += 2
+            }
+        }
+    },
+)
 
 /**
  * Gaming's Settings section: the Gaming settings catalog rendered by

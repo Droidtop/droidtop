@@ -3,6 +3,8 @@ package dev.droidtop.shell.gamepad
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.setValue
 
 /**
@@ -166,4 +168,50 @@ internal class ShellBackStack(initialSection: GamingSection) {
 
     /** [focusIn] for where the shell is now. */
     val focusHere: String? get() = focus[place.key]
+
+    companion object {
+        /**
+         * The whole back stack as one savable value, so the Activity
+         * recreate the Text size setting triggers (AccessibilityPrefs;
+         * Droidtop/tracker#87) restores the user's place instead of
+         * rebuilding it from the default section, which dropped whoever
+         * changed the setting on the Games tab with their whole place
+         * in the shell gone. Flat non-null strings and booleans only:
+         * a Bundle carries no nulls, and real group keys and entry ids
+         * are never the empty string, so "" can stand for "none".
+         */
+        val Saver: Saver<ShellBackStack, Any> = listSaver(
+            save = { nav -> toSavedState(nav) },
+            restore = { values -> fromSavedState(values) },
+        )
+
+        private fun toSavedState(nav: ShellBackStack): List<Any> = buildList {
+            add(nav.section.name)
+            add(nav.groupKey.orEmpty())
+            add(nav.detailId.orEmpty())
+            add(nav.optionsOpen)
+            nav.focus.forEach { (place, entryId) ->
+                add(place)
+                add(entryId)
+            }
+        }
+
+        private fun fromSavedState(values: List<Any?>): ShellBackStack? {
+            val section = (values.getOrNull(0) as? String)
+                ?.let { name -> runCatching { GamingSection.valueOf(name) }.getOrNull() }
+                ?: return null
+            val nav = ShellBackStack(section)
+            nav.groupKey = (values.getOrNull(1) as? String)?.takeIf { it.isNotEmpty() }
+            nav.detailId = (values.getOrNull(2) as? String)?.takeIf { it.isNotEmpty() }
+            nav.optionsOpen = values.getOrNull(3) as? Boolean ?: false
+            var i = 4
+            while (i + 1 < values.size) {
+                val place = values[i] as? String ?: break
+                val entryId = values[i + 1] as? String ?: break
+                nav.focus[place] = entryId
+                i += 2
+            }
+            return nav
+        }
+    }
 }

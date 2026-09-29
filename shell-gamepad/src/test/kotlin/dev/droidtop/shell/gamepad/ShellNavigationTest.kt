@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import androidx.compose.runtime.saveable.SaverScope
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -14,6 +15,12 @@ import org.junit.Test
 class ShellNavigationTest {
 
     private fun stack() = ShellBackStack(GamingSection.GAMES)
+
+    // listSaver's save asks its SaverScope what may be stored; this one
+    // stores anything, which is all the round-trip tests need.
+    private val saverScope = object : SaverScope {
+        override fun canBeSaved(value: Any) = true
+    }
 
     @Test
     fun `back from a detail returns to the group it was opened from`() {
@@ -133,5 +140,64 @@ class ShellNavigationTest {
         nav.openGroup("system:snes")
         assertNull(nav.detailId)
         assertTrue(nav.canGoBack)
+    }
+
+    @Test
+    fun `the saver round-trips the whole place`() {
+        val nav = stack()
+        nav.openGroup("system:pc")
+        nav.rememberFocus("pc-game")
+        nav.openOptions()
+        nav.openSection(GamingSection.SETTINGS)
+
+        val saved = with(saverScope) { ShellBackStack.Saver.save(nav) }
+        val restored = ShellBackStack.Saver.restore(saved!!)
+
+        assertEquals(GamingSection.SETTINGS, restored!!.section)
+        assertNull(restored.groupKey)
+        assertNull(restored.detailId)
+        assertFalse(restored.optionsOpen)
+        // The focus saved in a place the section switch left survives:
+        // returning to that PC grid lands on the game that was on it.
+        assertEquals("pc-game", restored.focusIn(ShellPlace.Group("system:pc")))
+        assertEquals(ShellPlace.Section(GamingSection.SETTINGS), restored.place)
+    }
+
+    @Test
+    fun `the saver round-trips an open detail and per-place focus`() {
+        val nav = stack()
+        nav.openGroup("system:snes")
+        nav.rememberFocus("snes-game")
+        nav.openDetail("snes-game")
+
+        val saved = with(saverScope) { ShellBackStack.Saver.save(nav) }
+        val restored = ShellBackStack.Saver.restore(saved!!)
+
+        assertEquals("system:snes", restored!!.groupKey)
+        assertEquals("snes-game", restored.detailId)
+        assertEquals(ShellPlace.Detail("snes-game"), restored.place)
+        assertEquals(ShellPlace.Group("system:snes"), restored.under)
+        // B out of the restored detail lands on the game it was opened
+        // from, same as it did before the save.
+        assertEquals(ShellPlace.Group("system:snes"), restored.back())
+        assertEquals("snes-game", restored.focusHere)
+    }
+
+    @Test
+    fun `the saver saves and restores the top level of the shell`() {
+        val saved = with(saverScope) { ShellBackStack.Saver.save(stack()) }
+        val restored = ShellBackStack.Saver.restore(saved!!)
+
+        assertEquals(GamingSection.GAMES, restored!!.section)
+        assertNull(restored.groupKey)
+        assertNull(restored.detailId)
+        assertFalse(restored.optionsOpen)
+        assertNull(restored.back())
+    }
+
+    @Test
+    fun `the saver refuses a save it cannot read back`() {
+        assertNull(ShellBackStack.Saver.restore(emptyList<Any>()))
+        assertNull(ShellBackStack.Saver.restore(listOf("not-a-section")))
     }
 }

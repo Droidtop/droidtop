@@ -43,6 +43,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -237,8 +238,11 @@ fun GamepadShell(
     // draw them, because a screen that owns its own place in the tree
     // loses it the moment something else is drawn instead -- which is
     // exactly what build 542's "B from a game detail does not return to
-    // the PC grid" was.
-    val nav = remember { ShellBackStack(GamingPrefs.defaultSection(context)) }
+    // the PC grid" was. Saveable rather than plain remember so the
+    // Activity recreate the Text size setting triggers
+    // (AccessibilityPrefs, Droidtop/tracker#87) restores this whole
+    // place instead of dropping the user on the default section.
+    val nav = rememberSaveable(saver = ShellBackStack.Saver) { ShellBackStack(GamingPrefs.defaultSection(context)) }
     val section = nav.section
     // Bumps whenever a real "Browse themes" deep-link arrives (see
     // deepLinkToken's own doc comment) -- SettingsCatalogView opens its

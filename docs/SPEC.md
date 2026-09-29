@@ -9536,6 +9536,14 @@ opts in.
 - *Text size:* Normal, Large (1.15), Larger (1.3), Largest (1.5), multiplied onto the system font
   scale on each activity's own Resources before its content is inflated or composed (`sp` in
   Views and Compose's Density both read it); a change recreates the foreground screen.
+  That recreate keeps the user's place (Droidtop/tracker#87): the Gaming shell's whole back
+  stack (section, open group, detail, options screen, and the entry focused in each —
+  `ShellBackStack.Saver`), and the Settings catalog's screen stack and per-depth selected
+  row (`CatalogNavigator`'s savers, pushed screens re-resolved through
+  `SettingsScreenRegistry` by id, so no live builder goes into saved state), are saveable and
+  restored across it; and MainActivity applies Gaming deep-link extras only on a fresh
+  create, because a recreate is not a new delivery (onNewIntent still is). Colour vision
+  needs none of this: its filter recolours the live window without a recreate.
   Themed views follow it only where the theme's own sizes use the Density (they are the
   theme author's, as above). Layout at 1.5 is not rig-verified: the one-row-height rule was
   designed to 1.3.
