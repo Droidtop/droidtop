@@ -3293,6 +3293,24 @@ owner's own rule against fabricated content rules out inventing one for this pas
   save-location policy already directs droidtop to make SYSTEM locations mean somewhere
   else without changing save logic -- a save-state reader is real, separate scope, not a
   companion-screen afternoon.
+
+  **Decision (Droidtop/tracker#76, 2026-09-28): discovery is core, data-driven, read-only,
+  and blocked on two facts that must be established per emulator before any row exists.**
+  It is one table in the players-database style (`vendor/droidtop-platforms`): per player
+  package, where its states live and how a slot file is named, each row citing the
+  emulator's own source or documentation, and a row is added only once that is confirmed
+  on a real device. First, the location and naming come from the emulator, never from
+  memory. Second, reachability: on Android 11+ another app's `Android/data` is not
+  readable without a grant, so a row is usable only where the states sit in shared storage
+  or a folder the person has granted (the same "make system locations mean somewhere
+  else" policy the save-location rule already uses); a state store droidtop cannot read
+  is reported as "not visible to droidtop", never as "no states". This supersedes the
+  "links to where the runner keeps them" line of §7g only in that a game's detail may
+  LIST slots and timestamps read-only; loading, switching, backing up or syncing a state
+  stays the runner's. Not built yet: no row has been confirmed, so no reader ships (an
+  empty mechanism would be dead code). The first step is a rig session per emulator
+  (RetroArch, DuckStation, PPSSPP, Dolphin) that records the path and file naming from a
+  real save, which becomes the cited row.
 - **Achievements.** DuckStation's own in-game menu has an Achievements row, which is
   RetroAchievements support living entirely inside that emulator's own process; droidtop
   has no RetroAchievements client of its own and no channel to read that emulator's
