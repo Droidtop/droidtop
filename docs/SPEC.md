@@ -8491,6 +8491,9 @@ from this:
   What remains here is a Dialog-hosted menu over rows this section's
   action groups already produced (`rememberPcActions`), unchanged in
   substance.
+  Since 2026-09-29 those rows are drawn under three section headers
+  (Play, About, Fix and advanced; 13, "Gaming mode"), the same rows and actions,
+  filed by the question a player opening the menu is asking.
 
 **PC is always visible (owner direction 2026-09-26: "PC should always be
 visible").** Unlike a console system, whose card only ever appears once
@@ -12133,17 +12136,32 @@ Settings`, above), Start opening the Quick Menu.
   take when a system just needs its emulator fixed lands on exactly
   that system; the other two remain generic entry points into the same
   screen, each individually justified in the sections above.
-- `PcGameMenu` (ES-DE-style, L2/Y) carries runner, container settings,
+- `PcGameMenu` (ES-DE-style, L2/Y) carried runner, container settings,
   ProtonDB, Lutris import, F95 link/update, and merge/versions in one flat
   list — a direct translation of what `## 7i` calls "everything ES-DE has
   no slot for", not a list a first-time player would recognise as grouped
   by task ("play differently" vs. "about this copy" vs. "fix a problem").
+  This no longer accumulates: since 2026-09-29 the same rows and actions
+  sit under three section headers — Play (Runs with, Play/Set up,
+  Install/Manage install), About (Owned on, store links, the F95 thread
+  and its update state, compatibility and ProtonDB, scrape/match/media/
+  collections/favourite), and Fix and advanced (the replacement fold,
+  same-game merge, the engine pin, versions/segments, and the runner's
+  own settings rows) — drawn with the same `MenuSectionLabel`/`MenuRow`
+  shell every other in-context menu uses, nothing new. ProtonDB landed
+  under About rather than the "Advanced" this sketch first named: it is
+  read-only evidence about the game (§7i, "evidence, never a verdict"),
+  not an internal that changes how this copy runs, which is what "Fix
+  and advanced" holds. The old mechanism-named group titles ("Game
+  management", "Runs on Windows") and the "Links"/"Compatibility"
+  sub-headers folded away — every row already says what it is in its own
+  subtitle. The premise itself (that the flat list read as ungrouped)
+  was never confirmed on the rig: the 2026-09-28 walkthrough collapsed
+  before reaching `PcGameMenu`, so the regrouping was cut from code alone
+  and the rig item at this section's end is what says whether it reads
+  right.
 
 **v2 direction:**
-- Group `PcGameMenu` rows under three headers (Play, About, Fix/Advanced)
-  instead of one flat list — same rows, same actions, no new screens;
-  ProtonDB/merge/container internals move under "Advanced" per the
-  progressive-disclosure goal below.
 - Keep everything else: the frame-only themed render, the chip-row
   filter/sort model, capture-style input, L2/Y binding.
 
@@ -12207,6 +12225,10 @@ walk onboarding, Gaming (Art Book Next and decaffe), Launcher, Desktop
 `emulator-5560`, screenshot each screen, and check specifically: the
 three-paths-to-system-settings claim above, whether the Desktop taskbar
 Settings button reads as Desktop-scoped versus Global, and whether
-`PcGameMenu`'s flat row list actually feels ungrouped to a first-time
-player or reads fine in practice. Log findings against this section and
+`PcGameMenu` now reads as grouped under Play / About / Fix and advanced
+the way its 2026-09-29 regrouping claims — and, since the original
+flat-menu premise was never confirmed on the rig (the 2026-09-28
+walkthrough ended before reaching it), whether the old flat list would
+even have read as ungrouped, so a revert stays a live option if the
+grouping reads worse. Log findings against this section and
 correct it — this is a starting hypothesis from the code, not a ledger.

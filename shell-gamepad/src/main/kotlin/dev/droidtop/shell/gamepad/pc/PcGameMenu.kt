@@ -94,6 +94,12 @@ import kotlinx.coroutines.withContext
  * update state, merge and versions/segments, favourite/collections/
  * scrape.
  *
+ * Those rows sit under three section headers -- Play, About, Fix and
+ * advanced (docs/SPEC.md 13, "Gaming mode", 2026-09-29) -- the same rows
+ * and actions the one flat list carried, filed under the question a
+ * player opening this menu is asking: play it, learn about this copy,
+ * or fix it.
+ *
  * A itself no longer opens this menu (docs/SPEC.md 7i): on the gamelist,
  * A launches when the resolved runner is ready and runs the one setup
  * action when it is not ([dev.droidtop.library.PcRunnerOptions.resolveAndPlay]),
@@ -515,17 +521,22 @@ internal fun PcGameMenu(
     val setupAction = runner?.option?.action
 
     // Flattened once per recomposition into what this Dialog actually
-    // draws and what Up/Down/A navigate: a header entry (never
-    // selectable), a group title (never selectable), an info line (never
-    // selectable, e.g. a status message or the compatibility summary),
-    // or a row (selectable, the same PcActionRow every group already
-    // produces). One list, one focus index, the same shape
-    // GamelistOptionsMenu's own Select-button menu already uses.
+    // draws and what Up/Down/A navigate: a section header (never
+    // selectable), an info line (never selectable, e.g. a status message
+    // or the compatibility summary), or a row (selectable, the same
+    // PcActionRow the sections produce). The rows sit under the three
+    // headers of docs/SPEC.md 13, "Gaming mode" -- Play, About, Fix and
+    // advanced -- so one list, one focus index, the same shape
+    // GamelistOptionsMenu's own Select-button menu already uses, still
+    // moves over the whole menu, while the headers say what each part
+    // is for.
     // Whether this game's "Get it on" rows were hidden (docs/SPEC.md 7m);
     // one small preferences read, on entry, like the other remembered facts.
     var storeLinksHidden by remember(entry) { mutableStateOf(dev.droidtop.library.StoreLinkPrefs.hidden(context, gameIds)) }
     val entries = buildList {
-        // 1. Runs with -- WHICH runner, and how to change it.
+        // Play: what runs the game, and getting it running.
+        add(PcMenuEntry.Header("Play"))
+        // Runs with -- WHICH runner, and how to change it.
         if (!entry.missing && (!loaded || runners.options.isNotEmpty())) {
             add(
                 PcMenuEntry.Row(
@@ -541,7 +552,7 @@ internal fun PcGameMenu(
                 ),
             )
         }
-        // 2. Play, or the one action that makes Play possible -- the
+        // Play, or the one action that makes Play possible -- the
         // gamelist's own A now makes this exact decision on its own
         // (docs/SPEC.md 7i, redecided 2026-09-26,
         // PcRunnerOptions.resolveAndPlay), so this row is a second way to
@@ -585,13 +596,12 @@ internal fun PcGameMenu(
                 ),
             )
         }
+        actions.play.forEach { add(PcMenuEntry.Row(it)) }
         status?.let { add(PcMenuEntry.Info(it)) }
 
-        actions.forEach { group ->
-            add(PcMenuEntry.Header(group.title))
-            group.rows.forEach { add(PcMenuEntry.Row(it)) }
-        }
-
+        // About: this copy -- where it is owned and where to get it, its
+        // update state, its record in the person's library, and how it
+        // runs for other people.
         // Where the game is owned, and where it could be got (docs/SPEC.md
         // 7m): "Owned on Steam and GOG" for a game a store owns; for one no
         // store owns, its scraped store and support links as "Get it on ..."
@@ -612,69 +622,77 @@ internal fun PcGameMenu(
         } else {
             emptyList()
         }
-        // A game a store owns keeps its scraped store links as plain Links
+        // A game a store owns keeps its scraped store links as plain
         // rows; one owned nowhere shows them as the pointers above instead.
         val plainLinks = if (ownedOn.isEmpty() && !storeLinksHidden) dev.droidtop.library.StorePages.other(entry.links) else entry.links
-        if (ownedOn.isNotEmpty()) add(PcMenuEntry.Info(ownedOn))
-        if (plainLinks.isNotEmpty()) {
-            add(PcMenuEntry.Header("Links"))
-            plainLinks.forEach { link -> add(PcMenuEntry.Row(PcActionRow(link.label, link.url) { openLink(link.url) })) }
-        }
-        if (pointers.isNotEmpty()) {
-            pointers.forEach { link -> add(PcMenuEntry.Row(PcActionRow(link.label, link.url) { openLink(link.url) })) }
-            add(
-                PcMenuEntry.Row(
-                    PcActionRow("Hide these for this game", "") {
-                        dev.droidtop.library.StoreLinkPrefs.hide(context, gameIds)
-                        storeLinksHidden = true
-                    },
-                ),
-            )
-        }
-
         // Compatibility: evidence, never a verdict and never a gate
         // (docs/SPEC.md 7i). gamenative's own reports when the entry
         // carries them, and ProtonDB for a game with a Windows route,
         // looked up only when asked.
         val compat = entry.pcInfo?.compatibility
         val offersProtonDb = !entry.missing && (hasWindowsRoute || entry.pcInfo?.storeId != null)
-        if (compat != null || offersProtonDb) {
-            add(PcMenuEntry.Header("Compatibility"))
+        val aboutEntries = buildList {
+            if (ownedOn.isNotEmpty()) add(PcMenuEntry.Info(ownedOn))
+            plainLinks.forEach { link -> add(PcMenuEntry.Row(PcActionRow(link.label, link.url) { openLink(link.url) })) }
+            if (pointers.isNotEmpty()) {
+                pointers.forEach { link -> add(PcMenuEntry.Row(PcActionRow(link.label, link.url) { openLink(link.url) })) }
+                add(
+                    PcMenuEntry.Row(
+                        PcActionRow("Hide these for this game", "") {
+                            dev.droidtop.library.StoreLinkPrefs.hide(context, gameIds)
+                            storeLinksHidden = true
+                        },
+                    ),
+                )
+            }
+            actions.about.forEach { add(PcMenuEntry.Row(it)) }
             compat?.let {
                 add(PcMenuEntry.Info(it.summary() + "\nOther people's results on other hardware."))
             }
-        }
-        if (offersProtonDb) {
-            val state = protonDb
-            add(
-                PcMenuEntry.Row(
-                    PcActionRow(
-                        title = if (state is ProtonDbState.Found) state.summary.line() else "ProtonDB",
-                        detail = state.detail(),
-                        onSelect = if (state !is ProtonDbState.Looking) {
-                            {
-                                when (state) {
-                                    is ProtonDbState.Found -> status = runCatching {
-                                        context.startActivity(
-                                            android.content.Intent(
-                                                android.content.Intent.ACTION_VIEW,
-                                                android.net.Uri.parse(ProtonDbClient.pageUrl(state.appId)),
-                                            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                                        )
-                                        null
-                                    }.getOrElse { "There is no browser on this device to open ProtonDB in." }
-                                    else -> {
-                                        protonDb = ProtonDbState.Looking
-                                        scope.launch { protonDb = lookUpProtonDb(entry, gameName) }
+            if (offersProtonDb) {
+                val state = protonDb
+                add(
+                    PcMenuEntry.Row(
+                        PcActionRow(
+                            title = if (state is ProtonDbState.Found) state.summary.line() else "ProtonDB",
+                            detail = state.detail(),
+                            onSelect = if (state !is ProtonDbState.Looking) {
+                                {
+                                    when (state) {
+                                        is ProtonDbState.Found -> status = runCatching {
+                                            context.startActivity(
+                                                android.content.Intent(
+                                                    android.content.Intent.ACTION_VIEW,
+                                                    android.net.Uri.parse(ProtonDbClient.pageUrl(state.appId)),
+                                                ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                                            )
+                                            null
+                                        }.getOrElse { "There is no browser on this device to open ProtonDB in." }
+                                        else -> {
+                                            protonDb = ProtonDbState.Looking
+                                            scope.launch { protonDb = lookUpProtonDb(entry, gameName) }
+                                        }
                                     }
                                 }
-                            }
-                        } else {
-                            null
-                        },
+                            } else {
+                                null
+                            },
+                        ),
                     ),
-                ),
-            )
+                )
+            }
+        }
+        if (aboutEntries.isNotEmpty()) {
+            add(PcMenuEntry.Header("About"))
+            addAll(aboutEntries)
+        }
+
+        // Fix and advanced: the repairs and the internals of how this copy
+        // runs -- drawn only when there is anything of the kind, because a
+        // header over no rows is a category claiming to exist.
+        if (actions.advanced.isNotEmpty()) {
+            add(PcMenuEntry.Header("Fix and advanced"))
+            actions.advanced.forEach { add(PcMenuEntry.Row(it)) }
         }
         add(PcMenuEntry.Row(PcActionRow("Close", "", onClose)))
     }
@@ -755,7 +773,7 @@ private fun FullScreenOverlay(onDismiss: () -> Unit, content: @Composable () -> 
     }
 }
 
-/** One entry in [PcGameMenu]'s flattened list: a group header, an info line, or a selectable row. */
+/** One entry in [PcGameMenu]'s flattened list: a section header, an info line, or a selectable row. */
 private sealed interface PcMenuEntry {
     data class Header(val title: String) : PcMenuEntry
     data class Info(val text: String) : PcMenuEntry
@@ -801,8 +819,19 @@ private fun f95Line(links: GameLinks?, available: String?, versions: List<String
     }
 }
 
-/** A named group of actions, in the order §7i lists them. */
-private data class PcActionGroup(val title: String, val rows: List<PcActionRow>)
+/**
+ * The menu's three sections (docs/SPEC.md 13, "Gaming mode"): what plays
+ * the game, what this copy is, and what fixes or reconfigures it. The
+ * same rows the old mechanism-named groups ("Game management", "Runs on
+ * Windows", "Metadata and media") carried, refiled under the question a
+ * player opening the menu is there to answer -- a list titled by its
+ * machinery reads as one flat list, not as things to do.
+ */
+private data class PcMenuSections(
+    val play: List<PcActionRow>,
+    val about: List<PcActionRow>,
+    val advanced: List<PcActionRow>,
+)
 
 /** [onSelect] null means the row is shown disabled, with [detail] saying why. */
 private data class PcActionRow(val title: String, val detail: String, val onSelect: (() -> Unit)?)
@@ -814,6 +843,12 @@ private data class EngineChoice(val folder: String?, val pinned: Boolean, val en
     }
 }
 
+/**
+ * The menu's rows, filed into its three sections ([PcMenuSections],
+ * docs/SPEC.md 13, "Gaming mode"). The rows that need state this
+ * function has not got are handed in pre-built; everything else is
+ * built here from [entry] alone.
+ */
 @Composable
 private fun rememberPcActions(
     group: dev.droidtop.library.LibraryGameGroup?,
@@ -839,18 +874,61 @@ private fun rememberPcActions(
     wineSettings: WineGameSettings?,
     onImportLutris: () -> Unit,
     onClearWineSettings: () -> Unit,
-): List<PcActionGroup> {
+): PcMenuSections {
     val isEngineGame = entry.kind != LibraryEntryKind.WINE_PROFILE
     val runsOnEnginehost = runner?.option?.strategy == GameLaunchStrategy.ENGINEHOST
     val isStoreGame = entry.pcInfo?.storeId != null || entry.id.substringBefore(':') in STORE_PREFIXES
 
-    return listOfNotNull(
-        // The game's other folders, when it has any: its parts, and the
-        // versions of each. The row that is open says so instead of
-        // offering to open itself again.
-        group?.let { versionsGroup(it, currentId, onOpenOther) },
-        PcActionGroup(
-            "Game management",
+    return PcMenuSections(
+        // Play: getting this game onto the device and running it. The
+        // store's own screen is the one step before Play can mean
+        // anything for a store game; a folder game keeps the row,
+        // disabled, saying droidtop does not manage it.
+        play = listOfNotNull(
+            // One row, not three: install, verify, update, DLC and
+            // delete are one screen on the store's side, and that
+            // screen is the store's own (gamenative's AppScreen for
+            // this game's source, with its GameManagerDialog /
+            // EpicGameManagerDialog / AmazonInstallDialog).
+            PcActionRow(
+                if (entry.pcInfo?.installed == false) "Install" else "Manage install",
+                if (isStoreGame) {
+                    "Install, verify, update or remove it, and pick which extras come with it"
+                } else {
+                    "This game is a folder on this device; droidtop doesn't manage it"
+                },
+                if (isStoreGame) {
+                    { onOpenAppScreen(PC_STORE_ACTIVITY, mapOf(EXTRA_PC_ENTRY_ID to entry.id)) }
+                } else {
+                    null
+                },
+            ),
+            // The global download queue is not this game's; it is
+            // under "PC setup" (UI pass 2026-09-24, M7; renamed from
+            // "Stores and folders" when store accounts moved to
+            // "Accounts and sources").
+        ),
+        // About: this copy -- its update state and its record in the
+        // person's library.
+        about = updateRows + listOfNotNull(
+            PcActionRow("Scrape", "Looks this game up in the PC sources", onScrape),
+            PcActionRow("Choose match", "Pick the right game by hand when the scraper guessed wrong", onChooseMatch),
+            if (media > 1) PcActionRow("View media", "$media images and videos scraped for this game", onViewMedia) else null,
+            PcActionRow("Collections", "Which of your collections this game is in", onCollections),
+            PcActionRow(
+                if (favorite) "Remove from favourites" else "Add to favourites",
+                if (favorite) "It is in your Favourites collection" else "Puts it in your Favourites collection",
+                onToggleFavorite,
+            ),
+        ),
+        // Fix and advanced: the repairs (a found replacement, a same-game
+        // merge, a corrected engine detection, another folder of the same
+        // game) and the internals of how this copy runs.
+        advanced = listOfNotNull(
+            // The game's other folders, when it has any: its parts, and the
+            // versions of each. The row that is open says so instead of
+            // offering to open itself again.
+            group?.let { versionsRows(it, currentId, onOpenOther) },
             listOfNotNull(
                 // The fold, from whichever side the user is standing on
                 // (docs/SPEC.md 7g). On the game that is not there it is
@@ -885,67 +963,30 @@ private fun rememberPcActions(
                 // Which engine this folder is, and the pin that corrects
                 // detection (docs/SPEC.md 7e2b).
                 engineRow,
-            ) + updateRows + listOfNotNull(
-                // One row, not three: install, verify, update, DLC and
-                // delete are one screen on the store's side, and that
-                // screen is the store's own (gamenative's AppScreen for
-                // this game's source, with its GameManagerDialog /
-                // EpicGameManagerDialog / AmazonInstallDialog).
-                PcActionRow(
-                    if (entry.pcInfo?.installed == false) "Install" else "Manage install",
-                    if (isStoreGame) {
-                        "Install, verify, update or remove it, and pick which extras come with it"
-                    } else {
-                        "This game is a folder on this device; droidtop doesn't manage it"
-                    },
-                    if (isStoreGame) {
-                        { onOpenAppScreen(PC_STORE_ACTIVITY, mapOf(EXTRA_PC_ENTRY_ID to entry.id)) }
-                    } else {
-                        null
-                    },
-                ),
-                // The global download queue is not this game's; it is
-                // under "PC setup" (UI pass 2026-09-24, M7; renamed from
-                // "Stores and folders" when store accounts moved to
-                // "Accounts and sources").
             ),
-        ),
-        // ONE runner section, for the runner this game actually uses.
-        // Until build 540 every game got both: a Ren'Py game running on
-        // enginehost carried a Wine "Prefix and graphics" section it can
-        // do nothing with, under a section label that repeated the name
-        // of its only row. A section titled like its row says one thing
-        // twice; a section for a runner the game does not use is worse
-        // than nothing, because it reads as a setting that applies.
-        runnerGroup(
-            runsOnEnginehost = runsOnEnginehost,
-            hasWindowsRoute = hasWindowsRoute,
-            isEngineGame = isEngineGame,
-            onEnginehost = onEnginehost,
-            onOpenPrefix = {
-                onOpenAppScreen(
-                    PC_CONTAINER_CONFIG_ACTIVITY,
-                    mapOf(EXTRA_PC_ENTRY_ID to entry.id, EXTRA_PC_TITLE to entry.title),
-                )
-            },
-            wineSettings = wineSettings,
-            onImportLutris = onImportLutris,
-            onClearWineSettings = onClearWineSettings,
-        ),
-        PcActionGroup(
-            "Metadata and media",
-            listOfNotNull(
-                PcActionRow("Scrape", "Looks this game up in the PC sources", onScrape),
-                PcActionRow("Choose match", "Pick the right game by hand when the scraper guessed wrong", onChooseMatch),
-                if (media > 1) PcActionRow("View media", "$media images and videos scraped for this game", onViewMedia) else null,
-                PcActionRow("Collections", "Which of your collections this game is in", onCollections),
-                PcActionRow(
-                    if (favorite) "Remove from favourites" else "Add to favourites",
-                    if (favorite) "It is in your Favourites collection" else "Puts it in your Favourites collection",
-                    onToggleFavorite,
-                ),
+            // ONE runner's rows, for the runner this game actually uses.
+            // Until build 540 every game got both: a Ren'Py game running on
+            // enginehost carried a Wine "Prefix and graphics" section it can
+            // do nothing with, under a section label that repeated the name
+            // of its only row. Rows for a runner the game does not use are
+            // worse than nothing, because they read as a setting that
+            // applies.
+            runnerRows(
+                runsOnEnginehost = runsOnEnginehost,
+                hasWindowsRoute = hasWindowsRoute,
+                isEngineGame = isEngineGame,
+                onEnginehost = onEnginehost,
+                onOpenPrefix = {
+                    onOpenAppScreen(
+                        PC_CONTAINER_CONFIG_ACTIVITY,
+                        mapOf(EXTRA_PC_ENTRY_ID to entry.id, EXTRA_PC_TITLE to entry.title),
+                    )
+                },
+                wineSettings = wineSettings,
+                onImportLutris = onImportLutris,
+                onClearWineSettings = onClearWineSettings,
             ),
-        ),
+        ).flatten(),
     )
 }
 
@@ -954,15 +995,15 @@ private fun rememberPcActions(
  * each saying what it carries, with the one that is open marked.
  *
  * Minimum by design (docs/SPEC.md 7m): the model's whole job is that a
- * game is one entry, so what the detail needs is a way to reach the other
+ * game is one entry, so what this menu needs is a way to reach the other
  * folders of it, which is a list of rows -- the same rows every other
  * action on this screen is.
  */
-private fun versionsGroup(
+private fun versionsRows(
     group: dev.droidtop.library.LibraryGameGroup,
     currentId: String,
     onOpenOther: (LibraryEntry) -> Unit,
-): PcActionGroup? {
+): List<PcActionRow>? {
     val rows = mutableListOf<PcActionRow>()
     val game = group.game
     for (segment in game.segments) {
@@ -974,35 +1015,8 @@ private fun versionsGroup(
         rows += row(group, version, currentId, onOpenOther, label = null)
     }
     if (rows.size < 2) return null
-    return PcActionGroup(if (game.segments.isEmpty()) "Versions" else "Parts and versions", rows)
+    return rows
 }
-
-/**
- * Which folder of [group] the open [entry] is, in the same words a
- * "Parts and versions" row uses for it, or null for a game that is one
- * folder with nothing in its name to say.
- */
-private fun copyLabel(group: dev.droidtop.library.LibraryGameGroup, entry: LibraryEntry): String? {
-    val game = group.game
-    for (segment in game.segments) {
-        for (version in segment.versions) {
-            version.copies.firstOrNull { it.path == entry.id }?.let { return partLabel(segment.label, version, it) }
-        }
-    }
-    for (version in game.versions) {
-        version.copies.firstOrNull { it.path == entry.id }?.let { return partLabel(null, version, it) }
-    }
-    return null
-}
-
-/** The one wording for "this part, this version, these mods, this language". */
-private fun partLabel(segment: String?, version: dev.droidtop.library.GameVersion, copy: dev.droidtop.library.GameCopy): String? =
-    listOfNotNull(
-        segment,
-        version.version.takeIf { it.isNotEmpty() }?.let { "v$it" },
-        copy.mods.takeIf { it.isNotEmpty() }?.joinToString(" "),
-        copy.language,
-    ).joinToString(" - ").ifEmpty { null }
 
 private fun row(
     group: dev.droidtop.library.LibraryGameGroup,
@@ -1031,16 +1045,18 @@ private fun row(
 }
 
 /**
- * The one section that depends on HOW this game runs: enginehost's own
- * settings for a game enginehost runs, the Wine prefix for a game that
- * takes the Windows route, and nothing at all for a game whose runner is
- * neither (a native Linux build, or a game with no runner on this device
- * -- the primary button above already says so, and a section of dead rows
- * repeating it is not information).
+ * The rows that depend on HOW this game runs: enginehost's own settings
+ * for a game enginehost runs, the Wine prefix for a game that takes the
+ * Windows route, and nothing at all for a game whose runner is neither
+ * (a native Linux build, or a game with no runner on this device -- the
+ * Play row above already says so, and rows of dead settings repeating it
+ * are not information).
  *
- * The section is named for the runner, never for its own first row.
+ * No sub-header of their own under "Fix and advanced": every row names
+ * its runner in its own subtitle ("the Windows prefix this game runs
+ * in", "Enginehost's own save settings").
  */
-private fun runnerGroup(
+private fun runnerRows(
     runsOnEnginehost: Boolean,
     hasWindowsRoute: Boolean,
     isEngineGame: Boolean,
@@ -1049,52 +1065,46 @@ private fun runnerGroup(
     wineSettings: WineGameSettings?,
     onImportLutris: () -> Unit,
     onClearWineSettings: () -> Unit,
-): PcActionGroup? = when {
-    runsOnEnginehost -> PcActionGroup(
-        "Runs on Enginehost",
-        listOfNotNull(
-            PcActionRow("Saves", "Opens Enginehost's own save settings", { onEnginehost(EngineHost.savesSettingsIntent()) }),
-            PcActionRow(
-                "Controls",
-                "Opens Enginehost's own per-engine controls for this game",
-                { onEnginehost(EngineHost.settingsIntent()) },
-            ),
-            if (isEngineGame) {
-                PcActionRow("Engine settings", "Opens Enginehost's own settings", { onEnginehost(EngineHost.settingsIntent()) })
-            } else {
-                null
-            },
+): List<PcActionRow>? = when {
+    runsOnEnginehost -> listOfNotNull(
+        PcActionRow("Saves", "Opens Enginehost's own save settings", { onEnginehost(EngineHost.savesSettingsIntent()) }),
+        PcActionRow(
+            "Controls",
+            "Opens Enginehost's own per-engine controls for this game",
+            { onEnginehost(EngineHost.settingsIntent()) },
         ),
+        if (isEngineGame) {
+            PcActionRow("Engine settings", "Opens Enginehost's own settings", { onEnginehost(EngineHost.settingsIntent()) })
+        } else {
+            null
+        },
     )
-    hasWindowsRoute -> PcActionGroup(
-        "Runs on Windows",
-        listOfNotNull(
-            PcActionRow(
-                "Prefix and graphics",
-                "The Windows prefix this game runs in: graphics driver, DXVK, Box64 and FEX, components, drives and the rest",
-                onOpenPrefix,
-            ),
-            // The game's own program, when an import chose one; selecting
-            // it goes back to the program droidtop detects (docs/SPEC.md 7i).
-            wineSettings?.executable?.let { exe ->
-                PcActionRow(
-                    "Program: $exe",
-                    listOfNotNull(
-                        wineSettings.arguments.takeIf { it.isNotEmpty() }?.joinToString(" ", prefix = "With "),
-                        wineSettings.source?.let { "from $it" },
-                        "select to go back to the program droidtop detects",
-                    ).joinToString(" - "),
-                    onClearWineSettings,
-                )
-            },
-            PcActionRow(
-                "Import a Lutris install script",
-                "Reads a Wine script from lutris.net into this game's settings and shows every change first; nothing in it is run",
-                onImportLutris,
-            ),
-            PcActionRow("Saves", "This game's saves live inside its prefix, under Prefix and graphics", null),
-            PcActionRow("Controls", "This game's controls are its prefix's controller tab, under Prefix and graphics", null),
+    hasWindowsRoute -> listOfNotNull(
+        PcActionRow(
+            "Prefix and graphics",
+            "The Windows prefix this game runs in: graphics driver, DXVK, Box64 and FEX, components, drives and the rest",
+            onOpenPrefix,
         ),
+        // The game's own program, when an import chose one; selecting
+        // it goes back to the program droidtop detects (docs/SPEC.md 7i).
+        wineSettings?.executable?.let { exe ->
+            PcActionRow(
+                "Program: $exe",
+                listOfNotNull(
+                    wineSettings.arguments.takeIf { it.isNotEmpty() }?.joinToString(" ", prefix = "With "),
+                    wineSettings.source?.let { "from $it" },
+                    "select to go back to the program droidtop detects",
+                ).joinToString(" - "),
+                onClearWineSettings,
+            )
+        },
+        PcActionRow(
+            "Import a Lutris install script",
+            "Reads a Wine script from lutris.net into this game's settings and shows every change first; nothing in it is run",
+            onImportLutris,
+        ),
+        PcActionRow("Saves", "This game's saves live inside its prefix, under Prefix and graphics", null),
+        PcActionRow("Controls", "This game's controls are its prefix's controller tab, under Prefix and graphics", null),
     )
     else -> null
 }
