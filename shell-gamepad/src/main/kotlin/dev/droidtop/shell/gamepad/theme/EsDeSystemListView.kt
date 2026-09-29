@@ -678,7 +678,18 @@ private fun EsDeCarousel(
                 when (GamepadKeyMap.actionFor(event.key)) {
                     GamepadAction.LEFT -> handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, true) { if (!verticalType) step(-1) }
                     GamepadAction.RIGHT -> handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, true) { if (!verticalType) step(1) }
-                    GamepadAction.UP -> handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, true) { if (verticalType) step(-1) }
+                    // Up is owned only where this carousel can really use
+                    // it (a vertical one). A horizontal carousel -- the
+                    // no-theme fallback the safe-mode banner draws over
+                    -- has no Up of its own, and swallowing the press cut
+                    // the pad off from everything above it. Unhandled, it
+                    // reaches Compose's own focus search, which in safe
+                    // mode finds the banner's action (docs/SPEC.md 10c)
+                    // and otherwise finds nothing, because the top bar
+                    // cannot take focus (docs/SPEC.md 7k) -- the same
+                    // reasoning the gamelist widgets' Left/Right bubble
+                    // already uses (Droidtop/tracker#43).
+                    GamepadAction.UP -> handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, verticalType) { if (verticalType) step(-1) }
                     GamepadAction.DOWN -> handleGamepadKeyDown(event.type == KeyEventType.KeyDown, event.type == KeyEventType.KeyUp, true) { if (verticalType) step(1) }
                     else -> false
                 }
