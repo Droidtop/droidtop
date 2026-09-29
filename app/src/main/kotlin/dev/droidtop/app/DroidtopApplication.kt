@@ -47,6 +47,9 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // a scan is diagnosable from a rig whatever the device's logcat
         // buffer did with the lines (see ScanLog).
         dev.droidtop.library.ScanLog.install(this)
+        // Crash notes and crash-loop safe mode (SPEC 10c): after ScanLog so
+        // a note can carry its tail, before anything that could crash.
+        dev.droidtop.library.diagnostics.CrashRecovery.install(this)
         // Everything mode-specific this process starts, and nothing else:
         // the mode snapshot was already taken by
         // SettingsCatalogInitProvider (a ContentProvider's onCreate runs

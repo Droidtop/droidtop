@@ -1140,8 +1140,8 @@ fully usable until a force-stop (dq-onboard-01).
 2026-09-25). The Murine fork's Recovery library ("Recover / Restart")
 rebuilt the activity stack after a crash into a blank white home screen
 that Home could not leave, and locked the screen to portrait
-(dq-onboard-01). It is gone; the Sentry SDK's own handler reports the
-crash (`CrashReporting`) and Android's own crash handling follows.
+(dq-onboard-01). It is gone; the crash is written down locally and Android's
+own crash handling follows (§10c: crash notes, and safe mode after a loop).
 
 The Gaming and Desktop switches are set in two places and read in one:
 onboarding writes them from "Anything else to set up" when it finishes
@@ -10135,12 +10135,12 @@ exception in droidtop's process, in any mode, becomes a crash note in that
 folder (`crash-<epoch>.txt`: build, mode, shell screen, the exception and
 its stack, and the last hundred lines of `scan.log`), written synchronously
 by the uncaught-exception handler before the process dies, and the ten
-newest notes are kept. The Murine fork's Recovery library keeps its job of
-restarting the app, and it restarts into `MainActivity` — the mode
-independent entry that renders whichever shell is enabled — never into
-the launcher fork's `Launcher`, which `HomeRolePrefs` may have disabled
-(a restart into a disabled component is a second crash); the note is what
-makes the restart diagnosable afterwards. Crash reporting is **local only**: the Sentry SDK
+newest notes are kept (`CrashRecovery`; the screen is the foreground
+Activity's class, tracked by a lifecycle callback). The handler then hands
+the crash to whatever handler was installed before it, so Android's own
+crash handling follows; there is no restart mechanism of droidtop's own (the
+Murine fork's Recovery library rebuilt a blank white task after a crash and
+is gone). Crash reporting is **local only**: the Sentry SDK
 that shipped with an empty DSN reported nowhere and is removed rather than
 pointed at a server, because a crash report leaves the device only when the
 person sends it (below). There is no automatic upload and no switch to
@@ -10155,7 +10155,19 @@ with one action that draws the theme again. The stored theme choice is not
 changed. A third crash in the same window starts the app on Global settings
 (the catalog the shell draws itself, §7) rather than in any shell, so a
 person can always reach Data, Rerun onboarding and Share diagnostics. The
-counter resets on any start that lives for a minute.
+counter resets on any start that lives for a minute. Implementation: one
+counter in a private preferences file (`droidtop_crash_state`), written with
+a synchronous commit by the crash handler and incremented only when the
+process died less than a minute after starting; `MainActivity` (the entry of
+every non-Standard shell) sends a start to Global settings when it reads
+three and backs the counter off to two, so the start after that is the
+unthemed Gaming shell rather than settings again. Safe mode is
+`ThemeSafeMode`: `ThemeAssets` resolves no active theme while it is on, which
+is the state the shell already draws its unthemed surface for. The banner and
+its "Use the theme again" action are drawn by `MainActivity` over the Gaming
+shell and are reached by touch; the pad does not reach the top of the screen
+(§7k). The Standard launcher entry is not routed through this: it does not
+render themes.
 
 **Share diagnostics** is one action in Global settings > Data. It zips the
 logs folder, the settings export (§7 Data, with every `droidtop_*`

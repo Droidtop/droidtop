@@ -208,6 +208,15 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         super.onCreate(savedInstanceState)
         applyGamingDeepLink(intent)
 
+        // A third crash while starting sends the app to Global settings,
+        // where Data > Share diagnostics is, instead of into any shell
+        // (SPEC 10c).
+        if (dev.droidtop.library.diagnostics.CrashRecovery.consumeSettingsRoute(this)) {
+            BackButtonMenu.openGlobalSettings(this)
+            finish()
+            return
+        }
+
         // Unfinished setup is resumed instead of drawing a shell under it
         // (docs/SPEC.md 7b): onboarding ends by opening the mode it set up,
         // so there is nothing for this instance to be until then, and a
@@ -363,6 +372,13 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             // true in Gaming and Desktop alike, and it must stay
             // reachable over a themed Gaming screen exactly as it is
             // over Desktop's own panels.
+            val safeMode by dev.droidtop.library.theme.ThemeSafeMode.activeFlow.collectAsState()
+            if (mode == Mode.GAMING && safeMode) {
+                SafeModeBanner(
+                    onRetry = { dev.droidtop.library.diagnostics.CrashRecovery.retryTheme(this@MainActivity) },
+                    modifier = Modifier.align(Alignment.TopCenter),
+                )
+            }
             if (mode == Mode.GAMING || mode == Mode.DESKTOP) {
                 ReinitializeDisplaysPill(
                     onClick = { reinitializeDisplays() },

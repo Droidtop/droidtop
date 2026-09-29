@@ -150,6 +150,9 @@ object ThemeAssets {
      * OTHER/future bundled theme set that doesn't include decaffe at all).
      */
     private fun resolveActiveTheme(context: Context): ThemeDescriptor? {
+        // Crash-loop safe mode (SPEC 10c): no theme at all, which the shell
+        // already draws its unthemed fallback for.
+        if (ThemeSafeMode.active) return null
         val discovered = discoverThemes(context)
         if (discovered.isEmpty()) return null
         val selected = ThemePrefs.get(context)
