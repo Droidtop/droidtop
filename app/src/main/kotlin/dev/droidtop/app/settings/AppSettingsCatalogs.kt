@@ -41,6 +41,9 @@ import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.PluginKind
 import dev.droidtop.pluginhost.PluginTrustState
 import dev.droidtop.pluginhost.PluginCapability
+import dev.droidtop.pluginhost.PluginConsent
+import dev.droidtop.pluginhost.PermissionTier
+import dev.droidtop.pluginhost.ExtensionPoints
 import dev.droidtop.pluginhost.PluginCrashPolicy
 import dev.droidtop.pluginhost.PluginOriginKeys
 import dev.droidtop.pluginhost.PluginSourceKeys
@@ -1718,6 +1721,12 @@ object AppSettingsCatalogs {
         )
     }
 
+    private fun pluginTrustBadge(origin: String, userKeys: Map<String, String>): String = when {
+        PluginOriginKeys.isOfficial(origin) -> "Official"
+        userKeys.containsKey(origin) -> "Added by you"
+        else -> "NOT TRUSTED"
+    }
+
     /** The installed-plugins list row: what it's called, what it adds in plain words, its trust badge and its state -- the whole card, one tap into [pluginDetailScreen]. */
     private fun pluginCard(record: dev.droidtop.pluginhost.PluginRecord, userKeys: Map<String, String>): NestedScreenItem {
         val m = record.manifest
@@ -1729,11 +1738,7 @@ object AppSettingsCatalogs {
             record.trust == PluginTrustState.APPROVED -> "Running"
             else -> "Unknown"
         }
-        val trustBadge = when {
-            PluginOriginKeys.isOfficial(m.origin) -> "Official"
-            userKeys.containsKey(m.origin) -> "Added by you"
-            else -> "NOT TRUSTED"
-        }
+        val trustBadge = pluginTrustBadge(m.origin, userKeys)
         return NestedScreenItem(
             id = "plugin_${m.id}",
             title = m.label,
@@ -1867,12 +1872,14 @@ object AppSettingsCatalogs {
             }
         }
 
+        val consentGroups = pluginConsentGroups(context, record, userKeys)
+
         val providesGroup = buildList<CatalogItem> {
             add(
                 ActionItem(
                     id = "plugin_${m.id}_provides",
                     title = "What it provides",
-                    subtitle = m.capabilities.joinToString { it.display }.ifEmpty { "No capabilities declared" },
+                    subtitle = pluginSummary(m),
                     run = {},
                 ),
             )
@@ -1984,6 +1991,7 @@ object AppSettingsCatalogs {
 
         return listOfNotNull(
             CatalogGroup(id = "plugin_${m.id}_status_group", title = null, items = statusGroup),
+        ) + consentGroups + listOfNotNull(
             CatalogGroup(id = "plugin_${m.id}_provides_group", title = "What it provides", items = providesGroup),
             if (runtimeGroup.isEmpty()) null else CatalogGroup(id = "plugin_${m.id}_runtime_group", title = "Runtime", items = runtimeGroup),
             CatalogGroup(id = "plugin_${m.id}_update_group", title = "Version", items = updateGroup),
@@ -2074,7 +2082,63 @@ object AppSettingsCatalogs {
 
     /** What a plugin adds, in plain words, for the installed-list row. */
     private fun pluginSummary(m: dev.droidtop.pluginhost.PluginManifest): String =
-        m.capabilities.joinToString { it.display }.ifEmpty { "No capabilities declared" }
+        m.v2.provides.mapNotNull { ExtensionPoints.find(it.point)?.label }.distinct().joinToString()
+            .ifEmpty { m.capabilities.joinToString { it.display } }
+            .ifEmpty { "No capabilities declared" }
+
+    /**
+     * The approval view of one plugin (docs/plugin-api.md 4.3), read-only:
+     * what it adds and where, what it can do, what it asks for, what it
+     * uses from other plugins, and what this droidtop does not support.
+     * Built from the registries by [PluginConsent]; there is no grant
+     * storage yet, so nothing here is a switch. The existing root tick on
+     * the Approve rows is unchanged.
+     */
+    private fun pluginConsentGroups(
+        context: Context,
+        record: dev.droidtop.pluginhost.PluginRecord,
+        userKeys: Map<String, String>,
+    ): List<CatalogGroup> {
+        val m = record.manifest
+        val view = PluginConsent.of(m, PluginStore.installed(context)) { pluginTrustBadge(it, userKeys) }
+        fun info(key: String, title: String, subtitle: String? = null, value: String? = null) =
+            ActionItem(id = "plugin_${m.id}_$key", title = title, subtitle = subtitle, value = value, run = {})
+        fun group(key: String, title: String, items: List<CatalogItem>) =
+            if (items.isEmpty()) null else CatalogGroup(id = "plugin_${m.id}_consent_$key", title = title, items = items)
+        return listOfNotNull(
+            if (view.olderPluginFullAccess) {
+                group("older", "Older plugin", listOf(info("older", "Full access (older plugin)", "Written before permissions existed: it can do everything it could before, and droidtop does not contain it")))
+            } else {
+                null
+            },
+            group(
+                "adds", "Adds",
+                view.adds.flatMap { (mode, lines) -> lines.mapIndexed { i, l -> info("adds_${mode}_$i", l.title, l.detail, mode) } },
+            ),
+            group("can", "Can", view.can.mapIndexed { i, l -> info("can_$i", l.title, l.detail) }),
+            group(
+                "asks", "Asks for",
+                view.asks.mapIndexed { i, a ->
+                    info(
+                        "asks_$i", a.line.title,
+                        listOfNotNull(a.line.detail, if (a.needed) "Needed" else null).joinToString(" - ").ifEmpty { null },
+                        if (a.tier == PermissionTier.CRITICAL) "Critical" else "Asks first",
+                    )
+                },
+            ),
+            group(
+                "uses", "Uses from other plugins",
+                view.uses.mapIndexed { i, u ->
+                    info(
+                        "uses_$i", u.line.title,
+                        listOfNotNull(u.line.detail, if (u.optional) "Optional" else "Needed").joinToString(" - "),
+                        if (u.providerLabel != null) "${u.providerLabel} (${u.providerBadge})" else "No plugin provides this yet",
+                    )
+                },
+            ),
+            group("unsupported", "Not supported by this version of droidtop", view.unsupported.mapIndexed { i, t -> info("unsupported_$i", t) }),
+        )
+    }
 
     // ------------------------------------------------------------------
     // Keys you trust (docs/SPEC.md 12a): user-trusted plugin origin keys.

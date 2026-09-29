@@ -41,7 +41,7 @@ object LegacyManifest {
             ProvidedPoint(point = point, version = 1, extra = extra)
         }
 
-        val permissions = buildList {
+        val permissions = buildList<DeclaredPermission> {
             fun grant(id: String, extra: String = "{}") {
                 if (none { it.id == id }) add(DeclaredPermission(id = id, extra = extra))
             }
