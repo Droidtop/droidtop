@@ -88,6 +88,11 @@ dependencies {
     // theme's own SVGs -- coil3's default decoders are raster-only, so this
     // is needed for AsyncImage to actually render them rather than fail.
     implementation(libs.coil.svg)
+    // The theme browser's screenshot previews load from the index repo's
+    // raw-file endpoint (ThemeDownloader.themesListFileUrl); coil3 ships
+    // no network fetcher by default, this adds it. Its okhttp dependency
+    // is the same 4.12.0 the version catalog already pins.
+    implementation(libs.coil.network.okhttp)
     // Lottie (.json) `animation` elements, ES-DE's LottieAnimComponent.
     // The same artifact :shell-default already ships, so nothing new lands
     // in the APK.

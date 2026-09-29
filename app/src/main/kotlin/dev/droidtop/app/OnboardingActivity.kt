@@ -1852,9 +1852,9 @@ private fun ControllerStep(
  * p1-rig-onboarding-artbooknext-never-downloads: the step's own copy
  * promises "press Next and it finishes in the background," and this used
  * to finish onboarding by killing the job and deleting the partial clone
- * a moment later -- on any run where the clone legitimately took a
- * while, which the theme-list index fetch alone can (see
- * ThemeDownloader's own doc comment on themes-list.git's real size), the promise was
+ * a moment later -- on any run where the download legitimately took a
+ * while, which the recommended theme's own git clone can (see
+ * ThemeDownloader's own doc comment on real theme-repo sizes), the promise was
  * never kept and nothing told the person). [disownIfIncomplete] now only
  * stops the LATE activation described below, once called; the download
  * itself always runs to completion or a real, visible FAILED status.
