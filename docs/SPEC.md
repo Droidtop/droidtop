@@ -9259,6 +9259,19 @@ and disabled states each have a shape or weight of their own. Themed views are t
 author's and are excluded, as in ES-DE. The touch-target minimum (§7j) already holds in every
 orientation and on every input.
 
+**What is checked and what is not (Droidtop/tracker#87, 2026-09-28).** Checked by unit test:
+the contrast pairs (`MenuTokensContrastTest`) and the source rules below. NOT yet checked on
+a device: the screen-reader half of this section (one focus order for pad and TalkBack, content
+descriptions read aloud, the 1.3 font-scale layout). Until a rig run with TalkBack on, paired
+with D-pad-only navigation through Gaming's menus and the Quick Menu, cites its result here,
+read those sentences as the rule the chrome is built to, not as a verified fact. Two things
+comparable consoles ship are NOT built and this section makes no promise of them: a
+colour-vision filter (droidtop's own guarantee is the weaker "colour is never the only
+signal") and a droidtop-owned text-size control (the chrome follows the system font scale
+only). If either is wanted it is one more Settings or Quick Menu entry in the existing
+catalog, not a parallel accessibility subsystem; whether they are in scope for the first
+release is the owner's call.
+
 **The rule is checked, not trusted.** A unit test in `:shell-gamepad` and `:app` fails on any
 `Color(0x` literal, any named `Color.*` constant and any `.dp` literal outside `DesignTokens.kt`,
 `MenuTokens` and the themed renderer (whose measurements are the theme's), and on any
