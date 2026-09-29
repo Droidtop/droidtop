@@ -53,11 +53,12 @@ import kotlinx.coroutines.withContext
 
 /**
  * Browse and download ES-DE community themes (`ThemeDownloader`,
- * `ThemeAssets`). Reads the parsed `themes-list.git` clone
- * (`ThemeDownloader.parseThemesList`), and fetches that index itself when
- * it is missing or more than a week old (docs/SPEC.md 7f, "Browse
- * themes"): the empty state used to send the person back to a separate
- * "Sync theme index" row in Settings (UI pass 2026-09-24, M3).
+ * `ThemeAssets`). Reads the parsed theme index
+ * (`ThemeDownloader.parseThemesList`), and fetches it itself -- one raw
+ * HTTPS file, `ThemeDownloader.syncThemesList` -- when it is missing or
+ * more than a week old (docs/SPEC.md 7f, "Browse themes"): the empty
+ * state used to send the person back to a separate "Sync theme index"
+ * row in Settings (UI pass 2026-09-24, M3).
  *
  * Downloading/updating a theme (`ThemeDownloader.downloadOrUpdateTheme`)
  * writes into `ThemeAssets.userThemesDir`, the exact same directory
@@ -66,15 +67,15 @@ import kotlinx.coroutines.withContext
  * no separate registration step.
  *
  * `ThemeDownloader.withStallWatchdog` (rig, p2-rig-theme-browser-fetch-
- * hang) is what every sync below actually runs through: real progress
- * from JGit's own transport ("Receiving objects", counts, not a fake
- * spinner) drives the visible status line, and a stall watchdog (shared
- * with the onboarding background download -- see that object's own doc
- * comment) tells a genuinely stuck transfer apart from a slow-but-
- * working one, since `themes-list.git`'s full real history is
- * legitimately large and a multi-minute first fetch on an ordinary
- * connection is expected, not itself a bug (`ThemeDownloader`'s own doc
- * comment).
+ * hang) is what every sync below actually runs through: real progress --
+ * JGit's own transport for the theme clones ("Receiving objects",
+ * counts), real byte counts for the raw index file -- drives the
+ * visible status line, and a stall watchdog (shared with the onboarding
+ * background download -- see that object's own doc comment) tells a
+ * genuinely stuck transfer apart from a slow-but-working one, since a
+ * real theme repo's own full history can be legitimately large and a
+ * multi-minute first clone on an ordinary connection is expected, not
+ * itself a bug (`ThemeDownloader`'s own doc comment).
  */
 @Composable
 fun ThemeBrowserScreen(onDismiss: () -> Unit) {
@@ -127,7 +128,10 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
         loading = false
         val stale = withContext(Dispatchers.IO) {
             val dir = ThemeDownloader.themesListDir(ThemeAssets.userThemesDir(context))
-            val stamp = File(dir, ".git/FETCH_HEAD").takeIf { it.exists() } ?: dir
+            // The index file's own mtime is the stamp: every successful
+            // sync rewrites it (the clone's FETCH_HEAD used to play
+            // this role).
+            val stamp = File(dir, "themes.json").takeIf { it.isFile } ?: dir
             System.currentTimeMillis() - stamp.lastModified() > INDEX_MAX_AGE_MS
         }
         if (entries.isEmpty() || stale) fetchIndex()
@@ -236,22 +240,24 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
                         val dirName = entry.reponame.ifBlank { entry.name }
                         val installed = dirName in installedDirNames
                         val status = statusByDirName[dirName]
-                        // Real screenshot preview -- ThemeDownloader already
-                        // parses this (real ES-DE theme authors check
-                        // screenshot images straight into their own
-                        // themes-list.git entry, confirmed via
-                        // GuiThemeDownloader.cpp's own real
+                        // Real screenshot preview -- the index's own image
+                        // for the theme (real ES-DE theme authors check
+                        // screenshots straight into themes-list.git,
+                        // confirmed via GuiThemeDownloader.cpp's own real
                         // mThemeDirectory + "themes-list/" + image path
-                        // convention), no extra network fetch needed --
-                        // this was just never read by the UI until now.
-                        val screenshotPath = entry.screenshots.firstOrNull()?.let {
-                            File(ThemeDownloader.themesListDir(ThemeAssets.userThemesDir(context)), it.image).path
+                        // convention), streamed from the index repo's
+                        // raw-file endpoint on demand through the app's
+                        // one image loader (Coil, disk-cached) -- instead
+                        // of every theme's images arriving with the index
+                        // the way the old clone's working tree made them.
+                        val screenshotUrl = entry.screenshots.firstOrNull()?.let {
+                            ThemeDownloader.themesListFileUrl(it.image)
                         }
                         ThemeBrowserRow(
                             entry = entry,
                             installed = installed,
                             status = status,
-                            screenshotPath = screenshotPath,
+                            screenshotUrl = screenshotUrl,
                             modifier = if (index == 0) Modifier.focusRequester(firstFocus) else Modifier,
                             onDownload = {
                                 statusByDirName = statusByDirName + (dirName to "Downloading…")
@@ -306,7 +312,7 @@ private fun ThemeBrowserRow(
     entry: ThemeDownloader.ThemeDownloadEntry,
     installed: Boolean,
     status: String?,
-    screenshotPath: String?,
+    screenshotUrl: String?,
     modifier: Modifier,
     onDownload: () -> Unit,
 ) {
@@ -332,9 +338,9 @@ private fun ThemeBrowserRow(
             .padding(16.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        if (screenshotPath != null) {
+        if (screenshotUrl != null) {
             AsyncImage(
-                model = screenshotPath,
+                model = screenshotUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.width(140.dp).height(90.dp).clip(RoundedCornerShape(8.dp)),
