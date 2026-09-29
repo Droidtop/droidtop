@@ -681,7 +681,7 @@ private fun EsDeCarousel(
                     // Up is owned only where this carousel can really use
                     // it (a vertical one). A horizontal carousel -- the
                     // no-theme fallback the safe-mode banner draws over
-                    -- has no Up of its own, and swallowing the press cut
+                    // -- has no Up of its own, and swallowing the press cut
                     // the pad off from everything above it. Unhandled, it
                     // reaches Compose's own focus search, which in safe
                     // mode finds the banner's action (docs/SPEC.md 10c)
