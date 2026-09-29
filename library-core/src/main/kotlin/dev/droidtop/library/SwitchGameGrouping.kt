@@ -102,10 +102,10 @@ object SwitchGameGrouping {
         return rows.mapNotNull { row ->
             when (val content = row.content) {
                 null -> row.entry
-                is SwitchContent.BaseGame -> row.entry.copy(
-                    switchFacts = factsByBase[content.baseTitleId]?.facts(content.baseTitleId)
-                        ?: SwitchGameFacts(baseTitleId = content.baseTitleId),
-                )
+                is SwitchContent.BaseGame -> {
+                    val base = content.baseTitleId ?: content.titleId ?: return@mapNotNull row.entry
+                    row.entry.copy(switchFacts = factsByBase[base]?.facts(base) ?: SwitchGameFacts(baseTitleId = base))
+                }
                 // Its base game is one of this library's rows: the file is
                 // that row's to carry, and no row of its own remains.
                 is SwitchContent.Update -> if (content.baseTitleId in presentBases) {
