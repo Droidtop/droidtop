@@ -95,6 +95,8 @@ object IgdbScraperClient {
         val connection = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             doOutput = true
+            connectTimeout = 10_000
+            readTimeout = 20_000
         }
         val body = "client_id=${URLEncoder.encode(clientId, "UTF-8")}" +
             "&client_secret=${URLEncoder.encode(clientSecret, "UTF-8")}" +
@@ -228,6 +230,8 @@ object IgdbScraperClient {
         val connection = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             doOutput = true
+            connectTimeout = 10_000
+            readTimeout = 20_000
             setRequestProperty("Client-ID", clientId)
             setRequestProperty("Authorization", "Bearer $bearer")
         }
