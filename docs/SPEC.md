@@ -12366,3 +12366,154 @@ walkthrough ended before reaching it), whether the old flat list would
 even have read as ungrouped, so a revert stays a live option if the
 grouping reads worse. Log findings against this section and
 correct it — this is a starting hypothesis from the code, not a ledger.
+**App-bridge plugin contracts, each with droidtop's own built-in
+fallback (owner, 2026-09-28).** The owner's direction: "plugins
+interface with other apps; droidtop keeps a built-in fallback." Four
+real named cases — Syncthing, key/button remapping apps (Key Mapper
+etc.), Obtainium, Discord presence — define four new
+`PluginCapability` ids. The rule that shapes all four: the FEATURE is
+droidtop's, the OTHER APP is the plugin's detail. droidtop always knows
+how to do the job a worse way on its own (scan the files, keep its own
+note, check GitHub itself, drive Discord's own client protocol), and a
+plugin, when installed and approved, is the better way — never a
+dependency. The fallback runs when no plugin declaring the capability
+is installed, and every surface renders the same way whichever side
+answered. Per the standing UX rule (2026-09-28), none of this is a
+provider screen: each thing surfaces on the game, on the system, or in
+the one Settings area, never as its own app/tab.
+
+The four wire contracts (JSON in/JSON out over the same
+`IPluginRuntime.invoke` every capability already uses; deliberately
+generic field names, same rule `acquire_content` set):
+
+- **`sync_status`** — a file-synchronization app (Syncthing's local
+  REST API is the named case: `127.0.0.1:8384/rest/...` with the API
+  key from its own config, all plugin-side; droidtop never speaks the
+  REST API itself). `invoke(SYNC_STATUS, {"action": "status", "path":
+  <the game's real folder>})` answers `values` of: `state` (a short
+  word: idle/syncing/error — droidtop shows it, it never parses it),
+  `progress` (0-100, optional), `conflicts` (a count; the plugin
+  answers from Syncthing's own folder state, where a non-zero
+  `pullInvalid`/conflict answer means exactly what the fallback's file
+  scan would find), and `details` (one complete sentence, the same
+  convention `settings_rows` already fixed). droidtop warns before
+  launching when `conflicts` is non-zero.
+- **`input_profile`** — a key/button remapping app (Key Mapper is the
+  named case; its own Intent/IPC surface is plugin-side, via
+  `PluginContext.launchAppWithExtras` or a bound service declared in
+  `boundServiceTargets`). `invoke(INPUT_PROFILE, {"action": "apply",
+  "gameId", "title", "kind", "systemId", "path"})` fires on EVERY
+  launch path (`Library.launch`, so launcher pins, the Gaming shell,
+  Desktop and deep links all behave identically), fire-and-forget on
+  background IO like `PluginEventBus`'s notifications — never blocking
+  a launch on a binder call. `{"action": "clear", ...same facts}` fires
+  when the shell gains foreground again (the game session ended; the
+  same signal PlayHistory already settles for, per its own doc
+  comment, is "the shell is back" and nothing finer exists).
+- **`app_updates`** — an update tracker (Obtainium is the named case:
+  the plugin reads Obtainium's own exported/local data for the apps it
+  tracks). `invoke(APP_UPDATES, {"action": "updates"})` answers
+  `values["updates"]` = a JSON array string of objects `{package,
+  installed, latest, url?}`, which droidtop filters to the packages its
+  players database names — a plugin's whole answer is untrusted input
+  like any other (12a point 5), shown as rows, never used as an intent
+  target beyond a plain browser `url`.
+- **`presence`** — "Playing \<game\>" on a chat platform (Discord is
+  the named case; the plugin is expected to reach the Discord APP
+  where possible, per the owner). `invoke(PRESENCE, {"action": "set",
+  "game": <title>})` on every launch, `invoke(PRESENCE, {"action":
+  "clear"})` on return to the shell — same call sites as
+  `input_profile`.
+
+**The four built-in fallbacks** (what runs with no plugin installed):
+
+1. **Syncthing conflicts: droidtop scans the files.** Syncthing writes
+   every conflict as a real file beside the data it conflicted with,
+   named `*.sync-conflict-<date>-<time>-<deviceId>*` (its own docs'
+   naming). droidtop's fallback (`SyncConflicts`, `library-core`)
+   walks the game's own resolved folder — for a console ROM the folder
+   the ROM lives in (emulators write saves beside the ROM, so this IS
+   the save folder; for an engine/PC game its game root — the same
+   folder droidtop already resolves for the launch) — depth-capped and
+   count-capped, off the main thread, for names matching
+   `*.sync-conflict-*`. Any hit warns before launching: the Gaming
+   shell's one dispatch point runs the check and shows a pre-launch
+   notice offering "Play anyway" or back, the conflicts listed. This
+   is deliberately NOT a second save-location model: droidtop does not
+   learn where any emulator keeps its saves ("we don't change save
+   logic, we just make system locations mean somewhere different",
+   §2a); it looks where the game itself already is.
+2. **Key Mapper: droidtop's own per-game controller notes.**
+   `ControllerNotes` (`library-core`, one editable note per entry,
+   SharedPreferences-keyed like `EngineVersionOverridePrefs`) is
+   droidtop's own memory of what a game needs ("hold Select for
+   hotkeys", "swap A/B in menus"): a chip on the game's own detail
+   screen edits it, and a set note appears in the same pre-launch
+   notice the sync check uses. A Key Mapper plugin automates the
+   equivalent; the fallback is the note reminding the human.
+3. **Obtainium: droidtop's own GitHub-release check.**
+   `EmulatorUpdates` (`library-core`) checks the packages the players
+   database names against the GitHub `releases/latest` API — only for
+   the handful whose real release repository is actually known
+   (a small curated map in code: RetroArch, PPSSPP, Dolphin,
+   Lemuroid, Flycast, Vita3K — each a real repo whose releases the
+   check reads; an emulator with no known repo is simply not
+   reported, never guessed), manual ("Check for emulator updates" in
+   the one Settings area) — never background traffic droidtop invents
+   for itself, since AppSelfUpdate's schedule is droidtop-build
+   traffic and borrowing it for third-party repos changes what the
+   user consented to. Rows show the installed version beside the
+   latest release, and say "Update available" only when the latest
+   tag is confidently newer — a tag that merely differs is reported as
+   differing, never as an update.
+4. **Discord presence: modelled on the iiSU Android frontend** (study
+   below). The user signs in THEMSELVES in a WebView droidtop opens on
+   Discord's own login page; droidtop captures only the resulting
+   session token from the page's own storage, encrypts it with an
+   AndroidKeyStore AES-GCM key (`DiscordSessionStore`), and never
+   touches a credential typed into that page. With a stored session,
+   "Playing \<game\>" is set over Discord's documented gateway
+   websocket (identify + presence update with a type-0 activity, the
+   same payload shape the Discord web client itself sends; a small
+   okhttp WebSocket client, `DiscordGateway`), held open while the
+   game runs and cleared when the shell returns. A clear on/off
+   switch, OFF by default, and "Sign out" deletes the stored session.
+   Where the plugin route exists ("via the Discord app where
+   possible"), the internal fallback is what remains when no plugin
+   is installed.
+
+**The iiSU study (task-directed, 2026-09-29).** Read from the same
+installed APK the SPEC already keeps for reference
+(`/root/re/iisu/base.apk`, `com.iisulauncher` 0.1.6.1): iiSU embeds
+Discord's official **Social SDK** (`com.discord.socialsdk.
+AuthenticationActivity` + `ForegroundService` in its manifest, custom
+redirect scheme `discord-1468133109882032191`, i.e. its own registered
+Discord application id), sends the user through Discord's own
+`https://discord.com/oauth2/authorize` page (the sign-in is Discord's
+UI, never the frontend's), stores the resulting `discord_refresh_token`
+— nothing else — and drives rich presence from it
+(`setDiscordRichPresenceEnabled`, `setDiscordPresenceShowCurrentRomApp`,
+`setDiscordPresenceShowBrowsingIiSu`, relationship group
+`OnlinePlayingGame`, `recordLaunchPresence`). The design lesson taken:
+sign-in belongs to Discord's own page, the app stores only the session,
+presence is a per-launch record with a clear off switch, and the
+feature's whole state is "enabled + signed in". The Social SDK itself
+is a native-library integration gated behind Discord's developer
+program (§7e already records it as the sanctioned plugin-side route);
+the internal fallback deliberately does NOT embed it, per the owner's
+direction, and speaks the gateway directly with the user's own session.
+
+**What is built, and what is not.** Built: the four capability ids and
+their call sites (`LaunchBridge`, `library-core`, the launch/return
+hooks); the sync-conflict scan and the pre-launch notice in the Gaming
+shell; per-game controller notes with the detail-screen chip;
+`EmulatorUpdates` (check, cached rows, both Settings surfaces);
+`DiscordPresence` (prefs, encrypted session store, WebView sign-in
+activity, gateway client) with its Settings screen. Not built: any of
+the four PLUGINS themselves (separate plugin repos, each against the
+contracts above), any automatic traffic for the fallback update check,
+and the live end-to-end against real Discord/Syncthing/Obtainium
+installs — the gateway payloads, the WebView token capture and the
+REST answer shapes are built from the documented/studied wire shapes
+and unit-tested as pure functions; the legs that need a real account
+or a real second app need rig checks.
