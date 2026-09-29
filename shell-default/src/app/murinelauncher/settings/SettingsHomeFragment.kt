@@ -41,6 +41,7 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
         const val DOUBLE_TAP_ACTION: String = "pref_gesture_double_tap_action"
         const val SWIPE_DOWN_ACTION: String = "pref_gesture_swipe_down_action"
         const val SMARTSPACE_MODE: String = "pref_smartspace_mode"
+        const val TASKBAR: String = "pref_taskbar"
         private const val REQUEST_DEVICE_ADMIN = 1001
 
         @JvmStatic @RequiresApi(Build.VERSION_CODES.P)
@@ -111,6 +112,14 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
             }
             GRID_SIZE_HEIGHT -> {
                 preference.setDefaultValue(LauncherPrefs.defaultGridHeight(isTablet))
+                return true
+            }
+            TASKBAR -> {
+                // Turning it on asks for the accessibility access its window needs.
+                preference.setOnPreferenceChangeListener { _, newValue ->
+                    if (newValue == true) requestAccessibilityPermission(requireContext())
+                    true
+                }
                 return true
             }
             DOUBLE_TAP_ACTION -> {

@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">Luba sellel käivitajal kasutada juurdepääsetavuse teenuseid</string>
     <string name="pref_accessibility_disclosure_title">Juurdepääsetavuse ligipääs</string>
-    <string name="pref_accessibility_disclosure_desc">Ekraani žestidega lukustamiseks vajab see käivitaja juurdepääsetavuse ligipääsu.\n\nKuigi need load annavad juurdepääsetavuse teenustele laia nähtavuse, kasutab see käivitaja ainult ekraani lukustamise funktsiooni ja ignoreerib kõike muud.\n\nAndmeid ei koguta, jagata ega edastata.</string>
 </resources>

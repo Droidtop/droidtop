@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">Sta deze launcher toe om toegankelijkheidsdiensten te gebruiken</string>
     <string name="pref_accessibility_disclosure_title">Toegankelijkheidstoegang</string>
-    <string name="pref_accessibility_disclosure_desc">Om het scherm met gebaren te vergrendelen, heeft deze launcher toegang tot toegankelijkheid nodig.\n\nHoewel deze machtigingen brede zichtbaarheid verlenen aan toegankelijkheidsdiensten, gebruikt deze launcher alleen de schermvergrendelingsfunctie en negeert al het andere.\n\nEr worden geen gegevens verzameld, gedeeld of verzonden.</string>
 </resources>

@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">Будь ласка, дозвольте цьому запускачу використовувати служби доступності</string>
     <string name="pref_accessibility_disclosure_title">Доступ до доступності</string>
-    <string name="pref_accessibility_disclosure_desc">Щоб блокувати екран жестами, цьому запускачу потрібен доступ до доступності.\n\nХоча ці дозволи надають широку видимість службам доступності, цей запускач використовує лише функцію блокування екрана та ігнорує все інше.\n\nДані не збираються, не передаються та не поширюються.</string>
 </resources>

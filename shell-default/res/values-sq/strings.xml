@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">Ju lutemi lejojeni këtë nisësi të përdorë shërbimet e aksesibilitetit</string>
     <string name="pref_accessibility_disclosure_title">Qasja në aksesibilitet</string>
-    <string name="pref_accessibility_disclosure_desc">Për të bllokuar ekranin me gjeste, këtij nisësi i duhet qasja në aksesibilitet.\n\nEdhe pse këto leje i japin shërbimeve të aksesibilitetit një dukshmëri të gjerë, ky nisës përdor vetëm funksionin e bllokimit të ekranit dhe injoron gjithçka tjetër.\n\nNuk mblidhen, ndahen ose transmetohen të dhëna.</string>
 </resources>

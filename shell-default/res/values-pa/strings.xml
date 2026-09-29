@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">ਕਿਰਪਾ ਕਰਕੇ ਇਸ ਲਾਂਚਰ ਨੂੰ ਪਹੁੰਚਯੋਗਤਾ ਸੇਵਾਵਾਂ ਦੀ ਵਰਤੋਂ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਦਿਓ</string>
     <string name="pref_accessibility_disclosure_title">ਪਹੁੰਚਯੋਗਤਾ ਪਹੁੰਚ</string>
-    <string name="pref_accessibility_disclosure_desc">ਇਸ਼ਾਰਿਆਂ ਨਾਲ ਸਕ੍ਰੀਨ ਲਾਕ ਕਰਨ ਲਈ, ਇਸ ਲਾਂਚਰ ਨੂੰ ਪਹੁੰਚਯੋਗਤਾ ਪਹੁੰਚ ਦੀ ਲੋੜ ਹੈ।\n\nਭਾਵੇਂ ਇਹ ਇਜਾਜ਼ਤਾਂ ਪਹੁੰਚਯੋਗਤਾ ਸੇਵਾਵਾਂ ਨੂੰ ਵਿਸਤ੍ਰਿਤ ਦ੍ਰਿਸ਼ਟੀਗੋਚਰਤਾ ਪ੍ਰਦਾਨ ਕਰਦੀਆਂ ਹਨ, ਇਹ ਲਾਂਚਰ ਸਿਰਫ ਸਕ੍ਰੀਨ ਲਾਕਿੰਗ ਫੰਕਸ਼ਨ ਦੀ ਵਰਤੋਂ ਕਰਦਾ ਹੈ ਅਤੇ ਬਾਕੀ ਸਭ ਕੁਝ ਨਜ਼ਰਅੰਦਾਜ਼ ਕਰਦਾ ਹੈ।\n\nਕੋਈ ਡਾਟਾ ਇਕੱਠਾ, ਸਾਂਝਾ ਜਾਂ ਟ੍ਰਾਂਸਮਿਟ ਨਹੀਂ ਕੀਤਾ ਜਾਂਦਾ।</string>
 </resources>

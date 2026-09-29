@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">Dozvolite ovom launcheru da koristi usluge pristupačnosti</string>
     <string name="pref_accessibility_disclosure_title">Pristup pristupačnosti</string>
-    <string name="pref_accessibility_disclosure_desc">Da biste zaključali ekran pokretima, ovom launcheru je potreban pristup pristupačnosti.\n\nIako ove dozvole pružaju široku vidljivost uslugama pristupačnosti, ovaj launcher koristi samo funkciju zaključavanja ekrana i zanemaruje sve ostalo.\n\nNijedni podaci se ne prikupljaju, ne dele ili ne prenose.</string>
 </resources>

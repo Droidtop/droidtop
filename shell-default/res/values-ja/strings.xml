@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">このランチャーがアクセシビリティサービスを使用できるようにしてください</string>
     <string name="pref_accessibility_disclosure_title">アクセシビリティアクセス</string>
-    <string name="pref_accessibility_disclosure_desc">ジェスチャーで画面をロックするには、このランチャーにアクセシビリティアクセスが必要です。\n\nこれらの権限はアクセシビリティサービスに広範な可視性を与えますが、このランチャーは画面ロック機能のみを使用し、それ以外はすべて無視します。\n\nデータは収集、共有、送信されません。</string>
 </resources>

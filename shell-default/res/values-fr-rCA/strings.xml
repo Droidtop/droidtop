@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">Veuillez autoriser ce launcher à utiliser les services d\'accessibilité</string>
     <string name="pref_accessibility_disclosure_title">Accès à l\'accessibilité</string>
-    <string name="pref_accessibility_disclosure_desc">Pour verrouiller l\'écran avec des gestes, ce launcher a besoin d\'un accès à l\'accessibilité.\n\nBien que ces permissions accordent une large visibilité aux services d\'accessibilité, ce launcher n\'utilise que la fonction de verrouillage de l\'écran et ignore tout le reste.\n\nAucune donnée n\'est collectée, partagée ou transmise.</string>
 </resources>

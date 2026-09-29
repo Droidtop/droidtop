@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">אנא אפשר ללונצ\'ר הזה להשתמש בשירותי נגישות</string>
     <string name="pref_accessibility_disclosure_title">גישה לנגישות</string>
-    <string name="pref_accessibility_disclosure_desc">כדי לנעול את המסך עם מחוות, הלונצ\'ר הזה זקוק לגישה לנגישות.\n\nלמרות שההרשאות האלה מעניקות נראות רחבה לשירותי נגישות, הלונצ\'ר הזה משתמש רק בפונקציית נעילת המסך ומתעלם מכל השאר.\n\nלא נאספים, משותפים או מועברים נתונים.</string>
 </resources>

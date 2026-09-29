@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">Vinsamlegast leyfðu þessum ræsi að nota aðgengisþjónustur</string>
     <string name="pref_accessibility_disclosure_title">Aðgengisaðgangur</string>
-    <string name="pref_accessibility_disclosure_desc">Til að læsa skjánum með hreyfingum þarf þessi ræsir aðgengisaðgang.\n\nÞótt þessar heimildir veiti aðgengisþjónustum víða sýnileika notar þessi ræsir aðeins skjálæsingarfallið og hunsa allt annað.\n\nEngin gögn eru söfnuð, deild eða send.</string>
 </resources>

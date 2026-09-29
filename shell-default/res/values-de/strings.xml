@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">Bitte erlaube dem Launcher, Bedienungshilfen zu verwenden</string>
     <string name="pref_accessibility_disclosure_title">Bedienungshilfen-Zugriff</string>
-    <string name="pref_accessibility_disclosure_desc">Um den Bildschirm mit Gesten zu sperren, benötigt der Launcher Zugriff auf Bedienungshilfen.\n\nDiese Berechtigungen gewähren zwar umfassende Sichtbarkeit für Bedienungshilfen, der Launcher verwendet jedoch ausschließlich die Bildschirmsperrfunktion und ignoriert alles andere.\n\nEs werden keine Daten gesammelt, geteilt oder übertragen.</string>
 </resources>

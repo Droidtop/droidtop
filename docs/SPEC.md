@@ -688,29 +688,78 @@ only the handheld's plain home screen (Droidtop/tracker#89). What that means in 
   size the rest, so portrait and landscape phones and tablets all get a real grid and are not
   one fixed 1920x1080 layout. Rotation of the home screen follows Launcher3's rule: on by
   default from a 600dp smallest width, off (portrait) below it, and a user setting either way.
-- **Not built, on purpose.** A persistent taskbar, split-screen entry from a drag, and app pairs
+- **Not built, on purpose.** Split-screen entry from a drag and app pairs
   (`AppPairIcon` is vendored, nothing launches it) are Launcher3 quickstep features. This fork
   compiles only `src_no_quickstep`, and the quickstep module is bound by the system to the
-  device's own recents component, so a third-party home cannot host it. A tablet gets the
-  stock large-screen home without a taskbar; the system's own split-screen and the freeform
-  window mode still work on the apps themselves (`resizeableActivity` is on for the launcher).
-  Bringing a taskbar to Standard is a separate piece of work if it is ever wanted.
-  **Checked in the tree (2026-09-28, Droidtop/tracker#88):** the fork carries no taskbar
-  code at all: there is no `taskbar` package under `shell-default/src`, only the stock
-  colour/drawable resources and the TAPL test helpers that name it. `DeviceProfile.
-  isTaskbarPresent` is `isTablet && wmProxy.isTaskbarDrawnInProcess()`, and
-  `WindowManagerProxy.isTaskbarDrawnInProcess()` is false without the quickstep module, so
-  a tablet reserves no space for a taskbar nothing would draw; its dock is the ordinary
-  hotseat, which already is the persistent row of pinned apps on the home screen. What a
-  real taskbar adds over that is a strip above OTHER apps, and a third-party home has only
-  two ways to draw one: the quickstep taskbar (bound to the system's own recents component,
-  above) or an overlay window of its own (`SYSTEM_ALERT_WINDOW`, a service and a permission
-  flow, the way farmerbb/Taskbar does it, plus launching the pinned apps into freeform
-  windows). The second is a new feature with its own permission and its own design, not a
-  port, and nothing is written for it until the owner wants it.
+  device's own recents component, so a third-party home cannot host it. The system's own
+  split-screen and the freeform window mode still work on the apps themselves
+  (`resizeableActivity` is on for the launcher). The taskbar is built without quickstep, as
+  droidtop's own component: see "Taskbar on large screens" below.
 - **Verified so far:** every rig run in this section is the 1920x1080 landscape handheld or its
   emulator. A tablet-class emulator and the portrait AVD are the outstanding checks.
 
+### Taskbar on large screens (owner, 2026-09-29, Droidtop/tracker#88)
+
+The owner: "Tablets and larger screens are important targets." Standard mode draws a taskbar
+along the bottom of every tablet-sized or larger display, and of every external display, with
+the launcher's pinned apps, the apps opened since it started, an Apps button that opens the
+drawer, Recents, and a Hide button that folds it to a small tab.
+
+**What upstream does, and why droidtop's is its own.** Launcher3's taskbar (`TaskbarActivityContext`
+and its controllers) is quickstep code drawn in a system-privileged window and fed by the
+system's recents; `DeviceProfile.isTaskbarPresent` is `isTablet && wmProxy.isTaskbarDrawnInProcess()`,
+false here because the module is not compiled. What upstream teaches, and what is followed: the
+taskbar is a strip of the pinned (hotseat) apps plus the running ones, the drawer button opens the
+same all-apps, and it exists only where the screen is large. What is not followed is the window
+type and the data source, which a third-party home cannot have.
+
+**The mechanism (`StandardTaskbar`, `dev.droidtop.shell.standard`).**
+- *Window.* A `TYPE_ACCESSIBILITY_OVERLAY` window per display, owned by
+  `MurineAccessibilityService`, the accessibility service the gesture actions (lock screen, Recents)
+  already need. No `SYSTEM_ALERT_WINDOW` and no second service or permission: the person enabling the
+  one service is the only grant. The overlay covers the bottom strip of the app in front (an overlay
+  cannot reserve space the app lays out around); Hide folds it to a tab for an app whose own controls sit
+  there. On external displays the window is created for that display (`createWindowContext` from
+  Android 12, `createDisplayContext` before) and apps are launched onto the display of the bar
+  that was tapped (`ActivityOptions.setLaunchDisplayId`).
+- *Where it shows.* `TaskbarPolicy.shownOnDisplay` (runtime-common, unit-tested): a display of 600dp
+  smallest width or more (Android's own phone/tablet line), and any non-default display; a phone's own
+  screen gets none. It is shown while another app is in front, not over the home screen (whose hotseat
+  is the same pinned row, so there is one source for pinned apps, the launcher model's hotseat, read
+  through `enqueueModelUpdateTask`, never a second list) and not over droidtop's own screens. Only when
+  droidtop is the Home app, and only while the setting is on (Home settings, "Taskbar on large screens",
+  default on; on turning it on the accessibility permission is asked for).
+- *Running apps.* An honest limit: Android gives a non-privileged app no list of other apps' tasks. The
+  taskbar lists the apps that came to the front since the service connected, from the service's
+  window-state events, of which it reads only the package and the activity name of the window (an
+  `Activity` that resolves in the package manager, so dialogs, the keyboard and its own overlay do not
+  count; never window content, `canRetrieveWindowContent` stays false). The list is per process, capped at
+  eight (`TaskbarPolicy.withOpened`), keeps an app's place while the person switches, and an app is taken
+  off it by a long press; it is "opened this session", not a live task list. The events are requested only
+  while the setting is on.
+- *Recents.* The same single path as the gesture slot: `GLOBAL_ACTION_RECENTS` through the service.
+- *D-pad.* The window is not focusable, so it never steals keys from the app. The service's key filter
+  (`canRequestFilterKeyEvents`, requested only while the setting is on) looks for exactly two keys, the Meta
+  key and the pad's Mode button, and consumes only those: a press makes the window focusable and puts focus on
+  its first button, the D-pad moves between buttons, A or Enter acts, and B, Back or a second press of the
+  trigger hands focus back to the app. No other key is read or consumed. Select/Start were not used as the
+  trigger because emulators use them.
+- *Disclosure.* The accessibility disclosure text (`pref_accessibility_disclosure_desc`) now says what the
+  taskbar reads: the front app's name and the two trigger keys, nothing on screen. Its translations were
+  dropped with the old text, which said the service uses only screen locking.
+
+**Why the Desktop shell's taskbar is not reused.** `DesktopShell.Taskbar` is a Compose row over the
+Wayland compositor's toplevels (`wlr-foreign-toplevel-management`) inside the Desktop mode surface, with
+its Start menu, container windows and tray; its window list is a list of container windows, not Android
+apps, and its host is droidtop's own activity, not a window over other apps. Nothing in it fits an
+Android-app strip over foreign apps except the look, so the Standard taskbar shares no code with it and
+neither is a second mechanism for the other's job: one draws Android apps over Android, the other draws the
+container's windows inside the container.
+
+**Not built.** Reserving screen space for the taskbar (apps are not resized around it), freeform launching of
+pinned apps into windows, drag from the taskbar into split-screen, per-display foreground tracking (the
+service's window events do not say which display an app came up on, so one foreground state drives every
+bar), work-profile apps in the open list, and a live task list.
 ### Accessibility of the custom dialogs (Droidtop/tracker#91)
 
 `BackButtonMenu` (the mode switcher) and `RadioListDialog` (the single-select picker)

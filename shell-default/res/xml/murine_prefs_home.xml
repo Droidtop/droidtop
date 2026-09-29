@@ -40,6 +40,13 @@
         launcher:logIdOn="615"
         launcher:logIdOff="616" />
 
+    <SwitchPreferenceCompat
+        android:key="pref_taskbar"
+        android:title="@string/pref_taskbar_title"
+        android:summary="@string/pref_taskbar_desc"
+        android:defaultValue="true"
+        android:persistent="true" />
+
     <PreferenceCategory android:title="@string/pref_subcategory_layout">
 
         <app.murinelauncher.widget.radio.RadioGroupPreference

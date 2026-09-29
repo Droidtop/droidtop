@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">Povoľte tomuto launcheru používať služby prístupnosti</string>
     <string name="pref_accessibility_disclosure_title">Prístup k prístupnosti</string>
-    <string name="pref_accessibility_disclosure_desc">Na uzamknutie obrazovky gestami potrebuje tento launcher prístup k prístupnosti.\n\nAj keď tieto povolenia poskytujú službám prístupnosti širokú viditeľnosť, tento launcher používa len funkciu uzamknutia obrazovky a všetko ostatné ignoruje.\n\nŽiadne údaje sa nezhromažďujú, nesdielajú ani neprenášajú.</string>
 </resources>

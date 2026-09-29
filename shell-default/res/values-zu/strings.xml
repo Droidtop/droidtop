@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">Sicela uvumele lesi siqalisi ukuba sisebenzise izinsiza zokufinyelela</string>
     <string name="pref_accessibility_disclosure_title">Ukwamukelwa kokufinyelela</string>
-    <string name="pref_accessibility_disclosure_desc">Ukuze uvale isikrini ngezinkomba, lesi siqalisi sidinga ukufinyelela kokufinyelela.\n\nNakuba lezi zimvume zinikeze ububonakalo obubanzi ezinsizeni zokufinyelela, lesi siqalisi sisebenzisa kuphela umsebenzi wokuvalela isikrini futhi singenakubheka okunye okuphelele.\n\nAlikho idatha eliqoqwayo, elabelwana noma elithunyelwayo.</string>
 </resources>

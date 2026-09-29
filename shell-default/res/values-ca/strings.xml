@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">Permet que aquest llançador utilitzi els serveis d\'accessibilitat</string>
     <string name="pref_accessibility_disclosure_title">Accés a l\'accessibilitat</string>
-    <string name="pref_accessibility_disclosure_desc">Per bloquejar la pantalla amb gestos, aquest llançador necessita accés a l\'accessibilitat.\n\nTot i que aquests permisos atorguen una visibilitat àmplia als serveis d\'accessibilitat, aquest llançador només utilitza la funció de bloqueig de pantalla i ignora la resta.\n\nNo es recopilen, comparteixen ni transmeten dades.</string>
 </resources>

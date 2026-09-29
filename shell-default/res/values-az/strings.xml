@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">Zəhmət olmasa, bu başlatıcının əlçatanlıq xidmətlərindən istifadəsinə icazə verin</string>
     <string name="pref_accessibility_disclosure_title">Əlçatanlıq girişi</string>
-    <string name="pref_accessibility_disclosure_desc">Ekranı jestlərl kilidləmək üçün bu başlatıcıya əlçatanlıq girişi lazımdır.\n\nBu icazələr əlçatanlıq xidmətlərinə geniş görünürlük versə də, bu başlatıcı yalnız ekran kilidləmə funksiyasından istifadə edir və qalan hər şeyi görməməzliyə vurur.\n\nHeç bir məlumat toplanmır, paylaşılmır və ya ötürülmür.</string>
 </resources>

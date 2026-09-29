@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">Vă rugăm să permiteți acestui lansator să utilizeze serviciile de accesibilitate</string>
     <string name="pref_accessibility_disclosure_title">Acces la accesibilitate</string>
-    <string name="pref_accessibility_disclosure_desc">Pentru a bloca ecranul cu gesturi, acestui lansator îi este necesar accesul la accesibilitate.\n\nDeși aceste permisiuni oferă o vizibilitate largă serviciilor de accesibilitate, acest lansator utilizează doar funcția de blocare a ecranului și ignoră restul.\n\nNu sunt colectate, partajate sau transmise date.</string>
 </resources>

@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">Tafadhali ruhusu kizinduzi hiki kutumia huduma za uwezo wa kufikia</string>
     <string name="pref_accessibility_disclosure_title">Ufikiaji wa uwezo wa kufikia</string>
-    <string name="pref_accessibility_disclosure_desc">Ili kufunga skrini kwa ishara, kizinduzi hiki kinahitaji ufikiaji wa uwezo wa kufikia.\n\nIngawa ruhusa hizi zinatoa mwonekano mpana kwa huduma za uwezo wa kufikia, kizinduzi hiki kinatumia tu kazi ya kufunga skrini na kinapuuza yote mengine.\n\nHakuna data inayokusanywa, kushirikiwa au kuhamishwa.</string>
 </resources>

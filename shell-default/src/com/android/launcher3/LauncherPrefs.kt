@@ -352,6 +352,11 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
                 SettingsHomeFragment.SWIPE_DOWN_ACTION,
                 com.android.launcher3.touch.GestureAction.OPEN_NOTIFICATIONS,
             )
+        // Standard mode's taskbar on tablet-sized and larger displays (docs/SPEC.md 2c,
+        // "Taskbar on large screens"). On by default; it draws only once the accessibility
+        // service, which owns its window, is enabled.
+        @JvmField
+        val TASKBAR_ENABLED = backedUpItem("pref_taskbar", true)
         @JvmField
         val ACCESSIBILITY_DISCLOSURE_ACCEPTED =
             backedUpItem("pref_accessibility_disclosure_accepted", false)

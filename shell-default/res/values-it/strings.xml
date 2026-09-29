@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">Consenti a questo launcher di utilizzare i servizi di accessibilità</string>
     <string name="pref_accessibility_disclosure_title">Accesso all\'accessibilità</string>
-    <string name="pref_accessibility_disclosure_desc">Per bloccare lo schermo con i gesti, il launcher ha bisogno dell\'accesso all\'accessibilità.\n\nSebbene si tratti di autorizzazioni sensibili che concedono un\'ampia visibilità ai servizi di accessibilità, il launcher utilizza solo la funzione di blocco dello schermo, ignorando tutto il resto.\n\nNessun dato viene raccolto, condiviso o trasmesso.</string>
 </resources>

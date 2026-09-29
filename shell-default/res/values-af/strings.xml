@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">Laat asseblief die launcher toe om toeganklikheidsdienste te gebruik</string>
     <string name="pref_accessibility_disclosure_title">Toeganklikheidstoegang</string>
-    <string name="pref_accessibility_disclosure_desc">Om die skerm met gebare te sluit, het die launcher toeganklikheidstoegang nodig.\n\nHoewel hierdie toestemmings breed sigbaarheid aan toeganklikheidsdienste verleen, gebruik die launcher slegs die skermsluitfunksie en ignoreer alles anders.\n\nGeen data word ingesamel, gedeel of oorgedra nie.</string>
 </resources>

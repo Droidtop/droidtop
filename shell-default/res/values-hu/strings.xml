@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">Kérjük, engedélyezze ennek az indítónak a kisegítő szolgáltatások használatát</string>
     <string name="pref_accessibility_disclosure_title">Kisegítés hozzáférés</string>
-    <string name="pref_accessibility_disclosure_desc">A képernyő mozdulatokkal történő zárolásához ennek az indítónak kisegítő szolgáltatási hozzáférésre van szüksége.\n\nBár ezek az engedélyek széles láthatóságot biztosítanak a kisegítő szolgáltatásoknak, ez az indító csak a képernyőzárolási funkciót használja, és minden mást figyelmen kívül hagy.\n\nAdatokat nem gyűjtenek, nem osztanak meg és nem továbbítanak.</string>
 </resources>

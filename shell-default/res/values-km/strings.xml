@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">សូមអនុញ្ញាតឱ្យឡន់ជឺនេះប្រើសេវាភាពងាយស្រួលចូលប្រើ</string>
     <string name="pref_accessibility_disclosure_title">ការចូលប្រើភាពងាយស្រួល</string>
-    <string name="pref_accessibility_disclosure_desc">ដើម្បីចាក់សោអេក្រង់ដោយយឹតឃ្លាំង ឡន់ជឺនេះត្រូវការការចូលប្រើភាពងាយស្រួល។\n\nទោះបីជាការអនុញ្ញាតទាំងនេះផ្តល់ភាពមើលឃើញទូលំទូលាយដល់សេវាភាពងាយស្រួលចូលប្រើ ក៏ឡន់ជឺនេះប្រើពេញតែមុខងារចាក់សោអេក្រង់ប៉ុណ្ណោះ ហើយមិនអើពើអ្វីទាំងអស់។\n\nគ្មានទិន្នន័យត្រូវបានប្រមូល ចែករំលែក ឬផ្ញើទេ។</string>
 </resources>

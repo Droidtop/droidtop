@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">Permite que este launcher use los servicios de accesibilidad</string>
     <string name="pref_accessibility_disclosure_title">Acceso de accesibilidad</string>
-    <string name="pref_accessibility_disclosure_desc">Para bloquear la pantalla con gestos, el launcher necesita acceso de accesibilidad.\n\nAunque estos son permisos delicados que otorgan una visibilidad amplia a los servicios de accesibilidad, el launcher solo utiliza la función de bloqueo de pantalla e ignora todo lo demás.\n\nNo se recopila, comparte ni transmite ningún tipo de datos.</string>
 </resources>

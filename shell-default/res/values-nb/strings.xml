@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">Tillat denne launcher-en å bruke tilgjengelighetstjenester</string>
     <string name="pref_accessibility_disclosure_title">Tilgjengelighets tilgang</string>
-    <string name="pref_accessibility_disclosure_desc">For å låse skjermen med bevegelser trenger denne launcher-en tilgang til tilgjengelighet.\n\nSelv om disse tillatelsene gir bred synlighet for tilgjengelighetstjenester, bruker denne launcher-en bare skjermlåsfunksjonen og ignorerer alt annet.\n\nIngen data samles inn, deles eller overføres.</string>
 </resources>

@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">অনুগ্ৰহ কৰি এই লঞ্চাৰটোৱে প্ৰৱেশাধিকাৰ সেৱা ব্যৱহাৰ কৰিবলৈ অনুমতি দিয়ক</string>
     <string name="pref_accessibility_disclosure_title">প্ৰৱেশাধিকাৰ প্ৰবেশ</string>
-    <string name="pref_accessibility_disclosure_desc">ইশাৰাৰ দ্বাৰা স্ক্ৰীণ লক কৰিবলৈ এই লঞ্চাৰটোৱে প্ৰৱেশাধিকাৰ প্ৰবেশৰ প্ৰয়োজন।\n\nযদিও এই অনুমতিসমূহে প্ৰৱেশাধিকাৰ সেৱাসমূহক বহল দৃশ্যমানতা প্ৰদান কৰে, এই লঞ্চাৰটোৱে কেৱল স্ক্ৰীণ লকিং ফাংশন ব্যৱহাৰ কৰে আৰু বাকি সকলোকে উপেক্ষা কৰে।\n\nকোনো ডেটা সংগ্ৰহ, ভাগ-বতৰা বা প্ৰেৰণ কৰা নহয়।</string>
 </resources>

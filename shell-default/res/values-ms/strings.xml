@@ -222,5 +222,4 @@
     <!-- Accessibility -->
     <string name="pref_accessibility_request_toast">Sila benarkan launcher ini menggunakan perkhidmatan kebolehcapaian</string>
     <string name="pref_accessibility_disclosure_title">Akses kebolehcapaian</string>
-    <string name="pref_accessibility_disclosure_desc">Untuk mengunci skrin dengan isyarat, launcher ini memerlukan akses kebolehcapaian.\n\nWalaupun keizinan ini memberikan visibiliti luas kepada perkhidmatan kebolehcapaian, launcher ini hanya menggunakan fungsi penguncian skrin dan mengabaikan yang lain.\n\nTiada data dikumpulkan, dikongsi atau dihantar.</string>
 </resources>
