@@ -1,15 +1,15 @@
 package dev.droidtop.runtime.linux.noroot
 
+import android.system.ErrnoException
+import android.system.Os
+import android.system.OsConstants
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
-import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
-import java.nio.file.SimpleFileVisitor
-import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.PosixFilePermission
 import java.nio.file.attribute.PosixFilePermission.OWNER_EXECUTE
 import java.nio.file.attribute.PosixFilePermission.OWNER_READ
@@ -31,8 +31,15 @@ internal object ContainerArchive {
     /** Writes [rootfs] to [out] as a tar archive, entries relative to the rootfs root. */
     fun export(rootfs: File, out: OutputStream, errorLog: File) {
         require(rootfs.isDirectory) { "no rootfs at $rootfs" }
-        makeOwnerReadable(rootfs)
-        val process = ProcessBuilder(TAR, "-cf", "-", "-C", rootfs.absolutePath, ".")
+        val sockets = mutableListOf<String>()
+        prepareForTar(rootfs, rootfs, sockets)
+        val command = buildList {
+            add(TAR); add("-cf"); add("-")
+            // Toybox matches --exclude against the member name as tar spells it, "./" first.
+            sockets.forEach { add("--exclude=./$it") }
+            add("-C"); add(rootfs.absolutePath); add(".")
+        }
+        val process = ProcessBuilder(command)
             .redirectError(errorLog)
             .start()
         process.inputStream.use { it.copyTo(out) }
@@ -61,31 +68,45 @@ internal object ContainerArchive {
     }
 
     /**
-     * proot makes an empty placeholder, with no permissions at all, at every
-     * bind target the image lacks (`/etc/resolv.conf`, `/run/droidtop-sockets`
-     * and the other binds of ProotRuntime), and a guest running as its
-     * fake root can chmod anything it owns. Toybox tar stops with "can't
-     * open ...: Permission denied" on the first such entry and fails the
-     * whole backup (Droidtop/tracker#81). Everything under [root] is the
-     * app's own, so give the owner back read (and search, for a directory)
-     * where it is missing; the archive then holds the placeholders as empty
-     * entries, which the binds cover again at the next start.
+     * What stops toybox tar finishing over a proot rootfs, all of it found
+     * in one walk of [dir] (Droidtop/tracker#81; rig, emulator, the whole
+     * message of tar's stderr):
+     *
+     *  - proot makes an empty placeholder with no permissions at every bind
+     *    target the image lacks (`/etc/resolv.conf`, `/run/droidtop-sockets`,
+     *    `/run/droidtop-app-storage`, the shared-storage and extra-mount
+     *    paths), and a guest running as its fake root can chmod anything it
+     *    owns. tar stops with "can't open ...: Permission denied" on each
+     *    and fails the backup. Everything under [dir] is the app's own, so
+     *    the owner gets read (and search, for a directory) back where it is
+     *    missing, before the directory is listed; the archive then holds the
+     *    placeholders as the empty entries they are.
+     *  - A socket a program left behind is "unknown file type '140000'" to
+     *    tar. The container is stopped, so it is dead state: it is left out
+     *    of the archive (its path is added to [sockets], relative to [root]).
+     *
+     * Symbolic links are never followed.
      */
-    private fun makeOwnerReadable(root: File) {
-        Files.walkFileTree(root.toPath(), object : SimpleFileVisitor<Path>() {
-            override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
-                ownerAccess(dir, OWNER_READ, OWNER_EXECUTE)
-                return FileVisitResult.CONTINUE
+    private fun prepareForTar(root: File, dir: File, sockets: MutableList<String>) {
+        ownerAccess(dir.toPath(), OWNER_READ, OWNER_EXECUTE)
+        val children = dir.listFiles() ?: return
+        for (child in children) {
+            val path = child.toPath()
+            when {
+                Files.isSymbolicLink(path) -> Unit
+                Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS) -> prepareForTar(root, child, sockets)
+                Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS) -> ownerAccess(path, OWNER_READ)
+                isSocket(child) -> sockets += child.relativeTo(root).path
             }
-
-            override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
-                if (attrs.isRegularFile) ownerAccess(file, OWNER_READ)
-                return FileVisitResult.CONTINUE
-            }
-
-            override fun visitFileFailed(file: Path, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
-        })
+        }
     }
+
+    private fun isSocket(file: File): Boolean =
+        try {
+            OsConstants.S_ISSOCK(Os.lstat(file.path).st_mode)
+        } catch (_: ErrnoException) {
+            false
+        }
 
     private fun ownerAccess(path: Path, vararg needed: PosixFilePermission) {
         runCatching {

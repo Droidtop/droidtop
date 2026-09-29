@@ -2052,10 +2052,13 @@ the `ContainerRuntime` interface that already exists (§3):
   Android's own toybox `tar`, so symlinks and modes survive and there is no
   tar writer in the app; ownership is not carried, every file is the app's).
   proot leaves a permissionless placeholder at every bind target the image lacks
-  (`/etc/resolv.conf`, `/run/droidtop-sockets`, the shared-storage and extra-mount
-  paths) and toybox tar stops on the first unreadable entry, so the export first gives
-  the owner read (and search) where it is missing (`ContainerArchive.makeOwnerReadable`);
-  the placeholders are archived as the empty entries they are.
+  (`/etc/resolv.conf`, `/run/droidtop-sockets`, `/run/droidtop-app-storage`, the shared-storage
+  and extra-mount paths) and toybox tar stops on each unreadable entry, so the export first
+  gives the owner read (and search) back where it is missing, walking the rootfs without
+  following symlinks (`ContainerArchive.prepareForTar`); the placeholders are archived as the
+  empty entries they are. A socket a program left in the rootfs is dead state in a stopped
+  container and tar cannot store it ("unknown file type '140000'"), so it is left out. A
+  failed export deletes the file the picker made, so no half archive looks like a backup.
   The container must be stopped (the rows say so while it runs). A restore
   unpacks beside the container, refuses an archive with no `/etc` and `/usr`,
   and only then swaps it in, so a bad or truncated archive leaves the
