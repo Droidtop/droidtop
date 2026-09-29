@@ -106,14 +106,22 @@ media3 = "1.4.1"
 okhttp = "4.12.0"
 bouncycastle = "1.78.1"
 # Real ES-DE theme downloader parity -- ThemeDownloader.kt (library-core)
-# git-clones the same real gitlab.com/es-de/themes/themes-list.git index
-# and per-theme repos real ES-DE itself clones (GuiThemeDownloader.cpp),
-# via libgit2 there -- JGit is the pure-Java equivalent for Android, no
-# native git binding available.
-# 5.13.x, the last JGit line built for Java 8: 6.x and 7.x call Java 11+
-# library methods (InputStream.readNBytes(int) among them) that Android
-# only has from API 33, and the theme downloader crashed with
-# NoSuchMethodError on Android 9 (rig, dq-onboard-01). minSdk is 26.
+# git-clones the same real per-theme repos real ES-DE itself clones
+# (GuiThemeDownloader.cpp), via libgit2 there -- JGit is the pure-Java
+# equivalent for Android, no native git binding available.
+# 5.13.x, the last JGit line built for Java 8. No 6.x/7.x runs on
+# minSdk 26: even 6.4.0, the first line with CloneCommand.setDepth,
+# calls API-33 library methods on the clone path itself
+# (InputStream.transferTo in DirCacheCheckout; String.strip/
+# stripTrailing in StringUtils/CommitConfig -- read from the real 6.4.0
+# jar), 7.x adds InputStream.readNBytes, and that is what crashed the
+# theme downloader with NoSuchMethodError on Android 9 (rig,
+# dq-onboard-01). desugar_jdk_libs 2.1.5 bridges transferTo but has no
+# shim for the String methods, so core-library desugaring is no way
+# out either.
+# The pin is also why the theme INDEX is not cloned at all: 5.13 has no
+# CloneCommand.setDepth, so ThemeDownloader fetches themes.json as one
+# raw HTTPS file instead (docs/SPEC.md 7b).
 jgit = "5.13.3.202401111512-r"
 
 [libraries]
@@ -165,6 +173,10 @@ coil = { module = "io.coil-kt.coil3:coil-compose-core", version.ref = "coil" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-android = { module = "io.coil-kt.coil3:coil-android", version.ref = "coil" }
 coil-svg = { module = "io.coil-kt.coil3:coil-svg", version.ref = "coil" }
+# coil3 ships no network fetcher by default; this one is what loads the
+# theme browser's screenshot previews from the index repo's raw endpoint
+# (the index itself is no longer cloned with all its images).
+coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
 apng = { module = "com.github.penfeizhou.android.animation:apng", version.ref = "apng" }
 apng-gif = { module = "com.github.penfeizhou.android.animation:gif", version.ref = "apng" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
