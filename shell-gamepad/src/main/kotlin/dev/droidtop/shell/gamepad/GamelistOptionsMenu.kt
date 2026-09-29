@@ -477,14 +477,16 @@ internal fun GamelistOptionsMenu(
             SYSTEM_SETTINGS -> {
                 // The same registered screen Settings > Library > Console
                 // systems opens (registryId "console_systems",
-                // AppSettingsCatalogs) -- resolved through the registry
-                // like every other :app-owned screen this module reaches,
-                // never a second copy of the folder/emulator picker. It
-                // lists every system's folder, not just this one, because
-                // that screen has no per-system deep link yet; landing on
-                // it from here still saves the Settings detour this
-                // system's folder/emulator/BIOS config used to need.
-                val screen = SettingsScreenRegistry.get("console_systems")
+                // AppSettingsCatalogs), through the same generic
+                // CatalogNavigator dialog "Get games" uses -- but
+                // DEEP-LINKED: the registry argument re-opens that one
+                // screen parameterized with THIS system (docs/SPEC.md
+                // "One consistent way into Settings"), so it lands on
+                // this system's folder rows instead of the top of the
+                // whole list, never a second folder/emulator picker.
+                // A system with no folder on any games root falls back
+                // to the full list inside the screen itself.
+                val screen = SettingsScreenRegistry.get("console_systems", systemId)
                 if (screen != null) acquireScreen = screen else status = "Settings screen unavailable"
             }
             "Close" -> onDismiss()
