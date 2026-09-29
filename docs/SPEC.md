@@ -2105,6 +2105,44 @@ the `ContainerRuntime` interface that already exists (§3):
   Terminal provisions `foot` into that sibling on first use (the
   provisioning plan without the compositor), which is what makes "a
   terminal into any container" literally true.
+- **The stop is off the main thread, and where `runBlocking` remains
+  (audited 2026-09-29).** Leaving Desktop must never park the UI thread
+  on the container stop (audit 2026-09-24, C4):
+  `DesktopSessionService.onDestroy` hands the stop to a process-lifetime
+  worker and returns, and the next session's `connect()` joins that
+  worker before it touches the container (`DesktopSessionService.kt:117`,
+  `:136`); the worker runs §3's "Stopping is a stop" mechanism, which
+  both backends implement as suspend work (`ProotRuntime.stop`,
+  `DroidSpacesRuntime.stop`), and neither backend module contains a
+  `runBlocking` at all. The `runBlocking`s that do remain in the app:
+  - **On the main thread, in this section's own surface (the known
+    gap).** The container page's Sockets switches (Wayland, Audio), the
+    Devices toggles and the Mounts "Add a folder" pick wrap their
+    `ContainerRuntime` config write in `runBlocking(Dispatchers.IO)`
+    (`ContainersCatalog.kt:394`, `:411`, `:465`, `:736`) — but both
+    renderers call a `ToggleItem.onToggle` and a `FolderPickItem.onPicked`
+    synchronously on the main thread (`CatalogPreferenceBuilder.kt:111`,
+    `:387`; `SettingsCatalogView.kt:238`, `:593`), and `runBlocking` parks
+    its caller whatever dispatcher the body runs on, so each of those
+    rows holds the UI thread for a container-config write. That is the
+    remaining violation of the settings catalog's own C4 rule ("an
+    action that touches a database or disk is an `AsyncActionItem` ...
+    Never `runBlocking` in a catalog callback", §7c); the fix is to make
+    those rows async like the rule says, and it is not built yet.
+  - **Off the main thread, by structure.** The Backup rows' tar
+    export/restore (`ContainersCatalog.kt:302`, `:317`) run inside a
+    `DocumentPickItem.onPicked`, which both renderers already run under
+    `withContext(Dispatchers.IO)` (`CatalogPreferenceBuilder.kt:128`;
+    `SettingsCatalogView.kt:228`), so the `runBlocking` parks an IO
+    thread for the archive, not the UI. The plugin broker's surface is
+    synchronous by contract, so its `runBlocking`s park the calling
+    binder thread while a grant sheet is answered or a provider call runs
+    (`PluginBrokers.kt:61`, `:158`). The Wine prefix preparation blocks
+    the dedicated `droidtop-wine-start` thread (`WineXSession.kt:106`,
+    started from `WineGameActivity.kt`'s single-thread executor).
+    launcher3's own `PreferenceSearchIndexablesProvider` keeps its
+    upstream `runBlocking` because a ContentProvider query must answer
+    synchronously (`shell-default`, upstream code, not ours to rewrite).
 
 ## 4. Display
 
