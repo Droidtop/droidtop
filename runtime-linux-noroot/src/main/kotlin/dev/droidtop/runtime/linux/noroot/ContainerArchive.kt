@@ -40,7 +40,7 @@ internal object ContainerArchive {
         check(into.mkdirs()) { "could not create $into" }
         val process = ProcessBuilder(TAR, "-xf", "-", "-C", into.absolutePath)
             .redirectError(errorLog)
-            .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+            .redirectOutput(File("/dev/null"))
             .start()
         try {
             process.outputStream.use { input.copyTo(it) }
