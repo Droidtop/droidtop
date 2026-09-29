@@ -29,10 +29,15 @@ internal class MicrophonePump(private val pipe: File) {
     @Volatile private var running = false
     private var worker: Thread? = null
 
-    /** Makes the FIFO PulseAudio's `module-pipe-source` reads. */
+    /**
+     * Clears the way for PulseAudio's `module-pipe-source`, which makes the
+     * FIFO itself and refuses to load when one is already there ("mkfifo:
+     * Unknown error 17", rig log of 1096, Droidtop/tracker#80). A leftover
+     * from an earlier session is removed here; [openWriter] waits for the
+     * module to create the new one.
+     */
     fun prepare() {
         pipe.delete()
-        Os.mkfifo(pipe.absolutePath, 384) // 0600: only this app's processes
     }
 
     @SuppressLint("MissingPermission") // checked by the caller, HostAudioServer.microphoneProblem
@@ -92,18 +97,18 @@ internal class MicrophonePump(private val pipe: File) {
         }
     }
 
-    /** Opens the FIFO for writing once PulseAudio has it open for reading; null when stopped first. */
+    /** Opens the FIFO for writing once PulseAudio has made and opened it for reading; null when stopped first. */
     private fun openWriter(): java.io.FileDescriptor? {
         while (running) {
             try {
                 return Os.open(pipe.absolutePath, OsConstants.O_WRONLY or OsConstants.O_NONBLOCK, 0)
             } catch (e: ErrnoException) {
-                if (e.errno != OsConstants.ENXIO) {
+                if (e.errno != OsConstants.ENXIO && e.errno != OsConstants.ENOENT) {
                     Log.w(TAG, "could not open the microphone pipe: ${e.message}")
                     return null
                 }
                 try {
-                    Thread.sleep(RETRY_MS) // ENXIO: no reader yet
+                    Thread.sleep(RETRY_MS) // ENOENT: the module has not made it yet; ENXIO: no reader yet
                 } catch (_: InterruptedException) {
                     return null
                 }
