@@ -444,15 +444,15 @@ fun GamepadShell(
         }
     }
 
+    // What the last Quit to Library actually did, for the row's subtitle
+    // (Droidtop/tracker#82). Null until a quit runs: the row then reads
+    // "Ends <game>", and a real quit replaces it with the outcome, so a
+    // quit that left the emulator alive is shown honestly instead of being
+    // reported as a success. Held outside the `if` so it survives the sheet
+    // closing; reset whenever the running game changes.
+    var quitOutcome by remember { mutableStateOf<dev.droidtop.library.QuitResult?>(null) }
+    LaunchedEffect(runningEntry?.id) { quitOutcome = null }
     if (quickMenuOpen) {
-        // What the last Quit to Library actually did, for the row's
-        // subtitle. Null until a quit runs: the row then reads "Ends
-        // <game>" (the pre-quit promise), and a real quit replaces it with
-        // the outcome, so a quit that left the emulator alive (the
-        // Android 13 case, Droidtop/tracker#82) is shown honestly instead
-        // of being reported as a success. Held here, not in the tab: it
-        // outlives the sheet, so a second R2 after a quit still shows it.
-        var quitOutcome by remember { mutableStateOf<dev.droidtop.library.QuitResult?>(null) }
         QuickMenu(
             runningEntry = runningEntry,
             // The same launch path every entry already goes through
@@ -466,9 +466,12 @@ fun GamepadShell(
                 onLaunch(entry)
             },
             onQuit = { entry ->
-                quickMenuOpen = false
+                // The sheet stays open until the game really ended, so a
+                // quit that could not end it shows its reason in the row.
                 scope.launch {
-                    val outcome = library.quit(entry)
+                    val outcome = runCatching { library.quit(entry) }.getOrElse {
+                        dev.droidtop.library.QuitResult.NotEnded("Quit failed: ${it.message ?: it.javaClass.simpleName}")
+                    }
                     quitOutcome = outcome
                     // Clear droidtop's own bookkeeping only when the
                     // game's task really ended (Droidtop/tracker#82): a
@@ -477,6 +480,7 @@ fun GamepadShell(
                     // outcome is shown in the row's subtitle instead.
                     if (outcome is dev.droidtop.library.QuitResult.Ended) {
                         dev.droidtop.library.LaunchDisplay.clearRunning()
+                        quickMenuOpen = false
                     }
                 }
             },

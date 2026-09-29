@@ -979,26 +979,26 @@ class ConsoleRomProvider(
         val player = resolvePlayer(context, system, entry.altEmulator)
             ?: return QuitResult.Unresolvable("No emulator is installed for ${system.displayName}, so ${entry.title} can't be ended")
         killPackageProcessesBestEffort(player.packageName)
-        val endedTask = endLaunchedTaskBestEffort(player.packageName)
-        return if (endedTask) QuitResult.Ended
-        else QuitResult.NotEnded("Couldn't end ${player.name}'s task; it may have been started outside droidtop")
+        return if (endLaunchedTaskBestEffort(player.packageName)) QuitResult.Ended
+        else QuitResult.NotEnded(
+            "Asked ${player.name} to close, but Android doesn't let droidtop end or confirm another app's game. " +
+                "Close it from Recents.",
+        )
     }
 
     /**
-     * Best-effort end of the emulator's Recents task, for the non-root
-     * path (docs/SPEC.md, Droidtop/tracker#82): only tasks this package
-     * actually started are removable by an unprivileged app, and
-     * [android.app.ActivityManager.getAppTasks] returns exactly those
-     * (a task droidtop launched via [android.content.Context.startActivity]
-     * with [Intent.FLAG_ACTIVITY_NEW_TASK], which every droidtop launch
-     * goes through). Matching on the emulator's package name is the
-     * honest scope -- droidtop never removes a task it did not start,
-     * and never removes its own shell task.
+     * Removes the player's task when it is one droidtop owns.
+     * [android.app.ActivityManager.getAppTasks] lists only tasks whose root
+     * activity belongs to THIS package, so it never finds a third-party
+     * emulator's task (Android hides those from a non-privileged app); it is
+     * here for players that run inside droidtop's own task. True only when a
+     * task was found and removed, never a guess.
      */
     private fun endLaunchedTaskBestEffort(packageName: String): Boolean {
         val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-        val tasks = am.getAppTasks() ?: return false
-        val mine = tasks.filter { it.taskId != 0 && it.topActivity?.packageName == packageName }
+        val mine = am.appTasks.orEmpty().filter {
+            it.taskInfo?.baseIntent?.component?.packageName == packageName
+        }
         if (mine.isEmpty()) return false
         mine.forEach { it.finishAndRemoveTask() }
         return true

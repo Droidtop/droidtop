@@ -2170,29 +2170,20 @@ the `ContainerRuntime` interface that already exists (§3):
   append to once that extension point's host exists, so it extends this
   tab instead of needing a second in-game menu built to compete with
   it.
-- **Quit to Library actually ends the game, and says so when it doesn't
-  (decided 2026-09-29, Droidtop/tracker#82)**: on the owner's console
-  (Android 13) the first version of this tab did not end the game —
-  after Quit the emulator's process and its Recents task both stayed
-  alive, yet droidtop had already dropped its running-game state, so the
-  menu read "the game ended" while it hadn't. Two changes: (1)
-  `LibraryProvider.quit` returns `QuitResult` (`Ended`, `NotEnded`,
-  `Unresolvable`) instead of `Boolean`; `Library.quit` forwards that
-  outcome, and the shell clears `LaunchDisplay`'s running-game state
-  **only** on `Ended`, showing the outcome in the row's subtitle
-  otherwise. (2) `ConsoleRomProvider.quit` now ends the task droidtop
-  itself launched: `ActivityManager.getAppTasks()` lists exactly the
-  tasks this package started (every droidtop launch goes through
-  `Context.startActivity` with `FLAG_ACTIVITY_NEW_TASK`, via
-  `LaunchDisplay.start`), and `AppTask.finishAndRemoveTask()` removes
-  one, which is the non-privileged path for a task the launcher owns —
-  `killBackgroundProcesses` alone is not enough on Android 14+ (7i), and
-  it left the process and task alive on 13. It is still best-effort: a
-  game the user launched from another app, or started before this
-  droidtop install, has no task here and comes back as `NotEnded` with
-  the reason, never a claimed success. PC/engine games and native apps
-  still return `NotEnded` honestly — they have no task droidtop
-  started to remove.
+- **Quit to Library says what it did (decided 2026-09-29, Droidtop/tracker#82)**: on the owner's
+  console (Android 13) the first version of this tab did not end the game — after Quit the
+  emulator's process and its Recents task both stayed alive, yet droidtop had already dropped its
+  running-game state, so the menu read "the game ended" when it hadn't. The rule now:
+  `LibraryProvider.quit` returns `QuitResult` (`Ended`, `NotEnded`, `Unresolvable`) instead of
+  `Boolean`; the shell clears `LaunchDisplay`'s running-game state **only** on `Ended`, keeps the
+  sheet open otherwise, and shows the outcome in the row's subtitle (the pre-quit promise "Ends
+  <game>" until a quit runs). What a non-privileged app can actually do to another app's game:
+  `killBackgroundProcesses` (only while its processes are cached; not on Android 14+ for other
+  apps, 7i) and `ActivityManager.getAppTasks`, which lists only tasks whose root activity is
+  droidtop's own, so it never finds a third-party emulator's task. `ConsoleRomProvider.quit` tries
+  both and reports `Ended` only when it removed a task; for an emulator it can neither end nor
+  confirm it says so and names Recents as the way out. Nothing here claims an end it did not see.
+  PC/engine games and native apps return `NotEnded` by default.
 - **Display reinit + parked displays (directed 2026-08-30)**: Android
   silently MIRRORS a second display nothing presents on (confirmed live
   on the addon) — droidtop's answer is that some droidtop surface owns
