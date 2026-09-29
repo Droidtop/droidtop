@@ -20,7 +20,6 @@ class MurineClockView @JvmOverloads constructor(
 
     private var dateText: TextClock? = null
     private var clockView: TextClock? = null
-    private var attached = false
     private var currentLocale: Locale? = null
 
     override fun onFinishInflate() {
@@ -28,34 +27,6 @@ class MurineClockView @JvmOverloads constructor(
         clockView = findViewById(R.id.murine_clock)
         dateText = findViewById(R.id.murine_clock_date)
         applyLocaleDateFormat()
-
-        // Uncomment to show alarms when clicked
-        /*setOnClickListener {
-            try {
-                val intent = Intent(AlarmClock.ACTION_SHOW_ALARMS).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(intent)
-            } catch (_: Exception) {
-                // No clock app available
-            }
-        }*/
-    }
-
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        if (!attached) {
-            attached = true
-            // Custom logic
-        }
-    }
-
-    override fun onDetachedFromWindow() {
-        super.onDetachedFromWindow()
-        if (attached) {
-            attached = false
-            // Custom logic
-        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {

@@ -59,6 +59,14 @@ object CompositorProvisioning {
     private const val DEBIAN_NO_SERVICE_STARTS =
         "printf '#!/bin/sh\\nexit 101\\n' > /usr/sbin/policy-rc.d && chmod 755 /usr/sbin/policy-rc.d"
 
+    /**
+     * The desktop's graphical file manager, an ordinary distro package next to the terminal
+     * (docs/SPEC.md 3d, "File manager"): PCManFM, the same name in both distros, light and
+     * with no desktop environment behind it. Its own `.desktop` entry puts it in the Start
+     * menu, and it browses the shared-storage folder ([ContainerLayout.SHARED_STORAGE_DIR]).
+     */
+    const val FILE_MANAGER_PACKAGE = "pcmanfm"
+
     /** CUPS's own package name, the same in both distros droidtop provisions. */
     const val PRINTING_PACKAGE = "cups"
 
@@ -98,7 +106,7 @@ object CompositorProvisioning {
     }
 
     private fun basePlan(os: String, desktopEnvironment: String): PrimaryProvisioning? {
-        val terminal = ContainerTerminal.PACKAGE
+        val terminal = "${ContainerTerminal.PACKAGE} $FILE_MANAGER_PACKAGE"
         return when (os to desktopEnvironment) {
             "debian" to "sway" -> PrimaryProvisioning(
                 installCommand = "$DEBIAN_NO_SERVICE_STARTS && export DEBIAN_FRONTEND=noninteractive && " +

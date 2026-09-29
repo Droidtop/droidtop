@@ -63,6 +63,14 @@ class CompositorProvisioningTest {
     }
 
     @Test
+    fun `every provisionable combination installs the graphical file manager`() {
+        for ((os, de) in listOf("debian" to "sway", "alpine" to "sway", "alpine" to "labwc")) {
+            val words = CompositorProvisioning.plan(os, de)!!.installCommand.split(" ")
+            assertTrue("$os/$de must install a file manager", words.contains(CompositorProvisioning.FILE_MANAGER_PACKAGE))
+        }
+    }
+
+    @Test
     fun `printing adds CUPS, points it at the shared socket, and starts it`() {
         val off = CompositorProvisioning.plan("debian", "sway")!!
         val on = CompositorProvisioning.plan("debian", "sway", printing = true)!!

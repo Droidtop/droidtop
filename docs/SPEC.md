@@ -676,6 +676,54 @@ Quick Menu on every real deep-link re-entry
 per-entry reset token `GamepadShell` already uses for a rescan/section
 deep link), not by touching mode resolution.
 
+### Standard mode on a phone, a tablet and in portrait (owner, 2026-09-28)
+
+Standard supports phone use. The same device can run different UIs as contexts: a phone becomes
+a desktop by plugging in and switching UIs, so Standard is a first-class phone launcher and not
+only the handheld's plain home screen (Droidtop/tracker#89). What that means in the fork:
+
+- **Grids and sizes.** Launcher3's own two grid profiles ship in `res/xml/device_profiles.xml`:
+  `murine_grid` (phone, and multi-display) and `murine_grid_tablet` (6x5, scalable). The device
+  category picks between them, and the stock `values-sw600dp`/`sw720dp` and `-land` resources
+  size the rest, so portrait and landscape phones and tablets all get a real grid and are not
+  one fixed 1920x1080 layout. Rotation of the home screen follows Launcher3's rule: on by
+  default from a 600dp smallest width, off (portrait) below it, and a user setting either way.
+- **Not built, on purpose.** A persistent taskbar, split-screen entry from a drag, and app pairs
+  (`AppPairIcon` is vendored, nothing launches it) are Launcher3 quickstep features. This fork
+  compiles only `src_no_quickstep`, and the quickstep module is bound by the system to the
+  device's own recents component, so a third-party home cannot host it. A tablet gets the
+  stock large-screen home without a taskbar; the system's own split-screen and the freeform
+  window mode still work on the apps themselves (`resizeableActivity` is on for the launcher).
+  Bringing a taskbar to Standard is a separate piece of work if it is ever wanted.
+- **Verified so far:** every rig run in this section is the 1920x1080 landscape handheld or its
+  emulator. A tablet-class emulator and the portrait AVD are the outstanding checks.
+
+### Recents in Standard (Droidtop/tracker#90)
+
+droidtop provides no Overview of its own (no quickstep module, above). The Recents key and
+gesture belong to the system: on Android 10 and later SystemUI binds to the device's own
+recents component (`config_recentsComponentName`, the OEM launcher's quickstep), whichever
+home app is set, and before 10 SystemUI draws it itself, so a third-party home such as this one
+gets the system task switcher the same way Nova does. That is expected, not yet rig-verified on
+the handheld's firmware. Where a device ships no working recents surface, or a user wants it on
+a gesture, the gesture slots (double-tap, swipe-down) offer **Open recent apps**
+(`GestureAction.OPEN_RECENTS`): it asks the system for its Recents through the accessibility
+service's `GLOBAL_ACTION_RECENTS`, the same single path the lock-screen action already uses
+(the disclosure and the Accessibility settings hand-off live in one place, `performGlobal`).
+
+### Wallpaper, and the first-screen widget (Droidtop/tracker#92, #93)
+
+- The long-press menu's **Wallpaper & style** fires the generic `ACTION_SET_WALLPAPER` and
+  names no package (`wallpaper_picker_package` is empty in this build), so it can only reach
+  what the device really has. The entry is offered only when an activity resolves that intent
+  (the manifest holds `QUERY_ALL_PACKAGES`, so the check is reliable), and a tap that races an
+  uninstall shows the launcher's own "App isn't installed" toast rather than failing silently.
+- The first-screen widget (`SmartspaceMode`) is real, not a stub: **Clock** is a live
+  `TextClock` time plus the locale's own date format, and **Google Smartspace** places the
+  Google app's own at-a-glance widget and is offered only when that app is installed. Neither
+  carries weather or calendar data of droidtop's own, and droidtop fabricates none; a weather
+  or calendar card would arrive as a plugin data source, not as placeholder text.
+
 ### "Full computer", and where Launcher mode stands against Nova/Apex (survey + decided 2026-09-25)
 
 The owner's direction: droidtop on the console "needs to make the android
@@ -699,7 +747,7 @@ sources rather than assumed from Nova/Apex's feature lists:
 | Backup/restore | HAVE, wired to Settings | `backup/BackupHelper.kt`, `SettingsMiscFragment.BACKUP_EXPORT`/`BACKUP_IMPORT` |
 | Smartspace/clock widget | HAVE | `widget/smartspace/{MurineClockView,SmartspaceMode}.kt` |
 | Configurable QSB with web search providers | HAVE | `widget/search/{SearchProvider,MurineSearchBarView}.kt` (8 providers + custom) |
-| Gestures: double-tap and swipe-down, each assignable to any of nothing/lock screen/open notifications/open app drawer (**built 2026-09-26**, was two fixed on/off gestures) | HAVE, exposed in Settings | `GestureAction` enum + `perform(Launcher)` (`com.android.launcher3.touch`), `LauncherPrefs.GESTURE_DOUBLE_TAP_ACTION`/`GESTURE_SWIPE_DOWN_ACTION`, picked from `SettingsHomeFragment`'s `RadioGroupPreference` rows (`DOUBLE_TAP_ACTION`, `SWIPE_DOWN_ACTION`), applied in `WorkspaceTouchListener.java`/`NotificationSwipeController.kt`; an existing install's old two-boolean prefs are carried over once by `GestureActionMigration` |
+| Gestures: double-tap and swipe-down, each assignable to any of nothing/lock screen/open notifications/open app drawer/open recent apps (**built 2026-09-26**, was two fixed on/off gestures) | HAVE, exposed in Settings | `GestureAction` enum + `perform(Launcher)` (`com.android.launcher3.touch`), `LauncherPrefs.GESTURE_DOUBLE_TAP_ACTION`/`GESTURE_SWIPE_DOWN_ACTION`, picked from `SettingsHomeFragment`'s `RadioGroupPreference` rows (`DOUBLE_TAP_ACTION`, `SWIPE_DOWN_ACTION`), applied in `WorkspaceTouchListener.java`/`NotificationSwipeController.kt`; an existing install's old two-boolean prefs are carried over once by `GestureActionMigration` |
 | App-drawer/QSB search over droidtop's own library (games, not just installed apps) | **built this change** | `DefaultAppSearchAlgorithm.doSearch` also queries `LibrarySearch.source`; see below |
 | A home-screen widget of droidtop's own (a "full computer" feature neither Nova nor Apex can offer, since they have no game library) | **built this change** | `ContinuePlayingWidgetProvider.kt` (see below) |
 | Global settings, Desktop settings rendered in the shell's own row component, pad-navigable | HAVE (fixed 2026-09-24/25, UI pass H4) | `DroidtopWideSettings.kt`, `SettingsGlobalFragment.kt`'s `CatalogPreferenceNavigator` |
@@ -1754,6 +1802,11 @@ the `ContainerRuntime` interface that already exists (§3):
   settings: shared-socket opt-outs (Wayland/audio — §2's defaults, but
   inspectable and disable-able per container), bind-mounts (Android
   shared storage in/out), autostart-with-session.
+- **A graphical file manager.** PCManFM (`CompositorProvisioning.FILE_MANAGER_PACKAGE`), an
+  ordinary distro package installed with the terminal on the primary container's first boot
+  and re-provisioned on an existing one (the plan changed), never an image of ours. Its
+  `.desktop` entry puts it in the Start menu; it browses the shared-storage folder (§4b), so
+  Android files can be opened, copied and moved with a pointer rather than `cd` and `ls`.
 - **A real terminal into any container** — a computer the user can't
   open a shell on isn't a computer. **Decided and built 2026-09-02, the
   other way round from this section's original sketch**: droidtop does
@@ -3879,6 +3932,16 @@ touchscreen (a hold threshold is not worth inventing without a device to tune
 it on). The second-screen trackpad surface of §6 is built on top of this
 router's relative-motion path — see §6c.
 
+### Desktop keeps the screen awake (Droidtop/tracker#97)
+
+A desktop session is driven through the seat, which Android's screen-off timer does not count
+as activity, so the primary panel could blank in the middle of typing on the second-screen
+keyboard. `MainActivity` sets `FLAG_KEEP_SCREEN_ON` on its window exactly while the mode is
+Desktop and a session is connected, and clears it otherwise. A window flag rather than a
+wake lock: it needs no permission, holds only while that window is showing, and Android
+releases it if the app dies or the window goes away, so nothing can leak a hold. It does not
+stop the user turning the screen off with the power key.
+
 ## 6c. Second-screen input (built 2026-09-02)
 
 Until now the second screen was output only, which §4 and §6 both name as
@@ -4050,6 +4113,15 @@ The container→Android direction has no such gate: `setPrimaryClip` is not
 focus-restricted. The bridge is owned by `MainActivity` rather than by
 `DesktopSessionService` for the same reason — window focus is an Activity
 fact and a Service has none to report.
+
+**The keyboard caveat is shown, not hidden (Droidtop/tracker#99).** While another keyboard
+than droidtop's own is active, a copy made in an Android app is read only when droidtop's
+window next has focus (the catch-up read above), so a paste can lag a copy. The bridge
+publishes that state (`ClipboardBridge.androidReadsLive`, checked when it starts and on every
+focus change, which is when a keyboard switch is seen), and the Desktop taskbar shows a quiet
+"Clipboard: on focus" entry only in that state. It carries `ClipboardAccess.WHY_BLOCKED` and
+opens the system keyboard switcher (§6a: the system draws it, droidtop changes nothing). It is
+the one explanation surface, and it never blocks.
 
 **Scope, and what is deliberately not bridged.** Text only. A null
 selection from the container is not mirrored: wiping the user's phone

@@ -8,6 +8,8 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import dev.droidtop.library.settings.Keyboards
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Text copied in Android is pasteable in the container, and text copied in
@@ -33,6 +35,12 @@ import dev.droidtop.library.settings.Keyboards
  * [onWindowFocusChanged] is for, a single read on regaining focus rather
  * than a timer. The container→Android direction has no such gate, because
  * `setPrimaryClip` is not focus-restricted.
+ *
+ * **Telling the user.** While the bridge runs, [androidReadsLive] says whether droidtop's own
+ * keyboard is the active one (so a copy in any Android app reaches the container at once) or
+ * not (a copy is picked up only when droidtop's window next has focus). The Desktop taskbar
+ * shows a quiet indicator, with the reason and the keyboard switcher, for the second case
+ * (docs/SPEC.md 6d), rather than leaving a paste that lags behind a copy unexplained.
  *
  * Owned by the Activity rather than by `DesktopSessionService`, deliberately:
  * the read permission above is a property of window focus, which a Service
@@ -64,6 +72,7 @@ class ClipboardBridge(
         }
         started = true
         sync.reset()
+        refreshReadsLive()
         manager.addPrimaryClipChangedListener(androidClipListener)
         hostBridge.containerClipboardListener = { text ->
             // The native side calls this on its own transfer thread.
@@ -78,6 +87,7 @@ class ClipboardBridge(
         hostBridge.containerClipboardListener = null
         clipboard?.removePrimaryClipChangedListener(androidClipListener)
         sync.reset()
+        _androidReadsLive.value = true
         Log.i(TAG, "Clipboard bridge stopped")
     }
 
@@ -92,7 +102,18 @@ class ClipboardBridge(
      */
     fun onWindowFocusChanged(focused: Boolean) {
         hasWindowFocus = focused
+        // The keyboard is switched from a picker that takes window focus, so regaining it is
+        // when a change of keyboard is seen.
+        if (started) refreshReadsLive()
         if (focused) pushAndroidSelectionToContainer("window focus regained")
+    }
+
+    private fun refreshReadsLive() {
+        _androidReadsLive.value = ClipboardAccess.canRead(
+            sdkInt = Build.VERSION.SDK_INT,
+            hasWindowFocus = false,
+            ownKeyboardActive = Keyboards.ownKeyboardActive(context),
+        )
     }
 
     private fun canReadAndroidClipboard(): Boolean = ClipboardAccess.canRead(
@@ -163,8 +184,18 @@ class ClipboardBridge(
         }
     }
 
-    private companion object {
-        const val TAG = "droidtop.Clipboard"
-        const val CLIP_LABEL = "droidtop desktop"
+    companion object {
+        private const val TAG = "droidtop.Clipboard"
+        private const val CLIP_LABEL = "droidtop desktop"
+
+        private val _androidReadsLive = MutableStateFlow(true)
+
+        /**
+         * True when Android's clipboard can be read at any time (droidtop's own keyboard is the
+         * active one, or the platform predates the restriction), and also whenever no bridge is
+         * running. False means a copy made in another Android app reaches the container only
+         * once droidtop's window has focus again. One bridge lives at a time, so this is one flow.
+         */
+        val androidReadsLive: StateFlow<Boolean> = _androidReadsLive
     }
 }

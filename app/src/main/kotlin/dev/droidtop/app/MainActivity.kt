@@ -271,6 +271,13 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             // is the only one. Every other mode keeps the system bars: a
             // home screen and a desktop both want them.
             LaunchedEffect(mode) { applySystemBars(mode) }
+            // A desktop session is used through the seat, which Android's screen-off timer does
+            // not count as activity, so the screen would blank mid-use (SPEC 4e). The window
+            // flag holds only while this window is showing the live desktop.
+            val keepAwakeState by DesktopSessionService.state.collectAsState()
+            LaunchedEffect(mode, keepAwakeState is DesktopSessionState.Connected) {
+                setKeepScreenOn(mode == Mode.DESKTOP && keepAwakeState is DesktopSessionState.Connected)
+            }
             Box(modifier = Modifier.fillMaxSize()) {
             when (mode) {
                 Mode.GAMING -> GamepadShell(
@@ -377,6 +384,14 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
      * help/hint bar per screen"; the clock defect was found on the
      * portrait rig). Transient-by-swipe, so the bars are still reachable.
      */
+    private fun setKeepScreenOn(keepOn: Boolean) {
+        if (keepOn) {
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+
     private fun applySystemBars(mode: Mode?) {
         val controller = WindowInsetsControllerCompat(window, window.decorView)
         if (mode == Mode.GAMING) {

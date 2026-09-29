@@ -379,6 +379,7 @@ private fun BoxScope.Taskbar(
         Button(onClick = { openSettings(context) }, modifier = Modifier.padding(horizontal = 8.dp)) {
             Text("Settings")
         }
+        ClipboardNotice()
         SystemTray()
         Text(clockText, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(horizontal = 16.dp))
     }
@@ -479,6 +480,37 @@ private fun TaskbarWindowRow(toplevel: Toplevel, onTap: () -> Unit, onClose: () 
             DropdownMenuItem(
                 text = { Text("Close") },
                 onClick = { menuOpen = false; onClose() },
+            )
+        }
+    }
+}
+
+/**
+ * Shown only while another keyboard than droidtop's own is active: copying in an Android app
+ * then reaches the container only when droidtop's window regains focus (Android lets just the
+ * focused app or the active keyboard read the clipboard), so a paste can lag a copy. The menu
+ * says why, using the bridge's own wording, and opens the system keyboard switcher; it is the
+ * only place the state shows and it never blocks anything (docs/SPEC.md 6a, 6d).
+ */
+@Composable
+private fun ClipboardNotice() {
+    val live by dev.droidtop.hostbridge.ClipboardBridge.androidReadsLive.collectAsState()
+    if (live) return
+    val context = LocalContext.current
+    var open by remember { mutableStateOf(false) }
+    Box {
+        androidx.compose.material3.TextButton(onClick = { open = !open }) {
+            Text("Clipboard: on focus", color = MaterialTheme.colorScheme.onSurface)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            Text(
+                dev.droidtop.hostbridge.ClipboardAccess.WHY_BLOCKED,
+                modifier = Modifier.padding(horizontal = 16.dp).widthIn(max = 320.dp),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            DropdownMenuItem(
+                text = { Text("Switch keyboard…") },
+                onClick = { open = false; dev.droidtop.library.settings.Keyboards.showPicker(context) },
             )
         }
     }

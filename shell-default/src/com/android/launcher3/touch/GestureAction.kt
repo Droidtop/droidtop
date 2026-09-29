@@ -31,6 +31,14 @@ enum class GestureAction(val displayNameRes: Int, val summaryRes: Int) {
         R.string.gesture_action_open_notifications_summary,
     ),
     OPEN_DRAWER(R.string.gesture_action_open_drawer, R.string.gesture_action_open_drawer_summary),
+
+    /**
+     * The system Recents (task switcher). This build compiles no quickstep module, so the
+     * launcher has no Overview of its own; the OS's recents provider answers the Recents key
+     * and gesture, and this slot asks it the same thing through the accessibility service's
+     * global action (docs/SPEC.md, Standard mode "Recents").
+     */
+    OPEN_RECENTS(R.string.gesture_action_open_recents, R.string.gesture_action_open_recents_summary),
     ;
 
     fun getDisplayName(context: Context): String = context.getString(displayNameRes)
@@ -51,6 +59,10 @@ enum class GestureAction(val displayNameRes: Int, val summaryRes: Int) {
             launcher.stateManager.goToState(LauncherState.ALL_APPS, true /* animated */)
             true
         }
+        OPEN_RECENTS -> {
+            performGlobal(launcher, AccessibilityService.GLOBAL_ACTION_RECENTS)
+            true
+        }
     }
 
     companion object {
@@ -63,23 +75,32 @@ enum class GestureAction(val displayNameRes: Int, val summaryRes: Int) {
          */
         private fun lockScreen(launcher: Launcher) {
             if (Utilities.ATLEAST_P) {
-                val accessibility = MurineAccessibilityService.INSTANCE
-                if (accessibility != null) {
-                    accessibility.performGlobalAction(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
-                } else if (!LauncherPrefs.ACCESSIBILITY_DISCLOSURE_ACCEPTED.get(launcher)) {
-                    AlertDialogSheet.show(
-                        launcher,
-                        launcher.getString(R.string.pref_accessibility_disclosure_title),
-                        launcher.getString(R.string.pref_accessibility_disclosure_desc),
-                    ) {
-                        LauncherPrefs.get(launcher).put(LauncherPrefs.ACCESSIBILITY_DISCLOSURE_ACCEPTED, true)
-                        SettingsHomeFragment.requestAccessibilityPermission(launcher)
-                    }
-                } else {
+                performGlobal(launcher, AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
+            } else {
+                lockScreenLegacy(launcher)
+            }
+        }
+
+        /**
+         * One path for every action that only the accessibility service may perform: run it if
+         * the service is connected, otherwise show the disclosure once and then the system's
+         * accessibility settings.
+         */
+        private fun performGlobal(launcher: Launcher, action: Int) {
+            val accessibility = MurineAccessibilityService.INSTANCE
+            if (accessibility != null) {
+                accessibility.performGlobalAction(action)
+            } else if (!LauncherPrefs.ACCESSIBILITY_DISCLOSURE_ACCEPTED.get(launcher)) {
+                AlertDialogSheet.show(
+                    launcher,
+                    launcher.getString(R.string.pref_accessibility_disclosure_title),
+                    launcher.getString(R.string.pref_accessibility_disclosure_desc),
+                ) {
+                    LauncherPrefs.get(launcher).put(LauncherPrefs.ACCESSIBILITY_DISCLOSURE_ACCEPTED, true)
                     SettingsHomeFragment.requestAccessibilityPermission(launcher)
                 }
             } else {
-                lockScreenLegacy(launcher)
+                SettingsHomeFragment.requestAccessibilityPermission(launcher)
             }
         }
 

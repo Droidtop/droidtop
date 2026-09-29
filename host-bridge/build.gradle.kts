@@ -54,6 +54,7 @@ android {
 dependencies {
     implementation(project(":runtime-common"))
     implementation(libs.androidx.core.ktx)
+    api(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
 }

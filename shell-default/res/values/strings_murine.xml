@@ -87,6 +87,8 @@
     <string name="gesture_action_open_notifications_summary">Expands the notification shade</string>
     <string name="gesture_action_open_drawer">Open app drawer</string>
     <string name="gesture_action_open_drawer_summary">Opens the full list of apps</string>
+    <string name="gesture_action_open_recents">Open recent apps</string>
+    <string name="gesture_action_open_recents_summary">Opens the system task switcher</string>
 
     <!-- Murine search bar -->
     <string name="murine_search_hint">Search…</string>

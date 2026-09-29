@@ -229,11 +229,15 @@ public class OptionsPopupView<T extends Context & ActivityContext> extends Arrow
                     v.getContext().startActivity(games);
                     return true;
                 }));
-        options.add(new OptionItem(launcher,
-                R.string.styles_wallpaper_button_text,
-                R.drawable.ic_palette,
-                IGNORE,
-                OptionsPopupView::startWallpaperPicker));
+        // droidtop patch: only offer the entry when something on this device can
+        // actually answer ACTION_SET_WALLPAPER (a handheld firmware may ship no picker).
+        if (wallpaperPickerIntent(launcher) != null) {
+            options.add(new OptionItem(launcher,
+                    R.string.styles_wallpaper_button_text,
+                    R.drawable.ic_palette,
+                    IGNORE,
+                    OptionsPopupView::startWallpaperPicker));
+        }
         if (WIDGETS_ENABLED) {
             options.add(new OptionItem(launcher,
                     R.string.widget_button_text,
@@ -323,6 +327,21 @@ public class OptionsPopupView<T extends Context & ActivityContext> extends Arrow
             Toast.makeText(launcher, message, Toast.LENGTH_SHORT).show();
             return false;
         }
+        Intent intent = wallpaperPickerIntent(launcher);
+        if (intent == null) {
+            Toast.makeText(launcher, R.string.activity_not_found, Toast.LENGTH_SHORT).show();
+            return false;
+        }
+        return launcher.startActivitySafely(v, intent, placeholderInfo(intent)) != null;
+    }
+
+    /**
+     * The wallpaper-picker intent, or null when no installed activity handles it. The target is
+     * the system's own resolution of ACTION_SET_WALLPAPER (wallpaper_picker_package is empty in
+     * this build, so no picker package is hardcoded); the manifest holds QUERY_ALL_PACKAGES, so
+     * the resolve check is reliable.
+     */
+    private static Intent wallpaperPickerIntent(Launcher launcher) {
         Intent intent = new Intent(Intent.ACTION_SET_WALLPAPER)
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
                 .putExtra(EXTRA_WALLPAPER_OFFSET,
@@ -333,7 +352,7 @@ public class OptionsPopupView<T extends Context & ActivityContext> extends Arrow
         if (!TextUtils.isEmpty(pickerPackage)) {
             intent.setPackage(pickerPackage);
         }
-        return launcher.startActivitySafely(v, intent, placeholderInfo(intent)) != null;
+        return launcher.getPackageManager().resolveActivity(intent, 0) == null ? null : intent;
     }
 
     static WorkspaceItemInfo placeholderInfo(Intent intent) {
