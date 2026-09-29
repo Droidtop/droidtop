@@ -775,7 +775,7 @@ sources rather than assumed from Nova/Apex's feature lists:
 | Smartspace/clock widget | HAVE | `widget/smartspace/{MurineClockView,SmartspaceMode}.kt` |
 | Configurable QSB with web search providers | HAVE | `widget/search/{SearchProvider,MurineSearchBarView}.kt` (8 providers + custom) |
 | Gestures: double-tap and swipe-down, each assignable to any of nothing/lock screen/open notifications/open app drawer/open recent apps (**built 2026-09-26**, was two fixed on/off gestures) | HAVE, exposed in Settings | `GestureAction` enum + `perform(Launcher)` (`com.android.launcher3.touch`), `LauncherPrefs.GESTURE_DOUBLE_TAP_ACTION`/`GESTURE_SWIPE_DOWN_ACTION`, picked from `SettingsHomeFragment`'s `RadioGroupPreference` rows (`DOUBLE_TAP_ACTION`, `SWIPE_DOWN_ACTION`), applied in `WorkspaceTouchListener.java`/`NotificationSwipeController.kt`; an existing install's old two-boolean prefs are carried over once by `GestureActionMigration` |
-| App-drawer/QSB search over droidtop's own library (games, not just installed apps) | **built this change** | `DefaultAppSearchAlgorithm.doSearch` also queries `LibrarySearch.source`; see below |
+| Drawer search over apps, droidtop's own library and plugin "Get more" results | **built (Droidtop/tracker#12)** | the drawer's search field opens `LauncherSearchActivity` on the shared `LibrarySearchDialog`; see "Launcher search" below |
 | A home-screen widget of droidtop's own (a "full computer" feature neither Nova nor Apex can offer, since they have no game library) | **built this change** | `ContinuePlayingWidgetProvider.kt` (see below) |
 | Global settings, Desktop settings rendered in the shell's own row component, pad-navigable | HAVE (fixed 2026-09-24/25, UI pass H4) | `DroidtopWideSettings.kt`, `SettingsGlobalFragment.kt`'s `CatalogPreferenceNavigator` |
 | Icon-pack/drawer/hidden-apps settings pages left as stock Android preference UI | HAVE, and correct: H4's own fix text scopes the shell's row component to Global/Desktop only, and explicitly keeps these stock | `docs/audit-2026-09-24/ui-assessment.md` H4 |
@@ -879,36 +879,38 @@ all; launching Chrome then Clock and reopening the drawer shows
 "Clock, Chrome" (most-recent-leftmost); launching Calendar next moves it
 to the front ("Calendar, Clock, Chrome").
 
-**Library-aware app-drawer/QSB search (built this change).**
-`DefaultAppSearchAlgorithm.getTitleMatchResult` only ever walked installed
-apps; a played game's own title never showed up searching the drawer even
-though one library across sources is droidtop's whole pitch. `:shell-
-default` cannot depend on `:library-core` directly (`:library-core`
-already depends on `:shell-default` for icon-cache reuse,
-`NativeAppProvider` -- the reverse would be circular), so the seam is
-`dev.droidtop.library.search.LibrarySearch` in `:runtime-common` (which
-depends on nothing else in the repo): a plain query-to-results callback,
-registered once from `DroidtopApplication.onCreate`
-(`LibrarySearchBridge`), backed by the same `Library`/`LibraryCore`
-instance and in-RAM index every other surface reads -- never a second
-index or folder walk, and the callback only ever filters an
-already-scanned snapshot (`StateFlow.value`), so a keystroke costs no
-disk read. `BaseAllAppsAdapter` gained `VIEW_TYPE_LIBRARY_GAME`/
-`AdapterItem.asGame`: a game result renders as its own full-width row
-(artwork + title, `all_apps_game_result.xml`), launching through the same
-`GameLaunchActivity.intentFor` Intent a pinned game icon or the "Continue
-playing" widget uses. The artwork decode itself
-(`LibraryArtwork.decodeSquareBitmap`) moved into `:runtime-common` from
-being a private function on `LauncherGamesActivity`, so both call sites
-share one mechanism. Rig-verified on BlueStacks against the real shared
-library: searching "beingadik" in the app drawer surfaced "BeingADIK
-0.8.3 scrappy" as its own row with its real cover art, alongside (none,
-in this case, since no installed app matched) ordinary app results;
-tapping it dispatched through the real launch path (confirmed by the
-real, correct refusal toast when Desktop mode's container wasn't running
-for that native-Linux build -- not a search bug, the expected behaviour
-of that same launch path from anywhere else); searching "chrome"
-continued to show the ordinary app icon unaffected.
+**Launcher search (rebuilt 2026-09-29, Droidtop/tracker#12, owner: "go ahead").**
+The drawer's search field is no longer a filter of the drawer. It is a door:
+a tap or Enter on it, or a printable key typed on a hardware keyboard while the
+drawer is up, opens `dev.droidtop.app.LauncherSearchActivity`, a translucent
+activity that draws the shared `LibrarySearchDialog` (`shell-gamepad`
+`query/LibraryQueryUi.kt`, the dialog the PC library and the console lists
+open, see 12a "Search surfaces wired") through `LauncherSearchScreen`. Its
+local results are the installed apps that match, then the library's games
+(`matchesSearchText`, the one text rule of every list, over the library's
+already-scanned in-RAM list: no per-game disk lookups while typing), then the
+dialog's own "Get more" group from the source plugins and, while the field is
+empty, droidtop's Recommendations. A tap on an app opens it, a tap on a game
+plays it through `GameLaunchActivity.dispatch`, a tap on a "Get more" result
+starts the download job as everywhere else.
+
+`:shell-default` cannot depend on `:app` or `:library-core`, so the seam is an
+action, `LauncherSearch.ACTION_SEARCH` (`dev.droidtop.shell.standard.
+LauncherSearch`), that the launcher fires and `:app` answers, and the
+installed apps are answered by the launcher itself
+(`LauncherSearch.findApps`: the launcher model's app list, the drawer's own
+word-matching rule, a quiet private space left out) and handed to the screen as
+plain rows. This replaced the library-only path, and what it replaced is
+deleted: `LibrarySearch`/`LibrarySearchEntry` in `:runtime-common`,
+`LibrarySearchBridge` in `:app`, the `VIEW_TYPE_LIBRARY_GAME` row of
+`BaseAllAppsAdapter` with its layout and placeholder drawable,
+`DefaultAppSearchAlgorithm` and `AllAppsSearchBarController` (the in-place
+filter). Known differences from the stock drawer search: the private-space
+"unlock" row that a search for its name used to offer is gone with the in-place
+list, and "Get more" from here has no download destination (the list has no
+system, as in the PC library), so a pick says where to download it from instead
+of starting a job; a per-title system guess is the follow-up if the owner wants
+downloads started from the drawer.
 
 **RadioGroupBottomSheet renders no options on this rig -- four real fixes
 landed, root cause still open (2026-09-26).** Verifying the gesture-action
@@ -11797,13 +11799,14 @@ through `matchesSearchText`, the one text rule `LibraryQuery.matches` also
 uses (title, genre or developer); the row reads "Search: <text>" while a
 search is on, and clearing the text in the dialog clears it. The search
 lasts as long as the gamelist stays open. The PC group keeps its own chip
-row. **The launcher drawer/QSB search stays library-only, on purpose for
-now**: it is a Launcher3 View list in `:shell-default`, which cannot host
-the Compose dialog and cannot depend on `:library-core`; "Get more" there
-would be a second, View-based renderer over the same
-`PluginSearchAggregator` and a second registered seam beside
-`LibrarySearch`, which this file does not decide to build until the owner
-wants downloads started from the drawer.
+row. **The launcher's drawer search is the same dialog too** (built
+2026-09-29, Droidtop/tracker#12): the drawer's search field opens
+`LauncherSearchActivity`, which draws `LibrarySearchDialog` with the installed
+apps and the library's games as local results, and gets the "Get more" group and
+the Recommendations from the dialog itself. `LibrarySearchDialog` gained two
+optional parameters for it, a `summary` line and a `results` slot for the local
+rows, and its column scrolls; the console and PC callers pass neither. See the
+Launcher mode section, "Launcher search", for the seam and what was deleted.
 
 **3. The Recommendations API (`dev.droidtop.library.integrations.RecommendationProvider`,
 `library-core`) — droidtop's OWN feature, never plugin-fed, never

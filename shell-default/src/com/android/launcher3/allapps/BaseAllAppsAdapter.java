@@ -44,7 +44,6 @@ import com.android.launcher3.R;
 import com.android.launcher3.allapps.search.SearchAdapterProvider;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.views.ActivityContext;
-import dev.droidtop.library.search.LibrarySearchEntry;
 
 /**
  * Adapter for all the apps.
@@ -55,11 +54,6 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
         RecyclerView.Adapter<BaseAllAppsAdapter.ViewHolder> {
 
     public static final String TAG = "BaseAllAppsAdapter";
-
-    // Edge length of a library search result row's own decoded artwork
-    // (LibraryArtwork.decodeSquareBitmap); matches the row's ImageView size
-    // (all_apps_game_result.xml, 48dp) at roughly xhdpi.
-    private static final int LIBRARY_GAME_ICON_PX = 144;
 
     // A normal icon
     public static final int VIEW_TYPE_ICON = 1 << 1;
@@ -73,14 +67,6 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
     public static final int VIEW_TYPE_PRIVATE_SPACE_HEADER = 1 << 6;
     public static final int VIEW_TYPE_PRIVATE_SPACE_SYS_APPS_DIVIDER = 1 << 7;
     public static final int VIEW_TYPE_BOTTOM_VIEW_TO_SCROLL_TO = 1 << 8;
-    // droidtop patch (not upstream Launcher3): a droidtop library entry
-    // (a game) shown as its own search result row, alongside app results
-    // -- docs/SPEC.md, Launcher mode, "App-drawer/QSB search over
-    // droidtop's own library". Spans the full row width like any other
-    // non-icon view type (AllAppsGridAdapter.GridSpanSizer), since
-    // isIconViewType(...) and mAdapterProvider.isViewSupported(...) are
-    // both false for it.
-    public static final int VIEW_TYPE_LIBRARY_GAME = 1 << 9;
     // droidtop patch (not upstream Launcher3): the app drawer's own
     // "Recent" section label, above a handful of AppInfo rows the
     // ordinary VIEW_TYPE_ICON path already renders -- see
@@ -148,20 +134,6 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
             return item;
         }
 
-        // droidtop patch: the associated LibrarySearchEntry for a
-        // VIEW_TYPE_LIBRARY_GAME row -- itemInfo stays null for these,
-        // since a game is not an installed AppInfo.
-        public LibrarySearchEntry libraryEntry = null;
-
-        /**
-         * Factory method for a droidtop library search result row.
-         */
-        public static AdapterItem asGame(LibrarySearchEntry entry) {
-            AdapterItem item = new AdapterItem(VIEW_TYPE_LIBRARY_GAME);
-            item.libraryEntry = entry;
-            return item;
-        }
-
         protected boolean isCountedForAccessibility() {
             return viewType == VIEW_TYPE_ICON;
         }
@@ -178,15 +150,6 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
          * as well. Returning true will prevent redrawing of thee item.
          */
         public boolean isContentSame(AdapterItem other) {
-            // droidtop patch: itemInfo stays null for a VIEW_TYPE_LIBRARY_GAME
-            // row (a game is not an AppInfo -- see asGame), so the base check
-            // below would call any two different games "the same content" and
-            // skip rebinding their title/artwork. Compare by the library
-            // entry's own id instead, same shape as the base check.
-            if (libraryEntry != null || other.libraryEntry != null) {
-                return libraryEntry != null && other.libraryEntry != null
-                        && libraryEntry.getId().equals(other.libraryEntry.getId());
-            }
             return itemInfo == null && other.itemInfo == null;
         }
 
@@ -274,9 +237,6 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
             case VIEW_TYPE_EMPTY_SEARCH:
                 return new ViewHolder(mLayoutInflater.inflate(R.layout.all_apps_empty_search,
                         parent, false));
-            case VIEW_TYPE_LIBRARY_GAME:
-                return new ViewHolder(mLayoutInflater.inflate(R.layout.all_apps_game_result,
-                        parent, false));
             case VIEW_TYPE_RECENT_APPS_HEADER:
                 return new ViewHolder(mLayoutInflater.inflate(R.layout.all_apps_recent_header,
                         parent, false));
@@ -352,37 +312,6 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
                     ((TextView) holder.itemView).setText(mActivityContext.getString(
                             R.string.all_apps_no_search_results, info.title));
                 }
-                break;
-            }
-            case VIEW_TYPE_LIBRARY_GAME: {
-                dev.droidtop.library.search.LibrarySearchEntry entry =
-                        mApps.getAdapterItems().get(position).libraryEntry;
-                if (entry == null) break;
-                TextView title = holder.itemView.findViewById(R.id.library_game_result_title);
-                android.widget.ImageView icon = holder.itemView.findViewById(
-                        R.id.library_game_result_icon);
-                title.setText(entry.getTitle());
-                icon.setTag(entry.getId());
-                icon.setImageDrawable(null);
-                String artworkUri = entry.getArtworkUri();
-                if (artworkUri != null) {
-                    Context ctx = mActivityContext;
-                    com.android.launcher3.util.Executors.THREAD_POOL_EXECUTOR.execute(() -> {
-                        android.graphics.Bitmap bitmap = dev.droidtop.library.search.LibraryArtwork
-                                .INSTANCE.decodeSquareBitmap(ctx, artworkUri, LIBRARY_GAME_ICON_PX);
-                        if (bitmap == null) return;
-                        com.android.launcher3.util.Executors.MAIN_EXECUTOR.execute(() -> {
-                            // The view may have been recycled to a different row by the
-                            // time this background decode finishes; only apply it if it
-                            // is still showing the same entry.
-                            if (entry.getId().equals(icon.getTag())) {
-                                icon.setImageBitmap(bitmap);
-                            }
-                        });
-                    });
-                }
-                holder.itemView.setOnClickListener(v ->
-                        v.getContext().startActivity(entry.getLaunchIntent()));
                 break;
             }
             case VIEW_TYPE_PRIVATE_SPACE_HEADER:

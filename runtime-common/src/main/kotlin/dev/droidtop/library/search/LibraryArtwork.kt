@@ -8,15 +8,10 @@ import java.io.File
 
 /**
  * Decodes a library entry's own artwork (`LibraryEntry.iconUri`/
- * `artworkUri`) into a square, downsampled [Bitmap] -- the one mechanism
- * for this, shared by every surface that draws a game's own image rather
- * than a generic app icon (`LauncherGamesActivity`'s pinned-shortcut icon,
- * and the app-drawer/QSB search row, `BaseAllAppsAdapter`'s
- * `VIEW_TYPE_LIBRARY_GAME`). Lives in `:runtime-common`, not
- * `:library-core`, so `:shell-default` (which cannot depend on
- * `:library-core`, see `LibrarySearch`'s own doc comment) can call it too,
- * without needing `LibraryEntry` itself -- callers pass the raw URI
- * string they already have.
+ * `artworkUri`) into a square, downsampled [Bitmap], for the surfaces that
+ * draw a game's own image rather than a generic app icon
+ * (`LauncherGamesActivity`'s pinned-shortcut icon). Callers pass the raw URI
+ * string they already have, so this needs no `LibraryEntry`.
  */
 object LibraryArtwork {
     /**

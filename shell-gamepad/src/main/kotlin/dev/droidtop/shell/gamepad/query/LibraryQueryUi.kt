@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
@@ -316,6 +317,13 @@ internal fun LibrarySearchDialog(
     // field is empty; picking one puts its title in the field. Computed by
     // the caller off the main thread, never here.
     suggestions: List<dev.droidtop.library.integrations.Recommendation> = emptyList(),
+    // The launcher's search (docs/SPEC.md 12a "Launcher search") is this
+    // same dialog with its own local results: the installed apps and the
+    // library's games that match, drawn between the count line and the
+    // "Get more" group. [summary] replaces the count line's wording, since
+    // "N games match" is wrong for a list of apps and games together.
+    summary: String? = null,
+    results: (@Composable androidx.compose.foundation.layout.ColumnScope.(String) -> Unit)? = null,
 ) {
     var text by remember { mutableStateOf(query.text) }
     val fieldFocus = remember { FocusRequester() }
@@ -369,6 +377,7 @@ internal fun LibrarySearchDialog(
                 }
                 .clip(MenuTokens.OverlayShape)
                 .background(MenuTokens.OverlaySurface)
+                .verticalScroll(rememberScrollState())
                 .padding(20.dp),
         ) {
             Text(
@@ -395,7 +404,9 @@ internal fun LibrarySearchDialog(
                     .padding(12.dp),
             )
             Text(
-                if (text.isBlank()) {
+                if (summary != null) {
+                    summary
+                } else if (text.isBlank()) {
                     "Type a name, a genre or a developer; ${totalCount} games to search"
                 } else {
                     val shown = "$matchCount ${if (matchCount == 1) "game" else "games"} match"
@@ -405,6 +416,7 @@ internal fun LibrarySearchDialog(
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(top = 8.dp),
             )
+            if (results != null && text.isNotBlank()) results(text.trim())
             if (text.isBlank() && suggestions.isNotEmpty()) {
                 MenuSectionLabel("Recommended for you")
                 suggestions.forEach { pick ->

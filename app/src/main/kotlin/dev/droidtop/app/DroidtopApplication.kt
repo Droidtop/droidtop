@@ -70,9 +70,6 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // Shared core too: a games folder added in onboarding or Settings
         // is walked at once, not when Gaming first opens (SPEC 2c).
         LibraryCore.followGamesRoots(this)
-        // Library-aware app-drawer/QSB search (docs/SPEC.md, Launcher
-        // mode): registers before any search can run.
-        LibrarySearchBridge.install(this)
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader {

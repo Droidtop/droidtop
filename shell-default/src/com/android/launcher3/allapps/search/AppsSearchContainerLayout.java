@@ -23,12 +23,7 @@ import static com.android.launcher3.Utilities.prefixTextWithIcon;
 import static com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR;
 
 import android.content.Context;
-import android.content.Intent;
 import android.graphics.Rect;
-import android.icu.text.RuleBasedCollator;
-import android.text.Selection;
-import android.text.SpannableStringBuilder;
-import android.text.method.TextKeyListener;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
 import android.view.View;
@@ -39,36 +34,26 @@ import com.android.launcher3.ExtendedEditText;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
 import com.android.launcher3.allapps.ActivityAllAppsContainerView;
-import com.android.launcher3.allapps.AllAppsStore;
-import com.android.launcher3.allapps.BaseAllAppsAdapter.AdapterItem;
-import com.android.launcher3.allapps.PrivateProfileManager;
 import com.android.launcher3.allapps.SearchUiManager;
-import com.android.launcher3.model.data.AppInfo;
-import com.android.launcher3.search.SearchCallback;
 import com.android.launcher3.views.ActivityContext;
 
-import android.icu.text.Collator;
-
-import java.util.ArrayList;
-import java.util.stream.Collectors;
+import dev.droidtop.shell.standard.LauncherSearch;
 
 /**
- * Layout to contain the All-apps search UI.
+ * The drawer's search field. It is a door, not a filter: a tap on it, Enter
+ * on it, or a printable key typed in the drawer opens droidtop's search
+ * screen ({@link LauncherSearch}), the shared library search with plugin
+ * "Get more" results and Recommendations, so the drawer never filters its
+ * own list in place and there is one search, not two.
  */
 public class AppsSearchContainerLayout extends ExtendedEditText
-        implements SearchUiManager, SearchCallback<AdapterItem>,
-        AllAppsStore.OnUpdateListener, Insettable {
+        implements SearchUiManager, Insettable {
     private final ActivityContext mLauncher;
-    private final AllAppsSearchBarController mSearchBarController;
-    private final SpannableStringBuilder mSearchQueryBuilder;
 
     private ActivityAllAppsContainerView<?> mAppsView;
 
     // The amount of pixels to shift down and overlap with the rest of the content.
     private final int mContentOverlap;
-
-    // Locale-aware matcher for the private-space label
-    private final Collator mLabelMatcher;
 
     public AppsSearchContainerLayout(Context context) {
         this(context, null);
@@ -82,32 +67,19 @@ public class AppsSearchContainerLayout extends ExtendedEditText
         super(context, attrs, defStyleAttr);
 
         mLauncher = ActivityContext.lookupContext(context);
-        mSearchBarController = new AllAppsSearchBarController();
-
-        mSearchQueryBuilder = new SpannableStringBuilder();
-        Selection.setSelection(mSearchQueryBuilder, 0);
         setHint(prefixTextWithIcon(getContext(), R.drawable.ic_allapps_search, getHint()));
 
         mContentOverlap =
                 getResources().getDimensionPixelSize(R.dimen.all_apps_search_bar_content_overlap);
 
-        mLabelMatcher = Collator.getInstance();
-        mLabelMatcher.setStrength(Collator.PRIMARY);
-        mLabelMatcher.setDecomposition(Collator.CANONICAL_DECOMPOSITION);
-        // Is it too permissive this way? (e.g. "privatespace" matches)
-        if (mLabelMatcher instanceof RuleBasedCollator rba) rba.setAlternateHandlingShifted(true);
-    }
-
-    @Override
-    protected void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        mAppsView.getAppsStore().addUpdateListener(this);
-    }
-
-    @Override
-    protected void onDetachedFromWindow() {
-        super.onDetachedFromWindow();
-        mAppsView.getAppsStore().removeUpdateListener(this);
+        // A button that looks like the field: no keyboard, no cursor, and a
+        // touch is a click (not a focus first), so one tap opens the search.
+        setInputType(android.text.InputType.TYPE_NULL);
+        setShowSoftInputOnFocus(false);
+        setCursorVisible(false);
+        setLongClickable(false);
+        setFocusableInTouchMode(false);
+        setOnClickListener(v -> LauncherSearch.open(getContext()));
     }
 
     @Override
@@ -146,66 +118,25 @@ public class AppsSearchContainerLayout extends ExtendedEditText
     @Override
     public void initializeSearch(ActivityAllAppsContainerView<?> appsView) {
         mAppsView = appsView;
-        mSearchBarController.initialize(
-                new DefaultAppSearchAlgorithm(getContext(), true),
-                this, mLauncher, this);
-    }
-
-    @Override
-    public void onAppsUpdated() {
-        mSearchBarController.refreshSearchResult();
     }
 
     @Override
     public void resetSearch() {
-        mSearchBarController.reset();
+        // Nothing is typed here, so there is no session to close.
     }
 
     @Override
     public void preDispatchKeyEvent(KeyEvent event) {
-        // Determine if the key event was actual text, if so, focus the search bar and then dispatch
-        // the key normally so that it can process this key event
-        if (!mSearchBarController.isSearchFieldFocused() &&
-                event.getAction() == KeyEvent.ACTION_DOWN) {
-            final int unicodeChar = event.getUnicodeChar();
-            final boolean isKeyNotWhitespace = unicodeChar > 0 &&
-                    !Character.isWhitespace(unicodeChar) && !Character.isSpaceChar(unicodeChar);
-            if (isKeyNotWhitespace) {
-                boolean gotKey = TextKeyListener.getInstance().onKeyDown(this, mSearchQueryBuilder,
-                        event.getKeyCode(), event);
-                if (gotKey && mSearchQueryBuilder.length() > 0) {
-                    mSearchBarController.focusSearchField();
-                }
-            }
+        // A printable key typed on a hardware keyboard while the drawer is up
+        // starts a search with that character, as typing in the drawer always did.
+        if (event.getAction() != KeyEvent.ACTION_DOWN || event.getRepeatCount() != 0) return;
+        final int unicodeChar = event.getUnicodeChar();
+        final boolean isKeyNotWhitespace = unicodeChar > 0
+                && !Character.isWhitespace(unicodeChar) && !Character.isSpaceChar(unicodeChar);
+        if (isKeyNotWhitespace && !event.isCtrlPressed() && !event.isAltPressed()
+                && !event.isMetaPressed()) {
+            LauncherSearch.open(getContext(), new String(Character.toChars(unicodeChar)));
         }
-    }
-
-    @Override
-    public void onSearchResult(String query, ArrayList<AdapterItem> items) {
-        if (items != null) {
-            PrivateProfileManager ppm = mAppsView.getPrivateProfileManager();
-            String privateSpaceLabel = getContext().getString(R.string.private_space_label);
-            if (ppm != null && ppm.isPrivateSpaceHidden() && (
-                    mLabelMatcher.compare(query, privateSpaceLabel) == 0
-                            || mLabelMatcher.compare(query, "private space") == 0)) {
-                AppInfo unlockInfo = new AppInfo();
-                unlockInfo.title = privateSpaceLabel;
-                unlockInfo.bitmap = ppm.preparePSUnlockBitmapInfo();
-                unlockInfo.intent = new Intent(PrivateProfileManager.ACTION_PRIVATE_SPACE_UNLOCK);
-                unlockInfo.contentDescription = privateSpaceLabel;
-                items.add(0, AdapterItem.asApp(unlockInfo));
-            }
-            mAppsView.setSearchResults(items);
-        }
-    }
-
-    @Override
-    public void clearSearchResult() {
-        // Clear the search query
-        mSearchQueryBuilder.clear();
-        mSearchQueryBuilder.clearSpans();
-        Selection.setSelection(mSearchQueryBuilder, 0);
-        mAppsView.onClearSearchResult();
     }
 
     @Override

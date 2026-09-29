@@ -307,6 +307,23 @@
           launches use component/action names elsewhere. Not exported:
           droidtop-internal surface.
         -->
+        <!--
+          Standard mode's search: the launcher's drawer search field opens it
+          by the action below (the launcher module cannot name this class).
+          Translucent, so the drawer shows behind it. Not exported.
+        -->
+        <activity
+            android:name="dev.droidtop.app.LauncherSearchActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:windowSoftInputMode="adjustResize|stateVisible"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|navigation">
+            <intent-filter>
+                <action android:name="dev.droidtop.app.action.SEARCH" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <activity
             android:name="dev.droidtop.app.MicrophonePermissionActivity"
             android:exported="false"
