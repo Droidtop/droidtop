@@ -3,6 +3,7 @@ package dev.droidtop.app.settings
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import dev.droidtop.app.AccessibilityPrefs
 import dev.droidtop.app.OnboardingActivity
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
@@ -69,7 +70,7 @@ object DroidtopWideSettings {
                                 }
                             },
                         ),
-                    ),
+                    ) + listOfNotNull(usersItem(context)),
                 ),
                 CatalogGroup(
                     id = "global_modes",
@@ -78,6 +79,45 @@ object DroidtopWideSettings {
                         defaultModeItem(context),
                         modeToggle(context, Mode.DESKTOP),
                         modeToggle(context, Mode.GAMING),
+                    ),
+                ),
+                CatalogGroup(
+                    id = "global_accessibility",
+                    title = "Accessibility",
+                    items = listOf(
+                        ChoiceItem(
+                            id = AccessibilityPrefs.KEY_COLOR_VISION,
+                            title = "Colour vision",
+                            subtitle = "Recolours droidtop's own screens; games and other apps are not changed",
+                            options = listOf(
+                                ChoiceOption(AccessibilityPrefs.VISION_NONE, "Off"),
+                                ChoiceOption(AccessibilityPrefs.VISION_PROTAN, "Protanopia (red-weak)"),
+                                ChoiceOption(AccessibilityPrefs.VISION_DEUTAN, "Deuteranopia (green-weak)"),
+                                ChoiceOption(AccessibilityPrefs.VISION_TRITAN, "Tritanopia (blue-weak)"),
+                                ChoiceOption(AccessibilityPrefs.VISION_GREY, "Greyscale"),
+                            ),
+                            current = AccessibilityPrefs.colorVision(context),
+                            onSelect = { ctx, value ->
+                                CatalogPrefs.prefs(ctx).edit().putString(AccessibilityPrefs.KEY_COLOR_VISION, value).apply()
+                            },
+                        ),
+                        ChoiceItem(
+                            id = AccessibilityPrefs.KEY_TEXT_SCALE,
+                            title = "Text size",
+                            subtitle = "Scales droidtop's own text on top of Android's font size",
+                            options = listOf(
+                                ChoiceOption("1.0", "Normal"),
+                                ChoiceOption("1.15", "Large"),
+                                ChoiceOption("1.3", "Larger"),
+                                ChoiceOption("1.5", "Largest"),
+                            ),
+                            current = AccessibilityPrefs.textScale(context).let { cur ->
+                                listOf("1.0", "1.15", "1.3", "1.5").minByOrNull { kotlin.math.abs(it.toFloat() - cur) }
+                            },
+                            onSelect = { ctx, value ->
+                                CatalogPrefs.prefs(ctx).edit().putString(AccessibilityPrefs.KEY_TEXT_SCALE, value).apply()
+                            },
+                        ),
                     ),
                 ),
                 CatalogGroup(
@@ -218,6 +258,26 @@ object DroidtopWideSettings {
             options = options,
             current = Modes.defaultMode(context)?.takeIf { id -> options.any { it.value == id } } ?: "",
             onSelect = { ctx, value -> Modes.setDefaultMode(ctx, Mode.byId(value.ifEmpty { null })) },
+        )
+    }
+
+    /**
+     * Android's own Users screen, for a shared device (Droidtop/tracker#79). An
+     * app cannot switch users itself (that needs a system-only permission), so
+     * this hands over to the screen that can, and is offered only where the
+     * device supports more than one user and a Settings activity answers.
+     */
+    private fun usersItem(context: Context): ActionItem? {
+        if (android.os.Build.VERSION.SDK_INT >= 31 &&
+            !context.getSystemService(android.os.UserManager::class.java).supportsMultipleUsers()
+        ) return null
+        val intent = Intent("android.settings.USER_SETTINGS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (context.packageManager.resolveActivity(intent, 0) == null) return null
+        return ActionItem(
+            id = "pref_global_users",
+            title = "Users and guest",
+            subtitle = "Opens Android's Users screen to switch user or start a guest session",
+            run = { ctx -> ctx.startActivity(Intent(intent)) },
         )
     }
 

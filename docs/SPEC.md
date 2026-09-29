@@ -9344,18 +9344,50 @@ and disabled states each have a shape or weight of their own. Themed views are t
 author's and are excluded, as in ES-DE. The touch-target minimum (§7j) already holds in every
 orientation and on every input.
 
-**What is checked and what is not (Droidtop/tracker#87, 2026-09-28).** Checked by unit test:
-the contrast pairs (`MenuTokensContrastTest`) and the source rules below. NOT yet checked on
+**What is checked and what is not (Droidtop/tracker#87).** Checked by unit test:
+the contrast pairs (`MenuTokensContrastTest`), the colour-matrix maths
+(`AccessibilityPrefsTest`) and the source rules below. NOT yet checked on
 a device: the screen-reader half of this section (one focus order for pad and TalkBack, content
-descriptions read aloud, the 1.3 font-scale layout). Until a rig run with TalkBack on, paired
-with D-pad-only navigation through Gaming's menus and the Quick Menu, cites its result here,
-read those sentences as the rule the chrome is built to, not as a verified fact. Two things
-comparable consoles ship are NOT built and this section makes no promise of them: a
-colour-vision filter (droidtop's own guarantee is the weaker "colour is never the only
-signal") and a droidtop-owned text-size control (the chrome follows the system font scale
-only). If either is wanted it is one more Settings or Quick Menu entry in the existing
-catalog, not a parallel accessibility subsystem; whether they are in scope for the first
-release is the owner's call.
+descriptions read aloud, the 1.3 font-scale layout) and the two controls below. Until a rig run with
+TalkBack on, paired with D-pad-only navigation through Gaming's menus and the Quick Menu, cites its
+result here, read those sentences as the rule the chrome is built to, not as a verified fact.
+
+**Colour vision and text size (Droidtop/tracker#87, owner: "if it's simple. build it").** Two
+choice rows in an **Accessibility** group of Global settings (a catalog, so Gaming's rows and
+Standard's preferences both show them, reachable by D-pad and by touch), stored in the launcher
+prefs (`pref_global_color_vision`, `pref_global_text_scale`) and applied by one mechanism,
+`AccessibilityPrefs`, registered from the Application's activity lifecycle callbacks so no screen
+opts in.
+- *Colour vision:* Off, Protanopia, Deuteranopia, Tritanopia or Greyscale. The three are
+  corrections, not simulations (the person's lost colour, measured against the Machado 2009
+  dichromacy matrices, is moved onto the channels they can still tell apart, the redistribution
+  Android's own daltonizer uses), applied as a hardware layer with a colour-matrix paint on each
+  activity's decor view. That recolours Compose and View surfaces alike in every mode. Dialogs
+  and popups are separate windows and are not filtered; a game running in another app is not
+  droidtop's to filter.
+- *Text size:* Normal, Large (1.15), Larger (1.3), Largest (1.5), multiplied onto the system font
+  scale on each activity's own Resources before its content is inflated or composed (`sp` in
+  Views and Compose's Density both read it); a change recreates the foreground screen.
+  Themed views follow it only where the theme's own sizes use the Density (they are the
+  theme author's, as above). Layout at 1.5 is not rig-verified: the one-row-height rule was
+  designed to 1.3.
+
+**Not built, with reasons (owner, 2026-09-29: only if simple).**
+- *Screenshot of the running game (#77).* The game runs in another app, so a capture needs the
+  accessibility service's `takeScreenshot` (API 30, an opt-in Accessibility grant the Standard
+  service does not hold) or MediaProjection (a consent prompt per session), a notion of "the
+  running game" droidtop does not keep once it hands over, an entry point that is reachable
+  while the game has focus, per-game storage and a gallery on the detail page. `PixelCopy` of
+  droidtop's own window would capture the menu, not the game. That is a feature, not an entry.
+- *Profiles and parental control (#78).* The UI modes (Kiosk, Kid) are the honest floor: they
+  hide Settings and non-kid games, and stay without a passcode (see `UiMode`). A PIN on leaving
+  them would be theatre while the Quick Menu can switch to Standard or Desktop and Android's Home
+  and other apps stay reachable; a real one needs those closed first and separate per-profile
+  state, which is a design of its own.
+- *Users and guest (#79).* An app cannot switch Android users (`switchUser` is system-only), so
+  the built version is a **Users and guest** row in Global settings that opens Android's own
+  Users screen, offered only where the device supports several users and a Settings activity
+  answers.
 
 **The rule is checked, not trusted.** A unit test in `:shell-gamepad` and `:app` fails on any
 `Color(0x` literal, any named `Color.*` constant and any `.dp` literal outside `DesignTokens.kt`,
