@@ -171,6 +171,10 @@ object PluginBundleInstaller {
             disabledReason = null,
         )
         writeRecord(pluginsRoot, record)
+        // A same-key update keeps the grants it effectively had; what it adds that is dangerous waits at `ask` (docs/plugin-api.md 1.5).
+        if (carriedOver && !sameBytes && existingState != null) {
+            PluginGrants.forPluginsRoot(pluginsRoot).applyUpdate(existingState, record)
+        }
         return PluginInstallResult.Installed(record)
     }
 
@@ -214,6 +218,7 @@ object PluginBundleInstaller {
         val dir = File(pluginsRoot, record.manifest.id)
         dir.mkdirs()
         File(dir, "record.json").writeText(record.toJson().toString())
+        PluginEpoch.bump()
     }
 
     /** Built-in ids no plugin may ever declare (checklist point 2). */

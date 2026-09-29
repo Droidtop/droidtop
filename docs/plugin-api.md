@@ -1543,6 +1543,101 @@ what makes the approval screen say "Full access (older plugin)". A v1
 record re-derives its v2 set on every read; a v2 record stores the five
 arrays under the manifest's own keys (`V2Declarations`).
 
+**As built (P1-1, P1-2, P1-3, P1-5 in part, P1-6, P1-7, P1-9; #57, #58,
+#59, #62, #63, #65).**
+
+- **The broker.**
+  - `IPluginHostBroker` has one method, `call(requestJson)`, and `:app`
+    hands `:pluginhost` one `PluginHostBroker` per plugin in
+    `IPluginRuntime.loadPlugin`. The object wraps a `BrokerCore` fixed to
+    that plugin's id, so a request cannot name its caller.
+    `BrokerCoreTest` sends the same request to two brokers and gets two
+    identities.
+  - `BrokerCore` runs the checks of §1.4 in order: runnable and not
+    Waiting; the API and version; the permission declared and granted;
+    the parameters within what was declared; the quota; then the host
+    executes or forwards; then the audit entry. `BrokerEnvironment` is
+    droidtop's side of it, and `AppBrokerEnvironment` its production
+    implementation.
+  - Host ops built: `host.info`, `plugins.available`,
+    `plugins.job_status`, `apps.check`, `apps.launch` and `apps.intent`.
+    The last three are the old `isAppInstalled`, `launchApp` and
+    `launchAppWithExtras`, which are now broker calls, so a contract 1
+    plugin is served by the same code and holds the grants it was
+    derived (no new prompts).
+  - Not moved onto the broker: `privateDataDir`, `libraryFolderPath` and
+    `hasRootApproval` are local answers with no host effect, and
+    `hasShizukuAccess` stays the local permission probe until the Shizuku
+    provider (P1-16) answers `plugins.available` for `priv.shell`.
+  - `PluginContext.call(api, version, op, argsJson)` is `host.call` for a
+    `native_bundle` plugin. **The `python` and `flutter_embed` adapters do
+    not expose `host.call` yet**, so the parity of §1.3 has this known gap
+    next to `startJob` for python.
+  - Quota: 50 calls burst, 10 per second sustained, per plugin (`TokenBucket`).
+- **Grants and the sheet.**
+  - `PluginGrants` keeps `plugin-grants/<id>.json`: an explicit state per
+    permission id, plus `provide:<point>` for a high-risk point and
+    `export:<api>` for an export. Approval writes it (normal granted, a
+    dangerous item granted only when ticked, otherwise `ask`); a contract 1
+    plugin holds what it could already do, and its root tick is the
+    `priv.shell.root` grant. A file that cannot be read is `ask` for
+    everything, never `granted`. The approval screen has no per-item tick
+    yet, so a dangerous permission is granted from the first-use sheet or
+    the Permissions screen.
+  - A call in `ask` state during a user-initiated host to plugin call
+    shows the sheet (`PluginGrantPrompts`, drawn by Gaming's shell); a call
+    from an event or a job fails with `PERMISSION_DENIED` and records that
+    the plugin "wants" it. A surface that cannot draw the sheet answers Not
+    now. Only `invoke` and `handle` calls count as user-initiated: a job
+    does not.
+- **The v2 envelope.**
+  - `DroidtopPlugin.handle(PluginCall): PluginReply` and the AIDL method
+    `IPluginRuntime.handle` carry the envelope of §1.3. A plugin that only
+    implements `invoke` is served by `LegacyHandle`: the point maps to its
+    contract 1 capability (`LegacyManifest.capabilityForPoint`), the op
+    travels as an `op` argument. A plugin compiled before `handle` existed
+    has no such method on its class and the JVM throws
+    `AbstractMethodError`; `LegacyHandle.dispatch` treats that as "use the
+    translation", never as a crash.
+  - `PluginCrashPolicy.handle` is the host's one way in. A miss of the
+    default 15 s budget is a crash; a shorter budget passed by a caller is
+    the UI declining to wait (`crashOnTimeout = false`). The wait runs on
+    the IO dispatcher, so a hung plugin does not hold the timeout up.
+  - A point the plugin provides at high risk needs its `provide:<point>`
+    grant, or the call is refused.
+- **Resolution and calls between plugins.**
+  - `PluginApiResolver` recomputes the graph on a change of `PluginEpoch`
+    (every record write, grant write and uninstall), never per call, to a
+    fixed point: a plugin that lost its provider stops providing, which
+    can make another one Waiting. A Waiting plugin is not called through
+    `invoke`, `handle`, jobs or events, and its row says what it needs.
+    "Provided by" is `PluginProviderChoices`.
+  - A call to a provider: the caller must have declared `requires` and the
+    op's permission and hold its own grant; the provider must be runnable,
+    with its export switched on (an update's new export waits at `ask`);
+    a privileged API from a source the user added also needs the
+    provider's `plugins.export_privileged`. The call reaches the
+    provider's `handle` with `point: "api:<id>"`, a `caller` block
+    (id, origin, trust, only the grant that applies, `via`), and a
+    deadline of the caller's remaining time minus 1 s, at most 15 s. Depth
+    is 3 plugins and a repeat is refused (`INVALID_ARGS`). A provider that
+    times out or dies gives `TIMEOUT` or `PROVIDER_CRASHED`. Both sides are
+    audited when the permission is dangerous or critical.
+  - A provider op declared `job: true` becomes a job in
+    `PluginJobsCenter` owned by the caller and shown "via" the provider;
+    the caller reads it with `plugins.job_status`.
+  - Replies of standard interfaces are checked for size and JSON shape only;
+    the per-interface reply schemas are not written yet.
+- **Updates.** A same-key update keeps the grants it effectively had
+  (written out first for a plugin that had no file), and
+  `PermissionDiff` puts each new dangerous permission, high-risk point
+  and export at `ask`, remembered as "fresh" until answered: that is
+  "Wants new access".
+- **Activity.** `PluginAudit` is the ring of §4.6 (2,000 entries, 30 days,
+  kept 7 days after uninstall), written for dangerous and critical calls
+  only; normal-permission calls are not counted yet. The Activity screen
+  is not built; the Permissions screen reads "last used" from it.
+
 **Compatibility promises:**
 
 1. Every v1 bundle that installs and runs today installs and runs after

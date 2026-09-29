@@ -4,6 +4,11 @@ import android.content.Context
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -55,13 +60,16 @@ object PluginJobsCenter {
         val jobId: String,
         val pluginId: String,
         val pluginLabel: String,
-        val capability: PluginCapability,
+        /** Null for a job a provider runs for another plugin (docs/plugin-api.md 2.4): those have no contract 1 capability. */
+        val capability: PluginCapability?,
         val title: String,
         val startedAtMs: Long,
         val percent: Int = -1,
         val statusLine: String = "Starting…",
         val done: Boolean = false,
         val result: PluginResult? = null,
+        /** The provider plugin's label when this job is brokered: the job is owned by the caller and shown "via" the provider. */
+        val via: String? = null,
     )
 
     /**
@@ -177,12 +185,53 @@ object PluginJobsCenter {
         return jobId
     }
 
+    private val brokeredScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val brokeredJobs = ConcurrentHashMap<String, Job>()
+    private val brokeredReplies = ConcurrentHashMap<String, PluginReply>()
+
+    /**
+     * Tracks a provider's job op for its CALLER (docs/plugin-api.md 2.4): the
+     * entry belongs to [callerId] and names [providerLabel] as "via". [block]
+     * runs the provider's `handle` with no per-call bound; the job ends with
+     * its reply, which [brokeredReply] returns to the caller that started it.
+     */
+    fun startBrokered(callerId: String, callerLabel: String, providerLabel: String, title: String, block: suspend () -> PluginReply): String {
+        val jobId = UUID.randomUUID().toString()
+        state.update { current ->
+            listOf(Entry(jobId, callerId, callerLabel, null, title, System.currentTimeMillis(), via = providerLabel)) + current
+        }
+        brokeredJobs[jobId] = brokeredScope.launch {
+            val reply = try {
+                block()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                PluginReply.error(PluginErrorCode.CANCELLED, "cancelled")
+            } catch (t: Throwable) {
+                PluginReply.error(PluginErrorCode.FAILED, t.message ?: "job failed")
+            }
+            brokeredReplies[jobId] = reply
+            val result = if (reply.ok) {
+                PluginResult.success(buildMap { reply.data.keys().forEach { put(it, reply.data.optString(it)) } })
+            } else {
+                PluginResult.failure(reply.message ?: "failed")
+            }
+            update(jobId) { it.copy(done = true, result = result, statusLine = if (result.ok) "Done" else (result.error ?: "Failed"), percent = 100) }
+            brokeredJobs.remove(jobId)
+            prune()
+        }
+        return jobId
+    }
+
+    /** The reply of a brokered job, or null while it still runs or when [jobId] is not one of [callerId]'s. */
+    fun brokeredReply(callerId: String, jobId: String): PluginReply? =
+        if (find(jobId)?.pluginId == callerId) brokeredReplies[jobId] else null
+
     /** Awaits [jobId]'s completion -- for a caller (a Jobs-screen row re-attaching to a job it didn't itself start) that needs the final result, not just the live [entries] view. Returns null when [jobId] is unknown. */
     suspend fun await(jobId: String): PluginResult? = deferreds[jobId]?.await()
 
     /** Best-effort cancel (docs/SPEC.md 12a: [DroidtopPlugin.cancelJob] itself is best-effort -- a plugin that ignores it keeps running until it finishes on its own). No-op for an unknown or already-finished [jobId]. */
     fun cancel(jobId: String) {
         val entry = find(jobId) ?: return
+        brokeredJobs[jobId]?.cancel()
         runners[jobId]?.cancelJob(entry.pluginId, jobId)
     }
 

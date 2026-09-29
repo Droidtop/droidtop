@@ -34,6 +34,17 @@ interface DroidtopPlugin {
     fun invoke(capability: PluginCapability, args: PluginArgs): PluginResult
 
     /**
+     * The contract 2 entry point (docs/plugin-api.md 1.3): one call in the
+     * v2 envelope, for an extension point (`ui.context_action`), an event,
+     * or `api:<id>` when this plugin is a provider serving another plugin.
+     * The default answers through the contract 1 capability the point
+     * replaced ([LegacyHandle]) and UNSUPPORTED otherwise, so a plugin that
+     * only implements [invoke] keeps working. Throw for a crash; an
+     * ordinary failure is [PluginReply.error].
+     */
+    fun handle(call: PluginCall): PluginReply = LegacyHandle.translate(this, call)
+
+    /**
      * The long-running counterpart to [invoke] (see [PluginJob]). Default
      * throws, which [PluginRuntimeService.startJob] turns into a clean
      * "this plugin doesn't support jobs" rather than a crash -- most
@@ -104,6 +115,16 @@ class PluginResult private constructor(val ok: Boolean, val values: Map<String, 
  * because the manifest never declared that capability.
  */
 interface PluginContext {
+    /**
+     * `host.call` (docs/plugin-api.md 1.4): one call to droidtop's broker,
+     * or through it to a provider plugin. [argsJson] is a JSON object; the
+     * return value is a reply as JSON, `{"ok":true,"data":{...}}` or
+     * `{"ok":false,"error":{"code","message"}}`. It never throws. The
+     * methods below are this same call with fixed arguments, kept for
+     * contract 1 plugins.
+     */
+    fun call(api: String, version: Int, op: String, argsJson: String): String
+
     /** This plugin's own private directory (`filesDir/plugins/<id>/data`), separate from its read-only installed payload -- the "per-plugin data directory" the crash-containment decision requires. */
     fun privateDataDir(): String
 

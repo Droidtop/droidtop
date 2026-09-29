@@ -10580,6 +10580,17 @@ of what is built. The decisions, briefly:
 - **Compatibility.** Contract 1 bundles keep working unchanged. One
   translation maps each existing capability, event and `PluginContext`
   method onto the new model (`docs/plugin-api.md` §6).
+- **Decisions made while building the broker** (`docs/plugin-api.md` §6,
+  "As built"):
+  - a call in `ask` state prompts only during a user-initiated call, and
+    only where a surface can draw the sheet. Everywhere else it fails with
+    `PERMISSION_DENIED` and the plugin's row says it wants the permission.
+  - A grant file that cannot be read means `ask`, never `granted`.
+  - A plugin whose required API has no runnable provider is Waiting: it is
+    not called and not disabled, and it resumes by itself.
+  - A plugin compiled before `handle` existed is served through its
+    contract 1 capability. `AbstractMethodError` from that missing method
+    is not a crash.
 
 The catalogue has 89 entries across ten areas (library and content,
 launch and runtime, UI, system and device, desktop, other apps,

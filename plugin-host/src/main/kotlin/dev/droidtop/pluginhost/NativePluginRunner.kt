@@ -6,7 +6,9 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 
@@ -108,7 +110,7 @@ class NativePluginRunner(
         val runtime = ensureConnected() ?: return false
         return try {
             withTimeout(PluginRunner.CALL_TIMEOUT_MS) {
-                runtime.loadPlugin(record.manifest.id, installDir, entryClass, record.rootApproved)
+                runtime.loadPlugin(record.manifest.id, installDir, entryClass, record.rootApproved, PluginBrokers.binderFor(context, record.manifest.id))
             }
         } catch (e: TimeoutCancellationException) {
             onCrash(record.manifest.id, "", "load timed out")
@@ -161,6 +163,34 @@ class NativePluginRunner(
         } catch (e: Exception) {
             onCrash(pluginId, event.id, e.message ?: "event call failed across the binder")
             PluginResult.failure(e.message ?: "call failed")
+        }
+    }
+
+    /**
+     * Sends one v2 envelope ([PluginCall]) and waits at most [timeoutMs].
+     * The wait is a real one: the binder call runs on the IO dispatcher so
+     * the timeout does not have to wait for a hung plugin to return. A
+     * timeout counts as a crash and disables the plugin only when
+     * [crashOnTimeout] (the default 15 s budget, a provider's deadline);
+     * the shorter budgets docs/plugin-api.md 8 lists ("shown enabled", "results
+     * omitted") are the UI choosing not to wait, so the plugin was slow, not
+     * broken. An exception or the process dying is always a crash.
+     */
+    suspend fun handle(pluginId: String, call: PluginCall, timeoutMs: Long, crashOnTimeout: Boolean): PluginReply {
+        val runtime = connection ?: ensureConnected() ?: return PluginReply.error(PluginErrorCode.FAILED, "plugin process is not running")
+        return try {
+            val text = withTimeout(timeoutMs) {
+                withContext(Dispatchers.IO) { runtime.handle(pluginId, call.toJson().toString()) }
+            }
+            PluginReply.parse(text)
+        } catch (e: TimeoutCancellationException) {
+            if (crashOnTimeout) onCrash(pluginId, call.point, "call timed out after ${timeoutMs}ms")
+            PluginReply.error(PluginErrorCode.TIMEOUT, "timed out")
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            onCrash(pluginId, call.point, e.message ?: "call failed across the binder")
+            PluginReply.error(PluginErrorCode.FAILED, e.message ?: "call failed")
         }
     }
 

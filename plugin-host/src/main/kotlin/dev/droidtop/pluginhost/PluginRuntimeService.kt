@@ -59,7 +59,7 @@ class PluginRuntimeService : Service() {
             cb?.let { callbacks.unregister(it) }
         }
 
-        override fun loadPlugin(pluginId: String, installDir: String, entryClass: String, rootApproved: Boolean): Boolean {
+        override fun loadPlugin(pluginId: String, installDir: String, entryClass: String, rootApproved: Boolean, broker: IPluginHostBroker): Boolean {
             // Found while fixing the flutter_embed channel-error race
             // (2026-09-26): PluginCrashPolicy.invoke()/startJob() call
             // load() before EVERY capability call, unconditionally --
@@ -92,13 +92,13 @@ class PluginRuntimeService : Service() {
                 PluginManifest.fromJson(JSONObject(manifestFile.readText()))?.kind
             }.getOrNull()
             return when (kind) {
-                PluginKind.PYTHON -> loadPythonPlugin(pluginId, dir, rootApproved)
-                PluginKind.FLUTTER_EMBED -> loadFlutterPlugin(pluginId, dir, rootApproved)
-                else -> loadNativeBundlePlugin(pluginId, dir, entryClass, rootApproved)
+                PluginKind.PYTHON -> loadPythonPlugin(pluginId, dir, rootApproved, broker)
+                PluginKind.FLUTTER_EMBED -> loadFlutterPlugin(pluginId, dir, rootApproved, broker)
+                else -> loadNativeBundlePlugin(pluginId, dir, entryClass, rootApproved, broker)
             }
         }
 
-        private fun loadNativeBundlePlugin(pluginId: String, dir: File, entryClass: String, rootApproved: Boolean): Boolean {
+        private fun loadNativeBundlePlugin(pluginId: String, dir: File, entryClass: String, rootApproved: Boolean, broker: IPluginHostBroker): Boolean {
             return try {
                 val jar = File(dir, "classes.jar")
                 if (!jar.isFile) return false
@@ -107,7 +107,7 @@ class PluginRuntimeService : Service() {
                 val loader = DexClassLoader(jar.absolutePath, optimizedDir.absolutePath, nativeDir, javaClass.classLoader)
                 val instance = loader.loadClass(entryClass).getDeclaredConstructor().newInstance()
                 val plugin = instance as? DroidtopPlugin ?: return false
-                plugin.onLoad(pluginContextFor(pluginId, dir, rootApproved))
+                plugin.onLoad(pluginContextFor(pluginId, dir, rootApproved, broker))
                 loaded[pluginId] = plugin
                 true
             } catch (t: Throwable) {
@@ -127,7 +127,7 @@ class PluginRuntimeService : Service() {
          * here), exactly like [NativePluginRunner.load] returning false
          * for "the process never connected" does not disable the plugin.
          */
-        private fun loadPythonPlugin(pluginId: String, dir: File, rootApproved: Boolean): Boolean {
+        private fun loadPythonPlugin(pluginId: String, dir: File, rootApproved: Boolean, broker: IPluginHostBroker): Boolean {
             val built = PythonDroidtopPlugin.forInstall(applicationContext, pluginId, dir)
             val plugin = built.getOrElse { e ->
                 if (e.message?.contains("runtime not installed", ignoreCase = true) == true) return false
@@ -135,7 +135,7 @@ class PluginRuntimeService : Service() {
                 return false
             }
             return try {
-                plugin.onLoad(pluginContextFor(pluginId, dir, rootApproved))
+                plugin.onLoad(pluginContextFor(pluginId, dir, rootApproved, broker))
                 loaded[pluginId] = plugin
                 true
             } catch (t: Throwable) {
@@ -164,7 +164,7 @@ class PluginRuntimeService : Service() {
          *      rather than left to fail confusingly deep inside
          *      FlutterEngine's own native init.
          */
-        private fun loadFlutterPlugin(pluginId: String, dir: File, rootApproved: Boolean): Boolean {
+        private fun loadFlutterPlugin(pluginId: String, dir: File, rootApproved: Boolean, broker: IPluginHostBroker): Boolean {
             val manifestFile = File(dir, "manifest.json")
             val runtimeVersion = runCatching {
                 PluginManifest.fromJson(JSONObject(manifestFile.readText()))?.runtimeVersion
@@ -183,7 +183,7 @@ class PluginRuntimeService : Service() {
                 return false
             }
             return try {
-                plugin.onLoad(pluginContextFor(pluginId, dir, rootApproved))
+                plugin.onLoad(pluginContextFor(pluginId, dir, rootApproved, broker))
                 loaded[pluginId] = plugin
                 true
             } catch (t: Throwable) {
@@ -232,6 +232,18 @@ class PluginRuntimeService : Service() {
                 encode(result)
             } catch (t: Throwable) {
                 reportCrash(pluginId, capability, t.message ?: t::class.java.simpleName)
+                null
+            }
+        }
+
+        override fun handle(pluginId: String, envelopeJson: String): String? {
+            val plugin = loaded[pluginId] ?: return null
+            val call = PluginCall.fromJson(envelopeJson)
+                ?: return PluginReply.error(PluginErrorCode.INVALID_ARGS, "the call envelope is not valid").encode()
+            return try {
+                LegacyHandle.dispatch(plugin, call).encode()
+            } catch (t: Throwable) {
+                reportCrash(pluginId, call.point, t.message ?: t::class.java.simpleName)
                 null
             }
         }
@@ -361,7 +373,22 @@ class PluginRuntimeService : Service() {
         return if (dir.isDirectory) dir.absolutePath else null
     }
 
-    private fun pluginContextFor(pluginId: String, installDir: File, rootApproved: Boolean): PluginContext = object : PluginContext {
+    private fun pluginContextFor(pluginId: String, installDir: File, rootApproved: Boolean, broker: IPluginHostBroker): PluginContext = object : PluginContext {
+        override fun call(api: String, version: Int, op: String, argsJson: String): String = try {
+            broker.call(
+                JSONObject().put("api", api).put("version", version).put("op", op)
+                    .put("args", runCatching { JSONObject(argsJson) }.getOrDefault(JSONObject())).toString(),
+            ) ?: PluginReply.error(PluginErrorCode.FAILED, "droidtop returned no reply").encode()
+        } catch (t: Throwable) {
+            PluginReply.error(PluginErrorCode.FAILED, "droidtop could not be reached: ${t.message ?: t::class.java.simpleName}").encode()
+        }
+
+        /** The contract 1 methods below are the broker calls they became (docs/plugin-api.md 6); a refused or failed call reads as false, as before. */
+        private fun flag(api: String, op: String, args: JSONObject, key: String): Boolean = runCatching {
+            val reply = JSONObject(call(api, 1, op, args.toString()))
+            reply.optBoolean("ok") && reply.optJSONObject("data")?.optBoolean(key) == true
+        }.getOrDefault(false)
+
         override fun privateDataDir(): String = File(installDir, "data").apply { mkdirs() }.absolutePath
         // The library-folder question needs :app's own configured state
         // (the systems database); this process never reads it directly
@@ -378,22 +405,21 @@ class PluginRuntimeService : Service() {
         override fun libraryFolderPath(systemId: String): String? = null
         override fun hasRootApproval(): Boolean = rootApproved && deviceHasRoot()
         override fun hasShizukuAccess(): Boolean = checkShizukuAccess(applicationContext)
-        override fun isAppInstalled(packageName: String): Boolean = checkPackageInstalled(applicationContext, packageName)
-        override fun launchApp(packageName: String): Boolean = runCatching {
-            val intent = applicationContext.packageManager.getLaunchIntentForPackage(packageName) ?: return@runCatching false
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            applicationContext.startActivity(intent)
-            true
+        override fun isAppInstalled(packageName: String): Boolean = runCatching {
+            // The reply carries one boolean per package: read it by name.
+            val reply = JSONObject(call("apps", 1, "check", JSONObject().put("packages", org.json.JSONArray(listOf(packageName))).toString()))
+            reply.optBoolean("ok") && reply.optJSONObject("data")?.optJSONObject("installed")?.optBoolean(packageName) == true
         }.getOrDefault(false)
 
-        override fun launchAppWithExtras(packageName: String, extras: Map<String, String>, action: String?): Boolean = runCatching {
-            val intent = applicationContext.packageManager.getLaunchIntentForPackage(packageName) ?: return@runCatching false
-            action?.let { intent.action = it }
-            extras.forEach { (key, value) -> intent.putExtra(key, value) }
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            applicationContext.startActivity(intent)
-            true
-        }.getOrDefault(false)
+        override fun launchApp(packageName: String): Boolean =
+            flag("apps", "launch", JSONObject().put("package", packageName), "launched")
+
+        override fun launchAppWithExtras(packageName: String, extras: Map<String, String>, action: String?): Boolean =
+            flag(
+                "apps", "intent",
+                JSONObject().put("package", packageName).put("extras", JSONObject(extras as Map<*, *>)).also { if (action != null) it.put("action", action) },
+                "launched",
+            )
     }
 
     private fun checkPackageInstalled(context: Context, packageName: String): Boolean = runCatching {

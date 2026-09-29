@@ -21,6 +21,9 @@ object LegacyManifest {
         PluginCapability.APP_STATUS to "apps.bridge",
     )
 
+    /** The contract 1 capability an extension point replaced, or null for a point that never had one. */
+    fun capabilityForPoint(point: String): PluginCapability? = CAPABILITY_POINTS.entries.firstOrNull { it.value == point }?.key
+
     /** The capabilities a v2 manifest's `provides` implies, so a v2 plugin is served by the same runners until they speak the v2 envelope. */
     fun capabilitiesFor(provides: List<ProvidedPoint>): Set<PluginCapability> {
         val byPoint = CAPABILITY_POINTS.entries.associate { (cap, point) -> point to cap }

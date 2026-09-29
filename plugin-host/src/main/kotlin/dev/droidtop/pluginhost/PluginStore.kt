@@ -63,13 +63,14 @@ object PluginStore {
         }
     }
 
-    /** The one action that moves a plugin from PENDING to APPROVED (or DENIED) -- the approval screen's confirm/decline buttons, and nothing else in the codebase may set this. */
-    fun setApproval(context: Context, pluginId: String, approved: Boolean, grantRoot: Boolean) {
+    /**
+     * The one action that moves a plugin from PENDING to APPROVED (or DENIED) -- the approval screen's confirm/decline buttons, and nothing else in the codebase may set this.
+     * Approving also writes the plugin's grants ([PluginGrants.initialiseOnApproval]): normal permissions granted, each dangerous one granted only when in [ticked] and otherwise left to be asked on first use.
+     */
+    fun setApproval(context: Context, pluginId: String, approved: Boolean, grantRoot: Boolean, ticked: Set<String> = emptySet()) {
         val dir = root(context)
         val record = PluginBundleInstaller.readRecord(dir, pluginId) ?: return
-        PluginBundleInstaller.writeRecord(
-            dir,
-            record.copy(
+        val updated = record.copy(
                 trust = if (approved) PluginTrustState.APPROVED else PluginTrustState.DENIED,
                 enabled = approved,
                 // Root is only ever granted alongside approval, and only
@@ -80,8 +81,9 @@ object PluginStore {
                 // false even if the plugin wanted it.
                 rootApproved = approved && grantRoot && record.manifest.requestsRoot,
                 disabledReason = null,
-            ),
-        )
+            )
+        PluginBundleInstaller.writeRecord(dir, updated)
+        if (approved) PluginGrants.forContext(context).initialiseOnApproval(updated, ticked)
     }
 
     fun setEnabled(context: Context, pluginId: String, enabled: Boolean) {
@@ -97,7 +99,14 @@ object PluginStore {
         PluginBundleInstaller.writeRecord(dir, record.copy(enabled = false, disabledReason = reason))
     }
 
+    /** Removes the plugin, its data and its grants; its activity ring is kept 7 days and marked removed (docs/plugin-api.md 1.5, 4.6). */
     fun uninstall(context: Context, pluginId: String) {
+        val audit = PluginAudit.forContext(context)
+        audit.markRemoved(pluginId)
+        audit.purgeExpired()
+        PluginGrants.forContext(context).delete(pluginId)
+        PluginBrokers.forget(pluginId)
         File(root(context), pluginId).deleteRecursively()
+        PluginEpoch.bump()
     }
 }

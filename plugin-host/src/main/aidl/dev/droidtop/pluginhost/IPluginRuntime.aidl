@@ -1,5 +1,6 @@
 package dev.droidtop.pluginhost;
 
+import dev.droidtop.pluginhost.IPluginHostBroker;
 import dev.droidtop.pluginhost.IPluginRuntimeCallback;
 
 /**
@@ -55,8 +56,13 @@ interface IPluginRuntime {
      * issued this load -- droidtop's own approval state never lives in
      * this process, so it is handed down on every load (see
      * PluginContext.hasRootApproval).
+     *
+     * broker is this plugin's own IPluginHostBroker object (docs/plugin-api.md
+     * 1.4): the only way the plugin reaches droidtop. :app makes one per
+     * plugin, so a call is attributed by WHICH object it arrived on, never
+     * by an id the plugin claims.
      */
-    boolean loadPlugin(String pluginId, String installDir, String entryClass, boolean rootApproved);
+    boolean loadPlugin(String pluginId, String installDir, String entryClass, boolean rootApproved, IPluginHostBroker broker);
 
     void unloadPlugin(String pluginId);
 
@@ -69,6 +75,15 @@ interface IPluginRuntime {
      * rather than the call returning.
      */
     String invoke(String pluginId, String capability, String argsJson);
+
+    /**
+     * The v2 call envelope (docs/plugin-api.md 1.3): envelopeJson is a
+     * PluginCall as JSON, the return value a PluginReply as JSON, or null
+     * when the plugin threw or is not loaded. A plugin compiled before the
+     * envelope existed is answered through its contract 1 capability
+     * (LegacyHandle). Bound by the caller's own watchdog, like invoke.
+     */
+    String handle(String pluginId, String envelopeJson);
 
     /**
      * Starts a long-running job (docs/SPEC.md 12a's job shape). jobId is

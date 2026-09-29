@@ -45,8 +45,9 @@ class PluginCrashPolicy(
      * callback missed, e.g. [ensureConnected] itself never getting a
      * connection).
      */
-    suspend fun invoke(record: PluginRecord, capability: PluginCapability, args: Map<String, String>): PluginResult {
+    suspend fun invoke(record: PluginRecord, capability: PluginCapability, args: Map<String, String>, userInitiated: Boolean = true): PluginResult {
         if (!record.runnable()) return PluginResult.failure("plugin is not approved/enabled")
+        waitingReason(record)?.let { return PluginResult.failure(it) }
         if (record.manifest.kind !in RUNNABLE_KINDS) {
             return PluginResult.failure("no runner for kind ${record.manifest.kind.id} yet")
         }
@@ -65,12 +66,55 @@ class PluginCrashPolicy(
         // Throwable and reports it there instead of encoding a normal
         // failure result; NativePluginRunner's timeout/exception catches
         // do the same).
-        return runner.invoke(record.manifest.id, capability, args)
+        return PluginBrokers.during(record.manifest.id, userInitiated, PluginRunner.CALL_TIMEOUT_MS) {
+            runner.invoke(record.manifest.id, capability, args)
+        }
+    }
+
+    /**
+     * Sends one v2 call to [record]'s `handle` (docs/plugin-api.md 1.3), the
+     * one path for extension points that have no contract 1 capability
+     * (quick tiles, `api:<id>` calls for a provider) and for the ones that
+     * do. The same runnable and re-verify gates as [invoke]; a plugin that
+     * is Waiting, or whose `provide:` grant for [PluginCall.point] is not
+     * given, is refused. [timeoutMs] is the budget of docs/plugin-api.md 8:
+     * a miss is a crash only for the default 15 s budget ([crashOnTimeout]),
+     * because a shorter one is the UI declining to wait. Never throws.
+     */
+    suspend fun handle(
+        record: PluginRecord,
+        call: PluginCall,
+        timeoutMs: Long = PluginRunner.CALL_TIMEOUT_MS,
+        crashOnTimeout: Boolean = timeoutMs >= PluginRunner.CALL_TIMEOUT_MS,
+        userInitiated: Boolean = true,
+    ): PluginReply {
+        if (!record.runnable()) return PluginReply.error(PluginErrorCode.PROVIDER_UNAVAILABLE, "plugin is not approved/enabled")
+        waitingReason(record)?.let { return PluginReply.error(PluginErrorCode.PROVIDER_UNAVAILABLE, it) }
+        if (record.manifest.kind !in RUNNABLE_KINDS) {
+            return PluginReply.error(PluginErrorCode.UNSUPPORTED, "no runner for kind ${record.manifest.kind.id} yet")
+        }
+        if (!call.point.startsWith("api:") &&
+            PluginGrants.provideState(record, PluginGrants.forContext(context).read(record.manifest.id), call.point) != GrantState.GRANTED
+        ) {
+            return PluginReply.error(PluginErrorCode.PERMISSION_DENIED, "${record.manifest.label} has not been allowed to provide ${call.point}")
+        }
+        gateOnVerification(record)?.let { return PluginReply.error(PluginErrorCode.FAILED, it.error ?: "plugin failed verification") }
+        val dir = PluginStore.payloadDirFor(context, record.manifest.id)
+        if (!runner.load(record, dir.absolutePath)) return PluginReply.error(PluginErrorCode.FAILED, "plugin failed to load")
+        return PluginBrokers.during(record.manifest.id, userInitiated, timeoutMs) {
+            runner.handle(record.manifest.id, call, timeoutMs, crashOnTimeout)
+        }
+    }
+
+    /** Why [record] cannot be called right now although it is approved and enabled: a required API of another plugin has no provider (docs/plugin-api.md 2.3). Null when it can. */
+    private fun waitingReason(record: PluginRecord): String? {
+        val missing = PluginApiResolver.current(context).waiting[record.manifest.id] ?: return null
+        return "waiting for " + missing.joinToString { it.api }
     }
 
     /** Starts a long-running job for [record] under the given [jobId] (see [PluginJob], and [IPluginRuntime.startJob]'s own doc comment for why the caller -- [PluginJobsCenter] -- chooses this id); same runnable/re-verify gates as [invoke], false on any refusal. */
     override suspend fun startJob(record: PluginRecord, capability: PluginCapability, args: Map<String, String>, jobId: String): Boolean {
-        if (!record.runnable()) return false
+        if (!record.runnable() || waitingReason(record) != null) return false
         if (record.manifest.kind !in RUNNABLE_KINDS) return false
         gateOnVerification(record)?.let { return false }
         val dir = PluginStore.payloadDirFor(context, record.manifest.id)
@@ -89,7 +133,7 @@ class PluginCrashPolicy(
      */
     suspend fun notifyEvent(record: PluginRecord, event: dev.droidtop.pluginhost.PluginEvent, args: Map<String, String>): PluginResult? {
         if (event.id !in record.manifest.subscribedEvents) return null
-        if (!record.runnable()) return null
+        if (!record.runnable() || waitingReason(record) != null) return null
         if (record.manifest.kind !in RUNNABLE_KINDS) return null
         gateOnVerification(record)?.let { return null }
         val dir = PluginStore.payloadDirFor(context, record.manifest.id)
