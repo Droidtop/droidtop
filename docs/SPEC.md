@@ -9782,12 +9782,12 @@ a folder that is a store's install, and a shared F95 thread.
 ### Switch content: an update and a DLC are parts of one game (2026-09-29)
 
 A Switch library is not folders but packages, and a package knows what it
-is without being opened: a title ID is 16 hex characters whose LAST THREE
-say what the content is -- `...000` the base game, `...800` its update,
-anything else an add-on (DLC) whose own index that suffix is. The base
-game all three belong to is the ID with its suffix replaced by `000`.
-`0100123456789000` is therefore the base, `0100123456789800` its update
-and `0100123456789001` its first add-on.
+is without being opened: a title ID is 16 hex characters whose LOW 13
+BITS say what the content is (switchbrew "Title list") -- clear, the base
+game; `0x800`, its update; bit 12 set with the add-on's own index in the
+low 12 bits, a DLC. The base game all three belong to is the ID with its
+low 13 bits cleared. `01007ef00011e000` is therefore the base,
+`01007ef00011e800` its update and `01007ef00011f001` its first add-on.
 
 `SwitchContent` reads that ID from exactly two places, both outside the
 crypto, in this order:
