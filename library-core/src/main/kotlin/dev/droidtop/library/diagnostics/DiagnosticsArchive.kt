@@ -23,7 +23,13 @@ import org.json.JSONObject
  * itself; the caller hands the finished file to the system share sheet.
  */
 object DiagnosticsArchive {
-    /** Where the finished archive is written: the cache, so it never outlives the sharing. */
+    /**
+     * Where the finished archive is written: under the same files root as
+     * the logs (docs/SPEC.md 10c), so a person -- or adb on an unrooted
+     * device, which cannot reach the cache at all -- can check what the
+     * action produced before or instead of sharing it. [build] leaves one
+     * archive: the newest.
+     */
     private const val OUT_DIR = "diagnostics"
 
     /** Per-file cap on what goes in. The log files roll well below this; it bounds a stray file someone put in the folder. */
@@ -62,7 +68,7 @@ object DiagnosticsArchive {
 
     /** Builds the archive and answers the file. Blocking file work: call off the main thread. */
     fun build(context: Context): File {
-        val dir = File(context.cacheDir, OUT_DIR).apply { mkdirs() }
+        val dir = File(ScanLog.filesRoot(context), OUT_DIR).apply { mkdirs() }
         dir.listFiles()?.forEach { it.delete() }
         val out = File(dir, "droidtop-diagnostics-${System.currentTimeMillis() / 1000}.zip")
         ZipOutputStream(out.outputStream().buffered()).use { zip ->

@@ -228,11 +228,17 @@ object ScanLog {
 
     private val fileLock = Any()
 
+    /**
+     * The storage root of everything droidtop records about itself: the
+     * external files dir, which a person and adb can read without root
+     * (docs/SPEC.md 10c), with the internal files dir as the fallback when
+     * external storage is not mounted.
+     */
+    fun filesRoot(context: Context): File =
+        runCatching { context.getExternalFilesDir(null) }.getOrNull() ?: context.filesDir
+
     /** The one folder droidtop records everything about itself in (docs/SPEC.md 10c): scan log, container log, crash notes. */
-    fun logsDir(context: Context): File {
-        val base = runCatching { context.getExternalFilesDir(null) }.getOrNull() ?: context.filesDir
-        return File(base, LOG_DIR)
-    }
+    fun logsDir(context: Context): File = File(filesRoot(context), LOG_DIR)
 
     /**
      * Points the scan log at this app's own files and records that the

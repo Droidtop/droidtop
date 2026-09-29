@@ -10636,9 +10636,13 @@ password, secret, api key, token, login, client id, auth or the
 ScreenScraper user and developer ids, so a new credential key that follows
 the naming is left out with no list to extend; the GitHub token (§12a) is in
 its own Keystore-backed file and is never in the settings export at all.
-Files are capped at 1 MiB each (the newest bytes), the archive is written to
-the cache and replaced by the next one, and the build, Android version,
-device, snapshot, Enginehost version and theme names go in `info.txt`.
+Files are capped at 1 MiB each (the newest bytes), the archive is written
+to `<external files>/diagnostics/` -- the same root as the logs folder, so
+like the logs it can be checked on the device without root (over adb, USB
+file transfer or a file manager; the 2026-09-29 rig check could not read
+the cache copy at all) -- and each build replaces the previous archive. The
+build, Android version, device, snapshot, Enginehost version and theme
+names go in `info.txt`.
 
 **Privacy.** droidtop sends nothing about the device, the library or the
 person anywhere. The complete list of hosts it talks to, each for one job
