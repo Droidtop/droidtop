@@ -445,6 +445,14 @@ fun GamepadShell(
     }
 
     if (quickMenuOpen) {
+        // What the last Quit to Library actually did, for the row's
+        // subtitle. Null until a quit runs: the row then reads "Ends
+        // <game>" (the pre-quit promise), and a real quit replaces it with
+        // the outcome, so a quit that left the emulator alive (the
+        // Android 13 case, Droidtop/tracker#82) is shown honestly instead
+        // of being reported as a success. Held here, not in the tab: it
+        // outlives the sheet, so a second R2 after a quit still shows it.
+        var quitOutcome by remember { mutableStateOf<dev.droidtop.library.QuitResult?>(null) }
         QuickMenu(
             runningEntry = runningEntry,
             // The same launch path every entry already goes through
@@ -452,6 +460,7 @@ fun GamepadShell(
             // entry is what "resume" already means for the planned
             // Recents tab (docs/SPEC.md, "Recents (decided 2026-08-30)"),
             // reused here rather than a second resume mechanism.
+            quitOutcome = quitOutcome,
             onResume = { entry ->
                 quickMenuOpen = false
                 onLaunch(entry)
@@ -459,8 +468,16 @@ fun GamepadShell(
             onQuit = { entry ->
                 quickMenuOpen = false
                 scope.launch {
-                    runCatching { library.quit(entry) }
-                    dev.droidtop.library.LaunchDisplay.clearRunning()
+                    val outcome = library.quit(entry)
+                    quitOutcome = outcome
+                    // Clear droidtop's own bookkeeping only when the
+                    // game's task really ended (Droidtop/tracker#82): a
+                    // quit that left the emulator alive must not make the
+                    // menu read "the game ended" when it didn't. The
+                    // outcome is shown in the row's subtitle instead.
+                    if (outcome is dev.droidtop.library.QuitResult.Ended) {
+                        dev.droidtop.library.LaunchDisplay.clearRunning()
+                    }
                 }
             },
             onDismiss = { quickMenuOpen = false },

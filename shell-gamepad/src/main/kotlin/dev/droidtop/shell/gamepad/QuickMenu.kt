@@ -108,6 +108,7 @@ internal fun QuickMenu(
     runningEntry: dev.droidtop.library.LibraryEntry?,
     onResume: (dev.droidtop.library.LibraryEntry) -> Unit,
     onQuit: (dev.droidtop.library.LibraryEntry) -> Unit,
+    quitOutcome: dev.droidtop.library.QuitResult?,
     onDismiss: () -> Unit,
 ) {
     Dialog(
@@ -233,7 +234,9 @@ internal fun QuickMenu(
                     // L1/R1 switches tabs; the ShoulderGlyph pair above the
                     // tab row names that now, not a hint-bar pill.
                     when (tab) {
-                        QuickTab.GAME -> runningEntry?.let { GameTab(it, onResume, onQuit, onDismiss) }
+                        QuickTab.GAME -> runningEntry?.let {
+                            GameTab(it, onResume, onQuit, quitOutcome, onDismiss)
+                        }
                         QuickTab.NOTIFICATIONS -> NotificationsTab(onDismiss)
                         QuickTab.SYSTEM -> QuickSettingsPanel(sheetWidth.value.toInt(), onDismiss)
                     }
@@ -445,24 +448,27 @@ private data class GameQuickTile(
  * engine games alike) -- relaunching the SAME entry is what real ES-DE's
  * own planned Recents tab (docs/SPEC.md, "Recents (decided 2026-08-30)")
  * already decided "resume" means here, reused rather than invented a
- * second time. [onQuit] runs [dev.droidtop.library.Library.quit] then
- * always clears droidtop's own running-game bookkeeping regardless of
- * whether the underlying process could actually be ended (see
- * [dev.droidtop.library.LibraryProvider.quit]'s own doc comment on why
- * that's honest, not a lie).
+ * second time. [onQuit] fires [dev.droidtop.library.Library.quit] and
+ * reports its outcome through [quitOutcome], which this tab shows in the
+ * quit row's subtitle: droidtop clears its own running-game state only
+ * when that outcome is [QuitResult.Ended], so a quit that left the
+ * emulator alive (the Android 13 case, Droidtop/tracker#82) is shown
+ * honestly instead of being reported as a success. See
+ * [dev.droidtop.library.LibraryProvider.quit]'s own doc comment.
  */
 @Composable
 private fun GameTab(
     entry: dev.droidtop.library.LibraryEntry,
     onResume: (dev.droidtop.library.LibraryEntry) -> Unit,
     onQuit: (dev.droidtop.library.LibraryEntry) -> Unit,
+    quitOutcome: dev.droidtop.library.QuitResult?,
     onDismiss: () -> Unit,
 ) {
     var focusIndex by remember(entry.id) { mutableStateOf(0) }
     val focusRequester = remember { FocusRequester() }
     val press = rememberGamepadTouch()
 
-    val tiles = remember(entry.id) {
+    val tiles = remember(entry.id, quitOutcome) {
         listOf(
             GameQuickTile(
                 title = "Resume",
@@ -471,7 +477,7 @@ private fun GameTab(
             ),
             GameQuickTile(
                 title = "Quit to Library",
-                subtitle = "Ends ${entry.title}",
+                subtitle = quitOutcome?.message ?: "Ends ${entry.title}",
                 dangerAction = true,
                 action = { onQuit(entry) },
             ),

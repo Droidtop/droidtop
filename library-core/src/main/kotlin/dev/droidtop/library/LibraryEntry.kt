@@ -630,17 +630,18 @@ interface LibraryProvider {
      * tracker#82). Never required to work: Android 14+ restricts
      * `killBackgroundProcesses` to the caller's own processes for apps
      * targeting it, so a provider with no reliable way to end another
-     * app's process (docs/SPEC.md 7i) returns false rather than claiming
-     * a result it cannot deliver. The default is that honest false --
-     * only [dev.droidtop.library.consoles.ConsoleRomProvider] overrides
-     * it, reusing the exact player-resolution + best-effort kill it
-     * already runs before a repeat launch. Callers treat
-     * [dev.droidtop.library.LaunchDisplay.clearRunning] as the real "did
-     * the session end" signal regardless of this return value: droidtop
-     * stops tracking the game as running either way, because from the
-     * shell's own side the user asked to leave it.
+     * app's process returns [QuitResult.NotEnded] rather than claiming
+     * a result it cannot deliver. The default is that honest
+     * [QuitResult.NotEnded] -- only
+     * [dev.droidtop.library.consoles.ConsoleRomProvider] overrides it, with
+     * the task-removal a non-privileged app is allowed to do for a task it
+     * launched. Callers clear droidtop's own bookkeeping only on
+     * [QuitResult.Ended], and otherwise show the returned message in the
+     * row's subtitle, so a quit that did not actually end the game says
+     * so instead of pretending.
      */
-    suspend fun quit(entry: LibraryEntry): Boolean = false
+    suspend fun quit(entry: LibraryEntry): QuitResult =
+        QuitResult.NotEnded("This source can't end a running game from here")
 
     /**
      * Whether this provider's last complete result is kept in the library
@@ -735,6 +736,35 @@ sealed interface LaunchResult {
     data object Launched : LaunchResult
     data class Refused(val reason: String) : LaunchResult
 }
+
+/**
+ * What [LibraryProvider.quit] did to the running game, for the Quick
+ * Menu's Game tab (docs/SPEC.md, Droidtop/tracker#82). A sealed
+ * outcome, not a boolean: a quit that "succeeded" but left the emulator
+ * alive (the Android 13 case -- the process and its Recents task were
+ * still there after Quit, while droidtop had already dropped its own
+ * running-game state and the row read "Ends <game>") is exactly the
+ * failure this type names. Callers clear droidtop's own bookkeeping only
+ * on [Ended], and otherwise surface the returned message.
+ */
+sealed interface QuitResult {
+    /** The game's process/task really ended; droidtop may now clear its running-game state. */
+    data object Ended : QuitResult
+
+    /** The provider tried, but the game is still running. [message] says what happened, for the row's subtitle. */
+    data class NotEnded(val message: String) : QuitResult
+
+    /** The provider couldn't even try (the entry's player/system can't be resolved, e.g. it was uninstalled since launch). */
+    data class Unresolvable(val message: String) : QuitResult
+}
+
+/** What the row's subtitle should say right now -- never a claim that didn't happen. */
+val QuitResult.message: String
+    get() = when (this) {
+        is Ended -> "Ended"
+        is NotEnded -> message
+        is Unresolvable -> message
+    }
 
 class Library(
     private val providers: List<LibraryProvider>,
@@ -1586,9 +1616,11 @@ class Library(
      * Dispatches [LibraryProvider.quit] for whichever provider owns
      * [entry]'s kind -- the Quick Menu Game tab's one route to "end this
      * game," never a second per-kind switch here (docs/SPEC.md,
-     * Droidtop/tracker#82).
+     * Droidtop/tracker#82). Returns the real outcome, not a boolean, so
+     * a quit that left the emulator running surfaces honestly in the
+     * row's subtitle instead of being reported as a success.
      */
-    suspend fun quit(entry: LibraryEntry): Boolean = withContext(Dispatchers.IO) {
+    suspend fun quit(entry: LibraryEntry): QuitResult = withContext(Dispatchers.IO) {
         providers.first { entry.kind in it.kinds }.quit(entry)
     }
 

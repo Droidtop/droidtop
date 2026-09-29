@@ -3,6 +3,7 @@ package dev.droidtop.library
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -10,17 +11,23 @@ private class FakeProvider(
     kind: LibraryEntryKind,
     private val entries: List<LibraryEntry>,
     private val failLaunch: Boolean = false,
+    private val quitResult: QuitResult = QuitResult.NotEnded("nothing to quit"),
 ) : LibraryProvider {
     override val kinds = setOf(kind)
     // One slice per provider: two instances of this class in one Library
     // must not share the default class-name key (see LibraryProvider.indexKey).
     override val indexKey = "fake-${kind.name}"
     val launched = mutableListOf<LibraryEntry>()
+    val quitCalls = mutableListOf<LibraryEntry>()
 
     override suspend fun scan(): List<LibraryEntry> = entries
     override suspend fun launch(entry: LibraryEntry) {
         if (failLaunch) error("launch failed")
         launched += entry
+    }
+    override suspend fun quit(entry: LibraryEntry): QuitResult {
+        quitCalls += entry
+        return quitResult
     }
 }
 
@@ -329,6 +336,58 @@ class LibraryTest {
         val library = Library(listOf(failing))
 
         assertTrue(library.launch(nativeEntry.id) is LaunchResult.Refused)
+    }
+
+    @Test
+    fun `quit dispatches to the provider matching the entry's kind, and reports its real outcome`() = runBlocking {
+        val nativeProvider = FakeProvider(
+            LibraryEntryKind.NATIVE_ANDROID_APP,
+            listOf(nativeEntry),
+            quitResult = QuitResult.Ended,
+        )
+        val wineProvider = FakeProvider(LibraryEntryKind.WINE_PROFILE, listOf(wineEntry))
+        // Deliberately registered native-provider first: if Library.quit
+        // ever regressed to "always use providers.first()" instead of
+        // matching on kind, this would quit wineEntry via the wrong
+        // provider and both assertions below would fail.
+        val library = Library(listOf(nativeProvider, wineProvider))
+
+        val ended = library.quit(nativeEntry)
+
+        assertSame(QuitResult.Ended, ended)
+        assertEquals(listOf(nativeEntry), nativeProvider.quitCalls)
+        assertTrue(wineProvider.quitCalls.isEmpty())
+    }
+
+    @Test
+    fun `quit never clears droidtop's own running-game state unless the game really ended`() {
+        // The state rule (docs/SPEC.md, Droidtop/tracker#82): droidtop's
+        // bookkeeping clears ONLY on QuitResult.Ended. A quit that left
+        // the emulator alive (the Android 13 case) must not be reported
+        // as a success, so the row's subtitle says what happened.
+        val provider = FakeProvider(
+            LibraryEntryKind.NATIVE_ANDROID_APP,
+            listOf(nativeEntry),
+            quitResult = QuitResult.NotEnded("Couldn't end the emulator's task; it may have been started outside droidtop"),
+        )
+        val library = Library(listOf(provider))
+
+        val outcome = runBlocking { library.quit(nativeEntry) }
+
+        assertTrue(outcome is QuitResult.NotEnded)
+        assertFalse(outcome is QuitResult.Ended)
+    }
+
+    @Test
+    fun `a provider with no quit override reports that it can't end the game`() = runBlocking {
+        // KeyedProvider deliberately does not override quit: the default
+        // is an honest NotEnded, never a claimed success.
+        val provider = KeyedProvider("keyed", LibraryEntryKind.WINE_PROFILE, listOf(wineEntry))
+        val library = Library(listOf(provider))
+
+        val outcome = library.quit(wineEntry)
+
+        assertTrue(outcome is QuitResult.NotEnded)
     }
 }
 

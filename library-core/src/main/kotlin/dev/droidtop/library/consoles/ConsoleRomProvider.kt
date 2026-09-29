@@ -12,6 +12,7 @@ import dev.droidtop.library.ScanSkips
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
+import dev.droidtop.library.QuitResult
 import dev.droidtop.library.PartRef
 import dev.droidtop.library.ScanStep
 import dev.droidtop.library.withScrapedMetadata
@@ -945,13 +946,28 @@ class ConsoleRomProvider(
 
     /**
      * [LibraryProvider.quit] for ROM entries (Droidtop/tracker#82): the
-     * exact same system/player resolution [launch] runs, then the exact
-     * same best-effort kill pre-launch cleanup already uses below --
-     * never a second way to find or end a ROM's player. Returns false
-     * (never attempted, not "failed") when the entry's system or player
-     * can't be resolved at all, e.g. it was uninstalled since launch.
+     * exact same system/player resolution [launch] runs, then the same
+     * best-effort kill pre-launch cleanup already uses below, plus the
+     * task-removal a non-privileged app is allowed to do for a task IT
+     * launched. Returns [QuitResult.Unresolvable] (never attempted, not
+     * "failed") when the entry's system or player can't be resolved at
+     * all, e.g. it was uninstalled since launch.
+     *
+     * Why the task removal is the part that actually works on Android 13:
+     * `killBackgroundProcesses` is restricted on Android 14+ to the
+     * caller's own processes (docs/SPEC.md 7i), so it alone left the
+     * emulator's process and its Recents task alive -- which is the
+     * exact tracker#82 report. droidtop launched this activity with
+     * [LaunchDisplay.start] -> `startActivity` with an explicit display,
+     * so Android records it as a task droidtop started, and
+     * [android.app.ActivityManager.getAppTasks] lists it for this
+     * package; [android.app.AppTask.finishAndRemoveTask] ends that task
+     * and its process, which is the non-privileged path for a task the
+     * launcher owns. It is still best-effort: a game the user launched
+     * from another app, or started before this droidtop install, has no
+     * task here and comes back as [QuitResult.NotEnded] with the reason.
      */
-    override suspend fun quit(entry: LibraryEntry): Boolean {
+    override suspend fun quit(entry: LibraryEntry): QuitResult {
         val romFile = File(entry.id)
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         val system = entry.systemId?.let { systemsById[it] }
@@ -959,9 +975,32 @@ class ConsoleRomProvider(
                 val parentFolder = romFile.parentFile
                 SystemOverridePrefs.resolveForFolder(context, parentFolder?.absolutePath ?: "", parentFolder?.name ?: "", systemsById)
             }
-            ?: return false
-        val player = resolvePlayer(context, system, entry.altEmulator) ?: return false
+            ?: return QuitResult.Unresolvable("Couldn't resolve a console system for ${entry.id}; the game may have been uninstalled")
+        val player = resolvePlayer(context, system, entry.altEmulator)
+            ?: return QuitResult.Unresolvable("No emulator is installed for ${system.displayName}, so ${entry.title} can't be ended")
         killPackageProcessesBestEffort(player.packageName)
+        val endedTask = endLaunchedTaskBestEffort(player.packageName)
+        return if (endedTask) QuitResult.Ended
+        else QuitResult.NotEnded("Couldn't end ${player.name}'s task; it may have been started outside droidtop")
+    }
+
+    /**
+     * Best-effort end of the emulator's Recents task, for the non-root
+     * path (docs/SPEC.md, Droidtop/tracker#82): only tasks this package
+     * actually started are removable by an unprivileged app, and
+     * [android.app.ActivityManager.getAppTasks] returns exactly those
+     * (a task droidtop launched via [android.content.Context.startActivity]
+     * with [Intent.FLAG_ACTIVITY_NEW_TASK], which every droidtop launch
+     * goes through). Matching on the emulator's package name is the
+     * honest scope -- droidtop never removes a task it did not start,
+     * and never removes its own shell task.
+     */
+    private fun endLaunchedTaskBestEffort(packageName: String): Boolean {
+        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+        val tasks = am.getAppTasks() ?: return false
+        val mine = tasks.filter { it.taskId != 0 && it.topActivity?.packageName == packageName }
+        if (mine.isEmpty()) return false
+        mine.forEach { it.finishAndRemoveTask() }
         return true
     }
 
