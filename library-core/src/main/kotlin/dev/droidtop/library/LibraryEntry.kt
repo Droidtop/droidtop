@@ -761,9 +761,9 @@ sealed interface QuitResult {
 /** What the row's subtitle should say right now -- never a claim that didn't happen. */
 val QuitResult.message: String
     get() = when (this) {
-        is Ended -> "Ended"
-        is NotEnded -> message
-        is Unresolvable -> message
+        QuitResult.Ended -> "Ended"
+        is QuitResult.NotEnded -> message
+        is QuitResult.Unresolvable -> message
     }
 
 class Library(
