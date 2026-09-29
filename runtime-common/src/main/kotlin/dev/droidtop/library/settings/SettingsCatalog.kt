@@ -228,6 +228,16 @@ class CatalogScreen(
     val title: String,
     val subtitle: String? = null,
     val groups: suspend (Context) -> List<CatalogGroup>,
+    /**
+     * This screen re-opened DEEP-LINKED at one argument (Console systems
+     * for the single system a gamelist's options menu was opened from,
+     * docs/SPEC.md "One consistent way into Settings"): the SAME screen
+     * builder, parameterized, never a second implementation of the
+     * screen. [SettingsScreenRegistry.get] passes the argument through;
+     * a screen that declares none (all but the deep-linkable ones)
+     * resolves unchanged whatever the caller asked for.
+     */
+    val forDeepLink: ((String) -> CatalogScreen)? = null,
 )
 
 /**
@@ -306,7 +316,21 @@ object SettingsScreenRegistry {
         screens[screen.id] = screen
     }
 
-    fun get(id: String): CatalogScreen? = screens[id]
+    /**
+     * [deepLink] opens the screen at one argument (Console systems for
+     * one system id): the registered screen's own [CatalogScreen.forDeepLink]
+     * re-opens its builder parameterized, so a caller in a module that
+     * cannot reach the screen's data (the gamelist options menu in
+     * :shell-gamepad, the console-systems screen in :app) deep-links
+     * through the same registry it always resolved by id through --
+     * no second mechanism for one screen. Without an argument, or for a
+     * screen that declares no deep link, the plain registered screen
+     * resolves, which is what every existing surface gets.
+     */
+    fun get(id: String, deepLink: String? = null): CatalogScreen? =
+        screens[id]?.let { screen ->
+            if (deepLink == null) screen else screen.forDeepLink?.invoke(deepLink) ?: screen
+        }
 }
 
 /** Shared helpers for catalogs storing into the launcher prefs file. */

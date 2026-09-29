@@ -6883,9 +6883,14 @@ Gaming, where the owner's ask was sharpest:
   (`SettingsScreenRegistry.get("console_systems")`) Settings > Library
   already renders, through the same generic `CatalogNavigator` dialog the
   menu already uses for "Get games" -- not a second folder/emulator
-  picker. It lists every system's folder rather than jumping straight to
-  this one (that screen has no per-system deep link yet), but it removes
-  the Settings detour a system's own options menu used to require.
+  picker. It first landed listing every system's folder (a known gap,
+  since closed 2026-09-29): the row now deep-links, passing the system
+  it was opened from through `SettingsScreenRegistry.get`'s argument so
+  the SAME screen builder re-opens parameterized and its folder section
+  holds just that system's rows -- the same targeted deep link the
+  menu's "Get games" row already uses, with the screen falling back to
+  its full list for a system with no folder on any games root. Settings
+  > Library itself keeps opening the unparameterized full list.
 
 Touch was already covered per surface and stays that way, deliberately
 not consolidated into a single new widget: Gaming's own "Settings" tab in
@@ -12025,13 +12030,14 @@ Settings`, above), Start opening the Quick Menu.
 **What still reads as accumulation:**
 - Three different entry points into "configure this system" exist because
   they were added at three different times: the gamelist options menu's
-  new "System settings" row (which opens the whole Console systems list,
-  not this system — noted as a known gap in that section above), the
-  Settings catalog's own Library > Console systems row, and the Quick
-  Menu's Settings tile. Each is individually justified in the sections
-  above; together they are three paths to the same screen with no single
-  one that is obviously "the" way in for a player who just wants to fix
-  this system's emulator.
+  "System settings" row, the Settings catalog's own Library > Console
+  systems row, and the Quick Menu's Settings tile. The first no longer
+  accumulates: since 2026-09-29 it deep-links to this system's own
+  section of the Console systems screen ("One consistent way into
+  Settings", above, same date), so the route a player is most likely to
+  take when a system just needs its emulator fixed lands on exactly
+  that system; the other two remain generic entry points into the same
+  screen, each individually justified in the sections above.
 - `PcGameMenu` (ES-DE-style, L2/Y) carries runner, container settings,
   ProtonDB, Lutris import, F95 link/update, and merge/versions in one flat
   list — a direct translation of what `## 7i` calls "everything ES-DE has
@@ -12039,10 +12045,6 @@ Settings`, above), Start opening the Quick Menu.
   by task ("play differently" vs. "about this copy" vs. "fix a problem").
 
 **v2 direction:**
-- Give the gamelist options menu's "System settings" row (§ above) the
-  per-system deep link the section already flags as missing, so the three
-  paths converge on identical behaviour instead of three routes that
-  happen to land on the same screen through different navigation depths.
 - Group `PcGameMenu` rows under three headers (Play, About, Fix/Advanced)
   instead of one flat list — same rows, same actions, no new screens;
   ProtonDB/merge/container internals move under "Advanced" per the
