@@ -9837,6 +9837,73 @@ never reaches this fold; and the classification says nothing about a
 base game it cannot identify, so updates for such a file read as loose
 rather than folding by guesswork.
 
+### How Android Switch emulators install updates and DLC (research, 2026-09-29)
+
+Researched for a future "Install update/DLC in \<emulator\>" action. The
+yuzu lineage (Eden, Citron and Sudachi are its active Android branches)
+answers the question in its own sources; what follows cites what was
+actually read on 2026-09-29.
+
+**There is no install intent.** The only `intent-filter`s the lineage's
+`EmulationActivity` declares are generic `application/octet-stream` ones
+(VIEW over the `content` scheme, plus the NFC `TECH_DISCOVERED` action it
+reuses as a file hand-off), and a `DocumentsProvider` at
+`${applicationId}.user` exposing the app's user folder to SAF -- verified
+in the two reachable lineage manifests:
+
+- Lemon (Eden branch): `src/android/app/src/main/AndroidManifest.xml`,
+  github.com/Ghael-V/Lemon-Project (EmulationActivity filters:
+  `android.intent.action.VIEW` + `application/octet-stream`,
+  `android.nfc.action.TECH_DISCOVERED`; `.features.DocumentProvider`
+  authority `${applicationId}.user`; a `<queries>` block for finding
+  OTHER yuzu-family emulators' document providers).
+- Citron: same file and same filters in github.com/citron-neo/emulator
+  (`org.citron.citron_emu`, `.features.DocumentProvider`).
+
+No Switch-specific MIME type exists in either manifest -- an earlier
+draft of this section claimed one and was wrong. Eden's and Sudachi's own
+repositories are not reachable from here (the names tried return 404/451
+on GitHub), so their CURRENT builds are cited only through droidtop's
+bundled players database (`players-database.json`, a snapshot of the
+pinned `Droidtop/droidtop-platforms` submodule shipped as an asset),
+which records their real packages (`dev.eden.eden_emulator`,
+`org.sudachi.sudachi_emu(.ea)`, `org.citron.citron_emu`) and the launch
+intents that ship for them -- all of them `EmulationActivity` LAUNCH
+intents, none an install.
+
+**Installation happens in the emulator's own UI, into its private
+NAND.** Lemon's `utils/InstallableActions.kt` (same repo) is the
+lineage's install flow, verbatim: the app opens a SAF picker and hands
+the chosen documents (a `List<Uri>`) to
+`verifyAndInstallContent(activity, fragmentManager, addonViewModel,
+documents, programId)`, which warns when
+`NativeLibrary.doesUpdateMatchProgram(programId, uri)` says a file does
+not belong to the game, then installs each document with
+`NativeLibrary.installFileToNand(uri, progressCallback)`. The flow's own
+`InstallResult` treats `BaseInstallAttempted` as an ERROR -- the
+install-content path exists for updates and DLC, and a base game in it
+is refused. The same file also shows the keys-install flow
+(`processKey`) exists; droidtop never reads, writes or automates keys,
+so that route is out of scope by standing rule.
+
+**The other route is external content folders.** Lemon's
+`utils/AddonUtil.kt` fixes the lineage's valid per-game drop-in
+directories: `cheats`, `exefs`, `romfs`, `romfslite`, `romfs_ext` -- a
+person (or a tool with SAF access to the emulator's DocumentsProvider)
+can place per-title content there without installing to NAND.
+
+**What an "Install update/DLC in \<emulator\>" action can honestly be.**
+Since no tested emulator exposes an install intent, and the generic
+octet-stream VIEW intent starts the handed file as a GAME rather than
+installing it, the action cannot hand the file over. What the citations
+above do support: opening the emulator's own launcher activity (both
+manifests declare `MAIN`/`LAUNCHER` on their `MainActivity`) with
+droidtop telling the person WHICH file to pick in the emulator's own
+picker, and naming the emulator's user-folder document provider for the
+external-content route. An action that claims to install would be
+fabrication; an action that opens the door and says which file to pick
+is real, and is the shape this research supports.
+
 ## 8. Licensing
 
 `vendor/gamenative` and `vendor/droidspaces` are GPL-3.0. Winlator itself
