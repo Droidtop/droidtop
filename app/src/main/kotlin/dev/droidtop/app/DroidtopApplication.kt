@@ -58,6 +58,13 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // unconditionally, in every mode; it now starts only for the two
         // modes that use it. See ModeStartup.
         ModeStartup.install(this)
+        // What `host.info` tells a plugin about the mode droidtop is in (docs/plugin-api.md 3 J4).
+        dev.droidtop.pluginhost.PluginBrokers.modeProvider = {
+            when (val id = dev.droidtop.library.settings.Modes.lastMode(this)) {
+                "standard" -> "android"
+                else -> id
+            }
+        }
         // Shared core too: a games folder added in onboarding or Settings
         // is walked at once, not when Gaming first opens (SPEC 2c).
         LibraryCore.followGamesRoots(this)

@@ -1637,6 +1637,24 @@ arrays under the manifest's own keys (`V2Declarations`).
   kept 7 days after uninstall), written for dangerous and critical calls
   only; normal-permission calls are not counted yet. The Activity screen
   is not built; the Permissions screen reads "last used" from it.
+- **Screens** (#59, #60, #62, #65).
+  - The first-use sheet is `PluginGrantSheetHost` in Gaming's shell:
+    Allow / Not now / Never allow, Up and Down, A, B is Not now, with the
+    plugin's own reason. Standard and Desktop have no such surface yet, so
+    a call in `ask` state there answers Not now and the permission is
+    granted from the Permissions screen.
+  - Accounts and sources > Plugins > a plugin > Permissions lists every
+    declared permission, each high-risk point it may provide and each
+    export, with Allowed / Ask first / Blocked, its reason, "tried to use
+    this while you were not being asked" and when it was last used. New
+    items from an update sit under "Wants new access" and the plugin's row
+    says so.
+  - A Waiting plugin's row says "Waiting" and its page says what it
+    needs. An interface with more than one running provider has a "Provided
+    by" choice on the Plugins screen. There is no "Get <provider>" row yet:
+    the catalog index carries no exports.
+  - The approval screen has no per-item tick, so a dangerous permission is
+    granted from the sheet or the Permissions screen, never at approval.
 
 **Compatibility promises:**
 

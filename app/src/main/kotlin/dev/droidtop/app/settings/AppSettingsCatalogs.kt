@@ -38,6 +38,13 @@ import dev.droidtop.library.GameEngineDetector
 import dev.droidtop.library.EnginesDatabase
 import dev.droidtop.library.ScanPrune
 import dev.droidtop.pluginhost.PluginStore
+import dev.droidtop.pluginhost.ApiResolution
+import dev.droidtop.pluginhost.GrantState
+import dev.droidtop.pluginhost.PluginApiResolver
+import dev.droidtop.pluginhost.PluginAudit
+import dev.droidtop.pluginhost.PluginGrants
+import dev.droidtop.pluginhost.PluginPermissions
+import dev.droidtop.pluginhost.PluginProviderChoices
 import dev.droidtop.pluginhost.PluginKind
 import dev.droidtop.pluginhost.PluginTrustState
 import dev.droidtop.pluginhost.PluginCapability
@@ -1704,6 +1711,9 @@ object AppSettingsCatalogs {
         // plain (non-suspend) closure the renderer may call on the main
         // thread, so it must not touch the key store itself.
         val userKeys = UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))
+        val resolution = PluginApiResolver.current(context)
+        val grantStore = PluginGrants.forContext(context)
+        val providerChoices = PluginProviderChoices.forContext(context).all()
 
         listOf(
             CatalogGroup(
@@ -1720,10 +1730,12 @@ object AppSettingsCatalogs {
                             ),
                         )
                     }
-                    installed.forEach { record -> add(pluginCard(record, userKeys)) }
+                    installed.forEach { record ->
+                        add(pluginCard(record, userKeys, resolution.waiting[record.manifest.id], grantStore.read(record.manifest.id).wantsNewAccess))
+                    }
                 },
             ),
-        ) + (
+        ) + providedByGroups(resolution, providerChoices) + (
             if (installed.isEmpty()) {
                 emptyList()
             } else {
@@ -1804,13 +1816,21 @@ object AppSettingsCatalogs {
     }
 
     /** The installed-plugins list row: what it's called, what it adds in plain words, its trust badge and its state -- the whole card, one tap into [pluginDetailScreen]. */
-    private fun pluginCard(record: dev.droidtop.pluginhost.PluginRecord, userKeys: Map<String, String>): NestedScreenItem {
+    private fun pluginCard(
+        record: dev.droidtop.pluginhost.PluginRecord,
+        userKeys: Map<String, String>,
+        waiting: List<dev.droidtop.pluginhost.RequiredApi>?,
+        wantsNewAccess: Boolean,
+    ): NestedScreenItem {
         val m = record.manifest
         val state = when {
             record.trust == PluginTrustState.PENDING -> "Needs approval"
             record.trust == PluginTrustState.DENIED -> "Denied"
             record.disabledReason != null -> "Crashed"
             record.trust == PluginTrustState.APPROVED && !record.enabled -> "Disabled"
+            // Waiting is not disabled: the plugin resumes by itself when a provider returns (docs/plugin-api.md 2.3).
+            waiting != null -> "Waiting"
+            record.trust == PluginTrustState.APPROVED && wantsNewAccess -> "Wants new access"
             record.trust == PluginTrustState.APPROVED -> "Running"
             else -> "Unknown"
         }
@@ -1876,6 +1896,8 @@ object AppSettingsCatalogs {
         userKeys: Map<String, String>,
     ): List<CatalogGroup> {
         val m = record.manifest
+        val resolution = PluginApiResolver.current(context)
+        val grantSnapshot = PluginGrants.forContext(context).read(m.id)
         val statusGroup = buildList<CatalogItem> {
             val statusLine = when {
                 record.trust == PluginTrustState.PENDING -> "Awaiting approval"
@@ -1890,6 +1912,26 @@ object AppSettingsCatalogs {
                 else -> "NOT TRUSTED: no trusted key for this origin anymore (see Keys you trust)"
             }
             add(ActionItem(id = "plugin_${m.id}_status", title = statusLine, subtitle = trustLine, run = {}))
+            resolution.waiting[m.id]?.let { missing ->
+                add(
+                    ActionItem(
+                        id = "plugin_${m.id}_waiting",
+                        title = "Needs " + missing.joinToString { it.api },
+                        subtitle = "Waiting: no running plugin provides this. It is not disabled and resumes by itself when one does.",
+                        run = {},
+                    ),
+                )
+            }
+            if (grantSnapshot.wantsNewAccess) {
+                add(
+                    ActionItem(
+                        id = "plugin_${m.id}_new_access",
+                        title = "Wants new access",
+                        subtitle = "An update asks for more than you allowed. Nothing new is on until you say so under Permissions.",
+                        run = {},
+                    ),
+                )
+            }
             when (record.trust) {
                 PluginTrustState.PENDING -> {
                     add(
@@ -1949,6 +1991,27 @@ object AppSettingsCatalogs {
         }
 
         val consentGroups = pluginConsentGroups(context, record, userKeys)
+
+        // Grants exist once the plugin is approved (docs/plugin-api.md 4.4): one screen per plugin, no second place.
+        val permissionsGroup: CatalogGroup? = if (record.trust != PluginTrustState.APPROVED) {
+            null
+        } else {
+            val rows = permissionRows(record, grantSnapshot)
+            val summary = "${rows.count { it.state == GrantState.GRANTED }} allowed, ${rows.count { it.state == GrantState.ASK }} ask, ${rows.count { it.state == GrantState.DENIED }} blocked"
+            CatalogGroup(
+                id = "plugin_${m.id}_permissions_group",
+                title = "Permissions",
+                items = listOf(
+                    NestedScreenItem(
+                        id = "plugin_${m.id}_permissions",
+                        title = "Permissions",
+                        subtitle = "What it may do, and when it last did",
+                        inline = pluginPermissionsScreen(m.id),
+                        valueLabel = { summary },
+                    ),
+                ),
+            )
+        }
 
         val providesGroup = buildList<CatalogItem> {
             add(
@@ -2068,6 +2131,7 @@ object AppSettingsCatalogs {
         return listOfNotNull(
             CatalogGroup(id = "plugin_${m.id}_status_group", title = null, items = statusGroup),
         ) + consentGroups + listOfNotNull(
+            permissionsGroup,
             CatalogGroup(id = "plugin_${m.id}_provides_group", title = "What it provides", items = providesGroup),
             if (runtimeGroup.isEmpty()) null else CatalogGroup(id = "plugin_${m.id}_runtime_group", title = "Runtime", items = runtimeGroup),
             CatalogGroup(id = "plugin_${m.id}_update_group", title = "Version", items = updateGroup),
@@ -2154,6 +2218,134 @@ object AppSettingsCatalogs {
         "Downloading... $pct% (${bytesRead / 1024 / 1024} MB / ${totalBytes / 1024 / 1024} MB)"
     } else {
         "Downloading... ${bytesRead / 1024 / 1024} MB"
+    }
+
+    /** One line of the Permissions screen: a permission, a high-risk point it may provide, or an export, with its current state. */
+    private data class PermissionRow(val id: String, val label: String, val reason: String?, val tier: PermissionTier, val state: GrantState)
+
+    /** Every item [record]'s grants cover, in the manifest's order (docs/plugin-api.md 4.3, 4.4). */
+    private fun permissionRows(
+        record: dev.droidtop.pluginhost.PluginRecord,
+        snap: PluginGrants.Snapshot,
+        providerLabels: Map<String, String> = emptyMap(),
+    ): List<PermissionRow> {
+        val m = record.manifest
+        val rows = mutableListOf<PermissionRow>()
+        for (declared in m.v2.permissions) {
+            if (declared.id.startsWith(PluginPermissions.PROVIDE_PREFIX)) continue
+            val state = PluginGrants.stateOf(record, snap, declared.id) ?: continue
+            rows += PermissionRow(declared.id, PluginPermissions.labelFor(declared.id) ?: providerLabels[declared.id] ?: declared.id, declared.reason, PluginGrants.tierOf(declared), state)
+        }
+        for (entry in m.v2.provides) {
+            val point = ExtensionPoints.find(entry.point) ?: continue
+            if (!point.risk.needsConsent) continue
+            val id = PluginPermissions.PROVIDE_PREFIX + entry.point
+            val tier = if (point.risk == dev.droidtop.pluginhost.PointRisk.CRITICAL) PermissionTier.CRITICAL else PermissionTier.DANGEROUS
+            rows += PermissionRow(id, PluginPermissions.labelFor(id) ?: id, null, tier, PluginGrants.provideState(record, snap, entry.point))
+        }
+        for (export in m.v2.exports) {
+            rows += PermissionRow(PluginGrants.EXPORT_PREFIX + export.api, "Offer ${export.api} to other plugins", null, PermissionTier.NORMAL, PluginGrants.exportState(snap, export.api))
+        }
+        return rows.distinctBy { it.id }
+    }
+
+    /**
+     * Accounts and sources > Plugins > one plugin > Permissions (docs/plugin-api.md 4.4): every declared permission with its state and when
+     * the audit log last saw it used. A change is written at once and takes effect on the plugin's next call.
+     */
+    private fun pluginPermissionsScreen(pluginId: String) = CatalogScreen(
+        id = "plugin_permissions_$pluginId",
+        title = "Permissions",
+        subtitle = "A change takes effect on the plugin's next call",
+        groups = { context -> withContext(Dispatchers.IO) { pluginPermissionGroups(context, pluginId) } },
+    )
+
+    private fun pluginPermissionGroups(context: Context, pluginId: String): List<CatalogGroup> {
+        val installed = PluginStore.installed(context)
+        val record = installed.firstOrNull { it.manifest.id == pluginId }
+            ?: return listOf(
+                CatalogGroup(
+                    id = "plugin_permissions_gone",
+                    title = null,
+                    items = listOf(ActionItem(id = "plugin_permissions_gone_row", title = "This plugin is no longer installed", run = {})),
+                ),
+            )
+        val snap = PluginGrants.forContext(context).read(pluginId)
+        val audit = PluginAudit.forContext(context)
+        val providerLabels = installed.flatMap { it.manifest.v2.exports }.flatMap { it.permissions }.associate { it.id to it.label }
+        val rows = permissionRows(record, snap, providerLabels)
+        val format = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)
+        fun item(row: PermissionRow): CatalogItem {
+            val lastUsed = audit.lastUsed(pluginId, row.id)?.let { "Last used ${format.format(java.util.Date(it))}" }
+            val wanted = if (row.id in snap.wanted) "It tried to use this while you were not being asked" else null
+            return dev.droidtop.library.settings.ChoiceItem(
+                id = "plugin_${pluginId}_perm_${row.id}",
+                title = row.label,
+                subtitle = listOfNotNull(row.reason, wanted, lastUsed).joinToString(" - ").ifEmpty { null },
+                options = listOf(
+                    dev.droidtop.library.settings.ChoiceOption(GrantState.GRANTED.name, "Allowed"),
+                    dev.droidtop.library.settings.ChoiceOption(GrantState.ASK.name, "Ask first"),
+                    dev.droidtop.library.settings.ChoiceOption(GrantState.DENIED.name, "Blocked"),
+                ),
+                current = row.state.name,
+                onSelect = { ctx, value -> GrantState.fromId(value)?.let { PluginGrants.forContext(ctx).set(pluginId, row.id, it) } },
+            )
+        }
+        val fresh = rows.filter { it.id in snap.fresh && it.state == GrantState.ASK }
+        val rest = rows - fresh.toSet()
+        return listOfNotNull(
+            if (record.manifest.contractVersion < 2) {
+                CatalogGroup(
+                    id = "plugin_permissions_older",
+                    title = "Older plugin",
+                    items = listOf(
+                        ActionItem(
+                            id = "plugin_permissions_older_row",
+                            title = "Full access (older plugin)",
+                            subtitle = "Written before permissions existed: it holds what it could always do. You can still turn any of it off below.",
+                            run = {},
+                        ),
+                    ),
+                )
+            } else {
+                null
+            },
+            if (fresh.isEmpty()) null else CatalogGroup("plugin_permissions_new", "Wants new access", fresh.map(::item)),
+            rest.filter { it.tier == PermissionTier.CRITICAL }.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_critical", "Critical", it.map(::item)) },
+            rest.filter { it.tier == PermissionTier.DANGEROUS }.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_dangerous", "Asks first", it.map(::item)) },
+            rest.filter { it.tier == PermissionTier.NORMAL }.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_normal", "Can", it.map(::item)) },
+            if (rows.isEmpty()) {
+                CatalogGroup(
+                    id = "plugin_permissions_none",
+                    title = null,
+                    items = listOf(ActionItem(id = "plugin_permissions_none_row", title = "This plugin asks for no permissions", run = {})),
+                )
+            } else {
+                null
+            },
+        )
+    }
+
+    /** "Provided by" (docs/plugin-api.md 2.3): one choice per API that more than one running plugin provides. Nothing is ranked for the user. */
+    private fun providedByGroups(resolution: ApiResolution, chosen: Map<String, String>): List<CatalogGroup> {
+        val shared = resolution.providers.filter { it.value.size > 1 }
+        if (shared.isEmpty()) return emptyList()
+        return listOf(
+            CatalogGroup(
+                id = "plugins_provided_by",
+                title = "Provided by",
+                items = shared.map { (api, list) ->
+                    dev.droidtop.library.settings.ChoiceItem(
+                        id = "plugins_provided_by_$api",
+                        title = api,
+                        subtitle = "Which plugin answers this for the plugins that use it",
+                        options = list.map { dev.droidtop.library.settings.ChoiceOption(it.plugin.manifest.id, it.plugin.manifest.label) },
+                        current = chosen[api]?.takeIf { id -> list.any { it.plugin.manifest.id == id } } ?: list.first().plugin.manifest.id,
+                        onSelect = { ctx, value -> PluginProviderChoices.forContext(ctx).choose(api, value) },
+                    )
+                },
+            ),
+        )
     }
 
     /** What a plugin adds, in plain words, for the installed-list row. */

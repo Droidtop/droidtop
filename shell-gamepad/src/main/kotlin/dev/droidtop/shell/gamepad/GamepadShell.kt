@@ -186,6 +186,8 @@ fun GamepadShell(
     triggerBrowseThemes: Boolean = false,
 ) {
     val context = LocalContext.current
+    // Where a plugin's first-use permission sheet is drawn (docs/plugin-api.md 4.3).
+    PluginGrantSheetHost()
     // One layout system for both orientations: every screen below reads
     // LocalShellWindow instead of assuming the console's landscape
     // geometry. There is no portrait COPY of any screen.

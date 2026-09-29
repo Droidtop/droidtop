@@ -49,13 +49,17 @@ object PluginJobsScreen {
         },
     )
 
+    /** The owner's name, the job, and for a job a provider runs for another plugin, who ran it (docs/plugin-api.md 2.4). */
+    private fun jobTitle(entry: PluginJobsCenter.Entry): String =
+        "${entry.pluginLabel}: ${entry.title}" + (entry.via?.let { " (via $it)" } ?: "")
+
     private fun jobItems(entry: PluginJobsCenter.Entry): List<CatalogItem> {
         if (entry.done) {
             val outcome = if (entry.result?.ok == true) "Done" else (entry.result?.error ?: "Failed")
             return listOf(
                 ActionItem(
                     id = "plugin_job_${entry.jobId}",
-                    title = "${entry.pluginLabel}: ${entry.title}",
+                    title = jobTitle(entry),
                     subtitle = outcome,
                     run = {},
                 ),
@@ -63,7 +67,7 @@ object PluginJobsScreen {
         }
         val progressRow = AsyncActionItem(
             id = "plugin_job_${entry.jobId}",
-            title = "${entry.pluginLabel}: ${entry.title}",
+            title = jobTitle(entry),
             subtitle = if (entry.percent >= 0) "${entry.statusLine} (${entry.percent}%)" else entry.statusLine,
             run = { _, onStatus ->
                 var finalEntry: PluginJobsCenter.Entry? = null
