@@ -689,6 +689,10 @@ class ProotRuntime(
         File(etcDir, "hosts").writeText(
             "127.0.0.1 localhost\n::1 localhost ip6-localhost ip6-loopback\n",
         )
+        File(etcDir, "bwrap").apply {
+            writeText(BWRAP_SHIM)
+            setExecutable(true, false)
+        }
     }
 
     /** The last [maxLines] lines a process printed, and when it last printed anything. */
