@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -358,31 +359,52 @@ private fun BoxScope.Taskbar(
             .background(MaterialTheme.colorScheme.surface),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Button(onClick = onToggleStartMenu, modifier = Modifier.padding(horizontal = 8.dp)) {
+        TaskbarButton(onClick = onToggleStartMenu) {
             Text(if (startMenuOpen) "Close" else "Start")
         }
         Spacer(modifier = Modifier.width(1.dp).height(32.dp).background(MaterialTheme.colorScheme.outline))
         TaskbarWindowList(hostBridge, modifier = Modifier.weight(1f))
         if (onOpenTerminal != null) {
-            Button(onClick = onOpenTerminal, modifier = Modifier.padding(horizontal = 8.dp)) {
+            TaskbarButton(onClick = onOpenTerminal) {
                 Text("Terminal")
             }
         }
-        Button(onClick = { openContainers(context) }, modifier = Modifier.padding(horizontal = 8.dp)) {
+        TaskbarButton(onClick = { openContainers(context) }) {
             Text("Containers")
         }
         // The mode switcher, by name: Desktop's only other route to the
         // Android home or Gaming was a long-press of Back (SPEC 2c).
-        Button(onClick = { openModes(context) }, modifier = Modifier.padding(horizontal = 8.dp)) {
+        TaskbarButton(onClick = { openModes(context) }) {
             Text("Modes")
         }
-        Button(onClick = { openSettings(context) }, modifier = Modifier.padding(horizontal = 8.dp)) {
+        TaskbarButton(onClick = { openSettings(context) }) {
             Text("Settings")
         }
         ClipboardNotice()
         SystemTray()
-        Text(clockText, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(horizontal = 16.dp))
+        Text(
+            clockText,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.padding(horizontal = 8.dp),
+        )
     }
+}
+
+/**
+ * A taskbar button with the narrow padding a bar needs. The stock Button's
+ * 24dp of content padding and 8dp of margin per side left the window list
+ * (the weighted slot beside them) zero width on a 1080p tablet-class display,
+ * so no window row could show even with windows open (Droidtop/tracker#94).
+ */
+@Composable
+private fun TaskbarButton(onClick: () -> Unit, content: @Composable () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier.padding(horizontal = 3.dp),
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+    ) { content() }
 }
 
 /**

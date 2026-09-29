@@ -4453,7 +4453,7 @@ app-drawer icon or a floating switcher button:
   listener is attached in the registry callback at bind time: the compositor
   answers a bind with one `toplevel` event per window already open, and a
   listener added after connect()'s round trips lost those, so a desktop
-  re-entered with apps running showed no rows (Droidtop/tracker#94). **Not built**:
+  re-entered with apps running showed no rows (Droidtop/tracker#94). The window list is the taskbar's one weighted slot, so the fixed buttons, tray and clock take what they need first: on a 1080p tablet-class display the stock Material buttons' padding left the slot no width at all and no row could show, so the taskbar buttons use narrow padding (`TaskbarButton`) and the clock never wraps. **Not built**:
   which container a toplevel came from (there is only ever one primary
   container today, so nothing distinguishes this yet), moving a toplevel to
   another output (the protocol itself has no such request — only
