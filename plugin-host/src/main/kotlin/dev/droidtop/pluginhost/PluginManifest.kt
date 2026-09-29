@@ -231,5 +231,34 @@ data class PluginManifest(
         if (id != id.lowercase() || !id.startsWith("$origin.")) {
             add("id \"$id\" must be lowercase and namespaced as \"<origin>.<name>\"")
         }
+        // Contract 2 declarations (docs/plugin-api.md 1.5, 2.7, 4.1). Unknown ids are NOT a problem here: see [unsupportedDeclarations].
+        v2.requires.filter { (it.api.startsWith("priv.") || it.api.startsWith("root.")) && !it.optional }.forEach {
+            add("requires \"${it.api}\" must be optional: privileged access is never something a plugin's core function depends on")
+        }
+        if (!PluginOriginKeys.isOfficial(origin)) {
+            v2.permissions.filter { PluginPermissions.find(it.id)?.officialOnly == true }.forEach {
+                add("permission \"${it.id}\" is restricted to the official origin")
+            }
+            v2.provides.filter { ExtensionPoints.find(it.point)?.officialOnly == true }.forEach {
+                add("extension point \"${it.point}\" is restricted to the official origin")
+            }
+        }
+    }
+
+    /**
+     * Declared ids this build of droidtop does not know, one line each, for
+     * the approval screen's "Not supported by this version of droidtop"
+     * (docs/plugin-api.md 1.2). Never a refusal: a newer plugin still
+     * installs on an older droidtop, it just does not get those parts. A
+     * permission the plugin's own `exports` declares is its own, not
+     * unknown.
+     */
+    fun unsupportedDeclarations(): List<String> = buildList {
+        val ownPermissions = v2.exports.flatMap { api -> api.permissions.map { it.id } }.toSet()
+        v2.provides.filter { !ExtensionPoints.supports(it.point, it.version) }.forEach {
+            add(if (ExtensionPoints.find(it.point) == null) "extension point ${it.point}" else "extension point ${it.point} version ${it.version}")
+        }
+        v2.permissions.filter { !PluginPermissions.isSupported(it.id) && it.id !in ownPermissions }.forEach { add("permission ${it.id}") }
+        v2.subscribes.filter { PluginEvent.fromId(it.event) == null && it.event != "library.default_player_changed" }.forEach { add("event ${it.event}") }
     }
 }
