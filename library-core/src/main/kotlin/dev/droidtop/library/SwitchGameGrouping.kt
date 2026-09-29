@@ -59,8 +59,8 @@ data class SwitchGameFacts(
  * package says about itself instead of by a folder name.
  *
  * Which file is which comes from [SwitchContent.classify]: a title ID is
- * a 16-hex-character string whose last three characters say base
- * (`000`) / update (`800`) / add-on index, read from a filename tag or
+ * a 16-hex-character string whose low 13 bits say base (clear) /
+ * update (`0x800`) / add-on (bit 12 plus its index), read from a filename tag or
  * from the PFS0 file table's ticket name, never from encrypted content
  * and never a console key. An update or DLC folds into the row whose own
  * title ID IS its base; a name never matches anything, because `Zelda

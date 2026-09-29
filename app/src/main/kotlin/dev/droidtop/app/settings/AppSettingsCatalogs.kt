@@ -187,7 +187,7 @@ object AppSettingsCatalogs {
     // Console systems: per-folder system/player/scrape management.
     // ------------------------------------------------------------------
 
-    private fun consoleSystemsScreen(systemId: String? = null) = CatalogScreen(
+    private fun consoleSystemsScreen(systemId: String? = null): CatalogScreen = CatalogScreen(
         id = SCREEN_CONSOLE_SYSTEMS,
         title = "Console systems",
         subtitle = "Each folder's system comes from its name; open a folder to change it",
@@ -406,7 +406,7 @@ object AppSettingsCatalogs {
         )
     }
 
-    private fun folderScreen(folder: File, kind: FolderKind) = CatalogScreen(
+    private fun folderScreen(folder: File, kind: FolderKind): CatalogScreen = CatalogScreen(
         id = "console_folder_${folder.absolutePath}",
         title = folder.name,
         groups = { context ->

@@ -11,10 +11,10 @@ import kotlinx.serialization.Serializable
  * encrypted content (docs/SPEC.md 7m, "Switch content").
  *
  * Two answers exist for "which of the three is this file", and both are
- * outside the crypto: a title ID is 16 hex characters whose last THREE
- * hex characters say what the content is -- `...000` the base game,
- * `...800` its update, anything else an add-on (DLC) whose index that
- * suffix is -- and the title ID is printed in two places droidtop may
+ * outside the crypto: a title ID is 16 hex characters whose low 13
+ * bits say what the content is -- clear for the base game, `0x800` for
+ * its update, bit 12 set plus the add-on's own index for a DLC -- and
+ * the title ID is printed in two places droidtop may
  * read, in this order:
  *
  *  1. a `[TitleID]` tag in the filename (the `[TitleID][vN][DLC]`
@@ -62,7 +62,7 @@ sealed class SwitchContent {
         override val titleId: String? = null,
         override val baseTitleId: String? = null,
         override val version: String? = null,
-        /** The add-on's own index: the suffix the title ID ends in, as a number. */
+        /** The add-on's own index: the low 12 bits of its title ID. */
         val addOnIndex: Int? = null,
     ) : SwitchContent()
 
@@ -76,11 +76,15 @@ sealed class SwitchContent {
         /** A title ID, as the classification reads it: 16 hex characters. */
         private const val TITLE_ID_LENGTH = 16
 
-        /** The last 3 hex characters that say base/update/add-on, so [TITLE_ID_LENGTH] minus the suffix. */
-        private const val TITLE_ID_PREFIX_LENGTH = 13
+        /** The low 13 bits of a title ID say what the content is (switchbrew "Title list"). */
+        private const val KIND_MASK = 0x1FFFL
 
-        private const val BASE_SUFFIX = "000"
-        private const val UPDATE_SUFFIX = "800"
+        /** A base game's title ID has none of them set; its update adds 0x800. */
+        private const val UPDATE_BITS = 0x800L
+
+        /** An add-on's ID is its base game's plus 0x1000, plus the add-on's own index in the low 12 bits. */
+        private const val DLC_BIT = 0x1000L
+        private const val DLC_INDEX_MASK = 0xFFFL
 
         private val TITLE_ID_TAG = Regex("""\[(\p{XDigit}{16})\]""")
         private val VERSION_TAG = Regex("""\[[vV](\d+(?:\.\d+)*)\]""")
@@ -100,23 +104,25 @@ sealed class SwitchContent {
 
         /**
          * What [titleId] says its content is, or null when [titleId] is
-         * not a title ID (wrong length, or not hex).
+         * not a title ID (wrong length, or not hex), or an ID that is
+         * none of the three kinds.
          *
-         * The suffix is the last 3 hex characters: a 16-character ID
-         * like `0100123456789000` ends in `000` and is the BASE GAME;
-         * `0100123456789800` ends in `800` and is that game's UPDATE;
-         * anything else (`...001`, `...0D0`) is an ADD-ON whose own
-         * index is that suffix as a number. The game all three belong
-         * to is the ID with its suffix replaced by `000`.
+         * A base game's ID has its low 13 bits clear
+         * (`01007ef00011e000`); its update is the base plus 0x800
+         * (`01007ef00011e800`); an add-on is the base plus 0x1000 plus
+         * its own index (`01007ef00011f001`, the first of them). The game
+         * all three belong to is the ID with its low 13 bits cleared.
          */
         fun classifyByTitleId(titleId: String): SwitchContent? {
             if (titleId.length != TITLE_ID_LENGTH || !titleId.all { it.digitToIntOrNull(16) != null }) return null
-            val suffix = titleId.substring(TITLE_ID_PREFIX_LENGTH)
-            val base = titleId.substring(0, TITLE_ID_PREFIX_LENGTH) + BASE_SUFFIX
-            return when (suffix) {
-                BASE_SUFFIX -> BaseGame(titleId = titleId, baseTitleId = base)
-                UPDATE_SUFFIX -> Update(titleId = titleId, baseTitleId = base)
-                else -> Dlc(titleId = titleId, baseTitleId = base, addOnIndex = suffix.toIntOrNull(16))
+            val id = java.lang.Long.parseUnsignedLong(titleId, 16)
+            val base = "%016x".format(id and KIND_MASK.inv())
+            val kind = id and KIND_MASK
+            return when {
+                kind == 0L -> BaseGame(titleId = titleId, baseTitleId = base)
+                kind == UPDATE_BITS -> Update(titleId = titleId, baseTitleId = base)
+                kind and DLC_BIT != 0L -> Dlc(titleId = titleId, baseTitleId = base, addOnIndex = (kind and DLC_INDEX_MASK).toInt())
+                else -> null
             }
         }
 
