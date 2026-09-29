@@ -695,8 +695,35 @@ only the handheld's plain home screen (Droidtop/tracker#89). What that means in 
   stock large-screen home without a taskbar; the system's own split-screen and the freeform
   window mode still work on the apps themselves (`resizeableActivity` is on for the launcher).
   Bringing a taskbar to Standard is a separate piece of work if it is ever wanted.
+  **Checked in the tree (2026-09-28, Droidtop/tracker#88):** the fork carries no taskbar
+  code at all: there is no `taskbar` package under `shell-default/src`, only the stock
+  colour/drawable resources and the TAPL test helpers that name it. `DeviceProfile.
+  isTaskbarPresent` is `isTablet && wmProxy.isTaskbarDrawnInProcess()`, and
+  `WindowManagerProxy.isTaskbarDrawnInProcess()` is false without the quickstep module, so
+  a tablet reserves no space for a taskbar nothing would draw; its dock is the ordinary
+  hotseat, which already is the persistent row of pinned apps on the home screen. What a
+  real taskbar adds over that is a strip above OTHER apps, and a third-party home has only
+  two ways to draw one: the quickstep taskbar (bound to the system's own recents component,
+  above) or an overlay window of its own (`SYSTEM_ALERT_WINDOW`, a service and a permission
+  flow, the way farmerbb/Taskbar does it, plus launching the pinned apps into freeform
+  windows). The second is a new feature with its own permission and its own design, not a
+  port, and nothing is written for it until the owner wants it.
 - **Verified so far:** every rig run in this section is the 1920x1080 landscape handheld or its
   emulator. A tablet-class emulator and the portrait AVD are the outstanding checks.
+
+### Accessibility of the custom dialogs (Droidtop/tracker#91)
+
+`BackButtonMenu` (the mode switcher) and `RadioListDialog` (the single-select picker)
+replaced stock AlertDialog lists with plain focusable Views so a D-pad reaches every row.
+A stock list also told a screen reader what each row is; a focusable `TextView` or
+`LinearLayout` does not, so the rewrite had made them read as bare text. One helper,
+`shell/standard/DialogAccessibility`, puts that back on the same views and is used by
+both: the dialog's title is its accessibility pane title and a heading; a mode row is
+announced as a button; a picker row as a radio button with its checked state (and a
+disabled row is `isEnabled = false`, not only unfocusable); an icon beside a label that is
+already read, and the controller hint row ("A Select, B Cancel"), are hidden from the
+screen reader. The D-pad behaviour is untouched, so nothing here can reopen that bug.
+Only the code path is changed: TalkBack itself has not been run on either dialog.
 
 ### Recents in Standard (Droidtop/tracker#90)
 

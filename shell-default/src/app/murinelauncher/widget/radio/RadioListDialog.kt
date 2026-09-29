@@ -11,6 +11,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import dev.droidtop.shell.standard.DialogAccessibility
 
 /**
  * droidtop's own replacement for [RadioGroupBottomSheet]'s single-select
@@ -60,8 +61,10 @@ object RadioListDialog {
                     textSize = 20f
                     setTextColor(TITLE_COLOR)
                     setPadding(dp(8), 0, dp(8), dp(16))
+                    DialogAccessibility.heading(this)
                 },
             )
+            DialogAccessibility.paneTitle(root, title)
         }
 
         var dialog: AlertDialog? = null
@@ -80,6 +83,8 @@ object RadioListDialog {
                 isFocusable = enabled
                 isClickable = enabled
                 isSelected = index == currentIndex
+                isEnabled = enabled
+                DialogAccessibility.radio(this, index == currentIndex)
                 alpha = if (enabled) 1.0f else 0.5f
                 background = context.getDrawable(com.android.launcher3.R.drawable.droidtop_list_selector)
                 setPadding(dp(16), dp(14), dp(16), dp(14))
@@ -90,6 +95,7 @@ object RadioListDialog {
                 row.addView(
                     ImageView(context).apply {
                         setImageDrawable(icon)
+                        DialogAccessibility.hide(this)
                         layoutParams = LinearLayout.LayoutParams(dp(24), dp(24)).apply {
                             marginEnd = dp(16)
                             marginStart = 0
@@ -154,6 +160,7 @@ object RadioListDialog {
                 setTextColor(HINT_COLOR)
                 gravity = Gravity.START
                 setPadding(dp(8), 0, dp(8), 0)
+                DialogAccessibility.hide(this)
             },
         )
 

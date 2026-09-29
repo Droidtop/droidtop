@@ -118,8 +118,10 @@ object BackButtonMenu {
                 textSize = 20f
                 setTextColor(TITLE_COLOR)
                 setPadding(dp(8), 0, dp(8), dp(16))
+                DialogAccessibility.heading(this)
             },
         )
+        DialogAccessibility.paneTitle(root, "Switch mode")
 
         var dialog: AlertDialog? = null
         val rows = mutableListOf<TextView>()
@@ -130,6 +132,7 @@ object BackButtonMenu {
                 setTextColor(ROW_COLOR)
                 isFocusable = true
                 isClickable = true
+                DialogAccessibility.button(this)
                 background = activity.getDrawable(com.android.launcher3.R.drawable.droidtop_list_selector)
                 setPadding(dp(16), dp(14), dp(16), dp(14))
                 setOnClickListener {
@@ -174,6 +177,7 @@ object BackButtonMenu {
                 setTextColor(HINT_COLOR)
                 gravity = Gravity.START
                 setPadding(dp(8), 0, dp(8), 0)
+                DialogAccessibility.hide(this)
             },
         )
 
