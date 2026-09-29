@@ -1655,6 +1655,40 @@ arrays under the manifest's own keys (`V2Declarations`).
     the catalog index carries no exports.
   - The approval screen has no per-item tick, so a dangerous permission is
     granted from the sheet or the Permissions screen, never at approval.
+- **Extension points wired** (#67, #73). All three are asked from the host's
+  own code through `PluginCrashPolicy.handle`, so a plugin that only
+  implements `invoke` answers them through `LegacyHandle`; the wire shapes
+  are read in one place (`ExtensionProtocols.kt`).
+  - **Context actions (C4).** `PluginContextActions` reads the static
+    filter of each `ui.context_action` entry (`targets`, default `game`;
+    `systems`; `packages`) from manifests, so no plugin is loaded to decide
+    visibility. `enabled` is asked once when a game's or app's detail screen
+    opens (500 ms, not a crash), and a disabled action is not offered; a
+    miss or failure keeps it offered. `run` is a quick call, or a job when
+    the entry says `"job": true` (the contract 1 `startJob` path). A game
+    target carries its id, title and system only when the plugin holds
+    `library.read`. Built on the detail screen of console ROMs and apps;
+    the PC game menu, the Select/Options menu, the launcher's long-press
+    menu and the desktop menus are not.
+  - **Metadata sources (A3).** `PluginMetadataSources` opens one session per
+    console scrape pass and, for each game, asks every running source
+    `match` (facts: title, file name, system) then `fetch` (the ids of the
+    best candidate at or above 0.5 confidence). What comes back is offered
+    after every built-in source: it fills a field none of them found and
+    never replaces one, and each field it supplied is recorded in
+    `fieldSources` under the plugin's name. `rating` is 0..1 and release
+    dates are normalised to ES-DE's `YYYYMMDDT000000` or dropped. Not built:
+    listing a plugin as a choice on the Scraper screen, "Rescrape with...",
+    and the PC scrape.
+  - **Quick Menu tiles (C2, C3).** `PluginTiles` reads `ui.status_tile` and
+    `ui.quick_tile` entries whose `surfaces` include `gaming.quick_menu`
+    (or list none) from manifests when the sheet opens; the Plugins tab
+    exists only when there is one. The state is asked once per opening (5 s,
+    a miss keeps the last value and is not a crash), a status tile is
+    read-only, and a quick tile's A is `toggle` when its state has `on` and
+    `action` otherwise. A contract 1 `status_tile` appears as a read-only
+    tile through the same path. The Standard and Desktop surfaces of C2 and
+    C3 are not built.
 
 **Compatibility promises:**
 

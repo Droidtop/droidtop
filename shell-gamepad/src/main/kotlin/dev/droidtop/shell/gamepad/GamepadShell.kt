@@ -1093,6 +1093,7 @@ private fun EntryDetailScreen(
     var pickingMatch by remember(entry) { mutableStateOf(false) }
     var scrapeStatus by remember(entry) { mutableStateOf<String?>(null) }
     var scrapeResult by remember(entry) { mutableStateOf<String?>(null) }
+    var pluginActionStatus by remember(entry) { mutableStateOf<String?>(null) }
     // Everything scraped for this game, for the media viewer: listed on
     // IO once per entry, never while drawing (the same as PcGameMenu).
     val media by produceState(emptyList<Pair<String, String>>(), entry) {
@@ -1129,6 +1130,25 @@ private fun EntryDetailScreen(
         }
         openWithTargets = targets
         openWith = integrations
+    }
+
+    // Context actions plugins offer on this game or app (docs/plugin-api.md 3 C4). Which ones apply comes from
+    // manifests alone, and `enabled` is asked once, when this screen opens, never while drawing.
+    val contextTarget = remember(entry) {
+        dev.droidtop.pluginhost.ContextTarget(
+            kind = if (entry.kind == LibraryEntryKind.NATIVE_ANDROID_APP) "app" else "game",
+            id = entry.id,
+            title = dev.droidtop.library.GameNaming.displayName(entry.title),
+            systemId = entry.systemId,
+            packageName = if (entry.kind == LibraryEntryKind.NATIVE_ANDROID_APP) entry.id else null,
+        )
+    }
+    var pluginActions by remember(entry) { mutableStateOf<List<dev.droidtop.library.integrations.PluginContextActions.Action>>(emptyList()) }
+    LaunchedEffect(entry) {
+        pluginActions = withContext(Dispatchers.IO) {
+            dev.droidtop.library.integrations.PluginContextActions.actionsFor(context, contextTarget)
+                .filter { dev.droidtop.library.integrations.PluginContextActions.enabled(context, it, contextTarget) }
+        }
     }
 
     // Console ROMs and native apps only: a PC or engine game never
@@ -1251,6 +1271,19 @@ private fun EntryDetailScreen(
             if (media.size > 1) {
                 ShellChip("View media (${media.size})", onClick = { viewingMedia = true })
             }
+            pluginActions.forEach { action ->
+                ShellChip(
+                    action.label,
+                    onClick = {
+                        pluginActionStatus = "${action.label}…"
+                        detailScope.launch {
+                            pluginActionStatus = withContext(Dispatchers.IO) {
+                                dev.droidtop.library.integrations.PluginContextActions.run(context, action, contextTarget)
+                            }
+                        }
+                    },
+                )
+            }
             // One chip per (hook, openable file). Never a substitution and
             // never a silent pick: droidtop has no manual reader and no
             // full video player of its own, so these open a door rather
@@ -1334,7 +1367,7 @@ private fun EntryDetailScreen(
                 })
             }
         }
-        (scrapeStatus ?: scrapeResult)?.let {
+        (pluginActionStatus ?: scrapeStatus ?: scrapeResult)?.let {
             Text(it, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
         }
         // An integration drives another app's own real Activity, so it can

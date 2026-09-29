@@ -122,6 +122,10 @@ suspend fun scrapeSystemArtwork(
     var hashMatched = 0
     var thumbnailed = 0
     var miximaged = 0
+    // Metadata plugins (docs/plugin-api.md 3 A3): asked per game for what the selected source did not find,
+    // never for list rendering. Null when none is running, which is the usual case: nothing is bound then.
+    val pluginSession = if (wantMetadata) dev.droidtop.library.integrations.PluginMetadataSources.open(context) else null
+    try {
     targets.forEachIndexed { index, romFile ->
         // A run that the server is refusing outright makes no progress,
         // and 46 refusals paced ~11s apart cost the user most of a night
@@ -177,6 +181,17 @@ suspend fun scrapeSystemArtwork(
             }
             val gamesDbResult = gamesDbLookup?.foundOrNull
             val libretroResult = libretroLookup?.find(romFile.nameWithoutExtension)
+            // What a metadata plugin knows, offered after every built-in source: it fills a gap, it never
+            // replaces a value another source found, and each field it supplies is recorded under its name.
+            val pluginFields = pluginSession?.lookup(
+                org.json.JSONObject()
+                    .put("title", romFile.nameWithoutExtension)
+                    .put("fileName", romFile.name)
+                    .put("systemId", system.id)
+                    .put("systemName", system.displayName),
+            ).orEmpty()
+            fun <T> plugin(select: (dev.droidtop.pluginhost.MetadataFields) -> T?): Array<Pair<String, T?>> =
+                pluginFields.map { it.source to select(it) }.toTypedArray()
 
             // Keyless boxart fallback, consulted only when the selected
             // credentialed source produced no cover (fresh installs have
@@ -274,25 +289,35 @@ suspend fun scrapeSystemArtwork(
             val ss = "ScreenScraper"
             val tgdb = "TheGamesDB"
             val libretro = "libretro database"
-            val description = pick(FieldSources.DESCRIPTION, ss to screenScraperResult?.description, tgdb to gamesDbResult?.description)
+            val description = pick(
+                FieldSources.DESCRIPTION,
+                ss to screenScraperResult?.description, tgdb to gamesDbResult?.description, *plugin { it.description },
+            )
             val developer = pick(
                 FieldSources.DEVELOPER,
                 ss to screenScraperResult?.developer, tgdb to gamesDbResult?.developer, libretro to libretroResult?.developer,
+                *plugin { it.developer },
             )
             val publisher = pick(
                 FieldSources.PUBLISHER,
                 ss to screenScraperResult?.publisher, tgdb to gamesDbResult?.publisher, libretro to libretroResult?.publisher,
+                *plugin { it.publisher },
             )
-            val genre = pick(FieldSources.GENRE, ss to screenScraperResult?.genre, tgdb to gamesDbResult?.genre, libretro to libretroResult?.genre)
+            val genre = pick(
+                FieldSources.GENRE,
+                ss to screenScraperResult?.genre, tgdb to gamesDbResult?.genre, libretro to libretroResult?.genre, *plugin { it.genre },
+            )
             val releaseDate = pick(
                 FieldSources.RELEASE_DATE,
                 ss to screenScraperResult?.releaseDate, tgdb to gamesDbResult?.releaseDate, libretro to libretroResult?.releaseDate,
+                *plugin { it.releaseDate },
             )
             val players = pick(
                 FieldSources.PLAYERS,
                 ss to screenScraperResult?.players, tgdb to gamesDbResult?.players, libretro to libretroResult?.players,
+                *plugin { it.players },
             )
-            val rating = pick(FieldSources.RATING, ss to screenScraperResult?.rating)
+            val rating = pick(FieldSources.RATING, ss to screenScraperResult?.rating, *plugin { it.rating })
             if (coverWritten) {
                 sources[FieldSources.COVER] = when (coverUrl) {
                     screenScraperResult?.coverUrl -> ss
@@ -344,6 +369,9 @@ suspend fun scrapeSystemArtwork(
             failed++
             android.util.Log.e("droidtop.Scraper", "Failed to scrape ${romFile.name}", t)
         }
+    }
+    } finally {
+        pluginSession?.close()
     }
     if (attempted > 0 && sourceRefused == attempted) onRefusedEverything()
     formatScrapeSummary(

@@ -10591,6 +10591,12 @@ of what is built. The decisions, briefly:
   - A plugin compiled before `handle` existed is served through its
     contract 1 capability. `AbstractMethodError` from that missing method
     is not a crash.
+  - A metadata plugin never replaces a value a built-in scraper found. It
+    fills the gaps, and each field records the plugin's name. ES-DE's model
+    of one selected scraper source is not changed by it.
+  - A context action whose plugin answers `enabled: false` is not offered
+    at all, rather than shown greyed. One that does not answer in 500 ms is
+    offered.
 
 The catalogue has 89 entries across ten areas (library and content,
 launch and runtime, UI, system and device, desktop, other apps,

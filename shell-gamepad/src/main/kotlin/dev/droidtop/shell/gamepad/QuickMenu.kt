@@ -47,6 +47,7 @@ import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.input.ownPadButtons
+import kotlinx.coroutines.launch
 
 /**
  * The Quick Menu: press R2 anywhere in the Gaming shell (docs/
@@ -85,11 +86,14 @@ import dev.droidtop.shell.gamepad.input.ownPadButtons
  * at all, unlike every console this mode is modeled on. When present,
  * Game opens first: the point of a distinct in-game menu is that it is
  * what greets you, not something you have to shoulder-cycle to find.
- * Its rows (resume, quit to library) are the same [MenuRow] tile shape
- * a plugin's `ui.quick_tile@1` targeting the game surface will append
- * to (docs/plugin-api.md C2, Droidtop/tracker#73) once that extension
- * point's host exists -- this tab's row list is what it extends, not a
- * second in-game menu built later to compete with it.
+ * Its rows are resume and quit to library.
+ *
+ * A fourth tab, Plugins, exists only while a running plugin provides a
+ * `ui.status_tile@1` or `ui.quick_tile@1` for this menu (docs/plugin-api.md
+ * C2, C3, Droidtop/tracker#73): the same [MenuRow] shape, one row per tile.
+ * What tiles exist is read from manifests when the sheet opens, their
+ * state is asked once per opening and never while drawing, and a quick
+ * tile's A press is the only other call. A status tile is read-only.
  *
  * WHERE the sheet sits follows the shape of the screen, because the
  * reason it is an edge sheet is that it must not cover the shell behind
@@ -120,8 +124,15 @@ internal fun QuickMenu(
         // function's own doc comment) -- computed once per sheet
         // opening, same as runningEntry itself is (GamepadShell only
         // re-resolves it when quickMenuOpen flips true).
-        val visibleTabs = remember(runningEntry != null) {
-            if (runningEntry != null) QuickTab.entries.toList() else QuickTab.entries.filter { it != QuickTab.GAME }
+        val context = androidx.compose.ui.platform.LocalContext.current
+        // Read from manifests off the main thread; the tab appears only when there is something to show.
+        val pluginTiles by androidx.compose.runtime.produceState(emptyList<dev.droidtop.library.integrations.PluginTiles.Tile>()) {
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                dev.droidtop.library.integrations.PluginTiles.tilesFor(context)
+            }
+        }
+        val visibleTabs = remember(runningEntry != null, pluginTiles.isNotEmpty()) {
+            QuickTab.entries.filter { (it != QuickTab.GAME || runningEntry != null) && (it != QuickTab.PLUGINS || pluginTiles.isNotEmpty()) }
         }
         var tab by remember { mutableStateOf(if (runningEntry != null) QuickTab.GAME else QuickTab.NOTIFICATIONS) }
 
@@ -240,6 +251,7 @@ internal fun QuickMenu(
                         }
                         QuickTab.NOTIFICATIONS -> NotificationsTab(onDismiss)
                         QuickTab.SYSTEM -> QuickSettingsPanel(sheetWidth.value.toInt(), onDismiss)
+                        QuickTab.PLUGINS -> PluginTilesTab(pluginTiles, onDismiss)
                     }
                 }
             }
@@ -253,6 +265,7 @@ private enum class QuickTab(val label: String) {
     GAME("Game"),
     NOTIFICATIONS("Notifications"),
     SYSTEM("System"),
+    PLUGINS("Plugins"),
 }
 
 @Composable
@@ -422,11 +435,10 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
 /**
  * One row this tab can show. Deliberately the same shape a plugin's
  * `ui.quick_tile@1` op (`state -> {label, value, on?, icon}` plus
- * `toggle`/`action`, docs/plugin-api.md C2) will hand over for the game
- * surface once #73's host exists -- [dangerAction] is this list's
- * `danger` styling, not a fourth quick-tile kind. Only droidtop's own
- * two core rows exist today; a plugin tile for this surface appends to
- * this same list rather than drawing a second menu.
+ * `toggle`/`action`, docs/plugin-api.md C2) hands over -- [dangerAction]
+ * is this list's `danger` styling, not a fourth quick-tile kind. Only
+ * droidtop's own two core rows are here: plugin tiles have the Plugins
+ * tab ([PluginTilesTab]).
  */
 private data class GameQuickTile(
     val title: String,
@@ -457,6 +469,104 @@ private data class GameQuickTile(
  * honestly instead of being reported as a success. See
  * [dev.droidtop.library.LibraryProvider.quit]'s own doc comment.
  */
+/**
+ * The Plugins tab: one row per status or quick tile a running plugin provides. The state is
+ * refreshed once when the tab opens (droidtop decides when, the plugin never runs its own loop),
+ * a tile that does not answer in time keeps its last value, and only a quick tile answers to A.
+ */
+@Composable
+private fun PluginTilesTab(
+    tiles: List<dev.droidtop.library.integrations.PluginTiles.Tile>,
+    onDismiss: () -> Unit,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var focusIndex by remember { mutableStateOf(0) }
+    val focusRequester = remember { FocusRequester() }
+    val press = rememberGamepadTouch()
+    var states by remember(tiles) {
+        mutableStateOf<Map<String, dev.droidtop.pluginhost.TileState?>>(tiles.associate { it.key to dev.droidtop.library.integrations.PluginTiles.cached(it) })
+    }
+    var message by remember { mutableStateOf<String?>(null) }
+
+    suspend fun refresh() {
+        states = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            dev.droidtop.library.integrations.PluginTiles.refresh(context, tiles)
+        }
+    }
+
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    LaunchedEffect(tiles) { refresh() }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .focusRequester(focusRequester)
+            .focusable()
+            .ownPadButtons(onBack = onDismiss)
+            .onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
+                when (GamepadKeyMap.actionFor(event.key)) {
+                    GamepadAction.BACK, GamepadAction.B -> {
+                        onDismiss(); true
+                    }
+                    GamepadAction.UP -> {
+                        if (tiles.isNotEmpty()) focusIndex = (focusIndex - 1 + tiles.size) % tiles.size
+                        true
+                    }
+                    GamepadAction.DOWN -> {
+                        if (tiles.isNotEmpty()) focusIndex = (focusIndex + 1) % tiles.size
+                        true
+                    }
+                    GamepadAction.A -> {
+                        val tile = tiles.getOrNull(focusIndex)
+                        if (tile != null && tile.quick) {
+                            scope.launch {
+                                message = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    dev.droidtop.library.integrations.PluginTiles.press(context, tile, states[tile.key])
+                                }
+                                refresh()
+                            }
+                        }
+                        true
+                    }
+                    else -> false
+                }
+            },
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            tiles.forEachIndexed { index, tile ->
+                val state = states[tile.key]
+                MenuRow(
+                    title = state?.label ?: tile.fallbackLabel,
+                    subtitle = if (index == focusIndex) message ?: tile.pluginLabel else tile.pluginLabel,
+                    value = when (state?.on) {
+                        true -> "On"
+                        false -> "Off"
+                        null -> state?.value
+                    },
+                    selected = index == focusIndex,
+                    onClick = {
+                        focusIndex = index
+                        press(GamepadAction.A)
+                    },
+                )
+            }
+        }
+        HintRow(
+            bindings = listOf(
+                HintBinding(GamepadAction.A, "Use") { tiles.getOrNull(focusIndex)?.quick == true },
+                HintBinding(GamepadAction.B, "Close"),
+            ),
+            background = androidx.compose.ui.graphics.Color.Transparent,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+}
+
 @Composable
 private fun GameTab(
     entry: dev.droidtop.library.LibraryEntry,
