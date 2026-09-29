@@ -36,6 +36,15 @@ sealed interface DesktopSessionState {
     data class Connected(
         val hostBridge: HostBridge,
         val primaryOutput: DisplayOutput,
+        /**
+         * The compositor the session started ([PrimaryProvisioning.compositorCommand]:
+         * "sway" or "labwc" today). The shell keys compositor-dependent affordances
+         * on it because the Wayland protocol has no way to ask a compositor what it
+         * implements: sway ignores zwlr_foreign_toplevel_handle_v1's
+         * set_minimized/unset_minimized, so the taskbar hides its minimize under
+         * sway (Droidtop/tracker#145).
+         */
+        val compositorCommand: String,
         /** The running primary container + the runtime that created it — what a native Linux game needs to run as a Wayland client sharing this same desktop (Windows games go through `:runtime-windows`'s own `WineEngine` and need neither). */
         val runtime: ContainerRuntime,
         val container: Container,
@@ -195,7 +204,13 @@ class DesktopSessionService : Service() {
         }
         android.util.Log.i(TAG, "HostBridge connected to $socketPath — desktop session up")
 
-        _stateHolder.value = DesktopSessionState.Connected(hostBridge, primaryDisplayOutput(), runtime, primary)
+        _stateHolder.value = DesktopSessionState.Connected(
+            hostBridge,
+            primaryDisplayOutput(),
+            provisioning.compositorCommand,
+            runtime,
+            primary,
+        )
     }
 
     /**

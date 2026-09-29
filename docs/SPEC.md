@@ -4489,7 +4489,18 @@ app-drawer icon or a floating switcher button:
   the row (and un-minimizes it first if needed), a second tap on the
   already-activated row minimizes it, and its long-press menu offers
   Restore/Minimize and Close (`zwlr_foreign_toplevel_handle_v1`'s
-  activate/set_minimized/unset_minimized/close requests). The manager's
+  activate/set_minimized/unset_minimized/close requests). The minimize
+  affordances are compositor-conditional (2026-09-29, Droidtop/tracker#145):
+  sway ignores set_minimized/unset_minimized outright — under it the
+  second-tap minimize and the menu's Minimize did nothing (rig,
+  fix2-t5.png in verify-2026-09-29) — while labwc implements the request
+  (its src/foreign-toplevel/wlr-foreign.c handle_request_minimize calls
+  view_minimize), and the protocol has no capability query to ask with,
+  so the session publishes the compositor it started
+  (`DesktopSessionState.Connected.compositorCommand`, straight from
+  CompositorProvisioning's plan) and under sway the taskbar drops the
+  second-tap minimize and hides the menu's Restore/Minimize row rather
+  than offer an action the compositor discards. The manager's
   listener is attached in the registry callback at bind time: the compositor
   answers a bind with one `toplevel` event per window already open, and a
   listener added after connect()'s round trips lost those, so a desktop

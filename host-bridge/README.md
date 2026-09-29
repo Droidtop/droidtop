@@ -102,8 +102,12 @@ it is not the same as confirmed-working. Treat the implementation below as
   `setOutputSize`) since the handle they act on can be invalidated by a
   `closed` event arriving concurrently. Optional like `ext-data-control-v1`:
   absent means the taskbar's window list is just empty. `shell-desktop`'s
-  `TaskbarWindowList` is the one consumer today. The protocol has no
-  "move to another output" request — only activate/set_minimized/
+  `TaskbarWindowList` is the one consumer today, and it hides its minimize
+  affordances while the session's compositor is sway: sway ignores
+  set_minimized/unset_minimized outright while labwc implements them
+  (Droidtop/tracker#145), and the protocol has no capability query to
+  ask with. It also has no "move to another output" request — only
+  activate/set_minimized/
   unset_minimized/close/set_fullscreen/set_rectangle — so that part of an
   earlier SPEC.md draft was corrected rather than implemented; see the
   single-output note below for what real "move to output" needs anyway.

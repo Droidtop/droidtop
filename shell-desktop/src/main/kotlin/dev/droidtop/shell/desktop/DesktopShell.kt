@@ -101,6 +101,16 @@ fun DesktopShell(
     library: Library,
     hostBridge: HostBridge?,
     primaryOutput: DisplayOutput?,
+    /**
+     * The compositor the session is running (DesktopSessionState.Connected's
+     * copy of the provisioning plan's compositorCommand, null with no session).
+     * sway ignores zwlr_foreign_toplevel_handle_v1's set_minimized/
+     * unset_minimized, so under it the taskbar hides its minimize affordances
+     * rather than offering an action that does nothing (Droidtop/tracker#145);
+     * labwc implements the requests. The Wayland protocol has no capability
+     * query, so the session says which compositor it started instead.
+     */
+    compositorCommand: String? = null,
     sessionMessage: DesktopSessionMessage = DesktopSessionMessage.Idle,
     onOpenTerminal: (() -> Unit)? = null,
     loadLinuxApps: (suspend () -> List<ContainerApp>)? = null,
@@ -119,6 +129,7 @@ fun DesktopShell(
 
         Taskbar(
             hostBridge = hostBridge,
+            compositorCommand = compositorCommand,
             startMenuOpen = startMenuOpen,
             onToggleStartMenu = { startMenuOpen = !startMenuOpen },
             // Absent rather than disabled when there is no live session:
@@ -338,6 +349,7 @@ private fun BoxScope.DesktopViewport(
 @Composable
 private fun BoxScope.Taskbar(
     hostBridge: HostBridge?,
+    compositorCommand: String?,
     startMenuOpen: Boolean,
     onToggleStartMenu: () -> Unit,
     onOpenTerminal: (() -> Unit)?,
@@ -363,7 +375,7 @@ private fun BoxScope.Taskbar(
             Text(if (startMenuOpen) "Close" else "Start")
         }
         Spacer(modifier = Modifier.width(1.dp).height(32.dp).background(MaterialTheme.colorScheme.outline))
-        TaskbarWindowList(hostBridge, modifier = Modifier.weight(1f))
+        TaskbarWindowList(hostBridge, compositorCommand, modifier = Modifier.weight(1f))
         if (onOpenTerminal != null) {
             TaskbarButton(onClick = onOpenTerminal) {
                 Text("Terminal")
@@ -417,6 +429,16 @@ private fun TaskbarButton(onClick: () -> Unit, content: @Composable () -> Unit) 
  * opens a small menu for Restore/Minimize and Close -- the destructive one
  * deliberately not on a plain tap.
  *
+ * Both minimize affordances exist only where they work. sway ignores the
+ * protocol's set_minimized and unset_minimized requests outright, so under
+ * it they were dead UI: the second tap and the menu's Minimize promised
+ * something that never happened (rig, fix2-t5.png in verify-2026-09-29,
+ * Droidtop/tracker#145). labwc implements the request (its wlr-foreign.c
+ * handle_request_minimize calls view_minimize), and there is no
+ * protocol-level capability query to ask with, so the one fact the shell
+ * keys on is [compositorCommand]: "sway" drops the second-tap minimize and
+ * hides the menu's Restore/Minimize row; anything else keeps both.
+ *
  * Empty (no row shown at all, not even a placeholder) when [hostBridge] is
  * null or the compositor never advertised the protocol: an empty window
  * list and "there is no session"/"the protocol isn't there" look the same
@@ -433,8 +455,12 @@ private fun TaskbarButton(onClick: () -> Unit, content: @Composable () -> Unit) 
  * change to stop claiming it as already built.
  */
 @Composable
-private fun TaskbarWindowList(hostBridge: HostBridge?, modifier: Modifier = Modifier) {
+private fun TaskbarWindowList(hostBridge: HostBridge?, compositorCommand: String?, modifier: Modifier = Modifier) {
     var toplevels by remember(hostBridge) { mutableStateOf(hostBridge?.toplevels() ?: emptyList()) }
+
+    // Sway's dead set_minimized (see the comment above) makes minimize a
+    // compositor-dependent affordance, not a universal one.
+    val minimizeSupported = compositorCommand != "sway"
 
     DisposableEffect(hostBridge) {
         val mainHandler = Handler(Looper.getMainLooper())
@@ -454,9 +480,10 @@ private fun TaskbarWindowList(hostBridge: HostBridge?, modifier: Modifier = Modi
         items(toplevels, key = { it.id }) { toplevel ->
             TaskbarWindowRow(
                 toplevel = toplevel,
+                showMinimize = minimizeSupported,
                 onTap = {
                     if (toplevel.activated) {
-                        hostBridge?.setToplevelMinimized(toplevel.id, true)
+                        if (minimizeSupported) hostBridge?.setToplevelMinimized(toplevel.id, true)
                     } else {
                         if (toplevel.minimized) hostBridge?.setToplevelMinimized(toplevel.id, false)
                         hostBridge?.activateToplevel(toplevel.id)
@@ -469,7 +496,7 @@ private fun TaskbarWindowList(hostBridge: HostBridge?, modifier: Modifier = Modi
 }
 
 @Composable
-private fun TaskbarWindowRow(toplevel: Toplevel, onTap: () -> Unit, onClose: () -> Unit) {
+private fun TaskbarWindowRow(toplevel: Toplevel, showMinimize: Boolean, onTap: () -> Unit, onClose: () -> Unit) {
     var menuOpen by remember { mutableStateOf(false) }
     Box {
         Text(
@@ -495,10 +522,12 @@ private fun TaskbarWindowRow(toplevel: Toplevel, onTap: () -> Unit, onClose: () 
                 .padding(horizontal = 10.dp, vertical = 6.dp),
         )
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-            DropdownMenuItem(
-                text = { Text(if (toplevel.minimized) "Restore" else "Minimize") },
-                onClick = { menuOpen = false; onTap() },
-            )
+            if (showMinimize) {
+                DropdownMenuItem(
+                    text = { Text(if (toplevel.minimized) "Restore" else "Minimize") },
+                    onClick = { menuOpen = false; onTap() },
+                )
+            }
             DropdownMenuItem(
                 text = { Text("Close") },
                 onClick = { menuOpen = false; onClose() },

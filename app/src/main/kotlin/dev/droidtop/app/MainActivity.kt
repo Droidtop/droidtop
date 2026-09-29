@@ -322,6 +322,9 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
                         library = library,
                         hostBridge = connected?.hostBridge,
                         primaryOutput = connected?.primaryOutput,
+                        // Which compositor the session started: the taskbar keys its
+                        // minimize affordances on it (sway ignores the zwlr request).
+                        compositorCommand = connected?.compositorCommand,
                         sessionMessage = when (val state = sessionState) {
                             is DesktopSessionState.Idle -> DesktopSessionMessage.Idle
                             is DesktopSessionState.Connecting -> DesktopSessionMessage.Connecting(state.detail)
