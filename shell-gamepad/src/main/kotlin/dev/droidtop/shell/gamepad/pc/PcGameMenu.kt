@@ -41,6 +41,8 @@ import dev.droidtop.library.EnginesDatabase
 import dev.droidtop.library.F95Thread
 import dev.droidtop.library.GameEngine
 import dev.droidtop.library.GameLinks
+import dev.droidtop.library.ownership
+import dev.droidtop.library.ownershipLabel
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.GameUpdates
 import dev.droidtop.library.GameLaunchStrategy
