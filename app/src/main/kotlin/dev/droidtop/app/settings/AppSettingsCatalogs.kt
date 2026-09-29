@@ -1730,8 +1730,8 @@ object AppSettingsCatalogs {
      * one -- same "no separate save step" shape [integrationsScreen]
      * uses.
      */
-    /** True on a debuggable build -- avoids needing android.buildFeatures.buildConfig just for this one debug-only plugin test action. */
-    private fun ctxIsDebuggable(context: Context): Boolean =
+    /** True on a debuggable build -- avoids needing android.buildFeatures.buildConfig just for the debug-only test actions. */
+    internal fun ctxIsDebuggable(context: Context): Boolean =
         (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
     private fun pluginsScreen() = CatalogScreen(

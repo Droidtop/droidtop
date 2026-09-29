@@ -158,7 +158,7 @@ object DroidtopWideSettings {
                             mimeType = "application/json",
                             onPicked = ::readBackup,
                         ),
-                    ),
+                    ) + listOfNotNull(debugCrashItem(context)),
                 ),
             )
         },
@@ -272,6 +272,34 @@ object DroidtopWideSettings {
             title = "Users and guest",
             subtitle = "Opens Android's Users screen to switch user or start a guest session",
             run = { ctx -> ctx.startActivity(Intent(intent)) },
+        )
+    }
+
+    /**
+     * The one way to crash droidtop on purpose (debug builds only), next to
+     * Share diagnostics in the Data group -- the screen the third-crash
+     * route itself opens. Crash notes and the crash-loop counter (SPEC 10c)
+     * had no other way to be exercised on a device once setup was done:
+     * `am crash` does not exist on the rigs, and the fresh-install
+     * onDestroy crash stops reproducing after onboarding, which left the
+     * third-crash Global settings route and the one-minute counter reset
+     * unverified (rig, verify-2026-09-29, Droidtop/tracker#49). The throw
+     * is posted to the main looper so it reaches CrashRecovery's
+     * uncaught-exception handler exactly like a real crash, whichever
+     * surface runs the row.
+     */
+    private fun debugCrashItem(context: Context): ActionItem? {
+        if (!AppSettingsCatalogs.ctxIsDebuggable(context)) return null
+        return ActionItem(
+            id = "pref_global_debug_crash",
+            title = "Debug: force a crash",
+            subtitle = "Crashes droidtop on purpose: writes a crash note and counts toward safe mode, like a real crash",
+            confirmTitle = "Crash droidtop now?",
+            run = { _ ->
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    throw RuntimeException("Debug: forced crash from Global settings")
+                }
+            },
         )
     }
 

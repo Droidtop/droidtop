@@ -10589,7 +10589,12 @@ is gone). Crash reporting is **local only**: the Sentry SDK
 that shipped with an empty DSN reported nowhere and is removed rather than
 pointed at a server, because a crash report leaves the device only when the
 person sends it (below). There is no automatic upload and no switch to
-turn one on.
+turn one on. Debug builds carry the one way to crash on purpose: a
+confirmed action in Global settings > Data (next to Share diagnostics, the
+screen the crash-loop route itself opens) throws on the main thread and
+reaches the same uncaught-exception handler as a real crash, so the note,
+the counter and the third-crash route can be exercised on a device;
+release builds carry no such action.
 
 **Safe mode after a crash loop.** The Gaming shell renders third-party
 themes, and "a theme must never be able to kill droidtop" (§7f) cannot be
