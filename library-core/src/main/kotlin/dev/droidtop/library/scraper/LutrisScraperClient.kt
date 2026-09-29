@@ -83,7 +83,11 @@ object LutrisScraperClient {
     fun search(gameTitle: String): ScrapeLookup<List<LutrisGameResult>> {
         val query = URLEncoder.encode(gameTitle, "UTF-8")
         val url = URL("https://lutris.net/api/games?search=$query")
-        val connection = (url.openConnection() as HttpURLConnection).apply { requestMethod = "GET" }
+        val connection = (url.openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 10_000
+            readTimeout = 20_000
+        }
         val status = connection.responseCode
         if (status != 200) return ScrapeRefusals.refused("Lutris", connection, status, emptyList(), gameTitle)
         return parse(JSONObject(connection.inputStream.bufferedReader().readText()))
@@ -97,7 +101,11 @@ object LutrisScraperClient {
     fun details(slug: String): ScrapeLookup<LutrisGameDetails> {
         val path = URLEncoder.encode(slug, "UTF-8").replace("+", "%20")
         val url = URL("https://lutris.net/api/games/$path")
-        val connection = (url.openConnection() as HttpURLConnection).apply { requestMethod = "GET" }
+        val connection = (url.openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 10_000
+            readTimeout = 20_000
+        }
         val status = connection.responseCode
         if (status == 404) return ScrapeLookup.NoMatch
         if (status != 200) return ScrapeRefusals.refused("Lutris", connection, status, emptyList(), slug)
