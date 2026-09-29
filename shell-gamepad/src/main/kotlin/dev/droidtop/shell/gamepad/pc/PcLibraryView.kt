@@ -1,6 +1,8 @@
 package dev.droidtop.shell.gamepad.pc
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -36,6 +39,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -43,6 +47,7 @@ import coil3.compose.AsyncImage
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.PcRunnerOptions
 import dev.droidtop.library.ResolvedRunner
+import dev.droidtop.library.scraper.FieldSources
 import dev.droidtop.shell.gamepad.GameCard
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import dev.droidtop.shell.gamepad.input.handleGamepadKeyDown
@@ -294,15 +299,21 @@ internal fun PcLibraryContent(
 /**
  * The focused game's own facts the theme's element schema has no slot
  * for and this pass's frame-only render therefore drops from the theme's
- * canvas entirely: hero art, description, playtime, the resolved runner,
- * the source/store, update state and ProtonDB. Read-only -- every real
- * action on this game (the runner picker, Wine settings, the Lutris
- * import, ProtonDB's own live ask) stays on [PcGameMenu] (L2/Y), which
- * this panel names as where to find them rather than duplicating them.
+ * canvas entirely: hero art, the scraped logo, the "About this game"
+ * facts and the line saying where each field came from (docs/SPEC.md 7h),
+ * playtime, the resolved runner, the source/store, update state and
+ * ProtonDB. Read-only -- every real action on this game (the runner
+ * picker, Wine settings, the Lutris import, ProtonDB's own live ask, the
+ * links as rows) stays on [PcGameMenu] (L2/Y), which this panel names as
+ * where to find them rather than duplicating them.
  */
 @Composable
 private fun FocusedGamePanel(entry: LibraryEntry?, plateColor: Color?, modifier: Modifier = Modifier) {
-    Column(modifier = modifier) {
+    // Touch-scrollable because the restored About section can make the
+    // facts taller than the panel on a handheld screen; the panel is
+    // never in the D-pad's route (the grid owns it), so the scroll is a
+    // finger's, not a thumbstick's.
+    Column(modifier = modifier.verticalScroll(rememberScrollState())) {
         if (entry == null) {
             Text("Select a game", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
             return
@@ -325,23 +336,75 @@ private fun FocusedGamePanel(entry: LibraryEntry?, plateColor: Color?, modifier:
                 )
             }
         }
-        Text(
-            dev.droidtop.library.GameNaming.displayName(entry.title),
-            color = MenuTokens.OnSurface,
-            style = MaterialTheme.typography.titleLarge,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 12.dp),
-        )
-        entry.description?.takeIf { it.isNotBlank() }?.let { desc ->
-            Text(
-                desc,
-                color = MenuTokens.OnSurfaceMuted,
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 5,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 6.dp),
+        val title = dev.droidtop.library.GameNaming.displayName(entry.title)
+        // The scraped logo names the game in its own lettering in place
+        // of the title text (docs/SPEC.md 7h), as the retired detail
+        // page did; the text answers for a game with no logo and for one
+        // whose logo failed to load. [logoUri] is the in-memory
+        // metadata-row field (a store install; a folder game's marquee
+        // lives in its layout, which this panel never reads), so this
+        // costs no IO.
+        var logoFailed by remember(entry.logoUri) { mutableStateOf(false) }
+        val logo = entry.logoUri
+        if (logo != null && !logoFailed) {
+            AsyncImage(
+                model = logo,
+                contentDescription = title,
+                contentScale = ContentScale.Fit,
+                alignment = Alignment.BottomStart,
+                onError = { logoFailed = true },
+                modifier = Modifier.padding(top = 12.dp).fillMaxWidth(0.8f).height(48.dp),
             )
+        } else {
+            Text(
+                title,
+                color = MenuTokens.OnSurface,
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+        }
+        // "About this game" (docs/SPEC.md 7h): the scraped flavour plus
+        // the one line saying where each field came from, all in-memory
+        // [LibraryEntry] data (aboutFacts/sourcesLine below). Restored
+        // here when 444271f2 deleted PcGameAbout.kt's full-screen detail:
+        // after the frame-only redecision this panel is the one surface
+        // that draws a PC game's own facts, so without it the field-source
+        // record protected a person's edits without ever being shown. The
+        // game's own hide-metadata flag hides the whole section, the same
+        // ES-DE semantic that hides a ROM's md_ fields on the theme's
+        // canvas.
+        if (!entry.hideMetadata) {
+            val facts = aboutFacts(entry)
+            val sources = sourcesLine(entry)
+            if (!entry.description.isNullOrBlank() || facts.isNotEmpty() || sources != null) {
+                Text(
+                    "About this game",
+                    color = MenuTokens.SectionLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+                entry.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                    Text(
+                        desc,
+                        color = MenuTokens.OnSurfaceMuted,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+                facts.forEach { (label, value) -> PanelFact(label, value) }
+                sources?.let { line ->
+                    Text(
+                        line,
+                        color = MenuTokens.OnSurfaceDisabled,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+            }
         }
         val context = LocalContext.current
         val runner by produceState<ResolvedRunner?>(null, entry.id) {
@@ -367,5 +430,60 @@ private fun PanelFact(label: String, value: String) {
     Row(modifier = Modifier.padding(top = 6.dp)) {
         Text(label, color = MenuTokens.SectionLabel, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(end = 6.dp))
         Text(value, color = MenuTokens.Value, style = MaterialTheme.typography.labelSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/**
+ * The labelled "About this game" facts, in the order a store page lists
+ * them; only the ones that exist. Restored from the PcGameAbout.kt
+ * 444271f2 deleted, for [FocusedGamePanel] to draw (docs/SPEC.md 7h).
+ */
+internal fun aboutFacts(entry: LibraryEntry): List<Pair<String, String>> = listOfNotNull(
+    entry.developer?.let { "Developer" to it },
+    entry.publisher?.let { "Publisher" to it },
+    entry.releaseDate?.let { formatReleaseDate(it) }?.let { "Released" to it },
+    entry.genre?.let { "Genre" to it },
+    entry.series?.let { "Series" to it },
+    // ES-DE's 0-1 rating, shown on the five-star scale ES-DE draws it on.
+    entry.rating?.let { "Rating" to String.format(java.util.Locale.US, "%.1f / 5", it * 5) },
+)
+
+/**
+ * ES-DE's `YYYYMMDDT000000` as a date a person reads, in their locale;
+ * null for anything that is not a full date (nothing here widens a year
+ * into a day).
+ */
+internal fun formatReleaseDate(raw: String): String? {
+    val parsed = runCatching {
+        java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).apply {
+            isLenient = false
+            timeZone = java.util.TimeZone.getTimeZone("UTC")
+        }.parse(raw.take(8))
+    }.getOrNull() ?: return null
+    return java.text.DateFormat.getDateInstance(java.text.DateFormat.LONG).apply {
+        timeZone = java.util.TimeZone.getTimeZone("UTC")
+    }.format(parsed)
+}
+
+/**
+ * "Description from IGDB. Cover and hero art from SteamGridDB." -- each
+ * source once, with the fields it gave, in the order the fields are
+ * listed ([FieldSources.LABELS]); "you" for what the metadata editor
+ * changed. Null when nothing recorded a source. The one line docs/
+ * SPEC.md 7h promises, read straight out of
+ * [LibraryEntry.fieldSources] with no state of its own: it is how a
+ * person sees where each field came from, which is also how they can
+ * see what a rescrape is not allowed to take from them.
+ */
+internal fun sourcesLine(entry: LibraryEntry): String? {
+    if (entry.fieldSources.isEmpty()) return null
+    val order = FieldSources.LABELS.keys.toList()
+    val bySource = entry.fieldSources.entries
+        .sortedBy { order.indexOf(it.key).let { i -> if (i < 0) Int.MAX_VALUE else i } }
+        .groupBy({ it.value }, { FieldSources.LABELS[it.key] ?: it.key })
+    return bySource.entries.joinToString(" ") { (source, fields) ->
+        val list = fields.mapIndexed { i, field -> if (i == 0) field else field.lowercase() }
+        val joined = if (list.size == 1) list.single() else list.dropLast(1).joinToString(", ") + " and " + list.last()
+        if (source == FieldSources.EDITED) "$joined edited by you." else "$joined from $source."
     }
 }

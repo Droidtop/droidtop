@@ -9,9 +9,10 @@ import org.json.JSONObject
  * [dev.droidtop.library.consoles.GameMetadataEntity.fieldSources].
  *
  * Two jobs. It lets a person see where a description or a cover came
- * from (the detail page names the source under each), and it is what
- * makes "a scrape never overwrites what you edited" true: a field whose
- * source is [EDITED] is skipped by every scrape write ([keep]).
+ * from (the PC surface's focused-game panel draws one line naming the
+ * source of each field), and it is what makes "a scrape never
+ * overwrites what you edited" true: a field whose source is [EDITED] is
+ * skipped by every scrape write ([keep]).
  */
 object FieldSources {
 

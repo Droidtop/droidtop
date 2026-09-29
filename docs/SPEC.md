@@ -8078,13 +8078,21 @@ the same care as the art.
   rating, series or links. The 2026-09-24 survey expected the per-game record to be HTML only;
   it is not. Its `gogslug` is not used (for Hollow Knight it names the soundtrack), its
   `provider_games` is.
-- **Where players see it.** A PC or engine game's detail page opens with the hero art (the
-  cover when there is none) and the logo in place of the title text, and has an "About this
-  game" section under Play: the description (a stop for the pad; A shows the rest), the
-  developer, publisher, date, genre, series and rating, each link as a row that opens it, and
-  one line saying where each field came from. ES-DE's hide-metadata flag hides the section.
-  The companion screen adds the publisher (when it is not the developer) and the series. A
-  pinned home-screen shortcut uses the scraped icon before the cover.
+- **Where players see it.** A PC or engine game's detail is the focused-game panel beside the
+  library grid (PcLibraryView's FocusedGamePanel -- the 2026-09-28 redecision draws PC games
+  over the theme's frame only, so that panel is the one surface that draws a PC game's own
+  facts): the hero art (the cover when there is none) opens it, the scraped logo, when the
+  scrape filed one in the metadata row (a store install has no ES-DE layout), names the game
+  in its own lettering in place of the title text, and under that an "About this game"
+  section: the description (its first lines, a stop), the developer, publisher, date, genre,
+  series and rating, each drawn only when scraped, and one line saying where each field came
+  from, in the words the scrape recorded (`FieldSources.LABELS` over the entry's
+  `fieldSources` map -- "Description from IGDB. Cover and hero art from SteamGridDB. Rating
+  edited by you."). ES-DE's hide-metadata flag hides the section, the same semantic that
+  hides a ROM's md_ fields on the theme's canvas. Each link is a row that opens it, on Game
+  options (Y or a long press, PcGameMenu). The companion screen adds the publisher (when it
+  is not the developer) and the series. A pinned home-screen shortcut uses the scraped icon
+  before the cover.
 
 An overnight ScreenScraper pass over the user's real library — 46 ROMs
 across 11 systems — returned HTTP 403 for **all 46** requests: zero
@@ -8447,12 +8455,16 @@ from this:
   buttons") -- no on-screen row is L2-only.
   `PcGameMenu` replaced the old fixed-layout `PcGameDetail` screen
   outright (renamed, not kept as a second implementation): its hero-art
-  header and scraped "About this game" text are gone, because the
-  theme's own gamelist already shows a focused PC game's art and
+  header and scraped "About this game" text are gone from the menu
+  itself. The 2026-09-26 revision believed the theme's own gamelist
+  widget would keep showing a focused PC game's art and its
   description/developer/rating/genre while browsing, the same as a
-  console ROM's; what remains is a Dialog-hosted menu over rows this
-  section's action groups already produced (`rememberPcActions`),
-  unchanged in substance.
+  console ROM's; the 2026-09-28 frame-only redecision took PC games off
+  that widget entirely, so those facts live on the focused-game panel
+  instead (7h, "Where players see it" -- restored there, never dropped).
+  What remains here is a Dialog-hosted menu over rows this section's
+  action groups already produced (`rememberPcActions`), unchanged in
+  substance.
 
 **PC is always visible (owner direction 2026-09-26: "PC should always be
 visible").** Unlike a console system, whose card only ever appears once
@@ -8506,9 +8518,12 @@ have for ArtBookNext is a terrible idea." Two changes from this:
   every other card grid in this shell -- missing art now takes an optional
   theme-coloured plate, `GameCard`'s new `plateColor` parameter, the same
   per-system accent `SystemThemeColors.forSystem` already gives a drill-down
-  screen) and a focused-game panel (hero art or the same plate, description,
-  playtime, the resolved runner, source/store, update state, and a note that
-  ProtonDB is asked for on `PcGameMenu` rather than fetched here -- compat
+  screen) and a focused-game panel (hero art or the same plate, the
+  scraped logo, the "About this game" facts with the line saying where
+  each field came from -- restored to this panel 2026-09-29, 7h "Where
+  players see it" -- the description, playtime, the resolved runner,
+  source/store, update state, and a note that ProtonDB is asked for on
+  `PcGameMenu` rather than fetched here -- compat
   info stays "evidence, never a gate," so this panel never fetches it on its
   own). `PcGameMenu` (L2, and now Y/long-press through `GameCard`'s own
   binding) is unchanged: everything ES-DE has no slot for still lives there.
