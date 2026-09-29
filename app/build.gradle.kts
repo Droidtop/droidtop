@@ -210,11 +210,13 @@ android {
 // protobuf-java. Both jars ship the same com.google.protobuf classes,
 // which is exactly the duplicate-class failure this resolves. The full
 // runtime is the documented superset -- lite-generated code runs on it
-// unchanged -- so one copy of the full artifact stands in for both.
+// unchanged -- so one copy of the full artifact stands in for both. Its
+// version is the catalog's protobufJavalite entry, so the substituted
+// runtime cannot drift from the release the launcher protos were built against.
 configurations.all {
     resolutionStrategy.dependencySubstitution {
         substitute(module("com.google.protobuf:protobuf-javalite"))
-            .using(module("com.google.protobuf:protobuf-java:4.33.2"))
+            .using(module("com.google.protobuf:protobuf-java:${libs.versions.protobufJavalite.get()}"))
     }
 }
 
