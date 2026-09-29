@@ -5,6 +5,7 @@ import app.gamenative.data.AmazonGame
 import app.gamenative.data.EpicGame
 import app.gamenative.data.GOGGame
 import app.gamenative.data.GameSource
+import app.gamenative.data.ItchGame
 import app.gamenative.data.LibraryItem
 import app.gamenative.data.SteamApp
 import app.gamenative.service.SteamService
@@ -48,7 +49,7 @@ object PcLibrary {
      * vocabulary, but is droidtop's own type so library-core and the
      * shells never import `app.gamenative.*`.
      */
-    enum class Source { STEAM, GOG, EPIC, AMAZON, FOLDER }
+    enum class Source { STEAM, GOG, EPIC, AMAZON, ITCH, FOLDER }
 
     /**
      * Community compatibility reports for a title, from gamenative's own
@@ -93,6 +94,7 @@ object PcLibrary {
         fun gogGameDao(): app.gamenative.db.dao.GOGGameDao
         fun epicGameDao(): app.gamenative.db.dao.EpicGameDao
         fun amazonGameDao(): app.gamenative.db.dao.AmazonGameDao
+        fun itchGameDao(): app.gamenative.db.dao.ItchGameDao
     }
 
     private fun daos(context: Context): StoreDaoEntryPoint =
@@ -144,6 +146,7 @@ object PcLibrary {
             addAll(runCatching { dao.gogGameDao().getAllAsList().map { it.toGame() } }.getOrDefault(emptyList()))
             addAll(runCatching { dao.epicGameDao().getAllAsList().map { it.toGame() } }.getOrDefault(emptyList()))
             addAll(runCatching { dao.amazonGameDao().getAllAsList().map { it.toGame() } }.getOrDefault(emptyList()))
+            addAll(runCatching { dao.itchGameDao().getAllAsList().map { it.toGame() } }.getOrDefault(emptyList()))
             addAll(
                 runCatching {
                     // Folders the user added to the vendored scanner by
@@ -369,6 +372,18 @@ object PcLibrary {
         compatibility = compatibilityFor(title),
     )
 
+    private fun ItchGame.toGame(): Game = Game(
+        id = "itch:$id",
+        source = Source.ITCH,
+        nativeId = id,
+        title = title,
+        installed = isInstalled,
+        installPath = installPath.takeIf { it.isNotEmpty() },
+        sizeBytes = sizeBytes,
+        artUrl = coverUrl.takeIf { it.isNotEmpty() },
+        compatibility = compatibilityFor(title),
+    )
+
     /**
      * The PC game folders under droidtop's own games roots, handed to
      * gamenative's folder scanner as the exact folders to make items for.
@@ -485,6 +500,7 @@ object PcLibrary {
                 "gog" -> dao.gogGameDao().getAllAsList().firstOrNull { it.id == nativeId }?.toLibraryItem()
                 "epic" -> dao.epicGameDao().getAllAsList().firstOrNull { it.catalogId == nativeId }?.toLibraryItem()
                 "amazon" -> dao.amazonGameDao().getAllAsList().firstOrNull { it.productId == nativeId }?.toLibraryItem()
+                "itch" -> dao.itchGameDao().getAllAsList().firstOrNull { it.id == nativeId }?.toLibraryItem()
                 // A folder game IS a LibraryItem already -- the scanner
                 // produced the id this entry carries.
                 "folder" -> CustomGameScanner.scanAsLibraryItems().firstOrNull { it.appId == nativeId }
@@ -539,6 +555,18 @@ object PcLibrary {
         heroImageUrl = heroUrl.ifEmpty { artUrl },
         gameSource = GameSource.AMAZON,
         sizeBytes = if (isInstalled) installSize else downloadSize,
+        isInstalled = isInstalled,
+    )
+
+    private fun ItchGame.toLibraryItem(): LibraryItem = LibraryItem(
+        appId = "${GameSource.ITCH.name}_$id",
+        name = title,
+        iconHash = coverUrl,
+        capsuleImageUrl = coverUrl,
+        headerImageUrl = coverUrl,
+        heroImageUrl = coverUrl,
+        gameSource = GameSource.ITCH,
+        sizeBytes = sizeBytes,
         isInstalled = isInstalled,
     )
 
@@ -615,5 +643,6 @@ fun PcLibrary.Source.displayName(): String = when (this) {
     PcLibrary.Source.GOG -> "GOG"
     PcLibrary.Source.EPIC -> "Epic"
     PcLibrary.Source.AMAZON -> "Amazon"
+    PcLibrary.Source.ITCH -> "itch.io"
     PcLibrary.Source.FOLDER -> "Folder"
 }

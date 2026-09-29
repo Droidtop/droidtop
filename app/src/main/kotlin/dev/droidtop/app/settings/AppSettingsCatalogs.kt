@@ -1207,9 +1207,9 @@ object AppSettingsCatalogs {
                     NestedScreenItem(
                         id = "pc_stores_accounts_link",
                         title = "Accounts and sources",
-                        subtitle = "Sign in to Steam, GOG, Epic or Amazon Games to download your library",
+                        subtitle = "Sign in to Steam, GOG, Epic, Amazon Games or itch.io to download your library",
                         registryId = SCREEN_ACCOUNTS_AND_SOURCES,
-                        valueLabel = { "$signedInCount of 4 stores signed in" },
+                        valueLabel = { "$signedInCount of 5 stores signed in" },
                         icon = CatalogIcon.GLOBAL,
                     ),
                 ),
@@ -1249,7 +1249,8 @@ object AppSettingsCatalogs {
         val gog = runCatching { app.gamenative.service.gog.GOGService.hasStoredCredentials(context) }.getOrDefault(false)
         val epic = runCatching { app.gamenative.service.epic.EpicService.hasStoredCredentials(context) }.getOrDefault(false)
         val amazon = runCatching { app.gamenative.service.amazon.AmazonService.hasStoredCredentials(context) }.getOrDefault(false)
-        return listOf(steam, gog, epic, amazon).count { it }
+        val itch = runCatching { app.gamenative.service.itch.ItchService.hasStoredCredentials(context) }.getOrDefault(false)
+        return listOf(steam, gog, epic, amazon, itch).count { it }
     }
 
     /**
@@ -1279,6 +1280,7 @@ object AppSettingsCatalogs {
         val gogSignedIn = runCatching { app.gamenative.service.gog.GOGService.hasStoredCredentials(context) }.getOrDefault(false)
         val epicSignedIn = runCatching { app.gamenative.service.epic.EpicService.hasStoredCredentials(context) }.getOrDefault(false)
         val amazonSignedIn = runCatching { app.gamenative.service.amazon.AmazonService.hasStoredCredentials(context) }.getOrDefault(false)
+        val itchSignedIn = runCatching { app.gamenative.service.itch.ItchService.hasStoredCredentials(context) }.getOrDefault(false)
 
         val activeIntegrations = IntegrationStore.available(context).size
         val installedPlugins = PluginStore.installed(context)
@@ -1341,6 +1343,16 @@ object AppSettingsCatalogs {
                                     ctx,
                                     dev.droidtop.app.PcStoreSignInActivity.Store.AMAZON,
                                 ),
+                            )
+                        },
+                    ),
+                    ActionItem(
+                        id = "pc_store_itch",
+                        title = "itch.io",
+                        subtitle = "${signedIn(itchSignedIn)} - paste your personal API key from itch.io settings",
+                        run = { ctx ->
+                            ctx.startActivity(
+                                dev.droidtop.app.ItchSignInActivity.intent(ctx),
                             )
                         },
                     ),
