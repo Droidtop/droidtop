@@ -3508,11 +3508,7 @@ one:
 
 - **Now playing** (Spotify/Discord ambient presence, §7e) -- that section is scoped, not
   built; there is no now-playing store this screen could read.
-- **Running jobs and downloads** -- no droidtop-owned `ScanProgress`/download-queue store
-  exists for any surface to read yet (Settings' own scan rows read provider state
-  directly, not a shared live-progress store); a companion tile for it needs that store
-  built first, wherever it is built, so every surface reads the one thing rather than the
-  companion inventing its own.
+- **Running jobs and downloads** -- no second mechanism; the visible download/install queue uses `PluginJobsCenter` / the Jobs screen (`plugin_jobs`) directly (`GamingSettingsCatalog` exposes it as "Downloads and installs", `Droidtop/tracker#85`). No `ScanProgress`/download-queue store is invented -- the existing registry (`entries(): StateFlow<List<Entry>>`) is the one surface every caller reads, controller-first (`CatalogNavigator`'s own `LazyColumn` focus and touch dispatch), with end-user wording ("Downloading…" / "Done" / "Failed", progress % and status line, cancel best-effort). No main-thread file/database work: all reads go through the flow, writes stay in the plugin runtime.
 
 ## 5. Windows compatibility — no real virtualization
 
