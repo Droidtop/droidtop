@@ -306,6 +306,46 @@ class ProotRuntime(
 
     override val microphoneUnavailableReason: String? = null
 
+    override val dataBackupUnavailableReason: String? = null
+
+    override suspend fun exportData(container: Container, out: java.io.OutputStream) {
+        stopProcess(container.id)
+        withContext(Dispatchers.IO) {
+            ContainerArchive.export(rootfsOf(container.id), out, backupLog())
+        }
+        log.line("exported ${container.id}")
+    }
+
+    override suspend fun importData(container: Container, input: InputStream) {
+        stopProcess(container.id)
+        withContext(Dispatchers.IO) {
+            val rootfs = rootfsOf(container.id)
+            val staged = File(containerDir(container.id), "rootfs.restore")
+            val previous = File(containerDir(container.id), "rootfs.previous")
+            TreeDelete.delete(staged, containersDir)
+            TreeDelete.delete(previous, containersDir)
+            try {
+                ContainerArchive.import(input, staged, backupLog())
+                check(ContainerArchive.looksLikeRootfs(staged)) {
+                    "that archive is not a container's filesystem (no /etc and /usr in it)"
+                }
+            } catch (e: Exception) {
+                TreeDelete.delete(staged, containersDir)
+                throw e
+            }
+            check(rootfs.renameTo(previous)) { "could not set the current filesystem aside" }
+            if (!staged.renameTo(rootfs)) {
+                previous.renameTo(rootfs)
+                error("could not put the restored filesystem in place; the container is unchanged")
+            }
+            TreeDelete.delete(previous, containersDir)
+        }
+        log.line("restored ${container.id}")
+    }
+
+    /** Where tar's own complaints go, read back into the error the person sees. */
+    private fun backupLog(): File = File(context.cacheDir, "container-backup.log")
+
     override suspend fun extraMounts(container: Container): List<ExtraMount> = withContext(Dispatchers.IO) {
         readExtraMounts(container.id)
     }

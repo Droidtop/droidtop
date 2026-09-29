@@ -1981,6 +1981,23 @@ the `ContainerRuntime` interface that already exists (§3):
   is unaffected. plugin-api D9's refusal of `audio.record` to plugins is a
   different question and stands.
   Still not built: Start with droidtop (autostart with the session).
+  **Backup (Droidtop/tracker#81, 2026-09-28).** A container's own data
+  (what was installed and made inside it: programs, config, a Wine prefix,
+  documents) had no way out. The container page has a Backup group with two
+  by-hand actions, "Back up its data" and "Restore its data from a backup",
+  through the system file picker like the settings backup (7f), not an
+  automatic sync: a container can be gigabytes. `ContainerRuntime.exportData`
+  / `importData` stream the rootfs as a tar archive (`ContainerArchive`, via
+  Android's own toybox `tar`, so symlinks and modes survive and there is no
+  tar writer in the app; ownership is not carried, every file is the app's).
+  The container must be stopped (the rows say so while it runs). A restore
+  unpacks beside the container, refuses an archive with no `/etc` and `/usr`,
+  and only then swaps it in, so a bad or truncated archive leaves the
+  container as it was. It replaces the container's files whole; the
+  container's own settings (name, sockets, mounts, provisioning plan) live
+  outside the rootfs and stay. Proot backend only: the droidspaces rootfs is
+  an image mounted as root, which shows "not available here". Scheduled or
+  incremental backups are later, once the manual path is proven.
   **Names (decided 2026-09-25).** A container is called by a name the
   person chooses, never by its id (`droidtop-sibling-8993dfbd` told two
   terminals nothing, dq-desk2-01): `ContainerNames`, one file per backend

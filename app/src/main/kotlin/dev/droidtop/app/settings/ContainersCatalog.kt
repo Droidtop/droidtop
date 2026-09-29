@@ -22,6 +22,7 @@ import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
+import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.FolderPickItem
@@ -262,8 +263,66 @@ object ContainersCatalog {
         groups += CatalogGroup(id = "devices", title = "USB devices", items = deviceItems(context, runtime, info))
         groups += CatalogGroup(id = "sockets", title = "Sockets", items = socketItems(context, runtime, info))
         groups += CatalogGroup(id = "mounts", title = "Mounts", items = mountItems(runtime, info))
+        groups += CatalogGroup(id = "backup", title = "Backup", items = backupItems(runtime, info, running))
         groups += CatalogGroup(id = "delete", title = null, items = listOf(deleteItem(info, runtime, running)))
         return groups
+    }
+
+    /**
+     * Export and import of the container's own data, by hand, to a file the
+     * person picks (docs/SPEC.md 3d "Backup", Droidtop/tracker#81). Only
+     * offered while it is stopped, since a running container's files are
+     * changing under the archive.
+     */
+    private fun backupItems(runtime: ContainerRuntime, info: ContainerInfo, running: Boolean): List<CatalogItem> {
+        runtime.dataBackupUnavailableReason?.let {
+            return listOf(ActionItem(id = "container_backup_unavailable", title = "Backup: not available here", subtitle = it, run = {}))
+        }
+        if (running) {
+            return listOf(
+                ActionItem(
+                    id = "container_backup_stop_first",
+                    title = "Back up or restore its data",
+                    subtitle = "Stop it first: a running container's files are changing",
+                    run = {},
+                ),
+            )
+        }
+        val container = info.container
+        val fileName = info.displayName.filter { it.isLetterOrDigit() || it == '-' || it == '_' }.ifEmpty { "container" }
+        return listOf(
+            DocumentPickItem(
+                id = "container_backup_export",
+                title = "Back up its data",
+                subtitle = "Saves everything installed and made in it to a file you choose, to restore later or on another device",
+                mimeType = "application/x-tar",
+                createName = "$fileName-container.tar",
+                onPicked = { ctx, uri ->
+                    runCatching {
+                        kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                            val out = ctx.contentResolver.openOutputStream(uri, "wt") ?: error("could not open that file")
+                            out.use { runtime.exportData(container, it) }
+                        }
+                        "Saved."
+                    }.getOrElse { "Not saved: ${it.message}" }
+                },
+            ),
+            DocumentPickItem(
+                id = "container_backup_import",
+                title = "Restore its data from a backup",
+                subtitle = "Replaces everything in it with a backup made by \"Back up its data\"; what is in it now is lost",
+                mimeType = "*/*",
+                onPicked = { ctx, uri ->
+                    runCatching {
+                        kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                            val input = ctx.contentResolver.openInputStream(uri) ?: error("could not open that file")
+                            input.use { runtime.importData(container, it) }
+                        }
+                        "Restored."
+                    }.getOrElse { "Not restored: ${it.message}" }
+                },
+            ),
+        )
     }
 
     /** Ends everything running in the container and boots it again (docs/SPEC.md 3d "Restart"). */

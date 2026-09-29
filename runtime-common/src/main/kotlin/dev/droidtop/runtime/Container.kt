@@ -223,6 +223,32 @@ interface ContainerRuntime {
     val microphoneUnavailableReason: String?
         get() = "Only the non-root desktop bridges the microphone"
 
+    /**
+     * Why this backend cannot export and import a container's data; null
+     * when it can (docs/SPEC.md 3d "Backup", Droidtop/tracker#81). Only the
+     * proot backend's plain rootfs directory is archived here; droidspaces'
+     * rootfs is an image mounted as root, which is its own piece of work.
+     */
+    val dataBackupUnavailableReason: String?
+        get() = "Only the non-root desktop can back up a container's data yet"
+
+    /**
+     * Writes [container]'s whole filesystem to [out] as a tar archive: what
+     * was installed and made inside it. [container] must be stopped. Runs
+     * on the caller's thread; callers keep it off the main thread.
+     */
+    suspend fun exportData(container: Container, out: java.io.OutputStream): Unit =
+        error(dataBackupUnavailableReason ?: "not supported")
+
+    /**
+     * Replaces [container]'s filesystem with the archive on [input] (one
+     * [exportData] wrote). The archive is unpacked beside the container and
+     * swapped in only once it is whole, so a bad archive leaves the
+     * container as it was.
+     */
+    suspend fun importData(container: Container, input: java.io.InputStream): Unit =
+        error(dataBackupUnavailableReason ?: "not supported")
+
     /** Extra host folders bound into [container] beyond the standard shared-storage set (docs/SPEC.md 3d Mounts row). */
     suspend fun extraMounts(container: Container): List<ExtraMount>
 
