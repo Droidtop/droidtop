@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import dev.droidtop.app.OnboardingActivity
 import dev.droidtop.library.settings.ActionItem
+import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogPrefs
 import dev.droidtop.library.settings.CatalogScreen
@@ -97,6 +98,15 @@ object DroidtopWideSettings {
                                 ctx.startActivity(
                                     Intent(ctx, OnboardingActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                                 )
+                            },
+                        ),
+                        AsyncActionItem(
+                            id = "pref_global_share_diagnostics",
+                            title = "Share diagnostics",
+                            subtitle = "Zip the logs, settings without credentials, build and theme names, then choose where to send it; nothing is sent until you pick a target",
+                            run = { ctx, onStatus ->
+                                onStatus("Packing diagnostics...")
+                                shareDiagnostics(ctx)
                             },
                         ),
                         DocumentPickItem(
@@ -248,6 +258,22 @@ object DroidtopWideSettings {
             ?: error("the file could not be opened")
         "Backup saved"
     }.getOrElse { "Backup failed: ${it.message}" }
+
+    /**
+     * Builds the diagnostics archive (10c) and only then opens the system
+     * share sheet with it; the caller runs this off the main thread.
+     */
+    private fun shareDiagnostics(context: Context): String = runCatching {
+        val file = dev.droidtop.library.diagnostics.DiagnosticsArchive.build(context)
+        val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val send = Intent(Intent.ACTION_SEND)
+            .setType("application/zip")
+            .putExtra(Intent.EXTRA_STREAM, uri)
+            .putExtra(Intent.EXTRA_SUBJECT, "droidtop diagnostics")
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        context.startActivity(Intent.createChooser(send, "Share diagnostics").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        "Diagnostics packed (${file.length() / 1024} KB); choose where to send it"
+    }.getOrElse { "Couldn't pack diagnostics: ${it.message}" }
 
     private fun readBackup(context: Context, uri: Uri): String = runCatching {
         val text = context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() }

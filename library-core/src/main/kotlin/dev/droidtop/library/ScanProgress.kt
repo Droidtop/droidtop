@@ -228,14 +228,19 @@ object ScanLog {
 
     private val fileLock = Any()
 
+    /** The one folder droidtop records everything about itself in (docs/SPEC.md 10c): scan log, container log, crash notes. */
+    fun logsDir(context: Context): File {
+        val base = runCatching { context.getExternalFilesDir(null) }.getOrNull() ?: context.filesDir
+        return File(base, LOG_DIR)
+    }
+
     /**
      * Points the scan log at this app's own files and records that the
      * process has started. Called once, from the Application: the log
      * belongs to the shared core, not to a mode.
      */
     fun install(context: Context) {
-        val base = runCatching { context.getExternalFilesDir(null) }.getOrNull() ?: context.filesDir
-        val dir = File(base, LOG_DIR)
+        val dir = logsDir(context)
         runCatching { dir.mkdirs() }
         logFile = File(dir, LOG_NAME)
         // The version NAME carries the build number ("0.2.0-dev.539"),

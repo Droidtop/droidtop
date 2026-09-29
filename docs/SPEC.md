@@ -10130,7 +10130,15 @@ credential key left out), the platform-database snapshot ids (§7e2), the
 installed theme names and the enginehost version, and opens the system
 share sheet with the archive. It never sends anywhere by itself. The same
 action is reachable from a crash note's own restart screen, so the report
-can be sent before the crash is reproduced.
+can be sent before the crash is reproduced. Implemented as one builder
+(`DiagnosticsArchive`): a key is a credential when its NAME carries
+password, secret, api key, token, login, client id, auth or the
+ScreenScraper user and developer ids, so a new credential key that follows
+the naming is left out with no list to extend; the GitHub token (§12a) is in
+its own Keystore-backed file and is never in the settings export at all.
+Files are capped at 1 MiB each (the newest bytes), the archive is written to
+the cache and replaced by the next one, and the build, Android version,
+device, snapshot, Enginehost version and theme names go in `info.txt`.
 
 **Privacy.** droidtop sends nothing about the device, the library or the
 person anywhere. The complete list of hosts it talks to, each for one job
