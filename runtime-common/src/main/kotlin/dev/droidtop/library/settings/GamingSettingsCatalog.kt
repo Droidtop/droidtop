@@ -75,6 +75,7 @@ object GamingSettingsCatalog {
         600_000 to "10 minutes",
         1_800_000 to "30 minutes",
     )
+    const val ID_DOWNLOADS = "pref_gaming_downloads"
     const val ID_GAME_FOLDERS = "pref_gaming_game_folders"
     const val ID_F95_IMPORT = "pref_gaming_f95_import"
     const val ID_DISPLAY_SHELL_TARGET = dev.droidtop.runtime.MainScreen.KEY
@@ -206,6 +207,15 @@ object GamingSettingsCatalog {
                         title = "Accounts and sources",
                         subtitle = "Store sign-ins, scraper credentials, plugins and app integrations -- one row per source",
                         registryId = "accounts_and_sources",
+                        icon = CatalogIcon.INTEGRATIONS,
+                    ),
+                )
+                add(
+                    NestedScreenItem(
+                        id = ID_DOWNLOADS,
+                        title = "Downloads and installs",
+                        subtitle = "Plugin downloads and long-running actions in progress or recently finished",
+                        registryId = "plugin_jobs",
                         icon = CatalogIcon.INTEGRATIONS,
                     ),
                 )
