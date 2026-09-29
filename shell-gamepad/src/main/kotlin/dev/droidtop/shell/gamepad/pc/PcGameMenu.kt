@@ -519,6 +519,9 @@ internal fun PcGameMenu(
     // or a row (selectable, the same PcActionRow every group already
     // produces). One list, one focus index, the same shape
     // GamelistOptionsMenu's own Select-button menu already uses.
+    // Whether this game's "Get it on" rows were hidden (docs/SPEC.md 7m);
+    // one small preferences read, on entry, like the other remembered facts.
+    var storeLinksHidden by remember(entry) { mutableStateOf(dev.droidtop.library.StoreLinkPrefs.hidden(context, gameIds)) }
     val entries = buildList {
         // 1. Runs with -- WHICH runner, and how to change it.
         if (!entry.missing && (!loaded || runners.options.isNotEmpty())) {
@@ -587,28 +590,44 @@ internal fun PcGameMenu(
             group.rows.forEach { add(PcMenuEntry.Row(it)) }
         }
 
-        // Links the scrape brought back (an official site, a store page):
-        // PC-only actionable rows, unlike description/developer/rating/
-        // genre, which the theme's own md_* elements already show while
-        // browsing (docs/SPEC.md 7i, redecided 2026-09-26) and are not
-        // repeated here.
-        if (entry.links.isNotEmpty()) {
-            add(PcMenuEntry.Header("Links"))
-            entry.links.forEach { link ->
-                add(
-                    PcMenuEntry.Row(
-                        PcActionRow(link.label, link.url) {
-                            status = runCatching {
-                                context.startActivity(
-                                    android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(link.url))
-                                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                                )
-                                null
-                            }.getOrElse { "Nothing on this device opens ${link.url}" }
-                        },
-                    ),
+        // Where the game is owned, and where it could be got (docs/SPEC.md
+        // 7m): "Owned on Steam and GOG" for a game a store owns; for one no
+        // store owns, its scraped store and support links as "Get it on ..."
+        // and "Support the developer" rows, hideable per game. Read from the
+        // entries and their links only, so no lookup happens as this opens.
+        val ownedOn = (grouping?.entriesByPath?.values ?: listOf(entry)).mapNotNull { it.ownership() }.ownershipLabel()
+        val openLink = { url: String ->
+            status = runCatching {
+                context.startActivity(
+                    android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
                 )
-            }
+                null
+            }.getOrElse { "Nothing on this device opens $url" }
+        }
+        val pointers = if (ownedOn.isEmpty() && !storeLinksHidden) {
+            dev.droidtop.library.StorePages.getItOn(entry.links) + dev.droidtop.library.StorePages.support(entry.links)
+        } else {
+            emptyList()
+        }
+        // A game a store owns keeps its scraped store links as plain Links
+        // rows; one owned nowhere shows them as the pointers above instead.
+        val plainLinks = if (ownedOn.isEmpty() && !storeLinksHidden) dev.droidtop.library.StorePages.other(entry.links) else entry.links
+        if (ownedOn.isNotEmpty()) add(PcMenuEntry.Info(ownedOn))
+        if (plainLinks.isNotEmpty()) {
+            add(PcMenuEntry.Header("Links"))
+            plainLinks.forEach { link -> add(PcMenuEntry.Row(PcActionRow(link.label, link.url) { openLink(link.url) })) }
+        }
+        if (pointers.isNotEmpty()) {
+            pointers.forEach { link -> add(PcMenuEntry.Row(PcActionRow(link.label, link.url) { openLink(link.url) })) }
+            add(
+                PcMenuEntry.Row(
+                    PcActionRow("Hide these for this game", "") {
+                        dev.droidtop.library.StoreLinkPrefs.hide(context, gameIds)
+                        storeLinksHidden = true
+                    },
+                ),
+            )
         }
 
         // Compatibility: evidence, never a verdict and never a gate

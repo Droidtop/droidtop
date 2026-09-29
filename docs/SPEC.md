@@ -9494,6 +9494,39 @@ real list of the user's game folders taken off the rig on 2026-09-16, and
 result and asserts it: 79 folders become 76 games, three of which have two
 versions, and no two different games are merged.
 
+### Ownership and "Get it on" (directed 2026-09-28, first slice built 2026-09-29)
+
+A game can be owned on a store. `LibraryEntry.ownership()` says which: a
+store row's own id, or the store id a folder absorbed when engine
+detection claimed a store's install directory (7g's ownership rule),
+limited to the stores droidtop reads (Steam, GOG, Epic, Amazon, itch.io,
+in that order). A local folder is never an ownership: the library is the
+local copies and the card already says so. The game's options menu
+(`PcGameMenu`) shows the stores as one muted line, "Owned on Steam and
+GOG", built only from the game's own entries; it is a fact, not a badge
+on the card.
+
+A game owned on no store that has scraped links saying where it can be
+bought or where its developer takes support shows them on that menu as
+plain rows: "Get it on Steam", "Get it on GOG", "Get it on itch.io",
+"Get it on DLsite", "Support the developer" (Patreon, SubscribeStar)
+(`StorePages`). They read the links a scrape already wrote and nothing
+else, so no lookup happens as the menu opens. They are information, not a
+pitch: no popups, no grid badges, and one "Hide these for this game" row
+dismisses them for that game (`StoreLinkPrefs`). A game a store owns gets
+none of it, and its scraped links stay as the plain Links rows.
+
+**Direction, not built**: one game across stores is one library game,
+identified by its store id, then a store cross-reference an identified
+scrape learned (IGDB's `external_games`), then the DLsite RJ code, the
+F95zone thread and the name the user confirmed. Titles never join that
+ladder: title, developer and year only SUGGEST a store row on the game's
+"The same game as..." picker, and only a person confirming folds it (with
+a split on the store row's own options). `LibraryGrouping` and
+`Library.mergeGames` stay the one mechanism for it; there is no second
+grouping. Two folds are not the person's to split: the shared store id of
+a folder that is a store's install, and a shared F95 thread.
+
 ## 8. Licensing
 
 `vendor/gamenative` and `vendor/droidspaces` are GPL-3.0. Winlator itself
