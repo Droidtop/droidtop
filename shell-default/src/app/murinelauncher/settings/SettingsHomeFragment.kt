@@ -117,7 +117,7 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
             TASKBAR -> {
                 // Turning it on asks for the accessibility access its window needs.
                 preference.setOnPreferenceChangeListener { _, newValue ->
-                    if (newValue == true) requestAccessibilityPermission(requireContext())
+                    if (newValue == true && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) requestAccessibilityPermission(requireContext())
                     true
                 }
                 return true
