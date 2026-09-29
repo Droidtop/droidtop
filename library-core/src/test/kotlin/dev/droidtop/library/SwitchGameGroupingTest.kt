@@ -14,7 +14,7 @@ import org.junit.Test
  * (SwitchContentTest), not this one's.
  *
  * Every title ID here has the shape real ones have: 16 hex characters,
- * last three `000` (base) / `800` (update) / add-on index.
+ * the low 13 bits `0` (base), `0x800` (update), or bit 12 set plus the add-on index (DLC).
  */
 class SwitchGameGroupingTest {
 
@@ -33,7 +33,7 @@ class SwitchGameGroupingTest {
         val rows = fold(
             "Zelda [01007ef00011e000].xci",
             "Zelda [01007ef00011e800][v131072].nsp",
-            "Zelda [01007ef00011f000].nsp",
+            "Zelda [01007ef00011f001].nsp",
         )
         assertEquals(1, rows.size)
         val facts = rows.single().switchFacts!!
@@ -42,7 +42,7 @@ class SwitchGameGroupingTest {
         assertEquals("131072", facts.updateVersion)
         assertEquals(1, facts.dlcCount)
         assertEquals(listOf("/sdcard/Roms/switch/Zelda [01007ef00011e800][v131072].nsp"), facts.updatePaths)
-        assertEquals(listOf("/sdcard/Roms/switch/Zelda [01007ef00011f000].nsp"), facts.dlcPaths)
+        assertEquals(listOf("/sdcard/Roms/switch/Zelda [01007ef00011f001].nsp"), facts.dlcPaths)
         assertEquals("Update v131072 · 1 DLC", facts.line())
     }
 
@@ -72,9 +72,9 @@ class SwitchGameGroupingTest {
     fun `dlc counts add-on packages, not files`() {
         val rows = fold(
             "Game [0100aa000000e000].nsp",
-            "Game [0100aa000000e001].nsp",
-            "Game [0100aa000000e002].nsp",
-            "Game [0100aa000000e001].nsz",
+            "Game [0100aa000000f001].nsp",
+            "Game [0100aa000000f002].nsp",
+            "Game [0100aa000000f001].nsz",
         )
         // Two distinct add-on indices; the second file of index 001 is
         // the same package twice.
@@ -98,7 +98,7 @@ class SwitchGameGroupingTest {
 
     @Test
     fun `a dlc whose base game is not in the library stays its own row, marked loose`() {
-        val rows = fold("Alone [0100bb000000e001].nsp")
+        val rows = fold("Alone [0100bb000000f001].nsp")
         val facts = rows.single().switchFacts!!
         assertTrue(facts.loose)
         assertEquals(1, facts.dlcCount)

@@ -14,11 +14,9 @@ import java.nio.ByteOrder
 /**
  * Title-ID classification for Switch content (docs/SPEC.md 7m, "Switch
  * content"), against the task's own examples: a title ID is 16 hex
- * characters and its LAST THREE say base (`000`) / update (`800`) /
- * add-on index -- the review of the first attempt of this change found
- * the suffix read as four characters, which sent every real ID down
- * the DLC branch and rebuilt one-char-short base IDs, so these tests
- * pin the 3-character suffix and the 16-character reconstruction.
+ * characters whose low 13 bits say base (clear) / update (`0x800`) /
+ * add-on (bit 12 plus its index), so an add-on's base is the ID below
+ * it (`...f001` folds into `...e000`), never the same prefix.
  *
  * The PFS0 reader is exercised against synthetic containers built with
  * the REAL header layout (magic, counts, 24-byte entries, NUL-terminated
@@ -32,39 +30,42 @@ class SwitchContentTest {
     private fun classifyByTitleId(titleId: String) = SwitchContent.classifyByTitleId(titleId)
 
     @Test
-    fun `a title id ending 000 is the base game, and its own base`() {
-        val c = classifyByTitleId("0100123456789000")
+    fun `a title id with its low 13 bits clear is the base game, and its own base`() {
+        val c = classifyByTitleId("01007ef00011e000")
         assertTrue(c is SwitchContent.BaseGame)
-        assertEquals("0100123456789000", c!!.titleId)
-        assertEquals(16, c.baseTitleId!!.length)
-        assertEquals("0100123456789000", c.baseTitleId)
+        assertEquals("01007ef00011e000", c!!.titleId)
+        assertEquals("01007ef00011e000", c.baseTitleId)
     }
 
     @Test
-    fun `a title id ending 800 is the update of the base id 000`() {
-        val c = classifyByTitleId("0100123456789800")
+    fun `a title id ending 800 is the update of the base below it`() {
+        val c = classifyByTitleId("01007ef00011e800")
         assertTrue(c is SwitchContent.Update)
-        assertEquals("0100123456789000", c!!.baseTitleId)
-        assertEquals(16, c.baseTitleId!!.length)
+        assertEquals("01007ef00011e000", c!!.baseTitleId)
     }
 
     @Test
-    fun `any other suffix is dlc, and the suffix is its add-on index`() {
-        val c = classifyByTitleId("0100123456789001")
+    fun `an id with bit 12 set is an add-on, its index the low 12 bits, its base the id below`() {
+        val c = classifyByTitleId("01007ef00011f001")
         assertTrue(c is SwitchContent.Dlc)
         assertEquals(1, (c as SwitchContent.Dlc).addOnIndex)
-        assertEquals("0100123456789000", c.baseTitleId)
+        assertEquals("01007ef00011e000", c.baseTitleId)
 
-        val letters = classifyByTitleId("0100abcdef01230d0")
-        assertTrue(letters is SwitchContent.Dlc)
-        assertEquals(0x0D0, (letters as SwitchContent.Dlc).addOnIndex)
-        assertEquals("0100abcdef0123000", letters.baseTitleId)
+        val later = classifyByTitleId("01007ef00011f0d0")
+        assertTrue(later is SwitchContent.Dlc)
+        assertEquals(0x0D0, (later as SwitchContent.Dlc).addOnIndex)
+        assertEquals("01007ef00011e000", later.baseTitleId)
     }
 
     @Test
-    fun `lowercase hex ids classify the same`() {
-        assertTrue(classifyByTitleId("0100abcdef0123800") is SwitchContent.Update)
-        assertTrue(classifyByTitleId("0100abcdef0123000") is SwitchContent.BaseGame)
+    fun `an id that is none of the three kinds says nothing`() {
+        assertNull(classifyByTitleId("01007ef00011e0d0"))
+    }
+
+    @Test
+    fun `uppercase hex ids classify the same, to a lowercase base`() {
+        assertTrue(classifyByTitleId("01007EF00011E800") is SwitchContent.Update)
+        assertEquals("01007ef00011e000", classifyByTitleId("01007EF00011F001")!!.baseTitleId)
     }
 
     @Test
@@ -115,7 +116,7 @@ class SwitchContentTest {
     fun `a cartridge dump is base content, with or without a tag`() {
         assertTrue(SwitchContent.classify(File("Some Game.xci")) is SwitchContent.BaseGame)
         assertTrue(SwitchContent.classify(File("Some Game.xcz")) is SwitchContent.BaseGame)
-        val tagged = SwitchContent.classify(File("Update Card [0100123456789800].xci"))!!
+        val tagged = SwitchContent.classify(File("Update Card [01007ef00011e800].xci"))!!
         assertTrue(tagged is SwitchContent.Update)
     }
 
