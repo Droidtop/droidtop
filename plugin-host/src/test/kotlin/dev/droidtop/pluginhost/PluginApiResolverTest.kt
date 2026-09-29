@@ -42,7 +42,7 @@ class PluginApiResolverTest {
     }
 
     @Test
-    fun `waiting cascades: a plugin that lost its provider stops providing`() {
+    fun `waiting cascades, a plugin that lost its provider stops providing`() {
         val middle = TestPlugins.record(
             TestPlugins.manifest(id = "acme.middle") {
                 it.put("requires", TestPlugins.arr(TestPlugins.obj("api" to "priv.shell", "version" to "1.0")))
