@@ -62,7 +62,7 @@ data class GroupedGame(
 /**
  * Whether a version an update source names is one this device does not
  * have, and the one wording for it (docs/SPEC.md 7g). The card, the
- * detail's update row and every "Parts and versions" row say it with
+ * menu's update rows and every versions row say it with
  * [line], so "an update is available" reads the same wherever it shows.
  */
 object GameUpdates {
