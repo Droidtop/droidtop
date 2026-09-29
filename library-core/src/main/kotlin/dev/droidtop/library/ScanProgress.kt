@@ -235,6 +235,19 @@ object ScanLog {
     }
 
     /**
+     * The one folder everything droidtop records about itself lives in
+     * (docs/SPEC.md 10c): the scan log, the desktop-container log, the
+     * update log and crash notes -- and what the 10c share action zips,
+     * so the archive and the writers can never disagree about where
+     * the folder is. The internal volume when the device offers no
+     * external one, which is why this decides the path, not each caller.
+     */
+    fun logsDir(context: Context): File {
+        val base = runCatching { context.getExternalFilesDir(null) }.getOrNull() ?: context.filesDir
+        return File(base, LOG_DIR)
+    }
+
+    /**
      * Points the scan log at this app's own files and records that the
      * process has started. Called once, from the Application: the log
      * belongs to the shared core, not to a mode.

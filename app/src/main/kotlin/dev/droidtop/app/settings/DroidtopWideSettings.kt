@@ -14,6 +14,8 @@ import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.Mode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import dev.droidtop.library.settings.Modes
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.shell.standard.HomeRolePrefs
@@ -164,6 +166,20 @@ object DroidtopWideSettings {
                             mimeType = "application/json",
                             onPicked = ::readBackup,
                         ),
+                        AsyncActionItem(
+                            id = "pref_global_share_diagnostics",
+                            title = "Share diagnostics",
+                            subtitle = "Zip the logs, redacted settings, snapshot id, theme names and the enginehost version for support; nothing is sent until you choose where",
+                            run = { ctx, onStatus ->
+                                withContext(Dispatchers.IO) {
+                                    val archive = ShareDiagnostics.buildArchive(ctx, onStatus)
+                                    // The share sheet is UI; the renderers run
+                                    // this block on IO, so hand it back to main.
+                                    withContext(Dispatchers.Main) { ShareDiagnostics.share(ctx, archive) }
+                                    "Diagnostics are in the share sheet as ${archive.name}"
+                                }
+                            },
+                        ),
                     ),
                 ),
             )
@@ -301,19 +317,32 @@ object DroidtopWideSettings {
     )
 
     /**
-     * The one SharedPreferences file every droidtop setting lives in, as
-     * JSON. Not a device backup: the scan cache, downloaded themes and
-     * folder grants are separate state, and grants need consent again.
+     * The one export of the settings file as JSON: the backup's own form,
+     * and the diagnostics archive's form with every credential key left
+     * out (docs/SPEC.md 10c). The backup carrying secrets is deliberate
+     * (ScreenScraperPrefs); sharing them is not, which is the whole
+     * difference between the two.
      */
-    private fun writeBackup(context: Context, uri: Uri): String = runCatching {
+    internal fun settingsJson(context: Context, omitCredentials: Boolean): JSONObject {
         val json = JSONObject()
         for ((key, value) in CatalogPrefs.prefs(context).all) {
+            if (omitCredentials && ShareDiagnostics.isCredentialKey(key)) continue
             when (value) {
                 is Boolean, is Int, is Long, is Float, is String -> json.put(key, value)
                 is Set<*> -> json.put(key, JSONArray(value.toList()))
                 else -> {}
             }
         }
+        return json
+    }
+
+    /**
+     * The one SharedPreferences file every droidtop setting lives in, as
+     * JSON. Not a device backup: the scan cache, downloaded themes and
+     * folder grants are separate state, and grants need consent again.
+     */
+    private fun writeBackup(context: Context, uri: Uri): String = runCatching {
+        val json = settingsJson(context, omitCredentials = false)
         context.contentResolver.openOutputStream(uri)?.use { it.write(json.toString(2).toByteArray()) }
             ?: error("the file could not be opened")
         "Backup saved"
